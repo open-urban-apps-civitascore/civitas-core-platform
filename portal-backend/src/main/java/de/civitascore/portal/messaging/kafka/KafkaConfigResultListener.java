@@ -1,5 +1,6 @@
 package de.civitascore.portal.messaging.kafka;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.model.ConfigResultEvent;
 import de.civitascore.portal.messaging.CloudEventPublisher;
@@ -62,7 +63,9 @@ public class KafkaConfigResultListener {
 
       kafkaPublisher.handleResult(resultEvent);
 
-    } catch (Exception e) {
+    } catch (JsonProcessingException e) {
+      log.error("Failed to deserialize Config Adapter result: {}", e.getMessage(), e);
+    } catch (RuntimeException e) {
       log.error("Failed to process Config Adapter result: {}", e.getMessage(), e);
     }
   }

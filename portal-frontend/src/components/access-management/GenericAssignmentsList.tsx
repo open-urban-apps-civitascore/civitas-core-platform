@@ -1,5 +1,6 @@
 'use client'
 
+import { AxiosError } from 'axios'
 import { InfoIcon, List, Plus, SquarePen, TriangleAlert } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -58,8 +59,6 @@ type ControlledProps = {
 }
 
 type GenericAssignmentsListProps = {
-  groups: Group[]
-  roles: Role[]
   testId?: string
   firstBoxText?: string
   secondBoxText?: string
@@ -67,7 +66,7 @@ type GenericAssignmentsListProps = {
 } & (UncontrolledProps | ControlledProps)
 
 export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
-  const { groups, roles, testId = 'accessManagement', hasSecondBox = false, firstBoxText, secondBoxText } = props
+  const { testId = 'accessManagement', hasSecondBox = false, firstBoxText, secondBoxText } = props
 
   const isControlled = props.assignedGroups !== undefined
 
@@ -111,11 +110,9 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
 
   const handleAddAssignmentClick = () => setIsAddGroupModalOpen(true)
 
-  const handleAddGroups = (groupIds: string[]) => {
-    const groupsToAdd = groups.filter(group => groupIds.includes(group.id))
-    if (groupsToAdd.length === 0) return
-
-    const newAssignments: GroupRoleAssignmentTable[] = groupsToAdd.map(g => ({
+  const handleAddGroups = (groups: Group[]) => {
+    if (groups.length === 0) return
+    const newAssignments: GroupRoleAssignmentTable[] = groups.map(g => ({
       groupId: g.id,
       groupName: g.name,
       groupDescription: g.description,
@@ -129,20 +126,15 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
     setIsAddRoleModalOpen(true)
   }
 
-  const handleAddRoles = (roleIds: string[]) => {
+  const handleAddRoles = (roles: Role[]) => {
     if (!selectedGroupForRole) return
-    const rolesToAdd = roles.filter(role => roleIds.includes(role.id))
-    if (rolesToAdd.length === 0) return
-
+    if (roles.length === 0) return
     updateAssignedGroups(
       assignedGroups.map(group =>
         group.groupId === selectedGroupForRole
           ? {
               ...group,
-              assignedRoles: [
-                ...group.assignedRoles,
-                ...rolesToAdd.map(role => ({ roleId: role.id, roleName: role.name })),
-              ],
+              assignedRoles: [...group.assignedRoles, ...roles.map(role => ({ roleId: role.id, roleName: role.name }))],
             }
           : group,
       ),
@@ -159,9 +151,7 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
     )
   }
 
-  const assignedGroupIds = assignedGroups
-    .map(a => groups.find(g => g.id === a.groupId)?.id ?? '')
-    .filter(id => id !== '')
+  const assignedGroupIds = assignedGroups.map(a => a.groupId)
 
   // Submit / Cancel / Exit handlers only relevant in uncontrolled mode
   const onSubmit = async () => {
@@ -181,7 +171,12 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
       router.refresh()
     } catch (error) {
       console.error('Error updating entity:', error)
-      toast.error(tCommon('errors.unexpectedError'))
+      const axiosError = error as AxiosError
+      if (axiosError?.response?.status === 400) {
+        toast.error(t('messages.updateErrorNotDraft'))
+      } else {
+        toast.error(tCommon('errors.unexpectedError'))
+      }
       setAssignedGroupsInternal(initialAssignments)
       setIsReadOnlyInternal(true)
     } finally {
@@ -261,14 +256,12 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
       <AddGroupModal
         open={isAddGroupModalOpen}
         onOpenChange={setIsAddGroupModalOpen}
-        groups={groups}
         assignedGroupIds={assignedGroupIds}
         onAddGroups={handleAddGroups}
       />
       <AddRoleModal
         open={isAddRoleModalOpen}
         onOpenChange={setIsAddRoleModalOpen}
-        roles={roles}
         assignedRoleIds={
           selectedGroupForRole
             ? (assignedGroups.find(g => g.groupId === selectedGroupForRole)?.assignedRoles.map(r => r.roleId) ?? [])

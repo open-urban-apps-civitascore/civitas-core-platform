@@ -1,7 +1,5 @@
 package de.civitascore.portal.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
@@ -14,7 +12,6 @@ import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
-import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -34,7 +31,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   private final AssignmentFactory assignmentFactory;
   private final DistributionService distributionService;
-  private final ObjectMapper objectMapper;
 
   private final DataSetSagaPublisher sagaPublisher;
 
@@ -43,13 +39,11 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       DataSetMapper dataSetMapper,
       AssignmentFactory assignmentFactory,
       DistributionService distributionService,
-      ObjectMapper objectMapper,
       DataSetSagaPublisher sagaPublisher) {
     this.dataSetRepository = dataSetRepository;
     this.dataSetMapper = dataSetMapper;
     this.assignmentFactory = assignmentFactory;
     this.distributionService = distributionService;
-    this.objectMapper = objectMapper;
     this.sagaPublisher = sagaPublisher;
   }
 
@@ -82,43 +76,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   public Optional<DataSet> findById(UUID id) {
     Optional<DataSet> entity = dataSetRepository.findByIdWithRelations(id);
     return postLoad(entity);
-  }
-
-  @Override
-  protected DataSet preSave(DataSet entity) {
-    validateUniqueName(entity);
-    return super.preSave(entity);
-  }
-
-  private void validateUniqueName(DataSet entity) {
-    dataSetRepository
-        .findByName(entity.getName())
-        .ifPresent(
-            existing -> {
-              if (!existing.getId().equals(entity.getId())) {
-                throw new UniqueConstraintViolationException(
-                    DataSet.class.getSimpleName(), "name", entity.getName());
-              }
-            });
-  }
-
-  @Override
-  protected DataSetInputDTO preProcessUpdateInput(DataSetInputDTO input, DataSet existingEntity) {
-    try {
-      String inputJson = objectMapper.writeValueAsString(input);
-      JsonNode jsonNode = objectMapper.readTree(inputJson);
-
-      if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
-        throw new InvalidInputException(
-            "name", existingEntity.getId(), "Name cannot be null or blank");
-      }
-
-    } catch (InvalidInputException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to process update input", e);
-    }
-    return super.preProcessUpdateInput(input, existingEntity);
   }
 
   /**

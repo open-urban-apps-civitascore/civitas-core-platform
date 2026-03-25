@@ -79,8 +79,8 @@ public interface BaseAssembler<
   default ID getIdFromOutput(O output) {
     try {
       return (ID) output.getId();
-    } catch (Exception e) {
-      throw new RuntimeException("Cannot extract ID from output DTO", e);
+    } catch (ClassCastException e) {
+      throw new IllegalStateException("Cannot extract ID from output DTO", e);
     }
   }
 }

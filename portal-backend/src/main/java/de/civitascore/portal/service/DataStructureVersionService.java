@@ -1,5 +1,6 @@
 package de.civitascore.portal.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
@@ -74,7 +75,7 @@ public class DataStructureVersionService
       try {
         String modelContent = modelService.downloadModel(modelAtlasUri, "application/xml");
         return Optional.ofNullable(modelContent);
-      } catch (Exception e) {
+      } catch (RuntimeException e) {
         // error has already been logged in ModelRestClientRequestService, so just return empty here
         return Optional.empty();
       }
@@ -132,9 +133,6 @@ public class DataStructureVersionService
 
     } catch (InvalidInputException e) {
       throw e;
-    } catch (Exception e) {
-      throw new InvalidInputException(
-          "DataStructureVersion", existingEntity.getId(), "Failed to process update input");
     }
     return super.preProcessUpdateInput(input, existingEntity);
   }
@@ -156,7 +154,7 @@ public class DataStructureVersionService
         parseAndSetExternalId(entity, response);
       } catch (ExternalSystemRejectionException e) {
         throw e;
-      } catch (Exception e) {
+      } catch (RuntimeException e) {
         throw new ExternalSystemRejectionException("Failed to upload model to Model Atlas", e);
       }
     }
@@ -169,7 +167,7 @@ public class DataStructureVersionService
     if (entity != null && StringUtils.isNotBlank(entity.getModelAtlasUri())) {
       try {
         modelService.deleteModel(entity.getModelAtlasUri());
-      } catch (Exception e) {
+      } catch (RuntimeException e) {
         log.warn(
             "Failed to delete model from Model Atlas for modelAtlasUri: {}",
             Encode.forJava(entity.getModelAtlasUri()),
@@ -183,7 +181,7 @@ public class DataStructureVersionService
     if (StringUtils.isNotBlank(oldUri) && !Objects.equals(oldUri, newUri)) {
       try {
         modelService.deleteModel(oldUri);
-      } catch (Exception e) {
+      } catch (RuntimeException e) {
         log.warn(
             "Failed to delete old model from Model Atlas for modelAtlasUri: {}",
             Encode.forJava(oldUri),
@@ -199,12 +197,16 @@ public class DataStructureVersionService
   private void parseAndSetExternalId(DataStructureVersion entity, String uploadResponse) {
     try {
       JsonNode root = objectMapper.readTree(uploadResponse);
+      if (root == null) {
+        log.warn("Model Atlas upload response was null or empty");
+        return;
+      }
       JsonNode objectIdNode = root.get(MODEL_ATLAS_OBJECT_ID_FIELD);
       if (objectIdNode != null && !objectIdNode.isNull()) {
         entity.setExternalId(objectIdNode.asText());
         dataStructureVersionRepository.save(entity);
       }
-    } catch (Exception e) {
+    } catch (JsonProcessingException e) {
       log.warn("Failed to parse externalId from Model Atlas upload response", e);
     }
   }

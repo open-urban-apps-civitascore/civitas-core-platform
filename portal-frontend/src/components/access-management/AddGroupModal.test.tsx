@@ -44,11 +44,20 @@ const mockGroups: Group[] = [
   },
 ]
 
+const mockUseGetGroups = vi.fn().mockReturnValue({
+  data: { data: mockGroups, totalElements: mockGroups.length, totalPages: 1 },
+  isLoading: false,
+  isError: false,
+})
+
+vi.mock('@/app/services/api/groups/clientRequests', () => ({
+  useGetGroups: (...args: unknown[]) => mockUseGetGroups(...args),
+}))
+
 describe('AddGroupModal', () => {
   const defaultProps = {
     open: true,
     onOpenChange: vi.fn(),
-    groups: mockGroups,
     assignedGroupIds: ['1'], // Admin Group already assigned
     onAddGroups: vi.fn(),
   }
@@ -63,17 +72,21 @@ describe('AddGroupModal', () => {
     expect(screen.getByText(/gruppe hinzufügen/i)).toBeInTheDocument()
   })
 
-  it('displays available groups excluding already assigned ones', () => {
+  it('displays all groups with assigned ones shown as disabled checkboxes', () => {
     render(
       <NextIntlClientProvider locale="de" messages={messages}>
         <AddGroupModal {...defaultProps} />
       </NextIntlClientProvider>,
     )
 
+    expect(screen.getByText('Admin Group')).toBeInTheDocument()
     expect(screen.getByText('Editor Group')).toBeInTheDocument()
     expect(screen.getByText('Viewer Group')).toBeInTheDocument()
-    // Admin Group should not be in the list (already assigned)
-    expect(screen.queryByText('Admin Group')).not.toBeInTheDocument()
+
+    // Admin Group checkbox should be checked and disabled
+    const adminCheckbox = screen.getByLabelText(/gruppe auswählen admin group/i)
+    expect(adminCheckbox).toBeChecked()
+    expect(adminCheckbox).toBeDisabled()
   })
 
   it('shows selection counter when groups are selected', async () => {
@@ -83,8 +96,8 @@ describe('AddGroupModal', () => {
       </NextIntlClientProvider>,
     )
 
-    const checkboxes = screen.getAllByRole('checkbox')
-    fireEvent.click(checkboxes[1]) // Select first available group
+    const editorCheckbox = screen.getByLabelText(/gruppe auswählen editor group/i)
+    fireEvent.click(editorCheckbox)
 
     await waitFor(() => {
       expect(screen.getByText(/1.*ausgewählt/i)).toBeInTheDocument()
@@ -109,8 +122,8 @@ describe('AddGroupModal', () => {
       </NextIntlClientProvider>,
     )
 
-    const checkboxes = screen.getAllByRole('checkbox')
-    fireEvent.click(checkboxes[1])
+    const editorCheckbox = screen.getByLabelText(/gruppe auswählen editor group/i)
+    fireEvent.click(editorCheckbox)
 
     await waitFor(() => {
       const confirmButton = screen.getByRole('button', { name: /hinzufügen/i })
@@ -118,7 +131,7 @@ describe('AddGroupModal', () => {
     })
   })
 
-  it('calls onAddGroups with selected group IDs when confirmed', async () => {
+  it('calls onAddGroups with selected groups when confirmed', async () => {
     const onAddGroups = vi.fn()
 
     render(
@@ -127,25 +140,128 @@ describe('AddGroupModal', () => {
       </NextIntlClientProvider>,
     )
 
-    const checkboxes = screen.getAllByRole('checkbox')
-    fireEvent.click(checkboxes[1]) // Select Editor Group (id: '2')
+    const editorCheckbox = screen.getByLabelText(/gruppe auswählen editor group/i)
+    fireEvent.click(editorCheckbox)
 
     const confirmButton = screen.getByRole('button', { name: /hinzufügen/i })
     fireEvent.click(confirmButton)
 
     await waitFor(() => {
-      expect(onAddGroups).toHaveBeenCalledWith(['2'])
+      expect(onAddGroups).toHaveBeenCalledWith([mockGroups[1]])
     })
   })
 
-  it('shows empty state when all groups are assigned', () => {
+  it('shows empty state when no groups exist', () => {
+    mockUseGetGroups.mockReturnValue({
+      data: { data: [], totalElements: 0, totalPages: 0 },
+      isLoading: false,
+      isError: false,
+    })
+
     render(
       <NextIntlClientProvider locale="de" messages={messages}>
-        <AddGroupModal {...defaultProps} assignedGroupIds={['1', '2', '3']} />
+        <AddGroupModal {...defaultProps} assignedGroupIds={[]} />
       </NextIntlClientProvider>,
     )
 
     expect(screen.getByText(/keine gruppen verfügbar/i)).toBeInTheDocument()
+
+    // Restore default mock
+    mockUseGetGroups.mockReturnValue({
+      data: { data: mockGroups, totalElements: mockGroups.length, totalPages: 1 },
+      isLoading: false,
+      isError: false,
+    })
+  })
+
+  it('shows error message when groups fetch fails', () => {
+    mockUseGetGroups.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+    })
+
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <AddGroupModal {...defaultProps} assignedGroupIds={[]} />
+      </NextIntlClientProvider>,
+    )
+
+    expect(screen.getByText(/fehler beim laden der daten/i)).toBeInTheDocument()
+
+    // Restore default mock
+    mockUseGetGroups.mockReturnValue({
+      data: { data: mockGroups, totalElements: mockGroups.length, totalPages: 1 },
+      isLoading: false,
+      isError: false,
+    })
+  })
+
+  it('does not include assigned groups in onAddGroups callback', async () => {
+    const onAddGroups = vi.fn()
+
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <AddGroupModal {...defaultProps} onAddGroups={onAddGroups} />
+      </NextIntlClientProvider>,
+    )
+
+    // Select an unassigned group
+    fireEvent.click(screen.getByLabelText(/gruppe auswählen editor group/i))
+
+    const confirmButton = screen.getByRole('button', { name: /hinzufügen/i })
+    fireEvent.click(confirmButton)
+
+    await waitFor(() => {
+      // Should only contain Editor Group, not Admin Group (which is assigned)
+      expect(onAddGroups).toHaveBeenCalledWith([mockGroups[1]])
+      expect(onAddGroups).not.toHaveBeenCalledWith(expect.arrayContaining([mockGroups[0]]))
+    })
+  })
+
+  it('does not count assigned groups in selection counter', () => {
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <AddGroupModal {...defaultProps} />
+      </NextIntlClientProvider>,
+    )
+
+    // Admin Group is assigned (checked+disabled) but counter should be 0
+    expect(screen.getByText(/0 ausgewählt/i)).toBeInTheDocument()
+  })
+
+  it('does not call onAddGroups when cancelled', async () => {
+    const onAddGroups = vi.fn()
+
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <AddGroupModal {...defaultProps} onAddGroups={onAddGroups} />
+      </NextIntlClientProvider>,
+    )
+
+    fireEvent.click(screen.getByLabelText(/gruppe auswählen editor group/i))
+
+    const cancelButton = screen.getByRole('button', { name: /abbrechen/i })
+    fireEvent.click(cancelButton)
+
+    expect(onAddGroups).not.toHaveBeenCalled()
+  })
+
+  it('passes pagination params to useGetGroups', () => {
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <AddGroupModal {...defaultProps} />
+      </NextIntlClientProvider>,
+    )
+
+    expect(mockUseGetGroups).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.any(URLSearchParams),
+      }),
+    )
+    const params = mockUseGetGroups.mock.calls[0][0].params as URLSearchParams
+    expect(params.get('page')).toBe('0')
+    expect(params.get('size')).toBe('10')
   })
 
   it('allows selecting multiple groups', async () => {
@@ -164,7 +280,7 @@ describe('AddGroupModal', () => {
       expect(screen.getByText(/1 ausgewählt/i)).toBeInTheDocument()
     })
 
-    // Select Viewer Group - re-query after the first selection
+    // Select Viewer Group
     fireEvent.click(screen.getByLabelText(/gruppe auswählen viewer group/i))
 
     await waitFor(() => {
@@ -175,7 +291,7 @@ describe('AddGroupModal', () => {
     fireEvent.click(confirmButton)
 
     await waitFor(() => {
-      expect(onAddGroups).toHaveBeenCalledWith(['2', '3'])
+      expect(onAddGroups).toHaveBeenCalledWith([mockGroups[1], mockGroups[2]])
     })
   })
 })

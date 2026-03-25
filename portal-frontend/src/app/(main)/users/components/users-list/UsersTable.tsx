@@ -39,6 +39,7 @@ const UsersTable = (props: UsersTableProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={t('info.displayName')} />,
       cell: ({ row }) => <LinkCell href={`/users/${row.id}?${params.toString()}`}>{row.original.fullName}</LinkCell>,
       meta: {
+        truncate: true,
         style: {
           width: '27%',
           minWidth: '200px',

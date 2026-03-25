@@ -132,7 +132,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
           navigateToGroup()
         }
       },
-      onError: (error: unknown) => handleGroupRequestError(error as AxiosError, t('errors.createError')),
+      onError: error => handleGroupRequestError(error, t('errors.createError')),
     })
   }
 
@@ -148,7 +148,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
               setPendingRoles([])
               setIsExitModalOpen(false)
             },
-            onError: (error: unknown) => {
+            onError: error => {
               toast.error(t('errors.updateError'))
               setInitialGroupData(data)
               console.error('Failed to save assignments', error)
@@ -156,11 +156,15 @@ export const GroupOverview = (props: GroupDetailsProps) => {
           },
         )
       },
-      onError: (error: unknown) => handleGroupRequestError(error as AxiosError, t('errors.updateError')),
+      onError: error => handleGroupRequestError(error, t('errors.updateError')),
     })
   }
 
   const handleExit = () => {
+    if (isCreateMode) {
+      router.push('/groups')
+      return
+    }
     form.reset()
     setIsReadOnly(true)
     setIsExitModalOpen(false)

@@ -3,7 +3,7 @@
 import { ArrowLeft, Slash } from 'lucide-react'
 import { useParams, usePathname, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import React from 'react'
+import React, { useRef } from 'react'
 
 import { useGetBredcrumbs } from '@/app/services/api/breadcrumbs/clientRequests'
 import {
@@ -14,6 +14,9 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useIsTruncated } from '@/hooks/use-is-truncated'
+import { cn } from '@/lib/utils'
 
 export type Breadcrumb = {
   title: string
@@ -29,6 +32,22 @@ export type BreadcrumbApiResponse = {
   lastName?: string
   title?: string
   version?: string
+}
+
+const BreadcrumbLinkWithTooltip = ({ href, title, isLast }: { href: string; title: string; isLast: boolean }) => {
+  const ref = useRef<HTMLAnchorElement>(null)
+  const isTruncated = useIsTruncated(ref)
+
+  return (
+    <Tooltip open={isTruncated ? undefined : false}>
+      <TooltipTrigger asChild>
+        <BreadcrumbLink ref={ref} href={href} aria-current={isLast ? 'page' : undefined} className="truncate block">
+          {title}
+        </BreadcrumbLink>
+      </TooltipTrigger>
+      <TooltipContent variant="secondary">{title}</TooltipContent>
+    </Tooltip>
+  )
 }
 
 const getName = (firstName?: string, lastName?: string) => (firstName && lastName ? `${firstName} ${lastName}` : null)
@@ -101,7 +120,7 @@ export const BreadcrumbNavigation = () => {
   if (!pathname) return null
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex items-center gap-4 min-w-0">
       {hasBackButton && parentPath && (
         <Button
           variant="outline"
@@ -113,8 +132,8 @@ export const BreadcrumbNavigation = () => {
           <ArrowLeft className="h-4 w-4" />
         </Button>
       )}
-      <Breadcrumb>
-        <BreadcrumbList>
+      <Breadcrumb className="min-w-0 ">
+        <BreadcrumbList className="flex-nowrap overflow-hidden">
           <BreadcrumbItem className="hidden md:block">
             <BreadcrumbLink href="/">Home</BreadcrumbLink>
           </BreadcrumbItem>
@@ -124,10 +143,10 @@ export const BreadcrumbNavigation = () => {
           {updatedBreadcrumbs.map(crumb => {
             return (
               <React.Fragment key={crumb.href}>
-                <BreadcrumbItem className={!crumb.isLast ? 'hidden md:block' : undefined}>
-                  <BreadcrumbLink href={crumb.href} aria-current={crumb.isLast ? 'page' : undefined}>
-                    {crumb.title}
-                  </BreadcrumbLink>
+                <BreadcrumbItem
+                  className={cn('min-w-0', !crumb.isLast ? 'hidden md:block' : '', !crumb.isDynamic && 'shrink-0')}
+                >
+                  <BreadcrumbLinkWithTooltip href={crumb.href} title={crumb.title} isLast={crumb.isLast} />
                 </BreadcrumbItem>
                 {!crumb.isLast && <CustomBreadcrumbSeparator />}
               </React.Fragment>

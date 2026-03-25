@@ -90,6 +90,7 @@
   --warn: oklch(85.148% 0.17171 99.388);
   --error: oklch(67.512% 0.20416 358.512);
   --search-height: calc(--spacing(16));
+  --segmented-control-bar-height: calc(--spacing(14));
   --status-label: oklch(90.196% 0.02539 233.145);
 }
 
@@ -147,4 +148,16 @@
   body {
     @apply bg-background text-foreground font-sans font-normal;
   }
+}
+
+[data-sonner-toast].toast-default {
+  --normal-bg: var(--popover-dark);
+  --normal-text: var(--popover-foreground-dark);
+  --normal-border: var(--popover-dark);
+}
+
+[data-sonner-toast].toast-error {
+  --normal-bg: var(--destructive);
+  --normal-text: oklch(1 0 0);
+  --normal-border: var(--destructive);
 }

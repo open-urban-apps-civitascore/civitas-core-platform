@@ -24,12 +24,13 @@ export const ExpanderCell = <T,>(props: ExpanderCellProps<T>) => {
   )
 
   return (
-    <div data-testid="expanderCell" className={cn('flex items-center min-w-[200px] w-[35%]', className)} {...divProps}>
+    <div data-testid="expanderCell" className={cn('flex items-center min-w-0', className)} {...divProps}>
       {row.getCanExpand() ? (
         <>
           <div
             style={{
               width: expanderWidth,
+              minWidth: expanderWidth,
               display: 'flex',
               justifyContent: 'flex-end',
               paddingRight: '0.25rem',
@@ -45,10 +46,12 @@ export const ExpanderCell = <T,>(props: ExpanderCellProps<T>) => {
               {row.getIsExpanded() ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </Button>
           </div>{' '}
-          <div>{children}</div>
+          <div className="min-w-0 truncate">{children}</div>
         </>
       ) : (
-        <span style={{ paddingLeft: expanderWidth }}>{children}</span>
+        <span className="min-w-0 truncate" style={{ paddingLeft: expanderWidth }}>
+          {children}
+        </span>
       )}
     </div>
   )

@@ -38,9 +38,9 @@ const MainLayout = async (props: MainLayoutProps) => {
           </div>
           <Toaster
             toastOptions={{
-              style: {
-                background: 'var(--popover-dark)',
-                color: 'var(--popover-foreground-dark)',
+              classNames: {
+                toast: 'toast-default',
+                error: 'toast-error',
               },
             }}
           />

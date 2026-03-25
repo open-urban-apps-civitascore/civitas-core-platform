@@ -14,7 +14,7 @@ export const useUpdateMutation = <TResponse, TData extends WithId<string>>({
 }: UpdateMutationInput<TData>) => {
   const queryClient = useQueryClient()
 
-  return useMutation<ApiServiceResponse<TResponse>, unknown, MutationData<TData>>({
+  return useMutation<ApiServiceResponse<TResponse>, AxiosError, MutationData<TData>>({
     mutationFn: (data: MutationData<TData>) => {
       const url = isFn(endpoint) ? getRequestEndpoint(endpoint, data) : endpoint
 

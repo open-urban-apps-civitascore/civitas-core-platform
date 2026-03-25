@@ -1,7 +1,6 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useForm } from 'react-hook-form'
@@ -48,8 +47,8 @@ export const DatasourceCreateForm = () => {
           toast.success(tCommon('messages.createSuccess', { item: tCommon('items.datasource') }))
           router.push(`/datasources/${data.id}`)
         },
-        onError: (error: unknown) => {
-          if (isNameConflictError(error as AxiosError)) {
+        onError: error => {
+          if (isNameConflictError(error)) {
             handleNameError(form, formData.name)
           } else toast.error(t('errors.creationError'))
         },

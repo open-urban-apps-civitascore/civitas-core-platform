@@ -272,6 +272,12 @@ api-test-backend:
     # Check which source JARs are available and add build overrides individually
     - |
       NEED_REGISTRY=true
+      if ls portal-backend/target/*.jar >/dev/null 2>&1; then
+        echo "Portal-backend JAR found — building from source"
+        export COMPOSE_FILES="$COMPOSE_FILES -f dev-environment/ci/docker-compose.api-test.build-portal.yml"
+      else
+        echo "Portal-backend JAR not available — using registry image"
+      fi
       if ls config-adapter/config-adapter-application/target/*.jar >/dev/null 2>&1; then
         echo "Config-adapter JARs found — building from source"
         export COMPOSE_FILES="$COMPOSE_FILES -f dev-environment/ci/docker-compose.api-test.build-ca.yml"
@@ -285,9 +291,7 @@ api-test-backend:
         echo "AuthZ JARs not available — using registry image"
       fi
       # Login to registry if any service still needs a pre-built image
-      if echo "$COMPOSE_FILES" | grep -qv "build-ca" || echo "$COMPOSE_FILES" | grep -qv "build-authz"; then
-        echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
-      fi
+      echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
     # Start full stack — blocks until all services are healthy
     - |
       docker compose -p api-test $COMPOSE_FILES up -d --build --wait --wait-timeout 600 || {

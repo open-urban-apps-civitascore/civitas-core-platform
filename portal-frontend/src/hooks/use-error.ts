@@ -19,9 +19,17 @@ export const useError = () => {
     toast.error(tCommon('errors.nameExistsToast', { name: name || '' }))
   }
 
+  const handleUserEmailError = <TFormData extends FieldValues & { email: string }>(
+    form: UseFormReturn<TFormData>,
+    email?: string,
+  ) => {
+    form.setError('email' as Path<TFormData>, { type: 'manual', message: 'common.errors.emailExists' })
+    toast.error(tCommon('errors.emailExistsToast', { email: email || '' }))
+  }
+
   const handlePermissionsError = () => {
     toast.error(tCommon('errors.insufficientPermissions'))
   }
 
-  return { handleFormValidationError, handleNameError, handlePermissionsError }
+  return { handleFormValidationError, handleNameError, handleUserEmailError, handlePermissionsError }
 }

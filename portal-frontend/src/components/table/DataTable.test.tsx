@@ -18,6 +18,12 @@ vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }))
 
+const mockUseIsTruncated = vi.fn().mockReturnValue(false)
+
+vi.mock('@/hooks/use-is-truncated', () => ({
+  useIsTruncated: () => mockUseIsTruncated(),
+}))
+
 const onRowClickMock = vi.fn()
 
 type Row = {
@@ -53,6 +59,22 @@ const mockColumnsWithoutSubrows = Object.keys(mockTableData[0]).flatMap(key =>
     : [],
 )
 
+const mockColumnsWithTruncate = [
+  columnHelper.accessor('id', {
+    header: 'id',
+    cell: info => info.getValue(),
+  }),
+  columnHelper.accessor('name', {
+    header: 'name',
+    cell: info => info.getValue(),
+    meta: { truncate: true },
+  }),
+  columnHelper.accessor('description', {
+    header: 'description',
+    cell: info => info.getValue(),
+  }),
+]
+
 const mockColumnsWithSubrows = [
   columnHelper.accessor('id', {
     header: 'id',
@@ -76,10 +98,11 @@ interface TestWrapperProps extends Omit<DataTableProps<Row>, 'table' | 'pageSize
   pageIndex?: number
   hasEmptyRows?: boolean
   hasSubrows?: boolean
+  hasTruncate?: boolean
 }
 
 const TestWrapper = (props: TestWrapperProps) => {
-  const { hasEmptyRows = false, hasSubrows = false, ...tableProps } = props
+  const { hasEmptyRows = false, hasSubrows = false, hasTruncate = false, ...tableProps } = props
   const [pagination, setPagination] = useState({
     pageIndex: tableProps.pageIndex ?? 0,
     pageSize: 10,
@@ -88,7 +111,7 @@ const TestWrapper = (props: TestWrapperProps) => {
   const table = useReactTable({
     getRowId: row => String(row.id),
     data: hasEmptyRows ? [] : mockTableData,
-    columns: hasSubrows ? mockColumnsWithSubrows : mockColumnsWithoutSubrows,
+    columns: hasSubrows ? mockColumnsWithSubrows : hasTruncate ? mockColumnsWithTruncate : mockColumnsWithoutSubrows,
     state: { pagination },
     onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
@@ -299,5 +322,32 @@ describe('DataTable layout', () => {
   it('renders the data table without card styles when hasCard is false', () => {
     render(<TestWrapper hasCard={false} />)
     expect(screen.getByTestId('dataTableScrollArea')).not.toHaveClass('rounded-md border-1')
+  })
+})
+
+describe('DataTable truncated cell tooltip', () => {
+  beforeEach(() => {
+    mockUseIsTruncated.mockReturnValue(false)
+  })
+
+  it('does not show tooltip when truncated cell text is not overflowing', async () => {
+    vi.useFakeTimers()
+    render(<TestWrapper hasTruncate />)
+    const truncatedCells = screen.getAllByText(/^item\d+$/)
+    fireEvent.focus(truncatedCells[0])
+    await vi.advanceTimersByTimeAsync(500)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it('shows tooltip when truncated cell text is overflowing', async () => {
+    vi.useFakeTimers()
+    mockUseIsTruncated.mockReturnValue(true)
+    render(<TestWrapper hasTruncate />)
+    const truncatedCells = screen.getAllByText(/^item\d+$/)
+    fireEvent.focus(truncatedCells[0])
+    await vi.advanceTimersByTimeAsync(500)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('item0')
+    vi.useRealTimers()
   })
 })

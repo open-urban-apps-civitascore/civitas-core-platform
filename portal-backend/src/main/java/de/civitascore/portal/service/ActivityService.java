@@ -5,7 +5,6 @@ import de.civitascore.portal.model.entity.Activity;
 import de.civitascore.portal.model.input.ActivityInputDTO;
 import de.civitascore.portal.repository.ActivityRepository;
 import de.civitascore.portal.repository.AgentRepository;
-import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -43,23 +42,5 @@ public class ActivityService extends BaseService<Activity, ActivityInputDTO> {
         .ifPresent(entity::setAgents);
 
     return super.postConvertToEntity(entity, input);
-  }
-
-  @Override
-  protected Activity preSave(Activity entity) {
-    validateUniqueName(entity);
-    return super.preSave(entity);
-  }
-
-  private void validateUniqueName(Activity entity) {
-    activityRepository
-        .findByName(entity.getName())
-        .ifPresent(
-            existing -> {
-              if (!existing.getId().equals(entity.getId())) {
-                throw new UniqueConstraintViolationException(
-                    Activity.class.getSimpleName(), "name", entity.getName());
-              }
-            });
   }
 }

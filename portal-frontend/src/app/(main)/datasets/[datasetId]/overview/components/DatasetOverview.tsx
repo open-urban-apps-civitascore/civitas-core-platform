@@ -181,7 +181,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
         if (serverStatus === DATASET_STATUS_TYPES.DRAFT) {
           await updateDataset.mutateAsync(updateData)
         } else {
-          await updatePublishedMeta.mutateAsync(updateData)
+          await updatePublishedMeta.mutateAsync({ ...parsed.data, id: dataset.id })
         }
       }
 

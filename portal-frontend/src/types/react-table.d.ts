@@ -4,5 +4,6 @@ declare module '@tanstack/react-table' {
   interface ColumnMeta {
     style?: React.CSSProperties
     className?: string
+    truncate?: boolean
   }
 }

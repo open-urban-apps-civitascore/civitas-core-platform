@@ -2,7 +2,7 @@ import z from 'zod'
 
 import { enumFromConst } from '@/utils/common'
 
-import { ItemSchema } from './common'
+import { GroupSummarySchema, ItemSchema } from './common'
 import { RoleTypeEnum } from './roles'
 
 export const ASSIGNMENT_SCOPE_TYPES = {
@@ -30,7 +30,7 @@ export const AssignmentApiResponseSchema = z.object({
   id: z.string(),
   createdAt: z.string(),
   modifiedAt: z.string(),
-  group: ItemSchema,
+  group: GroupSummarySchema,
   role: AssignmentRoleSchema,
   scopeType: AssignmentScopeEnum.nullable(),
   scope: ItemSchema.nullable(),

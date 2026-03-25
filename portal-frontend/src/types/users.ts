@@ -1,7 +1,7 @@
 import { parsePhoneNumberFromString } from 'libphonenumber-js'
 import { z } from 'zod'
 
-import { Item, ItemSchema, WithId } from './common'
+import { GroupSummarySchema, Item, WithId } from './common'
 
 export type UserTab = 'userData' | 'roles' | 'groups'
 
@@ -48,7 +48,7 @@ export const UserApiSchema = z.object({
   }),
   phone: PhoneSchema.nullable(),
   active: z.boolean(),
-  groups: z.array(ItemSchema).nullable(),
+  groups: z.array(GroupSummarySchema).nullable(),
 })
 
 export type User = z.infer<typeof UserApiSchema>

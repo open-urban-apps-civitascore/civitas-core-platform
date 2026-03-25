@@ -14,6 +14,12 @@ export const ItemSchema = z.object({
 
 export type ItemType = z.infer<typeof ItemSchema>
 
+export const GroupSummarySchema = ItemSchema.extend({
+  description: z.string().optional(),
+})
+
+export type GroupSummary = z.infer<typeof GroupSummarySchema>
+
 export type SelectOption = {
   value: string
   label: string
