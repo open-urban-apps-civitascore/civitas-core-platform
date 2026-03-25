@@ -202,7 +202,7 @@
     "title": "Datasets",
     "subtitle": "All available datasets of our organization",
     "searchDatasets": "Search Datasets",
-    "newDataset": "New Dataset",
+    "newDataset": "Create Dataset",
     "tableHeaders": {
       "name": "Name",
       "createdBy": "Created by",

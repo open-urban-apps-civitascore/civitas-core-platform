@@ -201,7 +201,7 @@
     "title": "Datensätze",
     "subtitle": "Alle verfügbaren Datensätze unserer Organisation",
     "searchDatasets": "Datensätze durchsuchen",
-    "newDataset": "Neuer Datensatz",
+    "newDataset": "Datensatz erstellen",
     "tableHeaders": {
       "name": "Name",
       "createdBy": "Erstellt von",
