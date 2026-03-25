@@ -166,16 +166,14 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     setIsExitModalOpen(false)
   }
 
-  const handleExitAndSafe = () => {
-    form.handleSubmit(handleSave)()
-  }
-
   const handleExitButtonClick = () => {
     if (isFormDirty) setIsExitModalOpen(true)
     else handleExit()
   }
 
-  const handleSave = isCreateMode ? handleCreateGroup : handleUpdateGroup
+  const handleSave = isCreateMode
+    ? form.handleSubmit(handleCreateGroup, handleFormValidationError)
+    : form.handleSubmit(handleUpdateGroup, handleFormValidationError)
 
   const renderTabContent = () => {
     switch (subTabValue) {
@@ -245,11 +243,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
       />
       <PageBackground className="flex flex-col" hasBackground={!isReadOnly}>
         <Form {...form}>
-          <form
-            id="groupEditForm"
-            onSubmit={form.handleSubmit(handleSave, handleFormValidationError)}
-            className="flex flex-col justify-between h-full"
-          >
+          <form id="groupEditForm" onSubmit={handleSave} className="flex flex-col justify-between h-full">
             {isLoading ? <LoadingSpinner className="h-[300px]" /> : renderTabContent()}
           </form>
         </Form>
@@ -258,7 +252,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
         open={isExitModalOpen}
         onOpenChange={() => setIsExitModalOpen(false)}
         onDiscard={handleExit}
-        onConfirm={handleExitAndSafe}
+        onConfirm={handleSave}
         isLoading={isLoading}
       />
     </PageContainer>

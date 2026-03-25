@@ -141,6 +141,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const deleteAssignment = useDeleteAssignment()
 
   const initialRole = roleData?.data || defaultRole
+  const isCreateMode = !(roleId && initialRole)
 
   const createRole = useCreateRole()
   const updateRole = useUpdateRole()
@@ -283,25 +284,25 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     }
   }
 
-  // Unified save handler
-  const handleSave = async (formValues: FormRole) => {
-    const isCreateMode = !(roleId && initialRole)
-
-    if (isCreateMode) {
-      createNewRole(formValues)
-    } else {
-      const shouldUpdateValues = form.formState.isDirty || arePermissionsDirty
-      try {
-        // values of default roles must not be edited but their assignments can be updated
-        if (!isDefaultRole && shouldUpdateValues) await updateRoleValues(formValues, roleId)
-        if (areAssignmentsDirty) await saveGroupAssignment(roleId)
-        setIsExitModalOpen(false)
-        // eslint-disable-next-line unused-imports/no-unused-vars
-      } catch (error) {
-        console.error('An error occurred while updating the role')
-      }
+  const updateRoleAndAssignments = async (formValues: FormRole, roleId: string) => {
+    const shouldUpdateValues = form.formState.isDirty || arePermissionsDirty
+    try {
+      // values of default roles must not be edited but their assignments can be updated
+      if (!isDefaultRole && shouldUpdateValues) await updateRoleValues(formValues, roleId)
+      if (areAssignmentsDirty) await saveGroupAssignment(roleId)
+      setIsExitModalOpen(false)
+      // eslint-disable-next-line unused-imports/no-unused-vars
+    } catch (error) {
+      console.error('An error occurred while updating the role')
     }
   }
+
+  const handleSave = isCreateMode
+    ? form.handleSubmit(createNewRole, handleFormValidationError)
+    : form.handleSubmit(
+        (formValues: FormRole) => updateRoleAndAssignments(formValues, roleId as string),
+        handleFormValidationError,
+      )
 
   const handleExit = () => {
     if (!roleId) {
@@ -349,7 +350,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     <ActionButtons
       confirmButtonType="button"
       onCancelClick={handleExitButtonClick}
-      onConfirmClick={form.handleSubmit(handleSave, handleFormValidationError)}
+      onConfirmClick={handleSave}
       isConfirmButtonDisabled={!isAnyDirty || isLoading}
       isCancelButtonDisabled={isLoading}
       cancelButtonTitle={tCommon('actions.exit')}
@@ -452,7 +453,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         open={isExitModalOpen}
         onOpenChange={() => setIsExitModalOpen(false)}
         onDiscard={handleExit}
-        onConfirm={form.handleSubmit(handleSave, handleFormValidationError)}
+        onConfirm={handleSave}
         isLoading={isLoading}
       />
     </PageContainer>

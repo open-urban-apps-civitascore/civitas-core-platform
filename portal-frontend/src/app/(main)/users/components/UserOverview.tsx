@@ -16,6 +16,7 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
+import { useError } from '@/hooks/use-error'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { PERMISSION_NAMES } from '@/types/currentUser'
@@ -61,6 +62,7 @@ export const UserOverview = (props: UserOverviewProps) => {
   const [isReadOnly, setIsReadOnly] = useState(isCreateMode ? false : mode !== 'edit')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const queryClient = useQueryClient()
+  const { handleFormValidationError } = useError()
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
   const isLoading = createUser.isPending || updateUser.isPending
@@ -167,7 +169,9 @@ export const UserOverview = (props: UserOverviewProps) => {
     )
   }
 
-  const handleSave = isCreateMode ? form.handleSubmit(handleCreateUser) : form.handleSubmit(handleUpdateUser)
+  const handleSave = isCreateMode
+    ? form.handleSubmit(handleCreateUser, handleFormValidationError)
+    : form.handleSubmit(handleUpdateUser, handleFormValidationError)
 
   const renderTabContent = () => {
     switch (subTabValue) {
