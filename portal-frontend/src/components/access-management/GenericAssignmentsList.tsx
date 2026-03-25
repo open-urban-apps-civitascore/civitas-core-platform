@@ -1,5 +1,6 @@
 'use client'
 
+import { AxiosError } from 'axios'
 import { InfoIcon, List, Plus, SquarePen, TriangleAlert } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -170,7 +171,12 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
       router.refresh()
     } catch (error) {
       console.error('Error updating entity:', error)
-      toast.error(tCommon('errors.unexpectedError'))
+      const axiosError = error as AxiosError
+      if (axiosError?.response?.status === 400) {
+        toast.error(t('messages.updateErrorNotDraft'))
+      } else {
+        toast.error(tCommon('errors.unexpectedError'))
+      }
       setAssignedGroupsInternal(initialAssignments)
       setIsReadOnlyInternal(true)
     } finally {
