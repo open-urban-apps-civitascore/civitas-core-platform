@@ -77,12 +77,12 @@ export type RoleInput = Omit<CreateRoleData, 'id'>
 
 export type RoleUpdate = UpdateRoleData
 
-export const roleSchema = z.object({
+export const RoleSchema = z.object({
   name: z.string().trim().min(2, {
     message: 'common.errors.atLeast2',
   }),
-  description: z.string().optional(),
+  description: z.string().trim().optional(),
   readonly: z.boolean(),
 })
 
-export type FormRole = z.infer<typeof roleSchema>
+export type FormRole = z.infer<typeof RoleSchema>

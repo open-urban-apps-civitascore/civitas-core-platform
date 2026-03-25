@@ -85,7 +85,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const router = useRouter()
   const { hasPermission } = usePermissions()
   const { setSubTabValueParam, subTabValue, tabValue } = useQueryParams()
-  const { handleNameError, handlePermissionsError } = useError()
+  const { handleFormValidationError, handleNameError, handlePermissionsError } = useError()
 
   const canUpdate = !roleId || hasPermission(PERMISSION_NAMES.ROLE_UPDATE)
   const canDelete = hasPermission(PERMISSION_NAMES.ROLE_DELETE)
@@ -218,32 +218,27 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     })
   }
 
-  const createNewRole = () => {
-    const formValues = form.getValues()
-    const parsedValues = RoleSchema.safeParse(formValues)
-    if (!parsedValues.success)
-      createRole.mutate(
-        {
-          name: formValues.name,
-          description: formValues.description,
-          roleType: (tabValue as Role['roleType']) || DEFAULT_TAB,
-          readonly: formValues.readonly,
+  const createNewRole = (formValues: FormRole) => {
+    createRole.mutate(
+      {
+        name: formValues.name,
+        description: formValues.description,
+        roleType: (tabValue as Role['roleType']) || DEFAULT_TAB,
+        readonly: formValues.readonly,
+      },
+      {
+        onSuccess: ({ data }) => {
+          toast.success(tCommon('success.creationSuccess', { item: tCommon('items.role') }))
+          router.push(`/roles/${data.id}?tab=${tabValue}`)
         },
-        {
-          onSuccess: ({ data }) => {
-            toast.success(tCommon('success.creationSuccess', { item: tCommon('items.role') }))
-            router.push(`/roles/${data.id}?tab=${tabValue}`)
-          },
-          onError: error => {
-            handleRoleRequestError(error as AxiosError, tRoles('errors.createError'))
-          },
+        onError: error => {
+          handleRoleRequestError(error as AxiosError, tRoles('errors.createError'))
         },
-      )
+      },
+    )
   }
 
-  const updateRoleValues = async (roleId: string) => {
-    const formValues = form.getValues()
-
+  const updateRoleValues = async (formValues: FormRole, roleId: string) => {
     try {
       await updateRole.mutateAsync({
         id: roleId,
@@ -289,16 +284,16 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   }
 
   // Unified save handler
-  const handleSave = async () => {
+  const handleSave = async (formValues: FormRole) => {
     const isCreateMode = !(roleId && initialRole)
 
     if (isCreateMode) {
-      createNewRole()
+      createNewRole(formValues)
     } else {
       const shouldUpdateValues = form.formState.isDirty || arePermissionsDirty
       try {
         // values of default roles must not be edited but their assignments can be updated
-        if (!isDefaultRole && shouldUpdateValues) await updateRoleValues(roleId)
+        if (!isDefaultRole && shouldUpdateValues) await updateRoleValues(formValues, roleId)
         if (areAssignmentsDirty) await saveGroupAssignment(roleId)
         setIsExitModalOpen(false)
         // eslint-disable-next-line unused-imports/no-unused-vars
@@ -354,7 +349,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     <ActionButtons
       confirmButtonType="button"
       onCancelClick={handleExitButtonClick}
-      onConfirmClick={handleSave}
+      onConfirmClick={form.handleSubmit(handleSave, handleFormValidationError)}
       isConfirmButtonDisabled={!isAnyDirty || isLoading}
       isCancelButtonDisabled={isLoading}
       cancelButtonTitle={tCommon('actions.exit')}
@@ -457,7 +452,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         open={isExitModalOpen}
         onOpenChange={() => setIsExitModalOpen(false)}
         onDiscard={handleExit}
-        onConfirm={handleSave}
+        onConfirm={form.handleSubmit(handleSave, handleFormValidationError)}
         isLoading={isLoading}
       />
     </PageContainer>

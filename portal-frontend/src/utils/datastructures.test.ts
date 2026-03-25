@@ -19,12 +19,13 @@ import {
 
 type Version = Datastructure['dataStructureVersions'][number]
 
-const createVersion = (versionNumber: string): Version => ({
+const createVersion = (versionNumber: string, dataStructureId = 'ds1'): Version => ({
   id: versionNumber,
   version: versionNumber,
   description: `Test Description ${versionNumber}`,
   dataStructureVersionStatus: 'DRAFT',
   dataStructureVersionSource: 'OWN',
+  dataStructureId,
   createdAt: new Date().toISOString(),
   modifiedAt: new Date().toISOString(),
 })
@@ -36,7 +37,7 @@ const createDatastructure = (versions: string[], datastructureId = 'ds1'): Datas
   createdFromDataSource: false,
   dataStructureStatus: 'DRAFT',
   inUse: false,
-  dataStructureVersions: versions.map(version => createVersion(version)),
+  dataStructureVersions: versions.map(version => createVersion(version, datastructureId)),
   assignments: [],
   createdAt: new Date().toISOString(),
   modifiedAt: new Date().toISOString(),
@@ -48,6 +49,7 @@ const createVersionSummary = (overrides?: Partial<DatastructureVersionSummary>):
   description: 'Version Description',
   dataStructureVersionStatus: 'DRAFT',
   dataStructureVersionSource: 'OWN',
+  dataStructureId: 'ds1',
   createdAt: new Date().toISOString(),
   modifiedAt: new Date().toISOString(),
   ...overrides,
