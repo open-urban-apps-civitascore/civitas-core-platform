@@ -21,6 +21,7 @@ import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -151,7 +152,7 @@ class UserServiceTest {
 
       assertThatThrownBy(() -> service.preProcessCreateInput(input))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("groups do not exist");
+          .hasMessage("One or more groups do not exist.");
     }
 
     @Test
@@ -324,12 +325,14 @@ class UserServiceTest {
     void shouldSkipWhenGroupIdsNull() {
       UserService service = createService();
       User user = userWithId(UUID.randomUUID());
+      Set<Group> originalGroups = user.getGroups();
       UserInputDTO input = new UserInputDTO();
       input.setGroupIds(null);
 
       service.prePublish(user, input);
 
       verify(groupRepository, never()).findAllByIdWithMembers(anyList());
+      assertThat(user.getGroups()).isSameAs(originalGroups);
     }
   }
 

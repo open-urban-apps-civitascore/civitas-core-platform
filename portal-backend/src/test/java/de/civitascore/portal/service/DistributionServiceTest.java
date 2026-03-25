@@ -14,6 +14,7 @@ import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.ResourceRepository;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -49,12 +50,16 @@ class DistributionServiceTest {
   @DisplayName("createFromApiUrlAndDataSet() — URL parsing")
   class CreateFromApiUrlTests {
 
+    @BeforeEach
+    void setUp() {
+      when(distributionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    }
+
     @Test
     @DisplayName("Should strip full URL with version prefix")
     void shouldStripFullUrlWithVersionPrefix() {
       DistributionService service = createService();
       DataSet dataSet = dataSetWithId(UUID.randomUUID());
-      when(distributionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       Distribution result =
           service.createFromApiUrlAndDataSet("http://frost:8080/FROST-Server/v1.1/Things", dataSet);
@@ -67,7 +72,6 @@ class DistributionServiceTest {
     void shouldStripRelativePathWithVersion() {
       DistributionService service = createService();
       DataSet dataSet = dataSetWithId(UUID.randomUUID());
-      when(distributionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       Distribution result = service.createFromApiUrlAndDataSet("/v1.1/Things", dataSet);
 
@@ -79,7 +83,6 @@ class DistributionServiceTest {
     void shouldHandleNestedSensorThingsPath() {
       DistributionService service = createService();
       DataSet dataSet = dataSetWithId(UUID.randomUUID());
-      when(distributionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       Distribution result =
           service.createFromApiUrlAndDataSet(
@@ -93,7 +96,6 @@ class DistributionServiceTest {
     void shouldHandleDifferentVersionNumbers() {
       DistributionService service = createService();
       DataSet dataSet = dataSetWithId(UUID.randomUUID());
-      when(distributionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       Distribution result = service.createFromApiUrlAndDataSet("/v2.0/Sensors", dataSet);
 
@@ -105,7 +107,6 @@ class DistributionServiceTest {
     void shouldReturnSlashWhenOnlyVersionInPath() {
       DistributionService service = createService();
       DataSet dataSet = dataSetWithId(UUID.randomUUID());
-      when(distributionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       Distribution result = service.createFromApiUrlAndDataSet("/v1.1", dataSet);
 
@@ -117,7 +118,6 @@ class DistributionServiceTest {
     void shouldPreservePathWhenNoVersionMatch() {
       DistributionService service = createService();
       DataSet dataSet = dataSetWithId(UUID.randomUUID());
-      when(distributionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       Distribution result = service.createFromApiUrlAndDataSet("/api/data", dataSet);
 
@@ -129,12 +129,11 @@ class DistributionServiceTest {
     void shouldPrependSlashIfMissing() {
       DistributionService service = createService();
       DataSet dataSet = dataSetWithId(UUID.randomUUID());
-      when(distributionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       // "api/data" has no leading slash and no version match
       Distribution result = service.createFromApiUrlAndDataSet("api/data", dataSet);
 
-      assertThat(result.getAccessUrl()).startsWith("/");
+      assertThat(result.getAccessUrl()).isEqualTo("/api/data");
     }
 
     @Test
@@ -142,7 +141,6 @@ class DistributionServiceTest {
     void shouldHandleFullUrlWithVersionOnly() {
       DistributionService service = createService();
       DataSet dataSet = dataSetWithId(UUID.randomUUID());
-      when(distributionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       Distribution result =
           service.createFromApiUrlAndDataSet("http://frost:8080/FROST-Server/v1.1", dataSet);
@@ -159,12 +157,16 @@ class DistributionServiceTest {
   @DisplayName("createFromApiUrlAndDataSet() — properties")
   class CreateFromApiUrlPropertiesTests {
 
+    @BeforeEach
+    void setUp() {
+      when(distributionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    }
+
     @Test
     @DisplayName("Should set apiType to SensorThings")
     void shouldSetApiTypeToSensorThings() {
       DistributionService service = createService();
       DataSet dataSet = dataSetWithId(UUID.randomUUID());
-      when(distributionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       Distribution result = service.createFromApiUrlAndDataSet("/v1.1/Things", dataSet);
 
@@ -176,7 +178,6 @@ class DistributionServiceTest {
     void shouldSetFormatToApplicationJson() {
       DistributionService service = createService();
       DataSet dataSet = dataSetWithId(UUID.randomUUID());
-      when(distributionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       Distribution result = service.createFromApiUrlAndDataSet("/v1.1/Things", dataSet);
 
@@ -188,7 +189,6 @@ class DistributionServiceTest {
     void shouldSetAutoGeneratedTrue() {
       DistributionService service = createService();
       DataSet dataSet = dataSetWithId(UUID.randomUUID());
-      when(distributionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       Distribution result = service.createFromApiUrlAndDataSet("/v1.1/Things", dataSet);
 
@@ -200,7 +200,6 @@ class DistributionServiceTest {
     void shouldAssociateWithDataSet() {
       DistributionService service = createService();
       DataSet dataSet = dataSetWithId(UUID.randomUUID());
-      when(distributionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       Distribution result = service.createFromApiUrlAndDataSet("/v1.1/Things", dataSet);
 
@@ -212,7 +211,6 @@ class DistributionServiceTest {
     void shouldSaveAndReturnDistribution() {
       DistributionService service = createService();
       DataSet dataSet = dataSetWithId(UUID.randomUUID());
-      when(distributionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       Distribution result = service.createFromApiUrlAndDataSet("/v1.1/Things", dataSet);
 
@@ -246,6 +244,22 @@ class DistributionServiceTest {
       Distribution result = service.postConvertToEntity(entity, input);
 
       assertThat(result.getResource()).isSameAs(resource);
+    }
+
+    @Test
+    @DisplayName("Should set resource to null when resourceId not found in repository")
+    void shouldSetResourceNullWhenResourceIdNotFound() {
+      DistributionService service = createService();
+      UUID resourceId = UUID.randomUUID();
+
+      Distribution entity = new Distribution();
+      DistributionInputDTO input = new DistributionInputDTO();
+      input.setResourceId(resourceId);
+      when(resourceRepository.findById(resourceId)).thenReturn(Optional.empty());
+
+      Distribution result = service.postConvertToEntity(entity, input);
+
+      assertThat(result.getResource()).isNull();
     }
 
     @Test
