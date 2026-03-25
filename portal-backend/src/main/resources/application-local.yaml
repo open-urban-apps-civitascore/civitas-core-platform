@@ -83,7 +83,7 @@ init:
     - name: 'Local Data Gatekeepers'
       roleName: 'Data Gatekeeper'
       scopeType: TENANT
-      description: 'Local dev group — data governance + release approval'
+      description: 'Local dev group — data release approval'
     - name: 'Local Data Architects'
       roleName: 'Data Architect'
       scopeType: TENANT

@@ -302,7 +302,7 @@ class AssignmentFactoryTest {
     void shouldResolveDataStructureScope() {
       UUID roleId = UUID.randomUUID();
       UUID scopeId = UUID.randomUUID();
-      Role role = createRole(roleId, RoleType.GOVERNANCE);
+      Role role = createRole(roleId, RoleType.DATA);
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(scopeId);
 

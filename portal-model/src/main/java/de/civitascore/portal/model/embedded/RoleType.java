@@ -3,8 +3,7 @@ package de.civitascore.portal.model.embedded;
 /**
  * Categorizes roles and determines assignment type.
  *
- * <p>SYSTEM roles → binary assignments. DATA/GOVERNANCE roles → ternary assignments (require
- * scope).
+ * <p>SYSTEM roles → binary assignments. DATA roles → ternary assignments (require scope).
  *
  * @see de.civitascore.portal.model.entity.Role
  * @see AssignmentType
@@ -14,8 +13,5 @@ public enum RoleType {
   SYSTEM,
 
   /** Data operation roles. Requires dataspace/dataset scope. */
-  DATA,
-
-  /** Data governance roles. Requires dataspace/dataset scope. */
-  GOVERNANCE
+  DATA
 }

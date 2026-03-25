@@ -1,13 +1,13 @@
 -- Test seed data for AuthZ Adapter integration tests
 
--- Create test permissions (using portal-model PermissionType enum: SYSTEM, DATA, GOVERNANCE)
+-- Create test permissions (using portal-model PermissionType enum: SYSTEM, DATA)
 INSERT INTO permissions (id, name, description, permission_type, category, source, created_at)
 VALUES
   ('a1111111-1111-1111-1111-111111111111', 'dataset:read', 'Read datasets', 'DATA', 'DATA', 'INTERNAL', NOW()),
   ('a2222222-2222-2222-2222-222222222222', 'dataset:write', 'Write datasets', 'DATA', 'DATA', 'INTERNAL', NOW()),
   ('a3333333-3333-3333-3333-333333333333', 'tenant:manage', 'Manage tenant', 'SYSTEM', 'TENANT_ADMINISTRATION', 'INTERNAL', NOW());
 
--- Create test roles (using portal-model RoleType enum: SYSTEM, DATA, GOVERNANCE)
+-- Create test roles (using portal-model RoleType enum: SYSTEM, DATA)
 INSERT INTO roles (id, name, description, role_type, created_at)
 VALUES
   ('b1111111-1111-1111-1111-111111111111', 'DataReader', 'Can read data', 'DATA', NOW()),

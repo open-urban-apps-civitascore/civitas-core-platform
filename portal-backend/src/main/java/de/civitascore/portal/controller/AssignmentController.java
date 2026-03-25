@@ -76,7 +76,7 @@ public class AssignmentController
       schema = @Schema(type = "string", example = "DATASET"))
   @Parameter(
       name = "roleType",
-      description = "Filter by role type (exact match). One of: SYSTEM, DATA, GOVERNANCE.",
+      description = "Filter by role type (exact match). One of: SYSTEM, DATA.",
       in = ParameterIn.QUERY,
       schema = @Schema(type = "string", example = "DATA"))
   @Parameter(

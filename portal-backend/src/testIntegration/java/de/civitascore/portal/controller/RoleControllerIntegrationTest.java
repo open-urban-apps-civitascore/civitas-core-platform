@@ -60,7 +60,7 @@ class RoleControllerIntegrationTest
     RoleInputDTO input = new RoleInputDTO();
     input.setName("test_role_" + UUID.randomUUID().toString().substring(0, 8));
     input.setDescription("A test role for integration testing");
-    input.setRoleType(RoleType.GOVERNANCE);
+    input.setRoleType(RoleType.DATA);
     return input;
   }
 
@@ -77,7 +77,7 @@ class RoleControllerIntegrationTest
     input.setName("updated_role");
     input.setName("Updated Role");
     input.setDescription("Updated description");
-    input.setRoleType(RoleType.GOVERNANCE);
+    input.setRoleType(RoleType.DATA);
     return input;
   }
 
