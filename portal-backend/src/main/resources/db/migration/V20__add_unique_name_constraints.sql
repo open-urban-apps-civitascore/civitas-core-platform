@@ -4,4 +4,4 @@
 
 ALTER TABLE activities ADD CONSTRAINT uk_activity_name UNIQUE (name);
 ALTER TABLE catalogs ADD CONSTRAINT uk_catalog_name UNIQUE (name);
-ALTER TABLE data_set_series ADD CONSTRAINT uk_data_set_series_name UNIQUE (name);
+ALTER TABLE dataset_series ADD CONSTRAINT uk_dataset_series_name UNIQUE (name);
