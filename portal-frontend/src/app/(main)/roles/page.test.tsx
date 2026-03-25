@@ -16,8 +16,14 @@ vi.mock('next/navigation', () => ({
   usePathname: vi.fn(),
 }))
 
+import { useQueryParams } from '@/hooks/use-query-params'
+
 vi.mock('@/hooks/use-query-params', () => ({
-  useQueryParams: () => ({
+  useQueryParams: vi.fn(),
+}))
+
+const mockQueryParams = (tabValue = 'SYSTEM') => {
+  vi.mocked(useQueryParams).mockReturnValue({
     setSortingParams: vi.fn(),
     setPaginationParams: vi.fn(),
     setSearchParam: vi.fn(),
@@ -28,11 +34,11 @@ vi.mock('@/hooks/use-query-params', () => ({
     pageSize: 10,
     sorting: [],
     search: '',
-    tabValue: 'SYSTEM',
+    tabValue,
     subTabValue: '',
     totalPages: 0,
-  }),
-}))
+  } as unknown as ReturnType<typeof useQueryParams>)
+}
 
 vi.mock('@/app/services/api/users/clientRequests', () => ({
   useGetCurrentUser: vi.fn(),
@@ -67,17 +73,38 @@ const mockCurrentUser = (permissions: PermissionName[]) => {
 describe('RolesPage permission gating', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockQueryParams('SYSTEM')
   })
 
   it('shows create button when user has ROLE_CREATE', () => {
     mockCurrentUser([PERMISSION_NAMES.ROLE_CREATE])
     renderPage()
-    expect(screen.getByText('newRole')).toBeInTheDocument()
+    expect(screen.getByText('newSystemRole')).toBeInTheDocument()
   })
 
   it('hides create button when user lacks ROLE_CREATE', () => {
     mockCurrentUser([PERMISSION_NAMES.ROLE_READ])
     renderPage()
-    expect(screen.queryByText('newRole')).not.toBeInTheDocument()
+    expect(screen.queryByText('newSystemRole')).not.toBeInTheDocument()
+  })
+})
+
+describe('RolesPage create button label', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('shows "newSystemRole" on System Roles tab', () => {
+    mockQueryParams('SYSTEM')
+    mockCurrentUser([PERMISSION_NAMES.ROLE_CREATE])
+    renderPage()
+    expect(screen.getByText('newSystemRole')).toBeInTheDocument()
+  })
+
+  it('shows "newDataRole" on Data Roles tab', () => {
+    mockQueryParams('DATA')
+    mockCurrentUser([PERMISSION_NAMES.ROLE_CREATE])
+    renderPage()
+    expect(screen.getByText('newDataRole')).toBeInTheDocument()
   })
 })

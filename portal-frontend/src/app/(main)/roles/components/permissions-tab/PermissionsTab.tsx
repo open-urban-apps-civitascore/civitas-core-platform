@@ -8,7 +8,6 @@ import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
-import { useQueryParams } from '@/hooks/use-query-params'
 import { Permission, PermissionItem } from '@/types/permissions'
 import { ROLE_TYPES, RoleType } from '@/types/roles'
 
@@ -43,15 +42,16 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   const t = useTranslations('common')
   const tRoles = useTranslations('roles')
   const tCommon = useTranslations('common')
-  const { getApiRequestParams } = useQueryParams()
   const [roleTemplate, setRoleTemplate] = useState<string | null>(null)
   const [checkedPermissionItems, setCheckedPermissionItems] = useState<PermissionItem[]>([])
   const [searchInput, setSearchInput] = useState<string>('')
 
   const rolesRequestParams = new URLSearchParams('readonly=true')
-  const permissionsRequestParams = new URLSearchParams(
-    getApiRequestParams({ pageIndex: 0, pageSize: 9999, search: searchInput }),
-  )
+  const permissionsRequestParams = new URLSearchParams()
+  if (searchInput.trim()) {
+    permissionsRequestParams.set('q', searchInput.trim())
+  }
+  permissionsRequestParams.set('permissionType', roleType === ROLE_TYPES.DATA ? 'DATA' : 'SYSTEM')
 
   const { data: rolesData, error: getRolesError } = useGetRoles({ params: rolesRequestParams })
 
@@ -122,16 +122,24 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
 
   return (
     <div>
-      <SearchHeader
-        searchString={searchInput}
-        onChangeSearchString={setSearchInput}
-        customElement={
-          isReadOnly ? null : (
+      {roleType === ROLE_TYPES.DATA ? (
+        !isReadOnly && (
+          <div className="mb-4 flex justify-end">
             <RoleTemplateSelect allRoles={allRoles} setRoleTemplate={setRoleTemplate} currentRoleId={currentRoleId} />
-          )
-        }
-        placeholder={tRoles('permissionsTab.searchPermissions')}
-      />
+          </div>
+        )
+      ) : (
+        <SearchHeader
+          searchString={searchInput}
+          onChangeSearchString={setSearchInput}
+          customElement={
+            isReadOnly ? null : (
+              <RoleTemplateSelect allRoles={allRoles} setRoleTemplate={setRoleTemplate} currentRoleId={currentRoleId} />
+            )
+          }
+          placeholder={tRoles('permissionsTab.searchPermissions')}
+        />
+      )}
 
       {permissions.length === 0 ? (
         <div className="flex items-center justify-center text-sm mt-3.5">{t('noResults')}</div>

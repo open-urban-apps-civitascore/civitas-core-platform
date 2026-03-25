@@ -104,7 +104,7 @@ const RolesPage = () => {
           customElement={
             hasPermission(PERMISSION_NAMES.ROLE_CREATE) ? (
               <Button onClick={() => router.push(`/roles/create/?tab=${selectedRoleType}`)}>
-                <Plus /> {t('newRole')}
+                <Plus /> {selectedRoleType === ROLE_TYPES.SYSTEM ? t('newSystemRole') : t('newDataRole')}
               </Button>
             ) : undefined
           }
