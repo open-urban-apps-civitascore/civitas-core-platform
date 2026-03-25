@@ -106,7 +106,7 @@ public class GenericDcatMapper<T extends BaseOutputDTO> extends DcatMapper<T>
       }
 
     } catch (IllegalAccessException e) {
-      throw new RuntimeException("Failed to access field " + field.getName(), e);
+      throw new IllegalStateException("Failed to access field " + field.getName(), e);
     }
   }
 

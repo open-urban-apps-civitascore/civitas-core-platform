@@ -7,7 +7,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
@@ -39,17 +38,11 @@ class DataSetServiceTest {
   @Mock private DataSetMapper dataSetMapper;
   @Mock private AssignmentFactory assignmentFactory;
   @Mock private DistributionService distributionService;
-  @Mock private ObjectMapper objectMapper;
   @Mock private DataSetSagaPublisher sagaPublisher;
 
   private DataSetService createService() {
     return new DataSetService(
-        dataSetRepository,
-        dataSetMapper,
-        assignmentFactory,
-        distributionService,
-        objectMapper,
-        sagaPublisher);
+        dataSetRepository, dataSetMapper, assignmentFactory, distributionService, sagaPublisher);
   }
 
   private DataSet readyDataSet(UUID id) {

@@ -1,17 +1,12 @@
 package de.civitascore.portal.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataSpaceMapper;
 import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.input.DataSpaceInputDTO;
 import de.civitascore.portal.repository.DataSpaceRepository;
-import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -21,7 +16,6 @@ public class DataSpaceService extends BaseService<DataSpace, DataSpaceInputDTO> 
   private final DataSpaceRepository dataSpaceRepository;
   private final DataSpaceMapper dataSpaceMapper;
   private final UserService userService;
-  private final ObjectMapper objectMapper;
 
   @Override
   protected DataSpaceRepository getRepository() {
@@ -65,42 +59,5 @@ public class DataSpaceService extends BaseService<DataSpace, DataSpaceInputDTO> 
     }
 
     return super.postConvertToEntity(entity, input);
-  }
-
-  @Override
-  protected DataSpace preSave(DataSpace entity) {
-    validateUniqueName(entity);
-    return super.preSave(entity);
-  }
-
-  private void validateUniqueName(DataSpace entity) {
-    dataSpaceRepository
-        .findByName(entity.getName())
-        .ifPresent(
-            existing -> {
-              if (!existing.getId().equals(entity.getId())) {
-                throw new UniqueConstraintViolationException(
-                    DataSpace.class.getSimpleName(), "name", entity.getName());
-              }
-            });
-  }
-
-  @Override
-  protected DataSpaceInputDTO preProcessUpdateInput(
-      DataSpaceInputDTO input, DataSpace existingEntity) {
-    try {
-      String inputJson = objectMapper.writeValueAsString(input);
-      JsonNode jsonNode = objectMapper.readTree(inputJson);
-
-      if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
-        throw new InvalidInputException(
-            "name", existingEntity.getId(), "Name cannot be null or blank");
-      }
-    } catch (InvalidInputException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to process update input", e);
-    }
-    return super.preProcessUpdateInput(input, existingEntity);
   }
 }
