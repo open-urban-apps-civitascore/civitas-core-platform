@@ -2,14 +2,12 @@ import { DialogProps } from '@radix-ui/react-dialog'
 import {
   createColumnHelper,
   getCoreRowModel,
-  getSortedRowModel,
   PaginationState,
-  RowSelectionState,
   SortingState,
   useReactTable,
 } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { useGetUsers } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
@@ -19,17 +17,16 @@ import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useAddItemSelection } from '@/hooks/use-add-item-selection'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { ListUser } from '@/types/users'
 import { isPageIndexHigherThanTotalPages, resolveUpdater } from '@/utils/table'
 import { mapListUsers } from '@/utils/users'
 
-export type UserSelection = { selectAll: boolean; selectedIds: string[]; excludedIds: string[] }
-
 interface AssignUsersModalProps extends DialogProps {
   assignedFormUsers: string[]
   groupTitle: string
-  onAssignUsers: (userSelection: RowSelectionState) => void
+  onAssignUsers: (userIds: string[]) => void
   isUpdating?: boolean
 }
 
@@ -42,30 +39,29 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
   const [pageSize, setPageSize] = useState(10)
   const [sorting, setSorting] = useState<SortingState>([])
   const [searchString, setSearchString] = useState('')
-  const [selection, setSelection] = useState<RowSelectionState>({})
-  const selectAllCheckbox = useRef<HTMLButtonElement>(null)
   const { getApiRequestParams } = useQueryParams()
 
-  // this implementation has to be adjusted when the backend is implemented
-  // only unassigned users have to be returned from the backend directly
   const { data: usersData, isFetching: isFetchingUsers } = useGetUsers({
     params: getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString }),
   })
 
   const users = useMemo(() => {
     if (usersData?.data && usersData?.data.length > 0) {
-      const allUsers = mapListUsers(usersData?.data)
-      const unassignedUsers = allUsers.filter(user => !assignedFormUsers.find(assignedUser => assignedUser === user.id))
-      return unassignedUsers
+      return mapListUsers(usersData?.data)
     } else return []
-  }, [usersData?.data, assignedFormUsers])
+  }, [usersData?.data])
 
   const rowCount = usersData?.totalElements || 0
   const totalPages = Math.ceil(rowCount / pageSize)
 
+  const { selection, selectedItemsRef, assignedIdsSet, handleSelectionChange, newlySelectedCount } =
+    useAddItemSelection({ assignedIds: assignedFormUsers, items: users, open: !!open })
+
   useEffect(() => {
     if (!open) {
-      setSelection({})
+      setSearchString('')
+      setPageIndex(0)
+      setSorting([])
     }
   }, [open])
 
@@ -80,7 +76,6 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
     setPageSize(newPagination.pageSize)
   }
 
-  // for accessibility: avoid losing focus after toggeling checkboxes via keyboard
   const setFocus = (elementId: string) => {
     requestAnimationFrame(() => {
       const element = document.getElementById(elementId)
@@ -94,7 +89,6 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
     columnHelper.accessor('id', {
       header: () => (
         <Checkbox
-          ref={selectAllCheckbox}
           checked={
             table.getIsAllPageRowsSelected() ? true : table.getIsSomePageRowsSelected() ? 'indeterminate' : false
           }
@@ -102,17 +96,21 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
           id="selectAll"
         />
       ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={value => {
-            row.toggleSelected(!!value)
-            setFocus(row.id)
-          }}
-          aria-label={`Select user ${row.original.fullName}`}
-          id={row.id}
-        />
-      ),
+      cell: ({ row }) => {
+        const isAssigned = assignedIdsSet.has(row.original.id)
+        return (
+          <Checkbox
+            checked={isAssigned || row.getIsSelected()}
+            onCheckedChange={value => {
+              row.toggleSelected(!!value)
+              setFocus(row.id)
+            }}
+            disabled={isAssigned}
+            aria-label={`Select user ${row.original.fullName}`}
+            id={row.id}
+          />
+        )
+      },
       enableSorting: false,
       enableHiding: false,
     }),
@@ -142,14 +140,14 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
       sorting,
       rowSelection: selection,
     },
+    enableRowSelection: row => !assignedIdsSet.has(row.original.id),
     manualPagination: true,
     manualSorting: true,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     onPaginationChange: updater => {
       handlePagination(resolveUpdater(updater, { pageIndex, pageSize }))
     },
-    onRowSelectionChange: setSelection,
+    onRowSelectionChange: handleSelectionChange,
     onSortingChange: updater => setSorting(resolveUpdater(updater, sorting)),
   })
 
@@ -182,9 +180,9 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
         </div>
         <ActionButtons
           confirmButtonType="button"
-          onConfirmClick={() => onAssignUsers(selection)}
+          onConfirmClick={() => onAssignUsers(Array.from(selectedItemsRef.current.keys()))}
           onCancelClick={() => onOpenChange(false)}
-          isConfirmButtonDisabled={isUpdating || isFetchingUsers}
+          isConfirmButtonDisabled={isUpdating || newlySelectedCount === 0}
           hasCard={false}
           confirmButtonTitle={tCommon('actions.add')}
         />

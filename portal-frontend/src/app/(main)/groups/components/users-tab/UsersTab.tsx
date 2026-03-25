@@ -1,6 +1,5 @@
 'use client'
 
-import { RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
@@ -79,8 +78,7 @@ export const UsersTab = (props: UsersTabProps) => {
     [usersData?.data, shouldLoadUsers],
   )
 
-  const handleAssignUsers = (userSelection: RowSelectionState) => {
-    const selectedUserIds = Object.keys(userSelection).filter(key => userSelection[key])
+  const handleAssignUsers = (selectedUserIds: string[]) => {
     const newUsers = Array.from(new Set([...usersWatch, ...selectedUserIds]))
     form.setValue('members', newUsers, { shouldDirty: true })
     setIsAssignUsersOpen(false)

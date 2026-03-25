@@ -60,10 +60,10 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
 
-let capturedOnAssignGroups: ((groupSelection: Record<string, boolean>) => void) | null = null
+let capturedOnAssignGroups: ((groupIds: string[]) => void) | null = null
 
 vi.mock('./groups-tab/GroupsTab', () => ({
-  GroupsTab: (props: { onAssignGroups: (groupSelection: Record<string, boolean>) => void }) => {
+  GroupsTab: (props: { onAssignGroups: (groupIds: string[]) => void }) => {
     capturedOnAssignGroups = props.onAssignGroups
     return <div data-testid="groupsTab">GroupsTab</div>
   },
@@ -295,7 +295,7 @@ describe('UserOverview', () => {
       mockSearchParams = new URLSearchParams('mode=edit')
       renderComponent()
 
-      capturedOnAssignGroups?.({ 'new-group-id': true })
+      capturedOnAssignGroups?.(['new-group-id'])
 
       await waitFor(() => {
         expect(screen.getByTestId('confirmButton')).not.toBeDisabled()

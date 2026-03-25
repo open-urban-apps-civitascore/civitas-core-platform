@@ -2,7 +2,6 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
-import { RowSelectionState } from '@tanstack/react-table'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
@@ -105,9 +104,8 @@ export const UserOverview = (props: UserOverviewProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultUserData])
 
-  const handleAssignGroups = (groupSelection: RowSelectionState) => {
-    const selectedgroupIds = Object.keys(groupSelection).filter(key => groupSelection[key])
-    const updateGroupData = selectedgroupIds.concat(groupWatch || [])
+  const handleAssignGroups = (selectedGroupIds: string[]) => {
+    const updateGroupData = selectedGroupIds.concat(groupWatch || [])
     form.setValue('groupIds', updateGroupData, { shouldDirty: true })
   }
 

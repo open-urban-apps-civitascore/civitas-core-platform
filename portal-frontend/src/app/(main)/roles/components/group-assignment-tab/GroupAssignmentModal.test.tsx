@@ -30,13 +30,8 @@ const mockApiRequest = vi.mocked(apiRequest)
 const defaultProps = {
   open: true,
   onOpenChange: vi.fn(),
-  selection: {
-    '2': true,
-  },
-  setSelection: vi.fn(),
-  originalSelection: {},
-  onGroupAssignmentUpdate: vi.fn(),
-  haveGroupsBeenTouched: false,
+  assignedGroupIds: ['2'],
+  onAddGroups: vi.fn(),
   roleName: 'Admin',
 }
 
@@ -74,8 +69,8 @@ describe('GroupAssignmentModal', () => {
     renderedModal.unmount()
   })
 
-  it('renders the confirm and cancel buttons in the correct initial state', () => {
-    const renderedModal = renderWithProvider(<GroupAssignmentModal {...defaultProps} haveGroupsBeenTouched={false} />)
+  it('renders the confirm button disabled when no new groups are selected', () => {
+    const renderedModal = renderWithProvider(<GroupAssignmentModal {...defaultProps} />)
 
     const confirmButton = screen.getByText('actions.add') as HTMLButtonElement
     const cancelButton = screen.getByText('actions.cancel') as HTMLButtonElement
@@ -89,8 +84,13 @@ describe('GroupAssignmentModal', () => {
     renderedModal.unmount()
   })
 
-  it('enables confirm button when changes have been made', () => {
-    const renderedModal = renderWithProvider(<GroupAssignmentModal {...defaultProps} haveGroupsBeenTouched={true} />)
+  it('enables confirm button when a new group is selected', async () => {
+    const renderedModal = renderWithProvider(<GroupAssignmentModal {...defaultProps} />)
+
+    await waitFor(() => {
+      const group1Checkbox = screen.getByRole('checkbox', { name: 'Select group Group 1' }) as HTMLInputElement
+      fireEvent.click(group1Checkbox)
+    })
 
     const confirmButton = screen.getByText('actions.add') as HTMLButtonElement
     expect(confirmButton.disabled).toBe(false)
@@ -98,72 +98,33 @@ describe('GroupAssignmentModal', () => {
     renderedModal.unmount()
   })
 
-  it('calls setSelection on group selection change', async () => {
+  it('shows assigned groups as checked and disabled', async () => {
     const renderedModal = renderWithProvider(<GroupAssignmentModal {...defaultProps} />)
 
     await waitFor(() => {
-      const firstRowCheckbox = screen.getByRole('checkbox', { name: 'Select group Group 1' }) as HTMLInputElement
-      fireEvent.click(firstRowCheckbox)
-      expect(defaultProps.setSelection).toHaveBeenCalled()
-    })
-    renderedModal.unmount()
-  })
+      const assignedCheckbox = screen.getByRole('checkbox', { name: 'Select group Group 2' }) as HTMLInputElement
 
-  it('calls setSelection on select all checkbox click', async () => {
-    const renderedModal = renderWithProvider(<GroupAssignmentModal {...defaultProps} />)
-
-    await waitFor(() => {
-      const selectAllCheckbox = screen.getAllByRole('checkbox')[0] as HTMLInputElement
-      fireEvent.click(selectAllCheckbox)
-      expect(defaultProps.setSelection).toHaveBeenCalled()
+      expect(assignedCheckbox).toBeInTheDocument()
+      expect(assignedCheckbox).toBeChecked()
+      expect(assignedCheckbox).toBeDisabled()
     })
 
     renderedModal.unmount()
   })
 
-  it('calls handleGroupAssignmentUpdate on confirm click', async () => {
-    const renderedModal = renderWithProvider(<GroupAssignmentModal {...defaultProps} haveGroupsBeenTouched={true} />)
+  it('calls onAddGroups with newly selected group IDs on confirm', async () => {
+    const renderedModal = renderWithProvider(<GroupAssignmentModal {...defaultProps} />)
 
     await waitFor(() => {
-      const confirmButton = screen.getByText('actions.add')
-      fireEvent.click(confirmButton)
+      const group1Checkbox = screen.getByRole('checkbox', { name: 'Select group Group 1' }) as HTMLInputElement
+      fireEvent.click(group1Checkbox)
     })
 
-    expect(defaultProps.onGroupAssignmentUpdate).toHaveBeenCalled()
+    const confirmButton = screen.getByText('actions.add')
+    fireEvent.click(confirmButton)
+
+    expect(defaultProps.onAddGroups).toHaveBeenCalledWith(['1'])
     expect(defaultProps.onOpenChange).toHaveBeenCalledWith(false)
-
-    renderedModal.unmount()
-  })
-
-  it('checks the already selected groups correctly', async () => {
-    const renderedModal = renderWithProvider(<GroupAssignmentModal {...defaultProps} haveGroupsBeenTouched={false} />)
-
-    await waitFor(() => {
-      const preSelectedCheckbox = screen.getByRole('checkbox', { name: 'Select group Group 2' }) as HTMLInputElement
-
-      expect(preSelectedCheckbox).toBeInTheDocument()
-      expect(preSelectedCheckbox).toBeChecked()
-    })
-
-    renderedModal.unmount()
-  })
-
-  it.skip('should select subrows when a parent row is selected', async () => {
-    const renderedModal = renderWithProvider(<GroupAssignmentModal {...defaultProps} />)
-
-    await waitFor(() => {
-      const parentRowCheckbox = screen.getByRole('checkbox', { name: 'Select group Group 1' }) as HTMLInputElement
-      fireEvent.click(parentRowCheckbox)
-
-      expect(defaultProps.setSelection).toHaveBeenCalledWith({
-        '1': true,
-        '2': true,
-        '3': true,
-        '4': true,
-        '5': true,
-        '6': true,
-      })
-    })
 
     renderedModal.unmount()
   })
@@ -176,7 +137,6 @@ describe('GroupAssignmentModal', () => {
       fireEvent.click(cancelButton)
     })
 
-    expect(defaultProps.setSelection).toHaveBeenCalledWith(defaultProps.originalSelection)
     expect(defaultProps.onOpenChange).toHaveBeenCalledWith(false)
 
     renderedModal.unmount()

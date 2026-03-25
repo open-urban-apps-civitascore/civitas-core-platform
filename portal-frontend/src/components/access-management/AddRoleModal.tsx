@@ -4,12 +4,11 @@ import {
   createColumnHelper,
   getCoreRowModel,
   PaginationState,
-  RowSelectionState,
   SortingState,
   useReactTable,
 } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
@@ -17,6 +16,7 @@ import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useAddItemSelection } from '@/hooks/use-add-item-selection'
 import { Role } from '@/types/roles'
 
 import { SearchHeader } from '../search-area/SearchArea'
@@ -39,14 +39,7 @@ export const AddRoleModal = (props: AddRoleModalProps) => {
   })
 
   const [sorting, setSorting] = useState<SortingState>([])
-  const [selection, setSelection] = useState<RowSelectionState>({})
   const [searchInput, setSearchInput] = useState('')
-
-  // Track selected Role objects across pages since server-side pagination
-  // only keeps the current page's data in the response
-  const selectedRolesRef = useRef<Map<string, Role>>(new Map())
-
-  const assignedRoleIdsSet = useMemo(() => new Set(assignedRoleIds), [assignedRoleIds])
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams({
@@ -69,17 +62,14 @@ export const AddRoleModal = (props: AddRoleModalProps) => {
   const totalPages = rolesResponse?.totalPages ?? 0
   const hasData = roles.length > 0 || isLoading
 
-  const resetState = () => {
-    setSelection({})
-    setPagination({ pageIndex: 0, pageSize: 10 })
-    setSorting([])
-    setSearchInput('')
-    selectedRolesRef.current.clear()
-  }
+  const { selection, selectedItemsRef, assignedIdsSet, handleSelectionChange, newlySelectedCount } =
+    useAddItemSelection({ assignedIds: assignedRoleIds, items: roles, open: !!open })
 
   useEffect(() => {
     if (!open) {
-      resetState()
+      setPagination({ pageIndex: 0, pageSize: 10 })
+      setSorting([])
+      setSearchInput('')
     }
   }, [open])
 
@@ -87,28 +77,6 @@ export const AddRoleModal = (props: AddRoleModalProps) => {
   useEffect(() => {
     setPagination(prev => ({ ...prev, pageIndex: 0 }))
   }, [searchInput])
-
-  const handleSelectionChange = (updater: RowSelectionState | ((old: RowSelectionState) => RowSelectionState)) => {
-    const newSelection = typeof updater === 'function' ? updater(selection) : updater
-    // Track newly selected roles, ignore already-assigned ones
-    const addedIds = Object.keys(newSelection).filter(id => !selection[id] && !assignedRoleIdsSet.has(id))
-    const removedIds = Object.keys(selection).filter(id => !newSelection[id] && !assignedRoleIdsSet.has(id))
-    for (const id of addedIds) {
-      const role = roles.find(r => r.id === id)
-      if (role) selectedRolesRef.current.set(id, role)
-    }
-    for (const id of removedIds) {
-      selectedRolesRef.current.delete(id)
-    }
-    // Keep assigned IDs out of selection (they're shown as checked+disabled via the cell renderer)
-    const filtered: RowSelectionState = {}
-    for (const id of Object.keys(newSelection)) {
-      if (!assignedRoleIdsSet.has(id)) {
-        filtered[id] = true
-      }
-    }
-    setSelection(filtered)
-  }
 
   const columnHelper = createColumnHelper<Role>()
 
@@ -125,7 +93,7 @@ export const AddRoleModal = (props: AddRoleModalProps) => {
           />
         ),
         cell: ({ row }) => {
-          const isAssigned = assignedRoleIdsSet.has(row.original.id)
+          const isAssigned = assignedIdsSet.has(row.original.id)
           return (
             <Checkbox
               checked={isAssigned || row.getIsSelected()}
@@ -165,7 +133,7 @@ export const AddRoleModal = (props: AddRoleModalProps) => {
         },
       }),
     ],
-    [columnHelper, t, assignedRoleIdsSet],
+    [columnHelper, t, assignedIdsSet],
   )
 
   const table = useReactTable({
@@ -181,17 +149,15 @@ export const AddRoleModal = (props: AddRoleModalProps) => {
     manualPagination: true,
     manualSorting: true,
     getCoreRowModel: getCoreRowModel(),
-    enableRowSelection: row => !assignedRoleIdsSet.has(row.original.id),
+    enableRowSelection: row => !assignedIdsSet.has(row.original.id),
     onRowSelectionChange: handleSelectionChange,
     onPaginationChange: setPagination,
     onSortingChange: setSorting,
   })
 
-  const newlySelectedCount = selectedRolesRef.current.size
-
   const onConfirmClick = () => {
     if (newlySelectedCount > 0) {
-      onAddRoles(Array.from(selectedRolesRef.current.values()))
+      onAddRoles(Array.from(selectedItemsRef.current.values()))
     }
     onOpenChange(false)
   }

@@ -149,6 +149,62 @@ describe('useAddItemSelection', () => {
     expect(result.current.newlySelectedCount).toBe(1)
   })
 
+  it('allows deselecting an item after navigating away and back', () => {
+    const page1Items = makeItems(5, 1)
+    const page2Items = makeItems(5, 6)
+
+    const { result, rerender } = renderHook(
+      ({ items }: { items: TestItem[] }) => useAddItemSelection({ assignedIds: [], items, open: true }),
+      { initialProps: { items: page1Items } },
+    )
+
+    // Select two items on page 1
+    act(() => {
+      result.current.handleSelectionChange({ '2': true, '4': true })
+    })
+    expect(result.current.newlySelectedCount).toBe(2)
+
+    // Navigate to page 2
+    rerender({ items: page2Items })
+
+    // Navigate back to page 1
+    rerender({ items: page1Items })
+
+    // Deselect item '2' — only '4' should remain
+    act(() => {
+      result.current.handleSelectionChange({ '4': true })
+    })
+
+    expect(result.current.newlySelectedCount).toBe(1)
+    expect(result.current.selectedItemsRef.current.has('2')).toBe(false)
+    expect(result.current.selectedItemsRef.current.has('4')).toBe(true)
+  })
+
+  it('resets cleanly when dialog is re-opened after close', () => {
+    const items = makeItems(3)
+    const { result, rerender } = renderHook(
+      ({ open }: { open: boolean }) => useAddItemSelection({ assignedIds: [], items, open }),
+      { initialProps: { open: true } },
+    )
+
+    // Select items
+    act(() => {
+      result.current.handleSelectionChange({ '1': true, '2': true })
+    })
+    expect(result.current.newlySelectedCount).toBe(2)
+
+    // Close dialog
+    rerender({ open: false })
+    expect(result.current.newlySelectedCount).toBe(0)
+    expect(result.current.selection).toEqual({})
+
+    // Re-open dialog — should start fresh
+    rerender({ open: true })
+    expect(result.current.newlySelectedCount).toBe(0)
+    expect(result.current.selection).toEqual({})
+    expect(result.current.selectedItemsRef.current.size).toBe(0)
+  })
+
   it('handles select-all scenario with assigned items', () => {
     const items = makeItems(5)
     const { result } = renderHook(() => useAddItemSelection({ assignedIds: ['1', '3'], items, open: true }))

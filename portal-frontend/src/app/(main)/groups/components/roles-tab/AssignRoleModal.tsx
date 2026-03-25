@@ -5,7 +5,6 @@ import {
   createColumnHelper,
   getCoreRowModel,
   PaginationState,
-  RowSelectionState,
   SortingState,
   useReactTable,
 } from '@tanstack/react-table'
@@ -20,6 +19,7 @@ import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useAddItemSelection } from '@/hooks/use-add-item-selection'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Role, ROLE_TYPES } from '@/types/roles'
 import { isPageIndexHigherThanTotalPages, resolveUpdater } from '@/utils/table'
@@ -39,7 +39,6 @@ export const AssignRoleModal = (props: AssignRoleModalProps) => {
   const [pageSize, setPageSize] = useState(10)
   const [sorting, setSorting] = useState<SortingState>([])
   const [searchString, setSearchString] = useState('')
-  const [selection, setSelection] = useState<RowSelectionState>({})
   const { getApiRequestParams } = useQueryParams()
 
   const roleTypeFilter = roleType === ROLE_TYPES.SYSTEM ? ROLE_TYPES.SYSTEM : ROLE_TYPES.DATA
@@ -52,11 +51,14 @@ export const AssignRoleModal = (props: AssignRoleModalProps) => {
   const rowCount = rolesData?.totalElements || 0
   const totalPages = Math.ceil(rowCount / pageSize)
 
+  const { selection, selectedItemsRef, assignedIdsSet, handleSelectionChange, newlySelectedCount } =
+    useAddItemSelection({ assignedIds: assignedRoleIds, items: roles, open: !!open })
+
   useEffect(() => {
     if (!open) {
-      setSelection({})
       setSearchString('')
       setPageIndex(0)
+      setSorting([])
     }
   }, [open])
 
@@ -79,8 +81,7 @@ export const AssignRoleModal = (props: AssignRoleModalProps) => {
   }
 
   const handleAssign = () => {
-    const selectedRoleIds = Object.keys(selection).filter(key => selection[key])
-    const selectedRoles = roles.filter(r => selectedRoleIds.includes(r.id))
+    const selectedRoles = Array.from(selectedItemsRef.current.values())
     onAssignRoles(selectedRoles)
   }
 
@@ -105,7 +106,7 @@ export const AssignRoleModal = (props: AssignRoleModalProps) => {
         />
       ),
       cell: ({ row }) => {
-        const isAssigned = assignedRoleIds.includes(row.original.id)
+        const isAssigned = assignedIdsSet.has(row.original.id)
         return (
           <Checkbox
             checked={isAssigned || row.getIsSelected()}
@@ -156,14 +157,14 @@ export const AssignRoleModal = (props: AssignRoleModalProps) => {
       sorting,
       rowSelection: selection,
     },
-    enableRowSelection: row => !assignedRoleIds.includes(row.original.id),
+    enableRowSelection: row => !assignedIdsSet.has(row.original.id),
     manualPagination: true,
     manualSorting: true,
     getCoreRowModel: getCoreRowModel(),
     onPaginationChange: updater => {
       handlePagination(resolveUpdater(updater, { pageIndex, pageSize }))
     },
-    onRowSelectionChange: setSelection,
+    onRowSelectionChange: handleSelectionChange,
     onSortingChange: updater => setSorting(resolveUpdater(updater, sorting)),
   })
 
@@ -197,7 +198,7 @@ export const AssignRoleModal = (props: AssignRoleModalProps) => {
           confirmButtonType="button"
           onConfirmClick={handleAssign}
           onCancelClick={() => onOpenChange(false)}
-          isConfirmButtonDisabled={isFetchingRoles || !Object.values(selection).some(Boolean)}
+          isConfirmButtonDisabled={isFetchingRoles || newlySelectedCount === 0}
           hasCard={false}
           confirmButtonTitle={tCommon('actions.add')}
         />

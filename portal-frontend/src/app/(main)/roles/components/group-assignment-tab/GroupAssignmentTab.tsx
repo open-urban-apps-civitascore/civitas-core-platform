@@ -1,6 +1,6 @@
 'use client'
 
-import { PaginationState, Row, RowSelectionState, SortingState } from '@tanstack/react-table'
+import { PaginationState, Row, SortingState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -40,9 +40,6 @@ const SCOPE_TABS: Tab<AssignmentScope>[] = [
   { label: 'roles.groupAssignmentTab.scopeTabs.datastructure', value: ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE },
 ]
 
-const getGroupSelection = (groupIds: Group['id'][]) =>
-  groupIds.reduce((acc, groupId) => ({ ...acc, [groupId]: true }), {})
-
 export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const {
     selectedGroupIds,
@@ -64,14 +61,8 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'title', desc: false }])
   const [totalPages, setTotalPages] = useState<number>(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [groupSelection, setGroupSelection] = useState<RowSelectionState>(getGroupSelection(selectedGroupIds))
-  const originalGroupSelection = getGroupSelection(selectedGroupIds)
   const [selectedScope, setSelectedScope] = useState<AssignmentScope>(ASSIGNMENT_SCOPE_TYPES.TENANT)
   const [groupToRemove, setGroupToRemove] = useState<GroupTableRow | null>(null)
-
-  useEffect(() => {
-    setGroupSelection(getGroupSelection(selectedGroupIds))
-  }, [selectedGroupIds])
 
   const groupRequestIds = selectedGroupIds.join(',')
   const requestParams = new URLSearchParams(`size=${pageSize}&page=${pageIndex}&id=${groupRequestIds}`)
@@ -145,9 +136,9 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const isTenantScope = selectedScope === ASSIGNMENT_SCOPE_TYPES.TENANT
   const canEdit = !isReadOnly && isTenantScope
 
-  const haveGroupsBeenTouched =
-    Object.keys(groupSelection).every(key => selectedGroupIds.includes(key)) === false ||
-    selectedGroupIds.every(id => Object.keys(groupSelection).includes(id)) === false
+  const handleAddGroups = (newGroupIds: string[]) => {
+    onGroupAssignmentUpdate(Array.from(new Set([...selectedGroupIds, ...newGroupIds])))
+  }
 
   if (isFetching) {
     return <LoadingSpinner />
@@ -188,11 +179,8 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
           <GroupAssignmentModal
             open={isModalOpen}
             onOpenChange={setIsModalOpen}
-            selection={groupSelection}
-            setSelection={setGroupSelection}
-            originalSelection={originalGroupSelection}
-            onGroupAssignmentUpdate={onGroupAssignmentUpdate}
-            haveGroupsBeenTouched={haveGroupsBeenTouched}
+            assignedGroupIds={selectedGroupIds}
+            onAddGroups={handleAddGroups}
             roleName={roleName}
           />
         )}
@@ -233,11 +221,8 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
         <GroupAssignmentModal
           open={isModalOpen}
           onOpenChange={setIsModalOpen}
-          selection={groupSelection}
-          setSelection={setGroupSelection}
-          originalSelection={originalGroupSelection}
-          onGroupAssignmentUpdate={onGroupAssignmentUpdate}
-          haveGroupsBeenTouched={haveGroupsBeenTouched}
+          assignedGroupIds={selectedGroupIds}
+          onAddGroups={handleAddGroups}
           roleName={roleName}
         />
       )}
