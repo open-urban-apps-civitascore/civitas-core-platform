@@ -163,9 +163,15 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   })
 
   const handleRoleRequestError = (error: AxiosError, defaultMessage: string) => {
-    if (isNameConflictError(error)) handleNameError(form, form.getValues('name'))
-    if (isPermissionsError(error)) handlePermissionsError()
-    else toast.error(defaultMessage)
+    if (isNameConflictError(error)) {
+      handleNameError(form, form.getValues('name'))
+      return
+    }
+    if (isPermissionsError(error)) {
+      handlePermissionsError()
+      return
+    }
+    toast.error(defaultMessage)
   }
 
   // Initialize form and permissions from role data
