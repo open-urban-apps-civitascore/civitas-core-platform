@@ -16,6 +16,7 @@ import {
 } from '@/app/services/api/datastructures/clientRequests'
 import { ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
+import { useError } from '@/hooks/use-error'
 import { STATUS_TYPES, WithId } from '@/types/common'
 import {
   Datastructure,
@@ -42,6 +43,7 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
   const router = useRouter()
   const t = useTranslations('datastructures')
   const tCommon = useTranslations('common')
+  const { handleFormValidationError } = useError()
   const [selectedTab, setSelectedTab] = useState(tabs[0].value)
 
   const defaultValues = useMemo<DatastructureFormDraft>(
@@ -194,8 +196,7 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
       ? DatastructureFormDraftSchema.safeParse(values)
       : DatastructureFormAvailableSchema.safeParse(values)
     if (!parsed.success) {
-      console.error(parsed.error)
-      toast.error(tCommon('errors.formInvalid'))
+      handleFormValidationError(parsed.error)
       return false
     }
 

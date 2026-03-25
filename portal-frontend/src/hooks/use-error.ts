@@ -1,9 +1,15 @@
 import { useTranslations } from 'next-intl'
-import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
+import { FieldErrors, FieldValues, Path, UseFormReturn } from 'react-hook-form'
 import { toast } from 'sonner'
+import { ZodError } from 'zod'
 
 export const useError = () => {
   const tCommon = useTranslations('common')
+
+  const handleFormValidationError = (errors: FieldErrors | ZodError) => {
+    console.error('Form validation errors: ', errors)
+    toast.error(tCommon('errors.formInvalid'))
+  }
 
   const handleNameError = <TFormData extends FieldValues & { name: string }>(
     form: UseFormReturn<TFormData>,
@@ -17,5 +23,5 @@ export const useError = () => {
     toast.error(tCommon('errors.insufficientPermissions'))
   }
 
-  return { handleNameError, handlePermissionsError }
+  return { handleFormValidationError, handleNameError, handlePermissionsError }
 }

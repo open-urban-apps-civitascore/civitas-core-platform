@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { AxiosError } from 'axios'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
-import { FieldErrors, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import {
@@ -15,6 +15,7 @@ import {
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
+import { useError } from '@/hooks/use-error'
 import { STATUS_TYPES } from '@/types/common'
 import {
   DATASTRUCTURE_STATUS_TYPES,
@@ -64,6 +65,7 @@ export const useDatastructureVersion = ({
 }: UseDatastructureVersionProps) => {
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
+  const { handleFormValidationError } = useError()
   const [initialSession, setInitialSession] = useState(() => buildSessionFromVersion(version))
 
   const updateVersion = useUpdateDatastructureVersion()
@@ -278,34 +280,29 @@ export const useDatastructureVersion = ({
   }
 
   const saveDatastructureVersion = async (datastructureId: string) => {
-    const formData = parseDatastructureVersionFormData(form.getValues(), isDraftMode)
-    if (!formData) {
-      toast.error(tCommon('errors.formInvalid'))
+    const parsed = parseDatastructureVersionFormData(form.getValues(), isDraftMode)
+    if (!parsed.success) {
+      handleFormValidationError(parsed.error)
       return false
     }
 
     try {
       const sessionDiagram = nodesWatch.length > 0 ? activeSession?.diagram || null : null
       const { model } = sessionDiagram ? buildUMLModelPayload(sessionDiagram, modelUri) : { model: null }
-      const payload = mapDatastructureVersionFormToApiData(formData, sessionDiagram, model)
+      const payload = mapDatastructureVersionFormToApiData(parsed.data, sessionDiagram, model)
 
       if (isCreateMode) {
         // eslint-disable-next-line unused-imports/no-unused-vars
         const { id, ...createData } = payload
         await handleCreateVersion(createData, datastructureId)
       } else {
-        await handleUpdateVersion(payload, formData, datastructureId)
+        await handleUpdateVersion(payload, parsed.data, datastructureId)
       }
       return true
     } catch (error: unknown) {
       console.error('An error occurred while submitting datastructure version data.', (error as AxiosError).message)
       return false
     }
-  }
-
-  const handleSubmitValidationErrors = (errors: FieldErrors<DatastructureVersionFormData>) => {
-    console.error('Validation errors: ', errors)
-    toast.error(tCommon('errors.formInvalid'))
   }
 
   const dirtyFields = form.formState.dirtyFields
@@ -331,6 +328,5 @@ export const useDatastructureVersion = ({
     hasUserChanges,
     resetSession,
     resetFormAndSession,
-    handleSubmitValidationErrors,
   }
 }

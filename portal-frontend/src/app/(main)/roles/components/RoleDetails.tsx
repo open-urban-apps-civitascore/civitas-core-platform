@@ -36,7 +36,7 @@ import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
-import { FormRole, Role, ROLE_TYPES, roleSchema, RoleTab } from '@/types/roles'
+import { FormRole, Role, ROLE_TYPES, RoleSchema, RoleTab } from '@/types/roles'
 import { isPlatformwideAssignment } from '@/utils/assignments'
 import { isNameConflictError, isPermissionsError } from '@/utils/errors'
 
@@ -157,7 +157,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const mapRoleApiToFormData = (role: Role): FormRole => ({ ...role, description: role.description || '' })
 
   const form = useForm<FormRole>({
-    resolver: zodResolver(roleSchema),
+    resolver: zodResolver(RoleSchema),
     defaultValues: mapRoleApiToFormData(initialRole),
   })
 
@@ -220,24 +220,25 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const createNewRole = () => {
     const formValues = form.getValues()
-
-    createRole.mutate(
-      {
-        name: formValues.name,
-        description: formValues.description,
-        roleType: (tabValue as Role['roleType']) || DEFAULT_TAB,
-        readonly: formValues.readonly,
-      },
-      {
-        onSuccess: ({ data }) => {
-          toast.success(tCommon('success.creationSuccess', { item: tCommon('items.role') }))
-          router.push(`/roles/${data.id}?tab=${tabValue}`)
+    const parsedValues = RoleSchema.safeParse(formValues)
+    if (!parsedValues.success)
+      createRole.mutate(
+        {
+          name: formValues.name,
+          description: formValues.description,
+          roleType: (tabValue as Role['roleType']) || DEFAULT_TAB,
+          readonly: formValues.readonly,
         },
-        onError: error => {
-          handleRoleRequestError(error as AxiosError, tRoles('errors.createError'))
+        {
+          onSuccess: ({ data }) => {
+            toast.success(tCommon('success.creationSuccess', { item: tCommon('items.role') }))
+            router.push(`/roles/${data.id}?tab=${tabValue}`)
+          },
+          onError: error => {
+            handleRoleRequestError(error as AxiosError, tRoles('errors.createError'))
+          },
         },
-      },
-    )
+      )
   }
 
   const updateRoleValues = async (roleId: string) => {

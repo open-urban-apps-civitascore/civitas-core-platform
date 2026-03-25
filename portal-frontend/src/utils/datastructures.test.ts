@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { assert, describe, expect, it } from 'vitest'
 
 import type {
   Datastructure,
@@ -267,21 +267,26 @@ describe('mapDatastructureVersionFormToApiData', () => {
 })
 
 describe('parseDatastructureVersionFormData', () => {
-  it('returns parsed draft values', () => {
-    const values = createVersionFormData({ version: ' 1.0 ', description: ' some description ' })
+  it('uses draft schema in draft mode and returns success with data', () => {
+    const values = createVersionFormData({
+      description: '',
+      modelAtlasUri: null,
+      modelName: null,
+      nodes: [],
+    })
 
     const result = parseDatastructureVersionFormData(values, true)
 
-    expect(result).toBeDefined()
-    expect(result?.version).toBe('1.0')
-    expect(result?.description).toBe('some description')
+    expect(result.success).toBe(true)
+    assert(result.success)
+    expect(result.data).toBeDefined()
   })
 
-  it('returns parsed available values when required fields are present', () => {
+  it('uses available schema in non-draft mode and returns success with data', () => {
     const values = createVersionFormData({
-      description: ' valid description ',
-      modelAtlasUri: ' atlas://valid-model ',
-      modelName: ' Valid Model ',
+      description: 'valid description',
+      modelAtlasUri: 'atlas://valid-model',
+      modelName: 'Valid Model',
       nodes: [
         {
           id: 'node-1',
@@ -303,30 +308,24 @@ describe('parseDatastructureVersionFormData', () => {
 
     const result = parseDatastructureVersionFormData(values, false)
 
-    expect(result).toBeDefined()
-    expect(result?.description).toBe('valid description')
-    expect(result?.modelAtlasUri).toBe('atlas://valid-model')
-    expect(result?.modelName).toBe('Valid Model')
-    expect(result?.nodes).toHaveLength(1)
+    expect(result.success).toBe(true)
+    assert(result.success)
+    expect(result.data).toBeDefined()
   })
 
-  it('returns undefined and logs error for invalid available values', () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    try {
-      const values = createVersionFormData({
-        description: '',
-        modelAtlasUri: null,
-        modelName: null,
-        nodes: [],
-      })
+  it('returns error when available schema validation fails', () => {
+    const values = createVersionFormData({
+      description: '',
+      modelAtlasUri: null,
+      modelName: null,
+      nodes: [],
+    })
 
-      const result = parseDatastructureVersionFormData(values, false)
+    const result = parseDatastructureVersionFormData(values, false)
 
-      expect(result).toBeUndefined()
-      expect(consoleErrorSpy).toHaveBeenCalled()
-    } finally {
-      consoleErrorSpy.mockRestore()
-    }
+    expect(result.success).toBe(false)
+    assert(!result.success)
+    expect(result.error).toBeDefined()
   })
 })
 

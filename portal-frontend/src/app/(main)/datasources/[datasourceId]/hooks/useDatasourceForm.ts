@@ -37,7 +37,7 @@ export const useDatasourceForm = (
 ) => {
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
-  const { handleNameError } = useError()
+  const { handleNameError, handleFormValidationError } = useError()
 
   const mapDatasourceToFormValues = (source: Datasource) => {
     const parsedDatasource = DatasourceApiToFormSchema.parse(source)
@@ -200,8 +200,7 @@ export const useDatasourceForm = (
         ? DatasourceFormDraftSchema.safeParse(values)
         : DatasourceFormAvailableSchema.safeParse(values)
       if (!parsed.success) {
-        console.error(parsed.error)
-        toast.error(tCommon('errors.formInvalid'))
+        handleFormValidationError(parsed.error)
         return
       }
 
