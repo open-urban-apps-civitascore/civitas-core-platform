@@ -83,36 +83,28 @@ describe('PermissionsTab', () => {
 
   describe('search bar visibility', () => {
     it('shows search area for SYSTEM roles', () => {
-      mockPermissions([
-        { id: '1', name: 'USER_READ', category: 'TENANT_ADMINISTRATION', permissionType: 'SYSTEM' },
-      ])
+      mockPermissions([{ id: '1', name: 'USER_READ', category: 'TENANT_ADMINISTRATION', permissionType: 'SYSTEM' }])
       renderTab(ROLE_TYPES.SYSTEM)
 
       expect(screen.getByTestId('searchArea')).toBeInTheDocument()
     })
 
     it('hides search area for DATA roles', () => {
-      mockPermissions([
-        { id: '1', name: 'DATASET_READ', category: 'DATA_MANAGEMENT', permissionType: 'DATA' },
-      ])
+      mockPermissions([{ id: '1', name: 'DATASET_READ', category: 'DATA_MANAGEMENT', permissionType: 'DATA' }])
       renderTab(ROLE_TYPES.DATA)
 
       expect(screen.queryByTestId('searchArea')).not.toBeInTheDocument()
     })
 
     it('shows role template select for DATA roles when not read-only', () => {
-      mockPermissions([
-        { id: '1', name: 'DATASET_READ', category: 'DATA_MANAGEMENT', permissionType: 'DATA' },
-      ])
+      mockPermissions([{ id: '1', name: 'DATASET_READ', category: 'DATA_MANAGEMENT', permissionType: 'DATA' }])
       render(<PermissionsTab {...defaultProps} roleType={ROLE_TYPES.DATA} isReadOnly={false} />)
 
       expect(screen.getByTestId('role-template-select')).toBeInTheDocument()
     })
 
     it('hides role template select for DATA roles when read-only', () => {
-      mockPermissions([
-        { id: '1', name: 'DATASET_READ', category: 'DATA_MANAGEMENT', permissionType: 'DATA' },
-      ])
+      mockPermissions([{ id: '1', name: 'DATASET_READ', category: 'DATA_MANAGEMENT', permissionType: 'DATA' }])
       render(<PermissionsTab {...defaultProps} roleType={ROLE_TYPES.DATA} isReadOnly={true} />)
 
       expect(screen.queryByTestId('role-template-select')).not.toBeInTheDocument()
@@ -121,18 +113,14 @@ describe('PermissionsTab', () => {
 
   describe('grid vs category list rendering', () => {
     it('renders DataPermissionsGrid for DATA roles', () => {
-      mockPermissions([
-        { id: '1', name: 'DATASET_READ', category: 'DATA_MANAGEMENT', permissionType: 'DATA' },
-      ])
+      mockPermissions([{ id: '1', name: 'DATASET_READ', category: 'DATA_MANAGEMENT', permissionType: 'DATA' }])
       renderTab(ROLE_TYPES.DATA)
 
       expect(screen.getByTestId('data-permissions-grid')).toBeInTheDocument()
     })
 
     it('renders CategoryList for SYSTEM roles', () => {
-      mockPermissions([
-        { id: '1', name: 'USER_READ', category: 'TENANT_ADMINISTRATION', permissionType: 'SYSTEM' },
-      ])
+      mockPermissions([{ id: '1', name: 'USER_READ', category: 'TENANT_ADMINISTRATION', permissionType: 'SYSTEM' }])
       renderTab(ROLE_TYPES.SYSTEM)
 
       expect(screen.getByTestId('category-TENANT_ADMINISTRATION')).toBeInTheDocument()
