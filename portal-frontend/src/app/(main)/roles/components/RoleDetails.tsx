@@ -32,8 +32,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useError } from '@/hooks/use-error'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { FormRole, Role, ROLE_TYPES, roleSchema, RoleTab } from '@/types/roles'
 import { isPlatformwideAssignment } from '@/utils/assignments'
 import { isNameConflictError, isPermissionsError } from '@/utils/errors'
@@ -81,8 +83,12 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const tRoles = useTranslations('roles')
   const tCommon = useTranslations('common')
   const router = useRouter()
+  const { hasPermission } = usePermissions()
   const { setSubTabValueParam, subTabValue, tabValue } = useQueryParams()
   const { handleNameError, handlePermissionsError } = useError()
+
+  const canUpdate = !roleId || hasPermission(PERMISSION_NAMES.ROLE_UPDATE)
+  const canDelete = hasPermission(PERMISSION_NAMES.ROLE_DELETE)
 
   const [isReadOnly, setIsReadOnly] = useState(!!roleId)
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
@@ -323,12 +329,14 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   }
 
   // Tab configuration
+  // - Permission-gated tabs are hidden (no affordance = no confusion)
+  // - State-gated tabs (unsaved role) are disabled (visible but greyed out)
   const disabledTabs = !roleId ? ['permissions', 'groupAssignment'] : undefined
 
   const subTabs: Tab<RoleTab>[] = [
     subTabValues.basicInformation,
-    subTabValues.permissions,
-    subTabValues.groupAssignment,
+    ...(hasPermission(PERMISSION_NAMES.PERMISSION_READ) ? [subTabValues.permissions] : []),
+    ...(hasPermission(PERMISSION_NAMES.GROUP_READ) ? [subTabValues.groupAssignment] : []),
   ]
   const defaultSubTab = subTabValues.basicInformation.value
 
@@ -363,8 +371,8 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const getButtons = () => {
     if (isDefaultRole && !isGroupTab) return undefined
-    if (isReadOnly) return EditButton
-    else return SaveAndExitButtons
+    if (isReadOnly) return canUpdate ? EditButton : undefined
+    return SaveAndExitButtons
   }
 
   return (
@@ -391,7 +399,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
                 form={form}
                 isDefaultRole={isDefaultRole}
                 isReadOnly={isReadOnly || isDefaultRole}
-                deleteRole={roleId ? () => setIsDeleteConfirmOpen(true) : undefined}
+                deleteRole={roleId && canDelete ? () => setIsDeleteConfirmOpen(true) : undefined}
                 getRoleError={getRoleError}
               />
             )}

@@ -6,7 +6,9 @@ import { useTranslations } from 'next-intl'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { usePermissions } from '@/hooks/use-permissions'
 import { type Assignment } from '@/types/assignments'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
@@ -30,6 +32,7 @@ export const RolesAssignmentTable = (props: RolesAssignmentTableProps) => {
   } = props
 
   const t = useTranslations('users.rolesTab')
+  const { hasPermission } = usePermissions()
 
   const columnHelper = createColumnHelper<Assignment>()
 
@@ -37,7 +40,11 @@ export const RolesAssignmentTable = (props: RolesAssignmentTableProps) => {
     columnHelper.accessor(row => row.role.name, {
       id: 'role.name',
       header: ({ column }) => <SortableTableHeader column={column} title={t('columns.name')} />,
-      cell: ({ row }) => <LinkCell href={`/roles/${row.original.role.id}`}>{row.original.role.name}</LinkCell>,
+      cell: ({ row }) => (
+        <LinkCell href={`/roles/${row.original.role.id}`} isDisabled={!hasPermission(PERMISSION_NAMES.ROLE_READ)}>
+          {row.original.role.name}
+        </LinkCell>
+      ),
       meta: {
         truncate: true,
         style: {

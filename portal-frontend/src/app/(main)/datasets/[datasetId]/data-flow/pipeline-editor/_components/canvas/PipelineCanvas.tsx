@@ -175,6 +175,7 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
         defaultViewport={CANVAS_CONFIG.defaultViewport}
         deleteKeyCode={['Delete', 'Backspace']}
         multiSelectionKeyCode={['Meta', 'Ctrl']}
+        panActivationKeyCode={null}
         className="bg-muted/10"
       >
         <Background variant={BackgroundVariant.Dots} gap={CANVAS_CONFIG.gridSize} size={1} color="hsl(var(--border))" />

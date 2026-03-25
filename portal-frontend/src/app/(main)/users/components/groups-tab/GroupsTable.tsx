@@ -5,6 +5,8 @@ import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { usePermissions } from '@/hooks/use-permissions'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { UserGroupsListData } from '@/types/groups'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
@@ -33,6 +35,7 @@ const GroupsTable = (props: GroupsTableProps) => {
   } = props
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
+  const { hasPermission } = usePermissions()
   const columnHelper = createColumnHelper<UserGroupsListData>()
 
   const columns = [
@@ -43,7 +46,11 @@ const GroupsTable = (props: GroupsTableProps) => {
     }),
     columnHelper.accessor('name', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('groupsTab.name')} />,
-      cell: ({ row }) => <LinkCell href={`/groups/${row.id}`}>{row.original.name}</LinkCell>,
+      cell: ({ row }) => (
+        <LinkCell href={`/groups/${row.id}`} isDisabled={!hasPermission(PERMISSION_NAMES.GROUP_READ)}>
+          {row.original.name}
+        </LinkCell>
+      ),
       meta: {
         truncate: true,
         style: {

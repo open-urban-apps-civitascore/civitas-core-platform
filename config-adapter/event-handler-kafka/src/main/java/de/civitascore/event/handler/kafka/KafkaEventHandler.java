@@ -193,7 +193,8 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
         org.apache.kafka.common.serialization.StringSerializer.class.getName());
     props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, CloudEventSerializer.class.getName());
     props.put(ProducerConfig.ACKS_CONFIG, "all");
-    props.put(ProducerConfig.RETRIES_CONFIG, 3);
+    props.put(ProducerConfig.RETRIES_CONFIG, Integer.MAX_VALUE);
+    props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
     return props;
   }
 
