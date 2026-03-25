@@ -1,6 +1,5 @@
 package de.civitascore.portal.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
@@ -25,13 +24,6 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
   private final GroupMapper groupMapper;
   private final UserService userService;
   private final AssignmentFactory assignmentFactory;
-  private final ObjectMapper objectMapper;
-
-  @Override
-  protected Group preSave(Group entity) {
-    validateUniqueName(entity, groupRepository::findByName);
-    return super.preSave(entity);
-  }
 
   @Override
   protected Group postConvertToEntity(Group entity, GroupInputDTO input) {
@@ -96,11 +88,5 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
   public Optional<Group> findById(UUID id) {
     Optional<Group> entity = groupRepository.findByIdWithRelations(id);
     return postLoad(entity);
-  }
-
-  @Override
-  protected GroupInputDTO preProcessUpdateInput(GroupInputDTO input, Group existingEntity) {
-    validateFieldsNotBlank(objectMapper, input, existingEntity.getId(), "name");
-    return super.preProcessUpdateInput(input, existingEntity);
   }
 }

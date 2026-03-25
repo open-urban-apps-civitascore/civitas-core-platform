@@ -90,6 +90,13 @@ public class ConfigEventPublisherService {
       log.error(
           "Error converting ConfigEvent: messageId={}, topic={}", messageId, topic.getValue(), e);
       return CompletableFuture.failedFuture(e);
+    } catch (RuntimeException e) {
+      log.error(
+          "Unexpected error creating ConfigEvent: messageId={}, topic={}",
+          messageId,
+          topic.getValue(),
+          e);
+      return CompletableFuture.failedFuture(e);
     }
 
     // Publish to messaging system if available

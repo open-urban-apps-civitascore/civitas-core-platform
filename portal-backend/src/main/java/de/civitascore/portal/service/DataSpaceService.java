@@ -1,6 +1,5 @@
 package de.civitascore.portal.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataSpaceMapper;
 import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.input.DataSpaceInputDTO;
@@ -17,7 +16,6 @@ public class DataSpaceService extends BaseService<DataSpace, DataSpaceInputDTO> 
   private final DataSpaceRepository dataSpaceRepository;
   private final DataSpaceMapper dataSpaceMapper;
   private final UserService userService;
-  private final ObjectMapper objectMapper;
 
   @Override
   protected DataSpaceRepository getRepository() {
@@ -61,18 +59,5 @@ public class DataSpaceService extends BaseService<DataSpace, DataSpaceInputDTO> 
     }
 
     return super.postConvertToEntity(entity, input);
-  }
-
-  @Override
-  protected DataSpace preSave(DataSpace entity) {
-    validateUniqueName(entity, dataSpaceRepository::findByName);
-    return super.preSave(entity);
-  }
-
-  @Override
-  protected DataSpaceInputDTO preProcessUpdateInput(
-      DataSpaceInputDTO input, DataSpace existingEntity) {
-    validateFieldsNotBlank(objectMapper, input, existingEntity.getId(), "name");
-    return super.preProcessUpdateInput(input, existingEntity);
   }
 }

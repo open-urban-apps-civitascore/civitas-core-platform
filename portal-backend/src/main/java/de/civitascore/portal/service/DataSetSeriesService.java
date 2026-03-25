@@ -28,10 +28,4 @@ public class DataSetSeriesService extends BaseService<DataSetSeries, DataSetSeri
   protected String getEntityName() {
     return DataSetSeries.class.getSimpleName();
   }
-
-  @Override
-  protected DataSetSeries preSave(DataSetSeries entity) {
-    validateUniqueName(entity, dataSetSeriesRepository::findByName);
-    return super.preSave(entity);
-  }
 }

@@ -9,6 +9,7 @@ import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.logging.log4j.util.Strings;
@@ -105,7 +106,7 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
       throw new ExternalSystemTimeoutException("Config Adapter request was interrupted", e);
     } catch (ExternalSystemRejectionException | ExternalSystemTimeoutException e) {
       throw e;
-    } catch (java.util.concurrent.ExecutionException e) {
+    } catch (ExecutionException e) {
       throw new ExternalSystemRejectionException(
           "Failed to validate with Config Adapter: " + e.getMessage());
     }

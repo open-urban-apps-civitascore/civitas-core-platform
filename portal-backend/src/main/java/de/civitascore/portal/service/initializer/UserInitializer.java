@@ -16,6 +16,7 @@ import de.civitascore.portal.service.ConfigEventPublisherService;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import lombok.extern.slf4j.Slf4j;
@@ -229,7 +230,7 @@ public class UserInitializer {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       log.error("Interrupted while waiting for Keycloak sync for user '{}'", user.getEmail());
-    } catch (java.util.concurrent.ExecutionException e) {
+    } catch (ExecutionException e) {
       log.error("Failed to sync user '{}' to Keycloak", user.getEmail(), e);
     }
   }

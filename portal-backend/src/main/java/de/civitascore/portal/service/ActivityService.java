@@ -43,10 +43,4 @@ public class ActivityService extends BaseService<Activity, ActivityInputDTO> {
 
     return super.postConvertToEntity(entity, input);
   }
-
-  @Override
-  protected Activity preSave(Activity entity) {
-    validateUniqueName(entity, activityRepository::findByName);
-    return super.preSave(entity);
-  }
 }

@@ -49,10 +49,4 @@ public class CatalogService extends BaseService<Catalog, CatalogInputDTO> {
 
     return super.postConvertToEntity(entity, input);
   }
-
-  @Override
-  protected Catalog preSave(Catalog entity) {
-    validateUniqueName(entity, catalogRepository::findByName);
-    return super.preSave(entity);
-  }
 }

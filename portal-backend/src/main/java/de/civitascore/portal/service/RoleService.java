@@ -1,6 +1,5 @@
 package de.civitascore.portal.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.RoleMapper;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.RoleInputDTO;
@@ -20,7 +19,6 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
   private final RoleRepository roleRepository;
   private final RoleMapper roleMapper;
   private final PermissionService permissionService;
-  private final ObjectMapper objectMapper;
 
   @Override
   protected RoleRepository getRepository() {
@@ -62,19 +60,12 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
   }
 
   @Override
-  protected Role preSave(Role entity) {
-    validateUniqueName(entity, roleRepository::findByName);
-    return super.preSave(entity);
-  }
-
-  @Override
   protected RoleInputDTO preProcessUpdateInput(RoleInputDTO input, Role existingEntity) {
     if (existingEntity.isReadonly()) {
       throw new ForbiddenException(
           "role", existingEntity.getId(), "Readonly roles cannot be modified");
     }
 
-    validateFieldsNotBlank(objectMapper, input, existingEntity.getId(), "name", "roleType");
     return super.preProcessUpdateInput(input, existingEntity);
   }
 

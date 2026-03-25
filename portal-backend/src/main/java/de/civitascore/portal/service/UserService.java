@@ -1,6 +1,5 @@
 package de.civitascore.portal.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.idm.UserConfig;
@@ -27,7 +26,6 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   private final UserRepository userRepository;
   private final UserMapper userMapper;
   private final GroupRepository groupRepository;
-  private final ObjectMapper objectMapper;
   private final String targetRealm;
 
   public UserService(
@@ -35,13 +33,11 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
       UserRepository userRepository,
       UserMapper userMapper,
       GroupRepository groupRepository,
-      ObjectMapper objectMapper,
       @Value("${keycloak.target-realm}") String targetRealm) {
     super(configEventPublisher);
     this.userRepository = userRepository;
     this.userMapper = userMapper;
     this.groupRepository = groupRepository;
-    this.objectMapper = objectMapper;
     this.targetRealm = targetRealm;
   }
 
@@ -124,8 +120,6 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   @Override
   protected UserInputDTO preProcessUpdateInput(UserInputDTO input, User existingEntity) {
     validateGroupIdsExist(input.getGroupIds());
-    validateFieldsNotBlank(
-        objectMapper, input, existingEntity.getId(), "title", "firstName", "lastName", "email");
     return input;
   }
 

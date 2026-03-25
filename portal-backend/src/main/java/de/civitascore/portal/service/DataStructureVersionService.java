@@ -1,5 +1,6 @@
 package de.civitascore.portal.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
@@ -196,12 +197,16 @@ public class DataStructureVersionService
   private void parseAndSetExternalId(DataStructureVersion entity, String uploadResponse) {
     try {
       JsonNode root = objectMapper.readTree(uploadResponse);
+      if (root == null) {
+        log.warn("Model Atlas upload response was null or empty");
+        return;
+      }
       JsonNode objectIdNode = root.get(MODEL_ATLAS_OBJECT_ID_FIELD);
       if (objectIdNode != null && !objectIdNode.isNull()) {
         entity.setExternalId(objectIdNode.asText());
         dataStructureVersionRepository.save(entity);
       }
-    } catch (com.fasterxml.jackson.core.JsonProcessingException | NullPointerException e) {
+    } catch (JsonProcessingException e) {
       log.warn("Failed to parse externalId from Model Atlas upload response", e);
     }
   }

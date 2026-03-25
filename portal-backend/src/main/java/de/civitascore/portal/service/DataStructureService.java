@@ -86,12 +86,6 @@ public class DataStructureService
   }
 
   @Override
-  protected DataStructure preSave(DataStructure entity) {
-    validateUniqueName(entity, dataStructureRepository::findByName);
-    return super.preSave(entity);
-  }
-
-  @Override
   protected DataStructureInputDTO preProcessCreateInput(DataStructureInputDTO input) {
     // Set DRAFT status for newly created data structures
     input.setDataStructureStatus(DataStructureStatus.DRAFT);

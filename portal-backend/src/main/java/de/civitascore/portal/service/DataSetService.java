@@ -1,6 +1,5 @@
 package de.civitascore.portal.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
@@ -32,7 +31,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   private final AssignmentFactory assignmentFactory;
   private final DistributionService distributionService;
-  private final ObjectMapper objectMapper;
 
   private final DataSetSagaPublisher sagaPublisher;
 
@@ -41,13 +39,11 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       DataSetMapper dataSetMapper,
       AssignmentFactory assignmentFactory,
       DistributionService distributionService,
-      ObjectMapper objectMapper,
       DataSetSagaPublisher sagaPublisher) {
     this.dataSetRepository = dataSetRepository;
     this.dataSetMapper = dataSetMapper;
     this.assignmentFactory = assignmentFactory;
     this.distributionService = distributionService;
-    this.objectMapper = objectMapper;
     this.sagaPublisher = sagaPublisher;
   }
 
@@ -80,18 +76,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   public Optional<DataSet> findById(UUID id) {
     Optional<DataSet> entity = dataSetRepository.findByIdWithRelations(id);
     return postLoad(entity);
-  }
-
-  @Override
-  protected DataSet preSave(DataSet entity) {
-    validateUniqueName(entity, dataSetRepository::findByName);
-    return super.preSave(entity);
-  }
-
-  @Override
-  protected DataSetInputDTO preProcessUpdateInput(DataSetInputDTO input, DataSet existingEntity) {
-    validateFieldsNotBlank(objectMapper, input, existingEntity.getId(), "name");
-    return super.preProcessUpdateInput(input, existingEntity);
   }
 
   /**
