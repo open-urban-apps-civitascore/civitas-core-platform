@@ -1,13 +1,19 @@
 package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.RoleMapper;
+import de.civitascore.portal.model.embedded.PermissionType;
+import de.civitascore.portal.model.embedded.RoleType;
+import de.civitascore.portal.model.entity.Permission;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.util.ForbiddenException;
+import de.civitascore.portal.util.InvalidInputException;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,6 +25,9 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class RoleService extends BaseService<Role, RoleInputDTO> {
+
+  private static final Map<RoleType, PermissionType> ROLE_TO_PERMISSION_TYPE =
+      Map.of(RoleType.SYSTEM, PermissionType.SYSTEM, RoleType.DATA, PermissionType.DATA);
 
   private final RoleRepository roleRepository;
   private final RoleMapper roleMapper;
@@ -49,6 +58,22 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
     return postLoad(entity);
   }
 
+  private void validatePermissionTypes(RoleType roleType, Set<Permission> permissions) {
+    PermissionType expectedType = ROLE_TO_PERMISSION_TYPE.get(roleType);
+    if (expectedType == null) {
+      throw new IllegalStateException("No permission type mapping for role type " + roleType);
+    }
+
+    boolean hasMismatch = permissions.stream().anyMatch(p -> p.getPermissionType() != expectedType);
+    if (hasMismatch) {
+      throw new InvalidInputException(
+          "permissions",
+          "permissionIds",
+          "Roles with type %s may only include permissions with type %s"
+              .formatted(roleType, expectedType));
+    }
+  }
+
   /**
    * Resolves permission references after DTO-to-entity conversion by batch-loading permissions from
    * the provided IDs.
@@ -63,8 +88,10 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
     if (Objects.nonNull(input.getPermissionIds())) {
       entity.setPermissions(new HashSet<>());
       if (!input.getPermissionIds().isEmpty()) {
-        entity.setPermissions(
-            new HashSet<>(permissionService.getRepository().findAllById(input.getPermissionIds())));
+        Set<Permission> permissions =
+            new HashSet<>(permissionService.getRepository().findAllById(input.getPermissionIds()));
+        validatePermissionTypes(entity.getRoleType(), permissions);
+        entity.setPermissions(permissions);
       }
     }
 
