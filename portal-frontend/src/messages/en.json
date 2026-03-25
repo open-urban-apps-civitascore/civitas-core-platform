@@ -836,14 +836,14 @@
       }
     }
   },
-  "datastructureVersion": {
-    "title": "New Version",
+  "datastructureVersions": {
+    "newVersion": "New Version",
     "tabs": {
-      "structure": "Strukturdefinition",
-      "versionInfo": "Versionsinformationen"
+      "structure": "Structure Definition",
+      "versionInfo": "Version Information"
     },
     "versionInfo": {
-      "title": "Version Informationen",
+      "title": "Version Information",
       "versionNumber": "Version Number",
       "versionNumberPlaceholder": "e. g. 1.0",
       "description": "Version Description",
