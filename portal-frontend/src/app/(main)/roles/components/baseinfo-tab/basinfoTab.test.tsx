@@ -4,7 +4,7 @@ import { type JSX, ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { vi } from 'vitest'
 
-import { roleSchema } from '@/types/roles'
+import { RoleSchema } from '@/types/roles'
 
 import { BaseInfoTab } from './BaseInfoTab'
 
@@ -21,7 +21,7 @@ const wrapper = ({ children }: { children: ReactNode }): JSX.Element => <div>{ch
 const { result } = renderHook(
   () =>
     useForm({
-      resolver: zodResolver(roleSchema),
+      resolver: zodResolver(RoleSchema),
       defaultValues: {
         name: '',
         description: '',

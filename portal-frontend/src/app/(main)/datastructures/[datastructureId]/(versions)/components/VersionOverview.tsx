@@ -15,6 +15,7 @@ import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
 import { QUERY_PARAMS } from '@/const/searchParams'
+import { useError } from '@/hooks/use-error'
 import { useQueryParams } from '@/hooks/use-query-params'
 import {
   Datastructure,
@@ -58,6 +59,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const tCommon = useTranslations('common')
   const router = useRouter()
   const { setSubTabValueParam, subTabValue } = useQueryParams()
+  const { handleFormValidationError } = useError()
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
@@ -90,7 +92,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     resetToInitialState,
     saveDatastructureVersion,
     handleStatusChange,
-    handleSubmitValidationErrors,
     hasUserChanges,
   } = useDatastructureVersion({
     version,
@@ -129,7 +130,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     if (isSaved) {
       setIsExitModalOpen(false)
     }
-  }, handleSubmitValidationErrors)
+  }, handleFormValidationError)
 
   const handleExit = () => {
     resetToInitialState()

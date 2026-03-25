@@ -26,6 +26,7 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { BasicTooltip } from '@/components/tooltip/Tooltip'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form'
+import { useError } from '@/hooks/use-error'
 import { cn } from '@/lib/utils'
 import {
   CompletionStepData,
@@ -63,6 +64,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const distributionAccessURL = distributions?.map(distribution => distribution.accessUrl) || []
 
   const router = useRouter()
+  const { handleFormValidationError } = useError()
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
   const [dataSetStatus, setDataSetStatus] = useState<DatasetStatusTypes>(
     dataset.dataSetStatus ?? DATASET_STATUS_TYPES.DRAFT,
@@ -165,8 +167,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
             : DatasetFormAvailableSchema.safeParse(valuesForValidation)
 
         if (!parsed.success) {
-          console.error(parsed.error)
-          toast.error(tCommon('errors.formInvalid'))
+          handleFormValidationError(parsed.error)
           return
         }
 

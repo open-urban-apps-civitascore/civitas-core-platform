@@ -5,7 +5,7 @@ import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
-import { FieldErrors, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { useCreateGroup, useReplaceGroupAssignments, useUpdateGroup } from '@/app/services/api/groups/clientRequests'
@@ -65,6 +65,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
   const t = useTranslations('groups')
   const tCommon = useTranslations('common')
   const { hasPermission } = usePermissions()
+  const { handleFormValidationError } = useError()
 
   const tabs = [
     tabValues.info,
@@ -95,11 +96,6 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     form.reset(mapGroupApiToFormData(initialGroupData))
     setPendingRoles([])
   }, [initialGroupData, form])
-
-  const handleValidationErrors = (errors: FieldErrors<GroupBaseFormData>) => {
-    console.error('Validation errors: ', errors)
-    toast.error(tCommon('errors.formInvalid'))
-  }
 
   const handleGroupRequestError = (error: AxiosError, defaultMessage: string) => {
     if (isNameConflictError(error)) handleNameError(form, form.getValues('name'))
@@ -174,16 +170,14 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     setIsExitModalOpen(false)
   }
 
-  const handleExitAndSafe = () => {
-    form.handleSubmit(handleSave)()
-  }
-
   const handleExitButtonClick = () => {
     if (isFormDirty) setIsExitModalOpen(true)
     else handleExit()
   }
 
-  const handleSave = isCreateMode ? handleCreateGroup : handleUpdateGroup
+  const handleSave = isCreateMode
+    ? form.handleSubmit(handleCreateGroup, handleFormValidationError)
+    : form.handleSubmit(handleUpdateGroup, handleFormValidationError)
 
   const renderTabContent = () => {
     switch (subTabValue) {
@@ -253,11 +247,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
       />
       <PageBackground className="flex flex-col" hasBackground={!isReadOnly}>
         <Form {...form}>
-          <form
-            id="groupEditForm"
-            onSubmit={form.handleSubmit(handleSave, handleValidationErrors)}
-            className="flex flex-col justify-between h-full"
-          >
+          <form id="groupEditForm" onSubmit={handleSave} className="flex flex-col justify-between h-full">
             {isLoading ? <LoadingSpinner className="h-[300px]" /> : renderTabContent()}
           </form>
         </Form>
@@ -266,7 +256,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
         open={isExitModalOpen}
         onOpenChange={() => setIsExitModalOpen(false)}
         onDiscard={handleExit}
-        onConfirm={handleExitAndSafe}
+        onConfirm={handleSave}
         isLoading={isLoading}
       />
     </PageContainer>

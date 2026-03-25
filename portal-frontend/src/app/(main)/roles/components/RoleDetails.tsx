@@ -36,7 +36,7 @@ import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
-import { FormRole, Role, ROLE_TYPES, roleSchema, RoleTab } from '@/types/roles'
+import { FormRole, Role, ROLE_TYPES, RoleSchema, RoleTab } from '@/types/roles'
 import { isPlatformwideAssignment } from '@/utils/assignments'
 import { isNameConflictError, isPermissionsError } from '@/utils/errors'
 
@@ -85,7 +85,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const router = useRouter()
   const { hasPermission } = usePermissions()
   const { setSubTabValueParam, subTabValue, tabValue } = useQueryParams()
-  const { handleNameError, handlePermissionsError } = useError()
+  const { handleFormValidationError, handleNameError, handlePermissionsError } = useError()
 
   const canUpdate = !roleId || hasPermission(PERMISSION_NAMES.ROLE_UPDATE)
   const canDelete = hasPermission(PERMISSION_NAMES.ROLE_DELETE)
@@ -141,6 +141,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const deleteAssignment = useDeleteAssignment()
 
   const initialRole = roleData?.data || defaultRole
+  const isCreateMode = !(roleId && initialRole)
 
   const createRole = useCreateRole()
   const updateRole = useUpdateRole()
@@ -157,14 +158,20 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const mapRoleApiToFormData = (role: Role): FormRole => ({ ...role, description: role.description || '' })
 
   const form = useForm<FormRole>({
-    resolver: zodResolver(roleSchema),
+    resolver: zodResolver(RoleSchema),
     defaultValues: mapRoleApiToFormData(initialRole),
   })
 
   const handleRoleRequestError = (error: AxiosError, defaultMessage: string) => {
-    if (isNameConflictError(error)) handleNameError(form, form.getValues('name'))
-    if (isPermissionsError(error)) handlePermissionsError()
-    else toast.error(defaultMessage)
+    if (isNameConflictError(error)) {
+      handleNameError(form, form.getValues('name'))
+      return
+    }
+    if (isPermissionsError(error)) {
+      handlePermissionsError()
+      return
+    }
+    toast.error(defaultMessage)
   }
 
   // Initialize form and permissions from role data
@@ -218,9 +225,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     })
   }
 
-  const createNewRole = () => {
-    const formValues = form.getValues()
-
+  const createNewRole = (formValues: FormRole) => {
     createRole.mutate(
       {
         name: formValues.name,
@@ -240,9 +245,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     )
   }
 
-  const updateRoleValues = async (roleId: string) => {
-    const formValues = form.getValues()
-
+  const updateRoleValues = async (formValues: FormRole, roleId: string) => {
     try {
       await updateRole.mutateAsync({
         id: roleId,
@@ -287,25 +290,25 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     }
   }
 
-  // Unified save handler
-  const handleSave = async () => {
-    const isCreateMode = !(roleId && initialRole)
-
-    if (isCreateMode) {
-      createNewRole()
-    } else {
-      const shouldUpdateValues = form.formState.isDirty || arePermissionsDirty
-      try {
-        // values of default roles must not be edited but their assignments can be updated
-        if (!isDefaultRole && shouldUpdateValues) await updateRoleValues(roleId)
-        if (areAssignmentsDirty) await saveGroupAssignment(roleId)
-        setIsExitModalOpen(false)
-        // eslint-disable-next-line unused-imports/no-unused-vars
-      } catch (error) {
-        console.error('An error occurred while updating the role')
-      }
+  const updateRoleAndAssignments = async (formValues: FormRole, roleId: string) => {
+    const shouldUpdateValues = form.formState.isDirty || arePermissionsDirty
+    try {
+      // values of default roles must not be edited but their assignments can be updated
+      if (!isDefaultRole && shouldUpdateValues) await updateRoleValues(formValues, roleId)
+      if (areAssignmentsDirty) await saveGroupAssignment(roleId)
+      setIsExitModalOpen(false)
+      // eslint-disable-next-line unused-imports/no-unused-vars
+    } catch (error) {
+      console.error('An error occurred while updating the role')
     }
   }
+
+  const handleSave = isCreateMode
+    ? form.handleSubmit(createNewRole, handleFormValidationError)
+    : form.handleSubmit(
+        (formValues: FormRole) => updateRoleAndAssignments(formValues, roleId as string),
+        handleFormValidationError,
+      )
 
   const handleExit = () => {
     if (!roleId) {

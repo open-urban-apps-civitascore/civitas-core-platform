@@ -95,17 +95,10 @@ export const mapDatastructureVersionFormToApiData = (
   }
 }
 
-export const parseDatastructureVersionFormData = (
-  values: DatastructureVersionFormData,
-  isDraftMode: boolean,
-): DatastructureVersionFormData | undefined => {
-  const parsed = isDraftMode
+export const parseDatastructureVersionFormData = (values: DatastructureVersionFormData, isDraftMode: boolean) => {
+  return isDraftMode
     ? DatastructureVersionFormDraftSchema.safeParse(values)
     : DatastructureVersionFormAvailableSchema.safeParse(values)
-  if (!parsed.success) {
-    console.error(parsed.error)
-  }
-  return parsed.data
 }
 
 type FormFields = DatastructureFormDraft | DatastructureVersionFormData

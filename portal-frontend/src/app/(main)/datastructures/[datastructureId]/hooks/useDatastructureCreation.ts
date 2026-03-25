@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { useCreateDatastructure } from '@/app/services/api/datastructures/clientRequests'
+import { useError } from '@/hooks/use-error'
 import {
   DatastructureCreateDataSchema,
   DatastructureCreateFormData,
@@ -13,6 +14,7 @@ import {
 export const useDatastructureCreation = () => {
   const t = useTranslations('datastructures')
   const tCommon = useTranslations('common')
+  const { handleFormValidationError } = useError()
 
   const createDatastructure = useCreateDatastructure()
   const isLoading = createDatastructure.isPending
@@ -33,8 +35,7 @@ export const useDatastructureCreation = () => {
     }
     const parsed = DatastructureCreateDataSchema.safeParse(createDatastructureData)
     if (!parsed.success) {
-      console.error(parsed.error)
-      toast.error(tCommon('errors.formInvalid'))
+      handleFormValidationError(parsed.error)
       return
     }
 
