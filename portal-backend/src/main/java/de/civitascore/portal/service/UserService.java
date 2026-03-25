@@ -11,8 +11,10 @@ import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -111,8 +113,41 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     return super.prePublish(entity, input);
   }
 
-  private UserConfig buildUserConfig(User entity) {
-    UserConfig userConfig = new UserConfig();
+  @Override
+  protected ConfigValue toConfigValuePreSave(User entity, UserInputDTO input) {
+    // Capture the current email before the entity is mutated so that toConfigValuePostSave
+    // can reliably detect whether the email address was changed by the update.
+    UserConfig config = new UserConfig();
+
+    Set<String> requiredActions = new HashSet<>();
+
+    boolean isNewUser = entity.getExternalId() == null || entity.getExternalId().isBlank();
+
+    if (isNewUser) {
+      requiredActions.add("VERIFY_EMAIL");
+      requiredActions.add("UPDATE_PASSWORD");
+    }
+
+    boolean hasEmailChanged = !Objects.equals(entity.getEmail(), input.getEmail());
+
+    if (hasEmailChanged) {
+      requiredActions.add("VERIFY_EMAIL");
+    }
+
+    config.setEmailVerified(!isNewUser && !hasEmailChanged);
+    config.setRequiredActions(new ArrayList<>(requiredActions));
+
+    return config;
+  }
+
+  @Override
+  protected ConfigValue toConfigValuePostSave(
+      User entity, UserInputDTO input, ConfigValue preSaveConfigValue) {
+
+    UserConfig userConfig =
+        preSaveConfigValue instanceof UserConfig
+            ? (UserConfig) preSaveConfigValue
+            : new UserConfig();
 
     // Set Keycloak user ID if it exists (required for UPDATE/DELETE operations)
     if (entity.getExternalId() != null && !entity.getExternalId().isBlank()) {
@@ -123,13 +158,7 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     userConfig.setEmail(entity.getEmail());
     userConfig.setFirstName(entity.getFirstName());
     userConfig.setLastName(entity.getLastName());
-    userConfig.setEnabled(true); // Default to enabled
-    userConfig.setEmailVerified(false); // Default to not verified
-
-    // Require email verification and password setup for new users
-    if (entity.getExternalId() == null || entity.getExternalId().isBlank()) {
-      userConfig.setRequiredActions(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
-    }
+    userConfig.setEnabled(true);
 
     return userConfig;
   }
@@ -222,18 +251,6 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   @Override
   protected String getConfigPath() {
     return "/users";
-  }
-
-  /**
-   * Converts a user entity into a {@link ConfigValue} (Keycloak user configuration) for the config
-   * adapter event payload.
-   *
-   * @param entity the user entity
-   * @return the Keycloak user configuration value
-   */
-  @Override
-  protected ConfigValue toConfigValue(User entity) {
-    return buildUserConfig(entity);
   }
 
   /**

@@ -9,7 +9,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.Topics;
-import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.idm.UserConfig;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.Group;
@@ -170,52 +169,27 @@ class UserServiceTest {
   }
 
   // ---------------------------------------------------------------------------
-  // buildUserConfig (called via toConfigValue)
+  // toConfigValuePreSave / toConfigValuePostSave (previously toConfigValue)
   // ---------------------------------------------------------------------------
 
   @Nested
-  @DisplayName("buildUserConfig()")
-  class BuildUserConfigTests {
+  @DisplayName("toConfigValuePreSave()")
+  class ToConfigValuePreSaveTests {
 
     @Test
-    @DisplayName("Should use email as username")
-    void shouldSetEmailAsUsername() {
-      UserService service = createService();
-      User user = userWithId(UUID.randomUUID());
-      user.setEmail("admin@civitas.de");
-
-      ConfigValue result = service.toConfigValue(user);
-
-      assertThat(result).isInstanceOf(UserConfig.class);
-      UserConfig config = (UserConfig) result;
-      assertThat(config.getUsername()).isEqualTo("admin@civitas.de");
-      assertThat(config.getEmail()).isEqualTo("admin@civitas.de");
-    }
-
-    @Test
-    @DisplayName("Should set required actions for new user without externalId")
+    @DisplayName("Should set VERIFY_EMAIL and UPDATE_PASSWORD for new user (no externalId)")
     void shouldSetRequiredActionsForNewUser() {
       UserService service = createService();
       User user = userWithId(UUID.randomUUID());
       user.setExternalId(null);
+      UserInputDTO input = new UserInputDTO();
+      input.setEmail(user.getEmail());
 
-      UserConfig config = (UserConfig) service.toConfigValue(user);
+      UserConfig config = (UserConfig) service.toConfigValuePreSave(user, input);
 
-      assertThat(config.getRequiredActions()).containsExactly("VERIFY_EMAIL", "UPDATE_PASSWORD");
-      assertThat(config.getId()).isNull();
-    }
-
-    @Test
-    @DisplayName("Should not set required actions for existing user with externalId")
-    void shouldNotSetRequiredActionsForExistingUser() {
-      UserService service = createService();
-      User user = userWithId(UUID.randomUUID());
-      user.setExternalId("keycloak-uuid-123");
-
-      UserConfig config = (UserConfig) service.toConfigValue(user);
-
-      assertThat(config.getRequiredActions()).isNull();
-      assertThat(config.getId()).isEqualTo("keycloak-uuid-123");
+      assertThat(config.getRequiredActions())
+          .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD");
+      assertThat(config.getEmailVerified()).isFalse();
     }
 
     @Test
@@ -224,15 +198,111 @@ class UserServiceTest {
       UserService service = createService();
       User user = userWithId(UUID.randomUUID());
       user.setExternalId("   ");
+      UserInputDTO input = new UserInputDTO();
+      input.setEmail(user.getEmail());
 
-      UserConfig config = (UserConfig) service.toConfigValue(user);
+      UserConfig config = (UserConfig) service.toConfigValuePreSave(user, input);
 
-      assertThat(config.getRequiredActions()).containsExactly("VERIFY_EMAIL", "UPDATE_PASSWORD");
+      assertThat(config.getRequiredActions())
+          .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD");
+      assertThat(config.getEmailVerified()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Should not set required actions for existing user when email is unchanged")
+    void shouldNotSetRequiredActionsForExistingUserWithSameEmail() {
+      UserService service = createService();
+      User user = userWithId(UUID.randomUUID());
+      user.setExternalId("keycloak-uuid-123");
+      user.setEmail("same@example.com");
+      UserInputDTO input = new UserInputDTO();
+      input.setEmail("same@example.com");
+
+      UserConfig config = (UserConfig) service.toConfigValuePreSave(user, input);
+
+      assertThat(config.getRequiredActions()).isEmpty();
+      assertThat(config.getEmailVerified()).isTrue();
+    }
+
+    @Test
+    @DisplayName(
+        "Should add VERIFY_EMAIL and set emailVerified=false when email changes for existing user")
+    void shouldResetEmailVerifiedWhenEmailChanges() {
+      UserService service = createService();
+      User user = userWithId(UUID.randomUUID());
+      user.setExternalId("keycloak-uuid-123");
+      user.setEmail("old@example.com");
+      UserInputDTO input = new UserInputDTO();
+      input.setEmail("new@example.com");
+
+      UserConfig config = (UserConfig) service.toConfigValuePreSave(user, input);
+
+      assertThat(config.getRequiredActions()).contains("VERIFY_EMAIL");
+      assertThat(config.getEmailVerified()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Should preserve emailVerified=false for new user even when email is unchanged")
+    void shouldPreserveEmailVerifiedFalseForNewUser() {
+      UserService service = createService();
+      User user = userWithId(UUID.randomUUID());
+      user.setExternalId(null);
+      user.setEmail("user@example.com");
+      UserInputDTO input = new UserInputDTO();
+      input.setEmail("user@example.com");
+
+      UserConfig config = (UserConfig) service.toConfigValuePreSave(user, input);
+
+      assertThat(config.getEmailVerified()).isFalse();
+    }
+  }
+
+  @Nested
+  @DisplayName("toConfigValuePostSave()")
+  class ToConfigValuePostSaveTests {
+
+    @Test
+    @DisplayName("Should use email as username")
+    void shouldSetEmailAsUsername() {
+      UserService service = createService();
+      User user = userWithId(UUID.randomUUID());
+      user.setEmail("admin@civitas.de");
+
+      UserConfig config =
+          (UserConfig) service.toConfigValuePostSave(user, new UserInputDTO(), null);
+
+      assertThat(config.getUsername()).isEqualTo("admin@civitas.de");
+      assertThat(config.getEmail()).isEqualTo("admin@civitas.de");
+    }
+
+    @Test
+    @DisplayName("Should set externalId as Keycloak id when present")
+    void shouldSetKeycloakIdFromExternalId() {
+      UserService service = createService();
+      User user = userWithId(UUID.randomUUID());
+      user.setExternalId("keycloak-uuid-123");
+
+      UserConfig config =
+          (UserConfig) service.toConfigValuePostSave(user, new UserInputDTO(), null);
+
+      assertThat(config.getId()).isEqualTo("keycloak-uuid-123");
+    }
+
+    @Test
+    @DisplayName("Should not set id when externalId is null")
+    void shouldNotSetIdWhenExternalIdNull() {
+      UserService service = createService();
+      User user = userWithId(UUID.randomUUID());
+      user.setExternalId(null);
+
+      UserConfig config =
+          (UserConfig) service.toConfigValuePostSave(user, new UserInputDTO(), null);
+
       assertThat(config.getId()).isNull();
     }
 
     @Test
-    @DisplayName("Should set user properties correctly")
+    @DisplayName("Should set user properties and enabled=true")
     void shouldSetUserProperties() {
       UserService service = createService();
       User user = userWithId(UUID.randomUUID());
@@ -240,11 +310,29 @@ class UserServiceTest {
       user.setLastName("Mustermann");
       user.setEmail("max@example.com");
 
-      UserConfig config = (UserConfig) service.toConfigValue(user);
+      UserConfig config =
+          (UserConfig) service.toConfigValuePostSave(user, new UserInputDTO(), null);
 
       assertThat(config.getFirstName()).isEqualTo("Max");
       assertThat(config.getLastName()).isEqualTo("Mustermann");
       assertThat(config.getEnabled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Should carry over requiredActions and emailVerified from preSaveConfigValue")
+    void shouldCarryOverPreSaveFields() {
+      UserService service = createService();
+      User user = userWithId(UUID.randomUUID());
+      user.setExternalId(null);
+      user.setEmail("user@example.com");
+      UserInputDTO input = new UserInputDTO();
+      input.setEmail("user@example.com");
+
+      UserConfig preSave = (UserConfig) service.toConfigValuePreSave(user, input);
+      UserConfig config = (UserConfig) service.toConfigValuePostSave(user, input, preSave);
+
+      assertThat(config.getRequiredActions())
+          .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD");
       assertThat(config.getEmailVerified()).isFalse();
     }
   }
@@ -311,7 +399,7 @@ class UserServiceTest {
       input.setGroupIds(groupIds);
 
       Group group = new Group();
-      group.setId(groupIds.get(0));
+      group.setId(groupIds.getFirst());
       when(groupRepository.findAllByIdWithMembers(groupIds)).thenReturn(List.of(group));
 
       service.prePublish(user, input);
