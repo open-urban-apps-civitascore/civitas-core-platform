@@ -70,9 +70,6 @@ export const UserOverview = (props: UserOverviewProps) => {
   const { handleUserEmailError } = useError()
   const { hasPermission } = usePermissions()
   const canUpdate = isCreateMode || hasPermission(PERMISSION_NAMES.USER_UPDATE)
-  const onError = () => {
-    toast.error(tCommon('errors.unexpectedError'))
-  }
 
   const tabs: Tab<UserTab>[] = [
     tabValues.userData,
