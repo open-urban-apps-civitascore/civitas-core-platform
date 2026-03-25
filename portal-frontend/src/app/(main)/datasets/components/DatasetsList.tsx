@@ -77,7 +77,10 @@ const DatasetsList = (props: DatasetsListProps) => {
   useEffect(() => setTotalPages(Math.ceil(rowCount / pageSize) || 1), [rowCount, pageSize, setTotalPages])
 
   const CustomElement = hasPermission(PERMISSION_NAMES.DATASET_CREATE) ? (
-    <Button onClick={() => router.push(`datasets/create?${getApiRequestParamsByUrl().toString()}`)}>
+    <Button
+      data-testid="addDatasetButton"
+      onClick={() => router.push(`datasets/create?${getApiRequestParamsByUrl().toString()}`)}
+    >
       <Plus />
       {t('newDataset')}
     </Button>
