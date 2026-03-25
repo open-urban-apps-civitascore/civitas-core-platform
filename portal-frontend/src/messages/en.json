@@ -236,7 +236,7 @@
         "title": "Creation Progress",
         "accessManagement": {
           "title": "Access Management",
-          "button": "Edit groups and roles",
+          "button": "View Groups and Roles",
           "assignments": "Groups and Roles",
           "noAssignments": "No groups or roles available",
           "groups": "Groups",
@@ -246,7 +246,7 @@
         },
         "dataFlow": {
           "title": "Data flow",
-          "button": "Load and provide data",
+          "button": "View Data flow",
           "pipelines": "Pipeline",
           "sensorThingsAPI": "SensorThings API",
           "noDataFlow": "No data flow available yet."

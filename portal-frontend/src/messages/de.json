@@ -235,7 +235,7 @@
         "title": "Erstellungsfortschritt",
         "accessManagement": {
           "title": "Zugriffsberechtigungen",
-          "button": "Gruppen und Rollen bearbeiten",
+          "button": "Gruppen und Rollen ansehen",
           "assignments": "Gruppen und Rollen",
           "noAssignments": "Keine Gruppen oder Rollen vorhanden",
           "groups": "Gruppen",
@@ -245,7 +245,7 @@
         },
         "dataFlow": {
           "title": "Datenfluss",
-          "button": "Daten laden und bereitstellen",
+          "button": "Datenfluss ansehen",
           "pipelines": "Pipeline",
           "distributionAccessURLs": "SensorThings API",
           "noDataFlow": "Es sind noch keine Daten vorhanden."
