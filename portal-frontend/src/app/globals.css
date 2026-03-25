@@ -149,3 +149,15 @@
     @apply bg-background text-foreground font-sans font-normal;
   }
 }
+
+[data-sonner-toast].toast-default {
+  --normal-bg: var(--popover-dark);
+  --normal-text: var(--popover-foreground-dark);
+  --normal-border: var(--popover-dark);
+}
+
+[data-sonner-toast].toast-error {
+  --normal-bg: var(--destructive);
+  --normal-text: oklch(1 0 0);
+  --normal-border: var(--destructive);
+}
