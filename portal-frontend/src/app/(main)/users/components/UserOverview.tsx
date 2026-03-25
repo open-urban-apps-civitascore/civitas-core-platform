@@ -16,10 +16,12 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
+import { useError } from '@/hooks/use-error'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { User, UserFormData, UserFormSchema, UserTab } from '@/types/users'
+import { isEmailConflictError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 import { getHeaderAction } from '@/utils/headerAction'
 import { mapUserToFormData } from '@/utils/users'
@@ -65,11 +67,9 @@ export const UserOverview = (props: UserOverviewProps) => {
   const updateUser = useUpdateUser()
   const isLoading = createUser.isPending || updateUser.isPending
   const { setSubTabValueParam, subTabValue } = useQueryParams()
+  const { handleUserEmailError } = useError()
   const { hasPermission } = usePermissions()
   const canUpdate = isCreateMode || hasPermission(PERMISSION_NAMES.USER_UPDATE)
-  const onError = () => {
-    toast.error(tCommon('errors.unexpectedError'))
-  }
 
   const tabs: Tab<UserTab>[] = [
     tabValues.userData,
@@ -143,7 +143,13 @@ export const UserOverview = (props: UserOverviewProps) => {
           toast.success(t('messages.createSuccess'))
           router.push(`/users/${data.id}?mode=edit`)
         },
-        onError,
+        onError: error => {
+          if (isEmailConflictError(error)) {
+            handleUserEmailError(form, parsed.email)
+          } else {
+            toast.error(t('errors.creationError'))
+          }
+        },
       },
     )
   }
@@ -166,7 +172,13 @@ export const UserOverview = (props: UserOverviewProps) => {
           router.refresh()
           toast.success(t('messages.updateSuccess'))
         },
-        onError,
+        onError: error => {
+          if (isEmailConflictError(error)) {
+            handleUserEmailError(form, parsed.email)
+          } else {
+            toast.error(t('errors.updateError'))
+          }
+        },
       },
     )
   }

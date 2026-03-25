@@ -406,13 +406,13 @@ describe('UserOverview', () => {
     it('shows error toast on failed create', async () => {
       const { toast } = await import('sonner')
       mockCreateMutate.mockImplementation((_data, options) => {
-        options?.onError?.()
+        options?.onError?.({ status: 500, response: { data: { message: 'error' } } })
       })
       renderComponent({ isCreateMode: true, userData: validUserData })
       fireEvent.change(screen.getByTestId('firstNameTextField'), { target: { value: 'NewFirst' } })
       fireEvent.click(screen.getByTestId('confirmButton'))
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith('errors.unexpectedError')
+        expect(toast.error).toHaveBeenCalledWith('errors.creationError')
       })
     })
   })
@@ -457,14 +457,14 @@ describe('UserOverview', () => {
     it('shows error toast on failed update', async () => {
       const { toast } = await import('sonner')
       mockUpdateMutate.mockImplementation((_data, options) => {
-        options?.onError?.()
+        options?.onError?.({ status: 500, response: { data: { message: 'error' } } })
       })
       mockSearchParams = new URLSearchParams('mode=edit')
       renderComponent()
       fireEvent.change(screen.getByTestId('firstNameTextField'), { target: { value: 'Updated' } })
       fireEvent.click(screen.getByTestId('confirmButton'))
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith('errors.unexpectedError')
+        expect(toast.error).toHaveBeenCalledWith('errors.updateError')
       })
     })
   })

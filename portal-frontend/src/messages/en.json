@@ -54,6 +54,8 @@
       "updateError": "An error occurred while updating the {item}.",
       "nameExists": "This name is already in use.",
       "nameExistsToast": "The name {name} is already in use. Please, choose another name.",
+      "emailExists": "This email is already in use.",
+      "emailExistsToast": "The email {email} is already in use. Please, choose another email address.",
       "insufficientPermissions": "You do not have the necessary permissions to perform this action."
     },
     "items": {
@@ -359,6 +361,10 @@
     "messages": {
       "createSuccess": "User has been successfully created.",
       "updateSuccess": "User has been successfully updated."
+    },
+    "errors": {
+      "creationError": "An error occurred while creating the user.",
+      "updateError": "An error occurred while updating the user."
     }
   },
   "groups": {

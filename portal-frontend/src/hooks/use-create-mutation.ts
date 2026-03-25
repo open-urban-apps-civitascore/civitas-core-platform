@@ -13,7 +13,7 @@ export const useCreateMutation = <TResponse, TData>({
 }: CreateMutationInput<TData>) => {
   const queryClient = useQueryClient()
 
-  return useMutation<ApiServiceResponse<TResponse>, unknown, TData>({
+  return useMutation<ApiServiceResponse<TResponse>, AxiosError, TData>({
     mutationFn: (data: TData) => {
       const url = isFn(endpoint) ? getRequestEndpoint(endpoint, data) : endpoint
 
