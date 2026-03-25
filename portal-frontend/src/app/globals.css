@@ -91,9 +91,6 @@
   --error: oklch(67.512% 0.20416 358.512);
   --search-height: calc(--spacing(16));
   --status-label: oklch(90.196% 0.02539 233.145);
-  --toast-error-bg: oklch(53.237% 0.21516 25.74);
-  --toast-error-text: oklch(1 0 0);
-  --toast-error-border: oklch(53.237% 0.21516 25.74);
 }
 
 .dark {
@@ -156,16 +153,10 @@
   --normal-bg: var(--popover-dark);
   --normal-text: var(--popover-foreground-dark);
   --normal-border: var(--popover-dark);
-  background-color: var(--popover-dark);
-  color: var(--popover-foreground-dark);
-  border-color: var(--popover-dark);
 }
 
 [data-sonner-toast].toast-error {
-  --normal-bg: var(--toast-error-bg);
-  --normal-text: var(--toast-error-text);
-  --normal-border: var(--toast-error-border);
-  background-color: var(--toast-error-bg);
-  color: var(--toast-error-text);
-  border-color: var(--toast-error-border);
+  --normal-bg: var(--destructive);
+  --normal-text: oklch(1 0 0);
+  --normal-border: var(--destructive);
 }
