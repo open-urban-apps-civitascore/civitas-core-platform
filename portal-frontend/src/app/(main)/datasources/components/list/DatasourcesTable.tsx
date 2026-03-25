@@ -48,6 +48,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
         info.getValue() ? <LinkCell href={`datasources/${info.row.original.id}`}>{info.getValue()}</LinkCell> : '-',
 
       meta: {
+        truncate: true,
         style: {
           width: '25%',
           minWidth: '200px',
@@ -60,6 +61,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
       header: t('tableHeaders.description'),
       cell: info => info.getValue(),
       meta: {
+        truncate: true,
         style: {
           width: '30%',
           minWidth: '200px',

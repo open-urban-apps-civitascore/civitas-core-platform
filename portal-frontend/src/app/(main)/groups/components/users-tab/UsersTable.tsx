@@ -52,6 +52,7 @@ export const UsersTable = (props: UsersTableProps) => {
         </LinkCell>
       ),
       meta: {
+        truncate: true,
         style: {
           width: '22.22%',
           minWidth: '200px',

@@ -52,6 +52,7 @@ const GroupsTable = (props: GroupsTableProps) => {
         </LinkCell>
       ),
       meta: {
+        truncate: true,
         style: {
           width: '22.22%',
           minWidth: '200px',
@@ -82,12 +83,7 @@ const GroupsTable = (props: GroupsTableProps) => {
       header: t('groupsTab.description'),
       cell: info => info.getValue() || '-',
       meta: {
-        style: {
-          whiteSpace: 'nowrap',
-          maxWidth: '300px',
-          textOverflow: 'ellipsis',
-          overflow: 'hidden',
-        },
+        truncate: true,
       },
     }),
     ...(!isReadOnly

@@ -1,13 +1,15 @@
 import { ScrollArea } from '@radix-ui/react-scroll-area'
 import { flexRender, Row, SortDirection, Table } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { ComponentProps } from 'react'
+import { ComponentProps, ReactNode, useRef } from 'react'
 
+import { useIsTruncated } from '@/hooks/use-is-truncated'
 import { cn } from '@/lib/utils'
 
 import { ScrollBar } from '../ui/scroll-area'
 import { Skeleton } from '../ui/skeleton'
 import { Table as ShadCnTable, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 import TablePagination from './table-pagination/TablePagination'
 
 export const getAriaSort = (sorting: false | SortDirection) => {
@@ -32,6 +34,22 @@ export interface DataTableProps<T> extends ComponentProps<'table'> {
   testId?: string
   isRowClickable?: (row: Row<T>) => boolean
   onRowClick?: (row: Row<T>) => void
+}
+
+const TruncatedCell = ({ children }: { children: ReactNode }) => {
+  const ref = useRef<HTMLDivElement>(null)
+  const isTruncated = useIsTruncated(ref)
+
+  return (
+    <Tooltip open={isTruncated ? undefined : false}>
+      <TooltipTrigger asChild>
+        <div ref={ref} tabIndex={0} className="truncate">
+          {children}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent variant="secondary">{children}</TooltipContent>
+    </Tooltip>
+  )
 }
 
 const LoadingSkeleton = () => (
@@ -107,11 +125,18 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
                   >
                     {row.getVisibleCells().map(cell => (
                       <TableCell
-                        className={cn('whitespace-normal px-3 group/cell relative h-16')}
+                        className={cn(
+                          'px-3 group/cell relative h-16',
+                          cell.column.columnDef.meta?.truncate ? 'max-w-0' : 'whitespace-normal',
+                        )}
                         key={cell.id}
                         style={cell.column.columnDef.meta?.style}
                       >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        {cell.column.columnDef.meta?.truncate ? (
+                          <TruncatedCell>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TruncatedCell>
+                        ) : (
+                          flexRender(cell.column.columnDef.cell, cell.getContext())
+                        )}
                       </TableCell>
                     ))}
                   </TableRow>

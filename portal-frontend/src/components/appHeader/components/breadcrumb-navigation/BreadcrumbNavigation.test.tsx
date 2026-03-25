@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 
 import { apiRequest } from '@/app/services/api/request/apiRequest'
@@ -22,6 +22,12 @@ vi.mock('next-intl', () => ({
 
 vi.mock('@/app/services/api/request/apiRequest', () => ({
   apiRequest: vi.fn(),
+}))
+
+const mockUseIsTruncated = vi.fn().mockReturnValue(false)
+
+vi.mock('@/hooks/use-is-truncated', () => ({
+  useIsTruncated: () => mockUseIsTruncated(),
 }))
 
 const queryClient = new QueryClient({
@@ -128,5 +134,39 @@ describe('BreadcrumbNavigation', () => {
       )
       expect(screen.getByText('Version 2')).toBeInTheDocument()
     })
+  })
+
+  it('does not show tooltip when dynamic breadcrumb is not truncated', async () => {
+    vi.useFakeTimers()
+    vi.mocked(apiRequest).mockResolvedValueOnce({
+      data: { name: 'Datastructure A' },
+    })
+    renderWithClient()
+
+    await vi.waitFor(() => {
+      expect(screen.getByText('Datastructure A')).toBeInTheDocument()
+    })
+    fireEvent.focus(screen.getByText('Datastructure A'))
+    await vi.advanceTimersByTimeAsync(500)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it('shows tooltip when dynamic breadcrumb is truncated', async () => {
+    vi.useFakeTimers()
+    mockUseIsTruncated.mockReturnValue(true)
+    vi.mocked(apiRequest).mockResolvedValueOnce({
+      data: { name: 'Datastructure with a long name' },
+    })
+    renderWithClient()
+
+    await vi.waitFor(() => {
+      expect(screen.getByText('Datastructure with a long name')).toBeInTheDocument()
+    })
+    fireEvent.focus(screen.getByText('Datastructure with a long name'))
+    await vi.advanceTimersByTimeAsync(500)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Datastructure with a long name')
+    vi.useRealTimers()
+    mockUseIsTruncated.mockReturnValue(false)
   })
 })
