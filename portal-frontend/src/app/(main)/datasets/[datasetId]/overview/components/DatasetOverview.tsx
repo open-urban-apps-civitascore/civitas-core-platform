@@ -280,7 +280,14 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     {
       title: t('overview.completion.dataFlow.title'),
       isCompleted: pipelineNames?.length > 0 || distributionAccessURL?.length > 0,
-      buttons: [{ text: t('overview.completion.dataFlow.button'), routeParam: 'data-flow' }],
+      buttons: [
+        {
+          text: isReadOnly
+            ? t('overview.completion.dataFlow.button.readOnly')
+            : t('overview.completion.dataFlow.button.editable'),
+          routeParam: 'data-flow',
+        },
+      ],
       content:
         pipelineNames?.length > 0 || distributionAccessURL?.length > 0 ? (
           <>
@@ -295,7 +302,14 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     {
       title: t('overview.completion.accessManagement.title'),
       isCompleted: groupCount > 0 && roleCount > 0,
-      buttons: [{ text: t('overview.completion.accessManagement.button'), routeParam: 'access-management' }],
+      buttons: [
+        {
+          text: isReadOnly
+            ? t('overview.completion.accessManagement.button.readOnly')
+            : t('overview.completion.accessManagement.button.editable'),
+          routeParam: 'access-management',
+        },
+      ],
       content: (
         <>
           {groupCount > 0 || roleCount > 0 ? (
