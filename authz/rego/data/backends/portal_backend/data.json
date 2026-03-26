@@ -150,7 +150,7 @@
     },
     "/v1/datastructures/{id}/versions": {
       "GET": "DATASTRUCTURE_READ",
-      "POST": "DATASTRUCTURE_CREATE"
+      "POST": "DATASTRUCTURE_UPDATE"
     },
     "/v1/datastructures/{id}/versions/{id}": {
       "GET": "DATASTRUCTURE_READ",
