@@ -47,7 +47,9 @@ export interface UseEntityResult<T extends SelectableEntity> {
  * Uses the real datasources API.
  *
  */
-export const useDataSourceEntities = (): UseEntityResult<Datasource> => {
+export const useDataSourceEntities = (opts?: { isEnabled?: boolean }): UseEntityResult<Datasource> => {
+  const isEnabled = opts?.isEnabled ?? true
+
   const params = useMemo(() => {
     const p = new URLSearchParams()
     p.set('dataSourceStatus', DATASOURCE_STATUS_TYPES.AVAILABLE)
@@ -55,7 +57,7 @@ export const useDataSourceEntities = (): UseEntityResult<Datasource> => {
     return p
   }, [])
 
-  const { data: response, isLoading, isError, error } = useGetDatasources({ params, isEnabled: true })
+  const { data: response, isLoading, isError, error } = useGetDatasources({ params, isEnabled })
 
   // Extract the data array from ApiServiceResponse
   const entities = useMemo(() => response?.data ?? [], [response])

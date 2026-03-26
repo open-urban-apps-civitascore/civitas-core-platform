@@ -1,9 +1,9 @@
 /**
- * E2E tests for Pipeline Editor gating by DATASOURCE_READ permission.
+ * E2E tests for Pipeline Editor datasource selector gating by DATASOURCE_READ.
  *
- * The pipeline editor on the dataset data-flow page should only be visible
- * when the user has DATASOURCE_READ permission. Without it, a "no permission"
- * message is shown instead.
+ * The pipeline editor is always accessible, but the datasource selector
+ * in the DataSource node inspector is disabled without DATASOURCE_READ.
+ * These tests verify the editor loads correctly for both user types.
  */
 import { expect, test } from '@playwright/test'
 
@@ -66,19 +66,19 @@ test.describe('Dataset Pipeline Editor — DATASOURCE_READ Gating', () => {
     await cleanupTestResources(adminApi, resources)
   })
 
-  test('Pipeline editor visible with DATASOURCE_READ', async ({ browser }) => {
+  test('Pipeline editor loads with DATASOURCE_READ', async ({ browser }) => {
     await withTestUser(browser, userWithDatasourceRead, async page => {
       await page.goto(`/datasets/${dataset.id}/data-flow`)
       await page.waitForLoadState('domcontentloaded')
-      await expect(page.getByTestId('noPermissionMessage')).not.toBeVisible({ timeout: 20_000 })
+      await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
     })
   })
 
-  test('Pipeline editor hidden without DATASOURCE_READ', async ({ browser }) => {
+  test('Pipeline editor loads without DATASOURCE_READ', async ({ browser }) => {
     await withTestUser(browser, userWithoutDatasourceRead, async page => {
       await page.goto(`/datasets/${dataset.id}/data-flow`)
       await page.waitForLoadState('domcontentloaded')
-      await expect(page.getByTestId('noPermissionMessage')).toBeVisible({ timeout: 20_000 })
+      await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
     })
   })
 })

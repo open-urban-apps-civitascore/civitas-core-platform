@@ -950,7 +950,8 @@
       "status": "Status",
       "description": "Description",
       "tags": "Tags",
-      "showDataStructure": "Show Data structure"
+      "showDataStructure": "Show Data Structure",
+      "noPermission": "No permission to read datasources"
     },
     "apiPanel": {
       "requestDetails": "API Request Details",
