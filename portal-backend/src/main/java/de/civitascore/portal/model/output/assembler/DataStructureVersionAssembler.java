@@ -8,6 +8,11 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/**
+ * Assembler for converting {@link DataStructureVersion} entities to {@link
+ * DataStructureVersionOutputDTO}. Participates in the template method pattern defined by {@link
+ * BaseAssembler}.
+ */
 @Component
 @RequiredArgsConstructor
 public class DataStructureVersionAssembler
@@ -16,11 +21,16 @@ public class DataStructureVersionAssembler
   private final DataStructureVersionMapper dataStructureVersionMapper;
   private final DataSourceRepository dataSourceRepository;
 
+  /** {@inheritDoc} Delegates to the {@link DataStructureVersionMapper} for basic field mapping. */
   @Override
   public DataStructureVersionOutputDTO mapToBaseDto(DataStructureVersion entity) {
     return dataStructureVersionMapper.toOutput(entity);
   }
 
+  /**
+   * {@inheritDoc} Sets the {@code inUse} flag based on whether any data source references this
+   * version.
+   */
   @Override
   public DataStructureVersionOutputDTO enrichDto(
       DataStructureVersionOutputDTO dto, DataStructureVersion entity) {
@@ -28,6 +38,10 @@ public class DataStructureVersionAssembler
     return dto;
   }
 
+  /**
+   * {@inheritDoc} Converts a data structure version entity back to its input DTO for PATCH
+   * operations.
+   */
   @Override
   @SuppressWarnings("unchecked")
   public <I> I toInput(DataStructureVersion entity) {

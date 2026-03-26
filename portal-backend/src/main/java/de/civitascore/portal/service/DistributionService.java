@@ -10,6 +10,11 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for managing {@link Distribution} entities, which represent access endpoints for a
+ * dataset. Supports both manual creation via input DTOs and automatic generation from pipeline API
+ * paths during dataset publishing.
+ */
 @Service
 @RequiredArgsConstructor
 public class DistributionService extends BaseService<Distribution, DistributionInputDTO> {
@@ -33,6 +38,14 @@ public class DistributionService extends BaseService<Distribution, DistributionI
     return Distribution.class.getSimpleName();
   }
 
+  /**
+   * Resolves the resource reference after DTO-to-entity conversion. The dataset and activity
+   * associations are managed by their owning entities and are not set here.
+   *
+   * @param entity the distribution entity
+   * @param input the distribution input DTO containing the resource ID
+   * @return the entity with the resource relationship set
+   */
   @Override
   protected Distribution postConvertToEntity(Distribution entity, DistributionInputDTO input) {
     // Set resource
@@ -45,6 +58,15 @@ public class DistributionService extends BaseService<Distribution, DistributionI
     return super.postConvertToEntity(entity, input);
   }
 
+  /**
+   * Creates an auto-generated distribution from a SensorThings API path and associates it with the
+   * given dataset. The API path is normalized to a relative resource path (e.g., {@code /Things})
+   * by stripping the SensorThings version prefix.
+   *
+   * @param apiPath the full or relative SensorThings API URL
+   * @param dataSet the owning dataset
+   * @return the persisted distribution entity
+   */
   public Distribution createFromApiUrlAndDataSet(String apiPath, DataSet dataSet) {
     Distribution distribution = new Distribution();
     // Store only the resource path (e.g. "/Things"), stripping everything up to and including the

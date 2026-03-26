@@ -20,6 +20,11 @@ import java.util.stream.Stream;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Links a {@link Group} to a {@link Role} with an optional {@link ScopeType scope}, forming the
+ * core of the authorization model. System roles have no scope; data/governance roles are scoped to
+ * a specific entity such as a {@link DataSet} or {@link DataSource}.
+ */
 @Entity
 @Table(
     name = "assignments",
@@ -86,6 +91,13 @@ public class Assignment extends BaseEntity {
   @JoinColumn(name = "catalog_id")
   private Catalog catalog;
 
+  /**
+   * Returns the scoped entity (e.g. {@link DataStructure}, {@link DataSource}, {@link DataSet},
+   * {@link DataSpace}, or {@link Catalog}) associated with this assignment, or {@code null} for
+   * unscoped (system/tenant) assignments.
+   *
+   * @return the scope entity, or {@code null}
+   */
   public NamedEntity getScope() {
     return Stream.of(dataStructure, dataSource, dataset, dataSpace, catalog)
         .filter(Objects::nonNull)
@@ -99,6 +111,12 @@ public class Assignment extends BaseEntity {
     validateRoleType();
   }
 
+  /**
+   * Validates that the scope entity is consistent with the {@link #scopeType}. For example, a
+   * {@link ScopeType#TENANT} assignment must not reference any scope entity.
+   *
+   * @throws IllegalStateException if the scope configuration is invalid
+   */
   protected void validateScope() {
     if (scopeType == null || scopeType == ScopeType.TENANT) {
       // no scope entity should be set
@@ -141,26 +159,52 @@ public class Assignment extends BaseEntity {
   // Convenience setters used by BaseDataEntity.linkAssignment implementations.
   // Each overload sets both the FK reference and the scopeType atomically.
 
+  /**
+   * Sets the scope to the given {@link DataStructure} and updates the {@link #scopeType}
+   * accordingly.
+   *
+   * @param scope the data structure to scope this assignment to
+   */
   public void setScope(DataStructure scope) {
     this.dataStructure = scope;
     this.scopeType = ScopeType.DATASTRUCTURE;
   }
 
+  /**
+   * Sets the scope to the given {@link DataSet} and updates the {@link #scopeType} accordingly.
+   *
+   * @param scope the dataset to scope this assignment to
+   */
   public void setScope(DataSet scope) {
     this.dataset = scope;
     this.scopeType = ScopeType.DATASET;
   }
 
+  /**
+   * Sets the scope to the given {@link DataSource} and updates the {@link #scopeType} accordingly.
+   *
+   * @param scope the data source to scope this assignment to
+   */
   public void setScope(DataSource scope) {
     this.dataSource = scope;
     this.scopeType = ScopeType.DATASOURCE;
   }
 
+  /**
+   * Sets the scope to the given {@link DataSpace} and updates the {@link #scopeType} accordingly.
+   *
+   * @param scope the dataspace to scope this assignment to
+   */
   public void setScope(DataSpace scope) {
     this.dataSpace = scope;
     this.scopeType = ScopeType.DATASPACE;
   }
 
+  /**
+   * Sets the scope to the given {@link Catalog} and updates the {@link #scopeType} accordingly.
+   *
+   * @param scope the catalog to scope this assignment to
+   */
   public void setScope(Catalog scope) {
     this.catalog = scope;
     this.scopeType = ScopeType.CATALOG;

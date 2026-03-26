@@ -9,6 +9,7 @@ import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Input DTO for creating and updating role resources. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class RoleInputDTO extends BaseInputDTO {

@@ -7,6 +7,10 @@ import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * High-level service for model management operations. Delegates to {@link
+ * ModelRestClientRequestService} for the actual HTTP communication with Model Atlas.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor

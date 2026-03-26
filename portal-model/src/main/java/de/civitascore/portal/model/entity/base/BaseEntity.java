@@ -19,6 +19,10 @@ import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+/**
+ * Abstract base class for all JPA entities, providing a UUID primary key and standard audit fields
+ * (created/modified timestamps and user references).
+ */
 @Getter
 @Setter
 @MappedSuperclass
@@ -48,6 +52,7 @@ public abstract class BaseEntity implements Serializable {
   @Column(name = "modified_by")
   protected UUID modifiedBy;
 
+  /** {@inheritDoc} Entities are equal if they share the same non-null {@link #id}. */
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -56,6 +61,7 @@ public abstract class BaseEntity implements Serializable {
     return id != null && id.equals(that.id);
   }
 
+  /** {@inheritDoc} Returns a class-based hash code to remain consistent across entity states. */
   @Override
   public int hashCode() {
     return getClass().hashCode();

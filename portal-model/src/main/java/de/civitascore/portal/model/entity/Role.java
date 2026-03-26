@@ -20,6 +20,13 @@ import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Represents a named role that bundles a set of {@link Permission Permissions}. The {@link
+ * RoleType} determines whether the role applies at the system level or requires a data scope.
+ *
+ * @see RoleType
+ * @see Assignment
+ */
 @Entity
 @Table(
     name = "roles",

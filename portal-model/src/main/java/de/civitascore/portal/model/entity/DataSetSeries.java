@@ -10,6 +10,10 @@ import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Groups related {@link DataSet DataSets} into a series, allowing versioned or thematically linked
+ * datasets to be tracked together.
+ */
 @Entity
 @Table(name = "dataset_series")
 @Getter

@@ -17,6 +17,13 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+/**
+ * Represents a specific version of a {@link DataStructure}, including its schema definition,
+ * status, and optional Model Atlas reference.
+ *
+ * @see DataStructureVersionStatus
+ * @see DataStructureVersionSource
+ */
 @Entity
 @Table(name = "data_structure_versions")
 @Getter

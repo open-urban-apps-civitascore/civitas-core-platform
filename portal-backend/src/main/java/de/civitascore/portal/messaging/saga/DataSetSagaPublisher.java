@@ -23,6 +23,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+/**
+ * Publishes dataset saga trigger messages to Kafka for the config-adapter orchestrator. Supports
+ * create, update, and delete saga triggers that provision or tear down FROST, APISIX, and Redpanda
+ * infrastructure. Sends synchronously to ensure Kafka acceptance before the database transaction
+ * commits.
+ */
 @Slf4j
 @Service
 public class DataSetSagaPublisher {
@@ -42,6 +48,12 @@ public class DataSetSagaPublisher {
     this.objectMapper = objectMapper;
   }
 
+  /**
+   * Publish a dataset creation saga trigger. Provisions FROST project, APISIX route, and Redpanda
+   * pipelines.
+   *
+   * @param dataset the dataset to create infrastructure for
+   */
   public void publishCreateRequested(DataSet dataset) {
     var trigger =
         SagaTrigger.DatasetCreate.of(
@@ -54,6 +66,13 @@ public class DataSetSagaPublisher {
     sendTrigger(trigger);
   }
 
+  /**
+   * Publish a dataset update saga trigger. Computes pipeline diffs and sends targeted update
+   * commands with existing infrastructure IDs.
+   *
+   * @param dataset the updated dataset
+   * @param previousPipelines the pipelines before the update, used for diff computation
+   */
   public void publishUpdateRequested(DataSet dataset, Set<Pipeline> previousPipelines) {
     var trigger =
         SagaTrigger.DatasetUpdate.of(
@@ -70,6 +89,12 @@ public class DataSetSagaPublisher {
     sendTrigger(trigger);
   }
 
+  /**
+   * Publish a dataset deletion saga trigger. Tears down Redpanda pipelines, APISIX route, and FROST
+   * project in reverse order.
+   *
+   * @param dataset the dataset whose infrastructure should be removed
+   */
   public void publishDeleteRequested(DataSet dataset) {
     var trigger =
         SagaTrigger.DatasetDelete.of(

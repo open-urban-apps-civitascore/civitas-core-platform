@@ -22,6 +22,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for publishing configuration events to the config adapter pipeline via CloudEvents. Wraps
+ * domain operations (user, group, role CRUD) as structured {@link ConfigEvent} messages and sends
+ * them to Kafka topics. Returns {@link CompletableFuture} handles for tracking the asynchronous
+ * config adapter result.
+ */
 @Service
 @Slf4j
 public class ConfigEventPublisherService {
@@ -49,6 +55,20 @@ public class ConfigEventPublisherService {
     }
   }
 
+  /**
+   * Publishes a config event to the given topic and returns a future for the adapter's result. If
+   * no {@link CloudEventPublisher} is configured, the event is logged but not sent, and the
+   * returned future completes with {@code null}.
+   *
+   * @param topic the Kafka topic to publish to
+   * @param targetComponent the target component identifier (e.g., "user", "group")
+   * @param targetResource the target resource context (e.g., Keycloak realm)
+   * @param operation the CRUD operation type
+   * @param configPath the configuration path (e.g., "/users")
+   * @param configValue the configuration payload
+   * @return a future that completes with the config adapter result, or {@code null} if no publisher
+   *     is configured
+   */
   public CompletableFuture<ConfigResultEvent> publishConfigEvent(
       Topics topic,
       String targetComponent,
@@ -150,54 +170,117 @@ public class ConfigEventPublisherService {
         .build();
   }
 
+  /**
+   * Publishes a USER_CREATED event.
+   *
+   * @param realm the Keycloak realm name
+   * @param userConfig the user configuration payload
+   * @return a future for the config adapter result
+   */
   public CompletableFuture<ConfigResultEvent> publishUserCreated(
       String realm, ConfigValue userConfig) {
     return publishConfigEvent(
         Topics.USER_CREATED, "user", realm, Operation.CREATE, "/users", userConfig);
   }
 
+  /**
+   * Publishes a USER_UPDATED event.
+   *
+   * @param realm the Keycloak realm name
+   * @param userConfig the user configuration payload
+   * @return a future for the config adapter result
+   */
   public CompletableFuture<ConfigResultEvent> publishUserUpdated(
       String realm, ConfigValue userConfig) {
     return publishConfigEvent(
         Topics.USER_UPDATED, "user", realm, Operation.UPDATE, "/users", userConfig);
   }
 
+  /**
+   * Publishes a USER_DELETED event.
+   *
+   * @param realm the Keycloak realm name
+   * @param userConfig the user configuration payload
+   * @return a future for the config adapter result
+   */
   public CompletableFuture<ConfigResultEvent> publishUserDeleted(
       String realm, ConfigValue userConfig) {
     return publishConfigEvent(
         Topics.USER_DELETED, "user", realm, Operation.DELETE, "/users", userConfig);
   }
 
+  /**
+   * Publishes a GROUP_CREATED event.
+   *
+   * @param realm the Keycloak realm name
+   * @param groupConfig the group configuration payload
+   * @return a future for the config adapter result
+   */
   public CompletableFuture<ConfigResultEvent> publishGroupCreated(
       String realm, ConfigValue groupConfig) {
     return publishConfigEvent(
         Topics.GROUP_CREATED, "group", realm, Operation.CREATE, "/groups", groupConfig);
   }
 
+  /**
+   * Publishes a GROUP_UPDATED event.
+   *
+   * @param realm the Keycloak realm name
+   * @param groupConfig the group configuration payload
+   * @return a future for the config adapter result
+   */
   public CompletableFuture<ConfigResultEvent> publishGroupUpdated(
       String realm, ConfigValue groupConfig) {
     return publishConfigEvent(
         Topics.GROUP_UPDATED, "group", realm, Operation.UPDATE, "/groups", groupConfig);
   }
 
+  /**
+   * Publishes a GROUP_DELETED event.
+   *
+   * @param realm the Keycloak realm name
+   * @param groupConfig the group configuration payload
+   * @return a future for the config adapter result
+   */
   public CompletableFuture<ConfigResultEvent> publishGroupDeleted(
       String realm, ConfigValue groupConfig) {
     return publishConfigEvent(
         Topics.GROUP_DELETED, "group", realm, Operation.DELETE, "/groups", groupConfig);
   }
 
+  /**
+   * Publishes a ROLE_CREATED event.
+   *
+   * @param realm the Keycloak realm name
+   * @param roleConfig the role configuration payload
+   * @return a future for the config adapter result
+   */
   public CompletableFuture<ConfigResultEvent> publishRoleCreated(
       String realm, ConfigValue roleConfig) {
     return publishConfigEvent(
         Topics.ROLE_CREATED, "role", realm, Operation.CREATE, "/roles", roleConfig);
   }
 
+  /**
+   * Publishes a ROLE_UPDATED event.
+   *
+   * @param realm the Keycloak realm name
+   * @param roleConfig the role configuration payload
+   * @return a future for the config adapter result
+   */
   public CompletableFuture<ConfigResultEvent> publishRoleUpdated(
       String realm, ConfigValue roleConfig) {
     return publishConfigEvent(
         Topics.ROLE_UPDATED, "role", realm, Operation.UPDATE, "/roles", roleConfig);
   }
 
+  /**
+   * Publishes a ROLE_DELETED event.
+   *
+   * @param realm the Keycloak realm name
+   * @param roleConfig the role configuration payload
+   * @return a future for the config adapter result
+   */
   public CompletableFuture<ConfigResultEvent> publishRoleDeleted(
       String realm, ConfigValue roleConfig) {
     return publishConfigEvent(

@@ -11,6 +11,10 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/**
+ * Assembler for converting {@link Group} entities to {@link GroupOutputDTO}. Participates in the
+ * template method pattern defined by {@link BaseAssembler}.
+ */
 @Component
 @RequiredArgsConstructor
 public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, UUID> {
@@ -19,6 +23,7 @@ public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, UUID
   private final UserMapper userMapper;
   private final AssignmentAssembler assignmentAssembler;
 
+  /** {@inheritDoc} Maps group fields including contact user, members, and assignment summaries. */
   @Override
   public GroupOutputDTO mapToBaseDto(Group entity) {
     GroupOutputDTO output = groupMapper.toOutput(entity);
@@ -46,6 +51,7 @@ public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, UUID
     return output;
   }
 
+  /** {@inheritDoc} Converts a group entity back to its input DTO for PATCH operations. */
   @Override
   @SuppressWarnings("unchecked")
   public <I> I toInput(Group entity) {

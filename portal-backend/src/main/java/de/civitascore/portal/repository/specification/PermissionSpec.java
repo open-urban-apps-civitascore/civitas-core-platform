@@ -15,6 +15,7 @@ interface PermissionCategorySpec extends Specification<Permission> {}
 @Spec(path = "source", params = "source", spec = Equal.class)
 interface PermissionSourceSpec extends Specification<Permission> {}
 
+/** JPA Specification for filtering {@link Permission} entities via query parameters. */
 public interface PermissionSpec
     extends NamedEntitySpec<Permission>,
         PermissionTypeSpec,

@@ -14,6 +14,10 @@ import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Represents a data catalog that organizes {@link DataSet DataSets} into a hierarchical structure
+ * of parent and child catalogs.
+ */
 @Entity
 @Table(name = "catalogs")
 @Getter

@@ -10,6 +10,10 @@ import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Represents a downloadable or addressable resource that is exposed through one or more {@link
+ * Distribution Distributions}.
+ */
 @Entity
 @Table(name = "resources")
 @Getter

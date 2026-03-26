@@ -5,6 +5,7 @@ import java.io.Serializable;
 import java.util.UUID;
 import lombok.Data;
 
+/** Abstract base class for all summary DTOs, providing the entity ID. */
 @Data
 public abstract class BaseSummaryDTO implements Serializable {
 

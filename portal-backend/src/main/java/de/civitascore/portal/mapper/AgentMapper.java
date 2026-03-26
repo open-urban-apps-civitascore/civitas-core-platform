@@ -10,6 +10,10 @@ import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ReportingPolicy;
 
+/**
+ * MapStruct mapper for converting between {@link AgentInputDTO}, {@link AgentOutputDTO}, and {@link
+ * Agent}.
+ */
 @Mapper(
     componentModel = "spring",
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,

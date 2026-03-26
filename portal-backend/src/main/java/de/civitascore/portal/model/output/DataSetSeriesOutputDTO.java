@@ -6,6 +6,7 @@ import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Output DTO representing a dataset series for API responses. */
 @Schema(description = "Dataset series details")
 @Data
 @EqualsAndHashCode(callSuper = true)

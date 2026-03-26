@@ -9,6 +9,10 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/**
+ * Assembler for converting {@link DataSpace} entities to {@link DataSpaceOutputDTO}. Participates
+ * in the template method pattern defined by {@link BaseAssembler}.
+ */
 @Component
 @RequiredArgsConstructor
 public class DataSpaceAssembler implements BaseAssembler<DataSpace, DataSpaceOutputDTO, UUID> {
@@ -16,6 +20,9 @@ public class DataSpaceAssembler implements BaseAssembler<DataSpace, DataSpaceOut
   private final DataSpaceMapper dataSpaceMapper;
   private final UserMapper userMapper;
 
+  /**
+   * {@inheritDoc} Maps data space fields including owner, parent, and child data space summaries.
+   */
   @Override
   public DataSpaceOutputDTO mapToBaseDto(DataSpace entity) {
     DataSpaceOutputDTO output = dataSpaceMapper.toOutput(entity);
@@ -41,6 +48,7 @@ public class DataSpaceAssembler implements BaseAssembler<DataSpace, DataSpaceOut
     return output;
   }
 
+  /** {@inheritDoc} Converts a data space entity back to its input DTO for PATCH operations. */
   @Override
   @SuppressWarnings("unchecked")
   public <I> I toInput(DataSpace entity) {

@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** REST controller for read-only access to permission resources. */
 @RestController
 @RequestMapping("/permissions")
 @RequiredArgsConstructor
@@ -93,6 +94,13 @@ public class PermissionController {
         in = ParameterIn.QUERY,
         schema = @Schema(implementation = PermissionSource.class))
   })
+  /**
+   * Retrieves a sorted, filterable list of all permissions.
+   *
+   * @param spec the permission search/filter specification
+   * @param sort the sort parameters (defaults to sorting by name)
+   * @return a list of permission output DTOs with HTTP 200 status
+   */
   @Operation(
       summary = "List all permissions",
       description = "Returns a filterable, sorted list of permissions.")
@@ -106,6 +114,12 @@ public class PermissionController {
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Retrieves a single permission by its unique identifier.
+   *
+   * @param id the UUID of the permission to retrieve
+   * @return the permission output DTO with HTTP 200 status
+   */
   @Operation(
       summary = "Get permission by ID",
       description = "Returns a single permission identified by its UUID.")
@@ -116,10 +130,20 @@ public class PermissionController {
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Returns the permission service for business logic operations.
+   *
+   * @return the permission service instance
+   */
   protected PermissionService getService() {
     return permissionService;
   }
 
+  /**
+   * Returns the assembler that converts between permission entities and output DTOs.
+   *
+   * @return the permission assembler instance
+   */
   protected PermissionAssembler getAssembler() {
     return permissionAssembler;
   }

@@ -26,6 +26,12 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Authorities", description = "Authority management API (stub)")
 public class AuthorityController {
 
+  /**
+   * Returns an empty page of authorities as a stub response.
+   *
+   * @param pageable pagination parameters
+   * @return an empty page with HTTP 200 status
+   */
   @GetMapping
   @Operation(
       summary = "List authorities (stub)",

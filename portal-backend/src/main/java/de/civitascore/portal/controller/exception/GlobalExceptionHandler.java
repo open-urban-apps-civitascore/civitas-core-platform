@@ -30,6 +30,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+/**
+ * Global exception handler that translates application and persistence exceptions into RFC 9457
+ * Problem Detail responses.
+ */
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
@@ -42,6 +46,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   private static final String FOREIGN_KEY_VIOLATION_STATE = "23503";
   private static final String NOT_NULL_VIOLATION_STATE = "23502";
 
+  /**
+   * Handles resource-not-found exceptions and returns a 404 Problem Detail response.
+   *
+   * @param ex the resource not found exception
+   * @param request the current HTTP request
+   * @return a Problem Detail with HTTP 404 status
+   */
   @ExceptionHandler(ResourceNotFoundException.class)
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public ProblemDetail handleNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
@@ -49,6 +60,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return createProblemDetail(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage(), request);
   }
 
+  /**
+   * Handles invalid input exceptions and returns a 400 Problem Detail response.
+   *
+   * @param ex the invalid input exception
+   * @param request the current HTTP request
+   * @return a Problem Detail with HTTP 400 status
+   */
   @ExceptionHandler(InvalidInputException.class)
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ProblemDetail handleInvalidInput(InvalidInputException ex, HttpServletRequest request) {
@@ -56,6 +74,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return createProblemDetail(HttpStatus.BAD_REQUEST, "INVALID_INPUT", ex.getMessage(), request);
   }
 
+  /**
+   * Handles unique constraint violation exceptions and returns a 409 Problem Detail response.
+   *
+   * @param ex the unique constraint violation exception
+   * @param request the current HTTP request
+   * @return a Problem Detail with HTTP 409 status
+   */
   @ExceptionHandler(UniqueConstraintViolationException.class)
   @ResponseStatus(HttpStatus.CONFLICT)
   public ProblemDetail handleUniqueConstraint(
@@ -65,6 +90,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         HttpStatus.CONFLICT, "UNIQUE_CONSTRAINT_VIOLATION", ex.getMessage(), request);
   }
 
+  /**
+   * Handles resource-in-use exceptions and returns a 409 Problem Detail response.
+   *
+   * @param ex the resource in use exception
+   * @param request the current HTTP request
+   * @return a Problem Detail with HTTP 409 status
+   */
   @ExceptionHandler(ResourceInUseException.class)
   @ResponseStatus(HttpStatus.CONFLICT)
   public ProblemDetail handleResourceInUse(ResourceInUseException ex, HttpServletRequest request) {
@@ -72,6 +104,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return createProblemDetail(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage(), request);
   }
 
+  /**
+   * Handles forbidden exceptions and returns a 403 Problem Detail response.
+   *
+   * @param ex the forbidden exception
+   * @param request the current HTTP request
+   * @return a Problem Detail with HTTP 403 status
+   */
   @ExceptionHandler(ForbiddenException.class)
   @ResponseStatus(HttpStatus.FORBIDDEN)
   public ProblemDetail handleForbidden(ForbiddenException ex, HttpServletRequest request) {
@@ -79,6 +118,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return createProblemDetail(HttpStatus.FORBIDDEN, "FORBIDDEN", ex.getMessage(), request);
   }
 
+  /**
+   * Handles data integrity violations (unique, foreign key, not-null constraints) and returns the
+   * appropriate Problem Detail response.
+   *
+   * @param ex the data integrity violation exception
+   * @param request the current HTTP request
+   * @return a Problem Detail response with a status code matching the constraint type
+   */
   @ExceptionHandler(DataIntegrityViolationException.class)
   public ResponseEntity<ProblemDetail> handleDataIntegrityViolation(
       DataIntegrityViolationException ex, HttpServletRequest request) {
@@ -121,6 +168,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         request);
   }
 
+  /**
+   * Handles JPA persistence exceptions, distinguishing entity validation failures from general
+   * persistence errors.
+   *
+   * @param ex the persistence exception
+   * @param request the current HTTP request
+   * @return a Problem Detail response with HTTP 400 for validation failures or 500 for other errors
+   */
   @ExceptionHandler(PersistenceException.class)
   public ResponseEntity<ProblemDetail> handlePersistenceException(
       PersistenceException ex, HttpServletRequest request) {
@@ -137,6 +192,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         request);
   }
 
+  /**
+   * Handles external system rejection exceptions and returns a 502 Problem Detail response.
+   *
+   * @param ex the external system rejection exception
+   * @param request the current HTTP request
+   * @return a Problem Detail with HTTP 502 status
+   */
   @ExceptionHandler(ExternalSystemRejectionException.class)
   @ResponseStatus(HttpStatus.BAD_GATEWAY)
   public ProblemDetail handleExternalSystemRejection(
@@ -149,6 +211,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         request);
   }
 
+  /**
+   * Handles external system timeout exceptions and returns a 504 Problem Detail response.
+   *
+   * @param ex the external system timeout exception
+   * @param request the current HTTP request
+   * @return a Problem Detail with HTTP 504 status
+   */
   @ExceptionHandler(ExternalSystemTimeoutException.class)
   @ResponseStatus(HttpStatus.GATEWAY_TIMEOUT)
   public ProblemDetail handleExternalSystemTimeout(
@@ -161,6 +230,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         request);
   }
 
+  /**
+   * Handles bean validation failures and returns a 400 Problem Detail response with field-level
+   * error details.
+   *
+   * @param ex the method argument not valid exception containing field errors
+   * @param headers the HTTP headers
+   * @param status the HTTP status code
+   * @param request the current web request
+   * @return a Problem Detail response with field error details and HTTP 400 status
+   */
   @Override
   protected ResponseEntity<Object> handleMethodArgumentNotValid(
       MethodArgumentNotValidException ex,
@@ -186,6 +265,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return ResponseEntity.badRequest().body(problemDetail);
   }
 
+  /**
+   * Handles malformed or missing request body and returns a 400 Problem Detail response.
+   *
+   * @param ex the HTTP message not readable exception
+   * @param headers the HTTP headers
+   * @param status the HTTP status code
+   * @param request the current web request
+   * @return a Problem Detail response with HTTP 400 status
+   */
   @Override
   protected ResponseEntity<Object> handleHttpMessageNotReadable(
       HttpMessageNotReadableException ex,

@@ -5,5 +5,6 @@ import de.civitascore.portal.repository.specification.base.NamedEntitySpec;
 import net.kaczmarzyk.spring.data.jpa.domain.Equal;
 import net.kaczmarzyk.spring.data.jpa.web.annotation.Spec;
 
+/** JPA Specification for filtering {@link Pipeline} entities via query parameters. */
 @Spec(path = "dataSet.id", pathVars = "dataSetId", spec = Equal.class)
 public interface PipelineSpec extends NamedEntitySpec<Pipeline> {}

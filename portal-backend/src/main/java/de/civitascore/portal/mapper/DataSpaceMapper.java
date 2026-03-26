@@ -11,6 +11,10 @@ import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ReportingPolicy;
 
+/**
+ * MapStruct mapper for converting between {@link DataSpaceInputDTO}, {@link DataSpaceOutputDTO},
+ * and {@link DataSpace}.
+ */
 @Mapper(
     componentModel = "spring",
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,

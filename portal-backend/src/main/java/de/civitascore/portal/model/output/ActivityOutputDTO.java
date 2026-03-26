@@ -7,6 +7,7 @@ import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Output DTO representing an activity for API responses. */
 @Schema(description = "Activity log entry")
 @Data
 @EqualsAndHashCode(callSuper = true)

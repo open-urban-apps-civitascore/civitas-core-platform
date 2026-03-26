@@ -7,6 +7,10 @@ import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/**
+ * Lightweight summary DTO for data structure version entities, used in list endpoints and nested
+ * references.
+ */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DataStructureVersionSummaryDTO extends BaseSummaryDTO {

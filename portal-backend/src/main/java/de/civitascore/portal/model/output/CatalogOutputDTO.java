@@ -13,6 +13,7 @@ import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Output DTO representing a catalog for API responses. */
 @Schema(description = "Catalog details")
 @Data
 @EqualsAndHashCode(callSuper = true)

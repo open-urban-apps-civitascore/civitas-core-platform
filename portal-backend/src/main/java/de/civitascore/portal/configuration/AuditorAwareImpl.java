@@ -22,6 +22,12 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class AuditorAwareImpl implements AuditorAware<UUID> {
 
+  /**
+   * Returns the UUID of the currently authenticated user for JPA auditing, or empty if no
+   * authenticated user is available.
+   *
+   * @return the current user's UUID, or empty for system-level operations
+   */
   @Override
   @NonNull public Optional<UUID> getCurrentAuditor() {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

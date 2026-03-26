@@ -7,6 +7,11 @@ import org.mapstruct.Mapper;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ReportingPolicy;
 
+/**
+ * MapStruct mapper for converting {@link Permission} entities to {@link PermissionOutputDTO} and
+ * {@link PermissionSummaryDTO}. Permissions are read-only resources, so no input DTO mapping is
+ * provided.
+ */
 @Mapper(
     componentModel = "spring",
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,

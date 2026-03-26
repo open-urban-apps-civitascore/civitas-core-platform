@@ -43,6 +43,17 @@ public sealed interface SagaTrigger
       List<DataPipeline> dataPipelines)
       implements SagaTrigger {
 
+    /**
+     * Factory method that creates a {@link DatasetCreate} trigger with the correct saga type.
+     *
+     * @param datasetId the dataset UUID
+     * @param datasetName the dataset name
+     * @param description the dataset description
+     * @param openDataAccess whether the dataset has open data access
+     * @param datasources the data sources referenced by pipelines
+     * @param dataPipelines the pipelines to provision
+     * @return a new create trigger
+     */
     public static DatasetCreate of(
         String datasetId,
         String datasetName,
@@ -81,6 +92,21 @@ public sealed interface SagaTrigger
       List<DataPipeline> dataPipelines)
       implements SagaTrigger {
 
+    /**
+     * Factory method that creates a {@link DatasetUpdate} trigger with the correct saga type.
+     *
+     * @param datasetId the dataset UUID
+     * @param datasetName the dataset name
+     * @param description the dataset description
+     * @param openDataAccess whether the dataset has open data access
+     * @param projectId the existing FROST project ID
+     * @param routeId the existing APISIX route ID
+     * @param serviceId the existing APISIX service ID
+     * @param pipelineIds the existing Redpanda pipeline IDs
+     * @param datasources the data sources referenced by pipelines
+     * @param dataPipelines the pipeline diff (ADD, UPDATE, DELETE actions)
+     * @return a new update trigger
+     */
     public static DatasetUpdate of(
         String datasetId,
         String datasetName,
@@ -123,6 +149,17 @@ public sealed interface SagaTrigger
       List<String> pipelineIds)
       implements SagaTrigger {
 
+    /**
+     * Factory method that creates a {@link DatasetDelete} trigger with the correct saga type.
+     *
+     * @param datasetId the dataset UUID
+     * @param projectId the FROST project ID to tear down
+     * @param frostBaseUrl the FROST base URL
+     * @param routeId the APISIX route ID to remove
+     * @param serviceId the APISIX service ID to remove
+     * @param pipelineIds the Redpanda pipeline IDs to remove
+     * @return a new delete trigger
+     */
     public static DatasetDelete of(
         String datasetId,
         String projectId,

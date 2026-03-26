@@ -8,6 +8,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
+/**
+ * Registry that maps each {@link ConnectorType} to its corresponding {@link ConnectorHandler}. All
+ * registered {@link ConnectorHandler} beans are collected at startup and indexed by their supported
+ * type.
+ */
 @Component
 public class ConnectorHandlerRegistry {
 
@@ -19,6 +24,13 @@ public class ConnectorHandlerRegistry {
             .collect(Collectors.toMap(ConnectorHandler::getSupportedType, Function.identity()));
   }
 
+  /**
+   * Returns the handler for the given connector type, or throws if none is registered.
+   *
+   * @param type the connector type
+   * @return the matching handler
+   * @throws InvalidInputException if no handler is registered for the type
+   */
   public ConnectorHandler getHandlerOrThrow(ConnectorType type) {
     ConnectorHandler handler = handlers.get(type);
     if (handler == null) {

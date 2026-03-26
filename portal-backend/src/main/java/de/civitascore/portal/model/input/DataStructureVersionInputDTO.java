@@ -11,6 +11,7 @@ import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Input DTO for creating and updating data structure version resources. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DataStructureVersionInputDTO extends BaseInputDTO {

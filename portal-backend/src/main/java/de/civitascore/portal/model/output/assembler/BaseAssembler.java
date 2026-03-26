@@ -41,6 +41,13 @@ public interface BaseAssembler<
     return postProcessOutput(enriched, preProcessed);
   }
 
+  /**
+   * Converts a page of entities to a page of output DTOs using the {@link #toOutput(BaseEntity)}
+   * template method.
+   *
+   * @param entities the page of entities to convert
+   * @return a page of output DTOs
+   */
   default Page<O> toOutput(Page<E> entities) {
     return entities.map(this::toOutput);
   }

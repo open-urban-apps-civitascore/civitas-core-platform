@@ -32,6 +32,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 
+/**
+ * OpenAPI/Swagger configuration that customizes the generated API documentation. Adds OAuth2
+ * security schemes, normalizes operation IDs, replaces entity name placeholders, provides RFC 9457
+ * ProblemDetail examples, and derives PATCH schemas from PUT input DTOs.
+ */
 @Configuration
 public class OpenApiConfig {
 
@@ -45,6 +50,12 @@ public class OpenApiConfig {
   @Value("${keycloak.realm:}")
   private String realm;
 
+  /**
+   * Creates the base OpenAPI definition with info metadata, license, contact, external docs, and
+   * OAuth2 security scheme derived from Keycloak configuration.
+   *
+   * @return the configured OpenAPI specification object
+   */
   @Bean
   public OpenAPI customOpenAPI() {
     OpenAPI openAPI =
@@ -221,6 +232,10 @@ public class OpenApiConfig {
         openApi.setServers(List.of(new io.swagger.v3.oas.models.servers.Server().url("/v1")));
   }
 
+  /**
+   * Ensures all path parameters referenced in URL templates are declared as {@code @Parameter} on
+   * the operation. Adds missing path parameters with UUID schema so the generated spec is valid.
+   */
   @Bean
   public OpenApiCustomizer missingPathParameterCustomizer() {
     Pattern pathParamPattern = Pattern.compile("\\{([^}]+)}");

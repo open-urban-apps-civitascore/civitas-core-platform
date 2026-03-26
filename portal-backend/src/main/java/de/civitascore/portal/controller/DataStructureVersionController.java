@@ -34,6 +34,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.MethodNotAllowedException;
 
+/**
+ * REST controller for managing data structure version resources nested under a parent data
+ * structure.
+ *
+ * <p>Versions support publish/unpublish lifecycle and Model Atlas integration. Responses are
+ * enriched with model data fetched from the external Model Atlas service.
+ */
 @RestController
 @RequestMapping("/datastructures/{dataStructureId}/versions")
 @RequiredArgsConstructor
@@ -48,6 +55,14 @@ public class DataStructureVersionController
   private final DataStructureVersionService dataStructureVersionService;
   private final DataStructureVersionAssembler dataStructureVersionAssembler;
 
+  /**
+   * Listing all versions is not supported on this endpoint; throws MethodNotAllowedException.
+   *
+   * @param spec the version search/filter specification (unused)
+   * @param pageable pagination parameters (unused)
+   * @return never returns normally
+   * @throws org.springframework.web.server.MethodNotAllowedException always
+   */
   @Override
   @Operation(hidden = true)
   public ResponseEntity<Page<DataStructureVersionOutputDTO>> getAll(
@@ -55,16 +70,24 @@ public class DataStructureVersionController
     throw new MethodNotAllowedException(HttpMethod.GET, Collections.emptySet());
   }
 
+  /** {@inheritDoc} */
   @Override
   protected DataStructureVersionService getService() {
     return dataStructureVersionService;
   }
 
+  /** {@inheritDoc} */
   @Override
   protected DataStructureVersionAssembler getAssembler() {
     return dataStructureVersionAssembler;
   }
 
+  /**
+   * Creates a new data structure version and enriches the response with Model Atlas data.
+   *
+   * @param input the validated version input DTO
+   * @return the created version output DTO with HTTP 201 status and a Location header
+   */
   @Override
   @Operation(
       operationId = "createDataStructureVersion",
@@ -83,6 +106,12 @@ public class DataStructureVersionController
     return response;
   }
 
+  /**
+   * Retrieves a data structure version by ID and enriches it with Model Atlas data.
+   *
+   * @param id the UUID of the version to retrieve
+   * @return the version output DTO enriched with model data, with HTTP 200 status
+   */
   @Override
   @GetMapping("/{id}")
   @Operation(operationId = "getDataStructureVersion", summary = "Get data structure version by ID")
@@ -93,6 +122,15 @@ public class DataStructureVersionController
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Applies a partial JSON-merge patch to a data structure version and enriches the response with
+   * Model Atlas data.
+   *
+   * @param id the UUID of the version to patch
+   * @param updates the JSON node containing the fields to update
+   * @return the patched version output DTO with HTTP 200 status
+   * @throws IOException if there is an error during JSON processing
+   */
   @Override
   @Operation(
       operationId = "patchDataStructureVersion",
@@ -111,6 +149,11 @@ public class DataStructureVersionController
     return response;
   }
 
+  /**
+   * Deletes a data structure version by its unique identifier.
+   *
+   * @param id the UUID of the version to delete
+   */
   @Override
   @Operation(
       operationId = "deleteDataStructureVersion",
@@ -119,6 +162,12 @@ public class DataStructureVersionController
     super.delete(id);
   }
 
+  /**
+   * Injects the parent {@code dataStructureId} path variable into the input DTO before
+   * create/update.
+   *
+   * @throws InvalidInputException if the path variable is missing or not a valid UUID
+   */
   @Override
   protected DataStructureVersionInputDTO preProcessInput(DataStructureVersionInputDTO input) {
     Optional.ofNullable(extractPathVariables().get("dataStructureId"))
@@ -134,6 +183,13 @@ public class DataStructureVersionController
     return super.preProcessInput(input);
   }
 
+  /**
+   * Fully replaces a data structure version and enriches the response with Model Atlas data.
+   *
+   * @param id the UUID of the version to replace
+   * @param input the validated version input DTO
+   * @return the updated version output DTO with HTTP 200 status
+   */
   @Override
   @Operation(
       operationId = "updateDataStructureVersion",
@@ -151,6 +207,14 @@ public class DataStructureVersionController
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Updates the metadata of a published data structure version.
+   *
+   * @param dataStructureId the UUID of the parent data structure
+   * @param versionId the UUID of the published version
+   * @param input the validated version input DTO containing updated metadata
+   * @return the updated version output DTO with HTTP 200 status
+   */
   @PutMapping("/{versionId}/published/meta")
   @Operation(
       operationId = "updateDataStructureVersionPublishedMeta",
@@ -192,6 +256,13 @@ public class DataStructureVersionController
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Publishes a data structure version by setting its status to AVAILABLE.
+   *
+   * @param dataStructureId the UUID of the parent data structure
+   * @param versionId the UUID of the version to publish
+   * @return the published version output DTO with HTTP 200 status
+   */
   @PostMapping("/{versionId}/publish")
   @Operation(
       operationId = "publishDataStructureVersion",
@@ -216,6 +287,13 @@ public class DataStructureVersionController
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Unpublishes a data structure version by reverting its status back to DRAFT.
+   *
+   * @param dataStructureId the UUID of the parent data structure
+   * @param versionId the UUID of the version to unpublish
+   * @return the unpublished version output DTO with HTTP 200 status
+   */
   @PostMapping("/{versionId}/unpublish")
   @Operation(
       operationId = "unpublishDataStructureVersion",
@@ -247,6 +325,12 @@ public class DataStructureVersionController
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Fetches the model definition from Model Atlas by the version's {@code modelAtlasUri} and sets
+   * it on the output DTO.
+   *
+   * @param output the version output DTO to enrich
+   */
   private void enrichWithModel(DataStructureVersionOutputDTO output) {
     getService().findModelByAtlasUri(output.getModelAtlasUri()).ifPresent(output::setModel);
   }

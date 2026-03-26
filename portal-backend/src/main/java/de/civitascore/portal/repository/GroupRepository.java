@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/** Spring Data JPA repository for {@link Group} entities. */
 @Repository
 public interface GroupRepository extends NamedEntityRepository<Group, UUID> {
 

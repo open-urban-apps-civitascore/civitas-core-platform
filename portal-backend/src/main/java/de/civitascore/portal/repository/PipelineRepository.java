@@ -8,10 +8,17 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
-/** Repository for Pipeline entity operations. */
+/** Spring Data JPA repository for {@link Pipeline} entities. */
 @Repository
 public interface PipelineRepository extends NamedEntityRepository<Pipeline, UUID> {
 
+  /**
+   * Find a pipeline by ID with related entities eagerly fetched. This prevents N+1 query problems
+   * when loading pipelines with their relationships.
+   *
+   * @param id the pipeline ID
+   * @return the pipeline with eagerly fetched dataSet and dataSources
+   */
   @EntityGraph(attributePaths = {"dataSet", "dataSources"})
   @Query("SELECT p FROM Pipeline p WHERE p.id = :id")
   Optional<Pipeline> findByIdWithRelations(UUID id);

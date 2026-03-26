@@ -14,6 +14,12 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
+/**
+ * Converts a {@link Jwt} token into a {@link CustomJwtAuthenticationToken} containing extracted
+ * user details and realm role authorities. Extracts the user ID from the {@code sub} claim, profile
+ * information from standard OIDC claims, and granted authorities from Keycloak's {@code
+ * realm_access.roles}.
+ */
 @Slf4j
 @Component
 public class CustomJwtAuthenticationConverter
@@ -28,6 +34,12 @@ public class CustomJwtAuthenticationConverter
   private static final String CLAIM_ROLES = "roles";
   private static final String ROLE_PREFIX = "ROLE_";
 
+  /**
+   * Convert a JWT token to a Spring Security authentication token.
+   *
+   * @param jwt the decoded JWT
+   * @return an authentication token with extracted user details and authorities
+   */
   @Override
   public AbstractAuthenticationToken convert(Jwt jwt) {
     UUID userId = extractUserId(jwt);

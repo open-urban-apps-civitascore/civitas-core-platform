@@ -6,6 +6,7 @@ import java.util.Set;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Abstract base input DTO for data entities that support scoped assignments. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public abstract class BaseDataEntityInputDTO extends BaseInputDTO {

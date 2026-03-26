@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.Data;
 
+/** Output DTO representing the authenticated user's assignment summary for the /me endpoint. */
 @Data
 @Schema(description = "Assignment summary for the authenticated user's /me endpoint")
 public class MeAssignmentOutputDTO {

@@ -22,6 +22,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST controller for managing data space resources. Only active under the {@code preview} profile.
+ */
 @Profile("preview")
 @RestController
 @RequestMapping("/dataspaces")
@@ -33,11 +36,13 @@ public class DataSpaceController
   private final DataSpaceService dataSpaceService;
   private final DataSpaceAssembler dataSpaceAssembler;
 
+  /** {@inheritDoc} */
   @Override
   protected DataSpaceService getService() {
     return dataSpaceService;
   }
 
+  /** {@inheritDoc} */
   @Override
   protected DataSpaceAssembler getAssembler() {
     return dataSpaceAssembler;
@@ -60,6 +65,14 @@ public class DataSpaceController
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "data"))
   })
+  /**
+   * Retrieves a paginated list of data spaces with optional filtering by name, description, or
+   * free-text search.
+   *
+   * @param spec the data space search/filter specification
+   * @param pageable pagination and sorting parameters
+   * @return a page of data space output DTOs with HTTP 200 status
+   */
   @Override
   public ResponseEntity<Page<DataSpaceOutputDTO>> getAll(
       @ParameterObject @Parameter(description = "Search/filter spec") DataSpaceSpec spec,

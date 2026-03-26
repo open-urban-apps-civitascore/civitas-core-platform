@@ -10,6 +10,10 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for managing {@link Activity} entities. Resolves associated {@link
+ * de.civitascore.portal.model.entity.Agent} references during entity conversion.
+ */
 @Service
 @RequiredArgsConstructor
 public class ActivityService extends BaseService<Activity, ActivityInputDTO> {
@@ -33,6 +37,14 @@ public class ActivityService extends BaseService<Activity, ActivityInputDTO> {
     return Activity.class.getSimpleName();
   }
 
+  /**
+   * Resolves agent references after DTO-to-entity conversion by loading agents from the provided
+   * IDs.
+   *
+   * @param entity the activity entity
+   * @param input the activity input DTO containing agent IDs
+   * @return the entity with resolved agent relationships
+   */
   @Override
   protected Activity postConvertToEntity(Activity entity, ActivityInputDTO input) {
     // Set agents
