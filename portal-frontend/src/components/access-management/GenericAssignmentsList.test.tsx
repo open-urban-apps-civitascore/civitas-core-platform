@@ -143,7 +143,9 @@ describe('GenericAssignmentsList', () => {
       )
 
       expect(
-        screen.getByText(/gruppen, die plattformweite berechtigungen an allen datenobjekten besitzen, haben zugriff/i),
+        screen.getByText(
+          /gruppen, die plattformweite berechtigungen an allen datenbezogenen Elementen besitzen, haben zugriff/i,
+        ),
       ).toBeInTheDocument()
       expect(screen.queryByText(/durch das entfernen der eigenen gruppen-rollen-zuordnung/i)).not.toBeInTheDocument()
     })
@@ -161,7 +163,7 @@ describe('GenericAssignmentsList', () => {
       await waitFor(() => {
         expect(
           screen.getByText(
-            /gruppen, die plattformweite berechtigungen an allen datenobjekten besitzen, haben zugriff/i,
+            /gruppen, die plattformweite berechtigungen an allen datenbezogenen Elementen besitzen, haben zugriff/i,
           ),
         ).toBeInTheDocument()
         expect(screen.getByText(/durch das entfernen der eigenen gruppen-rollen-zuordnung/i)).toBeInTheDocument()
