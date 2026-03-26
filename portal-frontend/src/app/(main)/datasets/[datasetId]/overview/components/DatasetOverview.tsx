@@ -1,6 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
@@ -39,6 +40,7 @@ import {
   DatasetUpdateApiData,
   DatasetUpdateApiSchema,
 } from '@/types/datasets'
+import { isNameConflictError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 import { mapDatasetToFormData } from '../../../utils/mappers'
@@ -64,7 +66,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const distributionAccessURL = distributions?.map(distribution => distribution.accessUrl) || []
 
   const router = useRouter()
-  const { handleFormValidationError } = useError()
+  const { handleFormValidationError, handleNameError } = useError()
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
   const [dataSetStatus, setDataSetStatus] = useState<DatasetStatusTypes>(
     dataset.dataSetStatus ?? DATASET_STATUS_TYPES.DRAFT,
@@ -208,9 +210,12 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
       router.refresh()
       setIsReadOnly(true)
-    } catch {
-      router.refresh()
-      toast.error(t('messages.transitionError'))
+    } catch (error) {
+      if (isNameConflictError(error as AxiosError)) {
+        handleNameError(form, form.getValues('name'))
+      } else {
+        toast.error(t('messages.transitionError'))
+      }
     }
   }
 

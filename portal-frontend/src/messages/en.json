@@ -49,6 +49,7 @@
       "nameRequired": "Name is required",
       "descriptionRequired": "Description is required",
       "descriptionMaxLength": "Description must be 150 characters or less",
+      "nameMaxLength": "Name must be 100 characters or less",
       "formInvalid": "All required information must be provided correctly. Please, verify your input.",
       "statusChangeError": "An error occurred while changing the availability status.",
       "updateError": "An error occurred while updating the {item}.",

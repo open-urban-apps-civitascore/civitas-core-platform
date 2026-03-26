@@ -4,7 +4,7 @@ import { UMLDiagram, UMLEdge, UMLNode } from '@/components/uml-modeler/types/dia
 import { enumFromConst } from '@/utils/common'
 
 import { AssignmentSchema, AssignmentScopedInput } from './assignments'
-import { ItemSchema, STATUS_TYPES, WithId } from './common'
+import { ItemSchema, MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, MIN_NAME_LENGTH, STATUS_TYPES, WithId } from './common'
 
 export const DATASTRUCTURE_STATUS_TYPES = {
   DRAFT: 'DRAFT',
@@ -85,7 +85,7 @@ export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormD
 
 export const DatastructureVersionCreateSchema = z.object({
   version: z.string().trim().min(1, 'common.errors.required'),
-  description: z.string().trim().optional(),
+  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength').optional(),
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   dataStructureVersionStatus: DatastructureStatusEnum.optional(),
   modelAtlasUri: z.string().trim().nullable().optional(),
@@ -136,27 +136,43 @@ export const DatastructureApiResponseSummarySchema = z.object({
 
 export const DatastructureFormDraftSchema = z.object({
   id: z.string(),
-  name: z.string().trim().min(1, 'common.errors.required'),
-  description: z.string().trim(),
+  name: z
+    .string()
+    .trim()
+    .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
+    .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
+  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   dataStructureStatus: DatastructureStatusEnum,
   dataStructureVersionIds: z.array(z.string()),
 })
 
 export const DatastructureFormAvailableSchema = DatastructureFormDraftSchema.extend({
-  description: z.string().trim().min(1, 'common.errors.required').max(150, 'common.errors.descriptionMaxLength'),
+  description: z
+    .string()
+    .trim()
+    .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
 })
 
 export type DatastructureFormDraft = z.infer<typeof DatastructureFormDraftSchema>
 export type DatastructureFormAvailable = z.infer<typeof DatastructureFormAvailableSchema>
 
 export const DatastructureCreateFormSchema = z.object({
-  name: z.string().trim().min(1, 'common.errors.required'),
+  name: z
+    .string()
+    .trim()
+    .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
+    .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
 })
 
 export const DatastructureCreateDataSchema = z.object({
-  name: z.string().trim().min(1, 'common.errors.required'),
+  name: z
+    .string()
+    .trim()
+    .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
+    .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
   createdFromDataSource: z.boolean(),
-  description: z.string().trim().optional(),
+  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength').optional(),
   dataStructureVersionIds: z.array(z.string()).optional(),
   assignments: z.array(AssignmentSchema).optional(),
 })
