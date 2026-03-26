@@ -282,7 +282,9 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             isCancelButtonDisabled={isLoadingDatasource}
             onCancelClick={handleExit}
             hasCard={false}
-            canEdit={canUpdate}
+            canEdit={
+              datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE ? canUpdate && canRelease : canUpdate
+            }
             isReadOnly={isReadOnly}
             onEditClick={() => updateMode(true)}
             cancelButtonTitle={tCommon('actions.exit')}

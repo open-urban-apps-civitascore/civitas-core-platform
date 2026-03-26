@@ -196,6 +196,26 @@ describe('DatastructureOverview', () => {
         expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
       })
     })
+
+    describe('Edit button gating when AVAILABLE', () => {
+      const availableDatastructure = {
+        ...datastructure,
+        dataStructureStatus: 'AVAILABLE' as const,
+      }
+      const availableProps = { ...defaultProps, datastructure: availableDatastructure }
+
+      it('shows Edit button when AVAILABLE and user has both UPDATE and RELEASE', () => {
+        mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_UPDATE, PERMISSION_NAMES.DATASTRUCTURE_RELEASE])
+        render(<DatastructureOverview {...availableProps} />)
+        expect(screen.getByTestId('editButton')).toBeInTheDocument()
+      })
+
+      it('hides Edit button when AVAILABLE and user has UPDATE but lacks RELEASE', () => {
+        mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_UPDATE])
+        render(<DatastructureOverview {...availableProps} />)
+        expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+      })
+    })
   })
 
   describe('Read-only mode behavior', () => {

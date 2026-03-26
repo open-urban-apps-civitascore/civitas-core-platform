@@ -13,11 +13,13 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
   useGetCurrentUser: vi.fn(),
 }))
 
+let mockSearchParams = new URLSearchParams('mode=edit')
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: vi.fn(),
   }),
-  useSearchParams: () => new URLSearchParams('mode=edit'),
+  useSearchParams: () => mockSearchParams,
 }))
 
 vi.mock('@/hooks/use-query-params', () => ({
@@ -93,6 +95,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockSearchParams = new URLSearchParams('mode=edit')
     vi.mocked(useGetCurrentUser).mockReturnValue({
       data: {
         username: 'test',
@@ -257,6 +260,59 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       await waitFor(() => {
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       })
+    })
+  })
+
+  describe('Edit button gating when AVAILABLE', () => {
+    const availableVersion: DatastructureVersion = {
+      ...mockVersion,
+      dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
+    }
+
+    it('shows Edit button when AVAILABLE and user has both UPDATE and RELEASE', () => {
+      mockSearchParams = new URLSearchParams()
+      vi.mocked(useGetCurrentUser).mockReturnValue({
+        data: {
+          username: 'test',
+          email: 'test@test.com',
+          title: 'MR' as const,
+          firstName: 'Test',
+          lastName: 'User',
+          assignments: [
+            {
+              scopeType: 'TENANT',
+              scopeId: null,
+              permissions: [PERMISSION_NAMES.DATASTRUCTURE_UPDATE, PERMISSION_NAMES.DATASTRUCTURE_RELEASE],
+            },
+          ],
+        },
+      } as ReturnType<typeof useGetCurrentUser>)
+
+      renderComponent({ version: availableVersion })
+      expect(screen.getByTestId('editButton')).toBeInTheDocument()
+    })
+
+    it('hides Edit button when AVAILABLE and user has UPDATE but lacks RELEASE', () => {
+      mockSearchParams = new URLSearchParams()
+      vi.mocked(useGetCurrentUser).mockReturnValue({
+        data: {
+          username: 'test',
+          email: 'test@test.com',
+          title: 'MR' as const,
+          firstName: 'Test',
+          lastName: 'User',
+          assignments: [
+            {
+              scopeType: 'TENANT',
+              scopeId: null,
+              permissions: [PERMISSION_NAMES.DATASTRUCTURE_UPDATE],
+            },
+          ],
+        },
+      } as ReturnType<typeof useGetCurrentUser>)
+
+      renderComponent({ version: availableVersion })
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
     })
   })
 

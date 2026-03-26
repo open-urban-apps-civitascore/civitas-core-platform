@@ -375,5 +375,25 @@ describe('DatasourceOverview', () => {
         expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
       })
     })
+
+    describe('Edit button gating when AVAILABLE', () => {
+      const availableDatasource = {
+        ...datasource,
+        dataSourceStatus: 'AVAILABLE' as const,
+      }
+      const availableProps = { ...defaultProps, datasource: availableDatasource }
+
+      it('shows Edit button when AVAILABLE and user has both UPDATE and RELEASE', () => {
+        mockCurrentUser([PERMISSION_NAMES.DATASOURCE_UPDATE, PERMISSION_NAMES.DATASOURCE_RELEASE])
+        render(<DatasourceOverview {...availableProps} />)
+        expect(screen.getByTestId('editButton')).toBeInTheDocument()
+      })
+
+      it('hides Edit button when AVAILABLE and user has UPDATE but lacks RELEASE', () => {
+        mockCurrentUser([PERMISSION_NAMES.DATASOURCE_UPDATE])
+        render(<DatasourceOverview {...availableProps} />)
+        expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+      })
+    })
   })
 })

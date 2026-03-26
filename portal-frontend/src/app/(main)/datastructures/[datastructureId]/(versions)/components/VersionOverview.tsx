@@ -223,7 +223,10 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         }}
         customElement={getHeaderAction({
           isReadOnly,
-          canUpdate,
+          canUpdate:
+            version?.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+              ? canUpdate && canRelease
+              : canUpdate,
           editButton: EditButton,
           saveExitButtons: ActionButtonsAndStatusSwitch,
         })}

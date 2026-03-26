@@ -240,11 +240,16 @@ test.describe('Status "Available" — RELEASE Permission Gating', () => {
     () => tenantWithRelease,
     () => `/datasources/${stack.datasource.id}`,
   )
-  testAvailableDisabled(
-    'Datasource: "Available" disabled without RELEASE (TENANT)',
-    () => tenantWithoutRelease,
-    () => `/datasources/${stack.datasource.id}`,
-  )
+
+  // Datasource is AVAILABLE, so user without RELEASE cannot even enter edit mode
+  test('Datasource: Edit button hidden without RELEASE on AVAILABLE entity (TENANT)', async ({ browser }) => {
+    await withTestUser(browser, tenantWithoutRelease, async page => {
+      await page.goto(`/datasources/${stack.datasource.id}`)
+      await page.waitForLoadState('domcontentloaded')
+      await expect(page.getByTestId('pageHeader').first()).toBeVisible({ timeout: 20_000 })
+      await expect(page.getByTestId('editButton')).not.toBeVisible()
+    })
+  })
 
   // TODO: entity-scoped datasource tests skipped — the shared datasource was published then
   // unpublished, which leaves it in a state where the detail page doesn't render the edit button.

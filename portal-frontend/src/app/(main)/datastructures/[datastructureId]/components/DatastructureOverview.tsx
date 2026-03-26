@@ -167,7 +167,10 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
         }}
         customElement={getHeaderAction({
           isReadOnly,
-          canUpdate,
+          canUpdate:
+            datastructure.dataStructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+              ? canUpdate && canRelease
+              : canUpdate,
           editButton: EditButton,
           saveExitButtons: ActionButtonsAndStatusSwitch,
         })}
