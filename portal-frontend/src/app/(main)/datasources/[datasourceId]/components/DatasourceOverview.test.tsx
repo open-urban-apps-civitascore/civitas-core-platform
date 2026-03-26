@@ -208,11 +208,7 @@ const datasource = {
 
 const defaultProps = {
   datasource,
-  datastructure: null,
-  datastructureVersion: null,
   initialAssignments: [],
-  groups: [],
-  roles: [],
 }
 
 describe('DatasourceOverview', () => {
@@ -220,7 +216,11 @@ describe('DatasourceOverview', () => {
     vi.clearAllMocks()
     mockSearchParams = new URLSearchParams()
     mockForm.formState.isDirty = false
-    mockCurrentUser([PERMISSION_NAMES.DATASOURCE_UPDATE, PERMISSION_NAMES.ASSIGNMENT_READ])
+    mockCurrentUser([
+      PERMISSION_NAMES.DATASOURCE_UPDATE,
+      PERMISSION_NAMES.ASSIGNMENT_READ,
+      PERMISSION_NAMES.DATASTRUCTURE_READ,
+    ])
   })
 
   describe('View/Edit mode initialization', () => {
@@ -373,6 +373,20 @@ describe('DatasourceOverview', () => {
         mockCurrentUser([])
         render(<DatasourceOverview {...defaultProps} />)
         expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('Datastructure tab gating (DATASTRUCTURE_READ)', () => {
+      it('shows dataStructure tab when user has DATASTRUCTURE_READ', () => {
+        mockCurrentUser([PERMISSION_NAMES.DATASOURCE_UPDATE, PERMISSION_NAMES.DATASTRUCTURE_READ])
+        render(<DatasourceOverview {...defaultProps} />)
+        expect(screen.getByTestId('tab-dataStructure')).toBeInTheDocument()
+      })
+
+      it('hides dataStructure tab when user lacks DATASTRUCTURE_READ', () => {
+        mockCurrentUser([PERMISSION_NAMES.DATASOURCE_UPDATE])
+        render(<DatasourceOverview {...defaultProps} />)
+        expect(screen.queryByTestId('tab-dataStructure')).not.toBeInTheDocument()
       })
     })
 

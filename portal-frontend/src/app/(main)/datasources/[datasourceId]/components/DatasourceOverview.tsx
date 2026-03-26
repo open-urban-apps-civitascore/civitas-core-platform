@@ -3,7 +3,7 @@
 import { RowSelectionState } from '@tanstack/react-table'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import {
   defaultDatastructureVersionFormData,
@@ -23,7 +23,7 @@ import { usePermissions } from '@/hooks/use-permissions'
 import { cn } from '@/lib/utils'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Datasource, DATASOURCE_STATUS_TYPES, DatasourceStatusType, DatasourceTab } from '@/types/datasources'
-import { Datastructure, DatastructureVersion } from '@/types/datastructures'
+import { DatastructureVersion } from '@/types/datastructures'
 import { getSelectedDatastructureVersion } from '@/utils/datasources'
 import { mapDatastructureVersionApiToFormData } from '@/utils/datastructures'
 
@@ -35,63 +35,53 @@ import { DatastructureTab } from './datastructure-tab/DatastructureTab'
 
 interface DatasourceOverviewProps {
   datasource: Datasource
-  datastructure: Datastructure | null
-  datastructureVersion: DatastructureVersion | null
   initialAssignments: GroupRoleAssignmentTable[]
 }
 
-const tabs: Tab<DatasourceTab>[] = [
+const allTabs: Tab<DatasourceTab>[] = [
   { value: 'basicInfo', label: 'datasources.tabs.basicInfo' },
   { value: 'connector', label: 'datasources.tabs.connector' },
   { value: 'dataStructure', label: 'datasources.tabs.dataStructure' },
   { value: 'accessManagement', label: 'datasources.tabs.accessManagement' },
 ]
+
 export const DatasourceOverview = (props: DatasourceOverviewProps) => {
-  const {
-    datasource,
-    datastructure: initialDatastructure,
-    datastructureVersion: initialDatastructureVersion,
-    initialAssignments,
-  } = props
+  const { datasource, initialAssignments } = props
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
-  const { hasScopedPermission } = usePermissions()
+  const { hasPermission, hasScopedPermission } = usePermissions()
   const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASOURCE_UPDATE, 'DATASOURCE', datasource.id)
   const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASOURCE_RELEASE, 'DATASOURCE', datasource.id)
+  const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const [assignedGroups, setAssignedGroups] = useState<GroupRoleAssignmentTable[]>(initialAssignments)
   const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit')
 
-  const [datastructureVersion, setDatastructureVersion] = useState<DatastructureVersion | null>(
-    initialDatastructureVersion,
-  )
+  // Derive initial IDs from the datasource's linked version summary
+  const initialDatastructureId = datasource.dataStructureVersion?.dataStructureId ?? null
+  const initialVersionId = datasource.dataStructureVersion?.id ?? null
 
-  const [selectedDatastructureVersionId, setSelectedDatastructureVersionId] = useState<string | null>(
-    initialDatastructureVersion?.id || null,
-  )
-  const [selectedDatastructureId, setSelectedDatastructureId] = useState<string | null>(
-    initialDatastructure?.id || null,
-  )
+  const [selectedDatastructureVersionId, setSelectedDatastructureVersionId] = useState<string | null>(initialVersionId)
+  const [selectedDatastructureId, setSelectedDatastructureId] = useState<string | null>(initialDatastructureId)
 
+  // Fetch the full version data client-side (needed for UML model/styles)
   const { data: datastructureVersionData } = useGetDatastructureVersion({
     datastructureId: selectedDatastructureId || '',
     versionId: selectedDatastructureVersionId || '',
-    isEnabled:
-      !!selectedDatastructureId &&
-      !!selectedDatastructureVersionId &&
-      initialDatastructureVersion?.id !== selectedDatastructureVersionId,
+    isEnabled: canReadDatastructures && !!selectedDatastructureId && !!selectedDatastructureVersionId,
   })
+
+  const [datastructureVersion, setDatastructureVersion] = useState<DatastructureVersion | null>(null)
 
   useEffect(() => {
     if (!selectedDatastructureVersionId) {
       setDatastructureVersion(null)
-      return
-    } else if (selectedDatastructureVersionId === initialDatastructureVersion?.id)
-      setDatastructureVersion(initialDatastructureVersion)
-    else setDatastructureVersion(datastructureVersionData?.data || null)
-  }, [selectedDatastructureVersionId, datastructureVersionData?.data, initialDatastructureVersion])
+    } else {
+      setDatastructureVersion(datastructureVersionData?.data || null)
+    }
+  }, [selectedDatastructureVersionId, datastructureVersionData?.data])
 
   useEffect(() => {
     setIsReadOnly(searchParams.get('mode') !== 'edit')
@@ -134,33 +124,32 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     // saveDatastructureVersion,
   } = useDatastructureVersion({
     datastructureId: selectedDatastructureId || '',
-    version: initialDatastructureVersion || null,
+    version: datastructureVersion,
     isCreateMode: false,
   })
 
   // sets the active session with the new selected version's diagram or null if no version is selected
   useEffect(() => {
-    const isInitialVersion = selectedDatastructureVersionId === initialDatastructureVersion?.id
-    if (isInitialVersion) {
-      resetToInitialDatastructureState()
-      return
-    } else {
-      if (!datastructureVersion) resetFormAndSession(defaultDatastructureVersionFormData, null)
-      else resetFormAndSession(mapDatastructureVersionApiToFormData(datastructureVersion), datastructureVersion)
-    }
+    if (!datastructureVersion) resetFormAndSession(defaultDatastructureVersionFormData, null)
+    else resetFormAndSession(mapDatastructureVersionApiToFormData(datastructureVersion), datastructureVersion)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datastructureVersion, initialDatastructureVersion, selectedDatastructureId, selectedDatastructureVersionId])
+  }, [datastructureVersion])
 
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
+
+  const tabs = useMemo(
+    () => (canReadDatastructures ? allTabs : allTabs.filter(tab => tab.value !== 'dataStructure')),
+    [canReadDatastructures],
+  )
 
   const resetToInitialState = () => {
     resetDatasourceToInitialState()
     resetToInitialDatastructureState()
     datasourceForm.reset()
     setAssignedGroups(initialAssignments)
-    setSelectedDatastructureId(initialDatastructure?.id || null)
-    setSelectedDatastructureVersionId(initialDatastructureVersion?.id || null)
+    setSelectedDatastructureId(initialDatastructureId)
+    setSelectedDatastructureVersionId(initialVersionId)
   }
   const handleSave = async () => {
     // TODO: use this function when implementing save datastructure version changes

@@ -52,22 +52,23 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
     setSelection(open && selectedVersion ? { [selectedVersion]: true } : {})
   }, [open, selectedVersion])
 
+  const apiParams = getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString })
+  apiParams.set('dataStructureStatus', DATASTRUCTURE_STATUS_TYPES.AVAILABLE)
+
   const { data: datastructuresData, isFetching: isFetchingDatasources } = useGetDatastructures({
-    params: getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString }),
+    params: apiParams,
   })
 
-  const filteredDatastructures = datastructuresData?.data
-    .filter(datastructure => datastructure.dataStructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE)
-    .map(datastructure => ({
-      ...datastructure,
-      dataStructureVersions: datastructure.dataStructureVersions.filter(
-        version => version.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
-      ),
-    }))
+  const availableDatastructures = (datastructuresData?.data || []).map(datastructure => ({
+    ...datastructure,
+    dataStructureVersions: datastructure.dataStructureVersions.filter(
+      version => version.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
+    ),
+  }))
 
-  const datastructures = mapDatastructuresApiToListData(filteredDatastructures || [])
+  const datastructures = mapDatastructuresApiToListData(availableDatastructures)
 
-  const rowCount = filteredDatastructures?.length || 0
+  const rowCount = datastructuresData?.totalElements || 0
   const totalPages = Math.ceil(rowCount / pageSize)
 
   useEffect(() => {
