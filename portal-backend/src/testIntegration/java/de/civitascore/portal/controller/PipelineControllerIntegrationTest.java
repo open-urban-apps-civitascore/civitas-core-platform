@@ -1164,5 +1164,69 @@ class PipelineControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
       assertThat(response.getBody()).contains("AVAILABLE status");
     }
+
+    @Test
+    @DisplayName(
+        "Should allow updating pipeline fields without re-validating unchanged datasource associations")
+    void shouldAllowPatchWhenLinkedDataSourceBecomesUnpublished() {
+      // Create pipeline with an AVAILABLE datasource
+      DataSource dataSource = createTestDataSource();
+      dataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      dataSourceRepository.save(dataSource);
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSourceIds(Set.of(dataSource.getId()));
+      ResponseEntity<PipelineOutputDTO> createResponse = performCreate(input);
+      assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      UUID pipelineId = createResponse.getBody().getId();
+
+      // Unpublish the datasource (revert to DRAFT)
+      dataSource.setDataSourceStatus(DataSourceStatus.DRAFT);
+      dataSourceRepository.save(dataSource);
+
+      // PATCH a non-datasource field — should succeed because dataSourceIds is not in the patch
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "Updated after datasource unpublished");
+
+      ResponseEntity<PipelineOutputDTO> patchResponse = performPatch(pipelineId, patchMap);
+
+      assertThat(patchResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patchResponse.getBody().getDescription())
+          .isEqualTo("Updated after datasource unpublished");
+    }
+
+    @Test
+    @DisplayName(
+        "Should reject updating datasource associations when a linked datasource is no longer AVAILABLE")
+    void shouldRejectUpdateWhenReSubmittingUnpublishedDataSource() {
+      // Create pipeline with an AVAILABLE datasource
+      DataSource dataSource = createTestDataSource();
+      dataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      dataSourceRepository.save(dataSource);
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSourceIds(Set.of(dataSource.getId()));
+      ResponseEntity<PipelineOutputDTO> createResponse = performCreate(input);
+      assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      UUID pipelineId = createResponse.getBody().getId();
+
+      // Unpublish the datasource (revert to DRAFT)
+      dataSource.setDataSourceStatus(DataSourceStatus.DRAFT);
+      dataSourceRepository.save(dataSource);
+
+      // PUT with the same datasource IDs — should fail because the datasource is now DRAFT
+      PipelineInputDTO updateInput = createUpdateInput();
+      updateInput.setDataSourceIds(Set.of(dataSource.getId()));
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpointPath() + "/" + pipelineId,
+              HttpMethod.PUT,
+              new HttpEntity<>(updateInput, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).contains("AVAILABLE status");
+    }
   }
 }
