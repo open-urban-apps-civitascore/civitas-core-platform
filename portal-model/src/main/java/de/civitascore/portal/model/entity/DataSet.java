@@ -26,6 +26,12 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Represents a dataset with its lifecycle status, infrastructure references, and relationships to
+ * {@link Pipeline Pipelines}, {@link Distribution Distributions}, and {@link DataSpace DataSpaces}.
+ *
+ * @see DataSetStatus
+ */
 @Entity
 @Table(
     name = "datasets",
@@ -143,21 +149,38 @@ public class DataSet extends BaseDataEntity {
   @Setter(AccessLevel.NONE)
   private Set<Assignment> assignments = new HashSet<>();
 
+  /** {@inheritDoc} Links the assignment to this dataset by setting its scope. */
   @Override
   protected void linkAssignment(Assignment assignment) {
     assignment.setScope(this);
   }
 
+  /**
+   * Replaces the current distributions with the provided collection, clearing then re-adding to
+   * satisfy Hibernate orphan-removal semantics.
+   *
+   * @param newDistributions the new distributions, or {@code null} to clear
+   */
   public void setDistributions(Collection<Distribution> newDistributions) {
     this.distributions.clear();
     Optional.ofNullable(newDistributions).ifPresent(distributions::addAll);
   }
 
+  /**
+   * Replaces the current pipelines with the provided collection, clearing then re-adding to satisfy
+   * Hibernate orphan-removal semantics.
+   *
+   * @param newPipelines the new pipelines, or {@code null} to clear
+   */
   public void setPipelines(Collection<Pipeline> newPipelines) {
     this.pipelines.clear();
     Optional.ofNullable(newPipelines).ifPresent(pipelines::addAll);
   }
 
+  /**
+   * Resets all infrastructure-related fields (projectId, frostBaseUrl, routeId, serviceId,
+   * publicUrl, pipelineIds) to {@code null}, typically called during unpublish.
+   */
   public void clearInfrastructureFields() {
     this.projectId = null;
     this.frostBaseUrl = null;

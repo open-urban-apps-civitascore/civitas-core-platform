@@ -7,7 +7,7 @@ package de.civitascore.portal.model.embedded;
  * scope).
  *
  * @see de.civitascore.portal.model.entity.Role
- * @see AssignmentType
+ * @see ScopeType
  */
 public enum RoleType {
   /** System administration roles. */

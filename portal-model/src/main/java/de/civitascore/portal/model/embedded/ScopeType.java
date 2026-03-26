@@ -6,7 +6,7 @@ package de.civitascore.portal.model.embedded;
  * <p>DATASPACE and DATASET scopes require a scope ID to identify the target entity.
  *
  * @see de.civitascore.portal.model.entity.Assignment
- * @see de.civitascore.portal.model.entity.base.ScopedEntity
+ * @see de.civitascore.portal.model.entity.base.AssignableEntity
  */
 public enum ScopeType {
   /** Tenant-wide scope for data roles. Requires scope ID to be null. */

@@ -19,6 +19,10 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Represents a dataspace that acts as a logical container for {@link DataSet DataSets}. DataSpaces
+ * can be organized hierarchically through parent-child relationships.
+ */
 @Entity
 @Table(
     name = "data_spaces",

@@ -11,6 +11,10 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Represents a distribution endpoint for a {@link DataSet}, describing how the data can be accessed
+ * (URL, format, API type). May be linked to an {@link Activity} and a {@link Resource}.
+ */
 @Entity
 @Table(
     name = "distributions",

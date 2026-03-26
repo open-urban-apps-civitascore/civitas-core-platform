@@ -24,6 +24,13 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+/**
+ * Represents an external data source with its connector configuration and lifecycle status. A data
+ * source may optionally reference a {@link DataStructureVersion} that defines its schema.
+ *
+ * @see ConnectorType
+ * @see DataSourceStatus
+ */
 @Entity
 @Table(
     name = "data_sources",
@@ -66,6 +73,7 @@ public class DataSource extends BaseDataEntity {
   @Setter(AccessLevel.NONE)
   private Set<Assignment> assignments = new HashSet<>();
 
+  /** {@inheritDoc} Links the assignment to this data source by setting its scope. */
   @Override
   protected void linkAssignment(Assignment assignment) {
     assignment.setScope(this);

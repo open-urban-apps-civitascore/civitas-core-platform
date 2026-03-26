@@ -19,6 +19,10 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Represents a group of {@link User Users} that can be assigned {@link Role Roles} via {@link
+ * Assignment Assignments}. Groups may be nested in a parent-child hierarchy.
+ */
 @Entity
 @Table(
     name = "groups",
@@ -62,6 +66,7 @@ public class Group extends AssignableEntity {
   @Setter(AccessLevel.NONE)
   private Set<Assignment> assignments = new HashSet<>();
 
+  /** {@inheritDoc} Links the assignment to this group by setting its group reference. */
   @Override
   protected void linkAssignment(Assignment assignment) {
     assignment.setGroup(this);
