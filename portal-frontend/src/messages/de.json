@@ -9,6 +9,7 @@
     "search": "Durchsuchen",
     "noResults": "Es gibt leider keine Ergebnisse.",
     "noData": "Keine Daten",
+    "noPermission": "Sie haben keine Berechtigung, diesen Inhalt anzuzeigen.",
     "loading": "Lädt...",
     "loadingItems": "Lädt {item} ...",
     "form": "Formular",

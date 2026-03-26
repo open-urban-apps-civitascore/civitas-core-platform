@@ -9,6 +9,7 @@
     "search": "Search",
     "noResults": "No results found.",
     "noData": "No Data",
+    "noPermission": "You do not have permission to view this content.",
     "loading": "Loading...",
     "loadingItems": "Loading {item} ...",
     "form": "Form",

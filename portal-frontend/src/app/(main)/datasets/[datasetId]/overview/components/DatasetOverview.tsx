@@ -60,9 +60,10 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
 
-  const { hasScopedPermission } = usePermissions()
+  const { hasPermission, hasScopedPermission } = usePermissions()
   const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASET_UPDATE, 'DATASET', dataset.id)
   const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASET_RELEASE, 'DATASET', dataset.id)
+  const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
 
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
@@ -292,16 +293,17 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     {
       title: t('overview.completion.dataFlow.title'),
       isCompleted: pipelineNames?.length > 0 || distributionAccessURL?.length > 0,
-      buttons: canUpdate
-        ? [
-            {
-              text: isReadOnly
-                ? t('overview.completion.dataFlow.button.readOnly')
-                : t('overview.completion.dataFlow.button.editable'),
-              routeParam: 'data-flow',
-            },
-          ]
-        : [],
+      buttons:
+        canUpdate && canReadDatasources
+          ? [
+              {
+                text: isReadOnly
+                  ? t('overview.completion.dataFlow.button.readOnly')
+                  : t('overview.completion.dataFlow.button.editable'),
+                routeParam: 'data-flow',
+              },
+            ]
+          : [],
       content:
         pipelineNames?.length > 0 || distributionAccessURL?.length > 0 ? (
           <>

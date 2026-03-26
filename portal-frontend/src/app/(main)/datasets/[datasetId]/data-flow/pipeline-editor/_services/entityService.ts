@@ -10,6 +10,7 @@ import { useCallback, useMemo } from 'react'
 
 import { useGetDatasources } from '@/app/services/api/datasources/clientRequests'
 import type { Datasource } from '@/types/datasources'
+import { DATASOURCE_STATUS_TYPES } from '@/types/datasources'
 
 // ============================================================================
 // Types
@@ -47,7 +48,14 @@ export interface UseEntityResult<T extends SelectableEntity> {
  *
  */
 export const useDataSourceEntities = (): UseEntityResult<Datasource> => {
-  const { data: response, isLoading, isError, error } = useGetDatasources({ isEnabled: true })
+  const params = useMemo(() => {
+    const p = new URLSearchParams()
+    p.set('dataSourceStatus', DATASOURCE_STATUS_TYPES.AVAILABLE)
+    p.set('size', '2000')
+    return p
+  }, [])
+
+  const { data: response, isLoading, isError, error } = useGetDatasources({ params, isEnabled: true })
 
   // Extract the data array from ApiServiceResponse
   const entities = useMemo(() => response?.data ?? [], [response])
