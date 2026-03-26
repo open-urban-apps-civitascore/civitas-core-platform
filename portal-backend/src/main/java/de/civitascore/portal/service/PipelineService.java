@@ -2,6 +2,7 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.PipelineMapper;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -129,6 +130,7 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
         throw new InvalidInputException(
             "Pipeline", "dataSourceIds", "One or more DataSource IDs not found");
       }
+      dataSources.forEach(this::validateDataSourceLinkable);
       entity.setDataSources(new HashSet<>(dataSources));
     } else {
       entity.setDataSources(null);
@@ -153,6 +155,15 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
       entity.setVersion(entity.getVersion() + 1);
     }
     return super.preSave(entity);
+  }
+
+  private void validateDataSourceLinkable(DataSource dataSource) {
+    if (dataSource.getDataSourceStatus() != DataSourceStatus.AVAILABLE) {
+      throw new InvalidInputException(
+          getEntityName(),
+          dataSource.getId(),
+          "DataSource must be in AVAILABLE status to be linked to a Pipeline");
+    }
   }
 
   private void validateUniqueName(Pipeline entity) {

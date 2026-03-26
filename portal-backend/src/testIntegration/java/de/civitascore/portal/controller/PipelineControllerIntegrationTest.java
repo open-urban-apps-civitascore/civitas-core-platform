@@ -3,6 +3,7 @@ package de.civitascore.portal.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -25,6 +26,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -89,6 +92,12 @@ class PipelineControllerIntegrationTest
     DataSource dataSource = new DataSource();
     dataSource.setName("test_data_source_" + System.currentTimeMillis());
     dataSource.setDescription("Test data source for pipelines");
+    return dataSourceRepository.save(dataSource);
+  }
+
+  private DataSource createAvailableTestDataSource() {
+    DataSource dataSource = createTestDataSource();
+    dataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
     return dataSourceRepository.save(dataSource);
   }
 
@@ -182,8 +191,8 @@ class PipelineControllerIntegrationTest
     @Test
     @DisplayName("Should create pipeline with data sources")
     void shouldCreatePipelineWithDataSources() {
-      DataSource ds1 = createTestDataSource();
-      DataSource ds2 = createTestDataSource();
+      DataSource ds1 = createAvailableTestDataSource();
+      DataSource ds2 = createAvailableTestDataSource();
 
       PipelineInputDTO input = createValidInput();
       input.setDataSourceIds(Set.of(ds1.getId(), ds2.getId()));
@@ -714,8 +723,8 @@ class PipelineControllerIntegrationTest
     @Test
     @DisplayName("Should cascade delete pipeline data sources associations")
     void shouldCascadeDeletePipelineDataSourceAssociations() {
-      DataSource ds1 = createTestDataSource();
-      DataSource ds2 = createTestDataSource();
+      DataSource ds1 = createAvailableTestDataSource();
+      DataSource ds2 = createAvailableTestDataSource();
 
       PipelineInputDTO input = createValidInput();
       input.setDataSourceIds(Set.of(ds1.getId(), ds2.getId()));
@@ -1090,6 +1099,70 @@ class PipelineControllerIntegrationTest
       assertThat(pipelineRepository.findById(pipelineId))
           .as("Pipeline should still exist after failed cross-dataset delete")
           .isPresent();
+    }
+  }
+
+  @Nested
+  @DisplayName("DataSource Status Validation Tests")
+  class DataSourceStatusValidationTests {
+
+    @Test
+    @DisplayName("Should reject creating a pipeline with a DRAFT datasource")
+    void shouldRejectDraftDataSource() {
+      DataSource draftDataSource = createTestDataSource();
+      // draftDataSource is DRAFT by default (DataSourceStatus.DRAFT)
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSourceIds(Set.of(draftDataSource.getId()));
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpointPath(),
+              HttpMethod.POST,
+              new HttpEntity<>(input, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).contains("AVAILABLE status");
+    }
+
+    @Test
+    @DisplayName("Should accept creating a pipeline with an AVAILABLE datasource")
+    void shouldAcceptAvailableDataSource() {
+      DataSource availableDataSource = createTestDataSource();
+      availableDataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      dataSourceRepository.save(availableDataSource);
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSourceIds(Set.of(availableDataSource.getId()));
+
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    @DisplayName("Should reject when one of multiple datasources is DRAFT")
+    void shouldRejectWhenOneDataSourceIsDraft() {
+      DataSource availableDataSource = createTestDataSource();
+      availableDataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      dataSourceRepository.save(availableDataSource);
+
+      DataSource draftDataSource = createTestDataSource();
+      // draftDataSource is DRAFT by default
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSourceIds(Set.of(availableDataSource.getId(), draftDataSource.getId()));
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpointPath(),
+              HttpMethod.POST,
+              new HttpEntity<>(input, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).contains("AVAILABLE status");
     }
   }
 }
