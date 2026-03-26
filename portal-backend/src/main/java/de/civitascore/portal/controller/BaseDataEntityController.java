@@ -29,6 +29,18 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
+/**
+ * Abstract base controller for data-entity resources that support scope-based access control.
+ *
+ * <p>Extends {@link BaseController} with automatic scope filtering on collection queries and an
+ * endpoint for retrieving {@link Assignment}s scoped to the entity. Subclasses must implement
+ * {@link #getScopeType()} to declare their scope category.
+ *
+ * @param <I> the input DTO type
+ * @param <O> the output DTO type
+ * @param <E> the JPA data-entity type
+ * @param <S> the specification type used for filtering
+ */
 public abstract class BaseDataEntityController<
         I extends BaseDataEntityInputDTO,
         O extends BaseOutputDTO,
@@ -40,6 +52,11 @@ public abstract class BaseDataEntityController<
   @Autowired private AssignmentAssembler assignmentAssembler;
   @Autowired private ObjectProvider<AllowedScopes> allowedScopesProvider;
 
+  /**
+   * Returns the scope type that identifies this data entity category for authorization filtering.
+   *
+   * @return the {@link ScopeType} for this controller's entity
+   */
   protected abstract ScopeType getScopeType();
 
   /**
@@ -72,6 +89,12 @@ public abstract class BaseDataEntityController<
     return spec == null ? scopeFilter : spec.and(scopeFilter);
   }
 
+  /**
+   * Retrieves all role assignments scoped to the specified entity.
+   *
+   * @param id the UUID of the entity whose assignments to retrieve
+   * @return a list of assignment output DTOs with HTTP 200 status
+   */
   @GetMapping("/{id}/assignments")
   @Operation(
       operationId = "get{Entity}Assignments",

@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Input DTO for creating and updating dataset resources. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DataSetInputDTO extends BaseDataEntityInputDTO {

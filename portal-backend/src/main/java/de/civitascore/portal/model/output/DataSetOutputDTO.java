@@ -10,6 +10,7 @@ import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Output DTO representing a dataset for API responses. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DataSetOutputDTO extends BaseOutputDTO {

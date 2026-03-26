@@ -31,6 +31,7 @@ interface UserActiveSpec extends BaseSpec<User> {}
 })
 interface UserQuickSearchSpec extends BaseSpec<User> {}
 
+/** JPA Specification for filtering {@link User} entities via query parameters. */
 public interface UserSpec
     extends UserEmailSpec,
         UserFirstNameSpec,

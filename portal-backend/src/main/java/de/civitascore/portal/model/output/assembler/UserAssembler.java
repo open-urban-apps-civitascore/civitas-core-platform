@@ -9,6 +9,10 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/**
+ * Assembler for converting {@link User} entities to {@link UserOutputDTO}. Participates in the
+ * template method pattern defined by {@link BaseAssembler}.
+ */
 @Component
 @RequiredArgsConstructor
 public class UserAssembler implements BaseAssembler<User, UserOutputDTO, UUID> {
@@ -16,6 +20,7 @@ public class UserAssembler implements BaseAssembler<User, UserOutputDTO, UUID> {
   private final UserMapper userMapper;
   private final GroupMapper groupMapper;
 
+  /** {@inheritDoc} Maps user fields including group summaries. */
   @Override
   public UserOutputDTO mapToBaseDto(User entity) {
     UserOutputDTO output = userMapper.toOutput(entity);
@@ -29,6 +34,7 @@ public class UserAssembler implements BaseAssembler<User, UserOutputDTO, UUID> {
     return output;
   }
 
+  /** {@inheritDoc} Converts a user entity back to its input DTO for PATCH operations. */
   @Override
   @SuppressWarnings("unchecked")
   public <I> I toInput(User entity) {

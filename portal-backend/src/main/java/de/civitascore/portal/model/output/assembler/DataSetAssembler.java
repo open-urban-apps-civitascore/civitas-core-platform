@@ -9,6 +9,10 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/**
+ * Assembler for converting {@link DataSet} entities to {@link DataSetOutputDTO}. Participates in
+ * the template method pattern defined by {@link BaseAssembler}.
+ */
 @Component
 @RequiredArgsConstructor
 public class DataSetAssembler implements BaseAssembler<DataSet, DataSetOutputDTO, UUID> {
@@ -17,11 +21,16 @@ public class DataSetAssembler implements BaseAssembler<DataSet, DataSetOutputDTO
   private final UserRepository userRepository;
   private final UserMapper userMapper;
 
+  /** {@inheritDoc} Delegates to the {@link DataSetMapper} for basic field mapping. */
   @Override
   public DataSetOutputDTO mapToBaseDto(DataSet entity) {
     return dataSetMapper.toOutput(entity);
   }
 
+  /**
+   * {@inheritDoc} Enriches the output with the creating user's summary resolved from the audit
+   * trail.
+   */
   @Override
   public DataSetOutputDTO enrichDto(DataSetOutputDTO dto, DataSet entity) {
     if (entity.getCreatedBy() != null) {
@@ -32,6 +41,7 @@ public class DataSetAssembler implements BaseAssembler<DataSet, DataSetOutputDTO
     return dto;
   }
 
+  /** {@inheritDoc} Converts a dataset entity back to its input DTO for PATCH operations. */
   @Override
   @SuppressWarnings("unchecked")
   public <I> I toInput(DataSet entity) {

@@ -19,6 +19,11 @@ import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for managing {@link Pipeline} entities, which define data processing pipelines belonging
+ * to a {@link DataSet}. Handles dataset and datasource relationship resolution, unique name
+ * validation within a dataset, and version incrementing on updates.
+ */
 @Slf4j
 @Service
 public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
@@ -60,6 +65,15 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
     return postLoad(entity);
   }
 
+  /**
+   * Finds a pipeline by ID and verifies that it belongs to the specified dataset.
+   *
+   * @param id the pipeline ID
+   * @param dataSetId the expected parent dataset ID
+   * @return the pipeline entity
+   * @throws ResourceNotFoundException if the pipeline does not exist or does not belong to the
+   *     given dataset
+   */
   public Pipeline findByIdAndDataSetOrThrow(UUID id, UUID dataSetId) {
     Pipeline pipeline = findByIdOrThrow(id);
     if (!dataSetId.equals(pipeline.getDataSet().getId())) {
@@ -68,6 +82,14 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
     return pipeline;
   }
 
+  /**
+   * Validates that an update does not attempt to move a pipeline to a different dataset.
+   *
+   * @param input the pipeline update input
+   * @param existingEntity the current pipeline entity
+   * @return the validated input
+   * @throws ResourceNotFoundException if the input specifies a different dataset ID
+   */
   @Override
   protected PipelineInputDTO preProcessUpdateInput(
       PipelineInputDTO input, Pipeline existingEntity) {
@@ -79,6 +101,16 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
     return super.preProcessUpdateInput(input, existingEntity);
   }
 
+  /**
+   * Resolves the parent dataset and data source references after DTO-to-entity conversion.
+   * Validates that the dataset and all referenced data sources exist.
+   *
+   * @param entity the pipeline entity
+   * @param input the pipeline input DTO
+   * @return the entity with resolved dataset and data source relationships
+   * @throws ResourceNotFoundException if the dataset is not found
+   * @throws InvalidInputException if any data source ID is not found
+   */
   @Override
   protected Pipeline postConvertToEntity(Pipeline entity, PipelineInputDTO input) {
     // Set the DataSet relationship
@@ -105,6 +137,15 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
     return super.postConvertToEntity(entity, input);
   }
 
+  /**
+   * Validates pipeline name uniqueness within the parent dataset and increments the version number
+   * on updates.
+   *
+   * @param entity the pipeline entity to validate
+   * @return the entity with version incremented (for updates)
+   * @throws UniqueConstraintViolationException if another pipeline with the same name exists in the
+   *     same dataset
+   */
   @Override
   protected Pipeline preSave(Pipeline entity) {
     validateUniqueName(entity);
@@ -131,6 +172,14 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
             });
   }
 
+  /**
+   * Prevents deletion of pipelines that belong to a non-DRAFT dataset.
+   *
+   * @param id the pipeline ID to delete
+   * @return the pipeline entity to be deleted
+   * @throws ResourceNotFoundException if the pipeline does not exist
+   * @throws InvalidInputException if the parent dataset is not in DRAFT status
+   */
   @Override
   protected Pipeline preProcessDelete(UUID id) {
     Pipeline pipeline =

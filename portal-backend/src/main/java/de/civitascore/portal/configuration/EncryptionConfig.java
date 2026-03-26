@@ -8,6 +8,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 
+/**
+ * Configures credential encryption for data source connector secrets. Uses the platform master key
+ * to derive an AES encryption key, producing {@code ENC(...)} wrapped ciphertext that the
+ * config-adapter can decrypt.
+ */
 @Configuration
 @EnableConfigurationProperties(CivitasProperties.class)
 public class EncryptionConfig {
@@ -17,6 +22,14 @@ public class EncryptionConfig {
 
   public static final String CREDENTIAL_CONTEXT = "portal-backend:datasource-connector";
 
+  /**
+   * Creates a {@link TextEncryptor} that wraps encrypted credentials in {@code ENC(...)} format.
+   * Decryption is intentionally unsupported as it is handled by the config-adapter.
+   *
+   * @param props the CIVITAS properties containing the master key
+   * @return a one-way text encryptor for credential encryption
+   * @throws GeneralSecurityException if the master key is invalid
+   */
   @Bean
   public TextEncryptor textEncryptor(CivitasProperties props) throws GeneralSecurityException {
     byte[] masterKey;

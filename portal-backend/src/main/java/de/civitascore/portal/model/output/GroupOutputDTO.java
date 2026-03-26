@@ -6,6 +6,7 @@ import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Output DTO representing a group for API responses. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class GroupOutputDTO extends BaseOutputDTO {

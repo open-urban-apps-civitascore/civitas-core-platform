@@ -9,6 +9,10 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for managing {@link DataSpace} entities. Resolves owner user and parent data space
+ * relationships during entity conversion.
+ */
 @Service
 @RequiredArgsConstructor
 public class DataSpaceService extends BaseService<DataSpace, DataSpaceInputDTO> {
@@ -43,6 +47,13 @@ public class DataSpaceService extends BaseService<DataSpace, DataSpaceInputDTO> 
     return postLoad(entity);
   }
 
+  /**
+   * Resolves owner user and parent data space references after DTO-to-entity conversion.
+   *
+   * @param entity the data space entity
+   * @param input the data space input DTO containing owner and parent IDs
+   * @return the entity with resolved owner and parent relationships
+   */
   @Override
   protected DataSpace postConvertToEntity(DataSpace entity, DataSpaceInputDTO input) {
     // Use getReferenceById for ManyToOne relationships to avoid unnecessary SELECT queries

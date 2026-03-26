@@ -30,6 +30,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST controller for managing dataset resources, including publish/release lifecycle operations.
+ */
 @RestController
 @RequestMapping("/datasets")
 @RequiredArgsConstructor
@@ -57,6 +60,14 @@ public class DataSetController
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "sensor"))
   })
+  /**
+   * Retrieves a paginated list of datasets with optional filtering by name, description, or
+   * free-text search.
+   *
+   * @param spec the dataset search/filter specification
+   * @param pageable pagination and sorting parameters
+   * @return a page of dataset output DTOs with HTTP 200 status
+   */
   @Override
   public ResponseEntity<Page<DataSetOutputDTO>> getAll(
       @ParameterObject @Parameter(description = "Search/filter spec") DataSetSpec spec,
@@ -66,16 +77,25 @@ public class DataSetController
     return super.getAll(spec, pageable);
   }
 
+  /** {@inheritDoc} */
   @Override
   protected DataSetService getService() {
     return dataSetService;
   }
 
+  /** {@inheritDoc} */
   @Override
   protected DataSetAssembler getAssembler() {
     return dataSetAssembler;
   }
 
+  /**
+   * Updates a dataset in DRAFT status by fully replacing its content.
+   *
+   * @param id the UUID of the dataset to update
+   * @param input the validated dataset input DTO
+   * @return the updated dataset output DTO with HTTP 200 status
+   */
   @Override
   @PutMapping("/{id}")
   @Operation(
@@ -87,6 +107,13 @@ public class DataSetController
     return super.update(id, input);
   }
 
+  /**
+   * Updates only the metadata of a published dataset (READY or AVAILABLE status).
+   *
+   * @param id the UUID of the published dataset
+   * @param input the validated dataset input DTO containing updated metadata
+   * @return the updated dataset output DTO with HTTP 200 status
+   */
   @PutMapping("/{id}/published/meta")
   @Operation(
       operationId = "updateDataSetPublishedMeta",
@@ -101,11 +128,19 @@ public class DataSetController
     return ResponseEntity.ok(output);
   }
 
+  /** {@inheritDoc} */
   @Override
   protected ScopeType getScopeType() {
     return ScopeType.DATASET;
   }
 
+  /**
+   * Publishes a dataset by generating distributions from pipeline APIs and transitioning status to
+   * READY.
+   *
+   * @param id the UUID of the dataset to publish
+   * @return the published dataset output DTO with HTTP 200 status
+   */
   @PostMapping("/{id}/publish")
   @Operation(
       operationId = "publishDataSet",
@@ -118,6 +153,12 @@ public class DataSetController
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Unpublishes a dataset by removing auto-generated distributions and reverting status to DRAFT.
+   *
+   * @param id the UUID of the dataset to unpublish
+   * @return the unpublished dataset output DTO with HTTP 200 status
+   */
   @PostMapping("/{id}/unpublish")
   @Operation(
       operationId = "unpublishDataSet",
@@ -130,6 +171,13 @@ public class DataSetController
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Releases a dataset by transitioning it from READY to AVAILABLE and triggering infrastructure
+   * provisioning via saga.
+   *
+   * @param id the UUID of the dataset to release
+   * @return the released dataset output DTO with HTTP 202 (Accepted) status
+   */
   @PostMapping("/{id}/release")
   @Operation(
       operationId = "releaseDataSet",
@@ -142,6 +190,13 @@ public class DataSetController
     return ResponseEntity.accepted().body(output);
   }
 
+  /**
+   * Unreleases a dataset by triggering infrastructure teardown via saga, transitioning from
+   * AVAILABLE to READY.
+   *
+   * @param id the UUID of the dataset to unrelease
+   * @return the unreleased dataset output DTO with HTTP 202 (Accepted) status
+   */
   @PostMapping("/{id}/unrelease")
   @Operation(
       operationId = "unreleaseDataSet",
@@ -154,6 +209,11 @@ public class DataSetController
     return ResponseEntity.accepted().body(output);
   }
 
+  /**
+   * Deletes a DRAFT dataset. Published or released datasets must be unpublished/unreleased first.
+   *
+   * @param id the UUID of the dataset to delete
+   */
   @Override
   @DeleteMapping("/{id}")
   @Operation(

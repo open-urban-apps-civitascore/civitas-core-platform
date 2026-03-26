@@ -16,6 +16,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service for managing {@link Group} entities. Handles contact user and member resolution, and
+ * supports bulk replacement of group assignments.
+ */
 @Service
 @RequiredArgsConstructor
 public class GroupService extends BaseService<Group, GroupInputDTO> {
@@ -25,6 +29,14 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
   private final UserService userService;
   private final AssignmentFactory assignmentFactory;
 
+  /**
+   * Resolves contact user and member references after DTO-to-entity conversion. Sets the contact
+   * user, and batch-loads group members by their IDs.
+   *
+   * @param entity the group entity
+   * @param input the group input DTO containing contact user and member IDs
+   * @return the entity with resolved relationships
+   */
   @Override
   protected Group postConvertToEntity(Group entity, GroupInputDTO input) {
     // Use getReferenceById for ManyToOne relationships to avoid unnecessary SELECT queries
@@ -53,6 +65,14 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
     return super.postConvertToEntity(entity, input);
   }
 
+  /**
+   * Replaces all assignments of a group with a new set built from the provided input DTOs.
+   *
+   * @param groupId the group ID
+   * @param assignmentInputs the new set of assignment definitions
+   * @return the updated group entity
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the group does not exist
+   */
   @Transactional
   public Group replaceAssignments(UUID groupId, Set<AssignmentGroupInputDTO> assignmentInputs) {
     Group group = findByIdOrThrow(groupId);

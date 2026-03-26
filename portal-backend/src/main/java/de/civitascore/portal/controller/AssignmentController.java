@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** REST controller for managing role-to-user/group assignment resources. */
 @RestController
 @RequestMapping("/assignments")
 @RequiredArgsConstructor
@@ -37,11 +38,13 @@ public class AssignmentController
   private final AssignmentService assignmentService;
   private final AssignmentAssembler assignmentAssembler;
 
+  /** {@inheritDoc} */
   @Override
   AssignmentService getService() {
     return assignmentService;
   }
 
+  /** {@inheritDoc} */
   @Override
   protected AssignmentAssembler getAssembler() {
     return assignmentAssembler;
@@ -86,6 +89,14 @@ public class AssignmentController
               + " (partial match, case-insensitive).",
       in = ParameterIn.QUERY,
       schema = @Schema(type = "string", example = "admin"))
+  /**
+   * Retrieves a paginated list of assignments with optional filtering by role, user, group, scope,
+   * and role type.
+   *
+   * @param spec the assignment search/filter specification
+   * @param pageable pagination and sorting parameters
+   * @return a page of assignment output DTOs with HTTP 200 status
+   */
   @Override
   public ResponseEntity<Page<AssignmentOutputDTO>> getAll(
       @ParameterObject @Parameter(description = "Search/filter spec") AssignmentSpec spec,
@@ -95,6 +106,14 @@ public class AssignmentController
     return super.getAll(spec, pageable);
   }
 
+  /**
+   * Update operation is not supported for assignments.
+   *
+   * @param id the assignment UUID (unused)
+   * @param input the assignment input (unused)
+   * @return never returns normally
+   * @throws UnsupportedOperationException always
+   */
   @PutMapping("/{id}")
   @Override
   @Operation(hidden = true)
@@ -103,6 +122,14 @@ public class AssignmentController
     throw new UnsupportedOperationException("Assignment updates are not supported.");
   }
 
+  /**
+   * Patch operation is not supported for assignments.
+   *
+   * @param id the assignment UUID (unused)
+   * @param updates the JSON patch data (unused)
+   * @return never returns normally
+   * @throws UnsupportedOperationException always
+   */
   @PatchMapping("/{id}")
   @Override
   @Operation(hidden = true)

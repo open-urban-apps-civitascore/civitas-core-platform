@@ -8,4 +8,5 @@ import net.kaczmarzyk.spring.data.jpa.web.annotation.Spec;
 @Spec(path = "roleType", params = "roleType", paramSeparator = ',', spec = In.class)
 interface RoleTypeSpec extends NamedEntitySpec<Role> {}
 
+/** JPA Specification for filtering {@link Role} entities via query parameters. */
 public interface RoleSpec extends RoleTypeSpec {}

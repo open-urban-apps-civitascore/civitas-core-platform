@@ -7,6 +7,7 @@ import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Output DTO representing an agent for API responses. */
 @Schema(description = "Agent details")
 @Data
 @EqualsAndHashCode(callSuper = true)

@@ -9,6 +9,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Configuration properties for the Model Atlas service integration, bound from the {@code
+ * model-atlas.*} namespace. Defines the base URL, scope, stage, and HTTP timeout settings.
+ */
 @Configuration
 @ConfigurationProperties(prefix = "model-atlas")
 @Validated

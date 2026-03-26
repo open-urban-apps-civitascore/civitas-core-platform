@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** REST controller for managing user group resources and their role assignments. */
 @RestController
 @RequestMapping("/groups")
 @RequiredArgsConstructor
@@ -66,6 +67,14 @@ public class GroupController
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "team"))
   })
+  /**
+   * Retrieves a paginated list of groups with optional filtering by name, description, contact
+   * user, parent group, or free-text search.
+   *
+   * @param spec the group search/filter specification
+   * @param pageable pagination and sorting parameters
+   * @return a page of group output DTOs with HTTP 200 status
+   */
   @Override
   public ResponseEntity<Page<GroupOutputDTO>> getAll(
       @ParameterObject @Parameter(description = "Search/filter spec") GroupSpec spec,
@@ -75,16 +84,25 @@ public class GroupController
     return super.getAll(spec, pageable);
   }
 
+  /** {@inheritDoc} */
   @Override
   protected GroupService getService() {
     return groupService;
   }
 
+  /** {@inheritDoc} */
   @Override
   protected GroupAssembler getAssembler() {
     return groupAssembler;
   }
 
+  /**
+   * Replaces all role assignments for a group using diff-based semantics.
+   *
+   * @param groupId the UUID of the group whose assignments to replace
+   * @param assignments the set of new assignment inputs
+   * @return the updated group output DTO with HTTP 200 status
+   */
   @PutMapping("/{groupId}/assignments")
   @Operation(
       operationId = "replaceGroupAssignments",

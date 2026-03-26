@@ -15,6 +15,11 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
+/**
+ * Low-level HTTP client for communicating with the external Model Atlas service. Provides upload,
+ * download, and delete operations for UML model files, translating transport errors into
+ * domain-specific exceptions.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor

@@ -18,6 +18,10 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/**
+ * Assembler for converting {@link Assignment} entities to {@link AssignmentOutputDTO}. Participates
+ * in the template method pattern defined by {@link BaseAssembler}.
+ */
 @Component
 @RequiredArgsConstructor
 public class AssignmentAssembler implements BaseAssembler<Assignment, AssignmentOutputDTO, UUID> {
@@ -26,6 +30,9 @@ public class AssignmentAssembler implements BaseAssembler<Assignment, Assignment
   private final GroupMapper groupMapper;
   private final RoleMapper roleMapper;
 
+  /**
+   * {@inheritDoc} Maps assignment fields including group summary, role summary, and resolved scope.
+   */
   @Override
   public AssignmentOutputDTO mapToBaseDto(Assignment entity) {
     AssignmentOutputDTO output = assignmentMapper.toOutput(entity);
@@ -107,6 +114,7 @@ public class AssignmentAssembler implements BaseAssembler<Assignment, Assignment
     return summary;
   }
 
+  /** {@inheritDoc} Converts an assignment entity back to its input DTO for PATCH operations. */
   @Override
   @SuppressWarnings("unchecked")
   public <I> I toInput(Assignment entity) {

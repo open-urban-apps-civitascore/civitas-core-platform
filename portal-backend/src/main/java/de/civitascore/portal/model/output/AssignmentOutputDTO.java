@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Output DTO representing an assignment for API responses. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class AssignmentOutputDTO extends BaseOutputDTO {

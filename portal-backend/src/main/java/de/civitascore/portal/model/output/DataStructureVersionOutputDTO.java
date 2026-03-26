@@ -8,6 +8,7 @@ import java.util.Map;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Output DTO representing a data structure version for API responses. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DataStructureVersionOutputDTO extends BaseOutputDTO {

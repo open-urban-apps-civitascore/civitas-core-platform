@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Output DTO representing a distribution for API responses. */
 @Schema(description = "Distribution details")
 @Data
 @EqualsAndHashCode(callSuper = true)

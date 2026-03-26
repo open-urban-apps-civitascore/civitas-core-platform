@@ -5,6 +5,7 @@ import lombok.Getter;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+/** Thrown when a resource cannot be deleted or modified because it is still referenced. */
 @Getter
 @ResponseStatus(HttpStatus.CONFLICT)
 public class ResourceInUseException extends RuntimeException {

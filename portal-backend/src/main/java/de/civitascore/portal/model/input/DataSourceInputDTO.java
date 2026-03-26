@@ -10,6 +10,7 @@ import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Input DTO for creating and updating data source resources. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DataSourceInputDTO extends BaseDataEntityInputDTO {

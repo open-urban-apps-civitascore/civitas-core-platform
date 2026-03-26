@@ -7,6 +7,7 @@ import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Output DTO representing a role for API responses. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class RoleOutputDTO extends BaseOutputDTO {

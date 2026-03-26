@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/** Spring Data JPA repository for {@link DataStructureVersion} entities. */
 @Repository
 public interface DataStructureVersionRepository extends BaseRepository<DataStructureVersion, UUID> {
 
@@ -23,5 +24,13 @@ public interface DataStructureVersionRepository extends BaseRepository<DataStruc
   @Query("SELECT dsv FROM DataStructureVersion dsv WHERE dsv.id = :id")
   Optional<DataStructureVersion> findByIdWithRelations(@Param("id") UUID id);
 
+  /**
+   * Find all data structure versions matching the given data structure ID and version string. Used
+   * for uniqueness validation when creating new versions.
+   *
+   * @param id the parent data structure ID
+   * @param version the version string to match
+   * @return matching data structure versions
+   */
   Set<DataStructureVersion> findAllByDataStructureIdAndVersion(UUID id, String version);
 }

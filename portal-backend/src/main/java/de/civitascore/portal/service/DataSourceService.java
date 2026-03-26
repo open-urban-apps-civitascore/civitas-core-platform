@@ -29,6 +29,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service for managing {@link DataSource} entities through their full lifecycle (DRAFT to
+ * AVAILABLE). Handles connector configuration normalization, encryption of sensitive fields, data
+ * structure version linking, and publish/unpublish status transitions.
+ */
 @Service
 @RequiredArgsConstructor
 public class DataSourceService extends BaseDataEntityService<DataSource, DataSourceInputDTO> {
@@ -60,6 +65,16 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     return assignmentFactory;
   }
 
+  /**
+   * Links the data structure version to the data source after DTO-to-entity conversion. Validates
+   * that the referenced version is in AVAILABLE status and its parent data structure is also
+   * AVAILABLE.
+   *
+   * @param entity the data source entity
+   * @param input the data source input DTO
+   * @return the entity with the data structure version relationship set
+   * @throws InvalidInputException if the data structure version is not linkable
+   */
   @Override
   protected DataSource postConvertToEntity(DataSource entity, DataSourceInputDTO input) {
     if (input.getDataStructureVersionId() != null) {
@@ -73,6 +88,14 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     return super.postConvertToEntity(entity, input);
   }
 
+  /**
+   * Normalizes and encrypts the connector configuration before creating the data source. Validates
+   * that a connector type is provided when configuration is present.
+   *
+   * @param input the data source creation input
+   * @return the input with normalized and encrypted configuration
+   * @throws InvalidInputException if configuration is set without a connector type
+   */
   @Override
   protected DataSourceInputDTO preProcessCreateInput(DataSourceInputDTO input) {
     if (input.getConfiguration() != null) {
@@ -125,8 +148,13 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   }
 
   /**
-   * Jackson's readerForUpdating does a shallow merge — the configuration map is replaced, not
-   * merged. We need to start from the existing (decrypted) config and overlay the patch fields.
+   * Merges configuration for a PATCH operation. Because Jackson's readerForUpdating performs a
+   * shallow replacement of the configuration map rather than a deep merge, this method starts from
+   * the existing (decrypted) config and overlays only the fields present in the patch.
+   *
+   * @param patchedDto the DTO produced by Jackson's partial deserialization
+   * @param existing the current persisted data source entity
+   * @param rawPatch the raw JSON patch node for inspecting which fields were supplied
    */
   public void mergeConfigurationForPatch(
       DataSourceInputDTO patchedDto, DataSource existing, JsonNode rawPatch) {
@@ -194,6 +222,13 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
   }
 
+  /**
+   * Validates the connector configuration before saving if the data source is in AVAILABLE status.
+   *
+   * @param entity the data source entity to validate
+   * @return the validated entity
+   * @throws InvalidInputException if the configuration is invalid for an AVAILABLE data source
+   */
   @Override
   protected DataSource preSave(DataSource entity) {
     if (entity.getDataSourceStatus() == DataSourceStatus.AVAILABLE) {
@@ -202,6 +237,15 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     return entity;
   }
 
+  /**
+   * Publishes a data source by transitioning it from DRAFT to AVAILABLE status. Validates that a
+   * connector type, data structure version, and valid configuration are present.
+   *
+   * @param id the data source ID
+   * @return the published data source
+   * @throws InvalidInputException if the data source is not in DRAFT status or is missing required
+   *     fields
+   */
   @Transactional
   public DataSource publish(UUID id) {
     DataSource entity = findByIdOrThrow(id);
@@ -227,6 +271,15 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     return save(entity);
   }
 
+  /**
+   * Unpublishes a data source by reverting it from AVAILABLE to DRAFT status. Validates that the
+   * data source is not referenced by any READY or AVAILABLE datasets.
+   *
+   * @param id the data source ID
+   * @return the unpublished data source
+   * @throws InvalidInputException if the data source is not in AVAILABLE status
+   * @throws ResourceInUseException if the data source is referenced by an active dataset
+   */
   @Transactional
   public DataSource unpublish(UUID id) {
     DataSource entity = findByIdOrThrow(id);
@@ -252,6 +305,17 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
   }
 
+  /**
+   * Updates metadata of an AVAILABLE data source. Allows name, description, and assignment changes.
+   * Technical fields (connector type, configuration, data structure version) can only be changed
+   * when the data source is not referenced by any READY or AVAILABLE dataset.
+   *
+   * @param id the data source ID
+   * @param input the partial update input
+   * @return the updated data source
+   * @throws InvalidInputException if the data source is not AVAILABLE or violates in-use
+   *     constraints
+   */
   @Transactional
   public DataSource updatePublishedMeta(UUID id, DataSourceInputDTO input) {
     DataSource entity = findByIdOrThrow(id);
@@ -344,6 +408,14 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
   }
 
+  /**
+   * Prevents deletion of data sources in AVAILABLE status. The data source must be unpublished
+   * first.
+   *
+   * @param id the data source ID
+   * @return the data source entity to be deleted
+   * @throws InvalidInputException if the data source is in AVAILABLE status
+   */
   @Override
   protected DataSource preProcessDelete(UUID id) {
     DataSource entity = findByIdOrThrow(id);
@@ -378,6 +450,14 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
   }
 
+  /**
+   * Returns the data structure version linked to the given data source, or {@code null} if none is
+   * linked.
+   *
+   * @param dataSourceId the data source ID
+   * @return the linked {@link DataStructureVersion}, or {@code null}
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the data source does not exist
+   */
   @Transactional(readOnly = true)
   public DataStructureVersion findLinkedDataStructureVersion(UUID dataSourceId) {
     DataSource dataSource = findByIdOrThrow(dataSourceId);

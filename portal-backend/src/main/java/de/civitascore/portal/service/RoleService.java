@@ -12,6 +12,10 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for managing {@link Role} entities. Resolves permission references during entity
+ * conversion and enforces readonly protection on system-managed roles.
+ */
 @Service
 @RequiredArgsConstructor
 public class RoleService extends BaseService<Role, RoleInputDTO> {
@@ -45,6 +49,14 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
     return postLoad(entity);
   }
 
+  /**
+   * Resolves permission references after DTO-to-entity conversion by batch-loading permissions from
+   * the provided IDs.
+   *
+   * @param entity the role entity
+   * @param input the role input DTO containing permission IDs
+   * @return the entity with resolved permission relationships
+   */
   @Override
   protected Role postConvertToEntity(Role entity, RoleInputDTO input) {
     // Use findAllById for efficient batch loading of permissions instead of N+1 queries
@@ -59,6 +71,14 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
     return super.postConvertToEntity(entity, input);
   }
 
+  /**
+   * Prevents modification of system-managed readonly roles.
+   *
+   * @param input the role update input
+   * @param existingEntity the current role entity
+   * @return the input if the role is not readonly
+   * @throws ForbiddenException if the role is marked as readonly
+   */
   @Override
   protected RoleInputDTO preProcessUpdateInput(RoleInputDTO input, Role existingEntity) {
     if (existingEntity.isReadonly()) {
@@ -69,6 +89,13 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
     return super.preProcessUpdateInput(input, existingEntity);
   }
 
+  /**
+   * Prevents deletion of system-managed readonly roles.
+   *
+   * @param id the role ID to delete
+   * @return the role entity to be deleted
+   * @throws ForbiddenException if the role is marked as readonly
+   */
   @Override
   protected Role preProcessDelete(UUID id) {
     Role existingEntity = super.preProcessDelete(id);

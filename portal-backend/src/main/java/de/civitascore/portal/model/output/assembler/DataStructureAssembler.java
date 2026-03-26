@@ -11,6 +11,10 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/**
+ * Assembler for converting {@link DataStructure} entities to {@link DataStructureOutputDTO}.
+ * Participates in the template method pattern defined by {@link BaseAssembler}.
+ */
 @Component
 @RequiredArgsConstructor
 public class DataStructureAssembler
@@ -19,11 +23,16 @@ public class DataStructureAssembler
   private final DataStructureMapper dataStructureMapper;
   private final DataSourceRepository dataSourceRepository;
 
+  /** {@inheritDoc} Delegates to the {@link DataStructureMapper} for basic field mapping. */
   @Override
   public DataStructureOutputDTO mapToBaseDto(DataStructure entity) {
     return dataStructureMapper.toOutput(entity);
   }
 
+  /**
+   * {@inheritDoc} Sets the {@code inUse} flag based on whether any data source references one of
+   * this structure's versions.
+   */
   @Override
   public DataStructureOutputDTO enrichDto(DataStructureOutputDTO dto, DataStructure entity) {
     Set<UUID> versionIds =
@@ -36,6 +45,7 @@ public class DataStructureAssembler
     return dto;
   }
 
+  /** {@inheritDoc} Converts a data structure entity back to its input DTO for PATCH operations. */
   @Override
   @SuppressWarnings("unchecked")
   public <I> I toInput(DataStructure entity) {

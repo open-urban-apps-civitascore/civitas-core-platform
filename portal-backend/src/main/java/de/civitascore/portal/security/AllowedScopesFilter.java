@@ -38,6 +38,16 @@ public class AllowedScopesFilter extends OncePerRequestFilter {
 
   private final ObjectProvider<AllowedScopes> allowedScopesProvider;
 
+  /**
+   * Extracts the {@value HEADER_NAME} header from the request and populates the request-scoped
+   * {@link AllowedScopes} bean with wildcard or specific scope IDs.
+   *
+   * @param request the incoming HTTP request
+   * @param response the HTTP response
+   * @param filterChain the filter chain to continue processing
+   * @throws ServletException if an error occurs during filtering
+   * @throws IOException if an I/O error occurs during filtering
+   */
   @Override
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)

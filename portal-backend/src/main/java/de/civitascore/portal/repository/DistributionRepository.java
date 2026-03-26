@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/** Spring Data JPA repository for {@link Distribution} entities. */
 @Repository
 public interface DistributionRepository extends BaseRepository<Distribution, UUID> {
 

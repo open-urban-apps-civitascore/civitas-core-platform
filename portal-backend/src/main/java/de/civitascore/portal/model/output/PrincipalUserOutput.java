@@ -5,6 +5,7 @@ import de.civitascore.portal.security.dto.PrincipalUserDetails;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
+/** Output DTO representing the authenticated principal user for API responses. */
 public record PrincipalUserOutput(
     @Schema(description = "User's unique identifier", example = "testuser") String username,
     @Schema(description = "User's email address", example = "user@example.com") String email,

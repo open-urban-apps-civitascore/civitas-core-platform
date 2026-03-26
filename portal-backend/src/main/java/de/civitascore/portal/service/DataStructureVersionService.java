@@ -26,6 +26,11 @@ import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service for managing {@link DataStructureVersion} entities through their lifecycle (DRAFT to
+ * AVAILABLE). Handles model file synchronization with Model Atlas, unique version validation within
+ * a data structure, and enforces constraints on versions that are in use by data sources.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -70,6 +75,13 @@ public class DataStructureVersionService
     return postLoad(entity);
   }
 
+  /**
+   * Downloads a model from Model Atlas by its URI. Returns empty if the URI is blank or the
+   * download fails.
+   *
+   * @param modelAtlasUri the Model Atlas namespace URI
+   * @return the model XML content, or empty if unavailable
+   */
   public Optional<String> findModelByAtlasUri(String modelAtlasUri) {
     if (StringUtils.isNotBlank(modelAtlasUri)) {
       try {
@@ -83,6 +95,15 @@ public class DataStructureVersionService
     return Optional.empty();
   }
 
+  /**
+   * Resolves and sets the parent data structure relationship after DTO-to-entity conversion.
+   *
+   * @param entity the data structure version entity
+   * @param input the input DTO containing the data structure ID
+   * @return the entity with the parent data structure set
+   * @throws InvalidInputException if the data structure ID is null or the data structure is not
+   *     found
+   */
   @Override
   protected DataStructureVersion postConvertToEntity(
       DataStructureVersion entity, DataStructureVersionInputDTO input) {
@@ -99,6 +120,14 @@ public class DataStructureVersionService
     return super.postConvertToEntity(entity, input);
   }
 
+  /**
+   * Sets initial DRAFT status and validates model/modelAtlasUri consistency before creating a new
+   * data structure version.
+   *
+   * @param input the creation input
+   * @return the preprocessed input with DRAFT status set
+   * @throws InvalidInputException if model is provided without modelAtlasUri or vice versa
+   */
   @Override
   protected DataStructureVersionInputDTO preProcessCreateInput(DataStructureVersionInputDTO input) {
     // Set DRAFT status for newly created data structure versions
@@ -108,6 +137,16 @@ public class DataStructureVersionService
     return super.preProcessCreateInput(input);
   }
 
+  /**
+   * Validates and constrains update input based on the version's current state. If the version is
+   * in use by a data source, structural fields (modelAtlasUri, version, styles, model) are locked
+   * and only description and modelName may change.
+   *
+   * @param input the update input
+   * @param existingEntity the current version entity
+   * @return the preprocessed input with restricted fields preserved if in use
+   * @throws InvalidInputException if the version string is blank
+   */
   @Override
   protected DataStructureVersionInputDTO preProcessUpdateInput(
       DataStructureVersionInputDTO input, DataStructureVersion existingEntity) {
@@ -137,12 +176,29 @@ public class DataStructureVersionService
     return super.preProcessUpdateInput(input, existingEntity);
   }
 
+  /**
+   * Validates version uniqueness within the parent data structure before saving.
+   *
+   * @param entity the data structure version entity
+   * @return the validated entity
+   * @throws UniqueConstraintViolationException if another version with the same version string
+   *     exists in the same data structure
+   */
   @Override
   protected DataStructureVersion preSave(DataStructureVersion entity) {
     validateUniqueVersion(entity);
     return super.preSave(entity);
   }
 
+  /**
+   * Uploads the model content to Model Atlas after persisting the entity and stores the returned
+   * external ID.
+   *
+   * @param entity the saved data structure version entity
+   * @param input the input DTO containing model content and atlas URI
+   * @return the entity, potentially updated with an external ID from Model Atlas
+   * @throws ExternalSystemRejectionException if the Model Atlas upload fails
+   */
   @Override
   protected DataStructureVersion postSave(
       DataStructureVersion entity, DataStructureVersionInputDTO input) {
@@ -162,6 +218,12 @@ public class DataStructureVersionService
     return super.postSave(entity, input);
   }
 
+  /**
+   * Deletes the associated model from Model Atlas after the version entity has been removed from
+   * the database. Failures are logged as warnings but do not propagate.
+   *
+   * @param entity the deleted data structure version entity
+   */
   @Override
   protected void postDelete(DataStructureVersion entity) {
     if (entity != null && StringUtils.isNotBlank(entity.getModelAtlasUri())) {
@@ -365,6 +427,16 @@ public class DataStructureVersionService
     return dataStructureVersionRepository.save(version);
   }
 
+  /**
+   * Validates that the version is not in use by any data source and that deleting it would not
+   * leave a published data structure without any published versions.
+   *
+   * @param id the version ID to delete
+   * @return the version entity to be deleted
+   * @throws ResourceInUseException if the version is referenced by a data source
+   * @throws InvalidInputException if the version is the only published version of a published data
+   *     structure
+   */
   @Override
   protected DataStructureVersion preProcessDelete(UUID id) {
     DataStructureVersion version = findByIdOrThrow(id);

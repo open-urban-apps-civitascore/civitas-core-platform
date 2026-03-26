@@ -22,6 +22,12 @@ import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service for managing {@link DataSet} entities through their full lifecycle: DRAFT, READY, and
+ * AVAILABLE. Orchestrates publishing (generating distributions from pipeline APIs), releasing
+ * (triggering infrastructure provisioning via sagas), and the corresponding reverse operations.
+ * Handles saga completion and failure callbacks to reconcile dataset state.
+ */
 @Slf4j
 @Service
 public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputDTO> {
@@ -311,7 +317,16 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     dataSetRepository.save(dataSet);
   }
 
-  /** Handles a failed saga result. Reverts state as needed based on the pending saga type. */
+  /**
+   * Handles a failed saga result. Reverts state as needed based on the pending saga type. For
+   * CREATE failures the dataset reverts to READY; for UPDATE and DELETE failures it stays
+   * AVAILABLE.
+   *
+   * @param datasetId the dataset ID
+   * @param failedStep the saga step that failed
+   * @param error the error message
+   * @param compensated whether compensation was executed
+   */
   @Transactional
   public void handleSagaFailed(
       UUID datasetId, String failedStep, String error, boolean compensated) {

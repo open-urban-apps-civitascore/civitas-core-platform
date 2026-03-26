@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.web.multipart.MultipartFile;
 
+/** Input DTO for uploading data model files. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

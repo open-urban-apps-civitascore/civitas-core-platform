@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Output DTO representing a permission for API responses. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class PermissionOutputDTO extends BaseOutputDTO {

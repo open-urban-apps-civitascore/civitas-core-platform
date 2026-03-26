@@ -7,6 +7,7 @@ import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Output DTO representing a data space for API responses. */
 @Schema(description = "Data space details")
 @Data
 @EqualsAndHashCode(callSuper = true)
