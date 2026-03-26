@@ -1,7 +1,7 @@
 package de.civitascore.portal.repository;
 
-import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.embedded.DataSetStatus;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
