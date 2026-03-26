@@ -157,7 +157,7 @@
       }
     },
     "infoBoxes": {
-      "firstBox": "Gruppen, die plattformweite Berechtigungen an allen Datenobjekten besitzen, haben Zugriff.",
+      "firstBox": "Gruppen, die plattformweite Berechtigungen an allen datenbezogenen Elementen besitzen, haben Zugriff.",
       "secondBox": "Durch das Entfernen der eigenen Gruppen-Rollen-Zuordnung können die eigenen Berechtigungen verloren gehen."
     },
     "messages": {
@@ -410,7 +410,7 @@
       "assignSystemRoleDescription": "zur Gruppe {groupName}",
       "assignDataRole": "Datenrolle hinzufügen",
       "assignDataRoleDescription": "zur Gruppe {groupName}",
-      "dataRolePlatformWarning": "Rollen, die hier zugeordnet werden, berechtigen die Gruppe Plattformweit (Berechtigungen auf alle Datenobjekte der Plattform).",
+      "dataRolePlatformWarning": "Rollen, die hier zugeordnet werden, berechtigen die Gruppe Plattformweit (Berechtigungen auf alle datenbezogenen Elemente der Plattform).",
       "scopedInfoBanner": {
         "DATASET": "Datensatzbezogene Zuordnungen erfolgen am jeweiligen Datensatz.",
         "DATASOURCE": "Datenquellenbezogene Zuordnungen erfolgen an der jeweiligen Datenquelle.",
@@ -505,7 +505,7 @@
     },
     "dataPermissions": {
       "title": "Datenberechtigungen",
-      "description": "Datenberechtigungen steuern den Zugriff auf Datenobjekte der Plattform.\nSie werden zu Datenrollen zusammengefasst und Gruppen innerhalb eines bestimmten Geltungsbereichs zugeordnet."
+      "description": "Datenberechtigungen steuern den Zugriff auf datenbezogene Elemente der Plattform.\nSie werden zu Datenrollen zusammengefasst und Gruppen innerhalb eines bestimmten Geltungsbereichs zugeordnet."
     },
     "actions": {
       "read": "Lesen",
@@ -647,7 +647,7 @@
         "DATASOURCE": "Datenquelle",
         "DATASTRUCTURE": "Datenstruktur"
       },
-      "infoBox": "Gruppen, die hier zugeordnet werden, erhalten den Typ Plattformweit (Berechtigungen auf alle Datenobjekte der Plattform)",
+      "infoBox": "Gruppen, die hier zugeordnet werden, erhalten den Typ Plattformweit (Berechtigungen auf alle datenbezogenen Elemente der Plattform)",
       "scopeReadOnlyMessageDATASET": "Datensatzbezogene Zuordnungen erfolgen am jeweiligen Datensatz",
       "scopeReadOnlyMessageDATASOURCE": "Datenquellenbezogene Zuordnungen erfolgen an der jeweiligen Datenquelle",
       "scopeReadOnlyMessageDATASTRUCTURE": "Datenstrukturbezogene Zuordnungen erfolgen an der jeweiligen Datenstruktur",
@@ -758,7 +758,7 @@
     },
     "accessManagementTab": {
       "infoBoxes": {
-        "firstBox": "Gruppen, die plattformweite Berechtigungen an allen Datenobjekten besitzen, haben Zugriff auf diese Datenquelle."
+        "firstBox": "Gruppen, die plattformweite Berechtigungen an allen datenbezogenen Elementen besitzen, haben Zugriff auf diese Datenquelle."
       }
     }
   },
@@ -818,7 +818,7 @@
     },
     "accessManagementTab": {
       "infoBoxes": {
-        "firstBox": "Gruppen, die plattformweite Berechtigungen an allen Datenobjekten besitzen, haben Zugriff auf diese Datenstruktur."
+        "firstBox": "Gruppen, die plattformweite Berechtigungen an allen datenbezogenen Elementen besitzen, haben Zugriff auf diese Datenstruktur."
       }
     }
   },

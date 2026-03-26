@@ -158,7 +158,7 @@
       }
     },
     "infoBoxes": {
-      "firstBox": "Groups with platform-wide permissions on all Data objects have access.",
+      "firstBox": "Groups with platform-wide permissions on all Data-related elements have access.",
       "secondBox": "By removing your own group-role assignment, you may lose your permissions."
     },
     "messages": {
@@ -413,7 +413,7 @@
       "assignSystemRoleDescription": "to group {groupName}",
       "assignDataRole": "Add data role",
       "assignDataRoleDescription": "to group {groupName}",
-      "dataRolePlatformWarning": "Roles assigned here authorize the group platform-wide (permissions on all data objects of the platform).",
+      "dataRolePlatformWarning": "Roles assigned here authorize the group platform-wide (permissions on all Data-related elements of the platform).",
       "scopedInfoBanner": {
         "DATASET": "Dataset-related assignments are made at the respective Dataset.",
         "DATASOURCE": "Data source-related assignments are made at the respective Data source.",
@@ -512,7 +512,7 @@
     },
     "dataPermissions": {
       "title": "Data Permissions",
-      "description": "Data permissions control access to data objects on the platform.\nThey are grouped into data roles and assigned to groups within a specific scope."
+      "description": "Data permissions control access to Data-related elements on the platform.\nThey are grouped into data roles and assigned to groups within a specific scope."
     },
     "actions": {
       "read": "Read",
@@ -655,7 +655,7 @@
         "DATASOURCE": "Data source",
         "DATASTRUCTURE": "Data structure"
       },
-      "infoBox": "Groups that are assigned here, get the type 'platform-wide' (permissions to all data objects inside the platform)",
+      "infoBox": "Groups that are assigned here, get the type 'platform-wide' (permissions to all Data-related elements inside the platform)",
       "scopeReadOnlyMessageDATASET": "Dataset-related assignments happen at the corresponding Dataset",
       "scopeReadOnlyMessageDATASOURCE": "Data source-related assignments happen at the corresponding Data source",
       "scopeReadOnlyMessageDATASTRUCTURE": "Data structure-related assignments happen at the corresponding Data structure",
@@ -771,7 +771,7 @@
     },
     "accessManagementTab": {
       "infoBoxes": {
-        "firstBox": "Groups that have platform-wide permissions on all data objects have access to this Data source."
+        "firstBox": "Groups that have platform-wide permissions on all Data-related elements have access to this Data source."
       }
     }
   },
