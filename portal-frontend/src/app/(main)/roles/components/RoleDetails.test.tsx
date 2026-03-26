@@ -71,8 +71,8 @@ describe('RoleDetails permission gating', () => {
   })
 
   describe('Group Assignment tab visibility', () => {
-    it('shows Group Assignment tab when user has GROUP_READ', () => {
-      mockHasPermission([PERMISSION_NAMES.GROUP_READ])
+    it('shows Group Assignment tab when user has GROUP_READ and ASSIGNMENT_READ', () => {
+      mockHasPermission([PERMISSION_NAMES.GROUP_READ, PERMISSION_NAMES.ASSIGNMENT_READ])
       render(<RoleDetails roleId="role-1" />)
       expect(screen.getByText('roles.tabLabels.groupAssignment')).toBeInTheDocument()
     })
