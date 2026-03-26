@@ -3,7 +3,7 @@ import { JSX } from 'react'
 import { z } from 'zod'
 
 import { AssignmentScopedInputSchema } from './assignments'
-import { ItemType, STATUS_TYPES, WithId } from './common'
+import { ItemType, MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, STATUS_TYPES, WithId } from './common'
 
 export const DATASET_STATUS_TYPES = {
   [STATUS_TYPES.DRAFT]: 'DRAFT',
@@ -84,8 +84,13 @@ export type DatasetPatchApiData = z.infer<typeof DatasetPatchApiSchema> & WithId
 
 export const DatasetBaseFormSchema = z.object({
   id: z.string(),
-  name: z.string().trim().min(3, 'common.errors.atLeast3'),
-  description: z.string().trim().min(1, 'common.errors.descriptionRequired'),
+  // Backend currently enforces name to be at least 3 characters
+  name: z.string().trim().min(3, 'common.errors.atLeast3').max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
+  description: z
+    .string()
+    .trim()
+    .min(1, 'common.errors.descriptionRequired')
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   openDataAccess: z.boolean(),
 })
 
@@ -94,7 +99,7 @@ export type DatasetBaseFormData = z.input<typeof DatasetBaseFormSchema>
 // ---------- Create Form ----------
 
 export const DatasetCreateFormSchema = z.object({
-  name: z.string().trim().min(3, 'common.errors.atLeast3'),
+  name: z.string().trim().min(3, 'common.errors.atLeast3').max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
 })
 
 export type DatasetCreateFormData = z.input<typeof DatasetCreateFormSchema>
@@ -103,7 +108,7 @@ export type DatasetCreateFormData = z.input<typeof DatasetCreateFormSchema>
 
 export const DatasetFormDraftSchema = DatasetBaseFormSchema.partial().extend({
   id: z.string(),
-  name: z.string().trim().min(3, 'common.errors.atLeast3'),
+  name: z.string().trim().min(3, 'common.errors.atLeast3').max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
 })
 
 export type DatasetFormDraft = z.input<typeof DatasetFormDraftSchema>
@@ -112,8 +117,12 @@ export type DatasetFormDraft = z.input<typeof DatasetFormDraftSchema>
 
 export const DatasetFormAvailableSchema = z.object({
   id: z.string().min(1),
-  name: z.string().trim().min(2, 'common.errors.atLeast3'),
-  description: z.string().trim().min(1, 'common.errors.descriptionRequired'),
+  name: z.string().trim().min(3, 'common.errors.atLeast3').max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
+  description: z
+    .string()
+    .trim()
+    .min(1, 'common.errors.descriptionRequired')
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   openDataAccess: z.boolean(),
 })
 

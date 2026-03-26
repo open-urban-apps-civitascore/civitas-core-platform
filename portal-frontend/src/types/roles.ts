@@ -2,7 +2,7 @@ import z from 'zod'
 
 import { enumFromConst } from '@/utils/common'
 
-import { WithId } from './common'
+import { MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, MIN_NAME_LENGTH, WithId } from './common'
 
 export type RoleTab = 'basicInformation' | 'permissions' | 'groupAssignment'
 
@@ -78,10 +78,14 @@ export type RoleInput = Omit<CreateRoleData, 'id'>
 export type RoleUpdate = UpdateRoleData
 
 export const RoleSchema = z.object({
-  name: z.string().trim().min(2, {
-    message: 'common.errors.atLeast2',
-  }),
-  description: z.string().trim().optional(),
+  name: z
+    .string()
+    .trim()
+    .min(MIN_NAME_LENGTH, {
+      message: 'common.errors.nameRequired',
+    })
+    .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
+  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength').optional(),
   readonly: z.boolean(),
 })
 

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { AssignmentApiResponseSchema, AssignmentScopeEnum } from './assignments'
-import { ItemSchema, WithId } from './common'
+import { ItemSchema, MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, MIN_NAME_LENGTH, WithId } from './common'
 
 export type GroupTab = 'info' | 'roles' | 'users'
 
@@ -13,8 +13,8 @@ export const GroupRoleScheme = ItemSchema.extend({
 
 export const GroupApiResponseSchema = z.object({
   id: z.string(),
-  name: z.string().min(2, {
-    message: 'common.errors.atLeast2',
+  name: z.string().min(MIN_NAME_LENGTH, {
+    message: 'common.errors.nameRequired',
   }),
   description: z.string(),
   roles: z.array(GroupRoleScheme).nullable(),
@@ -44,8 +44,8 @@ export type AssignmentFormData = z.infer<typeof AssignmentFormDataSchema>
 
 export const GroupApiDataSchema = z.object({
   id: z.string(),
-  name: z.string().trim().min(2, {
-    message: 'common.errors.atLeast2',
+  name: z.string().trim().min(MIN_NAME_LENGTH, {
+    message: 'common.errors.nameRequired',
   }),
   description: z.string().trim().optional(),
   contactUserId: z.string().optional(),
@@ -57,10 +57,14 @@ export type GroupApiData = z.infer<typeof GroupApiDataSchema>
 
 export const GroupBaseFormDataSchema = z.object({
   id: z.string(),
-  name: z.string().trim().min(2, {
-    message: 'common.errors.atLeast2',
-  }),
-  description: z.string().trim(),
+  name: z
+    .string()
+    .trim()
+    .min(MIN_NAME_LENGTH, {
+      message: 'common.errors.nameRequired',
+    })
+    .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
+  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength').optional(),
   contactUserId: z.string(),
   members: z.array(z.string()),
   assignments: z.array(AssignmentFormDataSchema),

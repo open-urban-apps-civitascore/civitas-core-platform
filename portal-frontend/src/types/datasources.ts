@@ -3,7 +3,7 @@ import z from 'zod'
 import { CONNECTOR_TYPES } from '@/const/connectors'
 
 import { AssignmentScopedInput } from './assignments'
-import { STATUS_TYPES, WithId } from './common'
+import { MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, MIN_NAME_LENGTH, STATUS_TYPES, WithId } from './common'
 import { ConnectorApiToFormSchema, ConnectorLooseSchema, ConnectorStrictSchema } from './connectors'
 import { DatastructureVersionSummaryApiResponseSchema } from './datastructures'
 
@@ -54,8 +54,12 @@ export type Datasource = z.infer<typeof DatasourceApiResponseSchema>
 /* Form schemas for edit */
 export const DatasourceBaseFormSchema = z.object({
   id: z.string(),
-  name: z.string().trim().min(1, 'common.errors.nameRequired'),
-  description: z.string().trim().max(150, 'common.errors.descriptionMaxLength'),
+  name: z
+    .string()
+    .trim()
+    .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
+    .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
+  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   dataSourceStatus: DatasourceStatusSchema,
   connectorType: ConnectorTypeSchema.optional(),
   configuration: z.record(z.string(), z.unknown()).optional(),
@@ -73,7 +77,11 @@ export const DatasourceFormDraftSchema = DatasourceBaseFormSchema.superRefine((d
 })
 
 export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.extend({
-  description: z.string().trim().min(1, 'common.errors.required').max(150, 'common.errors.descriptionMaxLength'),
+  description: z
+    .string()
+    .trim()
+    .min(1, 'common.errors.required')
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   connectorType: ConnectorTypeSchema,
   configuration: z.record(z.string(), z.unknown()),
   dataStructureVersionId: z.string().trim().min(1, 'datasources.errors.required'),
@@ -105,7 +113,11 @@ export const DatasourceApiToFormSchema = DatasourceApiResponseSchema.transform(
 )
 
 export const DatasourceCreateFormSchema = z.object({
-  name: z.string().trim().min(1, 'common.errors.nameRequired'),
+  name: z
+    .string()
+    .trim()
+    .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
+    .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
 })
 
 export type DatasourceCreateData = z.infer<typeof DatasourceCreateFormSchema>
