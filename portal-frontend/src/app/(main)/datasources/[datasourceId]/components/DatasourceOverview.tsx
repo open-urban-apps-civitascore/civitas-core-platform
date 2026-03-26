@@ -5,11 +5,6 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import {
-  defaultDatastructureVersionFormData,
-  useDatastructureVersion,
-} from '@/app/(main)/datastructures/[datastructureId]/(versions)/hooks/useDatastructureVersion'
-import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -23,9 +18,7 @@ import { usePermissions } from '@/hooks/use-permissions'
 import { cn } from '@/lib/utils'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Datasource, DATASOURCE_STATUS_TYPES, DatasourceStatusType, DatasourceTab } from '@/types/datasources'
-import { DatastructureVersion } from '@/types/datastructures'
 import { getSelectedDatastructureVersion } from '@/utils/datasources'
-import { mapDatastructureVersionApiToFormData } from '@/utils/datastructures'
 
 import { useDatasourceForm } from '../hooks/useDatasourceForm'
 import { AccessManagementTab } from './access-management/AccessManagementTab'
@@ -66,23 +59,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const [selectedDatastructureVersionId, setSelectedDatastructureVersionId] = useState<string | null>(initialVersionId)
   const [selectedDatastructureId, setSelectedDatastructureId] = useState<string | null>(initialDatastructureId)
 
-  // Fetch the full version data client-side (needed for UML model/styles)
-  const { data: datastructureVersionData } = useGetDatastructureVersion({
-    datastructureId: selectedDatastructureId || '',
-    versionId: selectedDatastructureVersionId || '',
-    isEnabled: canReadDatastructures && !!selectedDatastructureId && !!selectedDatastructureVersionId,
-  })
-
-  const [datastructureVersion, setDatastructureVersion] = useState<DatastructureVersion | null>(null)
-
-  useEffect(() => {
-    if (!selectedDatastructureVersionId) {
-      setDatastructureVersion(null)
-    } else {
-      setDatastructureVersion(datastructureVersionData?.data || null)
-    }
-  }, [selectedDatastructureVersionId, datastructureVersionData?.data])
-
   useEffect(() => {
     setIsReadOnly(searchParams.get('mode') !== 'edit')
   }, [searchParams])
@@ -116,25 +92,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     isLoading: isLoadingDatasource,
   } = useDatasourceForm(datasource, assignedGroups, initialAssignments)
 
-  const {
-    modelSessionManager,
-    hasUserChanges: hasDatastructureBeenEdited,
-    resetToInitialState: resetToInitialDatastructureState,
-    resetFormAndSession,
-    // saveDatastructureVersion,
-  } = useDatastructureVersion({
-    datastructureId: selectedDatastructureId || '',
-    version: datastructureVersion,
-    isCreateMode: false,
-  })
-
-  // sets the active session with the new selected version's diagram or null if no version is selected
-  useEffect(() => {
-    if (!datastructureVersion) resetFormAndSession(defaultDatastructureVersionFormData, null)
-    else resetFormAndSession(mapDatastructureVersionApiToFormData(datastructureVersion), datastructureVersion)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datastructureVersion])
-
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
@@ -145,25 +102,19 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const resetToInitialState = () => {
     resetDatasourceToInitialState()
-    resetToInitialDatastructureState()
     datasourceForm.reset()
     setAssignedGroups(initialAssignments)
     setSelectedDatastructureId(initialDatastructureId)
     setSelectedDatastructureVersionId(initialVersionId)
   }
   const handleSave = async () => {
-    // TODO: use this function when implementing save datastructure version changes
-    // if (shouldSaveDatastructureVersion) {
-    //   const isDatastructureVersionSaved = await saveDatastructureVersion(selectedDatastructureId)
-    //   if (!isDatastructureVersionSaved) return
-    // }
     submitDatasource(() => {
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
       router.refresh()
     })
   }
   const handleExit = () => {
-    if (datasourceForm.formState.isDirty || areAssignmentsDirty || hasDatastructureBeenEdited || hasStatusChanged) {
+    if (datasourceForm.formState.isDirty || areAssignmentsDirty || hasStatusChanged) {
       setIsExitModalOpen(true)
     } else {
       resetToInitialState()
@@ -179,12 +130,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
 
   const handleSaveAndExit = async () => {
-    // TODO: use this function when implementing save datastructure version changes
-    // if (shouldSaveDatastructureVersion) {
-    //   const isDatastructureVersionSaved = await saveDatastructureVersion(selectedDatastructureId)
-    //   if (!isDatastructureVersionSaved) return
-    // }
-
     submitDatasource(() => {
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
       setIsExitModalOpen(false)
@@ -207,7 +152,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
 
   const isConfirmButtonDisabled =
-    !(datasourceForm.formState.isDirty || hasDatastructureBeenEdited || areAssignmentsDirty || hasStatusChanged) ||
+    !(datasourceForm.formState.isDirty || areAssignmentsDirty || hasStatusChanged) ||
     !!datasourceForm.formState.errors.name ||
     (dataSourceStatus !== DATASOURCE_STATUS_TYPES.DRAFT && Object.keys(datasourceForm.formState.errors).length > 0) ||
     isLoadingDatasource
@@ -230,7 +175,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             onSelectDatastructureVersion={handleSelectDatastructureVersion}
             isReadOnly={isReadOnly}
             isDatasourceInUse={datasource.inUse}
-            modelSessionManager={modelSessionManager}
           />
         )
       case 'accessManagement':

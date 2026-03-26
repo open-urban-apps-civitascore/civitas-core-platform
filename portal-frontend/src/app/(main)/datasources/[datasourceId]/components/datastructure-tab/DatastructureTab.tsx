@@ -1,32 +1,62 @@
 import { RowSelectionState } from '@tanstack/react-table'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
-import { UseMultiSessionReturn } from '@/components/uml-modeler/types/session'
+import {
+  defaultDatastructureVersionFormData,
+  useDatastructureVersion,
+} from '@/app/(main)/datastructures/[datastructureId]/(versions)/hooks/useDatastructureVersion'
+import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
 import { UmlModeler } from '@/components/uml-modeler/UmlModeler'
+import { DatastructureVersion } from '@/types/datastructures'
+import { mapDatastructureVersionApiToFormData } from '@/utils/datastructures'
 
 import { DataModelImportModal } from './DataModelImportModal'
 
-interface DatastructureTab {
+interface DatastructureTabProps {
   datasourceTitle: string
   selectedVersionId: string | null
   isReadOnly: boolean
   isDatasourceInUse: boolean
-  modelSessionManager: UseMultiSessionReturn
   onSelectDatastructureVersion: (selection: RowSelectionState) => void
 }
-export const DatastructureTab = (props: DatastructureTab) => {
-  const {
-    modelSessionManager,
-    datasourceTitle,
-    selectedVersionId,
-    isReadOnly,
-    isDatasourceInUse,
-    onSelectDatastructureVersion,
-  } = props
+export const DatastructureTab = (props: DatastructureTabProps) => {
+  const { datasourceTitle, selectedVersionId, isReadOnly, isDatasourceInUse, onSelectDatastructureVersion } = props
   const t = useTranslations('datasources.dataModel.placeholder')
   const [isImportDatastructureModalOpen, setIsImportDatastructureModalOpen] = useState(false)
+
+  // Parse the composite "datastructureId/versionId" prop
+  const [selectedDatastructureId, selectedDatastructureVersionId] = selectedVersionId?.split('/') ?? [null, null]
+
+  // Fetch the full version data (needed for UML model/styles)
+  const { data: datastructureVersionData } = useGetDatastructureVersion({
+    datastructureId: selectedDatastructureId || '',
+    versionId: selectedDatastructureVersionId || '',
+    isEnabled: !!selectedDatastructureId && !!selectedDatastructureVersionId,
+  })
+
+  const [datastructureVersion, setDatastructureVersion] = useState<DatastructureVersion | null>(null)
+
+  useEffect(() => {
+    if (!selectedDatastructureVersionId) {
+      setDatastructureVersion(null)
+    } else {
+      setDatastructureVersion(datastructureVersionData?.data || null)
+    }
+  }, [selectedDatastructureVersionId, datastructureVersionData?.data])
+
+  const { modelSessionManager, resetFormAndSession } = useDatastructureVersion({
+    datastructureId: selectedDatastructureId || '',
+    version: datastructureVersion,
+    isCreateMode: false,
+  })
+
+  useEffect(() => {
+    if (!datastructureVersion) resetFormAndSession(defaultDatastructureVersionFormData, null)
+    else resetFormAndSession(mapDatastructureVersionApiToFormData(datastructureVersion), datastructureVersion)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datastructureVersion])
 
   const handleImportFromDatastructure = () => {
     setIsImportDatastructureModalOpen(true)

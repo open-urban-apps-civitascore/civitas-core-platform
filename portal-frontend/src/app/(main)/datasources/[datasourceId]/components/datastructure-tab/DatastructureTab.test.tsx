@@ -27,12 +27,25 @@ vi.mock('@/app/services/api/datastructures/clientRequests', () => ({
   useGetDatastructures: () => ({ data: undefined, isFetching: false }),
 }))
 
+vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
+  useGetDatastructureVersion: () => ({ data: undefined }),
+}))
+
+vi.mock('@/app/(main)/datastructures/[datastructureId]/(versions)/hooks/useDatastructureVersion', () => ({
+  defaultDatastructureVersionFormData: {},
+  useDatastructureVersion: () => ({
+    modelSessionManager: null,
+    hasUserChanges: false,
+    resetToInitialState: vi.fn(),
+    resetFormAndSession: vi.fn(),
+  }),
+}))
+
 const defaultProps = {
   datasourceTitle: 'Test Datasource',
   selectedVersionId: null,
   isReadOnly: false,
   isDatasourceInUse: false,
-  modelSessionManager: null as never,
   onSelectDatastructureVersion: vi.fn(),
 }
 

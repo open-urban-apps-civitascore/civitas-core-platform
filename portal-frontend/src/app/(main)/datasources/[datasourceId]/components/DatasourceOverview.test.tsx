@@ -83,22 +83,6 @@ vi.mock('../hooks/useDatasourceForm', () => ({
   }),
 }))
 
-vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
-  useGetDatastructureVersion: () => ({
-    data: undefined,
-  }),
-}))
-
-vi.mock('@/app/(main)/datastructures/[datastructureId]/(versions)/hooks/useDatastructureVersion', () => ({
-  defaultDatastructureVersionFormData: {},
-  useDatastructureVersion: () => ({
-    modelSessionManager: null,
-    hasUserChanges: false,
-    resetToInitialState: vi.fn(),
-    resetFormAndSession: vi.fn(),
-  }),
-}))
-
 vi.mock('./basic-info/BasicInfoTab', () => ({
   BasicInfoTab: ({ isReadOnly }: { isReadOnly: boolean }) => (
     <div data-testid="basicInfoTab" data-readonly={isReadOnly} />
