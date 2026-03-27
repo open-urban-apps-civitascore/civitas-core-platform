@@ -1,7 +1,4 @@
-import { getTranslations } from 'next-intl/server'
-
 import { PageContainer } from '@/components/page-container/PageContainer'
-import { PageHeader } from '@/components/page-header/PageHeader'
 
 import { PipelineEditorWrapper } from './_components/layout/PipelineEditorWrapper'
 
@@ -12,15 +9,10 @@ import { PipelineEditorWrapper } from './_components/layout/PipelineEditorWrappe
  * Uses UML activity diagram style for defining data processing pipelines.
  *
  */
-const PipelineEditorPage = async () => {
-  const t = await getTranslations('datasets')
-
+const PipelineEditorPage = () => {
   return (
     <PageContainer headerType="onlyTitle">
-      <PageHeader title={t('dataMode.pipelineEditor')} />
-      <div className="h-[calc(100vh-12rem)] w-full overflow-hidden rounded-xl border bg-background">
-        <PipelineEditorWrapper />
-      </div>
+      <PipelineEditorWrapper />
     </PageContainer>
   )
 }

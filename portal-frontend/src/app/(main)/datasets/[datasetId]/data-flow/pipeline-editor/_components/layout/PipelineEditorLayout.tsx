@@ -17,9 +17,13 @@
  */
 
 import { Loader2 } from 'lucide-react'
+import { useParams, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 
+import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
+import { PageHeader } from '@/components/page-header/PageHeader'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 import { LAYOUT_DIMENSIONS } from '../../_constants/pipelineStyles'
@@ -56,7 +60,57 @@ interface PipelineEditorLayoutInnerProps {
  */
 const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ className = '', sessionManager }) => {
   const t = useTranslations('pipelineEditor')
-  const { isLoadingPipelines } = useActivePipeline()
+  const { isLoadingPipelines, saveAllPipelines, isSavingAll, hasAnyDirtySession } = useActivePipeline()
+
+  const router = useRouter()
+  const params = useParams<{ datasetId: string }>()
+  const [isExitModalOpen, setIsExitModalOpen] = useState(false)
+
+  const handleExit = useCallback(() => {
+    if (hasAnyDirtySession) {
+      setIsExitModalOpen(true)
+    } else {
+      router.push(`/datasets/${params.datasetId}`)
+    }
+  }, [hasAnyDirtySession, router, params.datasetId])
+
+  const handleDiscardAndExit = useCallback(() => {
+    setIsExitModalOpen(false)
+    router.push(`/datasets/${params.datasetId}`)
+  }, [router, params.datasetId])
+
+  const handleSaveAndExit = useCallback(async () => {
+    try {
+      await saveAllPipelines()
+      setIsExitModalOpen(false)
+      router.push(`/datasets/${params.datasetId}`)
+    } catch {
+      // Save failed — keep user on page. Mutation error handling in provider shows the error.
+      setIsExitModalOpen(false)
+    }
+  }, [saveAllPipelines, router, params.datasetId])
+
+  const handleSaveAll = useCallback(async () => {
+    await saveAllPipelines()
+  }, [saveAllPipelines])
+
+  const customElement = (
+    <div className="flex items-center gap-4 mr-3.5">
+      <Button onClick={handleExit} type="button" variant="ghost">
+        {t('header.exit')}
+      </Button>
+      <Button onClick={handleSaveAll} disabled={!hasAnyDirtySession || isSavingAll}>
+        {isSavingAll ? (
+          <>
+            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+            {t('header.savingAll')}
+          </>
+        ) : (
+          t('header.saveAll')
+        )}
+      </Button>
+    </div>
+  )
 
   // ===== Tab management handlers =====
   const handleCreateSession = useCallback(() => {
@@ -78,45 +132,58 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
   )
 
   return (
-    <div className={cn('flex h-full w-full flex-col', className)}>
-      {/* Tab Bar */}
-      <div style={{ height: LAYOUT_DIMENSIONS.tabBarHeight }}>
-        <PipelineTabBar
-          sessions={sessionManager.sessions}
-          activeSessionId={sessionManager.activeSessionId}
-          onSelectSession={handleSelectSession}
-          onRenameSession={handleRenameSession}
-          onCreateSession={handleCreateSession}
-        />
-      </div>
-
-      {/* Main Content Area */}
-      {isLoadingPipelines ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-sm text-muted-foreground">{t('toolbar.loading')}</span>
-        </div>
-      ) : (
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left Panel - Palette */}
-          <PipelinePalette />
-
-          {/* Center Panel - Canvas + Toolbar */}
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-            {/* Toolbar */}
-            <PipelineToolbar />
-
-            {/* Canvas */}
-            <div className="relative flex-1 overflow-hidden">
-              <PipelineCanvas />
-            </div>
+    <>
+      <PageHeader title={t('title')} customElement={customElement} />
+      <div className="h-[calc(100vh-12rem)] w-full overflow-hidden rounded-xl border bg-background">
+        <div className={cn('flex h-full w-full flex-col', className)}>
+          {/* Tab Bar */}
+          <div style={{ height: LAYOUT_DIMENSIONS.tabBarHeight }}>
+            <PipelineTabBar
+              sessions={sessionManager.sessions}
+              activeSessionId={sessionManager.activeSessionId}
+              onSelectSession={handleSelectSession}
+              onRenameSession={handleRenameSession}
+              onCreateSession={handleCreateSession}
+            />
           </div>
 
-          {/* Right Panel - Inspector */}
-          <PipelineInspector />
+          {/* Main Content Area */}
+          {isLoadingPipelines ? (
+            <div className="flex flex-1 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-sm text-muted-foreground">{t('toolbar.loading')}</span>
+            </div>
+          ) : (
+            <div className="flex flex-1 overflow-hidden">
+              {/* Left Panel - Palette */}
+              <PipelinePalette />
+
+              {/* Center Panel - Canvas + Toolbar */}
+              <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                {/* Toolbar */}
+                <PipelineToolbar />
+
+                {/* Canvas */}
+                <div className="relative flex-1 overflow-hidden">
+                  <PipelineCanvas />
+                </div>
+              </div>
+
+              {/* Right Panel - Inspector */}
+              <PipelineInspector />
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </div>
+
+      <ExitWarningModal
+        open={isExitModalOpen}
+        onOpenChange={setIsExitModalOpen}
+        onDiscard={handleDiscardAndExit}
+        onConfirm={handleSaveAndExit}
+        isLoading={isSavingAll}
+      />
+    </>
   )
 }
 
