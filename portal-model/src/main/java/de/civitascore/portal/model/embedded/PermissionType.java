@@ -1,7 +1,7 @@
 package de.civitascore.portal.model.embedded;
 
 /**
- * Categorizes permissions by domain: system administration, data operations, or governance.
+ * Categorizes permissions by domain: system administration or data operations.
  *
  * @see de.civitascore.portal.model.entity.Permission
  */
@@ -10,8 +10,5 @@ public enum PermissionType {
   SYSTEM,
 
   /** Data access and management operations. */
-  DATA,
-
-  /** Data governance, policies, and compliance operations. */
-  GOVERNANCE
+  DATA
 }
