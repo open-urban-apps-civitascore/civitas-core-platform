@@ -307,4 +307,93 @@ describe('GenericAssignmentsList', () => {
       expect(screen.getByText('Keine Gruppen und Rollen vorhanden')).toBeInTheDocument()
     })
   })
+
+  describe('permission gating', () => {
+    const controlledEditProps = {
+      assignedGroups: mockAssignments,
+      onAssignedGroupsChange: vi.fn(),
+      isReadOnly: false,
+    }
+
+    it('shows add-group button when user has GROUP_READ and ROLE_READ', () => {
+      vi.mocked(useGetCurrentUser).mockReturnValue({
+        data: {
+          username: 'test',
+          email: 'test@test.com',
+          title: 'MR' as const,
+          firstName: 'Test',
+          lastName: 'User',
+          assignments: [
+            {
+              scopeType: 'TENANT',
+              scopeId: null,
+              permissions: [PERMISSION_NAMES.GROUP_READ, PERMISSION_NAMES.ROLE_READ],
+            },
+          ],
+        },
+      } as ReturnType<typeof useGetCurrentUser>)
+
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...controlledEditProps} />
+        </NextIntlClientProvider>,
+      )
+
+      expect(screen.getByText('Gruppe hinzufügen')).toBeInTheDocument()
+    })
+
+    it('hides add-group button when user lacks GROUP_READ', () => {
+      vi.mocked(useGetCurrentUser).mockReturnValue({
+        data: {
+          username: 'test',
+          email: 'test@test.com',
+          title: 'MR' as const,
+          firstName: 'Test',
+          lastName: 'User',
+          assignments: [
+            {
+              scopeType: 'TENANT',
+              scopeId: null,
+              permissions: [PERMISSION_NAMES.ROLE_READ],
+            },
+          ],
+        },
+      } as ReturnType<typeof useGetCurrentUser>)
+
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...controlledEditProps} />
+        </NextIntlClientProvider>,
+      )
+
+      expect(screen.queryByText('Gruppe hinzufügen')).not.toBeInTheDocument()
+    })
+
+    it('hides add-group button when user lacks ROLE_READ', () => {
+      vi.mocked(useGetCurrentUser).mockReturnValue({
+        data: {
+          username: 'test',
+          email: 'test@test.com',
+          title: 'MR' as const,
+          firstName: 'Test',
+          lastName: 'User',
+          assignments: [
+            {
+              scopeType: 'TENANT',
+              scopeId: null,
+              permissions: [PERMISSION_NAMES.GROUP_READ],
+            },
+          ],
+        },
+      } as ReturnType<typeof useGetCurrentUser>)
+
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...controlledEditProps} />
+        </NextIntlClientProvider>,
+      )
+
+      expect(screen.queryByText('Gruppe hinzufügen')).not.toBeInTheDocument()
+    })
+  })
 })
