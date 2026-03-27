@@ -29,14 +29,12 @@ const mockQueryParams = (tabValue = 'SYSTEM') => {
     setSearchParam: vi.fn(),
     getApiRequestParamsByUrl: vi.fn(() => new URLSearchParams()),
     setTabValueParam: vi.fn(),
-    setTotalPages: vi.fn(),
     pageIndex: 0,
     pageSize: 10,
     sorting: [],
     search: '',
     tabValue,
     subTabValue: '',
-    totalPages: 0,
   } as unknown as ReturnType<typeof useQueryParams>)
 }
 
