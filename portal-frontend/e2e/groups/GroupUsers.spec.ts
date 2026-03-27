@@ -16,6 +16,7 @@ import {
   emptyResources,
   type TestResources,
   type TestUserProfile,
+  uid,
 } from '../../playwright/helpers/api'
 import { loginAs } from '../../playwright/helpers/auth'
 
@@ -37,15 +38,15 @@ test.describe('Group Users Tab — Permission Gating', () => {
     // Create a member user
     memberUser = await adminApi.createUser({
       firstName: 'E2EMember',
-      lastName: `User${Date.now()}`,
-      email: `e2e-member-${Date.now()}@e2e.civitas.dev`,
+      lastName: `User${uid()}`,
+      email: `e2e-member-${uid()}@e2e.civitas.dev`,
       title: 'OTHER',
     })
     resources.userIds.push(memberUser.id)
 
     // Create a group with the member
     testGroup = await adminApi.createGroup({
-      name: `e2e-userstab-grp-${Date.now()}`,
+      name: `e2e-userstab-grp-${uid()}`,
       description: 'Group for users tab gating',
       memberIds: [memberUser.id],
     })
@@ -56,8 +57,8 @@ test.describe('Group Users Tab — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `GrpUsersEdit${Date.now()}`,
-        email: `e2e-grpusersedit-${Date.now()}@e2e.civitas.dev`,
+        lastName: `GrpUsersEdit${uid()}`,
+        email: `e2e-grpusersedit-${uid()}@e2e.civitas.dev`,
         permissions: ['GROUP_READ', 'GROUP_UPDATE', 'USER_READ'],
       },
       resources,
@@ -68,8 +69,8 @@ test.describe('Group Users Tab — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `GrpUsersRO${Date.now()}`,
-        email: `e2e-grpusersro-${Date.now()}@e2e.civitas.dev`,
+        lastName: `GrpUsersRO${uid()}`,
+        email: `e2e-grpusersro-${uid()}@e2e.civitas.dev`,
         permissions: ['GROUP_READ', 'USER_READ'],
       },
       resources,

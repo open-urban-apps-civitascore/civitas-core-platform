@@ -18,6 +18,7 @@ import {
   emptyResources,
   type TestResources,
   type TestUserProfile,
+  uid,
 } from '../../playwright/helpers/api'
 import { loginAs } from '../../playwright/helpers/auth'
 
@@ -38,7 +39,7 @@ test.describe('Groups List — Permission Gating', () => {
 
     // Create a group so the list is not empty
     testGroup = await adminApi.createGroup({
-      name: `e2e-gating-grp-${Date.now()}`,
+      name: `e2e-gating-grp-${uid()}`,
       description: 'Group for permission gating tests',
     })
     resources.groupIds.push(testGroup.id)
@@ -48,8 +49,8 @@ test.describe('Groups List — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `GrpCreate${Date.now()}`,
-        email: `e2e-grpcreate-${Date.now()}@e2e.civitas.dev`,
+        lastName: `GrpCreate${uid()}`,
+        email: `e2e-grpcreate-${uid()}@e2e.civitas.dev`,
         permissions: ['GROUP_READ', 'GROUP_CREATE'],
       },
       resources,
@@ -60,8 +61,8 @@ test.describe('Groups List — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `GrpReadOnly${Date.now()}`,
-        email: `e2e-grpreadonly-${Date.now()}@e2e.civitas.dev`,
+        lastName: `GrpReadOnly${uid()}`,
+        email: `e2e-grpreadonly-${uid()}@e2e.civitas.dev`,
         permissions: ['GROUP_READ'],
       },
       resources,
@@ -72,8 +73,8 @@ test.describe('Groups List — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `GrpDelete${Date.now()}`,
-        email: `e2e-grpdelete-${Date.now()}@e2e.civitas.dev`,
+        lastName: `GrpDelete${uid()}`,
+        email: `e2e-grpdelete-${uid()}@e2e.civitas.dev`,
         permissions: ['GROUP_READ', 'GROUP_DELETE'],
       },
       resources,
@@ -208,7 +209,7 @@ test.describe('Group Detail — Permission Gating', () => {
     resources = emptyResources()
 
     testGroup = await adminApi.createGroup({
-      name: `e2e-detail-grp-${Date.now()}`,
+      name: `e2e-detail-grp-${uid()}`,
       description: 'Group for detail permission gating',
     })
     resources.groupIds.push(testGroup.id)
@@ -218,8 +219,8 @@ test.describe('Group Detail — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `GrpUpdate${Date.now()}`,
-        email: `e2e-grpupdate-${Date.now()}@e2e.civitas.dev`,
+        lastName: `GrpUpdate${uid()}`,
+        email: `e2e-grpupdate-${uid()}@e2e.civitas.dev`,
         permissions: ['GROUP_READ', 'GROUP_UPDATE'],
       },
       resources,
@@ -230,8 +231,8 @@ test.describe('Group Detail — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `GrpRO${Date.now()}`,
-        email: `e2e-grpro-${Date.now()}@e2e.civitas.dev`,
+        lastName: `GrpRO${uid()}`,
+        email: `e2e-grpro-${uid()}@e2e.civitas.dev`,
         permissions: ['GROUP_READ'],
       },
       resources,
@@ -242,8 +243,8 @@ test.describe('Group Detail — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `GrpUserRead${Date.now()}`,
-        email: `e2e-grpuserread-${Date.now()}@e2e.civitas.dev`,
+        lastName: `GrpUserRead${uid()}`,
+        email: `e2e-grpuserread-${uid()}@e2e.civitas.dev`,
         permissions: ['GROUP_READ', 'USER_READ'],
       },
       resources,

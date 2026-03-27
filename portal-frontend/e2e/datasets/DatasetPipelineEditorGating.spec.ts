@@ -15,6 +15,7 @@ import {
   emptyResources,
   type TestResources,
   type TestUserProfile,
+  uid,
 } from '../../playwright/helpers/api'
 import { withTestUser } from '../utils/withTestUser'
 
@@ -32,15 +33,15 @@ test.describe('Dataset Pipeline Editor — DATASOURCE_READ Gating', () => {
     adminApi = await ApiClient.asUser(TEST_USERNAME, TEST_PASSWORD)
     resources = emptyResources()
 
-    dataset = await adminApi.createDataset({ name: `E2E-dset-pipe-${Date.now()}` })
+    dataset = await adminApi.createDataset({ name: `E2E-dset-pipe-${uid()}` })
     resources.datasetIds.push(dataset.id)
 
     userWithDatasourceRead = await createTestUserWithPermissions(
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `PipeYes${Date.now()}`,
-        email: `e2e-pipe-yes-${Date.now()}@e2e.civitas.dev`,
+        lastName: `PipeYes${uid()}`,
+        email: `e2e-pipe-yes-${uid()}@e2e.civitas.dev`,
         permissions: ['DATASET_READ', 'DATASET_UPDATE', 'DATASOURCE_READ'],
         roleType: 'DATA',
         scopeType: 'TENANT',
@@ -52,8 +53,8 @@ test.describe('Dataset Pipeline Editor — DATASOURCE_READ Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `PipeNo${Date.now()}`,
-        email: `e2e-pipe-no-${Date.now()}@e2e.civitas.dev`,
+        lastName: `PipeNo${uid()}`,
+        email: `e2e-pipe-no-${uid()}@e2e.civitas.dev`,
         permissions: ['DATASET_READ', 'DATASET_UPDATE'],
         roleType: 'DATA',
         scopeType: 'TENANT',

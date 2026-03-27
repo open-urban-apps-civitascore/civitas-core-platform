@@ -230,7 +230,19 @@ export class ApiClient {
     return this.delete(`/assignments/${assignmentId}`)
   }
 
+  // --- Assignments ---
+
+  async getAssignments(params?: string) {
+    return this.get<{ content: Array<{ id: string; groupId: string; roleId: string }> }>(
+      `/assignments${params ? `?${params}` : ''}`,
+    )
+  }
+
   // --- Datasets ---
+
+  async getDatasets(params?: string) {
+    return this.get<{ content: Array<{ id: string; name: string }> }>(`/datasets${params ? `?${params}` : ''}`)
+  }
 
   async createDataset(data: { name: string; description?: string }) {
     return this.post<{ id: string; name: string }>('/datasets', data)
@@ -264,6 +276,10 @@ export class ApiClient {
 
   // --- Datasources ---
 
+  async getDatasources(params?: string) {
+    return this.get<{ content: Array<{ id: string; name: string }> }>(`/datasources${params ? `?${params}` : ''}`)
+  }
+
   async createDatasource(data: {
     name: string
     description?: string
@@ -290,6 +306,10 @@ export class ApiClient {
   }
 
   // --- Datastructures ---
+
+  async getDatastructures(params?: string) {
+    return this.get<{ content: Array<{ id: string; name: string }> }>(`/datastructures${params ? `?${params}` : ''}`)
+  }
 
   async createDatastructure(data: { name: string; description?: string }) {
     return this.post<{ id: string; name: string }>('/datastructures', {

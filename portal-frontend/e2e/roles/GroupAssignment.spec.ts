@@ -18,6 +18,7 @@ import {
   emptyResources,
   type TestResources,
   type TestUserProfile,
+  uid,
 } from '../../playwright/helpers/api'
 import { loginAs } from '../../playwright/helpers/auth'
 
@@ -38,7 +39,7 @@ test.describe('Role Group Assignment Tab — Permission Gating', () => {
     resources = emptyResources()
 
     testRole = await adminApi.createRole({
-      name: `e2e-grpassign-role-${Date.now()}`,
+      name: `e2e-grpassign-role-${uid()}`,
       description: 'Role for group assignment tab gating tests',
       roleType: 'SYSTEM',
     })
@@ -46,7 +47,7 @@ test.describe('Role Group Assignment Tab — Permission Gating', () => {
 
     // Create a group and assign it to the role so the tab has content
     testGroup = await adminApi.createGroup({
-      name: `e2e-grpassign-grp-${Date.now()}`,
+      name: `e2e-grpassign-grp-${uid()}`,
       description: 'Group for group assignment tab gating',
     })
     resources.groupIds.push(testGroup.id)
@@ -62,8 +63,8 @@ test.describe('Role Group Assignment Tab — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `GrpAssignEdit${Date.now()}`,
-        email: `e2e-grpassignedit-${Date.now()}@e2e.civitas.dev`,
+        lastName: `GrpAssignEdit${uid()}`,
+        email: `e2e-grpassignedit-${uid()}@e2e.civitas.dev`,
         permissions: ['ROLE_READ', 'ROLE_UPDATE', 'ASSIGNMENT_CREATE', 'GROUP_READ'],
       },
       resources,
@@ -74,8 +75,8 @@ test.describe('Role Group Assignment Tab — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `GrpAssignNoCreate${Date.now()}`,
-        email: `e2e-grpassignnocreate-${Date.now()}@e2e.civitas.dev`,
+        lastName: `GrpAssignNoCreate${uid()}`,
+        email: `e2e-grpassignnocreate-${uid()}@e2e.civitas.dev`,
         permissions: ['ROLE_READ', 'ROLE_UPDATE', 'GROUP_READ'],
       },
       resources,
@@ -86,8 +87,8 @@ test.describe('Role Group Assignment Tab — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `GrpAssignRO${Date.now()}`,
-        email: `e2e-grpassignro-${Date.now()}@e2e.civitas.dev`,
+        lastName: `GrpAssignRO${uid()}`,
+        email: `e2e-grpassignro-${uid()}@e2e.civitas.dev`,
         permissions: ['ROLE_READ', 'GROUP_READ'],
       },
       resources,

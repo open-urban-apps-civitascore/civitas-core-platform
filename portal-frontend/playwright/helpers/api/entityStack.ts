@@ -6,7 +6,7 @@
  * can be published, and datasource must be AVAILABLE before dataset can be published.
  */
 import { ApiClient } from './apiClient'
-import { type TestResources } from './testSetup'
+import { type TestResources, uid } from './testSetup'
 
 const buildUmlModel = (modelName: string, uri: string) =>
   [
@@ -47,7 +47,7 @@ export type EntityStack = {
 export const createAvailableEntityStack = async (
   adminApi: ApiClient,
   resources: TestResources,
-  suffix = Date.now().toString(),
+  suffix = uid(),
 ): Promise<EntityStack> => {
   // 1. Datastructure + version → publish version
   const datastructure = await adminApi.createDatastructure({
@@ -122,7 +122,7 @@ export const createAvailableEntityStack = async (
 export const createDraftDatastructureWithAvailableVersion = async (
   adminApi: ApiClient,
   resources: TestResources,
-  suffix = Date.now().toString(),
+  suffix = uid(),
 ) => {
   const datastructure = await adminApi.createDatastructure({
     name: `E2E-ds-standalone-${suffix}`,

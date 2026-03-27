@@ -14,6 +14,7 @@ import {
   emptyResources,
   type TestResources,
   type TestUserProfile,
+  uid,
 } from '../../playwright/helpers/api'
 import { withTestUser } from '../utils/withTestUser'
 
@@ -31,15 +32,15 @@ test.describe('Datasource Detail — DataStructure Tab Gating', () => {
     adminApi = await ApiClient.asUser(TEST_USERNAME, TEST_PASSWORD)
     resources = emptyResources()
 
-    datasource = await adminApi.createDatasource({ name: `E2E-src-dstab-${Date.now()}` })
+    datasource = await adminApi.createDatasource({ name: `E2E-src-dstab-${uid()}` })
     resources.datasourceIds.push(datasource.id)
 
     userWithDsRead = await createTestUserWithPermissions(
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `DsTab${Date.now()}`,
-        email: `e2e-dstab-${Date.now()}@e2e.civitas.dev`,
+        lastName: `DsTab${uid()}`,
+        email: `e2e-dstab-${uid()}@e2e.civitas.dev`,
         permissions: ['DATASOURCE_READ', 'DATASOURCE_UPDATE', 'DATASTRUCTURE_READ'],
         roleType: 'DATA',
         scopeType: 'TENANT',
@@ -51,8 +52,8 @@ test.describe('Datasource Detail — DataStructure Tab Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `NoDsTab${Date.now()}`,
-        email: `e2e-nodstab-${Date.now()}@e2e.civitas.dev`,
+        lastName: `NoDsTab${uid()}`,
+        email: `e2e-nodstab-${uid()}@e2e.civitas.dev`,
         permissions: ['DATASOURCE_READ', 'DATASOURCE_UPDATE'],
         roleType: 'DATA',
         scopeType: 'TENANT',

@@ -19,6 +19,7 @@ import {
   type EntityStack,
   type TestResources,
   type TestUserProfile,
+  uid,
 } from '../../playwright/helpers/api'
 import { withTestUser } from '../utils/withTestUser'
 
@@ -29,6 +30,7 @@ test.describe('Status "Available" — RELEASE Permission Gating', () => {
   let resources: TestResources
   let stack: EntityStack
   let standaloneDs: { datastructure: { id: string; name: string }; version: { id: string } }
+  let availableDatasource: { id: string; name: string }
 
   // TENANT-scoped users
   let tenantWithRelease: TestUserProfile
@@ -53,8 +55,8 @@ test.describe('Status "Available" — RELEASE Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `Release${Date.now()}`,
-        email: `e2e-release-${Date.now()}@e2e.civitas.dev`,
+        lastName: `Release${uid()}`,
+        email: `e2e-release-${uid()}@e2e.civitas.dev`,
         permissions: [
           'DATASTRUCTURE_READ',
           'DATASTRUCTURE_UPDATE',
@@ -76,8 +78,8 @@ test.describe('Status "Available" — RELEASE Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `NoRelease${Date.now()}`,
-        email: `e2e-norelease-${Date.now()}@e2e.civitas.dev`,
+        lastName: `NoRelease${uid()}`,
+        email: `e2e-norelease-${uid()}@e2e.civitas.dev`,
         permissions: [
           'DATASTRUCTURE_READ',
           'DATASTRUCTURE_UPDATE',
@@ -96,8 +98,8 @@ test.describe('Status "Available" — RELEASE Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `DsRel${Date.now()}`,
-        email: `e2e-ds-rel-${Date.now()}@e2e.civitas.dev`,
+        lastName: `DsRel${uid()}`,
+        email: `e2e-ds-rel-${uid()}@e2e.civitas.dev`,
         permissions: ['DATASTRUCTURE_READ', 'DATASTRUCTURE_UPDATE', 'DATASTRUCTURE_RELEASE'],
         scopeType: 'DATASTRUCTURE',
         scopeId: standaloneDs.datastructure.id,
@@ -110,8 +112,8 @@ test.describe('Status "Available" — RELEASE Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `DsNoRel${Date.now()}`,
-        email: `e2e-ds-norel-${Date.now()}@e2e.civitas.dev`,
+        lastName: `DsNoRel${uid()}`,
+        email: `e2e-ds-norel-${uid()}@e2e.civitas.dev`,
         permissions: ['DATASTRUCTURE_READ', 'DATASTRUCTURE_UPDATE'],
         scopeType: 'DATASTRUCTURE',
         scopeId: standaloneDs.datastructure.id,
@@ -124,8 +126,8 @@ test.describe('Status "Available" — RELEASE Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `SrcRel${Date.now()}`,
-        email: `e2e-src-rel-${Date.now()}@e2e.civitas.dev`,
+        lastName: `SrcRel${uid()}`,
+        email: `e2e-src-rel-${uid()}@e2e.civitas.dev`,
         permissions: ['DATASOURCE_READ', 'DATASOURCE_UPDATE', 'DATASOURCE_RELEASE'],
         scopeType: 'DATASOURCE',
         scopeId: stack.datasource.id,
@@ -138,8 +140,8 @@ test.describe('Status "Available" — RELEASE Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `SrcNoRel${Date.now()}`,
-        email: `e2e-src-norel-${Date.now()}@e2e.civitas.dev`,
+        lastName: `SrcNoRel${uid()}`,
+        email: `e2e-src-norel-${uid()}@e2e.civitas.dev`,
         permissions: ['DATASOURCE_READ', 'DATASOURCE_UPDATE'],
         scopeType: 'DATASOURCE',
         scopeId: stack.datasource.id,
@@ -152,8 +154,8 @@ test.describe('Status "Available" — RELEASE Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `DsetRel${Date.now()}`,
-        email: `e2e-dset-rel-${Date.now()}@e2e.civitas.dev`,
+        lastName: `DsetRel${uid()}`,
+        email: `e2e-dset-rel-${uid()}@e2e.civitas.dev`,
         permissions: ['DATASET_READ', 'DATASET_UPDATE', 'DATASET_RELEASE'],
         scopeType: 'DATASET',
         scopeId: stack.dataset.id,
@@ -166,8 +168,8 @@ test.describe('Status "Available" — RELEASE Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `DsetNoRel${Date.now()}`,
-        email: `e2e-dset-norel-${Date.now()}@e2e.civitas.dev`,
+        lastName: `DsetNoRel${uid()}`,
+        email: `e2e-dset-norel-${uid()}@e2e.civitas.dev`,
         permissions: ['DATASET_READ', 'DATASET_UPDATE'],
         scopeType: 'DATASET',
         scopeId: stack.dataset.id,
@@ -175,6 +177,29 @@ test.describe('Status "Available" — RELEASE Permission Gating', () => {
       },
       resources,
     )
+
+    // Dedicated datasource that stays AVAILABLE (not unpublished like stack.datasource)
+    availableDatasource = await adminApi.createDatasource({
+      name: `E2E-src-avail-${uid()}`,
+      description: 'E2E datasource kept AVAILABLE for edit-button gating test',
+      connectorType: 'MQTT',
+      configuration: {
+        urls: ['tcp://broker:1883'],
+        topics: ['e2e/#'],
+        qos: 1,
+        keepalive: '30s',
+        user: 'e2e',
+        password: 'e2e',
+        // eslint-disable-next-line @typescript-eslint/naming-convention -- MQTT connector config uses snake_case keys
+        client_id: `e2e-avail-${uid()}`,
+        // eslint-disable-next-line @typescript-eslint/naming-convention -- MQTT connector config uses snake_case keys
+        connect_timeout: '5s',
+        tls: { enabled: false },
+      },
+      dataStructureVersionId: stack.version.id,
+    })
+    resources.datasourceIds.push(availableDatasource.id)
+    await adminApi.publishDatasource(availableDatasource.id)
   })
 
   test.afterAll(async () => {
@@ -244,7 +269,7 @@ test.describe('Status "Available" — RELEASE Permission Gating', () => {
   // Datasource is AVAILABLE, so user without RELEASE cannot even enter edit mode
   test('Datasource: Edit button hidden without RELEASE on AVAILABLE entity (TENANT)', async ({ browser }) => {
     await withTestUser(browser, tenantWithoutRelease, async page => {
-      await page.goto(`/datasources/${stack.datasource.id}`)
+      await page.goto(`/datasources/${availableDatasource.id}`)
       await page.waitForLoadState('domcontentloaded')
       await expect(page.getByTestId('pageHeader').first()).toBeVisible({ timeout: 20_000 })
       await expect(page.getByTestId('editButton')).not.toBeVisible()

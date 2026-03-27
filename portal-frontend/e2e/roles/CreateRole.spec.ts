@@ -20,6 +20,7 @@ import {
   emptyResources,
   type TestResources,
   type TestUserProfile,
+  uid,
 } from '../../playwright/helpers/api'
 import { loginAs } from '../../playwright/helpers/auth'
 
@@ -41,8 +42,8 @@ test.describe('Roles List — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `RoleCreate${Date.now()}`,
-        email: `e2e-rolecreate-${Date.now()}@e2e.civitas.dev`,
+        lastName: `RoleCreate${uid()}`,
+        email: `e2e-rolecreate-${uid()}@e2e.civitas.dev`,
         permissions: ['ROLE_READ', 'ROLE_CREATE'],
       },
       resources,
@@ -53,8 +54,8 @@ test.describe('Roles List — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `RoleRO${Date.now()}`,
-        email: `e2e-rolero-${Date.now()}@e2e.civitas.dev`,
+        lastName: `RoleRO${uid()}`,
+        email: `e2e-rolero-${uid()}@e2e.civitas.dev`,
         permissions: ['ROLE_READ'],
       },
       resources,
@@ -120,7 +121,7 @@ test.describe('Role Detail — Permission Gating', () => {
     resources = emptyResources()
 
     testRole = await adminApi.createRole({
-      name: `e2e-detail-role-${Date.now()}`,
+      name: `e2e-detail-role-${uid()}`,
       description: 'Role for detail permission gating',
       roleType: 'SYSTEM',
     })
@@ -130,8 +131,8 @@ test.describe('Role Detail — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `RoleUpd${Date.now()}`,
-        email: `e2e-roleupd-${Date.now()}@e2e.civitas.dev`,
+        lastName: `RoleUpd${uid()}`,
+        email: `e2e-roleupd-${uid()}@e2e.civitas.dev`,
         permissions: ['ROLE_READ', 'ROLE_UPDATE'],
       },
       resources,
@@ -141,8 +142,8 @@ test.describe('Role Detail — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `RoleDetailRO${Date.now()}`,
-        email: `e2e-roledetailro-${Date.now()}@e2e.civitas.dev`,
+        lastName: `RoleDetailRO${uid()}`,
+        email: `e2e-roledetailro-${uid()}@e2e.civitas.dev`,
         permissions: ['ROLE_READ'],
       },
       resources,
@@ -152,8 +153,8 @@ test.describe('Role Detail — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `PermRead${Date.now()}`,
-        email: `e2e-permread-${Date.now()}@e2e.civitas.dev`,
+        lastName: `PermRead${uid()}`,
+        email: `e2e-permread-${uid()}@e2e.civitas.dev`,
         permissions: ['ROLE_READ', 'PERMISSION_READ'],
       },
       resources,
@@ -163,8 +164,8 @@ test.describe('Role Detail — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `GrpRead${Date.now()}`,
-        email: `e2e-grpread-${Date.now()}@e2e.civitas.dev`,
+        lastName: `GrpRead${uid()}`,
+        email: `e2e-grpread-${uid()}@e2e.civitas.dev`,
         permissions: ['ROLE_READ', 'GROUP_READ'],
       },
       resources,
@@ -174,8 +175,8 @@ test.describe('Role Detail — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `RoleDel${Date.now()}`,
-        email: `e2e-roledel-${Date.now()}@e2e.civitas.dev`,
+        lastName: `RoleDel${uid()}`,
+        email: `e2e-roledel-${uid()}@e2e.civitas.dev`,
         permissions: ['ROLE_READ', 'ROLE_UPDATE', 'ROLE_DELETE'],
       },
       resources,
@@ -365,8 +366,8 @@ test.describe('Default Role — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `DefaultRole${Date.now()}`,
-        email: `e2e-defaultrole-${Date.now()}@e2e.civitas.dev`,
+        lastName: `DefaultRole${uid()}`,
+        email: `e2e-defaultrole-${uid()}@e2e.civitas.dev`,
         permissions: ['ROLE_READ', 'ROLE_UPDATE', 'ROLE_DELETE', 'PERMISSION_READ', 'GROUP_READ'],
       },
       resources,
@@ -432,8 +433,8 @@ test.describe('New Role — Tab State', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `NewRole${Date.now()}`,
-        email: `e2e-newrole-${Date.now()}@e2e.civitas.dev`,
+        lastName: `NewRole${uid()}`,
+        email: `e2e-newrole-${uid()}@e2e.civitas.dev`,
         permissions: ['ROLE_READ', 'ROLE_CREATE', 'PERMISSION_READ', 'GROUP_READ'],
       },
       resources,

@@ -16,6 +16,7 @@ import {
   emptyResources,
   type TestResources,
   type TestUserProfile,
+  uid,
 } from '../../playwright/helpers/api'
 import { loginAs } from '../../playwright/helpers/auth'
 
@@ -34,7 +35,7 @@ test.describe('Role Permissions Tab — Permission Gating', () => {
     resources = emptyResources()
 
     testRole = await adminApi.createRole({
-      name: `e2e-permtab-role-${Date.now()}`,
+      name: `e2e-permtab-role-${uid()}`,
       description: 'Role for permissions tab gating tests',
       roleType: 'SYSTEM',
     })
@@ -45,8 +46,8 @@ test.describe('Role Permissions Tab — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `PermEdit${Date.now()}`,
-        email: `e2e-permedit-${Date.now()}@e2e.civitas.dev`,
+        lastName: `PermEdit${uid()}`,
+        email: `e2e-permedit-${uid()}@e2e.civitas.dev`,
         permissions: ['ROLE_READ', 'ROLE_UPDATE', 'PERMISSION_READ'],
       },
       resources,
@@ -57,8 +58,8 @@ test.describe('Role Permissions Tab — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `PermRO${Date.now()}`,
-        email: `e2e-permro-${Date.now()}@e2e.civitas.dev`,
+        lastName: `PermRO${uid()}`,
+        email: `e2e-permro-${uid()}@e2e.civitas.dev`,
         permissions: ['ROLE_READ', 'PERMISSION_READ'],
       },
       resources,

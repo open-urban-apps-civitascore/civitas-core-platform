@@ -14,6 +14,7 @@ import {
   emptyResources,
   type TestResources,
   type TestUserProfile,
+  uid,
 } from '../../playwright/helpers/api'
 import { withTestUser } from '../utils/withTestUser'
 
@@ -74,8 +75,8 @@ export const registerEntityPermissionTests = (config: EntityConfig) => {
         adminApi,
         {
           firstName: 'E2E',
-          lastName: `${prefix}Admin${Date.now()}`,
-          email: `e2e-${prefix}-admin-${Date.now()}@e2e.civitas.dev`,
+          lastName: `${prefix}Admin${uid()}`,
+          email: `e2e-${prefix}-admin-${uid()}@e2e.civitas.dev`,
           permissions: [CREATE, READ, DELETE],
           roleType: 'DATA',
           scopeType: 'TENANT',
@@ -87,8 +88,8 @@ export const registerEntityPermissionTests = (config: EntityConfig) => {
         adminApi,
         {
           firstName: 'E2E',
-          lastName: `${prefix}RO${Date.now()}`,
-          email: `e2e-${prefix}-ro-${Date.now()}@e2e.civitas.dev`,
+          lastName: `${prefix}RO${uid()}`,
+          email: `e2e-${prefix}-ro-${uid()}@e2e.civitas.dev`,
           permissions: [READ],
           roleType: 'DATA',
           scopeType: 'TENANT',
@@ -120,7 +121,7 @@ export const registerEntityPermissionTests = (config: EntityConfig) => {
     })
 
     test(`Delete menu visible with ${DELETE} (TENANT)`, async ({ browser }) => {
-      const entity = await createEntity(adminApi, `E2E-${prefix}-del-${Date.now()}`)
+      const entity = await createEntity(adminApi, `E2E-${prefix}-del-${uid()}`)
       resources[resourceKey].push(entity.id)
 
       await withTestUser(browser, tenantAdmin, async page => {
@@ -135,7 +136,7 @@ export const registerEntityPermissionTests = (config: EntityConfig) => {
     })
 
     test(`Delete menu hidden without ${DELETE} (TENANT)`, async ({ browser }) => {
-      const entity = await createEntity(adminApi, `E2E-${prefix}-nodel-${Date.now()}`)
+      const entity = await createEntity(adminApi, `E2E-${prefix}-nodel-${uid()}`)
       resources[resourceKey].push(entity.id)
 
       await withTestUser(browser, readOnly, async page => {
@@ -165,15 +166,15 @@ export const registerEntityPermissionTests = (config: EntityConfig) => {
       adminApi = await ApiClient.asUser(TEST_USERNAME, TEST_PASSWORD)
       resources = emptyResources()
 
-      entity = await createEntity(adminApi, `E2E-${prefix}-scoped-${Date.now()}`)
+      entity = await createEntity(adminApi, `E2E-${prefix}-scoped-${uid()}`)
       resources[resourceKey].push(entity.id)
 
       scopedUser = await createTestUserWithPermissions(
         adminApi,
         {
           firstName: 'E2E',
-          lastName: `${prefix}Scoped${Date.now()}`,
-          email: `e2e-${prefix}-scoped-${Date.now()}@e2e.civitas.dev`,
+          lastName: `${prefix}Scoped${uid()}`,
+          email: `e2e-${prefix}-scoped-${uid()}@e2e.civitas.dev`,
           permissions: [READ, DELETE],
           scopeType,
           scopeId: entity.id,
@@ -186,8 +187,8 @@ export const registerEntityPermissionTests = (config: EntityConfig) => {
         adminApi,
         {
           firstName: 'E2E',
-          lastName: `${prefix}Unscoped${Date.now()}`,
-          email: `e2e-${prefix}-unscoped-${Date.now()}@e2e.civitas.dev`,
+          lastName: `${prefix}Unscoped${uid()}`,
+          email: `e2e-${prefix}-unscoped-${uid()}@e2e.civitas.dev`,
           permissions: [READ],
           scopeType,
           scopeId: entity.id,
@@ -241,15 +242,15 @@ export const registerEntityPermissionTests = (config: EntityConfig) => {
       adminApi = await ApiClient.asUser(TEST_USERNAME, TEST_PASSWORD)
       resources = emptyResources()
 
-      entity = await createEntity(adminApi, `E2E-${prefix}-detail-${Date.now()}`)
+      entity = await createEntity(adminApi, `E2E-${prefix}-detail-${uid()}`)
       resources[resourceKey].push(entity.id)
 
       userWithUpdate = await createTestUserWithPermissions(
         adminApi,
         {
           firstName: 'E2E',
-          lastName: `${prefix}Upd${Date.now()}`,
-          email: `e2e-${prefix}-upd-${Date.now()}@e2e.civitas.dev`,
+          lastName: `${prefix}Upd${uid()}`,
+          email: `e2e-${prefix}-upd-${uid()}@e2e.civitas.dev`,
           permissions: [READ, UPDATE],
           roleType: 'DATA',
           scopeType: 'TENANT',
@@ -261,8 +262,8 @@ export const registerEntityPermissionTests = (config: EntityConfig) => {
         adminApi,
         {
           firstName: 'E2E',
-          lastName: `${prefix}DetailRO${Date.now()}`,
-          email: `e2e-${prefix}-detailro-${Date.now()}@e2e.civitas.dev`,
+          lastName: `${prefix}DetailRO${uid()}`,
+          email: `e2e-${prefix}-detailro-${uid()}@e2e.civitas.dev`,
           permissions: [READ],
           roleType: 'DATA',
           scopeType: 'TENANT',
@@ -309,15 +310,15 @@ export const registerEntityPermissionTests = (config: EntityConfig) => {
       adminApi = await ApiClient.asUser(TEST_USERNAME, TEST_PASSWORD)
       resources = emptyResources()
 
-      entity = await createEntity(adminApi, `E2E-${prefix}-detail-scoped-${Date.now()}`)
+      entity = await createEntity(adminApi, `E2E-${prefix}-detail-scoped-${uid()}`)
       resources[resourceKey].push(entity.id)
 
       scopedUser = await createTestUserWithPermissions(
         adminApi,
         {
           firstName: 'E2E',
-          lastName: `${prefix}ScopedUpd${Date.now()}`,
-          email: `e2e-${prefix}-scoped-upd-${Date.now()}@e2e.civitas.dev`,
+          lastName: `${prefix}ScopedUpd${uid()}`,
+          email: `e2e-${prefix}-scoped-upd-${uid()}@e2e.civitas.dev`,
           permissions: [READ, UPDATE],
           scopeType,
           scopeId: entity.id,
@@ -330,8 +331,8 @@ export const registerEntityPermissionTests = (config: EntityConfig) => {
         adminApi,
         {
           firstName: 'E2E',
-          lastName: `${prefix}ScopedRO${Date.now()}`,
-          email: `e2e-${prefix}-scoped-ro-${Date.now()}@e2e.civitas.dev`,
+          lastName: `${prefix}ScopedRO${uid()}`,
+          email: `e2e-${prefix}-scoped-ro-${uid()}@e2e.civitas.dev`,
           permissions: [READ],
           scopeType,
           scopeId: entity.id,

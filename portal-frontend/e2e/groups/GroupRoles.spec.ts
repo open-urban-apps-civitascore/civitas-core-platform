@@ -20,6 +20,7 @@ import {
   emptyResources,
   type TestResources,
   type TestUserProfile,
+  uid,
 } from '../../playwright/helpers/api'
 import { loginAs } from '../../playwright/helpers/auth'
 
@@ -42,14 +43,14 @@ test.describe('Group Roles Tab — Permission Gating', () => {
     resources = emptyResources()
 
     testGroup = await adminApi.createGroup({
-      name: `e2e-rolestab-grp-${Date.now()}`,
+      name: `e2e-rolestab-grp-${uid()}`,
       description: 'Group for roles tab gating',
     })
     resources.groupIds.push(testGroup.id)
 
     // Create a role and assign it to the group so the roles tab has content
     testRole = await adminApi.createRole({
-      name: `e2e-rolestab-role-${Date.now()}`,
+      name: `e2e-rolestab-role-${uid()}`,
       description: 'Role for roles tab gating',
       roleType: 'SYSTEM',
     })
@@ -66,8 +67,8 @@ test.describe('Group Roles Tab — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `GrpRolesEdit${Date.now()}`,
-        email: `e2e-grprolesedit-${Date.now()}@e2e.civitas.dev`,
+        lastName: `GrpRolesEdit${uid()}`,
+        email: `e2e-grprolesedit-${uid()}@e2e.civitas.dev`,
         permissions: ['GROUP_READ', 'GROUP_UPDATE', 'ROLE_READ'],
       },
       resources,
@@ -78,8 +79,8 @@ test.describe('Group Roles Tab — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `GrpRolesNoRole${Date.now()}`,
-        email: `e2e-grprolesnorole-${Date.now()}@e2e.civitas.dev`,
+        lastName: `GrpRolesNoRole${uid()}`,
+        email: `e2e-grprolesnorole-${uid()}@e2e.civitas.dev`,
         permissions: ['GROUP_READ', 'GROUP_UPDATE'],
       },
       resources,
@@ -90,8 +91,8 @@ test.describe('Group Roles Tab — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `GrpRolesRO${Date.now()}`,
-        email: `e2e-grprolesro-${Date.now()}@e2e.civitas.dev`,
+        lastName: `GrpRolesRO${uid()}`,
+        email: `e2e-grprolesro-${uid()}@e2e.civitas.dev`,
         permissions: ['GROUP_READ', 'ROLE_READ'],
       },
       resources,
@@ -105,8 +106,8 @@ test.describe('Group Roles Tab — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `GrpNoRoleRead${Date.now()}`,
-        email: `e2e-grpnoroleread-${Date.now()}@e2e.civitas.dev`,
+        lastName: `GrpNoRoleRead${uid()}`,
+        email: `e2e-grpnoroleread-${uid()}@e2e.civitas.dev`,
         permissions: ['GROUP_READ'],
       },
       resources,

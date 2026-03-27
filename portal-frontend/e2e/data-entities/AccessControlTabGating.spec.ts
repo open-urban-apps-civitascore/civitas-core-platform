@@ -17,6 +17,7 @@ import {
   emptyResources,
   type TestResources,
   type TestUserProfile,
+  uid,
 } from '../../playwright/helpers/api'
 import { withTestUser } from '../utils/withTestUser'
 
@@ -35,15 +36,15 @@ test.describe('Access Control Tab — Permission Gating', () => {
     adminApi = await ApiClient.asUser(TEST_USERNAME, TEST_PASSWORD)
     resources = emptyResources()
 
-    ds = await adminApi.createDatastructure({ name: `E2E-ds-acl-${Date.now()}` })
+    ds = await adminApi.createDatastructure({ name: `E2E-ds-acl-${uid()}` })
     resources.datastructureIds.push(ds.id)
 
     userWithGroupAndRoleRead = await createTestUserWithPermissions(
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `AclFull${Date.now()}`,
-        email: `e2e-acl-full-${Date.now()}@e2e.civitas.dev`,
+        lastName: `AclFull${uid()}`,
+        email: `e2e-acl-full-${uid()}@e2e.civitas.dev`,
         permissions: ['DATASTRUCTURE_READ', 'DATASTRUCTURE_UPDATE', 'GROUP_READ', 'ROLE_READ'],
         roleType: 'DATA',
         scopeType: 'TENANT',
@@ -55,8 +56,8 @@ test.describe('Access Control Tab — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `AclRole${Date.now()}`,
-        email: `e2e-acl-role-${Date.now()}@e2e.civitas.dev`,
+        lastName: `AclRole${uid()}`,
+        email: `e2e-acl-role-${uid()}@e2e.civitas.dev`,
         permissions: ['DATASTRUCTURE_READ', 'DATASTRUCTURE_UPDATE', 'ROLE_READ'],
         roleType: 'DATA',
         scopeType: 'TENANT',
@@ -68,8 +69,8 @@ test.describe('Access Control Tab — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `AclNone${Date.now()}`,
-        email: `e2e-acl-none-${Date.now()}@e2e.civitas.dev`,
+        lastName: `AclNone${uid()}`,
+        email: `e2e-acl-none-${uid()}@e2e.civitas.dev`,
         permissions: ['DATASTRUCTURE_READ', 'DATASTRUCTURE_UPDATE'],
         roleType: 'DATA',
         scopeType: 'TENANT',

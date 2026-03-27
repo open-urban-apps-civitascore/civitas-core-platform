@@ -12,4 +12,5 @@ export {
   PERMISSION_PROFILES,
   type TestResources,
   type TestUserProfile,
+  uid,
 } from './testSetup'

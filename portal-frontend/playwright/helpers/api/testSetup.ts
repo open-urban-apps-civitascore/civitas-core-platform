@@ -14,6 +14,9 @@ import { KeycloakClient } from './keycloakClient'
 
 const E2E_TEST_PASSWORD = process.env.KC_TEST_PASSWORD ?? 'e2eTestPass1!'
 
+/** Short random ID for unique test data names. Collision-safe across parallel workers. */
+export const uid = () => crypto.randomUUID().slice(0, 8)
+
 /** Tracks all resources created during a test for cleanup. */
 export type TestResources = {
   userIds: string[]
@@ -82,7 +85,7 @@ export const createTestUserWithPermissions = async (
   })
 
   // 2. Create a role with exactly these permissions
-  const roleName = `e2e-role-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  const roleName = `e2e-role-${uid()}`
   const role = await adminApi.createRole({
     name: roleName,
     description: `E2E test role for ${opts.email}`,
@@ -101,7 +104,7 @@ export const createTestUserWithPermissions = async (
   resources.userIds.push(user.id)
 
   // 4. Create a group and add the user as member
-  const groupName = `e2e-group-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  const groupName = `e2e-group-${uid()}`
   const group = await adminApi.createGroup({
     name: groupName,
     description: `E2E test group for ${opts.email}`,

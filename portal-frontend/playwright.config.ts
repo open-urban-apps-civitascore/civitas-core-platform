@@ -69,9 +69,15 @@ export default defineConfig({
   /* Configure projects for major browsers */
   projects: [
     {
+      name: 'sweep',
+      testDir: './playwright',
+      testMatch: /sweep\.setup\.ts/,
+    },
+    {
       name: 'authSetup',
       testDir: './playwright',
       testMatch: /auth\.setup\.ts/,
+      dependencies: ['sweep'],
     },
     {
       name: 'chromium',

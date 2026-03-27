@@ -19,6 +19,7 @@ import {
   emptyResources,
   type TestResources,
   type TestUserProfile,
+  uid,
 } from '../../playwright/helpers/api'
 import { loginAs } from '../../playwright/helpers/auth'
 
@@ -40,8 +41,8 @@ test.describe('User Detail — Roles Tab Visibility', () => {
     // Create a target user to view
     targetUser = await adminApi.createUser({
       firstName: 'E2ERolesTab',
-      lastName: `Target${Date.now()}`,
-      email: `e2e-rolestab-target-${Date.now()}@e2e.civitas.dev`,
+      lastName: `Target${uid()}`,
+      email: `e2e-rolestab-target-${uid()}@e2e.civitas.dev`,
       title: 'OTHER',
     })
     resources.userIds.push(targetUser.id)
@@ -51,8 +52,8 @@ test.describe('User Detail — Roles Tab Visibility', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `AssignRead${Date.now()}`,
-        email: `e2e-assignread-${Date.now()}@e2e.civitas.dev`,
+        lastName: `AssignRead${uid()}`,
+        email: `e2e-assignread-${uid()}@e2e.civitas.dev`,
         permissions: ['USER_READ', 'ASSIGNMENT_READ'],
       },
       resources,
@@ -63,8 +64,8 @@ test.describe('User Detail — Roles Tab Visibility', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `NoAssign${Date.now()}`,
-        email: `e2e-noassign-${Date.now()}@e2e.civitas.dev`,
+        lastName: `NoAssign${uid()}`,
+        email: `e2e-noassign-${uid()}@e2e.civitas.dev`,
         permissions: ['USER_READ'],
       },
       resources,
@@ -141,15 +142,15 @@ test.describe('User Detail — Roles Tab Content', () => {
     // Create a target user
     targetUser = await adminApi.createUser({
       firstName: 'E2ERolesContent',
-      lastName: `Target${Date.now()}`,
-      email: `e2e-rolescontent-target-${Date.now()}@e2e.civitas.dev`,
+      lastName: `Target${uid()}`,
+      email: `e2e-rolescontent-target-${uid()}@e2e.civitas.dev`,
       title: 'OTHER',
     })
     resources.userIds.push(targetUser.id)
 
     // Create a custom role with a unique name
     testRole = await adminApi.createRole({
-      name: `e2e-roletab-role-${Date.now()}`,
+      name: `e2e-roletab-role-${uid()}`,
       description: 'E2E test role for roles tab',
       roleType: 'SYSTEM',
     })
@@ -157,7 +158,7 @@ test.describe('User Detail — Roles Tab Content', () => {
 
     // Create a group to link the user and role
     testGroup = await adminApi.createGroup({
-      name: `e2e-roletab-group-${Date.now()}`,
+      name: `e2e-roletab-group-${uid()}`,
       description: 'E2E test group for roles tab',
       memberIds: [targetUser.id],
     })
@@ -175,8 +176,8 @@ test.describe('User Detail — Roles Tab Content', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `RoleRead${Date.now()}`,
-        email: `e2e-roleread-${Date.now()}@e2e.civitas.dev`,
+        lastName: `RoleRead${uid()}`,
+        email: `e2e-roleread-${uid()}@e2e.civitas.dev`,
         permissions: ['USER_READ', 'ASSIGNMENT_READ', 'ROLE_READ'],
       },
       resources,
@@ -187,8 +188,8 @@ test.describe('User Detail — Roles Tab Content', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `NoRoleRead${Date.now()}`,
-        email: `e2e-noroleread-${Date.now()}@e2e.civitas.dev`,
+        lastName: `NoRoleRead${uid()}`,
+        email: `e2e-noroleread-${uid()}@e2e.civitas.dev`,
         permissions: ['USER_READ', 'ASSIGNMENT_READ'],
       },
       resources,

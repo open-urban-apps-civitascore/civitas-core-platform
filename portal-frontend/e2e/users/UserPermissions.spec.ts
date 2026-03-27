@@ -16,6 +16,7 @@ import {
   emptyResources,
   type TestResources,
   type TestUserProfile,
+  uid,
 } from '../../playwright/helpers/api'
 import { loginAs } from '../../playwright/helpers/auth'
 
@@ -37,8 +38,8 @@ test.describe('Users List — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `UserCreate${Date.now()}`,
-        email: `e2e-usercreate-${Date.now()}@e2e.civitas.dev`,
+        lastName: `UserCreate${uid()}`,
+        email: `e2e-usercreate-${uid()}@e2e.civitas.dev`,
         permissions: ['USER_READ', 'USER_CREATE'],
       },
       resources,
@@ -49,8 +50,8 @@ test.describe('Users List — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `UserRO${Date.now()}`,
-        email: `e2e-userro-${Date.now()}@e2e.civitas.dev`,
+        lastName: `UserRO${uid()}`,
+        email: `e2e-userro-${uid()}@e2e.civitas.dev`,
         permissions: ['USER_READ'],
       },
       resources,
@@ -115,8 +116,8 @@ test.describe('User Detail — Permission Gating', () => {
 
     targetUser = await adminApi.createUser({
       firstName: 'E2ETarget',
-      lastName: `Detail${Date.now()}`,
-      email: `e2e-target-detail-${Date.now()}@e2e.civitas.dev`,
+      lastName: `Detail${uid()}`,
+      email: `e2e-target-detail-${uid()}@e2e.civitas.dev`,
       title: 'OTHER',
     })
     resources.userIds.push(targetUser.id)
@@ -126,8 +127,8 @@ test.describe('User Detail — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `UserUpd${Date.now()}`,
-        email: `e2e-userupd-${Date.now()}@e2e.civitas.dev`,
+        lastName: `UserUpd${uid()}`,
+        email: `e2e-userupd-${uid()}@e2e.civitas.dev`,
         permissions: ['USER_READ', 'USER_UPDATE'],
       },
       resources,
@@ -138,8 +139,8 @@ test.describe('User Detail — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `UserDetailRO${Date.now()}`,
-        email: `e2e-userdetailro-${Date.now()}@e2e.civitas.dev`,
+        lastName: `UserDetailRO${uid()}`,
+        email: `e2e-userdetailro-${uid()}@e2e.civitas.dev`,
         permissions: ['USER_READ'],
       },
       resources,
@@ -150,8 +151,8 @@ test.describe('User Detail — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `UserGrpRead${Date.now()}`,
-        email: `e2e-usergrpread-${Date.now()}@e2e.civitas.dev`,
+        lastName: `UserGrpRead${uid()}`,
+        email: `e2e-usergrpread-${uid()}@e2e.civitas.dev`,
         permissions: ['USER_READ', 'GROUP_READ'],
       },
       resources,
