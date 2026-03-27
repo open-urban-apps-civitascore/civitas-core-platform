@@ -173,6 +173,7 @@ export const RolesTab = (props: RolesTabProps) => {
             width: '20%',
             minWidth: '150px',
           },
+          truncate: true,
         },
       }),
       columnHelper.accessor('role.description', {
@@ -180,6 +181,9 @@ export const RolesTab = (props: RolesTabProps) => {
         header: t('roles.columns.description'),
         cell: info => info.getValue() ?? '',
         enableSorting: false,
+        meta: {
+          truncate: true,
+        },
       }),
       columnHelper.display({
         id: 'object',
