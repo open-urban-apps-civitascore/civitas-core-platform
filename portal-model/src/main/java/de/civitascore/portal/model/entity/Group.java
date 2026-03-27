@@ -84,19 +84,21 @@ public class Group extends AssignableEntity {
   }
 
   /**
-   * Recursively collects all child groups in the hierarchy.
+   * Recursively collects all transitive child groups.
    *
-   * @return a set of all child groups
+   * @return all descendant groups in the hierarchy
    */
-  // TODO SECURITY (low): No cycle detection — a cycle in parentGroup/childGroups
-  // (e.g. from data corruption) causes unbounded recursion (StackOverflowError).
-  // Also triggers N+1 lazy-loading queries per recursion level. Consider adding a
-  // visited-set or depth limit if group hierarchies grow.
   public Set<Group> getChildGroupsRecursive() {
-    Set<Group> allChildGroups = new HashSet<>(childGroups);
+    Set<Group> visited = new HashSet<>();
+    collectChildGroups(visited);
+    return visited;
+  }
+
+  private void collectChildGroups(Set<Group> visited) {
     for (Group child : childGroups) {
-      allChildGroups.addAll(child.getChildGroupsRecursive());
+      if (visited.add(child)) {
+        child.collectChildGroups(visited);
+      }
     }
-    return allChildGroups;
   }
 }

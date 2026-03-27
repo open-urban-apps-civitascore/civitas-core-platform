@@ -40,7 +40,9 @@ public abstract class AssignableEntity extends NamedEntity {
     }
 
     Map<AssignmentKey, Assignment> existingByKey =
-        existing.stream().collect(Collectors.toMap(AssignmentKey::of, a -> a));
+        existing.stream()
+            .collect(
+                Collectors.toMap(AssignmentKey::of, a -> a, (existing1, duplicate) -> existing1));
 
     Set<Assignment> desired = new HashSet<>();
     for (Assignment a : assignments) {

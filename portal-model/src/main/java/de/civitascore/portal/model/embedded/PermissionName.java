@@ -50,34 +50,28 @@ public enum PermissionName implements GrantedAuthority {
       PermissionType.SYSTEM, PermissionCategory.TENANT_ADMINISTRATION, PermissionSource.INTERNAL),
 
   // Data access and management.
-  // TODO: V2.1: DATASET_EXISTS,
   DATASET_CREATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASET_READ(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASET_UPDATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASET_DELETE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASET_RELEASE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
-  // TODO: V2.1: DATASET_USE,
 
   DATASET_PAYLOAD_CREATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASET_PAYLOAD_READ(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASET_PAYLOAD_UPDATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASET_PAYLOAD_DELETE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
 
-  // TODO: V2.1: DATASOURCE_EXISTS,
   DATASOURCE_CREATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASOURCE_READ(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASOURCE_UPDATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASOURCE_DELETE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASOURCE_RELEASE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
-  // TODO: V2.1: DATASOURCE_USE,
 
-  // TODO: V2.1: DATASTRUCTURE_EXISTS,
   DATASTRUCTURE_CREATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASTRUCTURE_READ(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASTRUCTURE_UPDATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASTRUCTURE_DELETE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASTRUCTURE_RELEASE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL);
-  // TODO: V2.1: DATASTRUCTURE_USE,
 
   private final PermissionType permissionType;
   private final PermissionCategory category;

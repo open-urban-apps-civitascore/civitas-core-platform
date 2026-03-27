@@ -107,7 +107,7 @@ public class RoleInitializer {
   }
 
   private Set<Permission> resolvePermissions(
-      PermissionName[] names, Map<String, Permission> permissionsByNameAndSource) {
+      List<PermissionName> names, Map<String, Permission> permissionsByNameAndSource) {
     Set<Permission> permissions = new HashSet<>();
     for (PermissionName name : names) {
       String key = name.name() + ":" + name.getSource();

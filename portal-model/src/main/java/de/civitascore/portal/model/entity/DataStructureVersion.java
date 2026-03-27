@@ -11,6 +11,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotNull;
 import java.util.Map;
 import lombok.Getter;
 import lombok.Setter;
@@ -35,22 +36,22 @@ public class DataStructureVersion extends BaseEntity {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "data_structure_version_status", nullable = false)
-  private DataStructureVersionStatus dataStructureVersionStatus;
+  @NotNull private DataStructureVersionStatus dataStructureVersionStatus;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "data_structure_version_source", nullable = false)
   private DataStructureVersionSource dataStructureVersionSource;
 
-  @Column(name = "version", nullable = false)
+  @Column(name = "version", nullable = false, length = 100)
   private String version;
 
-  @Column(name = "model_atlas_uri")
+  @Column(name = "model_atlas_uri", length = 512)
   private String modelAtlasUri;
 
-  @Column(name = "model_name")
+  @Column(name = "model_name", length = 255)
   private String modelName;
 
-  @Column(name = "external_id")
+  @Column(name = "external_id", length = 255)
   private String externalId;
 
   @JdbcTypeCode(SqlTypes.JSON)

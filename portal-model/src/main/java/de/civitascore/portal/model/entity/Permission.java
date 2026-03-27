@@ -11,6 +11,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.security.core.GrantedAuthority;
@@ -39,7 +40,7 @@ public class Permission extends NamedEntity implements GrantedAuthority {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "permission_type", nullable = false)
-  private PermissionType permissionType;
+  @NotNull private PermissionType permissionType;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "category", nullable = false)

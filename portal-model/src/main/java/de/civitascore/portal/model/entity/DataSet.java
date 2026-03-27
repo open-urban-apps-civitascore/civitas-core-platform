@@ -20,7 +20,6 @@ import jakarta.persistence.UniqueConstraint;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -64,7 +63,7 @@ public class DataSet extends BaseDataEntity {
       orphanRemoval = true)
   private Set<Pipeline> pipelines = new HashSet<>();
 
-  @Column(name = "identifier")
+  @Column(name = "identifier", length = 255)
   private String identifier;
 
   @Column(name = "version")
@@ -110,25 +109,25 @@ public class DataSet extends BaseDataEntity {
   @ManyToMany(mappedBy = "dataSets", fetch = FetchType.LAZY)
   private Set<Catalog> catalogs = new HashSet<>();
 
-  @Column(name = "external_id")
+  @Column(name = "external_id", length = 255)
   private String externalId;
 
-  @Column(name = "format")
+  @Column(name = "format", length = 100)
   private String format;
 
   @Column(name = "open_data_access", nullable = false)
   private Boolean openDataAccess = false;
 
-  @Column(name = "project_id")
+  @Column(name = "project_id", length = 255)
   private String projectId;
 
   @Column(name = "frost_base_url", length = 500)
   private String frostBaseUrl;
 
-  @Column(name = "route_id")
+  @Column(name = "route_id", length = 255)
   private String routeId;
 
-  @Column(name = "service_id")
+  @Column(name = "service_id", length = 255)
   private String serviceId;
 
   @Column(name = "public_url", length = 500)
@@ -163,7 +162,9 @@ public class DataSet extends BaseDataEntity {
    */
   public void setDistributions(Collection<Distribution> newDistributions) {
     this.distributions.clear();
-    Optional.ofNullable(newDistributions).ifPresent(distributions::addAll);
+    if (newDistributions != null) {
+      this.distributions.addAll(newDistributions);
+    }
   }
 
   /**
@@ -174,7 +175,9 @@ public class DataSet extends BaseDataEntity {
    */
   public void setPipelines(Collection<Pipeline> newPipelines) {
     this.pipelines.clear();
-    Optional.ofNullable(newPipelines).ifPresent(pipelines::addAll);
+    if (newPipelines != null) {
+      this.pipelines.addAll(newPipelines);
+    }
   }
 
   /**

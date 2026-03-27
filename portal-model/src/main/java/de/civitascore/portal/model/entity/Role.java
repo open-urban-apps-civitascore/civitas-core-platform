@@ -15,6 +15,7 @@ import jakarta.persistence.NamedAttributeNode;
 import jakarta.persistence.NamedEntityGraph;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.validation.constraints.NotNull;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
@@ -44,7 +45,7 @@ public class Role extends NamedEntity {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "role_type", nullable = false)
-  private RoleType roleType;
+  @NotNull private RoleType roleType;
 
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(

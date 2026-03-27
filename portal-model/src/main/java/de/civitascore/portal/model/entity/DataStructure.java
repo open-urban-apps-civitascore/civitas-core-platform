@@ -2,7 +2,14 @@ package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.entity.base.BaseDataEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.AccessLevel;
@@ -23,7 +30,7 @@ public class DataStructure extends BaseDataEntity {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "data_structure_status", nullable = false)
-  private DataStructureStatus dataStructureStatus;
+  private DataStructureStatus dataStructureStatus = DataStructureStatus.DRAFT;
 
   @Column(name = "created_from_data_source", nullable = false)
   private Boolean createdFromDataSource = false;
