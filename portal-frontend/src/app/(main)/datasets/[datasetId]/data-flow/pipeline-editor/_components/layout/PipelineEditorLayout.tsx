@@ -90,16 +90,12 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
     }
   }, [saveAllPipelines, router, params.datasetId])
 
-  const handleSaveAll = useCallback(async () => {
-    await saveAllPipelines()
-  }, [saveAllPipelines])
-
   const customElement = (
     <div className="flex items-center gap-4 mr-3.5">
       <Button onClick={handleExit} type="button" variant="secondary">
         {t('header.exit')}
       </Button>
-      <Button onClick={handleSaveAll} disabled={!hasAnyDirtySession || isSavingAll}>
+      <Button onClick={saveAllPipelines} disabled={!hasAnyDirtySession || isSavingAll}>
         {isSavingAll ? (
           <>
             <Loader2 className="mr-1 h-4 w-4 animate-spin" />

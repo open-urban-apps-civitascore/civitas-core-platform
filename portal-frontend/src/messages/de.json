@@ -996,7 +996,8 @@
       "savingAll": "Speichert...",
       "exit": "Beenden",
       "validationFailed": "Validierung fehlgeschlagen für: {names}",
-      "duplicateNames": "Doppelte Pipeline-Namen: {names}"
+      "duplicateNames": "Doppelte Pipeline-Namen: {names}",
+      "saveFailed": "Speichern fehlgeschlagen: {names}"
     },
     "tabs": {
       "closeTab": "Tab schließen",

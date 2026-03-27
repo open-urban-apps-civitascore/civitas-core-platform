@@ -396,7 +396,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     const dirtySessions = sessionManager.sessions.filter(s => s.isDirty)
     if (dirtySessions.length === 0) return
 
-    // Check for duplicate pipeline names across ALL sessions
+    // Check for duplicate pipeline names across ALL sessions (not just dirty —
+    // a clean session could share a name with a new dirty one)
     const allNames = sessionManager.sessions.map(s => s.pipeline.name.trim().toLowerCase())
     const duplicateNames = new Set<string>()
     const seen = new Set<string>()
@@ -428,9 +429,11 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     }
 
     setIsSavingAll(true)
+    const saveFailedNames: string[] = []
     try {
-      await Promise.all(
-        dirtySessions.map(async session => {
+      // Serialize saves to avoid concurrent mutation state issues
+      for (const session of dirtySessions) {
+        try {
           const payload = buildPipelinePayload(session.pipeline)
           const pipelineId = session.pipeline.id
 
@@ -447,8 +450,14 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
             sessionManager.updateSessionPipeline(session.id, updatedPipeline)
             sessionManager.markSessionClean(session.id)
           }
-        }),
-      )
+        } catch {
+          saveFailedNames.push(session.name)
+        }
+      }
+
+      if (saveFailedNames.length > 0) {
+        toast.error(t('header.saveFailed', { names: saveFailedNames.join(', ') }))
+      }
     } finally {
       setIsSavingAll(false)
     }
