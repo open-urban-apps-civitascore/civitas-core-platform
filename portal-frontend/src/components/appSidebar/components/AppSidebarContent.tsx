@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
-import { MeAssignment, PermissionName } from '@/types/currentUser'
+import { usePermissions } from '@/hooks/use-permissions'
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible'
 import {
@@ -21,17 +21,12 @@ import {
 } from '../../ui/sidebar'
 import { appSidebarNavSections, NavItem } from '../appSidebarItems'
 
-interface AppSidebarContentProps {
-  assignments: MeAssignment[]
-}
-
-export const AppSidebarContent = ({ assignments }: AppSidebarContentProps) => {
+export const AppSidebarContent = () => {
   const tNav = useTranslations('sidebar')
   const pathname = usePathname()
+  const { hasPermission } = usePermissions()
 
-  const userPermissions = new Set<PermissionName>(assignments.flatMap(a => a.permissions))
-
-  const isVisible = (item: NavItem) => !item.requiredPermission || userPermissions.has(item.requiredPermission)
+  const isVisible = (item: NavItem) => !item.requiredPermission || hasPermission(item.requiredPermission)
 
   const visibleSections = appSidebarNavSections
     .map(section => ({

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { SidebarProvider } from '@/components/ui/sidebar'
 import messages from '@/messages/de.json'
-import { MeAssignment, PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
+import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 
 vi.mock('next/navigation', () => ({
   usePathname: vi.fn(() => '/'),
@@ -20,28 +20,41 @@ vi.mock('@/components/ui/collapsible', () => ({
   CollapsibleContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
+const mockHasPermission = vi.fn<(p: PermissionName) => boolean>()
+const mockHasAnyPermission = vi.fn<(...p: PermissionName[]) => boolean>()
+const mockHasScopedPermission = vi.fn()
+
+vi.mock('@/hooks/use-permissions', () => ({
+  usePermissions: () => ({
+    hasPermission: mockHasPermission,
+    hasAnyPermission: mockHasAnyPermission,
+    hasScopedPermission: mockHasScopedPermission,
+  }),
+}))
+
 import { AppSidebarContent } from './AppSidebarContent'
 
-const allPermissions: PermissionName[] = Object.values(PERMISSION_NAMES)
-
-const makeAssignments = (permissions: PermissionName[]): MeAssignment[] => [
-  { scopeType: 'TENANT', scopeId: null, permissions },
-]
-
-const renderWithProvider = (assignments: MeAssignment[]) => {
+const renderWithProvider = () => {
   return render(
     <NextIntlClientProvider locale="de" messages={messages}>
       <SidebarProvider>
-        <AppSidebarContent assignments={assignments} />
+        <AppSidebarContent />
       </SidebarProvider>
     </NextIntlClientProvider>,
   )
 }
 
+const setupPermissions = (permissions: PermissionName[]) => {
+  const permSet = new Set(permissions)
+  mockHasPermission.mockImplementation(p => permSet.has(p))
+  mockHasAnyPermission.mockImplementation((...perms) => perms.some(p => permSet.has(p)))
+}
+
 describe('AppSidebarContent', () => {
   describe('permission filtering', () => {
     it('renders all nav links when user has all permissions', () => {
-      const { container } = renderWithProvider(makeAssignments(allPermissions))
+      setupPermissions(Object.values(PERMISSION_NAMES))
+      const { container } = renderWithProvider()
 
       expect(container.querySelector('a[href="/datasets"]')).toBeInTheDocument()
       expect(container.querySelector('a[href="/datasources"]')).toBeInTheDocument()
@@ -52,9 +65,8 @@ describe('AppSidebarContent', () => {
     })
 
     it('hides data items when data permissions are missing', () => {
-      const { container } = renderWithProvider(
-        makeAssignments([PERMISSION_NAMES.USER_READ, PERMISSION_NAMES.GROUP_READ, PERMISSION_NAMES.ROLE_READ]),
-      )
+      setupPermissions([PERMISSION_NAMES.USER_READ, PERMISSION_NAMES.GROUP_READ, PERMISSION_NAMES.ROLE_READ])
+      const { container } = renderWithProvider()
 
       expect(container.querySelector('a[href="/datasets"]')).not.toBeInTheDocument()
       expect(container.querySelector('a[href="/datasources"]')).not.toBeInTheDocument()
@@ -62,13 +74,12 @@ describe('AppSidebarContent', () => {
     })
 
     it('hides admin items when admin permissions are missing', () => {
-      const { container } = renderWithProvider(
-        makeAssignments([
-          PERMISSION_NAMES.DATASET_READ,
-          PERMISSION_NAMES.DATASOURCE_READ,
-          PERMISSION_NAMES.DATASTRUCTURE_READ,
-        ]),
-      )
+      setupPermissions([
+        PERMISSION_NAMES.DATASET_READ,
+        PERMISSION_NAMES.DATASOURCE_READ,
+        PERMISSION_NAMES.DATASTRUCTURE_READ,
+      ])
+      const { container } = renderWithProvider()
 
       expect(container.querySelector('a[href="/users"]')).not.toBeInTheDocument()
       expect(container.querySelector('a[href="/groups"]')).not.toBeInTheDocument()
@@ -76,14 +87,16 @@ describe('AppSidebarContent', () => {
     })
 
     it('always renders documentation link', () => {
-      const { container } = renderWithProvider(makeAssignments([]))
+      setupPermissions([])
+      const { container } = renderWithProvider()
 
       const docsLink = container.querySelector('a[target="_blank"]')
       expect(docsLink).toBeInTheDocument()
     })
 
-    it('renders no data or admin items when assignments are empty', () => {
-      const { container } = renderWithProvider([])
+    it('renders no data or admin items when no permissions', () => {
+      setupPermissions([])
+      const { container } = renderWithProvider()
 
       expect(container.querySelector('a[href="/datasets"]')).not.toBeInTheDocument()
       expect(container.querySelector('a[href="/users"]')).not.toBeInTheDocument()
