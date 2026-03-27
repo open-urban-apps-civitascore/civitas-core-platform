@@ -36,7 +36,7 @@ import org.hibernate.type.SqlTypes;
     name = "data_sources",
     uniqueConstraints =
         @UniqueConstraint(
-            name = "uq_data_sources_name",
+            name = "uk_data_sources_name",
             columnNames = {"name"}),
     indexes = {
       @Index(name = "idx_data_sources_status", columnList = "data_source_status"),

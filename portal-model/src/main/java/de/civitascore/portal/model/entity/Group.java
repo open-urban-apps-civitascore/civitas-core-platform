@@ -53,7 +53,7 @@ public class Group extends AssignableEntity {
   @OneToMany(
       mappedBy = "parentGroup",
       fetch = FetchType.LAZY,
-      cascade = CascadeType.ALL,
+      cascade = {CascadeType.PERSIST, CascadeType.MERGE},
       orphanRemoval = true)
   @Setter(AccessLevel.NONE) // Custom setter needed for orphanRemoval
   private Set<Group> childGroups = new HashSet<>();

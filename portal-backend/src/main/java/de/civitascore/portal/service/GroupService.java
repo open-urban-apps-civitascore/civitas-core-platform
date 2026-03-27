@@ -6,6 +6,7 @@ import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentGroupInputDTO;
 import de.civitascore.portal.repository.GroupRepository;
+import de.civitascore.portal.util.ResourceInUseException;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Optional;
@@ -83,6 +84,18 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
     group.setAssignments(newAssignments);
 
     return save(group);
+  }
+
+  @Override
+  protected Group preProcessDelete(UUID id) {
+    Group group = findByIdOrThrow(id);
+    if (!group.getChildGroups().isEmpty()) {
+      throw new ResourceInUseException(
+          "Group",
+          group.getId(),
+          "Cannot delete Group because it has child groups. Remove or reassign child groups first.");
+    }
+    return group;
   }
 
   @Override
