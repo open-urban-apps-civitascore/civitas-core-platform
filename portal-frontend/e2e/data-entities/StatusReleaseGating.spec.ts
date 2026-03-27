@@ -190,9 +190,9 @@ test.describe('Status "Available" — RELEASE Permission Gating', () => {
         keepalive: '30s',
         user: 'e2e',
         password: 'e2e',
-        // eslint-disable-next-line @typescript-eslint/naming-convention -- MQTT connector config uses snake_case keys
+
         client_id: `e2e-avail-${uid()}`,
-        // eslint-disable-next-line @typescript-eslint/naming-convention -- MQTT connector config uses snake_case keys
+
         connect_timeout: '5s',
         tls: { enabled: false },
       },
