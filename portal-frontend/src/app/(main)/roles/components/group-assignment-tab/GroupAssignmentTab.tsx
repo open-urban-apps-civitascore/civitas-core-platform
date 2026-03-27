@@ -133,18 +133,6 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
     })) as GroupTableRow[]
   }, [groupsData?.data, scopeFilteredGroupIds, groupScopeMap])
 
-  const filteredGroups = useMemo(() => {
-    if (!search) {
-      return groups
-    }
-    return groups.filter(
-      group =>
-        group.name.toLowerCase().includes(search.toLowerCase()) ||
-        group.contactUser?.name.toLowerCase().includes(search.toLowerCase()) ||
-        group.description.toLowerCase().includes(search.toLowerCase()),
-    )
-  }, [search, groups])
-
   const onRowClick = (row: Row<GroupTableRow>) => {
     router.push(`/groups/${row.original.id}`)
   }
@@ -178,7 +166,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   }
 
   // No data state
-  if (!isFetching && scopeFilteredGroupIds.length === 0 && filteredGroups.length === 0) {
+  if (!isFetching && scopeFilteredGroupIds.length === 0 && groups.length === 0) {
     return (
       <div className="flex flex-col gap-4 h-full">
         {!isSystemRole && (
@@ -229,7 +217,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
         customElement={isReadOnly ? undefined : addGroupButton}
       />
       <GroupTable
-        groups={filteredGroups}
+        groups={groups}
         isLoading={isFetching}
         rowCount={rowCount}
         pageIndex={pageIndex}
