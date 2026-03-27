@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useGetPermissions } from '@/app/services/api/permissions/clientRequests'
 import { useGetRoles } from '@/app/services/api/roles/clientRequests'
@@ -46,7 +46,6 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   const { getApiRequestParams } = useQueryParams()
   const [roleTemplate, setRoleTemplate] = useState<string | null>(null)
   const [checkedPermissionItems, setCheckedPermissionItems] = useState<PermissionItem[]>([])
-  const initializedForIds = useRef<string | null>(null)
   const [searchInput, setSearchInput] = useState<string>('')
 
   const rolesRequestParams = new URLSearchParams('readonly=true')
@@ -78,26 +77,26 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
 
   const categories = getUniqueCategories()
 
-  // Initialize checked items from pending permission IDs
-  const selectedPermissions = useMemo(() => {
+  // Sync checked items to reflect the visible permissions that are selected
+  const visibleSelectedPermissions = useMemo(() => {
     return permissions.filter(permission => pendingPermissionIds.includes(permission.value))
   }, [pendingPermissionIds, permissions])
 
   useEffect(() => {
-    if (permissions.length === 0) return
-    const idsKey = pendingPermissionIds.slice().sort().join(',')
-    if (initializedForIds.current === idsKey) return
-    initializedForIds.current = idsKey
-    setCheckedPermissionItems(selectedPermissions)
-  }, [pendingPermissionIds, selectedPermissions, permissions])
+    setCheckedPermissionItems(visibleSelectedPermissions)
+  }, [visibleSelectedPermissions])
 
-  // Sync checked items to parent
+  // Sync checked items to parent, preserving selections hidden by search filter
   const handleCheckedItemsChange = useCallback(
     (items: PermissionItem[]) => {
+      const visiblePermissionIds = new Set(permissions.map(p => p.value))
+      // Keep previously selected IDs that are not in the current visible (filtered) permissions list
+      const hiddenSelectedIds = pendingPermissionIds.filter(id => !visiblePermissionIds.has(id))
+      const newIds = [...items.map(item => item.value), ...hiddenSelectedIds]
       setCheckedPermissionItems(items)
-      onPendingPermissionIdsChange(items.map(item => item.value))
+      onPendingPermissionIdsChange(newIds)
     },
-    [onPendingPermissionIdsChange],
+    [onPendingPermissionIdsChange, permissions, pendingPermissionIds],
   )
 
   // When template is selected

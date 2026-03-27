@@ -176,7 +176,7 @@ Configured via `@ConfigurationProperties(prefix = "init")`. Local defaults are i
 |---|---|---|---|
 | `INIT_GROUPS_0_NAME` | yes | `Tenant Admins` | Group name |
 | `INIT_GROUPS_0_ROLENAME` | no | `Tenant Admin` | Role assigned to the group. Valid values: `Tenant Admin`, `Data Architect`, `Data Consumer`, `Data Steward`, `Data Owner`, `Data Gatekeeper` |
-| `INIT_GROUPS_0_SCOPETYPE` | no | `TENANT` | Assignment scope. Required for DATA/GOVERNANCE roles. Not needed for SYSTEM roles (e.g. Tenant Admin). Values: `TENANT`, `DATASET`, `DATASOURCE`, `DATASTRUCTURE` |
+| `INIT_GROUPS_0_SCOPETYPE` | no | `TENANT` | Assignment scope. Required for DATA roles. Not needed for SYSTEM roles (e.g. Tenant Admin). Values: `TENANT`, `DATASET`, `DATASOURCE`, `DATASTRUCTURE` |
 | `INIT_GROUPS_0_DESCRIPTION` | no | `Admin group` | Group description |
 
 **Users** (`init.users[]`):

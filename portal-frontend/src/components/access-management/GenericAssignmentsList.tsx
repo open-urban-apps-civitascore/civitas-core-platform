@@ -1,7 +1,7 @@
 'use client'
 
 import { AxiosError } from 'axios'
-import { InfoIcon, List, Plus, SquarePen, TriangleAlert } from 'lucide-react'
+import { InfoIcon, List, Plus, TriangleAlert } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
@@ -287,8 +287,7 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
 
   // Uncontrolled mode: full standalone UI
   const EditButton = (
-    <Button variant="outline" type="button" onClick={() => setIsReadOnlyInternal(false)}>
-      <SquarePen />
+    <Button type="button" onClick={() => setIsReadOnlyInternal(false)}>
       {tCommon('actions.edit')}
     </Button>
   )

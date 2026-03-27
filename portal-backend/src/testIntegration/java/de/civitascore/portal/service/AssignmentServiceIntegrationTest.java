@@ -458,50 +458,6 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
           .isInstanceOf(InvalidDataAccessApiUsageException.class)
           .hasMessageContaining("Only SYSTEM roles can have null scope");
     }
-
-    @Test
-    @DisplayName("Should succeed when GOVERNANCE role has non-null scopeType")
-    void shouldSucceedWhenGovernanceRoleHasNonNullScope() {
-      // Create GOVERNANCE role
-      RoleInputDTO governanceRoleInput = new RoleInputDTO();
-      governanceRoleInput.setName(
-          "test_governance_role_" + UUID.randomUUID().toString().substring(0, 8));
-      governanceRoleInput.setDescription("Test GOVERNANCE role");
-      governanceRoleInput.setRoleType(RoleType.GOVERNANCE);
-      Role governanceRole = roleService.create(governanceRoleInput);
-
-      AssignmentInputDTO input = new AssignmentInputDTO();
-      input.setGroupId(testGroup.getId());
-      input.setRoleId(governanceRole.getId());
-      input.setScopeType(ScopeType.TENANT);
-
-      Assignment assignment = assignmentService.create(input);
-
-      assertThat(assignment).isNotNull();
-      assertThat(assignment.getRole().getRoleType()).isEqualTo(RoleType.GOVERNANCE);
-      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.TENANT);
-    }
-
-    @Test
-    @DisplayName("Should fail when GOVERNANCE role has null scopeType")
-    void shouldFailWhenGovernanceRoleHasNullScope() {
-      // Create GOVERNANCE role
-      RoleInputDTO governanceRoleInput = new RoleInputDTO();
-      governanceRoleInput.setName(
-          "test_governance_role_" + UUID.randomUUID().toString().substring(0, 8));
-      governanceRoleInput.setDescription("Test GOVERNANCE role");
-      governanceRoleInput.setRoleType(RoleType.GOVERNANCE);
-      Role governanceRole = roleService.create(governanceRoleInput);
-
-      AssignmentInputDTO input = new AssignmentInputDTO();
-      input.setGroupId(testGroup.getId());
-      input.setRoleId(governanceRole.getId());
-      input.setScopeType(null);
-
-      assertThatThrownBy(() -> assignmentService.create(input))
-          .isInstanceOf(InvalidDataAccessApiUsageException.class)
-          .hasMessageContaining("Only SYSTEM roles can have null scope");
-    }
   }
 
   @Nested

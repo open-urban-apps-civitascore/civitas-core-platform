@@ -215,7 +215,7 @@ export const UserOverview = (props: UserOverviewProps) => {
       onConfirmClick={handleSave}
       isConfirmButtonDisabled={isSaveButtonDisabled}
       isCancelButtonDisabled={isCancelButtonDisabled}
-      cancelButtonTitle={tCommon('actions.exit')}
+      cancelButtonTitle={tCommon('actions.cancel')}
       hasCard={false}
       className="px-6 py-0"
       wrapperClassname="w-auto"

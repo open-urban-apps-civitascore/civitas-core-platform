@@ -2,11 +2,14 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.model.embedded.PermissionType;
 import de.civitascore.portal.model.embedded.RoleType;
+import de.civitascore.portal.model.entity.Permission;
 import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.model.output.RoleOutputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.GroupRepository;
+import de.civitascore.portal.repository.PermissionRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.service.AssignmentService;
@@ -15,6 +18,7 @@ import de.civitascore.portal.service.UserService;
 import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -42,6 +46,8 @@ class RoleControllerIntegrationTest
   @Autowired private UserService userService;
   @Autowired private UserRepository userRepository;
 
+  @Autowired private PermissionRepository permissionRepository;
+
   @Override
   protected String getEndpointPath() {
     return ROLES_ENDPOINT;
@@ -60,7 +66,7 @@ class RoleControllerIntegrationTest
     RoleInputDTO input = new RoleInputDTO();
     input.setName("test_role_" + UUID.randomUUID().toString().substring(0, 8));
     input.setDescription("A test role for integration testing");
-    input.setRoleType(RoleType.GOVERNANCE);
+    input.setRoleType(RoleType.DATA);
     return input;
   }
 
@@ -77,7 +83,7 @@ class RoleControllerIntegrationTest
     input.setName("updated_role");
     input.setName("Updated Role");
     input.setDescription("Updated description");
-    input.setRoleType(RoleType.GOVERNANCE);
+    input.setRoleType(RoleType.DATA);
     return input;
   }
 
@@ -94,6 +100,17 @@ class RoleControllerIntegrationTest
   @Override
   protected UUID getIdFromOutput(RoleOutputDTO output) {
     return output.getId();
+  }
+
+  private List<UUID> getPermissionIdsByType(PermissionType type) {
+    List<UUID> ids =
+        permissionRepository.findAll().stream()
+            .filter(p -> p.getPermissionType() == type)
+            .map(Permission::getId)
+            .limit(2)
+            .toList();
+    assertThat(ids).as("Expected seeded permissions of type " + type).isNotEmpty();
+    return ids;
   }
 
   @Nested
@@ -730,6 +747,118 @@ class RoleControllerIntegrationTest
       ResponseEntity<RoleOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Nested
+  @DisplayName("Permission Type Validation Tests")
+  class PermissionTypeValidationTests {
+
+    @Test
+    @DisplayName("Should reject creating DATA role with SYSTEM permissions")
+    void shouldRejectDataRoleWithSystemPermissions() {
+      RoleInputDTO input = createValidInput();
+      input.setRoleType(RoleType.DATA);
+      input.setPermissionIds(getPermissionIdsByType(PermissionType.SYSTEM));
+
+      ResponseEntity<RoleOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST for mismatched permission types")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject creating SYSTEM role with DATA permissions")
+    void shouldRejectSystemRoleWithDataPermissions() {
+      RoleInputDTO input = createValidInput();
+      input.setRoleType(RoleType.SYSTEM);
+      input.setPermissionIds(getPermissionIdsByType(PermissionType.DATA));
+
+      ResponseEntity<RoleOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST for mismatched permission types")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should create SYSTEM role with SYSTEM permissions successfully")
+    void shouldCreateSystemRoleWithSystemPermissions() {
+      RoleInputDTO input = createValidInput();
+      input.setRoleType(RoleType.SYSTEM);
+      input.setPermissionIds(getPermissionIdsByType(PermissionType.SYSTEM));
+
+      ResponseEntity<RoleOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CREATED for matching permission types")
+          .isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getPermissions()).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("Should create DATA role with DATA permissions successfully")
+    void shouldCreateDataRoleWithDataPermissions() {
+      RoleInputDTO input = createValidInput();
+      input.setRoleType(RoleType.DATA);
+      input.setPermissionIds(getPermissionIdsByType(PermissionType.DATA));
+
+      ResponseEntity<RoleOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CREATED for matching permission types")
+          .isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getPermissions()).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("Should reject updating role to add mismatched permissions")
+    void shouldRejectUpdateWithMismatchedPermissions() {
+      RoleInputDTO input = createValidInput();
+      input.setRoleType(RoleType.DATA);
+      ResponseEntity<RoleOutputDTO> createResponse = performCreate(input);
+      assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      UUID roleId = createResponse.getBody().getId();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("permissionIds", getPermissionIdsByType(PermissionType.SYSTEM));
+
+      ResponseEntity<RoleOutputDTO> patchResponse = performPatch(roleId, patchMap);
+
+      assertThat(patchResponse.getStatusCode())
+          .as("Should return BAD_REQUEST when patching with mismatched permissions")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should allow creating role with empty permissions list")
+    void shouldAllowEmptyPermissions() {
+      RoleInputDTO input = createValidInput();
+      input.setRoleType(RoleType.DATA);
+      input.setPermissionIds(Collections.emptyList());
+
+      ResponseEntity<RoleOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CREATED for empty permissions")
+          .isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    @DisplayName("Should allow creating role with null permissions")
+    void shouldAllowNullPermissions() {
+      RoleInputDTO input = createValidInput();
+      input.setRoleType(RoleType.SYSTEM);
+      input.setPermissionIds(null);
+
+      ResponseEntity<RoleOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CREATED for null permissions")
+          .isEqualTo(HttpStatus.CREATED);
     }
   }
 }

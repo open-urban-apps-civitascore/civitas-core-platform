@@ -240,16 +240,6 @@ class AssignmentTest {
     }
 
     @Test
-    @DisplayName("Should pass for GOVERNANCE role with non-null scopeType")
-    void shouldPassForGovernanceRoleWithScope() {
-      Assignment a = baseAssignment(RoleType.GOVERNANCE);
-      a.setScopeType(ScopeType.DATASTRUCTURE);
-      a.setDataStructure(newDataStructure());
-
-      assertThatNoException().isThrownBy(() -> invokeValidateBeforePersist(a));
-    }
-
-    @Test
     @DisplayName("Should fail for SYSTEM role with non-null scopeType")
     void shouldFailForSystemRoleWithScope() {
       Assignment a = baseAssignment(RoleType.SYSTEM);
@@ -265,17 +255,6 @@ class AssignmentTest {
     @DisplayName("Should fail for DATA role with null scopeType")
     void shouldFailForDataRoleWithNullScope() {
       Assignment a = baseAssignment(RoleType.DATA);
-      a.setScopeType(null);
-
-      assertThatIllegalStateException()
-          .isThrownBy(() -> invokeValidateBeforePersist(a))
-          .withMessageContaining("Only SYSTEM roles can have null scope");
-    }
-
-    @Test
-    @DisplayName("Should fail for GOVERNANCE role with null scopeType")
-    void shouldFailForGovernanceRoleWithNullScope() {
-      Assignment a = baseAssignment(RoleType.GOVERNANCE);
       a.setScopeType(null);
 
       assertThatIllegalStateException()

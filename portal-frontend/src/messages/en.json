@@ -68,12 +68,12 @@
       "role": "Role",
       "roles": "Roles",
       "datasets": "Datasets",
-      "dataspaces": "Dataspaces",
+      "dataspaces": "Data spaces",
       "permissions": "Permissions",
-      "datasources": "Datasources",
-      "datasource": "Datasource",
-      "datastructures": "Datastructures",
-      "datastructure": "Datastructure",
+      "datasources": "Data sources",
+      "datasource": "Data source",
+      "datastructures": "Data structures",
+      "datastructure": "Data structure",
       "datastructureVersion": "Version",
       "assignments": "Assignments"
     },
@@ -99,9 +99,9 @@
       "READY": "Ready"
     },
     "exitModal": {
-      "title": "Vor dem Beenden speichern?",
-      "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
-      "discard": "Verwerfen"
+      "title": "Save before exiting?",
+      "description": "There is unsaved information. \"Discard\" cannot be undone.",
+      "discard": "Discard"
     },
     "deletionWarningModal": {
       "title": "Delete {item}?",
@@ -159,51 +159,51 @@
       }
     },
     "infoBoxes": {
-      "firstBox": "Groups with platform-wide permissions on all data objects have access.",
+      "firstBox": "Groups with platform-wide permissions on all Data-related elements have access.",
       "secondBox": "By removing your own group-role assignment, you may lose your permissions."
     },
     "messages": {
       "updateSuccess": "Permissions have been successfully updated.",
       "groupsWithoutRoles": "Groups without assigned roles have not been saved.",
-      "updateErrorNotDraft": "Permissions can only be updated when the dataset is in draft status."
+      "updateErrorNotDraft": "Permissions can only be updated when the Dataset is in draft status."
     }
   },
   "sidebar": {
     "home": "Home",
-    "menu-item": "Menu Item",
-    "sub-item": "Sub Item",
-    "data-catalog": "Data Catalog",
+    "menu-item": "Menu item",
+    "sub-item": "Sub item",
+    "data-catalog": "Data catalog",
     "all-datasets": "All Datasets",
     "documentation": "Documentation",
     "logout": "Log out",
     "platform": "Platform",
     "admin": "Admin",
     "help": "Help",
-    "ourData": "Our Data",
+    "ourData": "Our data",
     "datasets": "Datasets",
     "permissions": "Permissions",
     "roles": "Roles",
-    "create": "create",
-    "createVersion": "New Version",
-    "edit": "edit",
+    "create": "Create",
+    "createVersion": "New version",
+    "edit": "Edit",
     "users": "User",
     "groups": "Groups",
-    "dataspaces": "Data Spaces",
-    "tenants": "Tenant Management",
-    "uml-modeler": "UML Modeler",
-    "data-flow": "Data Flow",
-    "table-editor": "Table Editor",
-    "pipeline-editor": "Pipeline Editor",
-    "data-management": "Data-Management",
-    "datasources": "Datasources",
-    "datastructures": "Datastructures",
-    "access-management": "Access Management"
+    "dataspaces": "Data spaces",
+    "tenants": "Tenant management",
+    "uml-modeler": "UML modeler",
+    "data-flow": "Data flow",
+    "table-editor": "Table editor",
+    "pipeline-editor": "Pipeline editor",
+    "data-management": "Data management",
+    "datasources": "Data sources",
+    "datastructures": "Data structures",
+    "access-management": "Access management"
   },
   "datasets": {
     "title": "Datasets",
-    "subtitle": "All available datasets of our organization",
+    "subtitle": "All available Datasets of our organization",
     "searchDatasets": "Search Datasets",
-    "newDataset": "New Dataset",
+    "newDataset": "Create Dataset",
     "tableHeaders": {
       "name": "Name",
       "createdBy": "Created by",
@@ -219,7 +219,7 @@
     },
     "create": {
       "title": "New Dataset",
-      "subtitle": "New datasets are only visible internally.",
+      "subtitle": "New Datasets are only visible internally.",
       "form": {
         "title": "Basic Information",
         "subtitle": "The name can be adjusted later.",
@@ -237,17 +237,23 @@
         "title": "Creation Progress",
         "accessManagement": {
           "title": "Access Management",
-          "button": "Edit groups and roles",
+          "button": {
+            "readOnly": "View Groups and Roles",
+            "editable": "Edit Groups and Roles"
+          },
           "assignments": "Groups and Roles",
           "noAssignments": "No groups or roles available",
           "groups": "Groups",
           "roles": "Roles",
           "openDataAccess": "Open Data",
-          "openDataAccessHint": "Allow access to this dataset’s payload data without authentication."
+          "openDataAccessHint": "Allow access to this Dataset’s payload data without authentication."
         },
         "dataFlow": {
           "title": "Data flow",
-          "button": "Load and provide data",
+          "button": {
+            "readOnly": "View Data flow",
+            "editable": "Edit Data flow"
+          },
           "pipelines": "Pipeline",
           "sensorThingsAPI": "SensorThings API",
           "noDataFlow": "No data flow available yet."
@@ -255,27 +261,27 @@
       }
     },
     "dataMode": {
-      "selectMode": "In which mode would you like to create the dataset?",
+      "selectMode": "In which mode would you like to create the Dataset?",
       "tableEditor": "Table Editor",
       "pipelineEditor": "Pipeline Editor",
-      "tableDescription": "An interface oriented towards Excel workflows. For datasets with a clear data flow – based on file imports, few data sources, few transformations, …",
-      "pipelineDescription": "An interface oriented towards node based programming. For datasets with a complex data flow – based on many data sources, many transformations, …"
+      "tableDescription": "An interface oriented towards Excel workflows. For Datasets with a clear data flow – based on file imports, few Data sources, few transformations, …",
+      "pipelineDescription": "An interface oriented towards node based programming. For Datasets with a complex data flow – based on many Data sources, many transformations, …"
     },
     "messages": {
       "createSuccess": "Dataset has been successfully created.",
       "updateSuccess": "Dataset has been successfully updated.",
       "deleteSuccess": "Dataset has been successfully deleted.",
-      "deleteError": "An error occurred while deleting the dataset. Please try again.",
+      "deleteError": "An error occurred while deleting the Dataset. Please try again.",
       "updateAccessManagementSuccess": "Access management has been successfully updated.",
       "publishSuccess": "Dataset has been successfully published.",
       "unpublishSuccess": "Dataset has been successfully unpublished.",
       "releaseSuccess": "Dataset has been successfully released.",
       "unreleaseSuccess": "Dataset has been successfully unreleased.",
-      "transitionError": "An error occurred while changing the dataset status. Please try again."
+      "transitionError": "An error occurred while changing the Dataset status. Please try again."
     },
     "warningModal": {
-      "title": "Delete dataset?",
-      "description": "This action cannot be undone. This will permanently delete the dataset and all associated data.",
+      "title": "Delete Dataset?",
+      "description": "This action cannot be undone. This will permanently delete the Dataset and all associated data.",
       "confirm": "Delete"
     }
   },
@@ -325,8 +331,8 @@
       "segments": {
         "platformWide": "Platform-wide",
         "datasets": "Datasets",
-        "datasources": "Data Sources",
-        "datastructures": "Data Structures"
+        "datasources": "Data sources",
+        "datastructures": "Data structures"
       },
       "columns": {
         "name": "Name",
@@ -347,9 +353,9 @@
         "platform": "Platform"
       },
       "scopedInfoBanner": {
-        "dataset": "Dataset-related assignments are made at the respective dataset.",
-        "datasource": "Datasource-related assignments are made at the respective datasource.",
-        "datastructure": "Datastructure-related assignments are made at the respective datastructure."
+        "dataset": "Dataset-related assignments are made at the respective Dataset.",
+        "datasource": "Data source-related assignments are made at the respective Data source.",
+        "datastructure": "Data structure-related assignments are made at the respective Data structure."
       }
     },
     "groupsTab": {
@@ -399,12 +405,12 @@
       "scopeTabs": {
         "platform": "Platform-wide",
         "datasets": "Datasets",
-        "datasources": "Datasources",
-        "datastructures": "Datastructures"
+        "datasources": "Data sources",
+        "datastructures": "Data structures"
       },
       "scopePlatform": "Platform",
-      "addRole": "Add role",
-      "systemRole": "System role",
+      "addRole": "Add Role",
+      "systemRole": "System Role",
       "dataRole": "Data role",
       "noRoles": "No Roles",
       "noRolesDescription": "No roles assigned to the group",
@@ -414,11 +420,11 @@
       "assignSystemRoleDescription": "to group {groupName}",
       "assignDataRole": "Add data role",
       "assignDataRoleDescription": "to group {groupName}",
-      "dataRolePlatformWarning": "Roles assigned here authorize the group platform-wide (permissions on all data objects of the platform).",
+      "dataRolePlatformWarning": "Roles assigned here authorize the group platform-wide (permissions on all Data-related elements of the platform).",
       "scopedInfoBanner": {
-        "DATASET": "Dataset-related assignments are made at the respective dataset.",
-        "DATASOURCE": "Datasource-related assignments are made at the respective datasource.",
-        "DATASTRUCTURE": "Datastructure-related assignments are made at the respective datastructure."
+        "DATASET": "Dataset-related assignments are made at the respective Dataset.",
+        "DATASOURCE": "Data source-related assignments are made at the respective Data source.",
+        "DATASTRUCTURE": "Data structure-related assignments are made at the respective Data structure."
       },
       "columns": {
         "name": "Name",
@@ -491,10 +497,10 @@
     },
     "form": {
       "inputs": {
-        "name": "Data Space Name",
-        "description": "Data Space Description",
-        "protected": "Protect Data Space",
-        "protectedDescription": "Protected Data Spaces require elevated permissions for access"
+        "name": "Data space name",
+        "description": "Data space description",
+        "protected": "Protect Data space",
+        "protectedDescription": "Protected Data spaces require elevated permissions for access"
       }
     }
   },
@@ -513,7 +519,7 @@
     },
     "dataPermissions": {
       "title": "Data Permissions",
-      "description": "Data permissions control access to data objects on the platform.\nThey are grouped into data roles and assigned to groups within a specific scope."
+      "description": "Data permissions control access to Data-related elements on the platform.\nThey are grouped into data roles and assigned to groups within a specific scope."
     },
     "actions": {
       "read": "Read",
@@ -533,8 +539,8 @@
       "ASSIGNMENT": "Assignment",
       "DATASET": "Dataset",
       "DATASET_PAYLOAD": "Dataset Payload",
-      "DATASOURCE": "Datasource",
-      "DATASTRUCTURE": "Datastructure",
+      "DATASOURCE": "Data source",
+      "DATASTRUCTURE": "Data structure",
       "GROUP": "Group",
       "PERMISSION": "Permission",
       "ROLE": "Role",
@@ -618,8 +624,8 @@
       "dataPermissions": {
         "dataset": "Dataset",
         "datasetPayload": "Dataset Payload",
-        "datasource": "Datasource",
-        "datastructure": "Datastructure",
+        "datasource": "Data source",
+        "datastructure": "Data structure",
         "read": "Read",
         "create": "Create",
         "update": "Update",
@@ -647,19 +653,19 @@
       "scopeTabs": {
         "platformWide": "Platform-wide",
         "dataset": "Dataset",
-        "datasource": "Data Source",
-        "datastructure": "Data Structure"
+        "datasource": "Data source",
+        "datastructure": "Data structure"
       },
       "scopeLabels": {
         "TENANT": "Platform-wide",
         "DATASET": "Dataset",
-        "DATASOURCE": "Data Source",
-        "DATASTRUCTURE": "Data Structure"
+        "DATASOURCE": "Data source",
+        "DATASTRUCTURE": "Data structure"
       },
-      "infoBox": "Groups that are assigned here, get the type 'platform-wide' (permissions to all data objects inside the platform)",
-      "scopeReadOnlyMessageDATASET": "Dataset-related assignments happen at the corresponding dataset",
-      "scopeReadOnlyMessageDATASOURCE": "Datasource-related assignments happen at the corresponding datasource",
-      "scopeReadOnlyMessageDATASTRUCTURE": "Datastructure-related assignments happen at the corresponding datastructure",
+      "infoBox": "Groups that are assigned here, get the type 'platform-wide' (permissions to all Data-related elements inside the platform)",
+      "scopeReadOnlyMessageDATASET": "Dataset-related assignments happen at the corresponding Dataset",
+      "scopeReadOnlyMessageDATASOURCE": "Data source-related assignments happen at the corresponding Data source",
+      "scopeReadOnlyMessageDATASTRUCTURE": "Data structure-related assignments happen at the corresponding Data structure",
       "modal": {
         "title": "Add Group",
         "description": "to Role {roleName}",
@@ -679,9 +685,9 @@
     }
   },
   "datasources": {
-    "title": "Overview: Data Sources",
-    "subtitle": "All data sources available in our tenant.",
-    "newDatasource": "Create Data Source",
+    "title": "Overview: Data sources",
+    "subtitle": "All Data sources available in our tenant.",
+    "newDatasource": "Create Data source",
     "tableHeaders": {
       "name": "Name",
       "description": "Description",
@@ -696,18 +702,18 @@
       "AVAILABLE": "Available"
     },
     "deleteModal": {
-      "title": "Really delete data source?",
-      "description": "This action will permanently delete the data source. This action cannot be undone."
+      "title": "Really delete Data source?",
+      "description": "This action will permanently delete the Data source. This action cannot be undone."
     },
     "availableModal": {
       "title": "Data source cannot be deleted",
-      "description": "This data source has the status \"Available\" and cannot be deleted. Please set it to \"Draft\" first."
+      "description": "This Data source has the status \"Available\" and cannot be deleted. Please set it to \"Draft\" first."
     },
     "errors": {
       "invalidDsn": "Enter a valid URI (e.g. postgres://host:5432/db)",
       "invalidBrokerUrl": "Enter a valid broker URL (e.g. tcp://broker:1883)",
-      "creationError": "An error occurred while creating the data source.",
-      "updateError": "An error occurred while updating the data source.",
+      "creationError": "An error occurred while creating the Data source.",
+      "updateError": "An error occurred while updating the Data source.",
       "groupsWithoutRoles": "Groups with no assigned roles have not been saved."
     },
     "connection": {
@@ -716,8 +722,8 @@
       "static": "static"
     },
     "create": {
-      "title": "New Data Source",
-      "subtitle": "New data sources are only visible internally.",
+      "title": "New Data source",
+      "subtitle": "New Data sources are only visible internally.",
       "basicInfo": {
         "title": "Base Information",
         "subtitle": "The name can be changed later."
@@ -732,13 +738,13 @@
     "tabs": {
       "basicInfo": "Base Information",
       "connector": "Connector",
-      "dataStructure": "Data Structure",
+      "dataStructure": "Data structure",
       "accessManagement": "Access Management",
-      "dataspaces": "Data Spaces"
+      "dataspaces": "Data spaces"
     },
     "form": {
       "name": "Name",
-      "namePlaceholder": "Name of the data source",
+      "namePlaceholder": "Name of the Data source",
       "description": "Description"
     },
     "exitModal": {
@@ -756,12 +762,12 @@
     },
     "dataModel": {
       "placeholder": {
-        "title": "No data structure imported",
-        "description1": "Import an existing data structure from the platform to use it in this data source.",
-        "noDatastructures": "Don't have a data structure yet?",
+        "title": "No Data structure imported",
+        "description1": "Import an existing Data structure from the platform to use it in this Data source.",
+        "noDatastructures": "Don't have a Data structure yet?",
         "creationSteps": {
-          "step1": "Save this data source as draft",
-          "step2": "Create a data structure in <link>Data Structures</link>",
+          "step1": "Save this Data source as draft",
+          "step2": "Create a Data structure in <link>Data structures</link>",
           "step3": "Return here and import it"
         }
       },
@@ -772,14 +778,14 @@
     },
     "accessManagementTab": {
       "infoBoxes": {
-        "firstBox": "Groups that have platform-wide permissions on all data objects have access to this data source."
+        "firstBox": "Groups that have platform-wide permissions on all Data-related elements have access to this Data source."
       }
     }
   },
   "datastructures": {
-    "title": "Overview: Data Structures",
-    "subtitle": "All data sources available in our tenant.",
-    "newDatasource": "Create Data Structure",
+    "title": "Overview: Data structures",
+    "subtitle": "All Data sources available in our tenant.",
+    "newDatasource": "Create Data structure",
     "newVersion": "Create version",
 
     "tableHeaders": {
@@ -790,8 +796,8 @@
       "status": "Status"
     },
     "create": {
-      "title": "New Data Structure",
-      "subtitle": "New data structures are only visible internally.",
+      "title": "New Data structure",
+      "subtitle": "New Data structures are only visible internally.",
       "basicInfo": {
         "title": "Base Information",
         "subtitle": "The name can be changed later."
@@ -799,7 +805,7 @@
     },
     "form": {
       "name": "Name",
-      "namePlaceholder": "Name of the data structure",
+      "namePlaceholder": "Name of the Data structure",
       "description": "Description"
     },
     "tabs": {
@@ -816,16 +822,16 @@
     "messages": {
       "createSuccess": "Data structure has been successfully created.",
       "updateSuccess": "Data structure  has been successfully updated.",
-      "isInUseStatusHint": "Can not be set to draft since this datastructure is already in use."
+      "isInUseStatusHint": "Can not be set to draft since this Data structure is already in use."
     },
     "errors": {
-      "deletionError": "An error occurred while deleting the datastructure.",
-      "creationError": "An error occurred while creating the datastructure.",
+      "deletionError": "An error occurred while deleting the Data structure.",
+      "creationError": "An error occurred while creating the Data structure.",
       "groupsWithoutRoles": "Groups with no assigned roles have not been saved."
     },
     "infoModal": {
-      "title": "Datenstructure can not be deleted",
-      "description": "This Datenstructure is in use and can therefore not be deleted."
+      "title": "Data structure can not be deleted",
+      "description": "This Data structure is in use and can therefore not be deleted."
     },
     "unsavedChangesModal": {
       "title": "Unsaved Changes",
@@ -833,18 +839,18 @@
     },
     "accessManagementTab": {
       "infoBoxes": {
-        "firstBox": "Via the groups-roles-assignments, permissions are assigned to this data structure to allow the usage in datasets and datasources."
+        "firstBox": "Via the groups-roles-assignments, permissions are assigned to this Data structure to allow the usage in Datasets and Data sources."
       }
     }
   },
-  "datastructureVersion": {
-    "title": "New Version",
+  "datastructureVersions": {
+    "newVersion": "New Version",
     "tabs": {
-      "structure": "Strukturdefinition",
-      "versionInfo": "Versionsinformationen"
+      "structure": "Structure Definition",
+      "versionInfo": "Version Information"
     },
     "versionInfo": {
-      "title": "Version Informationen",
+      "title": "Version Information",
       "versionNumber": "Version Number",
       "versionNumberPlaceholder": "e. g. 1.0",
       "description": "Version Description",
@@ -854,15 +860,15 @@
       "OWN": "Own"
     },
     "messages": {
-      "createSuccess": "The version of the data structure has been successfully created.",
+      "createSuccess": "The version of the Data structure has been successfully created.",
       "updateSuccess": "The version of the data has been successfully updated.",
       "isInUseModelHint": "The data model can not be edited since it is already in use.",
       "isInUseStatusHint": "Can not be set to draft since this version is already in use.",
-      "isLastAvailableVersion": "Can not be set to draft because this is the last available version in an available datastructure. Set the datastructure to draft first."
+      "isLastAvailableVersion": "Can not be set to draft because this is the last available version in an available Data structure. Set the Data structure to draft first."
     },
     "errors": {
-      "creationError": "An error occurred while creating the datastructure version.",
-      "versionAlreadyExists": "A version with the same version number already exists in this data structure."
+      "creationError": "An error occurred while creating the Data structure version.",
+      "versionAlreadyExists": "A version with the same version number already exists in this Data structure."
     }
   },
   "pipelineEditor": {
@@ -882,7 +888,7 @@
     "nodeTypes": {
       "start": "Start",
       "end": "End",
-      "dataSource": "Data Source",
+      "dataSource": "Data source",
       "apiRequest": "API Request",
       "apiResponse": "API Response",
       "cronTrigger": "CRON Trigger",
@@ -904,8 +910,8 @@
       "flowStartDesc": "Pipeline entry point. Execution starts here.",
       "flowEnd": "Flow End",
       "flowEndDesc": "Pipeline exit point. Execution ends here.",
-      "dataSource": "Data Source",
-      "dataSourceDesc": "Data source. Select a configured data source.",
+      "dataSource": "Data source",
+      "dataSourceDesc": "Data source. Select a configured Data source.",
       "apiRequest": "API Request",
       "apiRequestDesc": "REST API request trigger. Creates endpoint that serves data on HTTP request.",
       "apiResponse": "API Response",
@@ -919,7 +925,7 @@
     },
     "controlPanel": {
       "entryPoint": "Pipeline Entry Point",
-      "entryPointDesc": "The Start node marks where the pipeline execution begins. Connect it to a trigger or data source node to define how the pipeline is activated.",
+      "entryPointDesc": "The Start node marks where the pipeline execution begins. Connect it to a trigger or Data source node to define how the pipeline is activated.",
       "exitPoint": "Pipeline Exit Point",
       "exitPointDesc": "The End node marks where the pipeline execution completes. All data flow paths should eventually lead to this node.",
       "nodeInformation": "Node Information",
@@ -935,15 +941,15 @@
       "currentExpression": "Current Expression"
     },
     "dataSourcePanel": {
-      "label": "Data Source",
-      "placeholder": "Select a datasource...",
-      "details": "Data Source Details",
+      "label": "Data source",
+      "placeholder": "Select a Data source...",
+      "details": "Data source details",
       "connector": "Connector",
       "connection": "Connection",
       "status": "Status",
       "description": "Description",
       "tags": "Tags",
-      "showDataStructure": "Show Data Structure"
+      "showDataStructure": "Show Data structure"
     },
     "apiPanel": {
       "requestDetails": "API Request Details",

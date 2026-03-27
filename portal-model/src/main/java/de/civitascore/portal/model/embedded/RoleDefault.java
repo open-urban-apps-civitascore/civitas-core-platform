@@ -101,7 +101,7 @@ public enum RoleDefault {
   DATA_GATEKEEPER(
       "Data Gatekeeper",
       "Responsibility for data protection and data governance.",
-      RoleType.GOVERNANCE,
+      RoleType.DATA,
       PermissionName.DATASET_READ,
       PermissionName.DATASET_RELEASE,
       PermissionName.DATASET_PAYLOAD_READ,

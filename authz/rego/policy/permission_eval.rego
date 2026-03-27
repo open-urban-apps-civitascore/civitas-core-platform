@@ -155,7 +155,7 @@ has_permission if {
 # endpoints per ADM spec. DATASPACE → child resource inheritance is deferred
 # (dataspaces not implemented in v2.0).
 
-# For collection endpoints with TENANT-scoped assignments (DATA/GOVERNANCE roles)
+# For collection endpoints with TENANT-scoped assignments (DATA roles)
 user_has_permission(permission) if {
 	resource_mapping.is_collection_endpoint
 	some group in user_context_fetcher.user_context.groups
