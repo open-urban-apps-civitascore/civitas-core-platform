@@ -40,7 +40,9 @@ vi.mock('@/hooks/use-query-params', () => ({
 }))
 
 vi.mock('./GroupsTable', () => ({
-  GroupsTable: () => <div data-testid="groups-table" />,
+  GroupsTable: (props: { onDeleteGroupClick?: unknown }) => (
+    <div data-testid="groups-table" data-has-delete={!!props.onDeleteGroupClick} />
+  ),
 }))
 
 const defaultProps = {
@@ -78,5 +80,17 @@ describe('GroupsList permission gating', () => {
     mockCurrentUser([])
     renderComponent()
     expect(screen.queryByText('newGroup')).not.toBeInTheDocument()
+  })
+
+  it('passes delete handler to GroupsTable when user has GROUP_DELETE permission', () => {
+    mockCurrentUser([PERMISSION_NAMES.GROUP_DELETE])
+    renderComponent()
+    expect(screen.getByTestId('groups-table')).toHaveAttribute('data-has-delete', 'true')
+  })
+
+  it('does not pass delete handler when user lacks GROUP_DELETE permission', () => {
+    mockCurrentUser([])
+    renderComponent()
+    expect(screen.getByTestId('groups-table')).toHaveAttribute('data-has-delete', 'false')
   })
 })
