@@ -872,6 +872,7 @@
     }
   },
   "pipelineEditor": {
+    "title": "Pipeline Editor",
     "canvas": {
       "noPipeline": "No pipeline available"
     },
@@ -1003,6 +1004,11 @@
       "deletePipeline": "Delete Pipeline",
       "deleteConfirmTitle": "Delete Pipeline?",
       "deleteConfirmDescription": "Are you sure you want to delete this pipeline? This action cannot be undone."
+    },
+    "header": {
+      "saveAll": "Save All",
+      "savingAll": "Saving...",
+      "exit": "Exit"
     },
     "tabs": {
       "closeTab": "Close tab",

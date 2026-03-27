@@ -110,6 +110,12 @@ export interface ActivePipelineContextValue {
   isDeleting: boolean
   /** Whether pipelines are being loaded from the backend */
   isLoadingPipelines: boolean
+  /** Save all dirty pipelines across all tabs */
+  saveAllPipelines: () => Promise<void>
+  /** Whether a save-all operation is currently in progress */
+  isSavingAll: boolean
+  /** Whether any session has unsaved changes */
+  hasAnyDirtySession: boolean
 
   // ===== Session Info =====
   /** ID of the active session */

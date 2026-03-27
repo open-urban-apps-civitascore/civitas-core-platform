@@ -384,6 +384,42 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   // ===== Loading State =====
   const isLoadingPipelines = pipelinesQuery.isLoading
 
+  // ===== Cross-session state =====
+  const hasAnyDirtySession = useMemo(() => sessionManager.sessions.some(s => s.isDirty), [sessionManager.sessions])
+
+  const [isSavingAll, setIsSavingAll] = useState(false)
+
+  const saveAllPipelines = useCallback(async () => {
+    const dirtySessions = sessionManager.sessions.filter(s => s.isDirty)
+    if (dirtySessions.length === 0) return
+
+    setIsSavingAll(true)
+    try {
+      await Promise.all(
+        dirtySessions.map(async session => {
+          const payload = buildPipelinePayload(session.pipeline)
+          const pipelineId = session.pipeline.id
+
+          if (pipelineId) {
+            await updatePipelineMutation.mutateAsync({ pipelineId, data: payload })
+            sessionManager.markSessionClean(session.id)
+          } else {
+            const response = await createPipelineMutation.mutateAsync(payload)
+            const updatedPipeline: Pipeline = {
+              ...session.pipeline,
+              id: response.data.id,
+              isDirty: false,
+            }
+            sessionManager.updateSessionPipeline(session.id, updatedPipeline)
+            sessionManager.markSessionClean(session.id)
+          }
+        }),
+      )
+    } finally {
+      setIsSavingAll(false)
+    }
+  }, [sessionManager, createPipelineMutation, updatePipelineMutation])
+
   // ===== Context Value =====
   const contextValue: ActivePipelineContextValue = useMemo(
     () => ({
@@ -434,6 +470,11 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       isDeleting,
       isLoadingPipelines,
 
+      // Cross-session operations
+      saveAllPipelines,
+      isSavingAll,
+      hasAnyDirtySession,
+
       // Session info
       activeSessionId: activeSession?.id || null,
     }),
@@ -469,6 +510,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       deletePipeline,
       isDeleting,
       isLoadingPipelines,
+      saveAllPipelines,
+      isSavingAll,
+      hasAnyDirtySession,
     ],
   )
 
