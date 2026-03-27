@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { usePermissions } from '@/hooks/use-permissions'
+
 import { GroupAssignmentTab } from './GroupAssignmentTab'
 
 vi.mock('next-intl', () => ({
@@ -21,10 +23,7 @@ vi.mock('@/app/services/api/groups/clientRequests', () => ({
 }))
 
 vi.mock('@/hooks/use-permissions', () => ({
-  usePermissions: () => ({
-    hasPermission: (perm: string) => perm === 'ASSIGNMENT_CREATE',
-    hasAnyPermission: () => false,
-  }),
+  usePermissions: vi.fn(),
 }))
 
 const defaultProps = {
@@ -39,6 +38,11 @@ const defaultProps = {
 describe('GroupAssignmentTab permission gating', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(usePermissions).mockReturnValue({
+      hasPermission: (perm: string) => perm === 'ASSIGNMENT_CREATE',
+      hasAnyPermission: () => false,
+      hasScopedPermission: () => false,
+    })
   })
 
   it('hides add-group button in read-only mode even on tenant scope', () => {
@@ -56,6 +60,16 @@ describe('GroupAssignmentTab permission gating', () => {
     // Switch to dataset scope tab
     const datasetTab = screen.getByText('roles.groupAssignmentTab.scopeTabs.dataset')
     fireEvent.click(datasetTab)
+    expect(screen.queryByText('addGroup')).not.toBeInTheDocument()
+  })
+
+  it('hides add-group button in edit mode when user lacks ASSIGNMENT_CREATE', () => {
+    vi.mocked(usePermissions).mockReturnValue({
+      hasPermission: () => false,
+      hasAnyPermission: () => false,
+      hasScopedPermission: () => false,
+    })
+    render(<GroupAssignmentTab {...defaultProps} isReadOnly={false} />)
     expect(screen.queryByText('addGroup')).not.toBeInTheDocument()
   })
 })
