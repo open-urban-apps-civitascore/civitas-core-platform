@@ -44,7 +44,8 @@ setup('sweep stale e2e data', async () => {
   }
 
   const isE2eName = (name?: string) => !!name && (name.startsWith('e2e-') || name.startsWith('E2E-'))
-  const isE2eEmail = (item: { email?: string }) => !!item.email && item.email.endsWith('@e2e.civitas.dev')
+  const isE2eEmail = (item: { id: string; name?: string; email?: string }) =>
+    !!item.email && item.email.endsWith('@e2e.civitas.dev')
 
   // --- 1. Datasets (before datasources — pipelines reference datasources) ---
   const datasets = await fetchE2eItems(
