@@ -1,6 +1,6 @@
 'use client'
 
-import { PaginationState, Row, SortingState } from '@tanstack/react-table'
+import { Row } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -14,6 +14,7 @@ import { SegmentedControlBar, Tab } from '@/components/segmented-control-bar/Seg
 import { AlertBox, InfoBox } from '@/components/text-box/TextBox'
 import { Button } from '@/components/ui/button'
 import { usePermissions } from '@/hooks/use-permissions'
+import { useQueryParams } from '@/hooks/use-query-params'
 import { type Assignment, ASSIGNMENT_SCOPE_TYPES, type AssignmentScope } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Group } from '@/types/groups'
@@ -55,19 +56,47 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const router = useRouter()
   const { hasPermission } = usePermissions()
   const canCreateAssignment = hasPermission(PERMISSION_NAMES.ASSIGNMENT_CREATE)
-  const [searchInput, setSearchInput] = useState<string>('')
-  const [pageIndex, setPageIndex] = useState(0)
-  const [pageSize, setPageSize] = useState(10)
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'title', desc: false }])
-  const [totalPages, setTotalPages] = useState<number>(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedScope, setSelectedScope] = useState<AssignmentScope>(ASSIGNMENT_SCOPE_TYPES.TENANT)
   const [groupToRemove, setGroupToRemove] = useState<GroupTableRow | null>(null)
+  const {
+    pageIndex,
+    pageSize,
+    sorting,
+    search,
+    totalPages,
+    setTotalPages,
+    setPaginationParams,
+    setSortingParams,
+    setSearchParam,
+    getApiRequestParams,
+  } = useQueryParams()
 
-  const groupRequestIds = selectedGroupIds.join(',')
-  const requestParams = new URLSearchParams(`size=${pageSize}&page=${pageIndex}&id=${groupRequestIds}`)
+  const getGroupRequestIds = () => {
+    if (selectedScope === ASSIGNMENT_SCOPE_TYPES.TENANT) return selectedGroupIds.join(',')
+    else {
+      const scopeAssignments = initialAssignments.filter(assignment => assignment.scopeType === selectedScope)
+      const scopeAssignmentGroupIds = scopeAssignments.map(assignment => assignment.group.id)
+      return scopeAssignmentGroupIds.join(',')
+    }
+  }
 
-  const { data: groupsData, isFetching } = useGetGroups({ params: requestParams })
+  const groupRequestIds = getGroupRequestIds()
+  const requestParams = useMemo(() => {
+    const requestParams = getApiRequestParams({ pageIndex, pageSize, sorting, search })
+    if (!!groupRequestIds) requestParams.set('id', groupRequestIds)
+    return requestParams
+  }, [getApiRequestParams, groupRequestIds, pageIndex, pageSize, sorting, search])
+
+  const { data: groupsData, isFetching } = useGetGroups({
+    params: requestParams,
+  })
+
+  const rowCount = groupsData?.totalElements || 0
+
+  useEffect(() => {
+    setTotalPages(Math.ceil(rowCount / pageSize))
+  }, [rowCount, pageSize, setTotalPages])
 
   // Build a map from group ID to scopeType from assignments
   const groupScopeMap = useMemo(() => {
@@ -94,34 +123,6 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
       scopeType: groupScopeMap[group.id],
     })) as GroupTableRow[]
   }, [groupsData?.data, scopeFilteredGroupIds, groupScopeMap])
-
-  const filteredGroups = useMemo(() => {
-    if (!searchInput) {
-      return groups
-    }
-    return groups.filter(
-      group =>
-        group.name.toLowerCase().includes(searchInput.toLowerCase()) ||
-        group.contactUser?.name.toLowerCase().includes(searchInput.toLowerCase()) ||
-        group.description.toLowerCase().includes(searchInput.toLowerCase()),
-    )
-  }, [searchInput, groups])
-
-  const rowCount = groups.length
-
-  useEffect(() => {
-    setTotalPages(Math.ceil(rowCount / pageSize))
-  }, [rowCount, pageSize, setTotalPages])
-
-  // Reset pagination when scope changes
-  useEffect(() => {
-    setPageIndex(0)
-  }, [selectedScope])
-
-  const handlePagination = (newPagination: PaginationState) => {
-    setPageIndex(newPagination.pageIndex)
-    setPageSize(newPagination.pageSize)
-  }
 
   const onRowClick = (row: Row<GroupTableRow>) => {
     router.push(`/groups/${row.original.id}`)
@@ -156,7 +157,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   }
 
   // No data state
-  if (!isFetching && scopeFilteredGroupIds.length === 0 && filteredGroups.length === 0) {
+  if (!isFetching && scopeFilteredGroupIds.length === 0 && groups.length === 0) {
     return (
       <div className="flex flex-col gap-4 h-full">
         {!isSystemRole && (
@@ -168,8 +169,8 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
         )}
 
         <SearchHeader
-          searchString={searchInput}
-          onChangeSearchString={setSearchInput}
+          searchString={search}
+          onChangeSearchString={setSearchParam}
           customElement={isReadOnly ? undefined : addGroupButton}
         />
 
@@ -199,19 +200,19 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
       )}
 
       <SearchHeader
-        searchString={searchInput}
-        onChangeSearchString={setSearchInput}
+        searchString={search}
+        onChangeSearchString={setSearchParam}
         customElement={isReadOnly ? undefined : addGroupButton}
       />
       <GroupTable
-        groups={filteredGroups}
+        groups={groups}
         isLoading={isFetching}
         rowCount={rowCount}
         pageIndex={pageIndex}
         pageSize={pageSize}
-        onPaginationChange={handlePagination}
+        onPaginationChange={setPaginationParams}
         sorting={sorting}
-        onSortingChange={setSorting}
+        onSortingChange={setSortingParams}
         totalPages={totalPages}
         onRowClick={canEdit ? undefined : onRowClick}
         isEditMode={canEdit}
