@@ -8,6 +8,7 @@ import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Input DTO for creating and updating pipeline resources. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class PipelineInputDTO extends BaseInputDTO {

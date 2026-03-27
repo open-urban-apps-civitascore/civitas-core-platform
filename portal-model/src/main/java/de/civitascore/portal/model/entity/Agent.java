@@ -12,6 +12,10 @@ import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Represents an agent (person or system) that participates in {@link Activity Activities} and is
+ * associated with {@link DataSet DataSets}.
+ */
 @Entity
 @Table(name = "agents")
 @Getter

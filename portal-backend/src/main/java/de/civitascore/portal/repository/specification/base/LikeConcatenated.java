@@ -16,6 +16,13 @@ import net.kaczmarzyk.spring.data.jpa.utils.QueryContext;
 import org.apache.commons.lang3.ArrayUtils;
 import org.springframework.data.jpa.domain.Specification;
 
+/**
+ * Custom specification-api filter that performs a case-insensitive LIKE match against a
+ * concatenation of multiple entity fields. Supports both original and reversed field/value order to
+ * match partial inputs regardless of token position (e.g., "John Doe" or "Doe John").
+ *
+ * @param <T> the entity type
+ */
 public class LikeConcatenated<T> implements Specification<T> {
 
   @Serial private static final long serialVersionUID = 1L;
@@ -36,6 +43,15 @@ public class LikeConcatenated<T> implements Specification<T> {
     this.queryContext = queryContext;
   }
 
+  /**
+   * Builds a JPA predicate that performs a case-insensitive LIKE against the concatenation of the
+   * configured entity fields, matching in both original and reversed order.
+   *
+   * @param root the query root
+   * @param query the criteria query
+   * @param cb the criteria builder
+   * @return a disjunction predicate matching forward and reversed concatenation orders
+   */
   @Override
   public Predicate toPredicate(
       @NonNull @NotNull Root<T> root,

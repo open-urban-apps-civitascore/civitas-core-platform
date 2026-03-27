@@ -33,6 +33,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** REST controller for managing user resources and retrieving the current authenticated user. */
 @RestController
 @RequestMapping(path = "/users")
 @RequiredArgsConstructor
@@ -71,6 +72,14 @@ public class UserController extends BaseController<UserInputDTO, UserOutputDTO, 
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "john doe, john@doe.com"))
   })
+  /**
+   * Retrieves a paginated list of users with optional filtering by first name, last name, email,
+   * active status, or free-text search.
+   *
+   * @param spec the user search/filter specification
+   * @param pageable pagination and sorting parameters
+   * @return a page of user output DTOs with HTTP 200 status
+   */
   @Override
   public ResponseEntity<Page<UserOutputDTO>> getAll(
       @ParameterObject @Parameter(description = "Search/filter spec") UserSpec spec,
@@ -80,6 +89,12 @@ public class UserController extends BaseController<UserInputDTO, UserOutputDTO, 
     return super.getAll(spec, pageable);
   }
 
+  /**
+   * Returns the profile of the currently authenticated user, including their role assignments.
+   *
+   * @param userPrincipal the authenticated user's principal details
+   * @return the current user's profile output with HTTP 200 status
+   */
   @GetMapping("/me")
   @Operation(
       operationId = "getCurrentUser",
@@ -103,11 +118,13 @@ public class UserController extends BaseController<UserInputDTO, UserOutputDTO, 
     return ResponseEntity.ok(PrincipalUserOutput.fromPrincipal(userPrincipal, assignments));
   }
 
+  /** {@inheritDoc} */
   @Override
   protected UserService getService() {
     return userService;
   }
 
+  /** {@inheritDoc} */
   @Override
   protected UserAssembler getAssembler() {
     return userAssembler;

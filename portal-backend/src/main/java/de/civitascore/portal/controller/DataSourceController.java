@@ -31,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** REST controller for managing data source resources, including publish/unpublish lifecycle. */
 @RestController
 @RequestMapping("/datasources")
 @RequiredArgsConstructor
@@ -42,16 +43,19 @@ public class DataSourceController
   private final DataSourceService dataSourceService;
   private final DataSourceAssembler dataSourceAssembler;
 
+  /** {@inheritDoc} */
   @Override
   protected DataSourceService getService() {
     return dataSourceService;
   }
 
+  /** {@inheritDoc} */
   @Override
   protected DataSourceAssembler getAssembler() {
     return dataSourceAssembler;
   }
 
+  /** {@inheritDoc} */
   @Override
   protected ScopeType getScopeType() {
     return ScopeType.DATASOURCE;
@@ -90,6 +94,14 @@ public class DataSourceController
                 type = "string",
                 allowableValues = {"MQTT", "SQL"}))
   })
+  /**
+   * Retrieves a paginated list of data sources with optional filtering by name, description,
+   * status, connector type, or free-text search.
+   *
+   * @param spec the data source search/filter specification
+   * @param pageable pagination and sorting parameters
+   * @return a page of data source output DTOs with HTTP 200 status
+   */
   @Override
   public ResponseEntity<Page<DataSourceOutputDTO>> getAll(
       @ParameterObject @Parameter(description = "Search/filter spec") DataSourceSpec spec,
@@ -99,6 +111,13 @@ public class DataSourceController
     return super.getAll(spec, pageable);
   }
 
+  /**
+   * Publishes a data source by validating its connector configuration and transitioning status from
+   * DRAFT to AVAILABLE.
+   *
+   * @param id the UUID of the data source to publish
+   * @return the published data source output DTO with HTTP 200 status
+   */
   @PostMapping("/{id}/publish")
   @Operation(
       operationId = "publishDataSource",
@@ -112,6 +131,12 @@ public class DataSourceController
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Unpublishes a data source by transitioning it from AVAILABLE back to DRAFT status.
+   *
+   * @param id the UUID of the data source to unpublish
+   * @return the unpublished data source output DTO with HTTP 200 status
+   */
   @PostMapping("/{id}/unpublish")
   @Operation(
       operationId = "unpublishDataSource",
@@ -123,6 +148,13 @@ public class DataSourceController
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Updates the metadata of a published data source in AVAILABLE status.
+   *
+   * @param id the UUID of the published data source
+   * @param input the validated data source input DTO containing updated metadata
+   * @return the updated data source output DTO with HTTP 200 status
+   */
   @PutMapping("/{id}/published/meta")
   @Operation(
       operationId = "updateDataSourcePublishedMeta",
@@ -137,6 +169,14 @@ public class DataSourceController
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Merges connector-specific configuration fields during a JSON-merge patch.
+   *
+   * <p>Delegates to {@link DataSourceService#mergeConfigurationForPatch} after the standard Jackson
+   * merge so that nested connector properties are handled correctly.
+   *
+   * <p>{@inheritDoc}
+   */
   @Override
   protected DataSourceInputDTO patchInput(
       DataSourceInputDTO currentDto, DataSource entity, JsonNode updates) throws IOException {

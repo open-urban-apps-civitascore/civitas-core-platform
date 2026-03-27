@@ -7,6 +7,7 @@ import de.civitascore.portal.repository.AgentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/** Service for managing {@link Agent} entities that represent processing agents in the platform. */
 @Service
 @RequiredArgsConstructor
 public class AgentService extends BaseService<Agent, AgentInputDTO> {

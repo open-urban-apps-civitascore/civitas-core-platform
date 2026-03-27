@@ -1,9 +1,9 @@
 'use client'
 
-import { Row, RowSelectionState } from '@tanstack/react-table'
+import { Row } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
 import { useGetGroups } from '@/app/services/api/groups/clientRequests'
@@ -41,9 +41,6 @@ const SCOPE_TABS: Tab<AssignmentScope>[] = [
   { label: 'roles.groupAssignmentTab.scopeTabs.datastructure', value: ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE },
 ]
 
-const getGroupSelection = (groupIds: Group['id'][]) =>
-  groupIds.reduce((acc, groupId) => ({ ...acc, [groupId]: true }), {})
-
 export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const {
     selectedGroupIds,
@@ -60,8 +57,6 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const { hasPermission } = usePermissions()
   const canCreateAssignment = hasPermission(PERMISSION_NAMES.ASSIGNMENT_CREATE)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [groupSelection, setGroupSelection] = useState<RowSelectionState>(getGroupSelection(selectedGroupIds))
-  const originalGroupSelection = getGroupSelection(selectedGroupIds)
   const [selectedScope, setSelectedScope] = useState<AssignmentScope>(ASSIGNMENT_SCOPE_TYPES.TENANT)
   const [groupToRemove, setGroupToRemove] = useState<GroupTableRow | null>(null)
   const {
@@ -76,10 +71,6 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
     setSearchParam,
     getApiRequestParams,
   } = useQueryParams()
-
-  useEffect(() => {
-    setGroupSelection(getGroupSelection(selectedGroupIds))
-  }, [selectedGroupIds])
 
   const getGroupRequestIds = () => {
     if (selectedScope === ASSIGNMENT_SCOPE_TYPES.TENANT) return selectedGroupIds.join(',')
@@ -146,9 +137,9 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const isTenantScope = selectedScope === ASSIGNMENT_SCOPE_TYPES.TENANT
   const canEdit = !isReadOnly && isTenantScope
 
-  const haveGroupsBeenTouched =
-    Object.keys(groupSelection).every(key => selectedGroupIds.includes(key)) === false ||
-    selectedGroupIds.every(id => Object.keys(groupSelection).includes(id)) === false
+  const handleAddGroups = (newGroupIds: string[]) => {
+    onGroupAssignmentUpdate(Array.from(new Set([...selectedGroupIds, ...newGroupIds])))
+  }
 
   if (isFetching) {
     return <LoadingSpinner />
@@ -189,11 +180,8 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
           <GroupAssignmentModal
             open={isModalOpen}
             onOpenChange={setIsModalOpen}
-            selection={groupSelection}
-            setSelection={setGroupSelection}
-            originalSelection={originalGroupSelection}
-            onGroupAssignmentUpdate={onGroupAssignmentUpdate}
-            haveGroupsBeenTouched={haveGroupsBeenTouched}
+            assignedGroupIds={selectedGroupIds}
+            onAddGroups={handleAddGroups}
             roleName={roleName}
           />
         )}
@@ -234,11 +222,8 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
         <GroupAssignmentModal
           open={isModalOpen}
           onOpenChange={setIsModalOpen}
-          selection={groupSelection}
-          setSelection={setGroupSelection}
-          originalSelection={originalGroupSelection}
-          onGroupAssignmentUpdate={onGroupAssignmentUpdate}
-          haveGroupsBeenTouched={haveGroupsBeenTouched}
+          assignedGroupIds={selectedGroupIds}
+          onAddGroups={handleAddGroups}
           roleName={roleName}
         />
       )}

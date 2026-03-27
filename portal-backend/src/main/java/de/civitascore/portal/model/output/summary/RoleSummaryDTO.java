@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Lightweight summary DTO for role entities, used in list endpoints and nested references. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class RoleSummaryDTO extends BaseSummaryNamedDTO {

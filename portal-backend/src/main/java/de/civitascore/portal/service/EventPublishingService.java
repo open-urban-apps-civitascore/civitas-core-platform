@@ -16,6 +16,12 @@ import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Abstract base service that extends {@link BaseService} with synchronous external system
+ * validation via config adapter events. Overrides create, update, and delete to publish a config
+ * event and wait for the adapter's response before committing the transaction. Subclasses must
+ * provide topic resolution, config value mapping, and realm extraction.
+ */
 public abstract class EventPublishingService<T, I extends BaseInputDTO> extends BaseService<T, I> {
 
   protected final ConfigEventPublisherService configEventPublisher;
@@ -74,6 +80,16 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
     postDelete(entity);
   }
 
+  /**
+   * Publishes a config event for the given entity and operation, then blocks until the config
+   * adapter responds or a timeout is reached.
+   *
+   * @param entity the entity to publish
+   * @param operation the operation name ("create", "update", or "delete")
+   * @return the config adapter result, or {@code null} if no publisher is configured
+   * @throws ExternalSystemRejectionException if the config adapter rejects the operation
+   * @throws ExternalSystemTimeoutException if the config adapter does not respond in time
+   */
   protected ConfigResultEvent preValidateWithExternalSystem(T entity, String operation) {
     try {
       Topics topic = resolveTopic(operation);
@@ -121,21 +137,70 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
     };
   }
 
+  /**
+   * Maps a CRUD operation name to the corresponding Kafka topic.
+   *
+   * @param operation the operation name ("create", "update", or "delete")
+   * @return the matching {@link Topics} enum value
+   */
   protected abstract Topics resolveTopic(String operation);
 
+  /**
+   * Returns the target component identifier for config events (e.g., "user", "group", "role").
+   *
+   * @return the target component name
+   */
   protected abstract String getTargetComponent();
 
+  /**
+   * Returns the target resource context (e.g., Keycloak realm) for the given entity.
+   *
+   * @param entity the entity being published
+   * @return the target resource identifier
+   */
   protected abstract String getRealm(T entity);
 
+  /**
+   * Returns the configuration path used in the config event (e.g., "/users", "/groups").
+   *
+   * @return the config path
+   */
   protected abstract String getConfigPath();
 
+  /**
+   * Converts the entity into a {@link ConfigValue} for the config event payload.
+   *
+   * @param entity the entity to convert
+   * @return the config value representation
+   */
   protected abstract ConfigValue toConfigValue(T entity);
 
+  /**
+   * Extracts the entity ID, used for correlation in config adapter events.
+   *
+   * @param entity the entity
+   * @return the entity's UUID
+   */
   protected abstract UUID getEntityId(T entity);
 
+  /**
+   * Hook called after the entity is saved and flushed but before publishing to the external system.
+   * Subclasses can override to perform additional setup (e.g., resolving relationships).
+   *
+   * @param entity the saved entity
+   * @param input the input DTO
+   * @return the entity ready for publishing
+   */
   protected T prePublish(T entity, I input) {
     return entity;
   }
 
+  /**
+   * Hook called after successful external system synchronization to store the external ID. Default
+   * implementation is a no-op; subclasses override to persist the ID.
+   *
+   * @param entity the entity to update
+   * @param externalId the external system ID returned by the config adapter
+   */
   protected void updateExternalId(T entity, String externalId) {}
 }

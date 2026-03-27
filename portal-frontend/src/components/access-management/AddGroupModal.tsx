@@ -4,12 +4,11 @@ import {
   createColumnHelper,
   getCoreRowModel,
   PaginationState,
-  RowSelectionState,
   SortingState,
   useReactTable,
 } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
@@ -17,6 +16,7 @@ import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useAddItemSelection } from '@/hooks/use-add-item-selection'
 import { Group } from '@/types/groups'
 
 import { SearchHeader } from '../search-area/SearchArea'
@@ -38,14 +38,7 @@ export const AddGroupModal = (props: AddGroupModalProps) => {
   })
 
   const [sorting, setSorting] = useState<SortingState>([])
-  const [selection, setSelection] = useState<RowSelectionState>({})
   const [searchInput, setSearchInput] = useState('')
-
-  // Track selected Group objects across pages since server-side pagination
-  // only keeps the current page's data in the response
-  const selectedGroupsRef = useRef<Map<string, Group>>(new Map())
-
-  const assignedGroupIdsSet = useMemo(() => new Set(assignedGroupIds), [assignedGroupIds])
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams({
@@ -67,17 +60,14 @@ export const AddGroupModal = (props: AddGroupModalProps) => {
   const totalPages = groupsResponse?.totalPages ?? 0
   const hasData = groups.length > 0 || isLoading
 
-  const resetState = () => {
-    setSelection({})
-    setPagination({ pageIndex: 0, pageSize: 10 })
-    setSorting([])
-    setSearchInput('')
-    selectedGroupsRef.current.clear()
-  }
+  const { selection, selectedItemsRef, assignedIdsSet, handleSelectionChange, newlySelectedCount } =
+    useAddItemSelection({ assignedIds: assignedGroupIds, items: groups, open: !!open })
 
   useEffect(() => {
     if (!open) {
-      resetState()
+      setPagination({ pageIndex: 0, pageSize: 10 })
+      setSorting([])
+      setSearchInput('')
     }
   }, [open])
 
@@ -85,28 +75,6 @@ export const AddGroupModal = (props: AddGroupModalProps) => {
   useEffect(() => {
     setPagination(prev => ({ ...prev, pageIndex: 0 }))
   }, [searchInput])
-
-  const handleSelectionChange = (updater: RowSelectionState | ((old: RowSelectionState) => RowSelectionState)) => {
-    const newSelection = typeof updater === 'function' ? updater(selection) : updater
-    // Track newly selected groups, ignore already-assigned ones
-    const addedIds = Object.keys(newSelection).filter(id => !selection[id] && !assignedGroupIdsSet.has(id))
-    const removedIds = Object.keys(selection).filter(id => !newSelection[id] && !assignedGroupIdsSet.has(id))
-    for (const id of addedIds) {
-      const group = groups.find(g => g.id === id)
-      if (group) selectedGroupsRef.current.set(id, group)
-    }
-    for (const id of removedIds) {
-      selectedGroupsRef.current.delete(id)
-    }
-    // Keep assigned IDs in selection (they're always checked)
-    const filtered: RowSelectionState = {}
-    for (const id of Object.keys(newSelection)) {
-      if (!assignedGroupIdsSet.has(id)) {
-        filtered[id] = true
-      }
-    }
-    setSelection(filtered)
-  }
 
   const columnHelper = createColumnHelper<Group>()
 
@@ -123,7 +91,7 @@ export const AddGroupModal = (props: AddGroupModalProps) => {
           />
         ),
         cell: ({ row }) => {
-          const isAssigned = assignedGroupIdsSet.has(row.original.id)
+          const isAssigned = assignedIdsSet.has(row.original.id)
           return (
             <Checkbox
               checked={isAssigned || row.getIsSelected()}
@@ -154,7 +122,7 @@ export const AddGroupModal = (props: AddGroupModalProps) => {
         },
       }),
     ],
-    [columnHelper, t, assignedGroupIdsSet],
+    [columnHelper, t, assignedIdsSet],
   )
 
   const table = useReactTable({
@@ -170,17 +138,15 @@ export const AddGroupModal = (props: AddGroupModalProps) => {
     manualPagination: true,
     manualSorting: true,
     getCoreRowModel: getCoreRowModel(),
-    enableRowSelection: row => !assignedGroupIdsSet.has(row.original.id),
+    enableRowSelection: row => !assignedIdsSet.has(row.original.id),
     onRowSelectionChange: handleSelectionChange,
     onPaginationChange: setPagination,
     onSortingChange: setSorting,
   })
 
-  const newlySelectedCount = selectedGroupsRef.current.size
-
   const onConfirmClick = () => {
     if (newlySelectedCount > 0) {
-      onAddGroups(Array.from(selectedGroupsRef.current.values()))
+      onAddGroups(Array.from(selectedItemsRef.current.values()))
     }
     onOpenChange(false)
   }

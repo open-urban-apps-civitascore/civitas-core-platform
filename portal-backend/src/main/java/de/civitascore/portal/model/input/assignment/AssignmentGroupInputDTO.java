@@ -7,6 +7,7 @@ import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Input DTO for creating assignments from the group management perspective. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class AssignmentGroupInputDTO extends BaseInputDTO {

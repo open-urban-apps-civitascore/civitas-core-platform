@@ -5,6 +5,7 @@ import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Input DTO for creating and updating data space resources. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DataSpaceInputDTO extends BaseInputDTO {

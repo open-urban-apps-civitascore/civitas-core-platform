@@ -6,6 +6,7 @@ import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Input DTO for scoped assignments embedded in data entity creation requests. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class AssignmentScopedInputDTO extends BaseInputDTO {

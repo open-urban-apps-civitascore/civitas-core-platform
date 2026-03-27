@@ -6,6 +6,7 @@ import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Output DTO representing a resource for API responses. */
 @Schema(description = "Resource details")
 @Data
 @EqualsAndHashCode(callSuper = true)

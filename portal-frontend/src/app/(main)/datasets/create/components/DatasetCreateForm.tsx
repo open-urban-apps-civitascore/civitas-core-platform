@@ -16,8 +16,10 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
+import { useError } from '@/hooks/use-error'
 import { cn } from '@/lib/utils'
 import { DatasetCreateFormData, DatasetCreateFormSchema } from '@/types/datasets'
+import { isNameConflictError } from '@/utils/errors'
 
 export const DatasetCreateForm = () => {
   const t = useTranslations('datasets')
@@ -36,6 +38,8 @@ export const DatasetCreateForm = () => {
     },
   })
 
+  const { handleFormValidationError, handleNameError } = useError()
+
   const handleCreateDataset = async (formData: DatasetCreateFormData) => {
     createDataset.mutate(
       {
@@ -46,7 +50,13 @@ export const DatasetCreateForm = () => {
           toast.success(t('messages.createSuccess'))
           router.push(`/datasets/${data.id}?mode=edit`)
         },
-        onError: () => toast.error(tCommon('errors.unexpectedError')),
+        onError: error => {
+          if (isNameConflictError(error)) {
+            handleNameError(form, form.getValues('name'))
+          } else {
+            toast.error(tCommon('errors.unexpectedError'))
+          }
+        },
       },
     )
   }
@@ -77,7 +87,7 @@ export const DatasetCreateForm = () => {
               id="dataset-create-form"
               data-testid="datasetCreateForm"
               aria-label={`${tCommon('form')} ${t('create.title')}`}
-              onSubmit={form.handleSubmit(handleCreateDataset)}
+              onSubmit={form.handleSubmit(handleCreateDataset, handleFormValidationError)}
               className={cn('max-w-300 flex flex-col gap-2 pt-2')}
             >
               <DetailsFieldContainer className="pt-0 border-b-0">

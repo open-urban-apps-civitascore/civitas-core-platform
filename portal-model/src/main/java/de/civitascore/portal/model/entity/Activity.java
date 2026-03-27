@@ -14,6 +14,10 @@ import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Represents an activity that groups {@link Agent}s and produces {@link Distribution}s within the
+ * data catalog.
+ */
 @Entity
 @Table(name = "activities")
 @Getter

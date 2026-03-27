@@ -7,6 +7,10 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Application startup runner that initializes permissions and default roles. Delegates to {@link
+ * PermissionInitializer} and {@link RoleInitializer} within a single transaction.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -15,6 +19,11 @@ public class PermissionRoleInitializer implements ApplicationRunner {
   private final PermissionInitializer permissionInitializer;
   private final RoleInitializer roleInitializer;
 
+  /**
+   * Runs permission and role initialization within a single transaction at application startup.
+   *
+   * @param args the application arguments (unused)
+   */
   @Override
   @Transactional
   public void run(ApplicationArguments args) {

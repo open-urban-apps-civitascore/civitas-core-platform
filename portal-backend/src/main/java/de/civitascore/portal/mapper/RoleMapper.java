@@ -11,6 +11,10 @@ import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ReportingPolicy;
 
+/**
+ * MapStruct mapper for converting between {@link RoleInputDTO}, {@link RoleOutputDTO}, and {@link
+ * Role}.
+ */
 @Mapper(
     componentModel = "spring",
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,

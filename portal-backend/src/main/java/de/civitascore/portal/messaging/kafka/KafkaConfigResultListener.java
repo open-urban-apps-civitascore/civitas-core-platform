@@ -43,6 +43,12 @@ public class KafkaConfigResultListener {
     this.objectMapper = objectMapper;
   }
 
+  /**
+   * Handle an incoming Config Adapter result message from Kafka. Deserializes the payload and
+   * notifies the publisher to complete the matching pending request.
+   *
+   * @param payload the raw JSON payload from Kafka
+   */
   @KafkaListener(
       topics = "${kafka.result-topic:de.civitascore.config.results}",
       groupId = "${spring.kafka.consumer.group-id:portal-backend-group}")

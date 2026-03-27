@@ -20,6 +20,11 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 
+/**
+ * Base implementation of {@link ConnectorHandler} providing connector-type-agnostic logic for
+ * configuration validation (via Jakarta Bean Validation), normalization through typed POJOs, and
+ * encryption/masking of sensitive fields.
+ */
 @Getter
 @RequiredArgsConstructor(access = AccessLevel.PROTECTED)
 public abstract class AbstractConnectorHandler implements ConnectorHandler {
@@ -35,6 +40,14 @@ public abstract class AbstractConnectorHandler implements ConnectorHandler {
 
   // --- Validation via Jakarta Bean Validation ---
 
+  /**
+   * Validates the configuration map by deserializing it into the typed POJO and running Jakarta
+   * Bean Validation. Returns a sorted list of violation messages, or an empty list if valid.
+   *
+   * @param configuration the raw configuration map
+   * @param groups optional validation groups to apply (defaults to {@link Default})
+   * @return sorted list of validation error messages
+   */
   @Override
   public List<String> validate(Map<String, Object> configuration, Class<?>... groups) {
     ConnectorConfiguration pojo;
@@ -51,6 +64,15 @@ public abstract class AbstractConnectorHandler implements ConnectorHandler {
 
   // --- Normalization ---
 
+  /**
+   * Normalizes and validates in one pass: deserializes the raw map into the typed configuration
+   * POJO, runs Bean Validation, throws on errors, then serializes back to the canonical map form.
+   *
+   * @param rawConfig the raw configuration map from user input
+   * @param groups optional validation groups to apply (defaults to {@link Default})
+   * @return the normalized configuration map
+   * @throws InvalidInputException if the configuration is invalid or cannot be deserialized
+   */
   @Override
   @SuppressWarnings("unchecked")
   public Map<String, Object> normalizeAndValidate(
@@ -75,6 +97,13 @@ public abstract class AbstractConnectorHandler implements ConnectorHandler {
 
   // --- Encryption / masking ---
 
+  /**
+   * Encrypts all sensitive fields in the configuration map. Fields that are already encrypted (have
+   * the {@code ENC()} prefix/suffix) are left unchanged.
+   *
+   * @param configuration the configuration map with plaintext sensitive values
+   * @return a new map with sensitive fields encrypted
+   */
   @Override
   public Map<String, Object> encryptSensitiveFields(Map<String, Object> configuration) {
     Map<String, Object> result = new HashMap<>(configuration);
@@ -93,6 +122,13 @@ public abstract class AbstractConnectorHandler implements ConnectorHandler {
         && value.length() > ENC_PREFIX.length() + ENC_SUFFIX.length();
   }
 
+  /**
+   * Replaces all non-null sensitive field values with the {@link ConnectorHandler#MASKED_VALUE}
+   * placeholder for safe output in API responses.
+   *
+   * @param configuration the configuration map with potentially encrypted sensitive values
+   * @return a new map with sensitive fields masked as {@code "********"}
+   */
   @Override
   public Map<String, Object> maskSensitiveFields(Map<String, Object> configuration) {
     Map<String, Object> result = new HashMap<>(configuration);

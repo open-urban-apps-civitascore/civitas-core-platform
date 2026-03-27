@@ -11,6 +11,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+/**
+ * Initializes the permission table at application startup by synchronizing it with the {@link
+ * PermissionName} enum. Creates any permissions that do not yet exist in the database.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -18,6 +22,7 @@ public class PermissionInitializer {
 
   private final PermissionRepository permissionRepository;
 
+  /** Creates any permissions from {@link PermissionName} that are not yet persisted. */
   public void initialize() {
     Set<String> existingKeys =
         permissionRepository.findAll().stream()

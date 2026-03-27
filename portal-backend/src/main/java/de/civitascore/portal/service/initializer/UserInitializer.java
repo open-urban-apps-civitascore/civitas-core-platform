@@ -29,6 +29,11 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Conditional initializer (active only under the {@code init} profile) that seeds groups and users
+ * from application configuration properties. For users without a pre-existing external ID, a
+ * Keycloak user is created via the config adapter event pipeline.
+ */
 @Component
 @Profile("init")
 @Slf4j
@@ -65,6 +70,10 @@ public class UserInitializer {
     this.environment = environment;
   }
 
+  /**
+   * Initializes groups and users from configuration after the application context is fully ready.
+   * Groups are created first so that users can reference them during setup.
+   */
   @EventListener(ApplicationReadyEvent.class)
   @Transactional
   public void initialize() {

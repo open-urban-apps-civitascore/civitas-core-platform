@@ -9,6 +9,12 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Represents a data structure definition that contains one or more {@link DataStructureVersion
+ * versions}. Tracks its own lifecycle status and whether it was auto-created from a data source.
+ *
+ * @see DataStructureStatus
+ */
 @Entity
 @Table(name = "data_structures")
 @Getter
@@ -37,11 +43,18 @@ public class DataStructure extends BaseDataEntity {
       orphanRemoval = true)
   private Set<DataStructureVersion> dataStructureVersions = new HashSet<>();
 
+  /** {@inheritDoc} Links the assignment to this data structure by setting its scope. */
   @Override
   protected void linkAssignment(Assignment assignment) {
     assignment.setScope(this);
   }
 
+  /**
+   * Replaces the current versions with the provided set and sets the back-reference on each
+   * version. Clears then re-adds to satisfy Hibernate orphan-removal semantics.
+   *
+   * @param dataStructureVersions the new set of versions, or {@code null} to clear
+   */
   public void setDataStructureVersions(Set<DataStructureVersion> dataStructureVersions) {
     this.dataStructureVersions.clear();
     if (dataStructureVersions != null) {

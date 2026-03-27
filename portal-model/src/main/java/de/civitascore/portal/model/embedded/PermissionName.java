@@ -90,6 +90,7 @@ public enum PermissionName implements GrantedAuthority {
     this.source = source;
   }
 
+  /** {@inheritDoc} Returns the enum constant name as the granted authority string. */
   @Override
   public String getAuthority() {
     return name();

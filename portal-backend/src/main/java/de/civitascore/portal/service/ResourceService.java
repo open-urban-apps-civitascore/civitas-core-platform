@@ -7,6 +7,7 @@ import de.civitascore.portal.repository.ResourceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/** Service for managing {@link Resource} entities that represent downloadable resources. */
 @Service
 @RequiredArgsConstructor
 public class ResourceService extends BaseService<Resource, ResourceInputDTO> {

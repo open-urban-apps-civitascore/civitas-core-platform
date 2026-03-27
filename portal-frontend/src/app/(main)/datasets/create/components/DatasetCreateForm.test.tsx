@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { AxiosError } from 'axios'
 import { vi } from 'vitest'
 
 import { DatasetCreateForm } from './DatasetCreateForm'
@@ -122,5 +123,29 @@ describe('DatasetCreateForm', () => {
 
     const submitButton = screen.getByRole('button', { name: 'actions.saveAndContinue' })
     expect(submitButton).toBeDisabled()
+  })
+
+  test('shows error toast if dataset name already exists', async () => {
+    mockMutate.mockImplementation((_data, options) => {
+      options?.onError?.({
+        status: 409,
+        response: {
+          status: 409,
+          data: {
+            detail: 'Datasource with name "Test Datasource" already exists',
+          },
+        },
+      } as AxiosError)
+    })
+
+    setup()
+    const nameInput = screen.getByTestId('nameTextField')
+    fireEvent.change(nameInput, { target: { value: 'Test Dataset' } })
+    const submitButton = screen.getByRole('button', { name: 'actions.saveAndContinue' })
+    fireEvent.click(submitButton)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('nameFormMessage')).toHaveTextContent('common.errors.nameExists')
+    })
   })
 })

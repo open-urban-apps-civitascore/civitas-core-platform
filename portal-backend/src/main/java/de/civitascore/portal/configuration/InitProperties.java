@@ -15,6 +15,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Configuration properties for initial seed data, active only under the {@code init} profile. Binds
+ * from the {@code init.*} namespace and defines groups and users to be created on first startup.
+ */
 @Configuration
 @ConfigurationProperties(prefix = "init")
 @Profile("init")

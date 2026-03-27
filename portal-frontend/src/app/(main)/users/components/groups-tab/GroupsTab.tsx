@@ -1,4 +1,4 @@
-import { PaginationState, RowSelectionState, SortingState } from '@tanstack/react-table'
+import { PaginationState, SortingState } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 
@@ -21,7 +21,7 @@ import GroupsTable from './GroupsTable'
 interface GroupsTabProps {
   formValues: UserFormData
   isReadOnly: boolean
-  onAssignGroups: (groupSelection: RowSelectionState) => void
+  onAssignGroups: (groupIds: string[]) => void
   onRemoveGroup: (id: string) => void
 }
 

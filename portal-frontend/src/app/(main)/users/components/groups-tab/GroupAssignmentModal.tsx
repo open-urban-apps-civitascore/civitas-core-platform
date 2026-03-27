@@ -2,14 +2,12 @@ import { DialogProps } from '@radix-ui/react-dialog'
 import {
   createColumnHelper,
   getCoreRowModel,
-  getSortedRowModel,
   PaginationState,
-  RowSelectionState,
   SortingState,
   useReactTable,
 } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
@@ -19,18 +17,17 @@ import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useAddItemSelection } from '@/hooks/use-add-item-selection'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { UserGroupsListData } from '@/types/groups'
 import { setFocus } from '@/utils/common'
 import { mapGroupsApiToListData } from '@/utils/groups'
 import { isPageIndexHigherThanTotalPages, resolveUpdater } from '@/utils/table'
 
-export type UserSelection = { selectAll: boolean; selectedIds: string[]; excludedIds: string[] }
-
 interface GroupAssignmentModalProps extends DialogProps {
   assignedGroups: string[]
   userName: string
-  onAssignGroups: (groupSelection: RowSelectionState) => void
+  onAssignGroups: (groupIds: string[]) => void
   isUpdating?: boolean
 }
 
@@ -42,8 +39,6 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
   const [pageSize, setPageSize] = useState(10)
   const [sorting, setSorting] = useState<SortingState>([])
   const [searchString, setSearchString] = useState('')
-  const [selection, setSelection] = useState<RowSelectionState>({})
-  const selectAllCheckbox = useRef<HTMLButtonElement>(null)
   const { getApiRequestParams } = useQueryParams()
 
   const { data: groupsData, isFetching: isFetchingGroups } = useGetGroups({
@@ -52,18 +47,21 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
 
   const groups = useMemo(() => {
     if (groupsData?.data && groupsData?.data.length > 0) {
-      const allUsers = mapGroupsApiToListData(groupsData?.data)
-      const unassignedGroups = allUsers.filter(group => !assignedGroups.find(original => original === group.id))
-      return unassignedGroups
+      return mapGroupsApiToListData(groupsData?.data)
     } else return []
-  }, [groupsData?.data, assignedGroups])
+  }, [groupsData?.data])
 
   const rowCount = groupsData?.totalElements || 0
   const totalPages = Math.ceil(rowCount / pageSize)
 
+  const { selection, selectedItemsRef, assignedIdsSet, handleSelectionChange, newlySelectedCount } =
+    useAddItemSelection({ assignedIds: assignedGroups, items: groups, open: !!open })
+
   useEffect(() => {
     if (!open) {
-      setSelection({})
+      setSearchString('')
+      setPageIndex(0)
+      setSorting([])
     }
   }, [open])
 
@@ -84,7 +82,6 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
     columnHelper.accessor('id', {
       header: () => (
         <Checkbox
-          ref={selectAllCheckbox}
           checked={
             table.getIsAllPageRowsSelected() ? true : table.getIsSomePageRowsSelected() ? 'indeterminate' : false
           }
@@ -92,17 +89,21 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
           id="selectAll"
         />
       ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={value => {
-            row.toggleSelected(!!value)
-            setFocus(row.id)
-          }}
-          aria-label={`Select user ${row.original.name}`}
-          id={row.id}
-        />
-      ),
+      cell: ({ row }) => {
+        const isAssigned = assignedIdsSet.has(row.original.id)
+        return (
+          <Checkbox
+            checked={isAssigned || row.getIsSelected()}
+            onCheckedChange={value => {
+              row.toggleSelected(!!value)
+              setFocus(row.id)
+            }}
+            disabled={isAssigned}
+            aria-label={`Select group ${row.original.name}`}
+            id={row.id}
+          />
+        )
+      },
       enableSorting: false,
       enableHiding: false,
     }),
@@ -148,14 +149,14 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
       sorting,
       rowSelection: selection,
     },
+    enableRowSelection: row => !assignedIdsSet.has(row.original.id),
     manualPagination: true,
     manualSorting: true,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     onPaginationChange: updater => {
       handlePagination(resolveUpdater(updater, { pageIndex, pageSize }))
     },
-    onRowSelectionChange: setSelection,
+    onRowSelectionChange: handleSelectionChange,
     onSortingChange: updater => setSorting(resolveUpdater(updater, sorting)),
   })
 
@@ -187,11 +188,11 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
         <ActionButtons
           confirmButtonType="button"
           onConfirmClick={() => {
-            onAssignGroups(selection)
+            onAssignGroups(Array.from(selectedItemsRef.current.keys()))
             onOpenChange(false)
           }}
           onCancelClick={() => onOpenChange(false)}
-          isConfirmButtonDisabled={isUpdating || isFetchingGroups}
+          isConfirmButtonDisabled={isUpdating || newlySelectedCount === 0}
           hasCard={false}
           confirmButtonTitle={tCommon('actions.add')}
         />

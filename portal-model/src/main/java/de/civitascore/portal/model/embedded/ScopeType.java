@@ -6,24 +6,24 @@ package de.civitascore.portal.model.embedded;
  * <p>DATASPACE and DATASET scopes require a scope ID to identify the target entity.
  *
  * @see de.civitascore.portal.model.entity.Assignment
- * @see de.civitascore.portal.model.entity.base.ScopedEntity
+ * @see de.civitascore.portal.model.entity.base.AssignableEntity
  */
 public enum ScopeType {
   /** Tenant-wide scope for data roles. Requires scope ID to be null. */
   TENANT,
 
-  /** Data structure scope for data/governance roles. Requires scope ID. */
+  /** Data structure scope for data roles. Requires scope ID. */
   DATASTRUCTURE,
 
-  /** Data source scope for data/governance roles. Requires scope ID. */
+  /** Data source scope for data roles. Requires scope ID. */
   DATASOURCE,
 
-  /** Dataset scope for data/governance roles. Requires scope ID. */
+  /** Dataset scope for data roles. Requires scope ID. */
   DATASET,
 
-  /** Dataspace scope for data/governance roles. Requires scope ID. */
+  /** Dataspace scope for data roles. Requires scope ID. */
   DATASPACE,
 
-  /** Datacatalogue scope for data/governance roles. Requires scope ID. */
+  /** Datacatalogue scope for data roles. Requires scope ID. */
   CATALOG,
 }

@@ -9,12 +9,17 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/**
+ * Assembler for converting {@link Catalog} entities to {@link CatalogOutputDTO}. Participates in
+ * the template method pattern defined by {@link BaseAssembler}.
+ */
 @Component
 @RequiredArgsConstructor
 public class CatalogAssembler implements BaseAssembler<Catalog, CatalogOutputDTO, UUID> {
   private final CatalogMapper catalogMapper;
   private final DataSetMapper dataSetMapper;
 
+  /** {@inheritDoc} Maps catalog fields including child catalogs, parent catalogs, and datasets. */
   @Override
   public CatalogOutputDTO mapToBaseDto(Catalog entity) {
     CatalogOutputDTO output = catalogMapper.toOutput(entity);
@@ -30,6 +35,7 @@ public class CatalogAssembler implements BaseAssembler<Catalog, CatalogOutputDTO
     return output;
   }
 
+  /** {@inheritDoc} Converts a catalog entity back to its input DTO for PATCH operations. */
   @Override
   @SuppressWarnings("unchecked")
   public CatalogInputDTO toInput(Catalog entity) {

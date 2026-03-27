@@ -19,6 +19,11 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+/**
+ * Represents a data ingestion pipeline belonging to a {@link DataSet}. Holds the executable
+ * RedpandaConnect configuration, associated {@link DataSource DataSources}, and API path
+ * definitions.
+ */
 @Entity
 @Table(
     name = "pipelines",

@@ -20,6 +20,13 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.Formula;
 
+/**
+ * Represents a platform user with personal information, authentication details, and {@link Group}
+ * memberships. Manages the bidirectional relationship with groups.
+ *
+ * @see Group
+ * @see UserTitleType
+ */
 @Entity
 @Table(
     name = "users",

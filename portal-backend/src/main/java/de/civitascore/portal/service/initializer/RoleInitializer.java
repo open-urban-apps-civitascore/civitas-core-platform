@@ -19,6 +19,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+/**
+ * Initializes the role table at application startup by synchronizing it with the {@link
+ * RoleDefault} enum. Creates missing roles, updates roles whose permissions or descriptions have
+ * changed, and removes obsolete readonly roles no longer defined in the enum.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -27,6 +32,10 @@ public class RoleInitializer {
   private final RoleRepository roleRepository;
   private final PermissionRepository permissionRepository;
 
+  /**
+   * Synchronizes roles in the database with the definitions in {@link RoleDefault}. Creates new
+   * roles, updates changed roles, and removes obsolete readonly roles.
+   */
   public void initialize() {
     Map<String, Permission> permissionsByNameAndSource =
         permissionRepository.findAll().stream()

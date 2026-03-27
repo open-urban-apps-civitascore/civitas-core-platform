@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** REST controller for managing data structure resources, including publish/unpublish lifecycle. */
 @RestController
 @RequestMapping("/datastructures")
 @RequiredArgsConstructor
@@ -57,6 +58,14 @@ public class DataStructureController
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "structure"))
   })
+  /**
+   * Retrieves a paginated list of data structures with optional filtering by name, description, or
+   * free-text search.
+   *
+   * @param spec the data structure search/filter specification
+   * @param pageable pagination and sorting parameters
+   * @return a page of data structure output DTOs with HTTP 200 status
+   */
   @Override
   public ResponseEntity<Page<DataStructureOutputDTO>> getAll(
       @ParameterObject @Parameter(description = "Search/filter spec") DataStructureSpec spec,
@@ -66,21 +75,31 @@ public class DataStructureController
     return super.getAll(spec, pageable);
   }
 
+  /** {@inheritDoc} */
   @Override
   protected DataStructureService getService() {
     return dataStructureService;
   }
 
+  /** {@inheritDoc} */
   @Override
   protected DataStructureAssembler getAssembler() {
     return dataStructureAssembler;
   }
 
+  /** {@inheritDoc} */
   @Override
   public ScopeType getScopeType() {
     return ScopeType.DATASTRUCTURE;
   }
 
+  /**
+   * Updates only the metadata of a published data structure in AVAILABLE status.
+   *
+   * @param dataStructureId the UUID of the published data structure
+   * @param input the validated data structure input DTO containing updated metadata
+   * @return the updated data structure output DTO with HTTP 200 status
+   */
   @PutMapping("/{dataStructureId}/published/meta")
   @Operation(
       operationId = "updateDataStructurePublishedMeta",
@@ -94,6 +113,12 @@ public class DataStructureController
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Publishes a data structure by setting its status to AVAILABLE.
+   *
+   * @param dataStructureId the UUID of the data structure to publish
+   * @return the published data structure output DTO with HTTP 200 status
+   */
   @PostMapping("/{dataStructureId}/publish")
   @Operation(
       operationId = "publishDataStructure",
@@ -107,6 +132,12 @@ public class DataStructureController
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Unpublishes a data structure by reverting its status back to DRAFT.
+   *
+   * @param dataStructureId the UUID of the data structure to unpublish
+   * @return the unpublished data structure output DTO with HTTP 200 status
+   */
   @PostMapping("/{dataStructureId}/unpublish")
   @Operation(
       operationId = "unpublishDataStructure",

@@ -7,6 +7,7 @@ import de.civitascore.portal.repository.DataSetSeriesRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/** Service for managing {@link DataSetSeries} entities that group related datasets. */
 @Service
 @RequiredArgsConstructor
 public class DataSetSeriesService extends BaseService<DataSetSeries, DataSetSeriesInputDTO> {

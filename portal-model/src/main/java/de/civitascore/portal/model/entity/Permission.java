@@ -15,6 +15,14 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.security.core.GrantedAuthority;
 
+/**
+ * Represents a single permission that can be granted to a {@link Role}. Implements {@link
+ * GrantedAuthority} so that permissions integrate directly with Spring Security.
+ *
+ * @see PermissionType
+ * @see PermissionCategory
+ * @see PermissionSource
+ */
 @Entity
 @Table(
     name = "permissions",
@@ -41,6 +49,7 @@ public class Permission extends NamedEntity implements GrantedAuthority {
   @Column(name = "source", nullable = false)
   private PermissionSource source;
 
+  /** {@inheritDoc} Returns the permission name as the granted authority string. */
   @Override
   public String getAuthority() {
     return getName();

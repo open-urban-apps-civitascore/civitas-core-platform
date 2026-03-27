@@ -10,6 +10,10 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for managing {@link Catalog} entities. Resolves child catalog and dataset references
+ * during entity conversion.
+ */
 @Service
 @RequiredArgsConstructor
 public class CatalogService extends BaseService<Catalog, CatalogInputDTO> {
@@ -33,6 +37,13 @@ public class CatalogService extends BaseService<Catalog, CatalogInputDTO> {
     return Catalog.class.getSimpleName();
   }
 
+  /**
+   * Resolves child catalog and dataset references after DTO-to-entity conversion.
+   *
+   * @param entity the catalog entity
+   * @param input the catalog input DTO containing child catalog and dataset IDs
+   * @return the entity with resolved child and dataset relationships
+   */
   @Override
   protected Catalog postConvertToEntity(Catalog entity, CatalogInputDTO input) {
     // Set child catalogs

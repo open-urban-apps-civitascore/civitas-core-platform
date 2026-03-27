@@ -3,16 +3,12 @@ import {
   CellContext,
   createColumnHelper,
   getCoreRowModel,
-  getExpandedRowModel,
-  getSortedRowModel,
   PaginationState,
-  Row,
-  RowSelectionState,
   SortingState,
   useReactTable,
 } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
@@ -22,31 +18,20 @@ import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useAddItemSelection } from '@/hooks/use-add-item-selection'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Group } from '@/types/groups'
 import { Role } from '@/types/roles'
-import { resolveUpdater } from '@/utils/table'
+import { isPageIndexHigherThanTotalPages, resolveUpdater } from '@/utils/table'
 
 interface GroupAssignmentModalProps extends DialogProps {
-  selection: RowSelectionState
-  setSelection: (selection: RowSelectionState) => void
-  originalSelection: RowSelectionState
-  onGroupAssignmentUpdate: (groupIds: string[]) => void
-  haveGroupsBeenTouched: boolean
+  assignedGroupIds: string[]
+  onAddGroups: (groupIds: string[]) => void
   roleName: Role['name']
 }
 
 export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
-  const {
-    open,
-    onOpenChange = () => {},
-    selection,
-    setSelection,
-    originalSelection,
-    onGroupAssignmentUpdate,
-    haveGroupsBeenTouched,
-    roleName,
-  } = props
+  const { open, onOpenChange = () => {}, assignedGroupIds, onAddGroups, roleName } = props
   const tRoles = useTranslations('roles')
   const tCommon = useTranslations('common')
   const [pageIndex, setPageIndex] = useState(0)
@@ -54,7 +39,6 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
   const [sorting, setSorting] = useState<SortingState>([])
   const [searchString, setSearchString] = useState('')
   const [totalPages, setTotalPages] = useState(0)
-  const selectAllCheckbox = useRef<HTMLButtonElement>(null)
   const { getApiRequestParams } = useQueryParams()
 
   const requestParams = getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString })
@@ -67,25 +51,33 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
     setTotalPages(Math.ceil(rowCount / pageSize))
   }, [rowCount, pageSize])
 
+  useEffect(() => {
+    if (isPageIndexHigherThanTotalPages(pageIndex, totalPages)) {
+      setPageIndex(totalPages - 1)
+    }
+  }, [pageIndex, totalPages])
+
+  const { selection, selectedItemsRef, assignedIdsSet, handleSelectionChange, newlySelectedCount } =
+    useAddItemSelection({ assignedIds: assignedGroupIds, items: groups, open: !!open })
+
+  useEffect(() => {
+    if (!open) {
+      setSearchString('')
+      setPageIndex(0)
+      setSorting([])
+    }
+  }, [open])
+
   const handlePagination = (newPagination: PaginationState) => {
     setPageIndex(newPagination.pageIndex)
     setPageSize(newPagination.pageSize)
   }
 
-  // for accessibility: avoid losing focus after toggeling checkboxes via keyboard
   const setFocus = (elementId: string) => {
     requestAnimationFrame(() => {
       const element = document.getElementById(elementId)
       element?.focus()
     })
-  }
-
-  const handleCheckedChange = (value: string | boolean, row: Row<Group>) => {
-    setFocus(row.id)
-    row.toggleSelected(!!value)
-    const isRowSelected = row.getIsSelected()
-    row.toggleExpanded(!isRowSelected)
-    row.subRows?.forEach(subRow => subRow.toggleExpanded(!isRowSelected))
   }
 
   const columnHelper = createColumnHelper<Group>()
@@ -94,7 +86,6 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
     columnHelper.accessor('id', {
       header: () => (
         <Checkbox
-          ref={selectAllCheckbox}
           checked={
             table.getIsAllPageRowsSelected() ? true : table.getIsSomePageRowsSelected() ? 'indeterminate' : false
           }
@@ -102,20 +93,21 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
           id="selectAll"
         />
       ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={
-            row.getIsSelected()
-              ? true
-              : row.getIsSomeSelected() || row.getIsAllSubRowsSelected()
-                ? 'indeterminate'
-                : false
-          }
-          onCheckedChange={value => handleCheckedChange(value, row)}
-          aria-label={`Select group ${row.original.name}`}
-          id={row.id}
-        />
-      ),
+      cell: ({ row }) => {
+        const isAssigned = assignedIdsSet.has(row.original.id)
+        return (
+          <Checkbox
+            checked={isAssigned || row.getIsSelected()}
+            onCheckedChange={value => {
+              setFocus(row.id)
+              row.toggleSelected(!!value)
+            }}
+            disabled={isAssigned}
+            aria-label={`Select group ${row.original.name}`}
+            id={row.id}
+          />
+        )
+      },
     }),
     columnHelper.accessor('name', {
       header: ({ column }) => (
@@ -162,30 +154,19 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
       },
     },
     state: { pagination: { pageIndex, pageSize }, sorting, rowSelection: selection },
+    enableRowSelection: row => !assignedIdsSet.has(row.original.id),
     manualPagination: true,
     manualSorting: true,
-    // getSubRows: row => row.subgroups || [],
-    getExpandedRowModel: getExpandedRowModel(),
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    onRowSelectionChange: updater => {
-      setSelection(resolveUpdater(updater, selection))
-    },
+    onRowSelectionChange: handleSelectionChange,
     onPaginationChange: updater => {
       handlePagination(resolveUpdater(updater, { pageIndex, pageSize }))
     },
     onSortingChange: updater => setSorting(resolveUpdater(updater, sorting)),
   })
 
-  const groupIdsToAssign = Object.keys(selection).map(key => key)
-
   const onConfirmClick = () => {
-    onGroupAssignmentUpdate(groupIdsToAssign)
-    onOpenChange(false)
-  }
-
-  const onCancelClick = () => {
-    setSelection(originalSelection)
+    onAddGroups(Array.from(selectedItemsRef.current.keys()))
     onOpenChange(false)
   }
 
@@ -215,8 +196,8 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
         <ActionButtons
           confirmButtonType="button"
           onConfirmClick={onConfirmClick}
-          onCancelClick={() => onCancelClick()}
-          isConfirmButtonDisabled={!haveGroupsBeenTouched}
+          onCancelClick={() => onOpenChange(false)}
+          isConfirmButtonDisabled={newlySelectedCount === 0}
           hasCard={false}
           confirmButtonTitle={tCommon('actions.add')}
         />

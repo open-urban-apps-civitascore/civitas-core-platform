@@ -142,7 +142,7 @@ class RoleInitializerTest {
     assertThat(findRole(created, "Data Consumer").getRoleType()).isEqualTo(RoleType.DATA);
     assertThat(findRole(created, "Data Steward").getRoleType()).isEqualTo(RoleType.DATA);
     assertThat(findRole(created, "Data Owner").getRoleType()).isEqualTo(RoleType.DATA);
-    assertThat(findRole(created, "Data Gatekeeper").getRoleType()).isEqualTo(RoleType.GOVERNANCE);
+    assertThat(findRole(created, "Data Gatekeeper").getRoleType()).isEqualTo(RoleType.DATA);
   }
 
   @Test
@@ -213,8 +213,8 @@ class RoleInitializerTest {
   }
 
   @Test
-  @DisplayName("Should assign governance permissions to Data Gatekeeper")
-  void shouldAssignGovernancePermissionsToDataGatekeeper() {
+  @DisplayName("Should assign data permissions to Data Gatekeeper")
+  void shouldAssignDataPermissionsToDataGatekeeper() {
     // given
     when(permissionRepository.findAll()).thenReturn(allPermissions);
     when(roleRepository.findAll()).thenReturn(List.of());

@@ -1426,11 +1426,103 @@ paths:
         required: true
       responses:
         "200":
-          description: OK
+          description: Published version metadata updated successfully
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/DataStructureVersionOutputDTO"
+        "400":
+          description: Invalid input (e.g. version is DRAFT)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    type: urn:civitas:error:INVALID_INPUT
+                    title: Bad Request
+                    status: 400
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/published/meta"
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    type: urn:civitas:error:VALIDATION_FAILED
+                    title: Bad Request
+                    status: 400
+                    detail: Request body validation failed
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/published/meta"
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                    title: Bad Request
+                    status: 400
+                    detail: Failed to read request body
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/published/meta"
+        "404":
+          description: Data structure version not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/published/meta"
+        "409":
+          description: Conflict (e.g. unique constraint violation)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/published/meta"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/published/meta"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/published/meta"
+        "502":
+          description: Model Atlas upload failed
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                upstream_failure:
+                  summary: upstream_failure
+                  value:
+                    type: urn:civitas:error:UPSTREAM_FAILURE
+                    title: Bad Gateway
+                    status: 502
+                    detail: Model Atlas upload failed
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/published/meta"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -1589,6 +1681,21 @@ paths:
                     title: Conflict
                     status: 409
                     detail: Referenced entity does not exist
+                    instance: "/datastructures/{dataStructureId}/versions/{id}"
+        "502":
+          description: Model Atlas upload failed
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                upstream_failure:
+                  summary: upstream_failure
+                  value:
+                    type: urn:civitas:error:UPSTREAM_FAILURE
+                    title: Bad Gateway
+                    status: 502
+                    detail: Model Atlas upload failed
                     instance: "/datastructures/{dataStructureId}/versions/{id}"
         "401":
           $ref: "#/components/responses/Unauthorized"
@@ -1774,6 +1881,21 @@ paths:
                     title: Conflict
                     status: 409
                     detail: Referenced entity does not exist
+                    instance: "/datastructures/{dataStructureId}/versions/{id}"
+        "502":
+          description: Model Atlas upload failed
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                upstream_failure:
+                  summary: upstream_failure
+                  value:
+                    type: urn:civitas:error:UPSTREAM_FAILURE
+                    title: Bad Gateway
+                    status: 502
+                    detail: Model Atlas upload failed
                     instance: "/datastructures/{dataStructureId}/versions/{id}"
         "401":
           $ref: "#/components/responses/Unauthorized"
@@ -2150,8 +2272,8 @@ paths:
       tags:
       - DataSources
       summary: Update metadata of a published data source
-      description: "Updates only name, description, and assignments on a data source\
-        \ in AVAILABLE status."
+      description: "Updates name, description, connector configuration, and assignments\
+        \ on a data source in AVAILABLE status."
       operationId: updateDataSourcePublishedMeta
       parameters:
       - name: id
@@ -2164,7 +2286,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/DataSourceMetaInputDTO"
+              $ref: "#/components/schemas/DataSourceInputDTO"
         required: true
       responses:
         "200":
@@ -3784,6 +3906,21 @@ paths:
                     status: 409
                     detail: Referenced entity does not exist
                     instance: "/datastructures/{dataStructureId}/versions"
+        "502":
+          description: Model Atlas upload failed
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                upstream_failure:
+                  summary: upstream_failure
+                  value:
+                    type: urn:civitas:error:UPSTREAM_FAILURE
+                    title: Bad Gateway
+                    status: 502
+                    detail: Model Atlas upload failed
+                    instance: "/datastructures/{dataStructureId}/versions"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -3814,11 +3951,88 @@ paths:
           format: uuid
       responses:
         "200":
-          description: OK
+          description: Data structure version unpublished successfully
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/DataStructureVersionOutputDTO"
+        "400":
+          description: Invalid input (e.g. already in DRAFT or only published version)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    type: urn:civitas:error:INVALID_INPUT
+                    title: Bad Request
+                    status: 400
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unpublish"
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    type: urn:civitas:error:VALIDATION_FAILED
+                    title: Bad Request
+                    status: 400
+                    detail: Request body validation failed
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unpublish"
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                    title: Bad Request
+                    status: 400
+                    detail: Failed to read request body
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unpublish"
+        "404":
+          description: Data structure version not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unpublish"
+        "409":
+          description: Conflict (version is in use by a DataSource)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unpublish"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unpublish"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unpublish"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -3848,11 +4062,57 @@ paths:
           format: uuid
       responses:
         "200":
-          description: OK
+          description: Data structure version published successfully
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/DataStructureVersionOutputDTO"
+        "400":
+          description: Invalid input (e.g. already published or missing modelAtlasUri)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    type: urn:civitas:error:INVALID_INPUT
+                    title: Bad Request
+                    status: 400
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/publish"
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    type: urn:civitas:error:VALIDATION_FAILED
+                    title: Bad Request
+                    status: 400
+                    detail: Request body validation failed
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/publish"
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                    title: Bad Request
+                    status: 400
+                    detail: Failed to read request body
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/publish"
+        "404":
+          description: Data structure version not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/publish"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -4796,7 +5056,7 @@ paths:
           example: DATASET
       - name: roleType
         in: query
-        description: "Filter by role type (exact match). One of: SYSTEM, DATA, GOVERNANCE."
+        description: "Filter by role type (exact match). One of: SYSTEM, DATA."
         schema:
           type: string
           example: DATA
@@ -5007,7 +5267,6 @@ paths:
           enum:
           - SYSTEM
           - DATA
-          - GOVERNANCE
       - name: category
         in: query
         description: Filter by category (exact match).
@@ -5407,6 +5666,8 @@ components:
           readOnly: true
         name:
           type: string
+        description:
+          type: string
     UserOutputDTO:
       type: object
       properties:
@@ -5471,7 +5732,6 @@ components:
           enum:
           - SYSTEM
           - DATA
-          - GOVERNANCE
           example: DATA
         permissionIds:
           type: array
@@ -5501,7 +5761,6 @@ components:
           enum:
           - SYSTEM
           - DATA
-          - GOVERNANCE
     RoleOutputDTO:
       type: object
       properties:
@@ -5534,7 +5793,6 @@ components:
           enum:
           - SYSTEM
           - DATA
-          - GOVERNANCE
           example: DATA
         permissions:
           type: array
@@ -5682,7 +5940,6 @@ components:
           enum:
           - SYSTEM
           - DATA
-          - GOVERNANCE
         description:
           type: string
         readonly:
@@ -6134,23 +6391,6 @@ components:
           type: boolean
           description: Whether this data source is currently referenced by a pipeline
           readOnly: true
-    DataSourceMetaInputDTO:
-      type: object
-      properties:
-        assignments:
-          type: array
-          items:
-            $ref: "#/components/schemas/AssignmentScopedInputDTO"
-          uniqueItems: true
-        name:
-          type: string
-          description: Data source name (required)
-          minLength: 1
-        description:
-          type: string
-          description: Data source description
-      required:
-      - name
     DataSetInputDTO:
       type: object
       properties:
@@ -6375,13 +6615,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageableObject:
@@ -6495,13 +6735,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     Sort:
@@ -6544,7 +6784,6 @@ components:
           enum:
           - SYSTEM
           - DATA
-          - GOVERNANCE
           example: DATA
         category:
           type: string
@@ -6576,13 +6815,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageDataStructureOutputDTO:
@@ -6608,13 +6847,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageDataSourceOutputDTO:
@@ -6640,13 +6879,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageDataSetOutputDTO:
@@ -6672,13 +6911,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PagePipelineOutputDTO:
@@ -6704,13 +6943,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     Pageable:
@@ -6750,13 +6989,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageAssignmentOutputDTO:
@@ -6782,13 +7021,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PatchUserInputDTO:
@@ -6843,7 +7082,6 @@ components:
           enum:
           - SYSTEM
           - DATA
-          - GOVERNANCE
           example: DATA
         permissionIds:
           type: array

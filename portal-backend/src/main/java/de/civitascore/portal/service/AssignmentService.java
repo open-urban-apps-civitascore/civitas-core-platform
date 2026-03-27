@@ -12,6 +12,10 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for managing {@link Assignment} entities, which link groups and roles with optional
+ * resource-level scoping (e.g., per datasource, dataset, or datastructure).
+ */
 @Service
 @RequiredArgsConstructor
 public class AssignmentService extends BaseService<Assignment, AssignmentInputDTO> {
@@ -35,12 +39,29 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
     return Assignment.class.getSimpleName();
   }
 
+  /**
+   * Validates that a scope ID is provided when the scope type requires one before creating the
+   * assignment.
+   *
+   * @param input the assignment creation input
+   * @return the validated input
+   * @throws InvalidInputException if a non-TENANT scope type is set without a scope ID
+   */
   @Override
   protected AssignmentInputDTO preProcessCreateInput(AssignmentInputDTO input) {
     validateScopeId(input);
     return super.preProcessCreateInput(input);
   }
 
+  /**
+   * Validates that a scope ID is provided when the scope type requires one before updating the
+   * assignment.
+   *
+   * @param input the assignment update input
+   * @param existingEntity the current assignment entity
+   * @return the validated input
+   * @throws InvalidInputException if a non-TENANT scope type is set without a scope ID
+   */
   @Override
   protected AssignmentInputDTO preProcessUpdateInput(
       AssignmentInputDTO input, Assignment existingEntity) {
@@ -57,6 +78,14 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
     }
   }
 
+  /**
+   * Delegates entity assembly to the {@link AssignmentFactory}, which resolves group, role, and
+   * scope references from the input DTO.
+   *
+   * @param entity the assignment entity
+   * @param input the assignment input DTO
+   * @return the fully assembled assignment entity
+   */
   @Override
   protected Assignment postConvertToEntity(Assignment entity, AssignmentInputDTO input) {
     return assignmentFactory.build(entity, input);
@@ -73,14 +102,35 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
     return postLoad(entity);
   }
 
+  /**
+   * Finds all assignments for a user identified by their external (Keycloak) ID.
+   *
+   * @param externalId the external identity provider ID of the user
+   * @return list of assignments associated with the user
+   */
   public List<Assignment> findAllByUserExternalId(String externalId) {
     return getRepository().findAllByUserExternalId(externalId);
   }
 
+  /**
+   * Finds all assignments that reference the given role.
+   *
+   * @param roleId the role ID
+   * @return list of assignments for the role
+   */
   public List<Assignment> findAllByRoleId(UUID roleId) {
     return getRepository().findAllByRoleId(roleId);
   }
 
+  /**
+   * Finds all assignments scoped to a specific resource type and resource ID. Dispatches to the
+   * appropriate repository query based on the {@link ScopeType}.
+   *
+   * @param scopeType the type of scoped resource (e.g., DATASOURCE, DATASET)
+   * @param scopeId the ID of the scoped resource
+   * @return list of matching assignments
+   * @throws InvalidInputException if the scope type is unsupported
+   */
   public List<Assignment> findAllByScopeTypeAndScopeId(ScopeType scopeType, UUID scopeId) {
     return switch (scopeType) {
       case DATASOURCE -> getRepository().findAllByScopeTypeAndDataSourceId(scopeType, scopeId);

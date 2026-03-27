@@ -19,6 +19,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for managing {@link User} entities with Keycloak integration. Extends {@link
+ * EventPublishingService} to synchronize user lifecycle events (create, update, delete) with
+ * Keycloak via the config adapter pipeline. Handles group membership, email uniqueness validation,
+ * and external ID tracking.
+ */
 @Service
 @Slf4j
 public class UserService extends EventPublishingService<User, UserInputDTO> {
@@ -56,18 +62,40 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     return "User";
   }
 
+  /**
+   * Validates that all referenced group IDs exist before creating the user.
+   *
+   * @param input the user creation input
+   * @return the validated input
+   * @throws InvalidInputException if any referenced group does not exist
+   */
   @Override
   protected UserInputDTO preProcessCreateInput(UserInputDTO input) {
     validateGroupIdsExist(input.getGroupIds());
     return super.preProcessCreateInput(input);
   }
 
+  /**
+   * Validates email uniqueness before persisting the user entity.
+   *
+   * @param entity the user entity to validate
+   * @return the validated entity
+   * @throws UniqueConstraintViolationException if another user with the same email already exists
+   */
   @Override
   protected User preSave(User entity) {
     validateUniqueEmail(entity);
     return super.preSave(entity);
   }
 
+  /**
+   * Resolves and updates group membership from the input before publishing the user to Keycloak.
+   * Fetches groups with eagerly loaded members and updates the bidirectional relationship.
+   *
+   * @param entity the saved user entity
+   * @param input the user input containing group IDs
+   * @return the entity with updated group memberships
+   */
   @Override
   protected User prePublish(User entity, UserInputDTO input) {
     List<UUID> groupUUIDs = input.getGroupIds();
@@ -117,6 +145,14 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
             });
   }
 
+  /**
+   * Validates that all referenced group IDs exist before updating the user.
+   *
+   * @param input the user update input
+   * @param existingEntity the current user entity
+   * @return the validated input
+   * @throws InvalidInputException if any referenced group does not exist
+   */
   @Override
   protected UserInputDTO preProcessUpdateInput(UserInputDTO input, User existingEntity) {
     validateGroupIdsExist(input.getGroupIds());
@@ -137,6 +173,12 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     }
   }
 
+  /**
+   * Stores the Keycloak user ID on the entity after successful external system synchronization.
+   *
+   * @param entity the user entity to update
+   * @param externalId the Keycloak user ID returned by the config adapter
+   */
   @Override
   protected void updateExternalId(User entity, String externalId) {
     if (externalId != null && !externalId.isBlank()) {
@@ -144,6 +186,13 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     }
   }
 
+  /**
+   * Maps a CRUD operation name to the corresponding Kafka topic for user events.
+   *
+   * @param operation the operation name ("create", "update", or "delete")
+   * @return the matching {@link Topics} enum value
+   * @throws IllegalArgumentException if the operation is unknown
+   */
   @Override
   protected Topics resolveTopic(String operation) {
     return switch (operation.toLowerCase()) {
@@ -159,6 +208,12 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     return "user";
   }
 
+  /**
+   * Returns the Keycloak realm for the user entity, used as the target resource in config events.
+   *
+   * @param entity the user entity
+   * @return the configured target realm name
+   */
   @Override
   protected String getRealm(User entity) {
     return targetRealm;
@@ -169,11 +224,24 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     return "/users";
   }
 
+  /**
+   * Converts a user entity into a {@link ConfigValue} (Keycloak user configuration) for the config
+   * adapter event payload.
+   *
+   * @param entity the user entity
+   * @return the Keycloak user configuration value
+   */
   @Override
   protected ConfigValue toConfigValue(User entity) {
     return buildUserConfig(entity);
   }
 
+  /**
+   * Extracts the entity ID from the user, used for correlation in config adapter events.
+   *
+   * @param entity the user entity
+   * @return the user's UUID
+   */
   @Override
   protected UUID getEntityId(User entity) {
     return entity.getId();

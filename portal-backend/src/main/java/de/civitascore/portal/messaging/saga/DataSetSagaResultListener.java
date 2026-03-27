@@ -13,6 +13,11 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
+/**
+ * Kafka listener for dataset saga result messages. Consumes {@code SAGA_COMPLETED} and {@code
+ * SAGA_FAILED} messages from the saga result topic and delegates to {@link DataSetService} to
+ * update dataset state with infrastructure IDs or record failure information.
+ */
 @Slf4j
 @Component
 public class DataSetSagaResultListener {
@@ -27,6 +32,12 @@ public class DataSetSagaResultListener {
     this.objectMapper = objectMapper;
   }
 
+  /**
+   * Handle an incoming saga result message from Kafka. Parses the message type and delegates to the
+   * appropriate handler for completed or failed sagas.
+   *
+   * @param payload the raw JSON payload from Kafka
+   */
   @KafkaListener(
       topics = "${saga.result-topic:de.civitascore.saga.result}",
       groupId = "${spring.kafka.consumer.group-id:civitas-portal-backend}-saga",

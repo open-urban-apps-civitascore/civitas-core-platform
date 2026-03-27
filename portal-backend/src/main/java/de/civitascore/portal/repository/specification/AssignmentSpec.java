@@ -38,6 +38,7 @@ interface AssignmentScopeTypeOrRoleTypeSpec extends BaseSpec<Assignment> {}
 })
 interface AssignmentQuickSearchSpec extends BaseSpec<Assignment> {}
 
+/** JPA Specification for filtering {@link Assignment} entities via query parameters. */
 public interface AssignmentSpec
     extends AssignmentRoleIdSpec,
         AssignmentUserIdSpec,

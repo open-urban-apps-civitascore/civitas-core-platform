@@ -22,6 +22,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service for managing {@link DataStructure} entities through their lifecycle (DRAFT to AVAILABLE).
+ * Handles version relationship resolution, publish/unpublish status transitions, and validates that
+ * no referenced versions are in use before allowing structural changes.
+ */
 @Service
 @RequiredArgsConstructor
 public class DataStructureService
@@ -64,6 +69,15 @@ public class DataStructureService
     return postLoad(entity);
   }
 
+  /**
+   * Resolves data structure version references after DTO-to-entity conversion. Validates that all
+   * provided version IDs exist and sets the bidirectional relationship.
+   *
+   * @param entity the data structure entity
+   * @param input the input DTO containing version IDs
+   * @return the entity with resolved version relationships and assignments
+   * @throws InvalidInputException if any version ID is not found
+   */
   @Override
   protected DataStructure postConvertToEntity(DataStructure entity, DataStructureInputDTO input) {
     if (input.getDataStructureVersionIds() != null) {
@@ -85,6 +99,12 @@ public class DataStructureService
     return super.postConvertToEntity(entity, input); // base handles assignments
   }
 
+  /**
+   * Sets initial DRAFT status for newly created data structures.
+   *
+   * @param input the creation input
+   * @return the input with DRAFT status set
+   */
   @Override
   protected DataStructureInputDTO preProcessCreateInput(DataStructureInputDTO input) {
     // Set DRAFT status for newly created data structures
@@ -92,6 +112,14 @@ public class DataStructureService
     return super.preProcessCreateInput(input);
   }
 
+  /**
+   * Validates that the name is not blank before updating the data structure.
+   *
+   * @param input the update input
+   * @param existingEntity the current data structure entity
+   * @return the validated input
+   * @throws InvalidInputException if the name is null or blank
+   */
   @Override
   protected DataStructureInputDTO preProcessUpdateInput(
       DataStructureInputDTO input, DataStructure existingEntity) {
@@ -200,6 +228,14 @@ public class DataStructureService
     return dataStructureRepository.save(dataStructure);
   }
 
+  /**
+   * Validates that none of the data structure's versions are in use by a data source before
+   * allowing deletion.
+   *
+   * @param id the data structure ID to delete
+   * @return the data structure entity to be deleted
+   * @throws ResourceInUseException if any version is referenced by a data source
+   */
   @Override
   protected DataStructure preProcessDelete(UUID id) {
     DataStructure dataStructure = findByIdOrThrow(id);

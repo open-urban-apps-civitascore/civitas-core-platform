@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** REST controller for managing catalog resources with JSON and JSON-LD content negotiation. */
 @Profile("preview")
 @RestController
 @RequestMapping("/catalogs")
@@ -55,6 +56,14 @@ public class CatalogController
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "public"))
   })
+  /**
+   * Retrieves a paginated list of catalogs with optional filtering by name, description, or
+   * free-text search.
+   *
+   * @param spec the catalog search/filter specification
+   * @param pageable pagination and sorting parameters
+   * @return a page of catalog output DTOs with HTTP 200 status
+   */
   @Override
   public ResponseEntity<Page<CatalogOutputDTO>> getAll(
       @ParameterObject @Parameter(description = "Search/filter spec") CatalogSpec spec,
@@ -73,16 +82,24 @@ public class CatalogController
           "Returns a catalog in JSON or JSON-LD format based on Accept header. "
               + "Use 'Accept: application/ld+json' for JSON-LD output, "
               + "or 'Accept: application/json' for standard JSON output.")
+  /**
+   * Retrieves a catalog by ID, supporting both JSON and JSON-LD content negotiation.
+   *
+   * @param id the UUID of the catalog to retrieve
+   * @return the catalog output DTO with HTTP 200 status
+   */
   @Override
   public ResponseEntity<CatalogOutputDTO> getById(@PathVariable UUID id) {
     return super.getById(id);
   }
 
+  /** {@inheritDoc} */
   @Override
   protected CatalogService getService() {
     return catalogService;
   }
 
+  /** {@inheritDoc} */
   @Override
   protected CatalogAssembler getAssembler() {
     return catalogAssembler;

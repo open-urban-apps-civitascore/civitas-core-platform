@@ -18,6 +18,13 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+/**
+ * Security exception handler that produces RFC 9457 Problem Detail responses for authentication and
+ * authorization failures.
+ *
+ * <p>Implements both {@link AuthenticationEntryPoint} and {@link AccessDeniedHandler} so that
+ * Spring Security delegates unauthenticated and forbidden requests here.
+ */
 @ControllerAdvice
 @Slf4j
 public class SecurityExceptionHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
@@ -25,6 +32,14 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
   private static final String ERROR_URN_PREFIX = "urn:civitas:error:";
   private final ObjectMapper mapper = new ObjectMapper();
 
+  /**
+   * Handles unauthenticated requests by writing a 401 Problem Detail response.
+   *
+   * @param request the current HTTP request
+   * @param response the HTTP response to write to
+   * @param ex the authentication exception
+   * @throws IOException if writing the response fails
+   */
   @Override
   public void commence(
       HttpServletRequest request, HttpServletResponse response, AuthenticationException ex)
@@ -34,6 +49,14 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
         request, response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required");
   }
 
+  /**
+   * Handles access-denied requests by writing a 403 Problem Detail response.
+   *
+   * @param request the current HTTP request
+   * @param response the HTTP response to write to
+   * @param ex the access denied exception
+   * @throws IOException if writing the response fails
+   */
   @Override
   public void handle(
       HttpServletRequest request, HttpServletResponse response, AccessDeniedException ex)
@@ -43,6 +66,13 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
         request, response, HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Insufficient privileges");
   }
 
+  /**
+   * Handles JWT validation failures and returns a 401 Problem Detail response.
+   *
+   * @param ex the JWT exception
+   * @param request the current HTTP request
+   * @return a Problem Detail with HTTP 401 status
+   */
   @ExceptionHandler(JwtException.class)
   @ResponseStatus(HttpStatus.UNAUTHORIZED)
   public ProblemDetail handleJwtException(JwtException ex, HttpServletRequest request) {

@@ -27,10 +27,22 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.stereotype.Component;
 
+/**
+ * Annotation-driven DCAT-AP mapper that uses {@link JsonLDResource} and {@link JsonLDProperty}
+ * annotations to generically convert any annotated {@link BaseOutputDTO} to an RDF model. Also
+ * serves as a Spring {@link HttpMessageConverter} for {@code application/ld+json} content
+ * negotiation.
+ *
+ * @param <T> the output DTO type annotated with {@link JsonLDResource}
+ */
 @Component
 public class GenericDcatMapper<T extends BaseOutputDTO> extends DcatMapper<T>
     implements HttpMessageConverter<T> {
 
+  /**
+   * {@inheritDoc} Converts an annotated DTO to an RDF model by reflecting over {@link
+   * JsonLDResource} and {@link JsonLDProperty} annotations on the DTO class hierarchy.
+   */
   @Override
   public Model toModel(T dto) {
     Model model = createEmptyModel();
@@ -165,17 +177,28 @@ public class GenericDcatMapper<T extends BaseOutputDTO> extends DcatMapper<T>
     resource.addProperty(property, literal);
   }
 
+  /**
+   * Serializes an Apache Jena RDF model to a JSON-LD string.
+   *
+   * @param model the RDF model to serialize
+   * @return the JSON-LD string representation
+   */
   public String toJsonLd(Model model) {
     StringWriter writer = new StringWriter();
     RDFDataMgr.write(writer, model, Lang.JSONLD);
     return writer.toString();
   }
 
+  /** {@inheritDoc} Always returns {@code false} since reading JSON-LD is not supported. */
   @Override
   public boolean canRead(@NonNull Class<?> clazz, @Nullable MediaType mediaType) {
     return false;
   }
 
+  /**
+   * {@inheritDoc} Returns {@code true} for {@code application/ld+json} when the class is annotated
+   * with {@link JsonLDResource}.
+   */
   @Override
   public boolean canWrite(@NonNull Class<?> clazz, @Nullable MediaType mediaType) {
     // Check if the media type is application/ld+json and the class has JsonLDResource annotation
@@ -188,17 +211,23 @@ public class GenericDcatMapper<T extends BaseOutputDTO> extends DcatMapper<T>
     return isJsonLd && hasAnnotation && isBaseOutputDTO;
   }
 
+  /** {@inheritDoc} Returns {@code application/ld+json} as the only supported media type. */
   @Override
   @NonNull public List<MediaType> getSupportedMediaTypes() {
     return List.of(MediaType.parseMediaType("application/ld+json"));
   }
 
+  /** {@inheritDoc} Not supported. Always throws {@link UnsupportedOperationException}. */
   @Override
   @NonNull public T read(@NonNull Class<? extends T> clazz, @NonNull HttpInputMessage inputMessage)
       throws IOException, HttpMessageNotReadableException {
     throw new UnsupportedOperationException("Reading JSON-LD is not yet implemented");
   }
 
+  /**
+   * {@inheritDoc} Converts the DTO to an RDF model and writes it as JSON-LD to the output message
+   * body.
+   */
   @Override
   public void write(
       @NonNull T dto, @Nullable MediaType contentType, @NonNull HttpOutputMessage outputMessage)

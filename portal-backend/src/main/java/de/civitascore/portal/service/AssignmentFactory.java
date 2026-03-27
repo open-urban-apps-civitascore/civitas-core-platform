@@ -19,6 +19,10 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/**
+ * Factory for constructing {@link Assignment} entities from various input DTOs. Resolves and
+ * validates referenced entities (groups, roles, scope targets) during assembly.
+ */
 @Service
 @RequiredArgsConstructor
 public class AssignmentFactory {

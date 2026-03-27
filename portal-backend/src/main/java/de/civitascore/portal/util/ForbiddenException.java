@@ -4,6 +4,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+/** Thrown when the current user lacks permission to access or modify a specific resource. */
 @ResponseStatus(HttpStatus.FORBIDDEN)
 public class ForbiddenException extends RuntimeException {
 

@@ -6,6 +6,10 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Abstract entity that adds a mandatory {@code name} and an optional {@code description} to {@link
+ * BaseEntity}.
+ */
 @Getter
 @Setter
 @MappedSuperclass

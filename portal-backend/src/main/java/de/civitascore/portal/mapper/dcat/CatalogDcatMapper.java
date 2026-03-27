@@ -10,9 +10,18 @@ import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.vocabulary.RDF;
 import org.springframework.stereotype.Component;
 
+/**
+ * DCAT-AP mapper for converting {@link CatalogOutputDTO} to an Apache Jena RDF {@link Model}.
+ * Produces DCAT Catalog resources with title, description, child/parent relationships, and dataset
+ * references.
+ */
 @Component
 public class CatalogDcatMapper extends DcatMapper<CatalogOutputDTO> {
 
+  /**
+   * {@inheritDoc} Produces a DCAT Catalog resource with title, description, {@code dct:hasPart} /
+   * {@code dct:isPartOf} relationships, and {@code dcat:dataset} references.
+   */
   @Override
   public Model toModel(CatalogOutputDTO dto) {
     Model model = createEmptyModel();

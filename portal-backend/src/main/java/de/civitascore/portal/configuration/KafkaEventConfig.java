@@ -19,6 +19,11 @@ import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.util.backoff.FixedBackOff;
 
+/**
+ * Kafka producer and consumer configuration for CloudEvent publishing and saga result processing.
+ * Configures an idempotent producer with compression and a consumer factory with dead-letter queue
+ * support.
+ */
 @Configuration
 public class KafkaEventConfig {
 
@@ -40,6 +45,7 @@ public class KafkaEventConfig {
   @Value("${spring.kafka.producer.buffer-memory:33554432}")
   private long bufferMemory;
 
+  /** Validates the configured Kafka compression type on startup, failing fast if unsupported. */
   @PostConstruct
   void validateCompressionType() {
     if (!VALID_COMPRESSION_TYPES.contains(compressionType)) {
@@ -49,6 +55,10 @@ public class KafkaEventConfig {
     }
   }
 
+  /**
+   * Creates an idempotent Kafka producer template with {@code acks=all}, configurable compression,
+   * and batching for CloudEvent publishing.
+   */
   @Bean
   public KafkaTemplate<String, String> eventKafkaTemplate() {
     Map<String, Object> props = new HashMap<>();

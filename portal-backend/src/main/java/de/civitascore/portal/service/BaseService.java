@@ -139,6 +139,12 @@ public abstract class BaseService<T, I extends BaseInputDTO> {
     return findById(id).orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
   }
 
+  /**
+   * Persists the given entity directly, bypassing lifecycle hooks.
+   *
+   * @param entity the entity to save
+   * @return the saved entity
+   */
   @Transactional
   public T save(T entity) {
     return getRepository().save(entity);
@@ -167,10 +173,21 @@ public abstract class BaseService<T, I extends BaseInputDTO> {
     postDelete(entity);
   }
 
+  /**
+   * Checks whether an entity with the given ID exists.
+   *
+   * @param id the entity ID
+   * @return {@code true} if the entity exists, {@code false} otherwise
+   */
   public boolean existsById(UUID id) {
     return getRepository().existsById(id);
   }
 
+  /**
+   * Returns the total number of entities of this type.
+   *
+   * @return the entity count
+   */
   public long count() {
     return getRepository().count();
   }

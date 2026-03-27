@@ -10,6 +10,7 @@ import java.util.Map;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Output DTO representing a data source for API responses. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DataSourceOutputDTO extends BaseOutputDTO {

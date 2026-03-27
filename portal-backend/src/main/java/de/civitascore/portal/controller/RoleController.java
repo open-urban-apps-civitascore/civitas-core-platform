@@ -21,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** REST controller for managing role resources. */
 @RestController
 @RequestMapping("/roles")
 @RequiredArgsConstructor
@@ -52,6 +53,14 @@ public class RoleController extends BaseController<RoleInputDTO, RoleOutputDTO, 
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "admin"))
   })
+  /**
+   * Retrieves a paginated list of roles with optional filtering by name, description, role type, or
+   * free-text search.
+   *
+   * @param spec the role search/filter specification
+   * @param pageable pagination and sorting parameters
+   * @return a page of role output DTOs with HTTP 200 status
+   */
   @Override
   public ResponseEntity<Page<RoleOutputDTO>> getAll(
       @ParameterObject @Parameter(description = "Search/filter spec") RoleSpec spec,
@@ -61,11 +70,13 @@ public class RoleController extends BaseController<RoleInputDTO, RoleOutputDTO, 
     return super.getAll(spec, pageable);
   }
 
+  /** {@inheritDoc} */
   @Override
   protected RoleService getService() {
     return roleService;
   }
 
+  /** {@inheritDoc} */
   @Override
   protected RoleAssembler getAssembler() {
     return roleAssembler;
