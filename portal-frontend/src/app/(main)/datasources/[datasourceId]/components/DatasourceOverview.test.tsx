@@ -11,6 +11,22 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
 }))
 
 const mockCurrentUser = (permissions: PermissionName[]) => {
+  // Split permissions by scope type so filterAssignmentPermissions keeps them:
+  // DATASOURCE_* stay in the DATASOURCE-scoped assignment, others go to TENANT.
+  const datasourcePermissions = permissions.filter(p => p.startsWith('DATASOURCE'))
+  const otherPermissions = permissions.filter(p => !p.startsWith('DATASOURCE'))
+
+  const assignments = [
+    {
+      scopeType: 'DATASOURCE',
+      scopeId: 'test-id',
+      permissions: datasourcePermissions,
+    },
+    ...(otherPermissions.length > 0
+      ? [{ scopeType: 'TENANT' as const, scopeId: null, permissions: otherPermissions }]
+      : []),
+  ]
+
   vi.mocked(useGetCurrentUser).mockReturnValue({
     data: {
       username: 'current',
@@ -18,13 +34,7 @@ const mockCurrentUser = (permissions: PermissionName[]) => {
       title: 'MR' as const,
       firstName: 'Current',
       lastName: 'User',
-      assignments: [
-        {
-          scopeType: 'DATASOURCE',
-          scopeId: 'test-id',
-          permissions,
-        },
-      ],
+      assignments,
     },
   } as unknown as ReturnType<typeof useGetCurrentUser>)
 }
