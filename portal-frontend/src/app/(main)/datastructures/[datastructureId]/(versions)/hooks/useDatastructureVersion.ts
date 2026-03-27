@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AxiosError } from 'axios'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -65,6 +66,7 @@ export const useDatastructureVersion = ({
 }: UseDatastructureVersionProps) => {
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
+  const router = useRouter()
   const { handleFormValidationError } = useError()
   const [initialSession, setInitialSession] = useState(() => buildSessionFromVersion(version))
 
@@ -179,6 +181,7 @@ export const useDatastructureVersion = ({
         endpoint: `/datastructures/${datastructureId}/versions/${versionId}/${endpoint}`,
       })
       toast.success(tCommon('success.statusChangeSuccess'))
+      router.refresh()
       return response.data
     } catch (error) {
       toast.error(tCommon('errors.statusChangeError'))
@@ -215,17 +218,18 @@ export const useDatastructureVersion = ({
   ): Promise<DatastructureVersion> => {
     try {
       let response: { data: DatastructureVersion }
-      if (initialFormValues.dataStructureVersionStatus === STATUS_TYPES.AVAILABLE)
+      if (initialFormValues.dataStructureVersionStatus === STATUS_TYPES.AVAILABLE) {
         response = await updatePublishedVersion.mutateAsync({
           data: values,
           endpoint: `/datastructures/${datastructureId}/versions/${values.id}/published/meta`,
         })
-      else
+      } else {
         response = await updateVersion.mutateAsync({
           data: values,
           endpoint: `/datastructures/${datastructureId}/versions/${values.id}`,
         })
-      toast.success(t('messages.updateSuccess'))
+        toast.success(t('messages.updateSuccess'))
+      }
       return response.data
     } catch (error) {
       toast.error(tCommon('errors.updateError', { item: tCommon('items.datastructureVersion') }))
