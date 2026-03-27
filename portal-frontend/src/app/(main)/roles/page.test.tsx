@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
@@ -42,11 +42,13 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
   useGetCurrentUser: vi.fn(),
 }))
 
+import { useGetRoles } from '@/app/services/api/roles/clientRequests'
+
 vi.mock('@/app/services/api/roles/clientRequests', () => ({
-  useGetRoles: () => ({
+  useGetRoles: vi.fn(() => ({
     data: { data: [], totalElements: 0 },
     isFetching: false,
-  }),
+  })),
 }))
 
 vi.mock('./components/RolesTable', () => ({
@@ -68,10 +70,18 @@ const mockCurrentUser = (permissions: PermissionName[]) => {
   } as unknown as ReturnType<typeof useGetCurrentUser>)
 }
 
+const mockGetRoles = () => {
+  vi.mocked(useGetRoles).mockReturnValue({
+    data: { data: [], totalElements: 0 },
+    isFetching: false,
+  } as unknown as ReturnType<typeof useGetRoles>)
+}
+
 describe('RolesPage permission gating', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockQueryParams('SYSTEM')
+    mockGetRoles()
   })
 
   it('shows create button when user has ROLE_CREATE', () => {
@@ -90,6 +100,7 @@ describe('RolesPage permission gating', () => {
 describe('RolesPage create button label', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockGetRoles()
   })
 
   it('shows "newSystemRole" on System Roles tab', () => {
@@ -104,5 +115,49 @@ describe('RolesPage create button label', () => {
     mockCurrentUser([PERMISSION_NAMES.ROLE_CREATE])
     renderPage()
     expect(screen.getByText('newDataRole')).toBeInTheDocument()
+  })
+})
+
+describe('RolesPage server-side pagination', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetRoles()
+  })
+
+  it('useGetRoles is called with roleType matching the active tab', () => {
+    mockQueryParams('SYSTEM')
+    mockCurrentUser([PERMISSION_NAMES.ROLE_READ])
+    renderPage()
+    const params = vi.mocked(useGetRoles).mock.calls[0][0]?.params
+    expect(params?.get('roleType')).toBe('SYSTEM')
+
+    vi.clearAllMocks()
+    mockGetRoles()
+    mockQueryParams('DATA')
+    mockCurrentUser([PERMISSION_NAMES.ROLE_READ])
+    renderPage()
+    const dataParams = vi.mocked(useGetRoles).mock.calls[0][0]?.params
+    expect(dataParams?.get('roleType')).toBe('DATA')
+  })
+
+  it('tab switch resets pagination to page 0', () => {
+    const setPaginationParams = vi.fn()
+    vi.mocked(useQueryParams).mockReturnValue({
+      setSortingParams: vi.fn(),
+      setPaginationParams,
+      setSearchParam: vi.fn(),
+      getApiRequestParamsByUrl: vi.fn(() => new URLSearchParams()),
+      setTabValueParam: vi.fn(),
+      pageIndex: 0,
+      pageSize: 10,
+      sorting: [],
+      search: '',
+      tabValue: 'SYSTEM',
+      subTabValue: '',
+    } as unknown as ReturnType<typeof useQueryParams>)
+    mockCurrentUser([PERMISSION_NAMES.ROLE_READ])
+    renderPage()
+    fireEvent.click(screen.getByText('dataRoles'))
+    expect(setPaginationParams).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 10 })
   })
 })
