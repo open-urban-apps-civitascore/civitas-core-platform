@@ -4,30 +4,30 @@ import { useTranslations } from 'next-intl'
 import { JSX } from 'react'
 
 import { cn } from '@/lib/utils'
-import { DatasetStatusTypes } from '@/types/datasets'
-import { DatasourceStatusType } from '@/types/datasources'
+import { StatusTypes } from '@/types/common'
 
 import { ActionButtons, ActionButtonsProps } from '../action-buttons/ActionButtons'
 import { StatusDropdown } from '../status-dropdown/StatusDropdown'
 import { Button } from '../ui/button'
 
-type PageEditControlsProps<T extends DatasourceStatusType | DatasetStatusTypes> = ActionButtonsProps & {
+type PageEditControlsProps<T extends StatusTypes> = ActionButtonsProps & {
   status: T
   onStatusChange: (status: T) => void
   canSetAvailable: boolean
+  canRelease?: boolean
   onEditClick: () => void
   isReadOnly: boolean
   formId?: string
   statusOptions: T[]
+  canEdit?: boolean
 }
 
-const PageEditControls = <T extends DatasourceStatusType | DatasetStatusTypes>(
-  props: PageEditControlsProps<T>,
-): JSX.Element => {
+const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>): JSX.Element => {
   const {
     status,
     onStatusChange,
     canSetAvailable,
+    canRelease,
     hasCard = true,
     wrapperClassname,
     className,
@@ -35,6 +35,7 @@ const PageEditControls = <T extends DatasourceStatusType | DatasetStatusTypes>(
     isReadOnly = true,
     formId,
     statusOptions,
+    canEdit = true,
     ...actionButtonsProps
   } = props
 
@@ -52,6 +53,7 @@ const PageEditControls = <T extends DatasourceStatusType | DatasetStatusTypes>(
         statusOptions={statusOptions}
         onStatusChange={onStatusChange}
         canSetAvailable={canSetAvailable}
+        canRelease={canRelease}
         isReadOnly={isReadOnly}
       />
 
@@ -65,14 +67,16 @@ const PageEditControls = <T extends DatasourceStatusType | DatasetStatusTypes>(
             className={cn('py-0', hasCard && 'py-3', className)}
           />
         ) : (
-          <Button
-            data-testid="editButton"
-            type="button"
-            onClick={onEditClick}
-            className={cn('py-0', hasCard && 'py-3')}
-          >
-            {t('actions.edit')}
-          </Button>
+          canEdit && (
+            <Button
+              data-testid="editButton"
+              type="button"
+              onClick={onEditClick}
+              className={cn('py-0', hasCard && 'py-3')}
+            >
+              {t('actions.edit')}
+            </Button>
+          )
         )}
       </div>
     </div>

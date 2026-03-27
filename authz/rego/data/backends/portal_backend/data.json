@@ -117,7 +117,7 @@
       "POST": "DATASOURCE_RELEASE"
     },
     "/v1/datasources/{id}/unpublish": {
-      "POST": "DATASOURCE_UPDATE"
+      "POST": "DATASOURCE_RELEASE"
     },
     "/v1/datasources/{id}/published/meta": {
       "PUT": ["DATASOURCE_UPDATE", "DATASOURCE_RELEASE"]
@@ -140,7 +140,7 @@
       "POST": "DATASTRUCTURE_RELEASE"
     },
     "/v1/datastructures/{id}/unpublish": {
-      "POST": "DATASTRUCTURE_UPDATE"
+      "POST": "DATASTRUCTURE_RELEASE"
     },
     "/v1/datastructures/{id}/published/meta": {
       "PUT": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
@@ -150,7 +150,7 @@
     },
     "/v1/datastructures/{id}/versions": {
       "GET": "DATASTRUCTURE_READ",
-      "POST": "DATASTRUCTURE_CREATE"
+      "POST": "DATASTRUCTURE_UPDATE"
     },
     "/v1/datastructures/{id}/versions/{id}": {
       "GET": "DATASTRUCTURE_READ",
@@ -162,7 +162,7 @@
       "POST": "DATASTRUCTURE_RELEASE"
     },
     "/v1/datastructures/{id}/versions/{id}/unpublish": {
-      "POST": "DATASTRUCTURE_UPDATE"
+      "POST": "DATASTRUCTURE_RELEASE"
     },
     "/v1/datastructures/{id}/versions/{id}/published/meta": {
       "PUT": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]

@@ -23,7 +23,6 @@ export const RolesTable = (props: RolesTableProps) => {
     totalPages,
     rowSelection,
     rowCount,
-    onRowClick,
     onPaginationChange,
     onSortingChange,
     selectedRoleType,
@@ -124,13 +123,6 @@ export const RolesTable = (props: RolesTableProps) => {
   })
 
   return (
-    <DataTable
-      table={table}
-      pageIndex={pageIndex}
-      pageSize={pageSize}
-      totalPages={totalPages}
-      isLoading={isLoading}
-      onRowClick={onRowClick}
-    />
+    <DataTable table={table} pageIndex={pageIndex} pageSize={pageSize} totalPages={totalPages} isLoading={isLoading} />
   )
 }

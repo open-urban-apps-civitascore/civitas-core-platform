@@ -15,7 +15,9 @@ import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Button } from '@/components/ui/button'
+import { usePermissions } from '@/hooks/use-permissions'
 import { AssignmentScopedInput } from '@/types/assignments'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Group } from '@/types/groups'
 import { Role } from '@/types/roles'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
@@ -69,6 +71,9 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
   const { testId = 'accessManagement', hasSecondBox = false, firstBoxText, secondBoxText } = props
 
   const isControlled = props.assignedGroups !== undefined
+  const { hasPermission } = usePermissions()
+  const canAddGroups = hasPermission(PERMISSION_NAMES.GROUP_READ) && hasPermission(PERMISSION_NAMES.ROLE_READ)
+  const canAddRoles = hasPermission(PERMISSION_NAMES.ROLE_READ)
 
   const params = useSearchParams()
   const mode = params.get('mode')
@@ -202,7 +207,7 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
   // Shared content
   const mainContent = (
     <div className="min-h-0">
-      {!isReadOnly && (
+      {!isReadOnly && canAddGroups && (
         <div className="flex justify-end mb-4">
           <Button onClick={handleAddAssignmentClick}>
             <Plus className="h-4 w-4 mr-2" />
@@ -229,7 +234,7 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
           <AccessManagementTable
             assignments={assignedGroups}
             onDeleteClick={id => handleDeleteGroup(id as string)}
-            onAddRoleClick={handleAddRoleClick}
+            onAddRoleClick={canAddRoles ? handleAddRoleClick : undefined}
             onDeleteRole={handleDeleteRole}
             isReadOnly={isReadOnly}
             isLoading={isLoading}

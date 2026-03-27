@@ -84,7 +84,12 @@ describe('AccessManagementTable', () => {
 
     render(
       <NextIntlClientProvider locale="de" messages={messages}>
-        <AccessManagementTable {...defaultProps} assignments={assignmentsWithoutRoles} isReadOnly={false} />
+        <AccessManagementTable
+          {...defaultProps}
+          assignments={assignmentsWithoutRoles}
+          isReadOnly={false}
+          onAddRoleClick={vi.fn()}
+        />
       </NextIntlClientProvider>,
     )
 

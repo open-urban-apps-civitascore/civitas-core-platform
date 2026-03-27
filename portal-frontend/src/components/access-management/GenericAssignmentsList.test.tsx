@@ -2,7 +2,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it, vi } from 'vitest'
 
+import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import messages from '@/messages/de.json'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 
 import { GroupRoleAssignmentTable } from './AccessManagementTable'
 import { GenericAssignmentsList } from './GenericAssignmentsList'
@@ -21,6 +23,10 @@ vi.mock('@/app/services/api/roles/clientRequests', () => ({
     isLoading: false,
     isError: false,
   }),
+}))
+
+vi.mock('@/app/services/api/users/clientRequests', () => ({
+  useGetCurrentUser: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -44,6 +50,25 @@ const mockAssignments: GroupRoleAssignmentTable[] = [
 ]
 
 describe('GenericAssignmentsList', () => {
+  beforeEach(() => {
+    vi.mocked(useGetCurrentUser).mockReturnValue({
+      data: {
+        username: 'test',
+        email: 'test@test.com',
+        title: 'MR' as const,
+        firstName: 'Test',
+        lastName: 'User',
+        assignments: [
+          {
+            scopeType: 'TENANT',
+            scopeId: null,
+            permissions: [PERMISSION_NAMES.GROUP_READ, PERMISSION_NAMES.ROLE_READ],
+          },
+        ],
+      },
+    } as ReturnType<typeof useGetCurrentUser>)
+  })
+
   describe('uncontrolled mode', () => {
     const defaultProps = {
       entityId: 'test-entity-1',
@@ -280,6 +305,95 @@ describe('GenericAssignmentsList', () => {
       )
 
       expect(screen.getByText('Keine Gruppen und Rollen vorhanden')).toBeInTheDocument()
+    })
+  })
+
+  describe('permission gating', () => {
+    const controlledEditProps = {
+      assignedGroups: mockAssignments,
+      onAssignedGroupsChange: vi.fn(),
+      isReadOnly: false,
+    }
+
+    it('shows add-group button when user has GROUP_READ and ROLE_READ', () => {
+      vi.mocked(useGetCurrentUser).mockReturnValue({
+        data: {
+          username: 'test',
+          email: 'test@test.com',
+          title: 'MR' as const,
+          firstName: 'Test',
+          lastName: 'User',
+          assignments: [
+            {
+              scopeType: 'TENANT',
+              scopeId: null,
+              permissions: [PERMISSION_NAMES.GROUP_READ, PERMISSION_NAMES.ROLE_READ],
+            },
+          ],
+        },
+      } as ReturnType<typeof useGetCurrentUser>)
+
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...controlledEditProps} />
+        </NextIntlClientProvider>,
+      )
+
+      expect(screen.getByText('Gruppe hinzufügen')).toBeInTheDocument()
+    })
+
+    it('hides add-group button when user lacks GROUP_READ', () => {
+      vi.mocked(useGetCurrentUser).mockReturnValue({
+        data: {
+          username: 'test',
+          email: 'test@test.com',
+          title: 'MR' as const,
+          firstName: 'Test',
+          lastName: 'User',
+          assignments: [
+            {
+              scopeType: 'TENANT',
+              scopeId: null,
+              permissions: [PERMISSION_NAMES.ROLE_READ],
+            },
+          ],
+        },
+      } as ReturnType<typeof useGetCurrentUser>)
+
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...controlledEditProps} />
+        </NextIntlClientProvider>,
+      )
+
+      expect(screen.queryByText('Gruppe hinzufügen')).not.toBeInTheDocument()
+    })
+
+    it('hides add-group button when user lacks ROLE_READ', () => {
+      vi.mocked(useGetCurrentUser).mockReturnValue({
+        data: {
+          username: 'test',
+          email: 'test@test.com',
+          title: 'MR' as const,
+          firstName: 'Test',
+          lastName: 'User',
+          assignments: [
+            {
+              scopeType: 'TENANT',
+              scopeId: null,
+              permissions: [PERMISSION_NAMES.GROUP_READ],
+            },
+          ],
+        },
+      } as ReturnType<typeof useGetCurrentUser>)
+
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...controlledEditProps} />
+        </NextIntlClientProvider>,
+      )
+
+      expect(screen.queryByText('Gruppe hinzufügen')).not.toBeInTheDocument()
     })
   })
 })

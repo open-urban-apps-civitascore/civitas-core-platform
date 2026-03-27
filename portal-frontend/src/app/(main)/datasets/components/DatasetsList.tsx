@@ -14,7 +14,9 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Dataset } from '@/types/datasets'
 
 import { DatasetsTable } from './DatasetsTable'
@@ -41,6 +43,8 @@ const DatasetsList = (props: DatasetsListProps) => {
     search,
     totalPages,
   } = useQueryParams()
+
+  const { hasPermission } = usePermissions()
 
   const [datasetToDelete, setDatasetToDelete] = useState<string | null>(null)
   const [isWarningOpen, setIsWarningOpen] = useState(false)
@@ -72,12 +76,15 @@ const DatasetsList = (props: DatasetsListProps) => {
 
   useEffect(() => setTotalPages(Math.ceil(rowCount / pageSize) || 1), [rowCount, pageSize, setTotalPages])
 
-  const CustomElement = (
-    <Button onClick={() => router.push(`datasets/create?${getApiRequestParamsByUrl().toString()}`)}>
+  const CustomElement = hasPermission(PERMISSION_NAMES.DATASET_CREATE) ? (
+    <Button
+      data-testid="addDatasetButton"
+      onClick={() => router.push(`datasets/create?${getApiRequestParamsByUrl().toString()}`)}
+    >
       <Plus />
       {t('newDataset')}
     </Button>
-  )
+  ) : undefined
 
   return (
     <>

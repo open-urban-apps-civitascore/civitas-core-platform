@@ -9,6 +9,7 @@
     "search": "Search",
     "noResults": "No results found.",
     "noData": "No Data",
+    "noPermission": "You do not have permission to view this content.",
     "loading": "Loading...",
     "loadingItems": "Loading {item} ...",
     "form": "Form",
@@ -949,7 +950,8 @@
       "status": "Status",
       "description": "Description",
       "tags": "Tags",
-      "showDataStructure": "Show Data structure"
+      "showDataStructure": "Show Data Structure",
+      "noPermission": "No permission to read datasources"
     },
     "apiPanel": {
       "requestDetails": "API Request Details",

@@ -2,6 +2,17 @@ import { headers as nextHeaders } from 'next/headers'
 import { getToken } from 'next-auth/jwt'
 
 /**
+ * Thrown when the user's session is missing or invalid (no JWT, no access token, or backend 401).
+ * Caught in layout.tsx to redirect to the signout route.
+ */
+export class AuthError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'AuthError'
+  }
+}
+
+/**
  * Server-side fetch utility for direct backend communication
  * Reads the access token directly from the encrypted JWT cookie via getToken().
  */
@@ -68,13 +79,13 @@ export const serverFetch = async <TResponse>({
   })
 
   if (!token) {
-    throw new Error('Not authenticated')
+    throw new AuthError('Not authenticated')
   }
 
   const accessToken = token.access_token as string | undefined
 
   if (!accessToken) {
-    throw new Error('No access token available')
+    throw new AuthError('No access token available')
   }
 
   // Determine which backend to use (similar to API route logic)
@@ -115,6 +126,10 @@ export const serverFetch = async <TResponse>({
 
   try {
     const response = await fetch(url, fetchOptions)
+
+    if (response.status === 401) {
+      throw new AuthError(`Backend responded with status ${response.status}`)
+    }
 
     if (!response.ok) {
       throw new Error(`Backend responded with status ${response.status}`)

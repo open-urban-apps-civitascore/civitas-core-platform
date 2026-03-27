@@ -15,7 +15,9 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { DatastructuresListData } from '@/types/datastructures'
 
 import { DatastructuresTable } from './DatastructuresTable'
@@ -35,6 +37,7 @@ export const DatastructuresList = (props: DatastructuresListProps) => {
   const [isDeletionWarningModalOpen, setIsDeletionWarningModalOpen] = useState(false)
   const deleteDatastructure = useDeleteDatastructure()
   const isLoading = deleteDatastructure.isPending
+  const { hasPermission } = usePermissions()
   const {
     pageIndex,
     pageSize,
@@ -82,12 +85,12 @@ export const DatastructuresList = (props: DatastructuresListProps) => {
     setIsDeletionWarningModalOpen(false)
   }
 
-  const CustomElement = (
-    <Button data-testid="addDatasourceButton" onClick={() => router.push('datastructures/create')}>
+  const CustomElement = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_CREATE) ? (
+    <Button data-testid="addDatastructureButton" onClick={() => router.push('datastructures/create')}>
       <Plus />
       {t('newDatasource')}
     </Button>
-  )
+  ) : undefined
 
   return (
     <PageContainer headerType="withSubTabsOrSubtitle" testId="datastructuresPage">

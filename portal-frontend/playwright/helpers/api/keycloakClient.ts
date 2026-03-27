@@ -167,6 +167,22 @@ export class KeycloakClient {
   }
 
   /**
+   * Search for Keycloak users by email domain. Returns all matching user IDs.
+   */
+  async searchUsersByEmail(emailSearch: string): Promise<Array<{ id: string; email: string }>> {
+    const ctx = await pwRequest.newContext()
+    try {
+      const res = await ctx.get(`${this.baseUrl}/users?search=${encodeURIComponent(emailSearch)}&max=100`, {
+        headers: { Authorization: `Bearer ${this.adminToken}` },
+      })
+      if (!res.ok()) return []
+      return (await res.json()) as Array<{ id: string; email: string }>
+    } finally {
+      await ctx.dispose()
+    }
+  }
+
+  /**
    * Delete a user from Keycloak by their Keycloak user ID.
    */
   async deleteUser(kcUserId: string): Promise<void> {

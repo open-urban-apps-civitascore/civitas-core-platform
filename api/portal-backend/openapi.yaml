@@ -3718,6 +3718,14 @@ paths:
         schema:
           type: string
           example: structure
+      - name: dataStructureStatus
+        in: query
+        description: Filter by status (exact match).
+        schema:
+          type: string
+          enum:
+          - DRAFT
+          - AVAILABLE
       responses:
         "200":
           description: Page of data structures returned successfully

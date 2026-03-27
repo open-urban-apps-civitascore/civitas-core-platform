@@ -17,7 +17,7 @@ export const AppSidebar = async (props: AppSidebarProps) => {
       <Sidebar collapsible="icon">
         <AppSidebarHeader />
 
-        <AppSidebarContent assignments={currentUser.assignments} />
+        <AppSidebarContent />
 
         <AppSidebarFooter currentUser={currentUser} />
       </Sidebar>

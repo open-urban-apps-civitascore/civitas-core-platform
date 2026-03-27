@@ -31,7 +31,11 @@ vi.mock('@/app/services/api/assignments/clientRequests', () => ({
   useDeleteAssignment: vi.fn(() => ({ mutateAsync: vi.fn() })),
 }))
 vi.mock('../page', () => ({ DEFAULT_TAB: 'SYSTEM' }))
-vi.mock('./baseinfo-tab/BaseInfoTab', () => ({ BaseInfoTab: () => null }))
+vi.mock('./baseinfo-tab/BaseInfoTab', () => ({
+  BaseInfoTab: (props: { deleteRole?: unknown }) => (
+    <div data-testid="base-info-tab" data-has-delete={!!props.deleteRole} />
+  ),
+}))
 vi.mock('./permissions-tab/PermissionsTab', () => ({ PermissionsTab: () => null }))
 vi.mock('./group-assignment-tab/GroupAssignmentTab', () => ({ GroupAssignmentTab: () => null }))
 
@@ -90,6 +94,26 @@ describe('RoleDetails permission gating', () => {
       mockHasPermission([PERMISSION_NAMES.ROLE_READ])
       render(<RoleDetails roleId="role-1" />)
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('Delete button visibility', () => {
+    it('passes delete handler to BaseInfoTab when user has ROLE_DELETE (existing role)', () => {
+      mockHasPermission([PERMISSION_NAMES.ROLE_DELETE])
+      render(<RoleDetails roleId="role-1" />)
+      expect(screen.getByTestId('base-info-tab')).toHaveAttribute('data-has-delete', 'true')
+    })
+
+    it('does not pass delete handler when user lacks ROLE_DELETE', () => {
+      mockHasPermission([PERMISSION_NAMES.ROLE_READ])
+      render(<RoleDetails roleId="role-1" />)
+      expect(screen.getByTestId('base-info-tab')).toHaveAttribute('data-has-delete', 'false')
+    })
+
+    it('does not pass delete handler for new role (no roleId)', () => {
+      mockHasPermission([PERMISSION_NAMES.ROLE_DELETE])
+      render(<RoleDetails />)
+      expect(screen.getByTestId('base-info-tab')).toHaveAttribute('data-has-delete', 'false')
     })
   })
 })

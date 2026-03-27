@@ -9,7 +9,8 @@
  */
 import { useTranslations } from 'next-intl'
 
-import { DATASOURCE_STATUS_TYPES } from '@/types/datasources'
+import { usePermissions } from '@/hooks/use-permissions'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 
 import { datasourceToSelectable, useDataSourceEntities } from '../../../_services/entityService'
 import type { DataSourceNodeData } from '../../../_types/nodes'
@@ -31,7 +32,9 @@ interface DataSourcePanelProps {
 
 export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate }) => {
   const t = useTranslations('pipelineEditor')
-  const { entities, isLoading, isError, getEntityById } = useDataSourceEntities()
+  const { hasPermission } = usePermissions()
+  const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
+  const { entities, isLoading, isError, getEntityById } = useDataSourceEntities({ isEnabled: canReadDatasources })
 
   const selectedEntity = data.entityId !== undefined ? getEntityById(data.entityId) : undefined
 
@@ -51,20 +54,19 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
     }
   }
 
-  const selectableEntities = entities
-    .filter(entity => entity.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE)
-    .map(datasourceToSelectable)
+  const selectableEntities = entities.map(datasourceToSelectable)
 
   return (
     <div className="space-y-4 p-4">
       <EntitySelector
         label={t('dataSourcePanel.label')}
-        placeholder={t('dataSourcePanel.placeholder')}
+        placeholder={canReadDatasources ? t('dataSourcePanel.placeholder') : t('dataSourcePanel.noPermission')}
         entities={selectableEntities}
         selectedId={data.entityId}
         isLoading={isLoading}
         isError={isError}
         onChange={handleEntityChange}
+        isDisabled={!canReadDatasources}
       />
 
       {selectedEntity && (

@@ -4,20 +4,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 
-import GroupsList from './GroupList'
+import DatasetsList from './DatasetsList'
 
 vi.mock('@/app/services/api/users/clientRequests', () => ({
   useGetCurrentUser: vi.fn(),
 }))
 
-vi.mock('@/app/services/api/groups/clientRequests', () => ({
-  useDeleteGroup: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+vi.mock('@/app/services/api/datasets/clientRequests', () => ({
+  useDeleteDataset: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
-  usePathname: vi.fn(() => '/groups'),
+  usePathname: vi.fn(() => '/datasets'),
 }))
 
 vi.mock('next-intl', () => ({
@@ -39,15 +39,13 @@ vi.mock('@/hooks/use-query-params', () => ({
   }),
 }))
 
-vi.mock('./GroupsTable', () => ({
-  GroupsTable: (props: { onDeleteGroupClick?: unknown }) => (
-    <div data-testid="groups-table" data-has-delete={!!props.onDeleteGroupClick} />
-  ),
+vi.mock('./DatasetsTable', () => ({
+  DatasetsTable: () => <div data-testid="datasets-table" />,
 }))
 
 const defaultProps = {
-  groupsData: [],
-  totalCount: 0,
+  datasets: [],
+  rowCount: 0,
 }
 
 const mockCurrentUser = (permissions: PermissionName[]) => {
@@ -63,34 +61,22 @@ const mockCurrentUser = (permissions: PermissionName[]) => {
   } as unknown as ReturnType<typeof useGetCurrentUser>)
 }
 
-const renderComponent = (props = {}) => render(<GroupsList {...defaultProps} {...props} />)
+const renderComponent = (props = {}) => render(<DatasetsList {...defaultProps} {...props} />)
 
-describe('GroupsList permission gating', () => {
+describe('DatasetsList permission gating', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('shows create button when user has GROUP_CREATE permission', () => {
-    mockCurrentUser([PERMISSION_NAMES.GROUP_CREATE])
+  it('shows create button when user has DATASET_CREATE permission', () => {
+    mockCurrentUser([PERMISSION_NAMES.DATASET_CREATE])
     renderComponent()
-    expect(screen.getByText('newGroup')).toBeInTheDocument()
+    expect(screen.getByTestId('addDatasetButton')).toBeInTheDocument()
   })
 
-  it('hides create button when user lacks GROUP_CREATE permission', () => {
-    mockCurrentUser([])
+  it('hides create button when user lacks DATASET_CREATE permission', () => {
+    mockCurrentUser([PERMISSION_NAMES.DATASET_READ])
     renderComponent()
-    expect(screen.queryByText('newGroup')).not.toBeInTheDocument()
-  })
-
-  it('passes delete handler to GroupsTable when user has GROUP_DELETE permission', () => {
-    mockCurrentUser([PERMISSION_NAMES.GROUP_DELETE])
-    renderComponent()
-    expect(screen.getByTestId('groups-table')).toHaveAttribute('data-has-delete', 'true')
-  })
-
-  it('does not pass delete handler when user lacks GROUP_DELETE permission', () => {
-    mockCurrentUser([])
-    renderComponent()
-    expect(screen.getByTestId('groups-table')).toHaveAttribute('data-has-delete', 'false')
+    expect(screen.queryByTestId('addDatasetButton')).not.toBeInTheDocument()
   })
 })

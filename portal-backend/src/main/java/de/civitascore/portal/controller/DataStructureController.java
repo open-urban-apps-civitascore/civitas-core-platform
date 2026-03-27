@@ -56,7 +56,15 @@ public class DataStructureController
         name = "q",
         description = "Search in name or description (partial match, case-insensitive).",
         in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "structure"))
+        schema = @Schema(type = "string", example = "structure")),
+    @Parameter(
+        name = "dataStructureStatus",
+        description = "Filter by status (exact match).",
+        in = ParameterIn.QUERY,
+        schema =
+            @Schema(
+                type = "string",
+                allowableValues = {"DRAFT", "AVAILABLE"}))
   })
   /**
    * Retrieves a paginated list of data structures with optional filtering by name, description, or

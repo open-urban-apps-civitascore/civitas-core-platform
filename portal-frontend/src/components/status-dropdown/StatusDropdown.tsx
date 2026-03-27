@@ -16,6 +16,7 @@ interface StatusDropdownProps<T extends StatusTypes> {
   statusOptions: readonly T[]
   canSetAvailable?: boolean
   canSetDraft?: boolean
+  canRelease?: boolean
   isReadOnly?: boolean
   statusHint?: string
 }
@@ -25,6 +26,7 @@ export const StatusDropdown = <T extends StatusTypes>(props: StatusDropdownProps
     onStatusChange,
     canSetAvailable = false,
     canSetDraft = true,
+    canRelease = true,
     isReadOnly = false,
     statusOptions,
     statusHint,
@@ -80,14 +82,17 @@ export const StatusDropdown = <T extends StatusTypes>(props: StatusDropdownProps
               data-testid={`statusOption-${option.toLowerCase()}`}
               onClick={() => onStatusChange(option)}
               disabled={
-                (option === STATUS_TYPES.AVAILABLE && !canSetAvailable) ||
+                // AVAILABLE requires both form validation (canSetAvailable) and *_RELEASE permission (canRelease).
+                // READY is a publish step requiring only *_UPDATE (implied by edit mode) — no RELEASE permission needed.
+                (option === STATUS_TYPES.AVAILABLE && (!canSetAvailable || !canRelease)) ||
                 (option === STATUS_TYPES.READY && !canSetAvailable) ||
                 (option === STATUS_TYPES.DRAFT && !canSetDraft)
               }
               className={cn(
                 status === option && 'bg-accent',
-                (option === STATUS_TYPES.AVAILABLE && !canSetAvailable) ||
-                  (option === STATUS_TYPES.READY && !canSetAvailable && 'opacity-50 cursor-not-allowed'),
+                ((option === STATUS_TYPES.AVAILABLE && (!canSetAvailable || !canRelease)) ||
+                  (option === STATUS_TYPES.READY && !canSetAvailable)) &&
+                  'opacity-50 cursor-not-allowed',
               )}
             >
               <div className="flex items-center gap-2">

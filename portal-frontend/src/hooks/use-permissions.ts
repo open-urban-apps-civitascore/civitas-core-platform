@@ -1,18 +1,31 @@
 import { useCallback, useMemo } from 'react'
 
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
-import { PermissionName } from '@/types/currentUser'
+import { MeAssignment, PermissionName, ScopedPermissionCheck } from '@/types/currentUser'
 
-// NOTE: This hook flattens all assignments into a single permission set,
-// discarding scopeType/scopeId. This is correct for tenant-level permissions
-// (users, groups, roles) but will need scope-aware overloads for resource-scoped
-// permissions (e.g. DATASET_CREATE on a specific dataset).
+// Filters permissions per assignment so that non-TENANT scoped assignments
+// only retain permissions matching their scope type (e.g. a DATASOURCE-scoped
+// assignment only keeps DATASOURCE_* permissions).
+const filterAssignmentPermissions = (assignment: MeAssignment): MeAssignment => {
+  if (!assignment.scopeType || assignment.scopeType === 'TENANT') return assignment
+  const prefix = assignment.scopeType
+  return {
+    ...assignment,
+    permissions: assignment.permissions.filter(p => p.startsWith(prefix)),
+  }
+}
+
 export const usePermissions = () => {
   const { data: currentUser } = useGetCurrentUser()
 
-  const permissions = useMemo(
-    () => new Set<PermissionName>(currentUser?.assignments.flatMap(a => a.permissions) ?? []),
+  const filteredAssignments = useMemo(
+    () => currentUser?.assignments.map(filterAssignmentPermissions) ?? [],
     [currentUser?.assignments],
+  )
+
+  const permissions = useMemo(
+    () => new Set<PermissionName>(filteredAssignments.flatMap(a => a.permissions)),
+    [filteredAssignments],
   )
 
   const hasPermission = useCallback((permission: PermissionName) => permissions.has(permission), [permissions])
@@ -22,5 +35,17 @@ export const usePermissions = () => {
     [permissions],
   )
 
-  return { hasPermission, hasAnyPermission }
+  const hasScopedPermission = useCallback<ScopedPermissionCheck>(
+    (permission, scopeType, scopeId) => {
+      if (!permissions.has(permission)) return false
+      return filteredAssignments.some(
+        a =>
+          a.permissions.includes(permission) &&
+          (a.scopeType === 'TENANT' || (a.scopeType === scopeType && a.scopeId === scopeId)),
+      )
+    },
+    [permissions, filteredAssignments],
+  )
+
+  return { hasPermission, hasAnyPermission, hasScopedPermission }
 }

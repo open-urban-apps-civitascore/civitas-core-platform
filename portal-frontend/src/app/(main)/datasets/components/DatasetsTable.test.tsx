@@ -1,14 +1,35 @@
 import { render, screen, within } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { mappedDatasets } from '@/__mocks__/datasets/mappedDatasets.mock'
+import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import messages from '@/messages/de.json'
+import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 
 import { DatasetsTable } from './DatasetsTable'
 
+vi.mock('@/app/services/api/users/clientRequests', () => ({
+  useGetCurrentUser: vi.fn(),
+}))
+
+const mockCurrentUser = (permissions: PermissionName[]) => {
+  vi.mocked(useGetCurrentUser).mockReturnValue({
+    data: {
+      username: 'test',
+      email: 'test@test.com',
+      title: 'MR' as const,
+      firstName: 'Test',
+      lastName: 'User',
+      assignments: [{ scopeType: 'TENANT', scopeId: null, permissions }],
+    },
+  } as ReturnType<typeof useGetCurrentUser>)
+}
+
 describe('DatasetsTable', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
+    mockCurrentUser([PERMISSION_NAMES.DATASET_READ, PERMISSION_NAMES.DATASET_DELETE])
     render(
       <NextIntlClientProvider locale="de" messages={messages}>
         <DatasetsTable
@@ -23,6 +44,7 @@ describe('DatasetsTable', () => {
           totalPages={4}
           onPaginationChange={() => null}
           onSortingChange={() => null}
+          onDeleteClick={() => null}
         />
       </NextIntlClientProvider>,
     )
@@ -58,5 +80,43 @@ describe('DatasetsTable', () => {
     expect(cells2[1]).toHaveTextContent(mappedDatasets[1].createdBy.name)
     expect(cells2[2]).toHaveTextContent('01.01.2023')
     expect(cells2[3]).toHaveTextContent('Verfügbar')
+  })
+})
+
+describe('DatasetsTable — Permission gating', () => {
+  const renderTable = () =>
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <DatasetsTable
+          datasets={mappedDatasets}
+          rowCount={2}
+          pageIndex={0}
+          pageSize={5}
+          setPageIndex={() => null}
+          setPageSize={() => null}
+          sorting={[{ desc: false, id: 'name' }]}
+          setSorting={() => null}
+          totalPages={4}
+          onPaginationChange={() => null}
+          onSortingChange={() => null}
+          onDeleteClick={() => null}
+        />
+      </NextIntlClientProvider>,
+    )
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('action menu is hidden when user lacks DELETE permission', () => {
+    mockCurrentUser([PERMISSION_NAMES.DATASET_READ])
+    renderTable()
+    expect(screen.queryByRole('button', { name: 'Open menu' })).toBeNull()
+  })
+
+  it('action menu is shown when user has DELETE permission', () => {
+    mockCurrentUser([PERMISSION_NAMES.DATASET_READ, PERMISSION_NAMES.DATASET_DELETE])
+    renderTable()
+    expect(screen.getAllByRole('button', { name: 'Open menu' })).toHaveLength(2)
   })
 })

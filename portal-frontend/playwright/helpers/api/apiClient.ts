@@ -230,20 +230,75 @@ export class ApiClient {
     return this.delete(`/assignments/${assignmentId}`)
   }
 
+  // --- Assignments ---
+
+  async getAssignments(params?: string) {
+    return this.get<{ content: Array<{ id: string; groupId: string; roleId: string }> }>(
+      `/assignments${params ? `?${params}` : ''}`,
+    )
+  }
+
   // --- Datasets ---
+
+  async getDatasets(params?: string) {
+    return this.get<{ content: Array<{ id: string; name: string }> }>(`/datasets${params ? `?${params}` : ''}`)
+  }
 
   async createDataset(data: { name: string; description?: string }) {
     return this.post<{ id: string; name: string }>('/datasets', data)
+  }
+
+  async publishDataset(datasetId: string) {
+    return this.post<{ id: string; dataSetStatus: string }>(`/datasets/${datasetId}/publish`, {})
+  }
+
+  async unpublishDataset(datasetId: string) {
+    return this.post<{ id: string; dataSetStatus: string }>(`/datasets/${datasetId}/unpublish`, {})
   }
 
   async deleteDataset(datasetId: string) {
     return this.delete(`/datasets/${datasetId}`)
   }
 
+  // --- Pipelines ---
+
+  async createPipeline(datasetId: string, data: { name: string; description?: string; dataSourceIds?: string[] }) {
+    return this.post<{ id: string; name: string }>(`/datasets/${datasetId}/pipelines`, {
+      styles: {},
+      model: {},
+      apis: [],
+      persistences: [],
+      description: '',
+      dataSourceIds: [],
+      ...data,
+    })
+  }
+
   // --- Datasources ---
 
-  async createDatasource(data: { name: string; description?: string }) {
-    return this.post<{ id: string; name: string; dataSourceStatus: string }>('/datasources', data)
+  async getDatasources(params?: string) {
+    return this.get<{ content: Array<{ id: string; name: string }> }>(`/datasources${params ? `?${params}` : ''}`)
+  }
+
+  async createDatasource(data: {
+    name: string
+    description?: string
+    connectorType?: string
+    configuration?: Record<string, unknown>
+    dataStructureVersionId?: string | null
+  }) {
+    return this.post<{ id: string; name: string; dataSourceStatus: string }>('/datasources', {
+      assignments: [],
+      ...data,
+    })
+  }
+
+  async publishDatasource(datasourceId: string) {
+    return this.post<{ id: string; dataSourceStatus: string }>(`/datasources/${datasourceId}/publish`, {})
+  }
+
+  async unpublishDatasource(datasourceId: string) {
+    return this.post<{ id: string; dataSourceStatus: string }>(`/datasources/${datasourceId}/unpublish`, {})
   }
 
   async deleteDatasource(datasourceId: string) {
@@ -251,6 +306,10 @@ export class ApiClient {
   }
 
   // --- Datastructures ---
+
+  async getDatastructures(params?: string) {
+    return this.get<{ content: Array<{ id: string; name: string }> }>(`/datastructures${params ? `?${params}` : ''}`)
+  }
 
   async createDatastructure(data: { name: string; description?: string }) {
     return this.post<{ id: string; name: string }>('/datastructures', {
@@ -260,6 +319,42 @@ export class ApiClient {
       assignments: [],
       ...data,
     })
+  }
+
+  async createDatastructureVersion(
+    datastructureId: string,
+    data: {
+      version: string
+      description?: string
+      modelAtlasUri: string
+      modelName: string
+      model: string
+    },
+  ) {
+    return this.post<{ id: string; version: string; dataStructureVersionStatus: string }>(
+      `/datastructures/${datastructureId}/versions`,
+      {
+        dataStructureVersionSource: 'OWN',
+        description: '',
+        styles: {},
+        ...data,
+      },
+    )
+  }
+
+  async publishDatastructureVersion(datastructureId: string, versionId: string) {
+    return this.post<{ id: string; dataStructureVersionStatus: string }>(
+      `/datastructures/${datastructureId}/versions/${versionId}/publish`,
+      {},
+    )
+  }
+
+  async publishDatastructure(datastructureId: string) {
+    return this.post<{ id: string; dataStructureStatus: string }>(`/datastructures/${datastructureId}/publish`, {})
+  }
+
+  async unpublishDatastructure(datastructureId: string) {
+    return this.post<{ id: string; dataStructureStatus: string }>(`/datastructures/${datastructureId}/unpublish`, {})
   }
 
   async deleteDatastructure(datastructureId: string) {

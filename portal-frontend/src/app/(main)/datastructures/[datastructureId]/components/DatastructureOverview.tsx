@@ -14,8 +14,11 @@ import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
+import { usePermissions } from '@/hooks/use-permissions'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Datastructure, DATASTRUCTURE_STATUS_TYPES, DatastructureTab } from '@/types/datastructures'
 import { mapDatastructureVersionsApiToListData } from '@/utils/datastructures'
+import { getHeaderAction } from '@/utils/headerAction'
 
 import { useDatastructure } from '../hooks/useDatastructure'
 import { AccessManagementTab } from './access-management-tab/AccessManagementTab'
@@ -46,6 +49,9 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   const { datastructure, initialAssignments } = props
   const t = useTranslations('datastructures')
   const tCommon = useTranslations('common')
+  const { hasScopedPermission } = usePermissions()
+  const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_UPDATE, 'DATASTRUCTURE', datastructure.id)
+  const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_RELEASE, 'DATASTRUCTURE', datastructure.id)
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(true)
@@ -96,6 +102,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
         onStatusChange={handleStatusChange}
         canSetAvailable={canSetAvailable}
         canSetDraft={canSetDraft}
+        canRelease={canRelease}
         statusHint={statusHint}
       />
       <ActionButtons
@@ -151,14 +158,22 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
       <PageHeader
         title={datastructure.name}
         segmentedControlBarProps={{
-          tabs: tabs,
+          tabs,
           selectedTab: selectedTab,
           onTabChange: setSelectedTab,
           completedTabs,
           tabsWithNoCompletionStatus: ['accessManagement'],
           hasCompletionStatus: true,
         }}
-        customElement={isReadOnly ? EditButton : ActionButtonsAndStatusSwitch}
+        customElement={getHeaderAction({
+          isReadOnly,
+          canUpdate:
+            datastructure.dataStructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+              ? canUpdate && canRelease
+              : canUpdate,
+          editButton: EditButton,
+          saveExitButtons: ActionButtonsAndStatusSwitch,
+        })}
       />
       <PageBackground className="overflow-y-auto" hasBackground={!isReadOnly}>
         <Form {...form}>
