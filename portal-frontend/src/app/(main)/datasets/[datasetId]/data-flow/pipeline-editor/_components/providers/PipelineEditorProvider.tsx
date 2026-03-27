@@ -11,7 +11,9 @@
 
 import type { Connection } from '@xyflow/react'
 import { useParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 import {
   useCreatePipeline,
@@ -67,6 +69,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   sessionManager,
 }) => {
   const params = useParams<{ datasetId: string }>()
+  const t = useTranslations('pipelineEditor')
   const datasetId = params.datasetId
   const activeSession = sessionManager.getActiveSession()
   const pipeline = activeSession?.pipeline || createEmptyPipeline()
@@ -393,6 +396,37 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     const dirtySessions = sessionManager.sessions.filter(s => s.isDirty)
     if (dirtySessions.length === 0) return
 
+    // Check for duplicate pipeline names across ALL sessions
+    const allNames = sessionManager.sessions.map(s => s.pipeline.name.trim().toLowerCase())
+    const duplicateNames = new Set<string>()
+    const seen = new Set<string>()
+    for (const name of allNames) {
+      if (seen.has(name)) duplicateNames.add(name)
+      seen.add(name)
+    }
+
+    if (duplicateNames.size > 0) {
+      const displayNames = sessionManager.sessions
+        .filter(s => duplicateNames.has(s.pipeline.name.trim().toLowerCase()))
+        .map(s => s.pipeline.name)
+      toast.error(t('header.duplicateNames', { names: [...new Set(displayNames)].join(', ') }))
+      return
+    }
+
+    // Validate all dirty pipelines before saving
+    const failedNames: string[] = []
+    for (const session of dirtySessions) {
+      const result = validatePipelineWithNodeStatus(session.pipeline)
+      if (!result.isValid) {
+        failedNames.push(session.name)
+      }
+    }
+
+    if (failedNames.length > 0) {
+      toast.error(t('header.validationFailed', { names: failedNames.join(', ') }))
+      return
+    }
+
     setIsSavingAll(true)
     try {
       await Promise.all(
@@ -418,7 +452,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     } finally {
       setIsSavingAll(false)
     }
-  }, [sessionManager, createPipelineMutation, updatePipelineMutation])
+  }, [sessionManager, createPipelineMutation, updatePipelineMutation, t])
 
   // ===== Context Value =====
   const contextValue: ActivePipelineContextValue = useMemo(

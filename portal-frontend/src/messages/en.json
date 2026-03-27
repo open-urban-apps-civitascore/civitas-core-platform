@@ -1008,7 +1008,9 @@
     "header": {
       "saveAll": "Save All",
       "savingAll": "Saving...",
-      "exit": "Exit"
+      "exit": "Exit",
+      "validationFailed": "Validation failed for: {names}",
+      "duplicateNames": "Duplicate pipeline names: {names}"
     },
     "tabs": {
       "closeTab": "Close tab",

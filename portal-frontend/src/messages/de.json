@@ -994,7 +994,9 @@
     "header": {
       "saveAll": "Alle speichern",
       "savingAll": "Speichert...",
-      "exit": "Beenden"
+      "exit": "Beenden",
+      "validationFailed": "Validierung fehlgeschlagen für: {names}",
+      "duplicateNames": "Doppelte Pipeline-Namen: {names}"
     },
     "tabs": {
       "closeTab": "Tab schließen",
