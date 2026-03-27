@@ -61,11 +61,11 @@ Pipeline definitions are converted from JSON to YAML before being sent to the St
 
 ### ConfigAdapter Path (CloudEvents)
 
-| Operation | HTTP Method | Endpoint | Description |
-|-----------|-------------|----------|-------------|
-| `CREATE` | `POST` | `/streams/{id}` | Create a new pipeline |
-| `UPDATE` | `PUT` | `/streams/{id}` | Update an existing pipeline |
-| `DELETE` | `DELETE` | `/streams/{id}` | Delete a pipeline |
+| Operation | HTTP Method | Endpoint | Description | Idempotent |
+|-----------|-------------|----------|-------------|-----------|
+| `CREATE` | `POST` | `/streams/{id}` | Create a new pipeline | Yes — HTTP 409 treated as success |
+| `UPDATE` | `PUT` | `/streams/{id}` | Update an existing pipeline (upsert if absent) | Yes — HTTP 404 triggers CREATE |
+| `DELETE` | `DELETE` | `/streams/{id}` | Delete a pipeline | Yes — HTTP 404 treated as success |
 
 ### Saga Orchestrator Path
 
@@ -380,14 +380,29 @@ Bloblang interpolation expressions (`${!...}`) are preserved and **not** resolve
 
 ## Error Handling
 
+### Idempotency
+
+All three operations (CREATE, UPDATE, DELETE) are idempotent:
+
+| Operation | Idempotent Behavior | HTTP Status |
+|-----------|-------------------|-------------|
+| CREATE | If pipeline already exists, treated as success | HTTP 409 → Success |
+| UPDATE | If pipeline is absent, adapter creates it (upsert) | HTTP 404 → Creates pipeline |
+| DELETE | If pipeline is already absent, treated as success | HTTP 404 → Success |
+
+This idempotency ensures operations are safe to retry and can be applied multiple times without unintended side effects.
+
 ### HTTP Status Code Mapping
 
-| HTTP Status | Exception Type | Behavior |
-|-------------|----------------|----------|
-| 2xx (Success) | — | Operation succeeded |
-| 4xx (Client Error) | `FatalAdapterException` | Send to DLQ immediately |
-| 5xx (Server Error) | `RetryableAdapterException` | Blocking retry with exponential backoff |
-| Network Error | `RetryableAdapterException` | Blocking retry with exponential backoff |
+| HTTP Status | Exception Type | Behavior | Notes |
+|-------------|----------------|----------|-------|
+| 2xx (Success) | — | Operation succeeded | — |
+| 409 (Conflict) | — | Treated as success on CREATE | Idempotency: pipeline already exists |
+| 404 (Not Found) | — | Treated as success on DELETE | Idempotency: pipeline already absent |
+| 404 (Not Found) | `FatalAdapterException` | Falls back to CREATE on UPDATE | Upsert behavior: creates missing pipeline |
+| Other 4xx (Client Error) | `FatalAdapterException` | Send to DLQ immediately | Invalid input or missing required fields |
+| 5xx (Server Error) | `RetryableAdapterException` | Blocking retry with exponential backoff | Transient server errors |
+| Network Error | `RetryableAdapterException` | Blocking retry with exponential backoff | Connection/timeout errors |
 
 ### RedPanda-Specific Error Codes
 
@@ -479,15 +494,23 @@ RedPanda client error during create for pipeline mqtt-pipeline: 400
 
 **Solution:** Validate the pipeline YAML configuration. Common causes: invalid Bloblang mapping syntax, unknown input/output types, malformed configuration structure.
 
-#### 3. Pipeline Not Found (404) on Delete
+#### 3. Pipeline Not Found (404) on Update
+
+```
+Signalling for upsert — pipeline not found during update (HTTP 404)
+```
+
+**Solution:** This is expected behavior. The adapter automatically creates the pipeline if it doesn't exist (upsert). No action required — the operation succeeds with the pipeline created.
+
+#### 4. Pipeline Not Found (404) on Delete
 
 ```
 RedPanda client error during delete for pipeline mqtt-pipeline: 404
 ```
 
-**Solution:** The pipeline does not exist. For `DELETE` operations, ensure the pipeline was successfully created. In saga context, this produces a `STEP_FAILED` result.
+**Solution:** The pipeline does not exist. For `DELETE` operations, this is treated as success (idempotency). The operation completes without error. No action required.
 
-#### 4. Credential Decryption Failed
+#### 5. Credential Decryption Failed
 
 ```
 Credential decryption error: AES/GCM/NoPadding decryption failed
@@ -495,7 +518,7 @@ Credential decryption error: AES/GCM/NoPadding decryption failed
 
 **Solution:** Verify `CIVITAS_MASTER_KEY` environment variable matches the key used to encrypt the credentials.
 
-#### 5. YAML Serialization Error
+#### 6. YAML Serialization Error
 
 ```
 RedPanda pipeline error: Unrecognized field

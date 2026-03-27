@@ -118,7 +118,18 @@ public class RedpandaAdapter extends AbstractConfigAdapter {
   private void handleUpdate(String pipelineId, ConfigEvent event)
       throws FatalAdapterException, RetryableAdapterException {
     Map<String, Object> pipelineData = extractPipelineData(event);
-    redpandaClient.updatePipeline(pipelineId, pipelineData);
+    try {
+      redpandaClient.updatePipeline(pipelineId, pipelineData);
+    } catch (FatalAdapterException e) {
+      if (e.getErrorCode() == AdapterErrorCode.RESOURCE_NOT_FOUND) {
+        logger.info(
+            "Pipeline {} not found during update, creating it as upsert",
+            Encode.forJava(pipelineId));
+        redpandaClient.createPipeline(pipelineId, pipelineData);
+      } else {
+        throw e;
+      }
+    }
     publishSuccessResult(event, "Pipeline updated successfully: " + pipelineId, pipelineId);
   }
 
