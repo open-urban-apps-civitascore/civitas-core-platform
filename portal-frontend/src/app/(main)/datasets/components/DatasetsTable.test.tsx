@@ -82,3 +82,41 @@ describe('DatasetsTable', () => {
     expect(cells2[3]).toHaveTextContent('Verfügbar')
   })
 })
+
+describe('DatasetsTable — Permission gating', () => {
+  const renderTable = () =>
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <DatasetsTable
+          datasets={mappedDatasets}
+          rowCount={2}
+          pageIndex={0}
+          pageSize={5}
+          setPageIndex={() => null}
+          setPageSize={() => null}
+          sorting={[{ desc: false, id: 'name' }]}
+          setSorting={() => null}
+          totalPages={4}
+          onPaginationChange={() => null}
+          onSortingChange={() => null}
+          onDeleteClick={() => null}
+        />
+      </NextIntlClientProvider>,
+    )
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('action menu is hidden when user lacks DELETE permission', () => {
+    mockCurrentUser([PERMISSION_NAMES.DATASET_READ])
+    renderTable()
+    expect(screen.queryByRole('button', { name: 'Open menu' })).toBeNull()
+  })
+
+  it('action menu is shown when user has DELETE permission', () => {
+    mockCurrentUser([PERMISSION_NAMES.DATASET_READ, PERMISSION_NAMES.DATASET_DELETE])
+    renderTable()
+    expect(screen.getAllByRole('button', { name: 'Open menu' })).toHaveLength(2)
+  })
+})
