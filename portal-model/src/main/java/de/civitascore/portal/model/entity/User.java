@@ -59,7 +59,7 @@ public class User extends BaseEntity {
   @Column(name = "phone")
   private String phone;
 
-  @Column(name = "external_id", length = 255)
+  @Column(name = "external_id")
   private String externalId;
 
   @Column(nullable = false)

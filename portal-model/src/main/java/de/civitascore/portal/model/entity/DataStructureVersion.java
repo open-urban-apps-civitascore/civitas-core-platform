@@ -42,16 +42,16 @@ public class DataStructureVersion extends BaseEntity {
   @Column(name = "data_structure_version_source", nullable = false)
   private DataStructureVersionSource dataStructureVersionSource;
 
-  @Column(name = "version", nullable = false, length = 100)
+  @Column(name = "version", nullable = false)
   private String version;
 
-  @Column(name = "model_atlas_uri", length = 512)
+  @Column(name = "model_atlas_uri")
   private String modelAtlasUri;
 
-  @Column(name = "model_name", length = 255)
+  @Column(name = "model_name")
   private String modelName;
 
-  @Column(name = "external_id", length = 255)
+  @Column(name = "external_id")
   private String externalId;
 
   @JdbcTypeCode(SqlTypes.JSON)

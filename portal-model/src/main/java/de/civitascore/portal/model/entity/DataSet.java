@@ -63,7 +63,7 @@ public class DataSet extends BaseDataEntity {
       orphanRemoval = true)
   private Set<Pipeline> pipelines = new HashSet<>();
 
-  @Column(name = "identifier", length = 255)
+  @Column(name = "identifier")
   private String identifier;
 
   @Column(name = "version")
@@ -109,25 +109,25 @@ public class DataSet extends BaseDataEntity {
   @ManyToMany(mappedBy = "dataSets", fetch = FetchType.LAZY)
   private Set<Catalog> catalogs = new HashSet<>();
 
-  @Column(name = "external_id", length = 255)
+  @Column(name = "external_id")
   private String externalId;
 
-  @Column(name = "format", length = 100)
+  @Column(name = "format")
   private String format;
 
   @Column(name = "open_data_access", nullable = false)
   private Boolean openDataAccess = false;
 
-  @Column(name = "project_id", length = 255)
+  @Column(name = "project_id")
   private String projectId;
 
   @Column(name = "frost_base_url", length = 500)
   private String frostBaseUrl;
 
-  @Column(name = "route_id", length = 255)
+  @Column(name = "route_id")
   private String routeId;
 
-  @Column(name = "service_id", length = 255)
+  @Column(name = "service_id")
   private String serviceId;
 
   @Column(name = "public_url", length = 500)
