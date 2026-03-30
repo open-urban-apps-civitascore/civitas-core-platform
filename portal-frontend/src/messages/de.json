@@ -859,6 +859,7 @@
     }
   },
   "pipelineEditor": {
+    "title": "Pipeline-Editor",
     "canvas": {
       "noPipeline": "Keine Pipeline verfügbar"
     },
@@ -991,6 +992,14 @@
       "deletePipeline": "Pipeline löschen",
       "deleteConfirmTitle": "Pipeline löschen?",
       "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "header": {
+      "saveAll": "Alle speichern",
+      "savingAll": "Speichert...",
+      "exit": "Beenden",
+      "validationFailed": "Validierung fehlgeschlagen für: {names}",
+      "duplicateNames": "Doppelte Pipeline-Namen: {names}",
+      "saveFailed": "Speichern fehlgeschlagen: {names}"
     },
     "tabs": {
       "closeTab": "Tab schließen",

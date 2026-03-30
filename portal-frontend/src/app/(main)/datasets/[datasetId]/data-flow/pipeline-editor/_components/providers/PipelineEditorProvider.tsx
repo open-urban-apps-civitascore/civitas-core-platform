@@ -11,7 +11,9 @@
 
 import type { Connection } from '@xyflow/react'
 import { useParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 import {
   useCreatePipeline,
@@ -67,6 +69,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   sessionManager,
 }) => {
   const params = useParams<{ datasetId: string }>()
+  const t = useTranslations('pipelineEditor')
   const datasetId = params.datasetId
   const activeSession = sessionManager.getActiveSession()
   const pipeline = activeSession?.pipeline || createEmptyPipeline()
@@ -308,50 +311,6 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     setShouldShowValidationPanel(false)
   }, [])
 
-  // ===== Pipeline Operations: Save (Create or Update) =====
-  const savePipeline = useCallback(() => {
-    if (!activeSession || !pipeline) return
-
-    const payload = buildPipelinePayload(pipeline)
-    const pipelineId = pipeline.id
-
-    if (pipelineId) {
-      // Existing pipeline → PUT update
-      updatePipelineMutation.mutate(
-        { pipelineId, data: payload },
-        {
-          onSuccess: () => {
-            sessionManager.markSessionClean(activeSession.id)
-            console.log('Pipeline updated successfully')
-          },
-          onError: error => {
-            console.error('Failed to update pipeline:', error)
-          },
-        },
-      )
-    } else {
-      // New pipeline → POST create
-      createPipelineMutation.mutate(payload, {
-        onSuccess: response => {
-          // Set the id from the response on the pipeline
-          const updatedPipeline: Pipeline = {
-            ...activeSession.pipeline,
-            id: response.data.id,
-            isDirty: false,
-          }
-          sessionManager.updateSessionPipeline(activeSession.id, updatedPipeline)
-          sessionManager.markSessionClean(activeSession.id)
-          console.log('Pipeline created successfully with id:', response.data.id)
-        },
-        onError: error => {
-          console.error('Failed to create pipeline:', error)
-        },
-      })
-    }
-  }, [activeSession, pipeline, sessionManager, createPipelineMutation, updatePipelineMutation])
-
-  const isSaving = createPipelineMutation.isPending || updatePipelineMutation.isPending
-
   // ===== Pipeline Operations: Delete =====
   const deletePipeline = useCallback(() => {
     if (!activeSession) return
@@ -383,6 +342,87 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Loading State =====
   const isLoadingPipelines = pipelinesQuery.isLoading
+
+  // ===== Cross-session state =====
+  const hasAnyDirtySession = useMemo(() => sessionManager.sessions.some(s => s.isDirty), [sessionManager.sessions])
+
+  const [isSavingAll, setIsSavingAll] = useState(false)
+
+  const saveAllPipelines = useCallback(async (): Promise<boolean> => {
+    if (isSavingAll) return false
+
+    const dirtySessions = sessionManager.sessions.filter(s => s.isDirty)
+    if (dirtySessions.length === 0) return true
+
+    // Check for duplicate pipeline names across ALL sessions (not just dirty —
+    // a clean session could share a name with a new dirty one)
+    const allNames = sessionManager.sessions.map(s => s.pipeline.name.trim().toLowerCase())
+    const duplicateNames = new Set<string>()
+    const seen = new Set<string>()
+    for (const name of allNames) {
+      if (seen.has(name)) duplicateNames.add(name)
+      seen.add(name)
+    }
+
+    if (duplicateNames.size > 0) {
+      const displayNames = sessionManager.sessions
+        .filter(s => duplicateNames.has(s.pipeline.name.trim().toLowerCase()))
+        .map(s => s.pipeline.name)
+      toast.error(t('header.duplicateNames', { names: [...new Set(displayNames)].join(', ') }))
+      return false
+    }
+
+    // Validate all dirty pipelines before saving
+    const failedNames: string[] = []
+    for (const session of dirtySessions) {
+      const result = validatePipelineWithNodeStatus(session.pipeline)
+      if (!result.isValid) {
+        failedNames.push(session.name)
+      }
+    }
+
+    if (failedNames.length > 0) {
+      toast.error(t('header.validationFailed', { names: failedNames.join(', ') }))
+      return false
+    }
+
+    setIsSavingAll(true)
+    const saveFailedNames: string[] = []
+    try {
+      // Serialize saves to avoid concurrent mutation state issues
+      for (const session of dirtySessions) {
+        try {
+          const payload = buildPipelinePayload(session.pipeline)
+          const pipelineId = session.pipeline.id
+
+          if (pipelineId) {
+            await updatePipelineMutation.mutateAsync({ pipelineId, data: payload })
+            sessionManager.markSessionClean(session.id)
+          } else {
+            const response = await createPipelineMutation.mutateAsync(payload)
+            const updatedPipeline: Pipeline = {
+              ...session.pipeline,
+              id: response.data.id,
+              isDirty: false,
+            }
+            sessionManager.updateSessionPipeline(session.id, updatedPipeline)
+            sessionManager.markSessionClean(session.id)
+          }
+        } catch {
+          saveFailedNames.push(session.name)
+        }
+      }
+
+      if (saveFailedNames.length > 0) {
+        toast.error(t('header.saveFailed', { names: saveFailedNames.join(', ') }))
+        return false
+      }
+
+      return true
+    } finally {
+      setIsSavingAll(false)
+    }
+  }, [isSavingAll, sessionManager, createPipelineMutation, updatePipelineMutation, t])
 
   // ===== Context Value =====
   const contextValue: ActivePipelineContextValue = useMemo(
@@ -428,11 +468,14 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       hideValidationPanel,
 
       // Pipeline operations
-      savePipeline,
-      isSaving,
       deletePipeline,
       isDeleting,
       isLoadingPipelines,
+
+      // Cross-session operations
+      saveAllPipelines,
+      isSavingAll,
+      hasAnyDirtySession,
 
       // Session info
       activeSessionId: activeSession?.id || null,
@@ -464,11 +507,12 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       canSave,
       shouldShowValidationPanel,
       hideValidationPanel,
-      savePipeline,
-      isSaving,
       deletePipeline,
       isDeleting,
       isLoadingPipelines,
+      saveAllPipelines,
+      isSavingAll,
+      hasAnyDirtySession,
     ],
   )
 
