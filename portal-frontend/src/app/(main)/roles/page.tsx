@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { PERMISSION_NAMES } from '@/types/currentUser'
-import { Role, ROLE_TYPES, RoleType } from '@/types/roles'
+import { ROLE_TYPES, RoleType } from '@/types/roles'
 
 import { RolesTable } from './components/RolesTable'
 
