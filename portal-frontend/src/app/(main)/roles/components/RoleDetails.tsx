@@ -232,6 +232,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         name: formValues.name,
         description: formValues.description,
         roleType: (tabValue as Role['roleType']) || DEFAULT_TAB,
+        permissionIds: pendingPermissionIds,
         readonly: formValues.readonly,
       },
       {

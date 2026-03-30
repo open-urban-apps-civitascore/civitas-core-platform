@@ -46,7 +46,12 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   const [checkedPermissionItems, setCheckedPermissionItems] = useState<PermissionItem[]>([])
   const [searchInput, setSearchInput] = useState<string>('')
 
-  const rolesRequestParams = new URLSearchParams('readonly=true')
+  const rolesRequestParams = useMemo(() => {
+    const params = new URLSearchParams()
+    params.set('readonly', 'true')
+    params.set('roleType', roleType)
+    return params
+  }, [roleType])
   const permissionsRequestParams = new URLSearchParams()
   if (searchInput.trim()) {
     permissionsRequestParams.set('q', searchInput.trim())
@@ -63,10 +68,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
     params: permissionsRequestParams,
   })
 
-  const allRoles = useMemo(
-    () => (rolesData?.data || []).filter(role => role.roleType === roleType && role.readonly),
-    [rolesData?.data, roleType],
-  )
+  const allRoles = useMemo(() => rolesData?.data || [], [rolesData?.data])
   const permissions = useMemo(() => mapPermissions(permissionsData?.data || []), [permissionsData?.data])
 
   const getUniqueCategories = (): string[] => {
