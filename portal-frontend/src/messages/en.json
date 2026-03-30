@@ -137,7 +137,6 @@
         "name": "Name",
         "description": "Description"
       },
-      "noGroupsAvailable": "No groups available to add",
       "selectAll": "Select all groups",
       "selectGroup": "Select group",
       "selectedGroups": "{number} selected"
@@ -150,7 +149,6 @@
         "description": "Description",
         "roleType": "Type"
       },
-      "noRolesAvailable": "No roles available to add",
       "selectRole": "Select role",
       "selectAll": "Select all roles",
       "selectedRoles": "{number} selected",

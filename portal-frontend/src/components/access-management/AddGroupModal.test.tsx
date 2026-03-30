@@ -155,7 +155,7 @@ describe('AddGroupModal', () => {
       </NextIntlClientProvider>,
     )
 
-    expect(screen.getByText(/keine gruppen verfügbar/i)).toBeInTheDocument()
+    expect(screen.getByText(/es gibt leider keine ergebnisse/i)).toBeInTheDocument()
 
     // Restore default mock
     mockUseGetGroups.mockReturnValue({
