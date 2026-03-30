@@ -8,8 +8,8 @@ import lombok.Getter;
 public enum RoleDefault {
   TENANT_ADMIN(
       "Tenant Admin",
-      "Tenant-wide permissions to manage users, roles and permissions as well as tenant"
-          + " parameters.",
+      "Mandantenweite Berechtigungen zur Verwaltung von Usern, Rollen und Berechtigungen"
+          + " sowie Mandantenparametern.",
       RoleType.SYSTEM,
       PermissionName.USER_CREATE,
       PermissionName.USER_READ,
@@ -30,8 +30,8 @@ public enum RoleDefault {
 
   DATA_ARCHITECT(
       "Data Architect",
-      "Management rights for all aspects of data ingestion, data processing, data storage and"
-          + " data output.",
+      "Verwaltungsrechte für alle Aspekte der Datenaufnahme, Datenverarbeitung, Datenspeicherung"
+          + " und Datenausgabe.",
       RoleType.DATA,
       PermissionName.DATASET_CREATE,
       PermissionName.DATASET_READ,
@@ -48,14 +48,14 @@ public enum RoleDefault {
 
   DATA_CONSUMER(
       "Data Consumer",
-      "Read access to published data products.",
+      "Lesezugriff auf veröffentlichte Datenprodukte.",
       RoleType.DATA,
       PermissionName.DATASET_READ,
       PermissionName.DATASET_PAYLOAD_READ),
 
   DATA_STEWARD(
       "Data Steward",
-      "Responsibility for the life-cycle of domain specific data in a data space.",
+      "Verantwortung für den Lebenszyklus domänenspezifischer Daten.",
       RoleType.DATA,
       PermissionName.DATASET_CREATE,
       PermissionName.DATASET_READ,
@@ -76,7 +76,7 @@ public enum RoleDefault {
 
   DATA_OWNER(
       "Data Owner",
-      "Business responsibility for one or several domains.",
+      "Fachliche Verantwortung für eine oder mehrere Domänen.",
       RoleType.DATA,
       PermissionName.DATASET_CREATE,
       PermissionName.DATASET_READ,
@@ -100,7 +100,7 @@ public enum RoleDefault {
 
   DATA_GATEKEEPER(
       "Data Gatekeeper",
-      "Responsibility for data protection and data governance.",
+      "Verantwortung für Datenschutz und Daten-Governance.",
       RoleType.DATA,
       PermissionName.DATASET_READ,
       PermissionName.DATASET_RELEASE,
