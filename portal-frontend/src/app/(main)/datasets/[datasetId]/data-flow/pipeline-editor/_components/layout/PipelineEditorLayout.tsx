@@ -80,12 +80,12 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
   }, [router, params.datasetId])
 
   const handleSaveAndExit = useCallback(async () => {
-    try {
-      await saveAllPipelines()
+    const isSuccess = await saveAllPipelines()
+    if (isSuccess) {
       setIsExitModalOpen(false)
       router.push(`/datasets/${params.datasetId}`)
-    } catch {
-      // Save failed — keep user on page. Mutation error handling in provider shows the error.
+    } else {
+      // Save failed — keep user on page. Error toasts are shown by saveAllPipelines.
       setIsExitModalOpen(false)
     }
   }, [saveAllPipelines, router, params.datasetId])

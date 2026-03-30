@@ -311,50 +311,6 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     setShouldShowValidationPanel(false)
   }, [])
 
-  // ===== Pipeline Operations: Save (Create or Update) =====
-  const savePipeline = useCallback(() => {
-    if (!activeSession || !pipeline) return
-
-    const payload = buildPipelinePayload(pipeline)
-    const pipelineId = pipeline.id
-
-    if (pipelineId) {
-      // Existing pipeline → PUT update
-      updatePipelineMutation.mutate(
-        { pipelineId, data: payload },
-        {
-          onSuccess: () => {
-            sessionManager.markSessionClean(activeSession.id)
-            console.log('Pipeline updated successfully')
-          },
-          onError: error => {
-            console.error('Failed to update pipeline:', error)
-          },
-        },
-      )
-    } else {
-      // New pipeline → POST create
-      createPipelineMutation.mutate(payload, {
-        onSuccess: response => {
-          // Set the id from the response on the pipeline
-          const updatedPipeline: Pipeline = {
-            ...activeSession.pipeline,
-            id: response.data.id,
-            isDirty: false,
-          }
-          sessionManager.updateSessionPipeline(activeSession.id, updatedPipeline)
-          sessionManager.markSessionClean(activeSession.id)
-          console.log('Pipeline created successfully with id:', response.data.id)
-        },
-        onError: error => {
-          console.error('Failed to create pipeline:', error)
-        },
-      })
-    }
-  }, [activeSession, pipeline, sessionManager, createPipelineMutation, updatePipelineMutation])
-
-  const isSaving = createPipelineMutation.isPending || updatePipelineMutation.isPending
-
   // ===== Pipeline Operations: Delete =====
   const deletePipeline = useCallback(() => {
     if (!activeSession) return
@@ -392,9 +348,11 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   const [isSavingAll, setIsSavingAll] = useState(false)
 
-  const saveAllPipelines = useCallback(async () => {
+  const saveAllPipelines = useCallback(async (): Promise<boolean> => {
+    if (isSavingAll) return false
+
     const dirtySessions = sessionManager.sessions.filter(s => s.isDirty)
-    if (dirtySessions.length === 0) return
+    if (dirtySessions.length === 0) return true
 
     // Check for duplicate pipeline names across ALL sessions (not just dirty —
     // a clean session could share a name with a new dirty one)
@@ -411,7 +369,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         .filter(s => duplicateNames.has(s.pipeline.name.trim().toLowerCase()))
         .map(s => s.pipeline.name)
       toast.error(t('header.duplicateNames', { names: [...new Set(displayNames)].join(', ') }))
-      return
+      return false
     }
 
     // Validate all dirty pipelines before saving
@@ -425,7 +383,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
     if (failedNames.length > 0) {
       toast.error(t('header.validationFailed', { names: failedNames.join(', ') }))
-      return
+      return false
     }
 
     setIsSavingAll(true)
@@ -457,11 +415,14 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
       if (saveFailedNames.length > 0) {
         toast.error(t('header.saveFailed', { names: saveFailedNames.join(', ') }))
+        return false
       }
+
+      return true
     } finally {
       setIsSavingAll(false)
     }
-  }, [sessionManager, createPipelineMutation, updatePipelineMutation, t])
+  }, [isSavingAll, sessionManager, createPipelineMutation, updatePipelineMutation, t])
 
   // ===== Context Value =====
   const contextValue: ActivePipelineContextValue = useMemo(
@@ -507,8 +468,6 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       hideValidationPanel,
 
       // Pipeline operations
-      savePipeline,
-      isSaving,
       deletePipeline,
       isDeleting,
       isLoadingPipelines,
@@ -548,8 +507,6 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       canSave,
       shouldShowValidationPanel,
       hideValidationPanel,
-      savePipeline,
-      isSaving,
       deletePipeline,
       isDeleting,
       isLoadingPipelines,
