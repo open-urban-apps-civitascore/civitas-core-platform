@@ -51,7 +51,12 @@ public class RoleController extends BaseController<RoleInputDTO, RoleOutputDTO, 
         name = "q",
         description = "Search in name or description (partial match, case-insensitive).",
         in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "admin"))
+        schema = @Schema(type = "string", example = "admin")),
+    @Parameter(
+        name = "readonly",
+        description = "Filter by readonly flag (exact match).",
+        in = ParameterIn.QUERY,
+        schema = @Schema(type = "boolean", example = "true"))
   })
   /**
    * Retrieves a paginated list of roles with optional filtering by name, description, role type, or

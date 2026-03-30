@@ -544,6 +544,8 @@
   "roles": {
     "title": "Rollen",
     "newRole": "Rolle erstellen",
+    "newSystemRole": "Systemrolle erstellen",
+    "newDataRole": "Datenrolle erstellen",
     "overView": "Übersicht:",
     "systemRoles": " Systemrollen",
     "dataRoles": "Datenrollen",

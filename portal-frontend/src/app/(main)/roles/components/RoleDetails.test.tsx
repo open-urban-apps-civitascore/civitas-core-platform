@@ -39,6 +39,7 @@ vi.mock('./baseinfo-tab/BaseInfoTab', () => ({
 vi.mock('./permissions-tab/PermissionsTab', () => ({ PermissionsTab: () => null }))
 vi.mock('./group-assignment-tab/GroupAssignmentTab', () => ({ GroupAssignmentTab: () => null }))
 
+import { useGetAssignments } from '@/app/services/api/assignments/clientRequests'
 import { usePermissions } from '@/hooks/use-permissions'
 
 import { RoleDetails } from './RoleDetails'
@@ -70,8 +71,8 @@ describe('RoleDetails permission gating', () => {
   })
 
   describe('Group Assignment tab visibility', () => {
-    it('shows Group Assignment tab when user has GROUP_READ', () => {
-      mockHasPermission([PERMISSION_NAMES.GROUP_READ])
+    it('shows Group Assignment tab when user has GROUP_READ and ASSIGNMENT_READ', () => {
+      mockHasPermission([PERMISSION_NAMES.GROUP_READ, PERMISSION_NAMES.ASSIGNMENT_READ])
       render(<RoleDetails roleId="role-1" />)
       expect(screen.getByText('roles.tabLabels.groupAssignment')).toBeInTheDocument()
     })
@@ -80,6 +81,24 @@ describe('RoleDetails permission gating', () => {
       mockHasPermission([PERMISSION_NAMES.ROLE_READ])
       render(<RoleDetails roleId="role-1" />)
       expect(screen.queryByText('roles.tabLabels.groupAssignment')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('Assignments fetch gating', () => {
+    it('enables assignments fetch when user has ASSIGNMENT_READ', () => {
+      mockHasPermission([PERMISSION_NAMES.ASSIGNMENT_READ])
+      render(<RoleDetails roleId="role-1" />)
+
+      const call = vi.mocked(useGetAssignments).mock.calls[0][0]
+      expect(call?.isEnabled).toBe(true)
+    })
+
+    it('disables assignments fetch when user lacks ASSIGNMENT_READ', () => {
+      mockHasPermission([PERMISSION_NAMES.ROLE_READ])
+      render(<RoleDetails roleId="role-1" />)
+
+      const call = vi.mocked(useGetAssignments).mock.calls[0][0]
+      expect(call?.isEnabled).toBe(false)
     })
   })
 

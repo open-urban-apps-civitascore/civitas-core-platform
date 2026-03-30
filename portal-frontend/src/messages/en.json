@@ -551,6 +551,8 @@
   "roles": {
     "title": "Roles",
     "newRole": "Create Role",
+    "newSystemRole": "Create System Role",
+    "newDataRole": "Create Data Role",
     "overView": "Overview:",
     "systemRoles": "System Roles",
     "dataRoles": "Data Roles",
