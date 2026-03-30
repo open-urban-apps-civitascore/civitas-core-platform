@@ -58,8 +58,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   }
   permissionsRequestParams.set('permissionType', roleType === ROLE_TYPES.DATA ? 'DATA' : 'SYSTEM')
 
-  const { data: rolesData, error: getRolesError } = useGetRoles({ params: rolesRequestParams })
-
+  const { data: templateRolesResponse, error: getRolesError } = useGetRoles({ params: rolesRequestParams })
   const {
     data: permissionsData,
     isFetching: isFetchingPermissions,
@@ -68,7 +67,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
     params: permissionsRequestParams,
   })
 
-  const allRoles = useMemo(() => rolesData?.data || [], [rolesData?.data])
+  const templateRoles = templateRolesResponse?.data
   const permissions = useMemo(() => mapPermissions(permissionsData?.data || []), [permissionsData?.data])
 
   const getUniqueCategories = (): string[] => {
@@ -104,7 +103,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   // When template is selected
   useEffect(() => {
     if (roleTemplate) {
-      const selectedRole = allRoles.find(role => role.id === roleTemplate)
+      const selectedRole = templateRoles?.find(role => role.id === roleTemplate)
       if (selectedRole) {
         const selectedRolePermissionIds = (selectedRole.permissions ?? []).map(p => p.id)
         const selected = permissions.filter(permission => selectedRolePermissionIds.includes(permission.value))
@@ -112,7 +111,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
       }
       setRoleTemplate(null)
     }
-  }, [roleTemplate, allRoles, permissions, handleCheckedItemsChange])
+  }, [roleTemplate, templateRoles, permissions, handleCheckedItemsChange])
 
   if (isFetchingPermissions) {
     return <LoadingSpinner />
@@ -127,7 +126,11 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
       {roleType === ROLE_TYPES.DATA ? (
         !isReadOnly && (
           <div className="mb-4 flex justify-end">
-            <RoleTemplateSelect allRoles={allRoles} setRoleTemplate={setRoleTemplate} currentRoleId={currentRoleId} />
+            <RoleTemplateSelect
+              templateRoles={templateRoles}
+              setRoleTemplate={setRoleTemplate}
+              currentRoleId={currentRoleId}
+            />
           </div>
         )
       ) : (
@@ -136,7 +139,11 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
           onChangeSearchString={setSearchInput}
           customElement={
             isReadOnly ? null : (
-              <RoleTemplateSelect allRoles={allRoles} setRoleTemplate={setRoleTemplate} currentRoleId={currentRoleId} />
+              <RoleTemplateSelect
+                templateRoles={templateRoles}
+                setRoleTemplate={setRoleTemplate}
+                currentRoleId={currentRoleId}
+              />
             )
           }
           placeholder={tRoles('permissionsTab.searchPermissions')}

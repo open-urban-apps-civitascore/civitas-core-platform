@@ -6,22 +6,22 @@ import { Role } from '@/types/roles'
 
 interface RoleTemplateSelectProps {
   setRoleTemplate: (roleId: string) => void
-  allRoles: Role[]
+  templateRoles?: Role[]
   currentRoleId?: string
 }
 
 export const RoleTemplateSelect = (props: RoleTemplateSelectProps): JSX.Element => {
-  const { setRoleTemplate, allRoles, currentRoleId } = props
+  const { setRoleTemplate, templateRoles, currentRoleId } = props
   const t = useTranslations('roles.permissionsTab')
 
   const rolesForSelect = useMemo((): { label: string; value: string }[] => {
-    return allRoles
+    return (templateRoles ?? [])
       .filter(role => role.id !== currentRoleId)
       .map(role => ({
         label: role.name,
         value: role.id,
       }))
-  }, [allRoles, currentRoleId])
+  }, [templateRoles, currentRoleId])
 
   return (
     <BasicSelect
