@@ -15,7 +15,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import jakarta.validation.constraints.NotNull;
 import java.util.Objects;
 import java.util.stream.Stream;
 import lombok.Getter;
@@ -62,11 +61,11 @@ public class Assignment extends BaseEntity {
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "group_id", nullable = false)
-  @NotNull private Group group;
+  private Group group;
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "role_id", nullable = false)
-  @NotNull private Role role;
+  private Role role;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "scope_type")

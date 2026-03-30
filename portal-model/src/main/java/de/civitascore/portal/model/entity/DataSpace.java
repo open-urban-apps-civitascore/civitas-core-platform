@@ -49,7 +49,7 @@ public class DataSpace extends NamedEntity {
   @OneToMany(
       mappedBy = "parentDataSpace",
       fetch = FetchType.LAZY,
-      cascade = {CascadeType.PERSIST, CascadeType.MERGE},
+      cascade = CascadeType.ALL,
       orphanRemoval = true)
   @Setter(AccessLevel.NONE) // Custom setter needed for orphanRemoval
   private Set<DataSpace> childDataSpaces = new HashSet<>();
