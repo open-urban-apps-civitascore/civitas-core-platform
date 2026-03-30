@@ -10,6 +10,7 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotNull;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +35,7 @@ public class Pipeline extends NamedEntity {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "dataset_id", nullable = false)
-  private DataSet dataSet;
+  @NotNull private DataSet dataSet;
 
   /** React Flow visual layout stored as JSON (nodes/edges/viewport). */
   @JdbcTypeCode(SqlTypes.JSON)
