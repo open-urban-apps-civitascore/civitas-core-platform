@@ -11,7 +11,9 @@
 
 import type { Connection } from '@xyflow/react'
 import { useParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 import {
   useCreatePipeline,
@@ -42,8 +44,6 @@ import type { ActivePipelineContextValue, PipelineStats } from '../../_types/con
 import { createDefaultNodeData, type PipelineNodeData } from '../../_types/nodes'
 import type { NodeCreationContext, Pipeline, PipelineEdge, PipelineNode, PipelineNodeType } from '../../_types/pipeline'
 import type { UsePipelineSessionReturn } from '../../_types/session'
-import { toast } from 'sonner'
-import { useTranslations } from 'next-intl'
 
 // ============================================================================
 // Props
@@ -352,7 +352,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       }
       return false
     }
-  }, [activeSession, canSave, pipeline, sessionManager, createPipelineMutation, updatePipelineMutation])
+  }, [activeSession, canSave, pipeline, sessionManager, createPipelineMutation, updatePipelineMutation, t])
 
   const isSaving = createPipelineMutation.isPending || updatePipelineMutation.isPending
 

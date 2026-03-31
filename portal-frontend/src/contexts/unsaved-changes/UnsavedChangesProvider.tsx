@@ -14,7 +14,9 @@ interface UnsavedChangesProviderProps {
 export const UnsavedChangesProvider = ({ children }: UnsavedChangesProviderProps) => {
   const router = useRouter()
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
-  const [pendingNavigation, setPendingNavigation] = useState<{ type: 'push'; href: string } | { type: 'back' } | null>(null)
+  const [pendingNavigation, setPendingNavigation] = useState<{ type: 'push'; href: string } | { type: 'back' } | null>(
+    null,
+  )
   const [isSaving, setIsSaving] = useState(false)
   const isNavigatingRef = useRef(false)
   const saveHandlerRef = useRef<(() => Promise<boolean>) | null>(null)

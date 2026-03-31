@@ -114,7 +114,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const hasStatusChanged = dataSetStatus !== dataset.dataSetStatus
 
   const hasUnsavedChanges = form.formState.isDirty || hasStatusChanged
-  const hasOnlyStatusChanges =  !form.formState.isDirty && hasStatusChanged
+  const hasOnlyStatusChanges = !form.formState.isDirty && hasStatusChanged
 
   const formValues = useWatch({ control: form.control })
 

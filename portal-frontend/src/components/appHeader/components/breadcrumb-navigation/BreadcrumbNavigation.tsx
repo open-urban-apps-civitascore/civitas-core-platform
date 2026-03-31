@@ -38,6 +38,7 @@ const BreadcrumbLinkWithTooltip = ({ href, title, isLast }: { href: string; titl
     <Tooltip open={isTruncated ? undefined : false}>
       <TooltipTrigger asChild>
         <GuardedLink
+          ref={ref}
           href={href}
           aria-current={isLast ? 'page' : undefined}
           className="truncate block hover:text-foreground transition-colors"

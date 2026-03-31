@@ -1,32 +1,34 @@
 'use client'
 
 import Link from 'next/link'
-import { MouseEvent } from 'react'
+import { ComponentPropsWithoutRef, forwardRef, MouseEvent } from 'react'
 
 import { useUnsavedChanges } from '@/contexts/unsaved-changes/UnsavedChangesContext'
 
-interface GuardedLinkProps {
+interface GuardedLinkProps extends Omit<ComponentPropsWithoutRef<typeof Link>, 'href'> {
   href: string
-  children: React.ReactNode
-  className?: string
-  target?: React.HTMLAttributeAnchorTarget
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  'aria-current'?: React.AriaAttributes['aria-current']
 }
 
-export const GuardedLink = ({ href, children, className, target, 'aria-current': ariaCurrent }: GuardedLinkProps) => {
-  const { hasUnsavedChanges, requestNavigation } = useUnsavedChanges()
+export const GuardedLink = forwardRef<HTMLAnchorElement, GuardedLinkProps>(
+  ({ href, children, onClick, ...props }, ref) => {
+    const { hasUnsavedChanges, requestNavigation } = useUnsavedChanges()
 
-  const handleClick = (e: MouseEvent<HTMLAnchorElement>) => {
-    if (hasUnsavedChanges) {
-      e.preventDefault()
-      requestNavigation(href)
+    const handleClick = (e: MouseEvent<HTMLAnchorElement>) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault()
+        requestNavigation(href)
+        return
+      }
+
+      onClick?.(e)
     }
-  }
 
-  return (
-    <Link href={href} className={className} target={target} aria-current={ariaCurrent} onClick={handleClick}>
-      {children}
-    </Link>
-  )
-}
+    return (
+      <Link ref={ref} href={href} onClick={handleClick} {...props}>
+        {children}
+      </Link>
+    )
+  },
+)
+
+GuardedLink.displayName = 'GuardedLink'
