@@ -115,9 +115,7 @@ describe('useQueryParams', () => {
     expect(params.get(QUERY_PARAMS.search)).toBe('foo')
   })
 
-  // TODO Fix and enable
-  // Disabled for pipeline development, to not have failing tests and a blocked MR
-  it.skip('should reset pageIndex if it exceeds totalPages in setApiRequestParams', () => {
+  it('should reset pageIndex if it exceeds totalPages', () => {
     mockSearchParams = new URLSearchParams({
       [QUERY_PARAMS.pageIndex]: '10',
       [QUERY_PARAMS.pageSize]: '10',
@@ -125,7 +123,7 @@ describe('useQueryParams', () => {
     const { result } = renderHook(() => useQueryParams())
 
     act(() => {
-      result.current.getApiRequestParamsByUrl()
+      result.current.setTotalPages(9)
     })
 
     expect(push).toHaveBeenCalledWith(
