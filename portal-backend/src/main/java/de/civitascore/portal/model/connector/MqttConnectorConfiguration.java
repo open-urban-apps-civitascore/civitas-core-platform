@@ -53,6 +53,22 @@ public class MqttConnectorConfiguration implements ConnectorConfiguration {
   @Schema(description = "Broker username.", example = "mqttuser")
   private String user;
 
+  public void setClientId(String clientId) {
+    this.clientId = normalizeBlank(clientId);
+  }
+
+  public void setConnectTimeout(String connectTimeout) {
+    this.connectTimeout = normalizeBlank(connectTimeout);
+  }
+
+  public void setKeepalive(String keepalive) {
+    this.keepalive = normalizeBlank(keepalive);
+  }
+
+  public void setUser(String user) {
+    this.user = normalizeBlank(user);
+  }
+
   @Schema(
       description = "Broker password. Write-only — returned as \"********\" in responses.",
       accessMode = Schema.AccessMode.WRITE_ONLY,
@@ -61,6 +77,10 @@ public class MqttConnectorConfiguration implements ConnectorConfiguration {
 
   public void setPassword(String password) {
     this.password = (password != null && password.isBlank()) ? null : password;
+  }
+
+  private static String normalizeBlank(String value) {
+    return (value != null && value.isBlank()) ? null : value;
   }
 
   // Validates URLs with java.net.URI and strips any embedded credentials (discarding them)

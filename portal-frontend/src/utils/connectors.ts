@@ -10,5 +10,8 @@ export const getConnectorFormData = (
   connectorType: ConnectorType,
   currentConfig: ConnectorDraft['configuration'] | undefined,
 ): ConnectorDraft['configuration'] => {
-  return currentConfig ?? getConnectorDefaults(connectorType)
+  return {
+    ...getConnectorDefaults(connectorType),
+    ...(currentConfig ?? {}),
+  }
 }
