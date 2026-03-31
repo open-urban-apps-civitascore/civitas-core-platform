@@ -194,6 +194,8 @@ Increment the `_0_` index for additional entries (e.g. `INIT_GROUPS_1_NAME`, `IN
 
 > **Note:** Passwords are only set during initial Keycloak sync and only when the `local` profile is active. In production, set passwords directly in Keycloak (admin console or self-service reset).
 
+> **Email:** In non-local environments, seeded users receive a Keycloak email to verify their address and set a password. This requires a working SMTP configuration in the Keycloak realm.
+
 ---
 
 ## 4. Local Development Only
