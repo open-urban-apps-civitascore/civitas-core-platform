@@ -32,13 +32,4 @@ public interface GroupRepository extends NamedEntityRepository<Group, UUID> {
   @EntityGraph(attributePaths = {"members"})
   @Query("SELECT g FROM Group g WHERE g.id IN :ids")
   List<Group> findAllByIdWithMembers(@Param("ids") List<UUID> ids);
-
-  /**
-   * Count groups by IDs.
-   *
-   * @param ids the group IDs
-   * @return the count of groups found
-   */
-  @Query("SELECT COUNT(g) FROM Group g WHERE g.id IN :ids")
-  long countByIdIn(@Param("ids") List<UUID> ids);
 }
