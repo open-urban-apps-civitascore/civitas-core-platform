@@ -1,10 +1,10 @@
 import './globals.css'
 
 import type { Metadata } from 'next'
+import { IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google'
 import { SessionProvider } from 'next-auth/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale } from 'next-intl/server'
-import { IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google'
 
 import { SessionManager } from '@/components/session-manager'
 
@@ -25,6 +25,19 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: 'CIVITAS/CORE V2',
   description: 'The frontend vor CIVITAS/CORE V2',
+  icons: {
+    icon: [
+      { url: '/favicon-light.ico' },
+      {
+        url: '/favicon-light.ico',
+        media: '(prefers-color-scheme: light)',
+      },
+      {
+        url: '/favicon-dark.ico',
+        media: '(prefers-color-scheme: dark)',
+      },
+    ],
+  },
 }
 
 interface RootLayoutProps {
