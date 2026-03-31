@@ -299,6 +299,63 @@ class DataSourceControllerIntegrationTest
   }
 
   @Nested
+  @DisplayName("MQTT Blank Parameter Normalization Tests")
+  class MqttBlankNormalizationTests {
+
+    @Test
+    @DisplayName("Should normalize blank optional MQTT strings to null on create")
+    void shouldNormalizeBlankOptionalStringsOnCreate() {
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("mqtt_blank_test_" + UUID.randomUUID().toString().substring(0, 8));
+      input.setConnectorType(ConnectorType.MQTT);
+      Map<String, Object> config = new HashMap<>();
+      config.put("urls", List.of("tcp://broker:1883"));
+      config.put("topics", List.of("sensor/data"));
+      config.put("qos", 1);
+      config.put("client_id", "");
+      config.put("connect_timeout", "   ");
+      config.put("keepalive", "");
+      config.put("user", " ");
+      input.setConfiguration(config);
+
+      ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      Map<String, Object> resultConfig = response.getBody().getConfiguration();
+      assertThat(resultConfig.get("client_id")).isNull();
+      assertThat(resultConfig.get("connect_timeout")).isNull();
+      assertThat(resultConfig.get("keepalive")).isNull();
+      assertThat(resultConfig.get("user")).isNull();
+    }
+
+    @Test
+    @DisplayName("Should persist non-blank optional MQTT strings unchanged")
+    void shouldPersistNonBlankOptionalStringsUnchanged() {
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("mqtt_nonblank_test_" + UUID.randomUUID().toString().substring(0, 8));
+      input.setConnectorType(ConnectorType.MQTT);
+      input.setConfiguration(
+          Map.of(
+              "urls", List.of("tcp://broker:1883"),
+              "topics", List.of("sensor/data"),
+              "qos", 1,
+              "client_id", "my-client",
+              "connect_timeout", "5s",
+              "keepalive", "30s",
+              "user", "mqttuser"));
+
+      ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      Map<String, Object> resultConfig = response.getBody().getConfiguration();
+      assertThat(resultConfig.get("client_id")).isEqualTo("my-client");
+      assertThat(resultConfig.get("connect_timeout")).isEqualTo("5s");
+      assertThat(resultConfig.get("keepalive")).isEqualTo("30s");
+      assertThat(resultConfig.get("user")).isEqualTo("mqttuser");
+    }
+  }
+
+  @Nested
   @DisplayName("Read DataSource Tests")
   class ReadTests {
 
