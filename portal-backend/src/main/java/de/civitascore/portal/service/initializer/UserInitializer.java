@@ -201,7 +201,6 @@ public class UserInitializer {
     userConfig.setFirstName(user.getFirstName());
     userConfig.setLastName(user.getLastName());
     userConfig.setEnabled(true);
-    userConfig.setEmailVerified(true);
 
     if (password != null && !password.isBlank() && environment.matchesProfiles("local")) {
       CredentialConfig credential = new CredentialConfig();
@@ -209,6 +208,10 @@ public class UserInitializer {
       credential.setValue(password);
       credential.setTemporary(false);
       userConfig.setCredentials(List.of(credential));
+      userConfig.setEmailVerified(true);
+    } else {
+      userConfig.setEmailVerified(false);
+      userConfig.setRequiredActions(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
     }
 
     try {

@@ -14,6 +14,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -87,7 +88,8 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
   }
 
   @Test
-  @DisplayName("Should sync user without externalId to Keycloak and persist externalId")
+  @DisplayName(
+      "Should sync user without externalId to Keycloak with requiredActions and emailVerified=false")
   void shouldSyncUserWithoutExternalIdToKeycloak() {
     userInitializer.initialize();
 
@@ -98,7 +100,10 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
     assertThat(user.get().getActive()).isTrue();
     assertThat(user.get().getExternalId()).isNotBlank();
 
-    assertThat(findKeycloakUserByEmail(TEST_SYNC_EMAIL)).isNotNull();
+    UserRepresentation keycloakUser = findKeycloakUserByEmail(TEST_SYNC_EMAIL);
+    assertThat(keycloakUser).isNotNull();
+    assertThat(keycloakUser.isEmailVerified()).isFalse();
+    assertThat(keycloakUser.getRequiredActions()).contains("VERIFY_EMAIL", "UPDATE_PASSWORD");
   }
 
   @Test
