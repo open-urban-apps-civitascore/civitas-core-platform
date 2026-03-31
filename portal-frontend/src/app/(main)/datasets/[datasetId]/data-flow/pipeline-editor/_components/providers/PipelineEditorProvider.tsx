@@ -42,6 +42,8 @@ import type { ActivePipelineContextValue, PipelineStats } from '../../_types/con
 import { createDefaultNodeData, type PipelineNodeData } from '../../_types/nodes'
 import type { NodeCreationContext, Pipeline, PipelineEdge, PipelineNode, PipelineNodeType } from '../../_types/pipeline'
 import type { UsePipelineSessionReturn } from '../../_types/session'
+import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 
 // ============================================================================
 // Props
@@ -69,6 +71,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 }) => {
   const params = useParams<{ datasetId: string }>()
   const datasetId = params.datasetId
+  const t = useTranslations('pipelineEditor')
   const activeSession = sessionManager.getActiveSession()
   const pipeline = activeSession?.pipeline || createEmptyPipeline()
 
@@ -311,7 +314,10 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Pipeline Operations: Save (Create or Update) =====
   const savePipeline = useCallback(async (): Promise<boolean> => {
-    if (!activeSession || !pipeline || !canSave) return false
+    if (!activeSession || !pipeline || !canSave) {
+      toast.error(t('validation.canNotSave'))
+      return false
+    }
 
     const payload = buildPipelinePayload(pipeline)
     const pipelineId = pipeline.id

@@ -971,6 +971,7 @@
       "warnings": "Warnungen ({count})",
       "fixErrors": "Behebe die obigen Fehler, bevor du die Pipeline speicherst.",
       "hasWarnings": "Pipeline hat Warnungen, kann aber gespeichert werden.",
+      "canNotSave": "Speichern der Pipeline nicht möglich. Überprüfe die Pipeline und verifiziere sie vor dem Speichern.",
       "messages": {
         "startNodeRequired": "Pipeline muss mindestens einen Start-Knoten haben",
         "endNodeRequired": "Pipeline muss mindestens einen End-Knoten haben",

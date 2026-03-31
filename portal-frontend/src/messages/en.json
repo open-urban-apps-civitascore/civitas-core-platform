@@ -985,6 +985,7 @@
       "warnings": "Warnings ({count})",
       "fixErrors": "Fix the errors above before saving the pipeline.",
       "hasWarnings": "Pipeline has warnings but can be saved.",
+      "canNotSave": "Unable to save the pipeline. Review the pipeline and validate it before saving.",
       "messages": {
         "startNodeRequired": "Pipeline must have at least one Start node",
         "endNodeRequired": "Pipeline must have at least one End node",
