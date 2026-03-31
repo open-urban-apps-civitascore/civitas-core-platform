@@ -185,17 +185,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           "pipelines", id, "DataSet must have at least one Pipeline with DataSources or APIs");
     }
 
-    // Generate distributions from pipeline APIs
-    dataSet.getPipelines().stream()
-        .filter(pipeline -> pipeline.getApis() != null)
-        .flatMap(pipeline -> pipeline.getApis().stream())
-        .distinct()
-        .forEach(
-            apiPath -> {
-              Distribution distribution =
-                  distributionService.createFromApiUrlAndDataSet(apiPath, dataSet);
-              dataSet.getDistributions().add(distribution);
-            });
+    generateDistributions(dataSet);
 
     dataSet.setDataSetStatus(DataSetStatus.READY);
     return dataSetRepository.save(dataSet);
@@ -301,6 +291,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       log.info("Saga DELETE completed for dataset {}, reverted to READY", datasetId);
     } else if (pendingType == PendingSagaType.CREATE) {
       applyInfrastructureResult(dataSet, result);
+      if (dataSet.getDistributions().isEmpty()) {
+        generateDistributions(dataSet);
+      }
       updateDistributionUrls(dataSet);
       log.info("Saga CREATE completed for dataset {}, infrastructure provisioned", datasetId);
     } else if (pendingType == PendingSagaType.UPDATE) {
@@ -415,6 +408,19 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     if (result.pipelineIds() != null) {
       dataSet.setPipelineIds(result.pipelineIds());
     }
+  }
+
+  private void generateDistributions(DataSet dataSet) {
+    dataSet.getPipelines().stream()
+        .filter(pipeline -> pipeline.getApis() != null)
+        .flatMap(pipeline -> pipeline.getApis().stream())
+        .distinct()
+        .forEach(
+            apiPath -> {
+              Distribution distribution =
+                  distributionService.createFromApiUrlAndDataSet(apiPath, dataSet);
+              dataSet.getDistributions().add(distribution);
+            });
   }
 
   private void updateDistributionUrls(DataSet dataSet) {
