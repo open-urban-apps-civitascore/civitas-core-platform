@@ -77,6 +77,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
   private static final String PASSWORD_PROPERTY_KEY = "password";
   private static final String USERNAME_PROPERTY_KEY = "username";
 
+  // Properties for invitation email redirect (execute-actions-email with client_id + redirect_uri)
+  private static final String INVITATION_CLIENT_ID_PROPERTY_KEY = "invitation.client.id";
+  private static final String INVITATION_REDIRECT_URI_PROPERTY_KEY = "invitation.redirect.uri";
+
   private static final String REALM = "realm";
   private static final String URL_PROPERTY = "url";
 
@@ -86,6 +90,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private final ObjectMapper objectMapper;
   private Keycloak keycloakClient;
+
+  // Optional invitation redirect configuration for execute-actions-email
+  private String invitationClientId;
+  private String invitationRedirectUri;
 
   public KeycloakAdapter() {
     this.objectMapper = new ObjectMapper();
@@ -110,10 +118,22 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
             .clientId(getAdapterProperty(CLIENT_ID_PROPERTY_KEY, "admin-cli"))
             .build();
 
+    // Read optional invitation redirect configuration for execute-actions-email.
+    // When both are set, the actions email link will redirect the user back to the
+    // specified client after completing all required actions (e.g., password setup).
+    this.invitationClientId = getAdapterProperty(INVITATION_CLIENT_ID_PROPERTY_KEY);
+    this.invitationRedirectUri = getAdapterProperty(INVITATION_REDIRECT_URI_PROPERTY_KEY);
+
     logger.info(
         "Keycloak adapter '{}' initialized for: {}",
         Encode.forJava(getName()),
         Encode.forJava(getAdapterProperty(URL_PROPERTY, DEFAULT_SERVER_URL)));
+    if (invitationClientId != null && invitationRedirectUri != null) {
+      logger.info(
+          "Invitation redirect configured: clientId={}, redirectUri={}",
+          Encode.forJava(invitationClientId),
+          Encode.forJava(invitationRedirectUri));
+    }
     logger.info(
         "Subscribed to {} Kafka topics: {}",
         getSubscribedTopics().size(),
@@ -479,7 +499,12 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
   /**
    * Sends an actions email to a newly created user if required actions are configured. The email
    * contains a link for the user to complete actions like email verification and password setup.
-   * Failures are logged as warnings but do not abort user creation (SMTP may not be configured).
+   *
+   * <p>When {@code invitationClientId} and {@code invitationRedirectUri} are configured, the
+   * overload {@code executeActionsEmail(clientId, redirectUri, actions)} is used. This embeds the
+   * client ID and redirect URI in the Keycloak action token, so that after the user completes all
+   * required actions (e.g., UPDATE_PASSWORD, VERIFY_EMAIL), Keycloak redirects them back to the
+   * portal instead of showing a generic "account updated" page.
    */
   private void sendActionsEmail(
       RealmResource realmResource, String userId, List<String> requiredActions) {
@@ -487,11 +512,21 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       return;
     }
     try {
-      realmResource.users().get(userId).executeActionsEmail(requiredActions);
-      logger.info(
-          "Sent actions email to user {} for actions: {}",
-          Encode.forJava(maskId(userId)),
-          Encode.forJava(String.valueOf(requiredActions)));
+      if (invitationClientId != null && invitationRedirectUri != null) {
+        // Use the overload with clientId and redirectUri so Keycloak redirects the user
+        // back to the portal after completing all required actions
+        realmResource
+            .users()
+            .get(userId)
+            .executeActionsEmail(invitationClientId, invitationRedirectUri, requiredActions);
+      } else {
+        // Fallback: no redirect configuration, use simple overload
+        realmResource.users().get(userId).executeActionsEmail(requiredActions);
+        logger.info(
+            "Sent actions email to user {} for actions: {}",
+            Encode.forJava(maskId(userId)),
+            Encode.forJava(String.valueOf(requiredActions)));
+      }
     } catch (Exception e) {
       logger.warn(
           "Failed to send actions email for user {}: {}",

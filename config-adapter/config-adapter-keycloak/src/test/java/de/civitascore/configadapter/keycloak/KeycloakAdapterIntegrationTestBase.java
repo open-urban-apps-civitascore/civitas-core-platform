@@ -102,6 +102,8 @@ abstract class KeycloakAdapterIntegrationTestBase {
     props.put("keycloak.username", "admin");
     props.put("keycloak.password", "admin");
     props.put("keycloak.client.id", "admin-cli");
+    props.put("keycloak.invitation.client.id", "test-portal");
+    props.put("keycloak.invitation.redirect.uri", "http://localhost:3000/");
     props.put(
         "keycloak.topics",
         String.join(

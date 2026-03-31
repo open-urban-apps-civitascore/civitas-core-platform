@@ -34,6 +34,7 @@ import org.keycloak.admin.client.CreatedResponseUtil;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.admin.client.resource.RolesResource;
 import org.keycloak.admin.client.resource.UsersResource;
+import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -147,6 +148,12 @@ class KeycloakUserIntegrationTest extends KeycloakAdapterIntegrationTestBase {
     smtpConfig.put("auth", "false");
     realmRep.setSmtpServer(smtpConfig);
     keycloakClient.realms().create(realmRep);
+
+    ClientRepresentation portalClient = new ClientRepresentation();
+    portalClient.setClientId("test-portal");
+    portalClient.setEnabled(true);
+    portalClient.setRedirectUris(List.of("http://localhost:3000/*"));
+    keycloakClient.realm(realmName).clients().create(portalClient);
 
     UserConfig userConfig = new UserConfig();
     userConfig.setUsername("emailuser");
