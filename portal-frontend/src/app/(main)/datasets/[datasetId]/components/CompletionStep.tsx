@@ -1,7 +1,7 @@
 import { Circle, CircleCheckBig } from 'lucide-react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
+import { GuardedLink } from '@/components/appSidebar/components/GuardedLink'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { CompletionStepData, CompletionStepParam } from '@/types/datasets'
@@ -51,7 +51,7 @@ export const CompletionStep = (props: CompletionStepProps) => {
       </Button>
     ) : (
       <Button asChild variant="outline">
-        <Link href={buildHref(routeParam, queryParam)}>{buttonText}</Link>
+        <GuardedLink href={buildHref(routeParam, queryParam)}>{buttonText}</GuardedLink>
       </Button>
     )
   return (

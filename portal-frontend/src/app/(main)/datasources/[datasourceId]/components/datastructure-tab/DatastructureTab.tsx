@@ -1,5 +1,4 @@
 import { RowSelectionState } from '@tanstack/react-table'
-import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
@@ -8,6 +7,7 @@ import {
   useDatastructureVersion,
 } from '@/app/(main)/datastructures/[datastructureId]/(versions)/hooks/useDatastructureVersion'
 import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
+import { GuardedLink } from '@/components/appSidebar/components/GuardedLink'
 import { UmlModeler } from '@/components/uml-modeler/UmlModeler'
 import { DatastructureVersion } from '@/types/datastructures'
 import { mapDatastructureVersionApiToFormData } from '@/utils/datastructures'
@@ -77,9 +77,9 @@ export const DatastructureTab = (props: DatastructureTabProps) => {
         <li className="text-muted-foreground text-sm">
           {t.rich('creationSteps.step2', {
             link: chunks => (
-              <Link className="underline" href="/datastructures">
+              <GuardedLink className="underline" href="/datastructures">
                 {chunks}
-              </Link>
+              </GuardedLink>
             ),
           })}
         </li>

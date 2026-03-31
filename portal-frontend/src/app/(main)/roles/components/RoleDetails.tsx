@@ -34,6 +34,7 @@ import {
 import { useError } from '@/hooks/use-error'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { FormRole, Role, ROLE_TYPES, RoleSchema, RoleTab } from '@/types/roles'
@@ -225,24 +226,21 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     })
   }
 
-  const createNewRole = (formValues: FormRole) => {
-    createRole.mutate(
-      {
+  const createNewRole = async (formValues: FormRole): Promise<boolean> => {
+    try {
+      const { data } = await createRole.mutateAsync({
         name: formValues.name,
         description: formValues.description,
         roleType: (tabValue as Role['roleType']) || DEFAULT_TAB,
         readonly: formValues.readonly,
-      },
-      {
-        onSuccess: ({ data }) => {
-          toast.success(tCommon('success.creationSuccess', { item: tCommon('items.role') }))
-          router.push(`/roles/${data.id}?tab=${tabValue}`)
-        },
-        onError: error => {
-          handleRoleRequestError(error, tRoles('errors.createError'))
-        },
-      },
-    )
+      })
+      toast.success(tCommon('success.creationSuccess', { item: tCommon('items.role') }))
+      router.push(`/roles/${data.id}?tab=${tabValue}`)
+      return true
+    } catch (error) {
+      handleRoleRequestError(error as AxiosError, tRoles('errors.createError'))
+      return false
+    }
   }
 
   const updateRoleValues = async (formValues: FormRole, roleId: string) => {
@@ -290,25 +288,40 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     }
   }
 
-  const updateRoleAndAssignments = async (formValues: FormRole, roleId: string) => {
+  const updateRoleAndAssignments = async (formValues: FormRole, roleId: string): Promise<boolean> => {
     const shouldUpdateValues = form.formState.isDirty || arePermissionsDirty
     try {
       // values of default roles must not be edited but their assignments can be updated
       if (!isDefaultRole && shouldUpdateValues) await updateRoleValues(formValues, roleId)
       if (areAssignmentsDirty) await saveGroupAssignment(roleId)
       setIsExitModalOpen(false)
+      return true
       // eslint-disable-next-line unused-imports/no-unused-vars
     } catch (error) {
       console.error('An error occurred while updating the role')
+      return false
     }
   }
 
-  const handleSave = isCreateMode
-    ? form.handleSubmit(createNewRole, handleFormValidationError)
-    : form.handleSubmit(
-        (formValues: FormRole) => updateRoleAndAssignments(formValues, roleId as string),
-        handleFormValidationError,
-      )
+  const handleSave = async () => {
+    let isSaved = false
+
+    await form.handleSubmit(
+      async formValues => {
+        isSaved = isCreateMode
+          ? await createNewRole(formValues)
+          : await updateRoleAndAssignments(formValues, roleId as string)
+      },
+      errors => {
+        handleFormValidationError(errors)
+        isSaved = false
+      },
+    )()
+
+    return isSaved
+  }
+
+  useRegisterUnsavedChanges(isAnyDirty, handleSave)
 
   const handleExit = () => {
     if (!roleId) {

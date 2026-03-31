@@ -6,15 +6,11 @@ import { useTranslations } from 'next-intl'
 import React, { useRef } from 'react'
 
 import { useGetBredcrumbs } from '@/app/services/api/breadcrumbs/clientRequests'
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb'
+import { GuardedLink } from '@/components/appSidebar/components/GuardedLink'
+import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useUnsavedChanges } from '@/contexts/unsaved-changes/UnsavedChangesContext'
 import { useIsTruncated } from '@/hooks/use-is-truncated'
 import { cn } from '@/lib/utils'
 
@@ -41,9 +37,13 @@ const BreadcrumbLinkWithTooltip = ({ href, title, isLast }: { href: string; titl
   return (
     <Tooltip open={isTruncated ? undefined : false}>
       <TooltipTrigger asChild>
-        <BreadcrumbLink ref={ref} href={href} aria-current={isLast ? 'page' : undefined} className="truncate block">
+        <GuardedLink
+          href={href}
+          aria-current={isLast ? 'page' : undefined}
+          className="truncate block hover:text-foreground transition-colors"
+        >
           {title}
-        </BreadcrumbLink>
+        </GuardedLink>
       </TooltipTrigger>
       <TooltipContent variant="secondary">{title}</TooltipContent>
     </Tooltip>
@@ -86,6 +86,7 @@ const getTitle = (
 export const BreadcrumbNavigation = () => {
   const pathname = usePathname()
   const params = useParams()
+  const { requestBack } = useUnsavedChanges()
   const router = useRouter()
   const t = useTranslations('sidebar')
   const tCommon = useTranslations('common')
@@ -127,7 +128,7 @@ export const BreadcrumbNavigation = () => {
           size="icon"
           className="h-7 w-7"
           aria-label={tCommon('actions.back')}
-          onClick={() => (globalThis.history.length > 1 ? router.back() : router.push(parentPath))}
+          onClick={() => (globalThis.history.length > 1 ? requestBack() : router.push(parentPath))}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
@@ -135,7 +136,9 @@ export const BreadcrumbNavigation = () => {
       <Breadcrumb className="min-w-0 ">
         <BreadcrumbList className="flex-nowrap overflow-hidden">
           <BreadcrumbItem className="hidden md:block">
-            <BreadcrumbLink href="/">Home</BreadcrumbLink>
+            <GuardedLink href="/" className="hover:text-foreground transition-colors">
+              Home
+            </GuardedLink>
           </BreadcrumbItem>
 
           {updatedBreadcrumbs.length > 0 && <CustomBreadcrumbSeparator />}

@@ -112,6 +112,8 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const isDraftMode = dataSetStatus === DATASET_STATUS_TYPES.DRAFT || !dataSetStatus
   const hasStatusChanged = dataSetStatus !== dataset.dataSetStatus
 
+  const hasUnsavedChanges = form.formState.isDirty || hasStatusChanged
+
   const formValues = useWatch({ control: form.control })
 
   const canSetAvailable = useMemo(() => {
@@ -245,7 +247,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   }
 
   const handleExit = () => {
-    if (form.formState.isDirty || hasStatusChanged) {
+    if (hasUnsavedChanges) {
       setIsExitModalOpen(true)
     } else {
       setIsReadOnly(true)

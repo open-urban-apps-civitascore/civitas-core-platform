@@ -4,7 +4,7 @@ import { AxiosError } from 'axios'
 import { InfoIcon, List, Plus, TriangleAlert } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
@@ -16,6 +16,7 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Button } from '@/components/ui/button'
 import { usePermissions } from '@/hooks/use-permissions'
+import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { AssignmentScopedInput } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Group } from '@/types/groups'
@@ -188,6 +189,19 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
       setIsLoading(false)
     }
   }
+
+  const onSubmitRef = useRef<() => void>(onSubmit)
+
+  const saveHandler = useCallback(
+    () =>
+      new Promise<boolean>(resolve => {
+        onSubmitRef.current()
+        resolve(true)
+      }),
+    [],
+  )
+
+  useRegisterUnsavedChanges(!isControlled && hasChanges, !isControlled ? saveHandler : undefined)
 
   const handleCancel = () => {
     if (hasChanges) {

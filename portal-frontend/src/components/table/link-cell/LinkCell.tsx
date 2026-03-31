@@ -1,7 +1,8 @@
 import { ChevronRight } from 'lucide-react'
-import Link, { LinkProps } from 'next/link'
+import { LinkProps } from 'next/link'
 import React, { JSX, useRef } from 'react'
 
+import { GuardedLink } from '@/components/appSidebar/components/GuardedLink'
 import { useIsTruncated } from '@/hooks/use-is-truncated'
 import { cn } from '@/lib/utils'
 
@@ -13,7 +14,7 @@ interface LinkCellProps extends LinkProps {
   isDisabled?: boolean
 }
 export const LinkCell = (props: LinkCellProps) => {
-  const { children, href, className, target, isDisabled, ...linkProps } = props
+  const { children, href, className, target, isDisabled } = props
   const ref = useRef<HTMLDivElement>(null)
   const isTruncated = useIsTruncated(ref)
 
@@ -23,20 +24,19 @@ export const LinkCell = (props: LinkCellProps) => {
         {isDisabled ? (
           <div className={cn('w-full h-full flex items-center', className)}>{children}</div>
         ) : (
-          <Link
+          <GuardedLink
             className={cn(
               'w-full h-full flex justify-between items-center gap-1.5 group/link hover:underline decoration-1.5 decoration-outline',
               className,
             )}
-            href={href}
+            href={href as string}
             target={target}
-            {...linkProps}
           >
             <div ref={ref} className="flex-1 min-w-0 truncate">
               {children}
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover/link:opacity-100 transition-opacity" />
-          </Link>
+          </GuardedLink>
         )}
       </TooltipTrigger>
       <TooltipContent variant="secondary">{children}</TooltipContent>
