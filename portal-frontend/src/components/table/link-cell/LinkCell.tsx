@@ -2,7 +2,7 @@ import { ChevronRight } from 'lucide-react'
 import { LinkProps } from 'next/link'
 import React, { JSX, useRef } from 'react'
 
-import { GuardedLink } from '@/components/appSidebar/components/GuardedLink'
+import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { useIsTruncated } from '@/hooks/use-is-truncated'
 import { cn } from '@/lib/utils'
 
@@ -14,7 +14,7 @@ interface LinkCellProps extends LinkProps {
   isDisabled?: boolean
 }
 export const LinkCell = (props: LinkCellProps) => {
-  const { children, href, className, target, isDisabled } = props
+  const { children, href, className, target, isDisabled, ...linkProps } = props
   const ref = useRef<HTMLDivElement>(null)
   const isTruncated = useIsTruncated(ref)
 
@@ -31,6 +31,7 @@ export const LinkCell = (props: LinkCellProps) => {
             )}
             href={href as string}
             target={target}
+            {...linkProps}
           >
             <div ref={ref} className="flex-1 min-w-0 truncate">
               {children}

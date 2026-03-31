@@ -4,7 +4,7 @@ import { AxiosError } from 'axios'
 import { InfoIcon, List, Plus, TriangleAlert } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useCallback, useRef, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
@@ -175,6 +175,7 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
       setIsReadOnlyInternal(true)
       setAssignedGroupsInternal(prev => prev.filter(g => g.assignedRoles.length > 0))
       router.refresh()
+      return true
     } catch (error) {
       console.error('Error updating entity:', error)
       const axiosError = error as AxiosError
@@ -185,23 +186,13 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
       }
       setAssignedGroupsInternal(initialAssignments)
       setIsReadOnlyInternal(true)
+      return false
     } finally {
       setIsLoading(false)
     }
   }
 
-  const onSubmitRef = useRef<() => void>(onSubmit)
-
-  const saveHandler = useCallback(
-    () =>
-      new Promise<boolean>(resolve => {
-        onSubmitRef.current()
-        resolve(true)
-      }),
-    [],
-  )
-
-  useRegisterUnsavedChanges(!isControlled && hasChanges, !isControlled ? saveHandler : undefined)
+  useRegisterUnsavedChanges(!isControlled && hasChanges, !isControlled ? onSubmit : undefined)
 
   const handleCancel = () => {
     if (hasChanges) {

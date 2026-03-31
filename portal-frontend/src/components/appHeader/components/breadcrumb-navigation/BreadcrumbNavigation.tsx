@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl'
 import React, { useRef } from 'react'
 
 import { useGetBredcrumbs } from '@/app/services/api/breadcrumbs/clientRequests'
-import { GuardedLink } from '@/components/appSidebar/components/GuardedLink'
+import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'

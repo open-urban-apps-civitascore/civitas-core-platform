@@ -7,7 +7,7 @@ import {
   useDatastructureVersion,
 } from '@/app/(main)/datastructures/[datastructureId]/(versions)/hooks/useDatastructureVersion'
 import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
-import { GuardedLink } from '@/components/appSidebar/components/GuardedLink'
+import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { UmlModeler } from '@/components/uml-modeler/UmlModeler'
 import { DatastructureVersion } from '@/types/datastructures'
 import { mapDatastructureVersionApiToFormData } from '@/utils/datastructures'

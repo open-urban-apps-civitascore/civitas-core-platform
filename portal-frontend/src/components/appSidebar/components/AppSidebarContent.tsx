@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
+import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { usePermissions } from '@/hooks/use-permissions'
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible'
@@ -19,7 +20,6 @@ import {
   SidebarMenuSubItem,
 } from '../../ui/sidebar'
 import { appSidebarNavSections, NavItem } from '../appSidebarItems'
-import { GuardedLink } from './GuardedLink'
 
 export const AppSidebarContent = () => {
   const tNav = useTranslations('sidebar')

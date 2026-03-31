@@ -1,7 +1,7 @@
 import { Circle, CircleCheckBig } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 
-import { GuardedLink } from '@/components/appSidebar/components/GuardedLink'
+import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { CompletionStepData, CompletionStepParam } from '@/types/datasets'

@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -13,6 +13,8 @@ interface UnsavedChangesProviderProps {
 
 export const UnsavedChangesProvider = ({ children }: UnsavedChangesProviderProps) => {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [pendingNavigation, setPendingNavigation] = useState<{ type: 'push'; href: string } | { type: 'back' } | null>(
     null,
@@ -54,9 +56,6 @@ export const UnsavedChangesProvider = ({ children }: UnsavedChangesProviderProps
       router.push(pendingNavigation.href)
     }
     setPendingNavigation(null)
-    setTimeout(() => {
-      isNavigatingRef.current = false
-    }, 100)
   }, [pendingNavigation, router])
 
   const discardAndNavigate = useCallback(() => {
@@ -86,6 +85,10 @@ export const UnsavedChangesProvider = ({ children }: UnsavedChangesProviderProps
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [hasUnsavedChanges])
+
+  useEffect(() => {
+    isNavigatingRef.current = false
+  }, [pathname, searchParams])
 
   const contextValue = useMemo(
     () => ({

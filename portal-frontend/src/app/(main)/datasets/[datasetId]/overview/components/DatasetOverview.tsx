@@ -237,18 +237,18 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     let isSaved = false
     if (hasOnlyStatusChanges) {
       isSaved = await handleSaveAndTransition(form.getValues() as DatasetFormDraft)
+    } else {
+      await form.handleSubmit(async data => {
+        isSaved = await handleSaveAndTransition(data as DatasetFormDraft)
+      })()
     }
-
-    await form.handleSubmit(async data => {
-      isSaved = await handleSaveAndTransition(data as DatasetFormDraft)
-    })()
 
     return isSaved
   }
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
-    handleSave()
+    void handleSave()
   }
 
   const handleStatusChange = (newStatus: DatasetStatusTypes) => {
