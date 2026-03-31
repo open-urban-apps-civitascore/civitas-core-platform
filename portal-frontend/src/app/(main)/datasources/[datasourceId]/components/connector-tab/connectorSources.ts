@@ -68,7 +68,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       expert: true,
       label: { label: 'Keepalive', labelHint: null },
       placeholder: '30s',
-      defaultValue: '',
+      defaultValue: '30s',
       required: false,
     },
     {
