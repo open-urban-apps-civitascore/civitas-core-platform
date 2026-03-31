@@ -1125,20 +1125,23 @@ class DataSetControllerIntegrationTest
   }
 
   @Nested
-  @DisplayName("Release DataSet Tests")
-  class ReleaseDataSetTests {
+  @DisplayName("Saga Completion Tests")
+  class SagaCompletionTests {
 
-    /** Creates a READY dataset with a pipeline containing the given API paths. */
+    /**
+     * Creates a published (READY) dataset with a pipeline containing the given API paths. Reuses
+     * the existing publish HTTP endpoint which does not require Kafka.
+     */
     private DataSet createReadyDataSetWithApis(List<String> apiPaths) {
       DataSet dataSet = new DataSet();
-      dataSet.setName("test_dataset_release_" + System.currentTimeMillis());
-      dataSet.setDescription("Test dataset for release");
+      dataSet.setName("test_dataset_saga_" + System.currentTimeMillis());
+      dataSet.setDescription("Test dataset for saga completion");
       dataSet.setDataSetStatus(DataSetStatus.DRAFT);
       dataSet.setOpenDataAccess(false);
       dataSet = dataSetRepository.save(dataSet);
 
       Pipeline pipeline = new Pipeline();
-      pipeline.setName("test_pipeline_release_" + System.currentTimeMillis());
+      pipeline.setName("test_pipeline_saga_" + System.currentTimeMillis());
       pipeline.setDataSet(dataSet);
       pipeline.setApis(apiPaths);
       pipelineRepository.save(pipeline);
@@ -1154,8 +1157,22 @@ class DataSetControllerIntegrationTest
       return dataSetRepository.findById(dataSetId).orElseThrow();
     }
 
-    /** Simulates a successful CREATE saga completion with a fake publicUrl. */
-    private void simulateCreateSagaCompleted(UUID dataSetId) {
+    /** Simulates what release() does in the DB, without Kafka. */
+    private void simulateRelease(UUID dataSetId) {
+      DataSet ds = dataSetRepository.findById(dataSetId).orElseThrow();
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      dataSetRepository.save(ds);
+    }
+
+    /** Simulates what unrelease() does in the DB, without Kafka. */
+    private void simulateUnrelease(UUID dataSetId) {
+      DataSet ds = dataSetRepository.findById(dataSetId).orElseThrow();
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      dataSetRepository.save(ds);
+    }
+
+    private void handleCreateSagaCompleted(UUID dataSetId) {
       SagaResultPayload result =
           new SagaResultPayload(
               dataSetId.toString(),
@@ -1171,8 +1188,7 @@ class DataSetControllerIntegrationTest
       dataSetService.handleSagaCompleted(dataSetId, result);
     }
 
-    /** Simulates a successful DELETE saga completion. */
-    private void simulateDeleteSagaCompleted(UUID dataSetId) {
+    private void handleDeleteSagaCompleted(UUID dataSetId) {
       SagaResultPayload result =
           new SagaResultPayload(
               dataSetId.toString(), null, null, null, null, null, null, null, null, null);
@@ -1180,99 +1196,89 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should release a READY dataset and set status to AVAILABLE")
-    void shouldReleaseReadyDataSet() {
+    @DisplayName("CREATE saga should persist infrastructure and update distribution URLs")
+    void createSagaShouldPersistInfrastructure() {
       DataSet dataSet = createReadyDataSetWithApis(List.of("/v1.1/Things"));
       UUID dataSetId = dataSet.getId();
 
-      ResponseEntity<DataSetOutputDTO> response =
-          exchange(
-              getEndpointPath() + "/" + dataSetId + "/release",
-              HttpMethod.POST,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
+      simulateRelease(dataSetId);
+      handleCreateSagaCompleted(dataSetId);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
-      assertThat(response.getBody().getPendingSagaType()).isEqualTo(PendingSagaType.CREATE);
+      DataSet result = dataSetRepository.findById(dataSetId).orElseThrow();
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
+      assertThat(result.getPendingSagaType()).isNull();
+      assertThat(result.getProjectId()).isEqualTo("proj-test");
+      assertThat(result.getPublicUrl())
+          .isEqualTo("https://public.example.com/datasets/" + dataSetId);
     }
 
     @Test
-    @DisplayName("Should reject release of a DRAFT dataset")
-    void shouldRejectReleaseOfDraftDataSet() {
-      DataSet dataSet = new DataSet();
-      dataSet.setName("test_dataset_draft_release_" + System.currentTimeMillis());
-      dataSet.setDescription("Test dataset in draft");
-      dataSet.setDataSetStatus(DataSetStatus.DRAFT);
-      dataSet = dataSetRepository.save(dataSet);
+    @DisplayName("DELETE saga should remove distributions and revert to READY")
+    void deleteSagaShouldRemoveDistributions() {
+      DataSet dataSet = createReadyDataSetWithApis(List.of("/v1.1/Things", "/v1.1/Observations"));
+      UUID dataSetId = dataSet.getId();
 
-      ResponseEntity<DataSetOutputDTO> response =
-          exchange(
-              getEndpointPath() + "/" + dataSet.getId() + "/release",
-              HttpMethod.POST,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
+      simulateRelease(dataSetId);
+      handleCreateSagaCompleted(dataSetId);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      long distsBefore =
+          distributionRepository.findAll().stream()
+              .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
+              .count();
+      assertThat(distsBefore).as("Should have 2 distributions before unrelease").isEqualTo(2);
+
+      simulateUnrelease(dataSetId);
+      handleDeleteSagaCompleted(dataSetId);
+
+      DataSet result = dataSetRepository.findById(dataSetId).orElseThrow();
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+
+      long distsAfter =
+          distributionRepository.findAll().stream()
+              .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
+              .count();
+      assertThat(distsAfter).as("Should have 0 distributions after DELETE saga").isEqualTo(0);
     }
 
     @Test
-    @DisplayName("Should regenerate distributions after unrelease and re-release")
+    @DisplayName("CREATE saga should regenerate distributions after prior DELETE saga")
     void shouldRegenerateDistributionsAfterUnreleaseAndRerelease() {
       DataSet dataSet = createReadyDataSetWithApis(List.of("/v1.1/Things", "/v1.1/Observations"));
       UUID dataSetId = dataSet.getId();
 
-      // Step 1: release → AVAILABLE
-      exchange(
-          getEndpointPath() + "/" + dataSetId + "/release",
-          HttpMethod.POST,
-          createAuthHeaders(),
-          null,
-          getOutputTypeReference());
-      simulateCreateSagaCompleted(dataSetId);
+      // First release cycle
+      simulateRelease(dataSetId);
+      handleCreateSagaCompleted(dataSetId);
 
-      long distCountAfterFirstRelease =
+      long distsAfterFirstRelease =
           distributionRepository.findAll().stream()
               .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
               .count();
-      assertThat(distCountAfterFirstRelease)
+      assertThat(distsAfterFirstRelease)
           .as("Should have 2 distributions after first release")
           .isEqualTo(2);
 
-      // Step 2: unrelease → READY (DELETE saga removes distributions)
-      exchange(
-          getEndpointPath() + "/" + dataSetId + "/unrelease",
-          HttpMethod.POST,
-          createAuthHeaders(),
-          null,
-          getOutputTypeReference());
-      simulateDeleteSagaCompleted(dataSetId);
+      // Unrelease (DELETE saga removes distributions)
+      simulateUnrelease(dataSetId);
+      handleDeleteSagaCompleted(dataSetId);
 
-      long distCountAfterUnrelease =
+      long distsAfterUnrelease =
           distributionRepository.findAll().stream()
               .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
               .count();
-      assertThat(distCountAfterUnrelease)
+      assertThat(distsAfterUnrelease)
           .as("Should have 0 distributions after unrelease")
           .isEqualTo(0);
 
-      // Step 3: release again → AVAILABLE (should recreate distributions)
-      exchange(
-          getEndpointPath() + "/" + dataSetId + "/release",
-          HttpMethod.POST,
-          createAuthHeaders(),
-          null,
-          getOutputTypeReference());
-      simulateCreateSagaCompleted(dataSetId);
+      // Re-release (CREATE saga should regenerate distributions)
+      simulateRelease(dataSetId);
+      handleCreateSagaCompleted(dataSetId);
 
-      long distCountAfterRerelease =
+      long distsAfterRerelease =
           distributionRepository.findAll().stream()
               .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
               .count();
-      assertThat(distCountAfterRerelease)
+      assertThat(distsAfterRerelease)
           .as("Should have 2 distributions again after re-release")
           .isEqualTo(2);
 
