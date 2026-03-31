@@ -134,6 +134,22 @@ class MqttConnectorConfigurationTest {
       config.setPassword(null);
       assertThat(config.getPassword()).isNull();
     }
+
+    @Test
+    @DisplayName("Should normalize blank optional MQTT strings to null")
+    void shouldNormalizeBlankOptionalStringsToNull() {
+      MqttConnectorConfiguration config = new MqttConnectorConfiguration();
+
+      config.setClientId("   ");
+      config.setConnectTimeout("");
+      config.setKeepalive(" ");
+      config.setUser("\t");
+
+      assertThat(config.getClientId()).isNull();
+      assertThat(config.getConnectTimeout()).isNull();
+      assertThat(config.getKeepalive()).isNull();
+      assertThat(config.getUser()).isNull();
+    }
   }
 
   @Nested

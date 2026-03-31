@@ -59,7 +59,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       expert: true,
       label: { label: 'Connect Timeout', labelHint: null },
       placeholder: '3s',
-      defaultValue: '',
+      defaultValue: '3s',
       required: false,
     },
     {
