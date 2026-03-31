@@ -111,13 +111,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     healthcheck:
-      test:
-        [
-          "CMD",
-          "kafka-broker-api-versions",
-          "--bootstrap-server",
-          "localhost:9092",
-        ]
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -150,11 +144,7 @@ services:
       etcd:
         condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "curl -sf http://localhost:9180/apisix/admin/routes -H 'X-API-KEY: edd1c9f034335f136f87ad84b625c8f1' > /dev/null",
-        ]
+      test: ["CMD-SHELL", "curl -sf http://localhost:9180/apisix/admin/routes -H 'X-API-KEY: edd1c9f034335f136f87ad84b625c8f1' > /dev/null"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -175,15 +165,7 @@ services:
       postgres-portal:
         condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://localhost:8091/actuator/health",
-        ]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8091/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -275,13 +257,7 @@ services:
       APICURIO_REST_DELETION_ARTIFACT-VERSION_ENABLED: "true"
       APICURIO_REST_MUTABILITY_ARTIFACT_VERSION_CONTENT_ENABLED: "true"
     healthcheck:
-      test:
-        [
-          "CMD",
-          "curl",
-          "-sf",
-          "http://localhost:8080/apis/registry/v3/system/info",
-        ]
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/apis/registry/v3/system/info"]
       interval: 10s
       timeout: 5s
       retries: 10
