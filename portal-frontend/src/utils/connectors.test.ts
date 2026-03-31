@@ -7,6 +7,7 @@ vi.mock('@/app/(main)/datasources/[datasourceId]/components/connector-tab/connec
     MQTT: [
       { key: 'urls', defaultValue: '' },
       { key: 'topics', defaultValue: '' },
+      { key: 'connect_timeout', defaultValue: '3s' },
     ],
     SQL: [
       { key: 'columns', defaultValue: '' },
@@ -21,6 +22,7 @@ describe('getConnectorDefaults', () => {
     expect(result).toEqual({
       urls: '',
       topics: '',
+      connect_timeout: '3s',
     })
   })
 
@@ -34,12 +36,16 @@ describe('getConnectorDefaults', () => {
 })
 
 describe('getConnectorFormData', () => {
-  it('returns existing config when provided', () => {
+  it('merges defaults with existing config when provided', () => {
     const existingConfig = { urls: 'a', topics: 'b' }
 
     const result = getConnectorFormData(CONNECTOR_TYPES.MQTT, existingConfig)
 
-    expect(result).toBe(existingConfig)
+    expect(result).toEqual({
+      urls: 'a',
+      topics: 'b',
+      connect_timeout: '3s',
+    })
   })
 
   it('creates defaults when no existing config', () => {
@@ -48,6 +54,7 @@ describe('getConnectorFormData', () => {
     expect(result).toEqual({
       urls: '',
       topics: '',
+      connect_timeout: '3s',
     })
   })
 })
