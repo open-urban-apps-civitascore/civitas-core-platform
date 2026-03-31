@@ -11,7 +11,7 @@ import {
   getDiagramStats,
   getSelectedEdges,
   getSelectedNodes,
-  validateConnection,
+  validateRelationshipConnection,
 } from '../../services/diagramService'
 import type { DiagramAction, NodeCreationContext, UMLDiagram, UMLEdge } from '../../types/diagram'
 import type { UseMultiSessionReturn } from '../../types/session'
@@ -119,9 +119,8 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
   // Edge operations
   const addEdge = useCallback(
     (connection: Connection) => {
-      if (!validateConnection(diagram, connection)) return
-
       const edgeType = activeRelationshipType || 'association'
+      if (!validateRelationshipConnection(diagram, connection, edgeType)) return
       const newEdge: UMLEdge = {
         id: crypto.randomUUID(),
         type: edgeType as UMLRelationshipType,
@@ -206,8 +205,8 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
   }, [diagram, deleteNodes, deleteEdges])
 
   const validateConnectionCallback = useCallback(
-    (connection: Connection) => validateConnection(diagram, connection),
-    [diagram],
+    (connection: Connection) => validateRelationshipConnection(diagram, connection, activeRelationshipType),
+    [diagram, activeRelationshipType],
   )
 
   const contextValue = useMemo(
