@@ -78,7 +78,10 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
     assertThat(user.get().getActive()).isTrue();
     assertThat(user.get().getExternalId()).isNotBlank();
 
-    assertThat(findKeycloakUserByEmail(TEST_EMAIL)).isNotNull();
+    UserRepresentation keycloakUser = findKeycloakUserByEmail(TEST_EMAIL);
+    assertThat(keycloakUser).isNotNull();
+    assertThat(keycloakUser.isEmailVerified()).isFalse();
+    assertThat(keycloakUser.getRequiredActions()).contains("VERIFY_EMAIL", "UPDATE_PASSWORD");
 
     Group group = groupRepository.findByName(TEST_GROUP_NAME).orElseThrow();
     List<Group> groupsWithMembers = groupRepository.findAllByIdWithMembers(List.of(group.getId()));
