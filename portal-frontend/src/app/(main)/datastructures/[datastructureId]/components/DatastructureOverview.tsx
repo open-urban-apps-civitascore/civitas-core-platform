@@ -23,6 +23,7 @@ import {
 } from '@/types/datastructures'
 import { mapDatastructureVersionsApiToListData } from '@/utils/datastructures'
 
+import { useSearchParams } from 'next/navigation'
 import { useDatastructure } from '../hooks/useDatastructure'
 import { AccessManagementTab } from './access-management-tab/AccessManagementTab'
 import { BasicInfoTab } from './basic-info-tab/BasicInfoTab'
@@ -51,14 +52,15 @@ interface DatastructureOverviewProps {
 export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   const { datastructure, initialAssignments } = props
   const t = useTranslations('datastructures')
+  const searchParams = useSearchParams()
+
   const tCommon = useTranslations('common')
   const { hasScopedPermission } = usePermissions()
   const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_UPDATE, 'DATASTRUCTURE', datastructure.id)
   const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_RELEASE, 'DATASTRUCTURE', datastructure.id)
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
-  const [isReadOnly, setIsReadOnly] = useState(true)
-
+  const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit')
   const [assignedGroups, setAssignedGroups] = useState<GroupRoleAssignmentTable[]>(initialAssignments)
 
   const {

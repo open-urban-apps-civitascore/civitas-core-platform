@@ -44,7 +44,7 @@ export const DatasourceCreateForm = () => {
     try {
       const { data } = await createDatasource.mutateAsync({ name: formData.name! })
       toast.success(tCommon('messages.createSuccess', { item: tCommon('items.datasource') }))
-      router.push(`/datasources/${data.id}`)
+      router.push(`/datasources/${data.id}?mode=edit`)
       return true
     } catch (error) {
       if (isNameConflictError(error)) {
