@@ -1,5 +1,6 @@
 'use client'
 
+import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
@@ -23,7 +24,6 @@ import {
 } from '@/types/datastructures'
 import { mapDatastructureVersionsApiToListData } from '@/utils/datastructures'
 
-import { useSearchParams } from 'next/navigation'
 import { useDatastructure } from '../hooks/useDatastructure'
 import { AccessManagementTab } from './access-management-tab/AccessManagementTab'
 import { BasicInfoTab } from './basic-info-tab/BasicInfoTab'
