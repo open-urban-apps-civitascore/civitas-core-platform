@@ -276,7 +276,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         ),
       )
       await Promise.all(assignmentsToRemove.map(a => deleteAssignment.mutateAsync(a.id)))
-      await refetchAssignments()
+      void refetchAssignments()
       toast.success(tRoles('success.assignmentSuccess'))
     } catch (error) {
       if (isPermissionsError(error as AxiosError)) handlePermissionsError()
