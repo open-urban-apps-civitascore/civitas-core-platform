@@ -83,14 +83,6 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
     }
   }, [sessionManager])
 
-  const handleExport = useCallback(() => {
-    const activeSession = sessionManager.getActiveSession()
-    if (activeSession) {
-      // TODO: Implement export functionality
-      console.log('Export diagram:', activeSession.name)
-    }
-  }, [sessionManager])
-
   const activeSession = sessionManager.getActiveSession()
 
   const shouldShowToolBar = !isControlledExternally || canImportXmi || canExportXmi || onImportFromDatastructure
@@ -119,7 +111,6 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
             {shouldShowToolBar && (
               <Toolbar
                 onSave={isControlledExternally ? undefined : handleSave}
-                onExport={handleExport}
                 hasUnsavedChanges={activeSession?.isDirty || false}
                 canExportXmi={canExportXmi}
                 canImportXmi={canImportXmi}

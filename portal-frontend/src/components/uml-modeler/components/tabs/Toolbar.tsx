@@ -57,8 +57,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   }, [diagram, isSaving, onSave, createModel, sessionName, t])
 
   const handleExportXmi = useCallback(() => {
-    downloadXmi(diagram)
-  }, [diagram])
+    try {
+      downloadXmi(diagram)
+      toast.success(t('export.success'))
+    } catch {
+      toast.error(t('export.error'))
+    }
+  }, [diagram, t])
 
   const handleImportClick = useCallback(() => {
     fileInputRef.current?.click()
