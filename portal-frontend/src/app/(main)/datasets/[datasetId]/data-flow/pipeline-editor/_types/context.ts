@@ -101,7 +101,7 @@ export interface ActivePipelineContextValue {
 
   // ===== Pipeline Operations =====
   /** Save pipeline to backend API */
-  savePipeline: () => void
+  savePipeline: () => Promise<boolean>
   /** Whether a save operation is currently in progress */
   isSaving: boolean
   /** Delete the active pipeline from backend and remove its tab */

@@ -75,7 +75,7 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
       return
     }
 
-    savePipeline()
+    void savePipeline()
   }, [pipeline, canSave, savePipeline])
 
   /**

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect } from 'react'
+import { useEffect } from 'react'
 
 import { useUnsavedChanges } from '@/contexts/unsaved-changes/UnsavedChangesContext'
 

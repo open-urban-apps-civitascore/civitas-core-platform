@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -29,6 +29,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form'
 import { useError } from '@/hooks/use-error'
 import { usePermissions } from '@/hooks/use-permissions'
+import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
@@ -113,6 +114,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const hasStatusChanged = dataSetStatus !== dataset.dataSetStatus
 
   const hasUnsavedChanges = form.formState.isDirty || hasStatusChanged
+  const hasOnlyStatusChanges =  !form.formState.isDirty && hasStatusChanged
 
   const formValues = useWatch({ control: form.control })
 
@@ -179,7 +181,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
         if (!parsed.success) {
           handleFormValidationError(parsed.error)
-          return
+          return false
         }
 
         const fieldsToUpdate = pickDirtyValues(parsed.data, dirtyFields)
@@ -219,27 +221,34 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
       router.refresh()
       setIsReadOnly(true)
+      return true
     } catch (error) {
       if (isNameConflictError(error as AxiosError)) {
         handleNameError(form, form.getValues('name'))
       } else {
         toast.error(t('messages.transitionError'))
       }
+      return false
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-
+  const handleSave = async (): Promise<boolean> => {
     // If only status changed (form not dirty), call transition directly
-    if (!form.formState.isDirty && hasStatusChanged) {
-      void handleSaveAndTransition(form.getValues() as DatasetFormDraft)
-      return
+    let isSaved = false
+    if (hasOnlyStatusChanges) {
+      isSaved = await handleSaveAndTransition(form.getValues() as DatasetFormDraft)
     }
 
-    void form.handleSubmit(data => {
-      void handleSaveAndTransition(data as DatasetFormDraft)
-    })(e)
+    await form.handleSubmit(async data => {
+      isSaved = await handleSaveAndTransition(data as DatasetFormDraft)
+    })()
+
+    return isSaved
+  }
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    handleSave()
   }
 
   const handleStatusChange = (newStatus: DatasetStatusTypes) => {
@@ -264,7 +273,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const handleSaveAndExit = () => {
     // Handle status-only change (form not dirty)
-    if (!form.formState.isDirty && hasStatusChanged) {
+    if (hasOnlyStatusChanges) {
       void handleSaveAndTransition(form.getValues() as DatasetFormDraft).then(() => {
         setIsExitModalOpen(false)
       })
@@ -277,6 +286,8 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       })
     })()
   }
+
+  useRegisterUnsavedChanges(hasUnsavedChanges, handleSave)
 
   const getList = (title: string, items: string[]) => (
     <div className="w-[50%] grid grid-cols-2 mt-2">
@@ -373,7 +384,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       canRelease={canRelease}
       confirmButtonType="submit"
       formId="dataset-form"
-      isConfirmButtonDisabled={(!form.formState.isDirty && !hasStatusChanged) || isLoading}
+      isConfirmButtonDisabled={!hasUnsavedChanges || isLoading}
       onCancelClick={() => {
         handleExit()
       }}

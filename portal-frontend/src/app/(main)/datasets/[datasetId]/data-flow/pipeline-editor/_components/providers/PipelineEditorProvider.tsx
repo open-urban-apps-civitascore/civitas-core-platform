@@ -19,6 +19,7 @@ import {
   useGetPipelines,
   useUpdatePipeline,
 } from '@/app/services/api/pipelines/clientRequests'
+import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
 import { buildPipelinePayload } from '../../_services/payloadBuilderService'
@@ -309,48 +310,47 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   }, [])
 
   // ===== Pipeline Operations: Save (Create or Update) =====
-  const savePipeline = useCallback(() => {
-    if (!activeSession || !pipeline) return
+  const savePipeline = useCallback(async (): Promise<boolean> => {
+    if (!activeSession || !pipeline || !canSave) return false
 
     const payload = buildPipelinePayload(pipeline)
     const pipelineId = pipeline.id
 
-    if (pipelineId) {
-      // Existing pipeline → PUT update
-      updatePipelineMutation.mutate(
-        { pipelineId, data: payload },
-        {
-          onSuccess: () => {
-            sessionManager.markSessionClean(activeSession.id)
-            console.log('Pipeline updated successfully')
-          },
-          onError: error => {
-            console.error('Failed to update pipeline:', error)
-          },
-        },
-      )
-    } else {
-      // New pipeline → POST create
-      createPipelineMutation.mutate(payload, {
-        onSuccess: response => {
-          // Set the id from the response on the pipeline
-          const updatedPipeline: Pipeline = {
-            ...activeSession.pipeline,
-            id: response.data.id,
-            isDirty: false,
-          }
-          sessionManager.updateSessionPipeline(activeSession.id, updatedPipeline)
-          sessionManager.markSessionClean(activeSession.id)
-          console.log('Pipeline created successfully with id:', response.data.id)
-        },
-        onError: error => {
-          console.error('Failed to create pipeline:', error)
-        },
-      })
+    try {
+      if (pipelineId) {
+        // Existing pipeline → PUT update
+        await updatePipelineMutation.mutateAsync({ pipelineId, data: payload })
+        sessionManager.markSessionClean(activeSession.id)
+        console.log('Pipeline updated successfully')
+      } else {
+        // New pipeline → POST create
+        const response = await createPipelineMutation.mutateAsync(payload)
+
+        // Set the id from the response on the pipeline
+        const updatedPipeline: Pipeline = {
+          ...activeSession.pipeline,
+          id: response.data.id,
+          isDirty: false,
+        }
+        sessionManager.updateSessionPipeline(activeSession.id, updatedPipeline)
+        sessionManager.markSessionClean(activeSession.id)
+        console.log('Pipeline created successfully with id:', response.data.id)
+      }
+
+      return true
+    } catch (error) {
+      if (!pipelineId) {
+        console.error('Failed to create pipeline:', error)
+      } else {
+        console.error('Failed to update pipeline:', error)
+      }
+      return false
     }
-  }, [activeSession, pipeline, sessionManager, createPipelineMutation, updatePipelineMutation])
+  }, [activeSession, canSave, pipeline, sessionManager, createPipelineMutation, updatePipelineMutation])
 
   const isSaving = createPipelineMutation.isPending || updatePipelineMutation.isPending
+
+  useRegisterUnsavedChanges(activeSession?.isDirty || false, savePipeline)
 
   // ===== Pipeline Operations: Delete =====
   const deletePipeline = useCallback(() => {

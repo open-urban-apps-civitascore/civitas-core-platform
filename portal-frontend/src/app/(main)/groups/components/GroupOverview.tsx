@@ -1,7 +1,6 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { FormEvent, useEffect, useState } from 'react'
@@ -98,11 +97,6 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     setPendingRoles([])
   }, [initialGroupData, form])
 
-  const handleGroupRequestError = (error: AxiosError, defaultMessage: string) => {
-    if (isNameConflictError(error)) handleNameError(form, form.getValues('name'))
-    else toast.error(defaultMessage)
-  }
-
   const handleCreateGroup = async (formData: GroupBaseFormData): Promise<boolean> => {
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createGroupData } = mapGroupFormToApiData(formData)
@@ -130,8 +124,12 @@ export const GroupOverview = (props: GroupDetailsProps) => {
       }
 
       return true
-    } catch (error) {
-      handleGroupRequestError(error as AxiosError, t('errors.createError'))
+    } catch (error: unknown) {
+      if (isNameConflictError(error)) {
+        handleNameError(form, form.getValues('name'))
+      } else {
+        toast.error(t('errors.createError'))
+      }
       return false
     }
   }
@@ -155,8 +153,12 @@ export const GroupOverview = (props: GroupDetailsProps) => {
         console.error('Failed to save assignments', error)
         return false
       }
-    } catch (error) {
-      handleGroupRequestError(error as AxiosError, t('errors.updateError'))
+    } catch (error: unknown) {
+      if (isNameConflictError(error)) {
+        handleNameError(form, form.getValues('name'))
+      } else {
+        toast.error(t('errors.updateError'))
+      }
       return false
     }
   }
@@ -176,9 +178,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     else handleExit()
   }
 
-  const handleSave = async (event?: FormEvent<HTMLFormElement>) => {
-    event?.preventDefault()
-
+  const handleSave = async () => {
     let isSaved = false
 
     await form.handleSubmit(
@@ -192,6 +192,11 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     )()
 
     return isSaved
+  }
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    void handleSave()
   }
 
   useRegisterUnsavedChanges(isFormDirty, handleSave)
@@ -264,7 +269,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
       />
       <PageBackground className="flex flex-col" hasBackground={!isReadOnly}>
         <Form {...form}>
-          <form id="groupEditForm" onSubmit={handleSave} className="flex flex-col justify-between h-full">
+          <form id="groupEditForm" onSubmit={handleSubmit} className="flex flex-col justify-between h-full">
             {isLoading ? <LoadingSpinner className="h-[300px]" /> : renderTabContent()}
           </form>
         </Form>
