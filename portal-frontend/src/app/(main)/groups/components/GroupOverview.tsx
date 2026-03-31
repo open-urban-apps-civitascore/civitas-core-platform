@@ -176,7 +176,9 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     else handleExit()
   }
 
-  const handleSave = async () => {
+  const handleSave = async (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault()
+
     let isSaved = false
 
     await form.handleSubmit(
