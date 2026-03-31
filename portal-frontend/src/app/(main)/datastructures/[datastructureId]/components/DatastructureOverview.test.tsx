@@ -12,6 +12,7 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useSearchParams: () => ({ get: () => null }),
 }))
 
 vi.mock('next-intl', () => ({
