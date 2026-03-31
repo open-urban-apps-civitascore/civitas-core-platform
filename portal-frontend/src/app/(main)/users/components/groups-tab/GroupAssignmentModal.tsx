@@ -42,6 +42,7 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
   const { getApiRequestParams } = useQueryParams()
 
   const { data: groupsData, isFetching: isFetchingGroups } = useGetGroups({
+    isEnabled: !!open,
     params: getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString }),
   })
 

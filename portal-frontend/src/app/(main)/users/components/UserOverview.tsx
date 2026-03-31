@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -243,8 +244,8 @@ export const UserOverview = (props: UserOverviewProps) => {
       toast.success(t('messages.updateSuccess'))
       if (isExitModalOpen) setIsExitModalOpen(false)
       return true
-    } catch (error) {
-      if (isEmailConflictError(error)) {
+    } catch (error: unknown) {
+      if (isEmailConflictError(error as AxiosError)) {
         handleUserEmailError(form, parsed.email)
       } else {
         toast.error(t('errors.updateError'))

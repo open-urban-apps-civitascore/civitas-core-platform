@@ -62,6 +62,11 @@ public class GroupController
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "group-456")),
     @Parameter(
+        name = "memberId",
+        description = "Filter by member user ID (exact match).",
+        in = ParameterIn.QUERY,
+        schema = @Schema(type = "string", example = "user-456")),
+    @Parameter(
         name = "q",
         description = "Search in name or description (partial match, case-insensitive).",
         in = ParameterIn.QUERY,
