@@ -20,6 +20,7 @@ vi.mock('next/navigation', () => ({
     push: vi.fn(),
   }),
   useSearchParams: () => mockSearchParams,
+  usePathname: () => '/datastructures/ds-1/versions/v-1',
 }))
 
 vi.mock('@/hooks/use-query-params', () => ({
