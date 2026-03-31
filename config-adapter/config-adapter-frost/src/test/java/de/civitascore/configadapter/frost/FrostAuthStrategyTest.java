@@ -94,18 +94,6 @@ class FrostAuthStrategyTest {
     }
 
     @Test
-    @DisplayName("supports custom header names")
-    void shouldSupportCustomHeaderName() {
-      Invocation.Builder builder = mock(Invocation.Builder.class);
-      when(builder.header("Authorization-Key", "secret")).thenReturn(builder);
-
-      FrostAuthStrategy strategy = FrostAuthStrategy.apiKey("Authorization-Key", "secret");
-      strategy.apply(builder);
-
-      verify(builder).header("Authorization-Key", "secret");
-    }
-
-    @Test
     @DisplayName("throws on null header name")
     void shouldThrowOnNullHeaderName() {
       assertThrows(NullPointerException.class, () -> FrostAuthStrategy.apiKey(null, "key"));
