@@ -1020,6 +1020,14 @@
       "title": "Importieren",
       "fromPlatform": "aus der Plattform",
       "fromFile": "aus Datei"
+    },
+    "save": {
+      "success": "Modell erfolgreich gespeichert",
+      "error": "Modell konnte nicht gespeichert werden. Bitte versuchen Sie es erneut."
+    },
+    "export": {
+      "success": "Diagramm erfolgreich exportiert",
+      "error": "Diagramm konnte nicht exportiert werden. Bitte versuchen Sie es erneut."
     }
   }
 }

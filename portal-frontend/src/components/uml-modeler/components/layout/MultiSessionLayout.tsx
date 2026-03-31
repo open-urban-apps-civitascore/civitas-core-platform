@@ -80,8 +80,6 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
     const activeSession = sessionManager.getActiveSession()
     if (activeSession) {
       sessionManager.markSessionClean(activeSession.id)
-      // TODO: Implement actual save functionality
-      console.log('Save diagram:', activeSession.name)
     }
   }, [sessionManager])
 
