@@ -23,8 +23,6 @@ tags:
   description: User management endpoints
 - name: Data Structures
   description: Data structure management endpoints
-- name: Authorities
-  description: Authority management API (stub)
 - name: Pipelines
   description: Pipeline management endpoints
 - name: Assignments
@@ -3111,7 +3109,7 @@ paths:
         description: Filter by active status.
         schema:
           type: boolean
-          example: true
+          example: "true"
       - name: q
         in: query
         description: "Search in full name, or email (partial match, case-insensitive)."
@@ -3323,7 +3321,7 @@ paths:
         description: Filter by readonly flag (exact match).
         schema:
           type: boolean
-          example: true
+          example: "true"
       responses:
         "200":
           description: Page of roles returned successfully
@@ -5470,33 +5468,6 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /authorities:
-    get:
-      tags:
-      - Authorities
-      summary: List authorities (stub)
-      description: Returns an empty list. Authorities feature is not implemented in
-        v2.
-      operationId: listAuthorities
-      parameters:
-      - name: pageable
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/Pageable"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PageObject"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
   /assignments/{id}:
     get:
       tags:
@@ -6629,13 +6600,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageableObject:
@@ -6749,13 +6720,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     Sort:
@@ -6829,13 +6800,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageDataStructureOutputDTO:
@@ -6861,13 +6832,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageDataSourceOutputDTO:
@@ -6893,13 +6864,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageDataSetOutputDTO:
@@ -6925,13 +6896,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PagePipelineOutputDTO:
@@ -6957,59 +6928,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        empty:
-          type: boolean
-    Pageable:
-      type: object
-      properties:
-        page:
-          type: integer
-          format: int32
-          minimum: 0
-        size:
-          type: integer
-          format: int32
-          minimum: 1
-        sort:
-          type: array
-          items:
-            type: string
-    PageObject:
-      type: object
-      properties:
-        totalElements:
-          type: integer
-          format: int64
-        totalPages:
-          type: integer
-          format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
-        size:
-          type: integer
-          format: int32
-        content:
-          type: array
-          items: {}
-        number:
-          type: integer
-          format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
         numberOfElements:
           type: integer
           format: int32
-        first:
-          type: boolean
-        last:
-          type: boolean
         empty:
           type: boolean
     PageAssignmentOutputDTO:
@@ -7035,13 +6960,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PatchUserInputDTO:
