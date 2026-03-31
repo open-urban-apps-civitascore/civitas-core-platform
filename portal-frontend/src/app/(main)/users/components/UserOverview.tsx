@@ -4,10 +4,12 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
+import { usePatchGroup } from '@/app/services/api/groups/clientRequests'
+import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { useCreateUser, useUpdateUser } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -20,6 +22,7 @@ import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { PERMISSION_NAMES } from '@/types/currentUser'
+import { Group } from '@/types/groups'
 import { User, UserFormData, UserFormSchema, UserTab } from '@/types/users'
 import { isEmailConflictError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
@@ -66,15 +69,18 @@ export const UserOverview = (props: UserOverviewProps) => {
   const { handleFormValidationError } = useError()
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
-  const isLoading = createUser.isPending || updateUser.isPending
+  const patchGroup = usePatchGroup()
+  const isLoading = createUser.isPending || updateUser.isPending || patchGroup.isPending
   const { setSubTabValueParam, subTabValue } = useQueryParams()
   const { handleUserEmailError } = useError()
   const { hasPermission } = usePermissions()
-  const canUpdate = isCreateMode || hasPermission(PERMISSION_NAMES.USER_UPDATE)
+  const canUpdateUser = isCreateMode || hasPermission(PERMISSION_NAMES.USER_UPDATE)
+  const canUpdateGroups = hasPermission(PERMISSION_NAMES.GROUP_UPDATE)
+  const canUpdate = canUpdateUser || canUpdateGroups
 
   const tabs: Tab<UserTab>[] = [
     tabValues.userData,
-    ...(hasPermission(PERMISSION_NAMES.GROUP_READ) ? [tabValues.groups] : []),
+    ...(!isCreateMode && hasPermission(PERMISSION_NAMES.GROUP_READ) ? [tabValues.groups] : []),
     ...(hasPermission(PERMISSION_NAMES.ASSIGNMENT_READ) ? [tabValues.roles] : []),
   ]
 
@@ -119,6 +125,51 @@ export const UserOverview = (props: UserOverviewProps) => {
     form.setValue('groupIds', currentGroups, { shouldDirty: true })
   }
 
+  const saveGroupMemberships = useCallback(
+    async (userId: string) => {
+      const originalGroupIds = defaultUserData?.groups?.map(g => g.id) || []
+      const currentGroupIds = form.getValues('groupIds')
+
+      const addedGroupIds = currentGroupIds.filter(id => !originalGroupIds.includes(id))
+      const removedGroupIds = originalGroupIds.filter(id => !currentGroupIds.includes(id))
+
+      if (addedGroupIds.length === 0 && removedGroupIds.length === 0) return
+
+      // Fetch all affected groups in parallel
+      const [removedResponses, addedResponses] = await Promise.all([
+        Promise.all(
+          removedGroupIds.map(id =>
+            apiRequest<Group>({ endpoint: `/groups/${id}`, method: 'GET', headers: { 'x-api-request': 'true' } }),
+          ),
+        ),
+        Promise.all(
+          addedGroupIds.map(id =>
+            apiRequest<Group>({ endpoint: `/groups/${id}`, method: 'GET', headers: { 'x-api-request': 'true' } }),
+          ),
+        ),
+      ])
+
+      const groupPatches: Promise<unknown>[] = []
+
+      removedGroupIds.forEach((groupId, i) => {
+        const currentMemberIds = removedResponses[i].data.members?.map(m => m.id) || []
+        groupPatches.push(
+          patchGroup.mutateAsync({ id: groupId, memberIds: currentMemberIds.filter(id => id !== userId) }),
+        )
+      })
+
+      addedGroupIds.forEach((groupId, i) => {
+        const currentMemberIds = addedResponses[i].data.members?.map(m => m.id) || []
+        if (!currentMemberIds.includes(userId)) {
+          groupPatches.push(patchGroup.mutateAsync({ id: groupId, memberIds: [...currentMemberIds, userId] }))
+        }
+      })
+
+      await Promise.all(groupPatches)
+    },
+    [defaultUserData, form, patchGroup],
+  )
+
   const handleExit = () => {
     if (isCreateMode) {
       router.push('/users')
@@ -136,9 +187,8 @@ export const UserOverview = (props: UserOverviewProps) => {
 
   const handleCreateUser = async (formData: UserFormData): Promise<boolean> => {
     const parsed = UserFormSchema.parse(formData)
-    const mappedData = { ...parsed, groups: defaultUserData?.groups || [] }
     // eslint-disable-next-line unused-imports/no-unused-vars
-    const { id, ...createUserData } = mappedData
+    const { id, groupIds, ...createUserData } = parsed
     try {
       const { data } = await createUser.mutateAsync({ ...createUserData, phone: createUserData.phone || null })
       toast.success(t('messages.createSuccess'))
@@ -157,18 +207,41 @@ export const UserOverview = (props: UserOverviewProps) => {
   const handleUpdateUser = async (formData: UserFormData): Promise<boolean> => {
     const parsed = UserFormSchema.parse(formData)
     const dirtyFields = form.formState.dirtyFields
-    const fieldsToUpdate = pickDirtyValues(parsed, dirtyFields)
-    const updateData = {
-      ...fieldsToUpdate,
-      phone: !parsed.phone && dirtyFields.phone ? null : fieldsToUpdate.phone,
-    }
+
+    const { groupIds: _groupIds, ...dirtyUserFields } = pickDirtyValues(parsed, dirtyFields)
+    const hasUserFieldChanges = Object.keys(dirtyUserFields).length > 0
+    const hasGroupChanges = !!dirtyFields.groupIds
+
+    // Guard: nothing actionable
+    if (!hasUserFieldChanges && !(hasGroupChanges && canUpdateGroups)) return true
+
     try {
-      const { data } = await updateUser.mutateAsync({ ...updateData, id: parsed.id })
-      ;[['groups']].forEach(queryKey => queryClient.invalidateQueries({ queryKey }))
-      setDefaultUserData(data)
-      if (isExitModalOpen) setIsExitModalOpen(false)
+      // Save group membership changes via PATCH /groups/{id}
+      if (hasGroupChanges && canUpdateGroups) {
+        await saveGroupMemberships(parsed.id)
+      }
+
+      // Save user field changes via PATCH /users/{id}
+      if (hasUserFieldChanges && canUpdateUser) {
+        const updateData = {
+          ...dirtyUserFields,
+          phone: !parsed.phone && dirtyFields.phone ? null : dirtyUserFields.phone,
+        }
+        const { data } = await updateUser.mutateAsync({ ...updateData, id: parsed.id })
+        setDefaultUserData(data)
+      } else if (hasGroupChanges) {
+        // Group-only save: fetch updated user to keep local state in sync
+        const { data } = await apiRequest<User>({
+          endpoint: `/users/${parsed.id}`,
+          method: 'GET',
+          headers: { 'x-api-request': 'true' },
+        })
+        setDefaultUserData(data)
+      }
+
       router.refresh()
       toast.success(t('messages.updateSuccess'))
+      if (isExitModalOpen) setIsExitModalOpen(false)
       return true
     } catch (error) {
       if (isEmailConflictError(error)) {
@@ -177,6 +250,9 @@ export const UserOverview = (props: UserOverviewProps) => {
         toast.error(t('errors.updateError'))
       }
       return false
+    } finally {
+      queryClient.invalidateQueries({ queryKey: ['groups'] })
+      queryClient.invalidateQueries({ queryKey: ['users'] })
     }
   }
 
@@ -203,8 +279,9 @@ export const UserOverview = (props: UserOverviewProps) => {
       case tabValues.groups.value:
         return (
           <GroupsTab
+            userId={userData.id}
             formValues={watch}
-            isReadOnly={isReadOnly}
+            isReadOnly={isReadOnly || !canUpdateGroups}
             onAssignGroups={handleAssignGroups}
             onRemoveGroup={handleRemoveGroup}
           />
@@ -213,7 +290,14 @@ export const UserOverview = (props: UserOverviewProps) => {
         return <RolesTab userId={userData.id} isReadOnly={isReadOnly} />
       case tabValues.userData.value:
       default:
-        return <UserBasicInfoTab userData={userData} form={form} isReadOnly={isReadOnly} isLoading={isLoading} />
+        return (
+          <UserBasicInfoTab
+            userData={userData}
+            form={form}
+            isReadOnly={isReadOnly || !canUpdateUser}
+            isLoading={isLoading}
+          />
+        )
     }
   }
 

@@ -42,6 +42,11 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
 
 vi.mock('@/app/services/api/groups/clientRequests', () => ({
   useGetGroups: vi.fn(() => ({ data: { data: [], totalElements: 0 }, isFetching: false, error: null })),
+  usePatchGroup: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+}))
+
+vi.mock('@/app/services/api/request/apiRequest', () => ({
+  apiRequest: vi.fn(() => Promise.resolve({ data: {} })),
 }))
 
 vi.mock('@/app/services/api/assignments/clientRequests', () => ({
@@ -415,7 +420,7 @@ describe('UserOverview', () => {
   })
 
   describe('Update User', () => {
-    it('calls updateUser.mutate with only dirty fields', async () => {
+    it('calls updateUser.mutateAsync with only dirty fields', async () => {
       mockSearchParams = new URLSearchParams('mode=edit')
       renderComponent()
       fireEvent.change(screen.getByTestId('firstNameTextField'), { target: { value: 'Updated' } })

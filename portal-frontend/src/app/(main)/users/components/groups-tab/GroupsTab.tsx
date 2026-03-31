@@ -19,6 +19,7 @@ import { GroupAssignmentModal } from './GroupAssignmentModal'
 import GroupsTable from './GroupsTable'
 
 interface GroupsTabProps {
+  userId: string
   formValues: UserFormData
   isReadOnly: boolean
   onAssignGroups: (groupIds: string[]) => void
@@ -26,7 +27,7 @@ interface GroupsTabProps {
 }
 
 export const GroupsTab = (props: GroupsTabProps) => {
-  const { formValues, isReadOnly, onAssignGroups, onRemoveGroup } = props
+  const { userId, formValues, isReadOnly, onAssignGroups, onRemoveGroup } = props
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
   const tGroups = useTranslations('groups')
@@ -38,28 +39,41 @@ export const GroupsTab = (props: GroupsTabProps) => {
   const [groupToRemove, setGroupToRemove] = useState<string | null>(null)
   const [isWarningModalOpen, setIsWarningModalOpen] = useState(false)
 
-  const getGroupsRequestParams = () => {
-    const params = new URLSearchParams()
-    formValues.groupIds.forEach(group => {
-      params.append('id', group)
-    })
-    return params
-  }
-
+  // Primary query: server-side filter by member
+  const memberParams = useMemo(() => new URLSearchParams({ memberId: userId }), [userId])
   const {
-    data: groupsData,
-    isFetching: isLoadingGroups,
-    error: groupsError,
-  } = useGetGroups({ isEnabled: formValues.groupIds.length > 0, params: getGroupsRequestParams() })
+    data: serverGroupsData,
+    isFetching: isLoadingServerGroups,
+    isSuccess: hasServerGroupsLoaded,
+    error: serverGroupsError,
+  } = useGetGroups({ isEnabled: !!userId, params: memberParams })
 
+  // Derive original group IDs from server state
+  const serverGroupIds = useMemo(() => serverGroupsData?.data.map(g => g.id) || [], [serverGroupsData])
+
+  // Compute locally added group IDs (in form but not on server) — only after server data loaded
+  const addedGroupIds = useMemo(
+    () => (hasServerGroupsLoaded ? formValues.groupIds.filter(id => !serverGroupIds.includes(id)) : []),
+    [formValues.groupIds, serverGroupIds, hasServerGroupsLoaded],
+  )
+
+  // Secondary query: fetch locally-added groups that aren't on the server yet
+  const addedParams = useMemo(() => {
+    const params = new URLSearchParams()
+    addedGroupIds.forEach(id => params.append('id', id))
+    return params
+  }, [addedGroupIds])
+  const { data: addedGroupsData, isFetching: isLoadingAddedGroups } = useGetGroups({
+    isEnabled: addedGroupIds.length > 0,
+    params: addedParams,
+  })
+
+  // Combine: server groups (minus removed) + added groups
   const groups = useMemo(() => {
-    if (groupsData) {
-      const userGroups = groupsData?.data.filter(group => formValues.groupIds?.includes(group.id))
-      return mapGroupsApiToListData(userGroups)
-    } else {
-      return []
-    }
-  }, [groupsData, formValues])
+    const serverGroups = (serverGroupsData?.data || []).filter(g => formValues.groupIds.includes(g.id))
+    const addedGroups = (addedGroupsData?.data || []).filter(g => addedGroupIds.includes(g.id))
+    return mapGroupsApiToListData([...serverGroups, ...addedGroups])
+  }, [serverGroupsData, addedGroupsData, formValues.groupIds, addedGroupIds])
 
   const filteredGroups = useMemo(() => {
     if (searchString) {
@@ -77,8 +91,8 @@ export const GroupsTab = (props: GroupsTabProps) => {
   const rowCount = groups.length
   const totalPages = Math.ceil(rowCount / pageSize) || 1
 
-  const isLoading = isLoadingGroups
-  const error = groupsError
+  const isLoading = isLoadingServerGroups || isLoadingAddedGroups
+  const error = serverGroupsError
 
   const handlePagination = (newPagination: PaginationState) => {
     setPageIndex(newPagination.pageIndex)
