@@ -268,6 +268,105 @@ class DataStructureVersionServiceTest {
   }
 
   @Nested
+  @DisplayName("Publish model existence guard")
+  class PublishModelExistenceTests {
+
+    @Test
+    @DisplayName(
+        "Should block publish when modelAtlasUri is set but no model exists in Model Atlas")
+    void shouldBlockPublishWhenModelNotFoundInAtlas() {
+      UUID versionId = UUID.randomUUID();
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      version.setModelAtlasUri("http://example.com/model/missing");
+
+      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
+          .thenReturn(Optional.of(version));
+      when(modelService.downloadModel("http://example.com/model/missing", "application/xml"))
+          .thenThrow(new RuntimeException("Not found"));
+
+      assertThatThrownBy(() -> dataStructureVersionService.publish(versionId))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("no model found in Model Atlas");
+    }
+
+    @Test
+    @DisplayName("Should block publish when Model Atlas returns null content")
+    void shouldBlockPublishWhenModelContentIsNull() {
+      UUID versionId = UUID.randomUUID();
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      version.setModelAtlasUri("http://example.com/model/empty");
+
+      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
+          .thenReturn(Optional.of(version));
+      when(modelService.downloadModel("http://example.com/model/empty", "application/xml"))
+          .thenReturn(null);
+
+      assertThatThrownBy(() -> dataStructureVersionService.publish(versionId))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("no model found in Model Atlas");
+    }
+
+    @Test
+    @DisplayName("Should allow publish when model exists in Model Atlas")
+    void shouldAllowPublishWhenModelExists() {
+      UUID versionId = UUID.randomUUID();
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      version.setModelAtlasUri("http://example.com/model/valid");
+
+      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
+          .thenReturn(Optional.of(version));
+      when(modelService.downloadModel("http://example.com/model/valid", "application/xml"))
+          .thenReturn("<xml>model content</xml>");
+      when(dataStructureVersionRepository.save(version)).thenReturn(version);
+
+      DataStructureVersion result = dataStructureVersionService.publish(versionId);
+
+      assertThat(result.getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
+      verify(dataStructureVersionRepository).save(version);
+    }
+
+    @Test
+    @DisplayName("Should block publish when modelAtlasUri is blank")
+    void shouldBlockPublishWhenModelAtlasUriIsBlank() {
+      UUID versionId = UUID.randomUUID();
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      version.setModelAtlasUri("  ");
+
+      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
+          .thenReturn(Optional.of(version));
+
+      assertThatThrownBy(() -> dataStructureVersionService.publish(versionId))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("modelAtlasUri");
+    }
+
+    @Test
+    @DisplayName("Should block publish when version is already published")
+    void shouldBlockPublishWhenAlreadyPublished() {
+      UUID versionId = UUID.randomUUID();
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+
+      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
+          .thenReturn(Optional.of(version));
+
+      assertThatThrownBy(() -> dataStructureVersionService.publish(versionId))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("already published");
+    }
+  }
+
+  @Nested
   @DisplayName("findModelByAtlasUri")
   class FindModelByAtlasUriTests {
 
