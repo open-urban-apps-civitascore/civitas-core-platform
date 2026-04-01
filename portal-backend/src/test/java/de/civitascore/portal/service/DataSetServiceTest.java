@@ -17,6 +17,7 @@ import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.HashSet;
 import java.util.List;
@@ -202,7 +203,7 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("throws when saga already in-flight")
+    @DisplayName("throws ResourceInUseException when saga already in-flight")
     void throwsWhenSagaInFlight() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
@@ -210,7 +211,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().unrelease(id))
-          .isInstanceOf(InvalidInputException.class)
+          .isInstanceOf(ResourceInUseException.class)
           .hasMessageContaining("saga is in-flight");
     }
 

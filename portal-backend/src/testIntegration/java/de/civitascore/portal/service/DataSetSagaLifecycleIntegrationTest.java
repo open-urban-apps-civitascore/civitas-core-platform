@@ -20,6 +20,7 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -342,7 +343,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
 
     // pendingSagaType is CREATE — try to unrelease immediately
     assertThatThrownBy(() -> dataSetService.unrelease(dataSetId))
-        .isInstanceOf(InvalidInputException.class)
+        .isInstanceOf(ResourceInUseException.class)
         .hasMessageContaining("saga is in-flight");
 
     DataSet completed = verifier.awaitSagaCompletion(dataSetId);

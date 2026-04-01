@@ -11,6 +11,7 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.HashSet;
 import java.util.Optional;
@@ -249,7 +250,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    *
    * @param id the dataset ID
    * @return the dataset with pending DELETE saga
-   * @throws InvalidInputException if dataset is not AVAILABLE or has a saga in-flight
+   * @throws InvalidInputException if dataset is not AVAILABLE
+   * @throws ResourceInUseException if a saga is already in-flight
    */
   @Transactional
   public DataSet unrelease(UUID id) {
@@ -261,8 +263,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     if (dataSet.getPendingSagaType() != null) {
-      throw new InvalidInputException(
-          "pendingSagaType",
+      throw new ResourceInUseException(
+          "DataSet",
           id,
           "Cannot unrelease while a saga is in-flight: " + dataSet.getPendingSagaType());
     }
