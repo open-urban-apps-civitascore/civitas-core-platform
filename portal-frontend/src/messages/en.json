@@ -992,7 +992,8 @@
         "apiPairing": "API Request node requires an API Response node in the pipeline",
         "nodeNotConfigured": "{label} is not configured",
         "invalidCronExpression": "{label} has an invalid cron expression. Must be a 6-field Quartz syntax.",
-        "orphanNode": "{label} is not connected to any other node"
+        "orphanNode": "{label} is not connected to any other node",
+        "minimumFunctionalNodes": "Pipeline must have at least one functional node between Start and End"
       }
     },
     "toolbar": {

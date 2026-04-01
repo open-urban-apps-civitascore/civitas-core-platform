@@ -978,7 +978,8 @@
         "apiPairing": "API-Request-Knoten benötigt einen API-Response-Knoten in der Pipeline",
         "nodeNotConfigured": "{label} ist nicht konfiguriert",
         "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein.",
-        "orphanNode": "{label} ist mit keinem anderen Knoten verbunden"
+        "orphanNode": "{label} ist mit keinem anderen Knoten verbunden",
+        "minimumFunctionalNodes": "Pipeline muss mindestens einen funktionalen Knoten zwischen Start und Ende haben"
       }
     },
     "toolbar": {
