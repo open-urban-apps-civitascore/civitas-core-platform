@@ -1,7 +1,6 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -9,7 +8,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { useCreateUser, useReplaceUserGroups, useUpdateUser } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -64,7 +62,6 @@ export const UserOverview = (props: UserOverviewProps) => {
   const [defaultUserData, setDefaultUserData] = useState(userData)
   const [isReadOnly, setIsReadOnly] = useState(isCreateMode ? false : mode !== 'edit')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
-  const queryClient = useQueryClient()
   const { handleFormValidationError } = useError()
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
@@ -172,10 +169,11 @@ export const UserOverview = (props: UserOverviewProps) => {
     try {
       // Save group membership changes via PUT /users/{id}/groups
       if (hasGroupChanges && canUpdateGroups) {
-        await replaceUserGroups.mutateAsync({
+        const { data } = await replaceUserGroups.mutateAsync({
           userId: parsed.id,
           groupIds: form.getValues('groupIds'),
         })
+        setDefaultUserData(data)
       }
 
       // Save user field changes via PATCH /users/{id}
@@ -185,14 +183,6 @@ export const UserOverview = (props: UserOverviewProps) => {
           phone: !parsed.phone && dirtyFields.phone ? null : dirtyUserFields.phone,
         }
         const { data } = await updateUser.mutateAsync({ ...updateData, id: parsed.id })
-        setDefaultUserData(data)
-      } else if (hasGroupChanges) {
-        // Group-only save: fetch updated user to keep local state in sync
-        const { data } = await apiRequest<User>({
-          endpoint: `/users/${parsed.id}`,
-          method: 'GET',
-          headers: { 'x-api-request': 'true' },
-        })
         setDefaultUserData(data)
       }
 
@@ -207,9 +197,6 @@ export const UserOverview = (props: UserOverviewProps) => {
         toast.error(t('errors.updateError'))
       }
       return false
-    } finally {
-      queryClient.invalidateQueries({ queryKey: ['groups'] })
-      queryClient.invalidateQueries({ queryKey: ['users'] })
     }
   }
 
