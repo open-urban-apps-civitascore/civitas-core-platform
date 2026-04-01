@@ -4,12 +4,17 @@ import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.idm.UserConfig;
 import de.civitascore.portal.mapper.UserMapper;
+import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.UserInputDTO;
+import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.UserRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -29,16 +34,19 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
 
   private final UserRepository userRepository;
   private final UserMapper userMapper;
+  private final GroupRepository groupRepository;
   private final String targetRealm;
 
   public UserService(
       ConfigEventPublisherService configEventPublisher,
       UserRepository userRepository,
       UserMapper userMapper,
+      GroupRepository groupRepository,
       @Value("${keycloak.target-realm}") String targetRealm) {
     super(configEventPublisher);
     this.userRepository = userRepository;
     this.userMapper = userMapper;
+    this.groupRepository = groupRepository;
     this.targetRealm = targetRealm;
   }
 
@@ -68,6 +76,26 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   protected User preSave(User entity) {
     validateUniqueEmail(entity);
     return super.preSave(entity);
+  }
+
+  @Transactional
+  public User replaceGroups(UUID userId, List<UUID> groupIds) {
+    User user = findByIdOrThrow(userId);
+
+    if (groupIds.isEmpty()) {
+      user.setGroups(new HashSet<>());
+    } else {
+      List<Group> groups = groupRepository.findAllById(groupIds);
+      if (groups.size() != groupIds.size()) {
+        throw new InvalidInputException(
+            "groups",
+            (groupIds.size() - groups.size()) + " groups not found",
+            "One or more groups do not exist.");
+      }
+      user.setGroups(new HashSet<>(groups));
+    }
+
+    return getRepository().save(user);
   }
 
   @Override
