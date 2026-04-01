@@ -10,9 +10,19 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
   useGetCurrentUser: vi.fn(),
 }))
 
+const mockPush = vi.fn()
+const mockReplace = vi.fn()
+const mockRefresh = vi.fn()
+let mockSearchParams = new URLSearchParams()
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
-  useSearchParams: () => ({ get: () => null }),
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+    refresh: mockRefresh,
+  }),
+  useSearchParams: () => mockSearchParams,
+  usePathname: () => '/datastructures/test-id',
 }))
 
 vi.mock('next-intl', () => ({
@@ -179,6 +189,7 @@ const mockCurrentUser = (permissions: PermissionName[]) => {
 describe('DatastructureOverview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockSearchParams = new URLSearchParams()
     mockForm.formState.isDirty = false
     mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_UPDATE, PERMISSION_NAMES.ASSIGNMENT_READ])
   })
@@ -229,6 +240,8 @@ describe('DatastructureOverview', () => {
       render(<DatastructureOverview {...defaultProps} />)
       fireEvent.click(screen.getByTestId('editButton'))
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+      expect(screen.getByTestId('cancelButton')).toBeInTheDocument()
+      expect(mockReplace).toHaveBeenCalledWith('/datastructures/test-id?mode=edit', { scroll: false })
     })
   })
 })
