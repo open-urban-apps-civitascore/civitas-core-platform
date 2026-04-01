@@ -88,6 +88,9 @@ class UserUpdateEventIntegrationTest extends BaseEventPublishingIntegrationTest 
                       .get(externalId)
                       .toRepresentation();
               assertThat(keycloakUser.getEmail()).isEqualTo(newEmail);
+              assertThat(keycloakUser.getRequiredActions())
+                  .as("VERIFY_EMAIL should be required after an email address change")
+                  .contains("VERIFY_EMAIL");
               assertThat(keycloakUser.isEmailVerified())
                   .as("emailVerified should be false after an email address change")
                   .isFalse();

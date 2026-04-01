@@ -237,7 +237,7 @@ class UserServiceTest {
 
       UserConfig config = (UserConfig) service.toConfigValuePreSave(user, input);
 
-      assertThat(config.getRequiredActions()).contains("VERIFY_EMAIL");
+      assertThat(config.getRequiredActions()).containsExactly("VERIFY_EMAIL");
       assertThat(config.getEmailVerified()).isFalse();
     }
 
