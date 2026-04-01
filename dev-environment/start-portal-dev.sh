@@ -625,6 +625,8 @@ export KEYCLOAK_USERNAME=admin
 export KEYCLOAK_PASSWORD=admin
 export KEYCLOAK_CLIENT_ID=admin-cli
 export KEYCLOAK_TOPICS=de.civitascore.idm.user.created,de.civitascore.idm.user.updated,de.civitascore.idm.user.deleted,de.civitascore.idm.group.created,de.civitascore.idm.group.updated,de.civitascore.idm.group.deleted
+export KEYCLOAK_INVITATION_CLIENT_ID=portal-frontend
+export KEYCLOAK_INVITATION_REDIRECT_URI=http://localhost:3000/
 export APISIX_ADMIN_URL=http://localhost:9180
 export APISIX_ADMIN_KEY=edd1c9f034335f136f87ad84b625c8f1
 export APISIX_GATEWAY_URL=http://localhost:9080
@@ -670,6 +672,8 @@ else
     echo "  KEYCLOAK_USERNAME=admin"
     echo "  KEYCLOAK_PASSWORD=admin"
     echo "  KEYCLOAK_CLIENT_ID=admin-cli"
+    echo "  KEYCLOAK_INVITATION_CLIENT_ID=portal-frontend"
+    echo "  KEYCLOAK_INVITATION_REDIRECT_URI=http://localhost:3000/"
     echo "  APISIX_ADMIN_URL=http://localhost:9180"
     echo "  APISIX_ADMIN_KEY=edd1c9f034335f136f87ad84b625c8f1"
     echo "  APISIX_GATEWAY_URL=http://localhost:9080"
