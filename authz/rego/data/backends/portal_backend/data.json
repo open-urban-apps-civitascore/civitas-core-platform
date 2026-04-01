@@ -18,6 +18,9 @@
       "PATCH": "USER_UPDATE",
       "DELETE": "USER_DELETE"
     },
+    "/v1/users/{id}/groups": {
+      "PUT": "GROUP_UPDATE"
+    },
     "/v1/assignments": {
       "_collection": true,
       "GET": "ASSIGNMENT_READ",
