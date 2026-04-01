@@ -85,6 +85,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   )
 
   const {
+    areAssignmentsDirty,
     canSetAvailable,
     completedTabs,
     form: datastructureForm,
@@ -113,10 +114,20 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   useRegisterUnsavedChanges(hasUnsavedChanges, handleSave)
 
   const handleExit = () => {
-    resetToInitialState()
+    if (datastructureForm.formState.isDirty || areAssignmentsDirty) {
+      setIsExitModalOpen(true)
+    } else {
+      resetToInitialState()
+      updateMode(false)
+      setAssignedGroups(initialAssignments)
+    }
+  }
+
+  const handleDiscardAndExit = () => {
     setIsExitModalOpen(false)
-    setAssignedGroups(initialAssignments)
     updateMode(false)
+    resetToInitialState()
+    setAssignedGroups(initialAssignments)
   }
 
   const handleExitButtonClick = () => {
@@ -209,7 +220,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
         open={isExitModalOpen}
         isLoading={isLoading}
         onOpenChange={setIsExitModalOpen}
-        onDiscard={handleExit}
+        onDiscard={handleDiscardAndExit}
         onConfirm={handleSave}
       />
     </PageContainer>
