@@ -8,10 +8,14 @@ import static org.mockito.Mockito.when;
 import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.idm.UserConfig;
 import de.civitascore.portal.mapper.UserMapper;
+import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.UserInputDTO;
+import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.UserRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -28,11 +32,13 @@ class UserServiceTest {
   @Mock private ConfigEventPublisherService configEventPublisher;
   @Mock private UserRepository userRepository;
   @Mock private UserMapper userMapper;
+  @Mock private GroupRepository groupRepository;
 
   private static final String TARGET_REALM = "test-realm";
 
   private UserService createService() {
-    return new UserService(configEventPublisher, userRepository, userMapper, TARGET_REALM);
+    return new UserService(
+        configEventPublisher, userRepository, userMapper, groupRepository, TARGET_REALM);
   }
 
   private User userWithId(UUID id) {
@@ -298,6 +304,31 @@ class UserServiceTest {
       service.updateExternalId(user, "   ");
 
       assertThat(user.getExternalId()).isEqualTo("original");
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // replaceGroups
+  // ---------------------------------------------------------------------------
+
+  @Nested
+  @DisplayName("replaceGroups()")
+  class ReplaceGroupsTests {
+
+    @Test
+    @DisplayName("Should throw when some groups do not exist")
+    void shouldThrowWhenGroupsMissing() {
+      UserService service = createService();
+      UUID userId = UUID.randomUUID();
+      User user = userWithId(userId);
+      when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+      List<UUID> groupIds = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+      when(groupRepository.findAllById(groupIds)).thenReturn(List.of(new Group()));
+
+      assertThatThrownBy(() -> service.replaceGroups(userId, groupIds))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessage("One or more groups do not exist.");
     }
   }
 
