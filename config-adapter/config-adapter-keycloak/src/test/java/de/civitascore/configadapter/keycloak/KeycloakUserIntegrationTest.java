@@ -337,7 +337,7 @@ class KeycloakUserIntegrationTest extends KeycloakAdapterIntegrationTestBase {
     badCredentials.put("keycloak.username", "wrong-user");
     badCredentials.put("keycloak.password", "wrong-password");
 
-    assertThrows(RuntimeException.class, () -> createAdapterWithProps(badCredentials));
+    assertThrows(IllegalStateException.class, () -> createAdapterWithProps(badCredentials));
   }
 
   @Test
@@ -346,7 +346,7 @@ class KeycloakUserIntegrationTest extends KeycloakAdapterIntegrationTestBase {
     Map<String, Object> partialConfig = new HashMap<>();
     partialConfig.put("keycloak.invitation.client.id", "some-client");
 
-    assertThrows(IllegalArgumentException.class, () -> createAdapterWithProps(partialConfig));
+    assertThrows(IllegalStateException.class, () -> createAdapterWithProps(partialConfig));
   }
 
   @Test
@@ -355,6 +355,6 @@ class KeycloakUserIntegrationTest extends KeycloakAdapterIntegrationTestBase {
     Map<String, Object> partialConfig = new HashMap<>();
     partialConfig.put("keycloak.invitation.redirect.uri", "http://localhost:3000/");
 
-    assertThrows(IllegalArgumentException.class, () -> createAdapterWithProps(partialConfig));
+    assertThrows(IllegalStateException.class, () -> createAdapterWithProps(partialConfig));
   }
 }
