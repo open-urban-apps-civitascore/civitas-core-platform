@@ -540,12 +540,6 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
    * Sends an actions email to a newly created user if required actions are configured. The email
    * contains a link for the user to complete actions like email verification and password setup.
    *
-   * <p>When {@code invitationClientId} and {@code invitationRedirectUri} are configured, the
-   * overload {@code executeActionsEmail(clientId, redirectUri, actions)} is used. This embeds the
-   * client ID and redirect URI in the Keycloak action token, so that after the user completes all
-   * required actions (e.g., UPDATE_PASSWORD, VERIFY_EMAIL), Keycloak redirects them back to the
-   * portal instead of showing a generic "account updated" page.
-   *
    * @throws Exception if invitation redirect is configured and the email sending fails
    */
   private void sendActionsEmail(
