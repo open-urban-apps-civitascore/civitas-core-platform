@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.portal.mapper.DataSourceMapper;
 import de.civitascore.portal.model.connector.OnPublish;
 import de.civitascore.portal.model.embedded.ConnectorType;
-import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
@@ -14,6 +13,7 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
+import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
 import de.civitascore.portal.util.InvalidInputException;
@@ -44,6 +44,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   private final AssignmentFactory assignmentFactory;
   private final DataStructureVersionService dataStructureVersionService;
   private final DataSetRepository dataSetRepository;
+  private final PipelineRepository pipelineRepository;
 
   @Override
   protected DataSourceRepository getRepository() {
@@ -296,12 +297,11 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   }
 
   private void validateNotInUse(UUID id) {
-    if (dataSetRepository.existsByPipelinesDataSourcesIdAndDataSetStatusIn(
-        id, List.of(DataSetStatus.READY, DataSetStatus.AVAILABLE))) {
+    if (pipelineRepository.existsByDataSourcesId(id)) {
       throw new ResourceInUseException(
           getEntityName(),
           id,
-          "Cannot unpublish DataSource because it is referenced by a READY or AVAILABLE DataSet.");
+          "Cannot unpublish DataSource because it is referenced by a Pipeline.");
     }
   }
 
@@ -325,9 +325,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
           getEntityName(), id, "Only data sources in AVAILABLE status can have metadata updated");
     }
 
-    boolean inUse =
-        dataSetRepository.existsByPipelinesDataSourcesIdAndDataSetStatusIn(
-            id, List.of(DataSetStatus.READY, DataSetStatus.AVAILABLE));
+    boolean inUse = pipelineRepository.existsByDataSourcesId(id);
 
     if (inUse) {
       validateInUseConstraints(input, entity);

@@ -1,13 +1,11 @@
 package de.civitascore.portal.model.output.assembler;
 
 import de.civitascore.portal.mapper.DataSourceMapper;
-import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
-import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -22,7 +20,7 @@ public class DataSourceAssembler implements BaseAssembler<DataSource, DataSource
 
   private final DataSourceMapper dataSourceMapper;
   private final ConnectorHandlerRegistry connectorHandlerRegistry;
-  private final DataSetRepository dataSetRepository;
+  private final PipelineRepository pipelineRepository;
 
   /** {@inheritDoc} Delegates to the {@link DataSourceMapper} for basic field mapping. */
   @Override
@@ -36,9 +34,7 @@ public class DataSourceAssembler implements BaseAssembler<DataSource, DataSource
    */
   @Override
   public DataSourceOutputDTO enrichDto(DataSourceOutputDTO dto, DataSource entity) {
-    dto.setInUse(
-        dataSetRepository.existsByPipelinesDataSourcesIdAndDataSetStatusIn(
-            entity.getId(), List.of(DataSetStatus.READY, DataSetStatus.AVAILABLE)));
+    dto.setInUse(pipelineRepository.existsByDataSourcesId(entity.getId()));
     return dto;
   }
 
