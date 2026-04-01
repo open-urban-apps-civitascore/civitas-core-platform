@@ -3,12 +3,15 @@ package de.civitascore.portal.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.model.embedded.UserTitleType;
+import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.input.UserInputDTO;
+import de.civitascore.portal.model.output.GroupOutputDTO;
 import de.civitascore.portal.model.output.UserOutputDTO;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -16,6 +19,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -82,6 +86,26 @@ class UserControllerIntegrationTest
   @Override
   protected UUID getIdFromOutput(UserOutputDTO output) {
     return output.getId();
+  }
+
+  private UUID createTestGroup(String name) {
+    GroupInputDTO input = new GroupInputDTO();
+    input.setName(name);
+    input.setDescription("Test group");
+    ResponseEntity<GroupOutputDTO> response =
+        exchange(
+            "/groups",
+            HttpMethod.POST,
+            createAuthHeaders(),
+            input,
+            new ParameterizedTypeReference<GroupOutputDTO>() {});
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    return response.getBody().getId();
+  }
+
+  private ResponseEntity<UserOutputDTO> performReplaceGroups(UUID userId, List<UUID> groupIds) {
+    String url = getEndpointPath() + "/" + userId + "/groups";
+    return exchange(url, HttpMethod.PUT, createAuthHeaders(), groupIds, getOutputTypeReference());
   }
 
   @Nested
@@ -583,6 +607,82 @@ class UserControllerIntegrationTest
       ResponseEntity<UserOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Nested
+  @DisplayName("Replace User Groups Tests")
+  class ReplaceUserGroupsTests {
+
+    @Test
+    @DisplayName("Should replace user groups with new set")
+    void shouldReplaceUserGroups() {
+      UUID userId = createTestEntity();
+      UUID groupA = createTestGroup("Group A " + UUID.randomUUID().toString().substring(0, 8));
+      UUID groupB = createTestGroup("Group B " + UUID.randomUUID().toString().substring(0, 8));
+
+      ResponseEntity<UserOutputDTO> response =
+          performReplaceGroups(userId, List.of(groupA, groupB));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getGroups()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Should clear all groups with empty list")
+    void shouldClearAllGroups() {
+      UUID userId = createTestEntity();
+      UUID groupA = createTestGroup("Group A " + UUID.randomUUID().toString().substring(0, 8));
+      performReplaceGroups(userId, List.of(groupA));
+
+      ResponseEntity<UserOutputDTO> response = performReplaceGroups(userId, List.of());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getGroups()).isNullOrEmpty();
+    }
+
+    @Test
+    @DisplayName("Should return 400 for non-existent group ID")
+    void shouldReturn400ForNonExistentGroup() {
+      UUID userId = createTestEntity();
+
+      ResponseEntity<UserOutputDTO> response =
+          performReplaceGroups(userId, List.of(UUID.randomUUID()));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should return 404 for non-existent user")
+    void shouldReturn404ForNonExistentUser() {
+      UUID groupA = createTestGroup("Group A " + UUID.randomUUID().toString().substring(0, 8));
+
+      ResponseEntity<UserOutputDTO> response =
+          performReplaceGroups(UUID.randomUUID(), List.of(groupA));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("Should replace existing groups with different set")
+    void shouldReplaceExistingGroupsWithDifferentSet() {
+      UUID userId = createTestEntity();
+      UUID groupA = createTestGroup("Group A " + UUID.randomUUID().toString().substring(0, 8));
+      UUID groupB = createTestGroup("Group B " + UUID.randomUUID().toString().substring(0, 8));
+      UUID groupC = createTestGroup("Group C " + UUID.randomUUID().toString().substring(0, 8));
+
+      performReplaceGroups(userId, List.of(groupA, groupB));
+
+      ResponseEntity<UserOutputDTO> response =
+          performReplaceGroups(userId, List.of(groupB, groupC));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getGroups()).hasSize(2);
+      assertThat(response.getBody().getGroups())
+          .extracting("id")
+          .containsExactlyInAnyOrder(groupB, groupC);
     }
   }
 }
