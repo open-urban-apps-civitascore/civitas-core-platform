@@ -15,6 +15,7 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Form } from '@/components/ui/form'
 import { usePermissions } from '@/hooks/use-permissions'
+import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Datasource, DATASOURCE_STATUS_TYPES, DatasourceStatusType, DatasourceTab } from '@/types/datasources'
@@ -95,6 +96,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
+  const hasUnsavedChanges = datasourceForm.formState.isDirty || areAssignmentsDirty || hasStatusChanged
+
   const tabs = useMemo(
     () => (canReadDatastructures ? allTabs : allTabs.filter(tab => tab.value !== 'dataStructure')),
     [canReadDatastructures],
@@ -107,14 +110,21 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     setSelectedDatastructureId(initialDatastructureId)
     setSelectedDatastructureVersionId(initialVersionId)
   }
-  const handleSave = async () => {
+  const handleSave = () =>
     submitDatasource(() => {
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
       router.refresh()
     })
-  }
+
+  const handleSaveForUnsavedChanges = () =>
+    submitDatasource(() => {
+      setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
+    })
+
+  useRegisterUnsavedChanges(hasUnsavedChanges, handleSaveForUnsavedChanges)
+
   const handleExit = () => {
-    if (datasourceForm.formState.isDirty || areAssignmentsDirty || hasStatusChanged) {
+    if (hasUnsavedChanges) {
       setIsExitModalOpen(true)
     } else {
       resetToInitialState()
@@ -130,7 +140,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
 
   const handleSaveAndExit = async () => {
-    submitDatasource(() => {
+    await submitDatasource(() => {
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
       setIsExitModalOpen(false)
       updateMode(false)
@@ -152,7 +162,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
 
   const isConfirmButtonDisabled =
-    !(datasourceForm.formState.isDirty || areAssignmentsDirty || hasStatusChanged) ||
+    !hasUnsavedChanges ||
     !!datasourceForm.formState.errors.name ||
     (dataSourceStatus !== DATASOURCE_STATUS_TYPES.DRAFT && Object.keys(datasourceForm.formState.errors).length > 0) ||
     isLoadingDatasource

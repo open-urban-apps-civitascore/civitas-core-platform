@@ -1,10 +1,10 @@
 'use client'
 
 import { ChevronRight } from 'lucide-react'
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
+import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { usePermissions } from '@/hooks/use-permissions'
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible'
@@ -71,9 +71,9 @@ export const AppSidebarContent = () => {
                         {item.items.map(subItem => (
                           <SidebarMenuSubItem key={subItem.title} data-testid={`sidebarMenuItem-${subItem.title}`}>
                             <SidebarMenuSubButton asChild isActive={pathname === subItem.url}>
-                              <Link href={subItem.url}>
+                              <GuardedLink href={subItem.url}>
                                 <span>{tNav(subItem.title)}</span>
-                              </Link>
+                              </GuardedLink>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         ))}
@@ -90,10 +90,10 @@ export const AppSidebarContent = () => {
                         <span>{tNav(item.title)}</span>
                       </a>
                     ) : (
-                      <Link href={item.url}>
+                      <GuardedLink href={item.url}>
                         {item.icon && <item.icon />}
                         <span>{tNav(item.title)}</span>
-                      </Link>
+                      </GuardedLink>
                     )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>

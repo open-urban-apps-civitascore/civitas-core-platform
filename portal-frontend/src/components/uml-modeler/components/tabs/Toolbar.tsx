@@ -3,6 +3,7 @@
 import { FileDown, Loader2, Save } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useRef } from 'react'
+import { toast } from 'sonner'
 
 import { useCreateModel } from '@/app/services/api/models/clientRequests'
 import { BasicDropdownMenu } from '@/components/dropdown-menu/BasicDropdownMenu'
@@ -16,7 +17,6 @@ import { importXmiFromFile } from '../../services/xmiImportService'
 interface ToolbarProps {
   onSave?: () => void
   hasUnsavedChanges?: boolean
-  onExport?: () => void
   sessionName?: string
   canExportXmi: boolean
   canImportXmi: boolean
@@ -35,7 +35,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const createModel = useCreateModel()
   const isSaving = createModel.isPending
-  const t = useTranslations('umlModeler.import')
+  const t = useTranslations('umlModeler')
 
   const handleSave = useCallback(() => {
     if (isSaving) return
@@ -48,17 +48,22 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     createModel.mutate(payload, {
       onSuccess: () => {
         onSave?.()
-        console.log('Model saved successfully')
+        toast.success(t('save.success'))
       },
-      onError: error => {
-        console.error('Failed to save model:', error)
+      onError: () => {
+        toast.error(t('save.error'))
       },
     })
-  }, [diagram, isSaving, onSave, createModel, sessionName])
+  }, [diagram, isSaving, onSave, createModel, sessionName, t])
 
   const handleExportXmi = useCallback(() => {
-    downloadXmi(diagram)
-  }, [diagram])
+    try {
+      downloadXmi(diagram)
+      toast.success(t('export.success'))
+    } catch {
+      toast.error(t('export.error'))
+    }
+  }, [diagram, t])
 
   const handleImportClick = useCallback(() => {
     fileInputRef.current?.click()
@@ -120,12 +125,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
         {(canImportXmi || onImportFromDatastructure) && (
           <BasicDropdownMenu
-            title={t('title')}
+            title={t('import.title')}
             menuItems={[
               ...(canImportXmi
                 ? [
                     {
-                      label: t('fromFile'),
+                      label: t('import.fromFile'),
                       onClick: () => handleImportClick(),
                     },
                   ]
@@ -133,7 +138,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               ...(onImportFromDatastructure
                 ? [
                     {
-                      label: t('fromPlatform'),
+                      label: t('import.fromPlatform'),
                       onClick: () => onImportFromDatastructure(),
                     },
                   ]

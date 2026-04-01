@@ -26,8 +26,8 @@ body:json {
 tests {
   test("Updated or not published", function() {
     const status = res.getStatus();
-    // 200=updated, 400=dataset not in published state
-    expect(status === 200 || status === 400).to.be.true;
+    // 200=updated, 400=dataset not in published state, 409=saga in-flight
+    expect(status === 200 || status === 400 || status === 409).to.be.true;
   });
 }
 

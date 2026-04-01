@@ -1,6 +1,6 @@
 {
   "welcome": {
-    "title": "Willkommen in CIVITAS/CORE 2.0",
+    "title": "Willkommen in CIVITAS/CORE V2 Beta",
     "subtitle": "Neu hier?",
     "docsButton": "Dokumentation"
   },
@@ -352,7 +352,8 @@
         "dataset": "Datensatzbezogene Zuordnungen erfolgen am jeweiligen Datensatz.",
         "datasource": "Datenquellenbezogene Zuordnungen erfolgen an der jeweiligen Datenquelle.",
         "datastructure": "Datenstrukturbezogene Zuordnungen erfolgen an der jeweiligen Datenstruktur."
-      }
+      },
+      "disabledHint": "Zugeordnete Rollen können nach dem Speichern des Nutzers eingesehen werden."
     },
     "groupsTab": {
       "title": "Gruppenmitgliedschaft",
@@ -972,13 +973,15 @@
       "warnings": "Warnungen ({count})",
       "fixErrors": "Behebe die obigen Fehler, bevor du die Pipeline speicherst.",
       "hasWarnings": "Pipeline hat Warnungen, kann aber gespeichert werden.",
+      "canNotSave": "Speichern der Pipeline nicht möglich. Überprüfen Sie die Pipeline und verifizieren Sie sie vor dem Speichern.",
       "messages": {
         "startNodeRequired": "Pipeline muss mindestens einen Start-Knoten haben",
         "endNodeRequired": "Pipeline muss mindestens einen End-Knoten haben",
         "apiPairing": "API-Request-Knoten benötigt einen API-Response-Knoten in der Pipeline",
         "nodeNotConfigured": "{label} ist nicht konfiguriert",
         "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein.",
-        "orphanNode": "{label} ist mit keinem anderen Knoten verbunden"
+        "orphanNode": "{label} ist mit keinem anderen Knoten verbunden",
+        "minimumFunctionalNodes": "Pipeline muss mindestens einen funktionalen Knoten zwischen Start und Ende haben"
       }
     },
     "toolbar": {
@@ -999,7 +1002,8 @@
       "exit": "Beenden",
       "validationFailed": "Validierung fehlgeschlagen für: {names}",
       "duplicateNames": "Doppelte Pipeline-Namen: {names}",
-      "saveFailed": "Speichern fehlgeschlagen: {names}"
+      "saveFailed": "Speichern fehlgeschlagen: {names}",
+      "saveSucces": "Pipelines erfolgreich gespeichert"
     },
     "tabs": {
       "closeTab": "Tab schließen",
@@ -1020,6 +1024,14 @@
       "title": "Importieren",
       "fromPlatform": "aus der Plattform",
       "fromFile": "aus Datei"
+    },
+    "save": {
+      "success": "Modell erfolgreich gespeichert",
+      "error": "Modell konnte nicht gespeichert werden. Bitte versuchen Sie es erneut."
+    },
+    "export": {
+      "success": "Diagramm erfolgreich exportiert",
+      "error": "Diagramm konnte nicht exportiert werden. Bitte versuchen Sie es erneut."
     }
   }
 }

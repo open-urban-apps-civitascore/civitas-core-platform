@@ -1,4 +1,4 @@
-import { AxiosError } from 'axios'
+import { isAxiosError } from 'axios'
 
 type ApiError = {
   type: string
@@ -8,7 +8,8 @@ type ApiError = {
   instance: string
 }
 
-export const isNameConflictError = (error: AxiosError) => {
+export const isNameConflictError = (error: unknown) => {
+  if (!isAxiosError(error)) return false
   const isConflictError = error.status === 409
   if (!error?.response) return false
   const apiError = error.response.data as ApiError
@@ -16,7 +17,8 @@ export const isNameConflictError = (error: AxiosError) => {
   return isConflictError && errorDetail.includes('with name') && errorDetail.includes('already exists')
 }
 
-export const isEmailConflictError = (error: AxiosError) => {
+export const isEmailConflictError = (error: unknown) => {
+  if (!isAxiosError(error)) return false
   const isConflictError = error.status === 409
   if (!error?.response) return false
   const apiError = error.response.data as ApiError
@@ -24,6 +26,7 @@ export const isEmailConflictError = (error: AxiosError) => {
   return isConflictError && errorDetail.includes('with email') && errorDetail.includes('already exists')
 }
 
-export const isPermissionsError = (error: AxiosError) => {
+export const isPermissionsError = (error: unknown) => {
+  if (!isAxiosError(error)) return false
   return error.status === 403
 }

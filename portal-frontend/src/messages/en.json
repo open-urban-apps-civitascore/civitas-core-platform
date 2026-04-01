@@ -1,6 +1,6 @@
 {
   "welcome": {
-    "title": "Welcome to CIVITAS/CORE 2.0",
+    "title": "Welcome to CIVITAS/CORE V2 Beta",
     "subtitle": "New here?",
     "docsButton": "Documentation"
   },
@@ -355,7 +355,8 @@
         "dataset": "Dataset-related assignments are made at the respective Dataset.",
         "datasource": "Data source-related assignments are made at the respective Data source.",
         "datastructure": "Data structure-related assignments are made at the respective Data structure."
-      }
+      },
+      "disabledHint": "Assigned roles can be viewed after saving the user."
     },
     "groupsTab": {
       "title": "Group Membership",
@@ -986,13 +987,15 @@
       "warnings": "Warnings ({count})",
       "fixErrors": "Fix the errors above before saving the pipeline.",
       "hasWarnings": "Pipeline has warnings but can be saved.",
+      "canNotSave": "Unable to save the pipeline. Review the pipeline and validate it before saving.",
       "messages": {
         "startNodeRequired": "Pipeline must have at least one Start node",
         "endNodeRequired": "Pipeline must have at least one End node",
         "apiPairing": "API Request node requires an API Response node in the pipeline",
         "nodeNotConfigured": "{label} is not configured",
         "invalidCronExpression": "{label} has an invalid cron expression. Must be a 6-field Quartz syntax.",
-        "orphanNode": "{label} is not connected to any other node"
+        "orphanNode": "{label} is not connected to any other node",
+        "minimumFunctionalNodes": "Pipeline must have at least one functional node between Start and End"
       }
     },
     "toolbar": {
@@ -1013,7 +1016,8 @@
       "exit": "Exit",
       "validationFailed": "Validation failed for: {names}",
       "duplicateNames": "Duplicate pipeline names: {names}",
-      "saveFailed": "Failed to save: {names}"
+      "saveFailed": "Failed to save: {names}",
+      "saveSucces": "Pipelines saved successfully"
     },
     "tabs": {
       "closeTab": "Close tab",
@@ -1034,6 +1038,14 @@
       "title": "Import",
       "fromPlatform": "from the platform",
       "fromFile": "from file"
+    },
+    "save": {
+      "success": "Model saved successfully",
+      "error": "Failed to save model. Please try again."
+    },
+    "export": {
+      "success": "Diagram exported successfully",
+      "error": "Failed to export diagram. Please try again."
     }
   }
 }

@@ -122,8 +122,7 @@ class FrostAdapterTest {
         assertThrows(IllegalArgumentException.class, () -> adapter.initialize(mockConfig));
 
     assertEquals(
-        "The FROST adapter requires authentication: configure frost.api.key or "
-            + "frost.basic.auth.username with frost.basic.auth.password.",
+        "FROST authentication not configured: provide either basic.auth.username or api.key",
         exception.getMessage());
   }
 
@@ -139,8 +138,7 @@ class FrostAdapterTest {
         assertThrows(IllegalArgumentException.class, () -> adapter.initialize(mockConfig));
 
     assertEquals(
-        "The FROST adapter requires authentication: configure frost.api.key or "
-            + "frost.basic.auth.username with frost.basic.auth.password.",
+        "FROST authentication not configured: provide either basic.auth.username or api.key",
         exception.getMessage());
   }
 

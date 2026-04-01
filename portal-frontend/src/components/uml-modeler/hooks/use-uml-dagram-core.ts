@@ -10,7 +10,7 @@ import {
   getDiagramStats,
   getSelectedEdges,
   getSelectedNodes,
-  validateConnection,
+  validateRelationshipConnection,
 } from '../services/diagramService'
 import type { DiagramAction, NodeCreationContext, UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
 import type { UMLElement, UMLRelationship, UMLRelationshipType } from '../types/uml'
@@ -100,9 +100,8 @@ export const useUMLDiagramCore = (initialDiagram?: UMLDiagram): UseUMLDiagramCor
   // Edge operations
   const addEdge = useCallback(
     (connection: Connection) => {
-      if (validateConnection(diagram, connection)) {
-        const edgeType = activeRelationshipType || 'association'
-
+      const edgeType = activeRelationshipType || 'association'
+      if (validateRelationshipConnection(diagram, connection, edgeType)) {
         // Create basic relationship data
         const relationshipData = {
           id: crypto.randomUUID(),
@@ -219,9 +218,9 @@ export const useUMLDiagramCore = (initialDiagram?: UMLDiagram): UseUMLDiagramCor
 
   const validateConnectionCallback = useCallback(
     (connection: Connection) => {
-      return validateConnection(diagram, connection)
+      return validateRelationshipConnection(diagram, connection, activeRelationshipType)
     },
-    [diagram],
+    [diagram, activeRelationshipType],
   )
 
   return {

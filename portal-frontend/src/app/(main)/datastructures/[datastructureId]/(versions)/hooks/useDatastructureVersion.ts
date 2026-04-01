@@ -21,7 +21,7 @@ import { STATUS_TYPES } from '@/types/common'
 import {
   DATASTRUCTURE_STATUS_TYPES,
   DATASTRUCTURE_VERSION_SOURCE,
-  DatastructureStatusTypes,
+  DatastructureStatusType,
   DatastructureVersion,
   DatastructureVersionCreateData,
   DatastructureVersionFormData,
@@ -166,7 +166,7 @@ export const useDatastructureVersion = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canSetAvailable, statusWatch])
 
-  const handleStatusChange = (newStatus: DatastructureStatusTypes) => {
+  const handleStatusChange = (newStatus: DatastructureStatusType) => {
     form.setValue('dataStructureVersionStatus', newStatus, { shouldDirty: true })
   }
 
@@ -316,7 +316,7 @@ export const useDatastructureVersion = ({
     dirtyFields.dataStructureVersionSource ||
     dirtyFields.dataStructureVersionStatus
   const hasModelChanges =
-    activeSession?.isDirty === true || (initialSession?.id && activeSessionId !== initialSession?.id)
+    activeSession?.isDirty === true || (!!initialSession?.id && activeSessionId !== initialSession?.id)
   const hasUserChanges = hasMetadataChanges || hasModelChanges
 
   return {

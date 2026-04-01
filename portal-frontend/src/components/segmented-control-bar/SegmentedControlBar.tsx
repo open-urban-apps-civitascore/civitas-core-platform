@@ -3,6 +3,7 @@
 import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 export type Tab<TabValue> = { value: TabValue; label: string }
@@ -13,6 +14,7 @@ export interface SegmentedControlBarProps<TabValue extends string> {
   onTabChange: (tab: TabValue) => void
   completedTabs?: TabValue[]
   disabledTabs?: TabValue[]
+  disabledTabTooltips?: Partial<Record<TabValue, string>>
   tabsWithNoCompletionStatus?: TabValue[]
   hasCompletionStatus?: boolean
   className?: string
@@ -26,6 +28,7 @@ export const SegmentedControlBar = <TabValue extends string>(props: SegmentedCon
     onTabChange,
     completedTabs = [],
     disabledTabs = [],
+    disabledTabTooltips = {} as Partial<Record<TabValue, string>>,
     tabsWithNoCompletionStatus = [],
     hasCompletionStatus = false,
     className,
@@ -59,7 +62,7 @@ export const SegmentedControlBar = <TabValue extends string>(props: SegmentedCon
         const isDisabled = disabledTabs.includes(tab.value)
         const hasNoCompletionStatus = tabsWithNoCompletionStatus.includes(tab.value)
 
-        return (
+        const button = (
           <button
             key={tab.value}
             data-testid={`tab-${tab.value}`}
@@ -77,6 +80,21 @@ export const SegmentedControlBar = <TabValue extends string>(props: SegmentedCon
             <span>{getTabLabel(tab.label)}</span>
           </button>
         )
+
+        const tooltipText = isDisabled ? disabledTabTooltips[tab.value] : undefined
+
+        if (tooltipText) {
+          return (
+            <Tooltip key={tab.value}>
+              <TooltipTrigger asChild>
+                <span>{button}</span>
+              </TooltipTrigger>
+              <TooltipContent className="w-48">{tooltipText}</TooltipContent>
+            </Tooltip>
+          )
+        }
+
+        return button
       })}
     </div>
   )
