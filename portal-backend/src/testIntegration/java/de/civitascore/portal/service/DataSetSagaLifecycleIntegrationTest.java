@@ -591,6 +591,42 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
     }
 
     @Test
+    @DisplayName("updatePublishedMeta rejects when CREATE saga is in-flight (409)")
+    void updatePublishedMeta_rejectsDuringSagaInFlight() throws Exception {
+      DataSource dataSource = data.createMqttDataSource();
+      DataSet dataSet = data.createDataSet("Saga Guard Meta Update Dataset");
+      data.createGeneratePipeline(dataSet, dataSource);
+      data.seedGroupAndAssignment(dataSet);
+      UUID dataSetId = dataSet.getId();
+
+      // DRAFT → READY → AVAILABLE (pendingSagaType = CREATE while saga runs)
+      dataSetService.publish(dataSetId);
+      dataSetService.release(dataSetId);
+
+      // Attempt metadata update while CREATE saga is in-flight
+      DataSetInputDTO updateInput = new DataSetInputDTO();
+      updateInput.setName("Should Be Rejected " + System.nanoTime());
+
+      assertThatThrownBy(() -> dataSetService.updatePublishedMeta(dataSetId, updateInput))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("saga is in-flight")
+          .hasMessageContaining("CREATE");
+
+      // Verify the name was NOT changed
+      DataSet unchanged = dataSetRepository.findByIdWithRelations(dataSetId).orElseThrow();
+      assertThat(unchanged.getName())
+          .as("Name should not have been modified")
+          .isEqualTo("Saga Guard Meta Update Dataset");
+
+      // Let the saga complete and verify dataset is healthy
+      DataSet completed = verifier.awaitSagaCompletion(dataSetId);
+      assertThat(completed.getPendingSagaType()).isNull();
+      assertThat(completed.getProjectId()).isNotNull();
+
+      log.info("updatePublishedMeta correctly rejected during in-flight CREATE saga");
+    }
+
+    @Test
     @DisplayName(
         "Full cycle: CREATE → UPDATE (metadata change) → DELETE preserves correct transitions")
     void createThenUpdateThenDelete_fullCycle() throws Exception {
