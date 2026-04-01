@@ -207,10 +207,10 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
 
       <ExitWarningModal
         open={isExitModalOpen}
-        onOpenChange={() => setIsExitModalOpen(false)}
+        isLoading={isLoading}
+        onOpenChange={setIsExitModalOpen}
         onDiscard={handleExit}
         onConfirm={handleSave}
-        isLoading={isLoading}
       />
     </PageContainer>
   )
