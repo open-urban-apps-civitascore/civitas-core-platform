@@ -42,7 +42,6 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
 
 vi.mock('@/app/services/api/groups/clientRequests', () => ({
   useGetGroups: vi.fn(() => ({ data: { data: [], totalElements: 0 }, isFetching: false, error: null })),
-  usePatchGroup: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }))
 
 vi.mock('@/app/services/api/request/apiRequest', () => ({
