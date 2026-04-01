@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Role;
+import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentGroupInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
@@ -13,6 +14,7 @@ import de.civitascore.portal.model.output.summary.RoleSummaryDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.RoleRepository;
+import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
 import java.util.HashMap;
@@ -38,6 +40,7 @@ class GroupControllerIntegrationTest
   @Autowired private GroupRepository groupRepository;
   @Autowired private RoleRepository roleRepository;
   @Autowired private AssignmentRepository assignmentRepository;
+  @Autowired private UserRepository userRepository;
 
   @Override
   protected String getEndpointPath() {
@@ -54,6 +57,15 @@ class GroupControllerIntegrationTest
     assignmentRepository.deleteAll();
     groupRepository.deleteAll();
     roleRepository.deleteAll();
+    userRepository.deleteAll();
+  }
+
+  private User createTestUser() {
+    User user = new User();
+    user.setFirstName("Test");
+    user.setLastName("User " + UUID.randomUUID().toString().substring(0, 8));
+    user.setEmail("test" + UUID.randomUUID().toString().substring(0, 8) + "@example.com");
+    return userRepository.save(user);
   }
 
   @Override
@@ -283,6 +295,64 @@ class GroupControllerIntegrationTest
       ResponseEntity<RestPage<GroupOutputDTO>> response = performGetAll(params);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    @DisplayName("Should filter groups by single memberId")
+    void shouldFilterGroupsByMemberId() {
+      User user = createTestUser();
+
+      GroupInputDTO groupWithMember = createValidInput();
+      groupWithMember.setMemberIds(List.of(user.getId()));
+      performCreate(groupWithMember);
+
+      // Create a group without this member
+      performCreate(createValidInput());
+
+      Map<String, String> params = Map.of("memberId", user.getId().toString());
+      ResponseEntity<RestPage<GroupOutputDTO>> response = performGetAll(params);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Should filter groups by multiple memberIds")
+    void shouldFilterGroupsByMultipleMemberIds() {
+      User user1 = createTestUser();
+      User user2 = createTestUser();
+
+      GroupInputDTO groupA = createValidInput();
+      groupA.setMemberIds(List.of(user1.getId()));
+      performCreate(groupA);
+
+      GroupInputDTO groupB = createValidInput();
+      groupB.setMemberIds(List.of(user2.getId()));
+      performCreate(groupB);
+
+      // Create a group without either member
+      performCreate(createValidInput());
+
+      Map<String, String> params = Map.of("memberId", user1.getId() + "," + user2.getId());
+      ResponseEntity<RestPage<GroupOutputDTO>> response = performGetAll(params);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getTotalElements()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Should return empty result when filtering by non-existent memberId")
+    void shouldReturnEmptyForNonExistentMemberId() {
+      performCreate(createValidInput());
+
+      Map<String, String> params = Map.of("memberId", UUID.randomUUID().toString());
+      ResponseEntity<RestPage<GroupOutputDTO>> response = performGetAll(params);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getTotalElements()).isZero();
     }
   }
 

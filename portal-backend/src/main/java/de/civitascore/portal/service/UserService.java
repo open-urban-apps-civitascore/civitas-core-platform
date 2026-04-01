@@ -10,7 +10,6 @@ import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;

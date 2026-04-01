@@ -9,6 +9,7 @@ import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.service.event.BaseEventPublishingIntegrationTest;
+import jakarta.transaction.Transactional;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
@@ -67,6 +68,7 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
   }
 
   @Test
+  @Transactional
   @DisplayName("Should sync user to Keycloak and persist externalId automatically")
   void shouldSyncUserAndSetExternalId() {
     userInitializer.initialize();
@@ -84,10 +86,7 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
     assertThat(keycloakUser.getRequiredActions()).contains("VERIFY_EMAIL", "UPDATE_PASSWORD");
 
     Group group = groupRepository.findByName(TEST_GROUP_NAME).orElseThrow();
-    List<Group> groupsWithMembers = groupRepository.findAllByIdWithMembers(List.of(group.getId()));
-    assertThat(groupsWithMembers.get(0).getMembers())
-        .extracting("email")
-        .containsExactly(TEST_EMAIL);
+    assertThat(group.getMembers()).extracting("email").containsExactly(TEST_EMAIL);
   }
 
   @Test
