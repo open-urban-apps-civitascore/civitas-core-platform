@@ -39,7 +39,7 @@ By contributing code, you agree to fulfill certain technical responsibilities:
 
 
 ## Project Structure
-* The project is divided into [the core platform](https://gitlab.com/civitas-connect/civitas.core/civitas-core), [the documentation](https://gitlab.com/civitas-connect/civitas.core/documentation) and various repositories that are used by the platform repository.
+* The project is divided into [the core platform](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform), [the documentation](https://gitlab.com/civitas-connect/civitas.core/documentation), the [the deployment](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-deployment) and various other repositories that are used by the platform repository.
 * The **core platform** repository contains everything needed to set up the platform.
 * Within the **documentation** repository you can find extensive documentation about deployment, administration and usage of the platform.
 
