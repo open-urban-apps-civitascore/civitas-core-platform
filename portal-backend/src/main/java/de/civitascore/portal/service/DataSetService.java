@@ -11,6 +11,7 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.HashSet;
 import java.util.Optional;
@@ -115,6 +116,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * @param input the update input
    * @return the updated dataset
    * @throws InvalidInputException if trying to update a DRAFT dataset
+   * @throws ResourceInUseException if a saga is in-flight for this dataset
    */
   @Transactional
   public DataSet updatePublishedMeta(UUID id, DataSetInputDTO input) {
@@ -124,6 +126,14 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           "dataSetStatus",
           id,
           "This endpoint requires a published dataset (READY or AVAILABLE), current status: DRAFT");
+    }
+
+    if (existingEntity.getPendingSagaType() != null) {
+      throw new ResourceInUseException(
+          "DataSet",
+          id,
+          "Cannot update metadata while a saga is in-flight: "
+              + existingEntity.getPendingSagaType());
     }
 
     Set<Pipeline> previousPipelines = new HashSet<>(existingEntity.getPipelines());
@@ -249,7 +259,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    *
    * @param id the dataset ID
    * @return the dataset with pending DELETE saga
-   * @throws InvalidInputException if dataset is not AVAILABLE or has a saga in-flight
+   * @throws InvalidInputException if dataset is not AVAILABLE
+   * @throws ResourceInUseException if a saga is already in-flight
    */
   @Transactional
   public DataSet unrelease(UUID id) {
@@ -261,8 +272,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     if (dataSet.getPendingSagaType() != null) {
-      throw new InvalidInputException(
-          "pendingSagaType",
+      throw new ResourceInUseException(
+          "DataSet",
           id,
           "Cannot unrelease while a saga is in-flight: " + dataSet.getPendingSagaType());
     }

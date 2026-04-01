@@ -17,8 +17,8 @@ params:path {
 tests {
   test("Unreleased or precondition not met", function() {
     const status = res.getStatus();
-    // 202=delete saga triggered, 400=not in AVAILABLE state
-    expect(status === 202 || status === 400).to.be.true;
+    // 202=delete saga triggered, 400=not in AVAILABLE state, 409=saga in-flight
+    expect(status === 202 || status === 400 || status === 409).to.be.true;
   });
 }
 

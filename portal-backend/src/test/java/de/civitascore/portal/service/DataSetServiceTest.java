@@ -15,8 +15,10 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.HashSet;
 import java.util.List;
@@ -202,7 +204,7 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("throws when saga already in-flight")
+    @DisplayName("throws ResourceInUseException when saga already in-flight")
     void throwsWhenSagaInFlight() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
@@ -210,7 +212,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().unrelease(id))
-          .isInstanceOf(InvalidInputException.class)
+          .isInstanceOf(ResourceInUseException.class)
           .hasMessageContaining("saga is in-flight");
     }
 
@@ -227,6 +229,78 @@ class DataSetServiceTest {
 
       assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.DELETE);
       verify(sagaPublisher).publishDeleteRequested(result);
+    }
+  }
+
+  @Nested
+  @DisplayName("updatePublishedMeta()")
+  class UpdatePublishedMetaTests {
+
+    @Test
+    @DisplayName("throws ResourceInUseException when CREATE saga is in-flight")
+    void throwsWhenCreateSagaInFlight() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+
+      assertThatThrownBy(() -> createService().updatePublishedMeta(id, input))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("saga is in-flight")
+          .hasMessageContaining("CREATE");
+    }
+
+    @Test
+    @DisplayName("throws ResourceInUseException when UPDATE saga is in-flight")
+    void throwsWhenUpdateSagaInFlight() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+
+      assertThatThrownBy(() -> createService().updatePublishedMeta(id, input))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("saga is in-flight")
+          .hasMessageContaining("UPDATE");
+    }
+
+    @Test
+    @DisplayName("throws ResourceInUseException when DELETE saga is in-flight")
+    void throwsWhenDeleteSagaInFlight() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+
+      assertThatThrownBy(() -> createService().updatePublishedMeta(id, input))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("saga is in-flight")
+          .hasMessageContaining("DELETE");
+    }
+
+    @Test
+    @DisplayName("allows update when no saga is pending")
+    void allowsUpdateWhenNoSagaPending() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+
+      DataSet result = createService().updatePublishedMeta(id, input);
+      assertThat(result).isNotNull();
+      verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
     }
   }
 
