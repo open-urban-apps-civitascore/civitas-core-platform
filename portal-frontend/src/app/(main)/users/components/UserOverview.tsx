@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -22,7 +22,6 @@ import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { PERMISSION_NAMES } from '@/types/currentUser'
-import { Group } from '@/types/groups'
 import { User, UserFormData, UserFormSchema, UserTab } from '@/types/users'
 import { isEmailConflictError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
@@ -31,6 +30,7 @@ import { mapUserToFormData } from '@/utils/users'
 
 import { UserBasicInfoTab } from './basic-info-tab/UserBasicInfoTab'
 import { GroupsTab } from './groups-tab/GroupsTab'
+import { useGroupMembership } from './hooks/useGroupMembership'
 import { RolesTab } from './roles-tab/RolesTab'
 
 const tabValues: Record<UserTab, Tab<UserTab>> = {
@@ -69,7 +69,7 @@ export const UserOverview = (props: UserOverviewProps) => {
   const { handleFormValidationError } = useError()
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
-  const [isSavingGroups, setIsSavingGroups] = useState(false)
+  const { saveGroupMemberships, isSavingGroups } = useGroupMembership(defaultUserData)
   const isLoading = createUser.isPending || updateUser.isPending || isSavingGroups
   const { setSubTabValueParam, subTabValue } = useQueryParams()
   const { handleUserEmailError } = useError()
@@ -125,78 +125,6 @@ export const UserOverview = (props: UserOverviewProps) => {
     form.setValue('groupIds', currentGroups, { shouldDirty: true })
   }
 
-  const getCachedGroupMembers = useCallback(
-    (groupId: string): string[] => {
-      const queries = queryClient.getQueriesData<{ data: Group[] }>({ queryKey: ['groups'] })
-      for (const [, data] of queries) {
-        const group = data?.data?.find(g => g.id === groupId)
-        if (group) return group.members?.map(m => m.id) || []
-      }
-      return []
-    },
-    [queryClient],
-  )
-
-  const saveGroupMemberships = useCallback(
-    async (userId: string) => {
-      const originalGroupIds = defaultUserData?.groups?.map(g => g.id) || []
-      const currentGroupIds = form.getValues('groupIds')
-
-      const addedGroupIds = currentGroupIds.filter(id => !originalGroupIds.includes(id))
-      const removedGroupIds = originalGroupIds.filter(id => !currentGroupIds.includes(id))
-
-      if (addedGroupIds.length === 0 && removedGroupIds.length === 0) return
-
-      setIsSavingGroups(true)
-      try {
-        const groupPatches: Promise<unknown>[] = []
-
-        // For groups missing from cache, fetch them on demand
-        const getMemberIds = async (groupId: string) => {
-          const cached = getCachedGroupMembers(groupId)
-          if (cached.length > 0) return cached
-          const { data } = await apiRequest<Group>({
-            endpoint: `/groups/${groupId}`,
-            method: 'GET',
-            headers: { 'x-api-request': 'true' },
-          })
-          return data.members?.map(m => m.id) || []
-        }
-
-        for (const groupId of removedGroupIds) {
-          const memberIds = await getMemberIds(groupId)
-          groupPatches.push(
-            apiRequest({
-              endpoint: `/groups/${groupId}`,
-              method: 'PATCH',
-              headers: { 'x-api-request': 'true' },
-              data: { memberIds: memberIds.filter(id => id !== userId) },
-            }),
-          )
-        }
-
-        for (const groupId of addedGroupIds) {
-          const memberIds = await getMemberIds(groupId)
-          if (!memberIds.includes(userId)) {
-            groupPatches.push(
-              apiRequest({
-                endpoint: `/groups/${groupId}`,
-                method: 'PATCH',
-                headers: { 'x-api-request': 'true' },
-                data: { memberIds: [...memberIds, userId] },
-              }),
-            )
-          }
-        }
-
-        await Promise.all(groupPatches)
-      } finally {
-        setIsSavingGroups(false)
-      }
-    },
-    [defaultUserData, form, getCachedGroupMembers],
-  )
-
   const handleExit = () => {
     if (isCreateMode) {
       router.push('/users')
@@ -245,7 +173,7 @@ export const UserOverview = (props: UserOverviewProps) => {
     try {
       // Save group membership changes via PATCH /groups/{id}
       if (hasGroupChanges && canUpdateGroups) {
-        await saveGroupMemberships(parsed.id)
+        await saveGroupMemberships(parsed.id, form.getValues('groupIds'))
       }
 
       // Save user field changes via PATCH /users/{id}
