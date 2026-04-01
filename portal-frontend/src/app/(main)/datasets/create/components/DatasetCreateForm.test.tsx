@@ -1,12 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { InternalAxiosRequestConfig } from 'axios'
 import { AxiosError } from 'axios'
 import { vi } from 'vitest'
 
 import { DatasetCreateForm } from './DatasetCreateForm'
 
 const mockPush = vi.fn()
-const mockMutate = vi.fn()
+const mockMutateAsync = vi.fn()
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
@@ -22,7 +23,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   useCreateDataset: () => ({
-    mutate: mockMutate,
+    mutateAsync: mockMutateAsync,
     isPending: false,
   }),
 }))
@@ -39,6 +40,7 @@ const setup = () => {
 describe('DatasetCreateForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockMutateAsync.mockResolvedValue({ data: { id: 'test-id-123' } })
   })
 
   test('renders the form with correct elements', () => {
@@ -89,20 +91,15 @@ describe('DatasetCreateForm', () => {
     fireEvent.click(submitButton)
 
     await waitFor(() => {
-      expect(mockMutate).toHaveBeenCalledWith(
+      expect(mockMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'Test Dataset',
         }),
-        expect.any(Object),
       )
     })
   })
 
   test('navigates to dataset overview on successful creation', async () => {
-    mockMutate.mockImplementation((data, options) => {
-      options.onSuccess({ data: { id: 'test-id-123' } })
-    })
-
     setup()
     const nameInput = screen.getByTestId('nameTextField')
     fireEvent.change(nameInput, { target: { value: 'Test Dataset' } })
@@ -126,17 +123,16 @@ describe('DatasetCreateForm', () => {
   })
 
   test('shows error toast if dataset name already exists', async () => {
-    mockMutate.mockImplementation((_data, options) => {
-      options?.onError?.({
-        status: 409,
-        response: {
-          status: 409,
-          data: {
-            detail: 'Datasource with name "Test Datasource" already exists',
-          },
-        },
-      } as AxiosError)
+    const conflictError = new AxiosError('Conflict', 'ERR_BAD_REQUEST', {} as InternalAxiosRequestConfig, undefined, {
+      status: 409,
+      statusText: 'Conflict',
+      headers: {},
+      config: {} as InternalAxiosRequestConfig,
+      data: {
+        detail: 'Dataset with name "Test Dataset" already exists',
+      },
     })
+    mockMutateAsync.mockRejectedValueOnce(conflictError)
 
     setup()
     const nameInput = screen.getByTestId('nameTextField')

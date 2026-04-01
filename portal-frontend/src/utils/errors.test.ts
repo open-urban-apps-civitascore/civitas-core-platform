@@ -1,18 +1,32 @@
-import { AxiosError } from 'axios'
+import { AxiosError, AxiosHeaders, InternalAxiosRequestConfig } from 'axios'
 import { describe, expect, it } from 'vitest'
 
 import { isNameConflictError, isPermissionsError } from './errors'
 
 const getError = (status: number, detail?: string) => {
-  return {
-    status: status,
-    response: {
-      status: status,
+  return new AxiosError(
+    'request failed',
+    undefined,
+    {
+      headers: new AxiosHeaders(),
+      method: 'GET',
+      url: '/test',
+    } as InternalAxiosRequestConfig,
+    undefined,
+    {
+      status,
+      statusText: '',
+      headers: new AxiosHeaders(),
+      config: {
+        headers: new AxiosHeaders(),
+        method: 'GET',
+        url: '/test',
+      } as InternalAxiosRequestConfig,
       data: {
         detail,
       },
     },
-  } as AxiosError
+  )
 }
 
 describe('isNameConflictError', () => {
@@ -24,15 +38,7 @@ describe('isNameConflictError', () => {
   })
 
   it('returns false for non-409 status codes', () => {
-    const error = {
-      status: 400,
-      response: {
-        status: 400,
-        data: {
-          detail: 'Datasource with name "Test" already exists',
-        },
-      },
-    } as AxiosError
+    const error = getError(400, 'Datasource with name "Test" already exists')
 
     expect(isNameConflictError(error)).toBe(false)
   })

@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { FormEvent } from 'react'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
@@ -12,6 +13,7 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
+import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
 
 import { useDatastructureCreation } from '../../[datastructureId]/hooks/useDatastructureCreation'
@@ -25,13 +27,34 @@ export const DatastructureCreateForm = () => {
 
   const { form, isLoading, saveDatastructure } = useDatastructureCreation()
 
-  const handleCreateDatastructure = async () => {
+  const handleCreateDatastructure = async (): Promise<boolean> => {
     const response = await saveDatastructure()
-    if (response) router.push(`/datastructures/${response?.id}?mode=edit`)
+    if (!response) return false
+
+    router.push(`/datastructures/${response.id}?mode=edit`)
+    return true
   }
+
+  const handleSave = async (): Promise<boolean> => {
+    let isSaved = false
+
+    await form.handleSubmit(async () => {
+      isSaved = await handleCreateDatastructure()
+    })()
+
+    return isSaved
+  }
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    void handleSave()
+  }
+
   const handleCancel = () => {
     router.push(`/datastructures?${searchParams.toString()}`)
   }
+
+  useRegisterUnsavedChanges(form.formState.isDirty, handleSave)
 
   return (
     <PageContainer testId="createDatastructurePage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
@@ -53,9 +76,9 @@ export const DatastructureCreateForm = () => {
             </Button>
             <Button
               data-testid="submitButton"
-              type="button"
-              onClick={form.handleSubmit(handleCreateDatastructure)}
+              type="submit"
               disabled={!form.formState.isDirty || isLoading}
+              form="datastructure-create-form"
             >
               {tCommon('actions.saveAndContinue')}
             </Button>
@@ -66,9 +89,10 @@ export const DatastructureCreateForm = () => {
         <ContentCard className={cn('h-full overflow-auto')}>
           <Form {...form}>
             <form
+              id="datastructure-create-form"
               data-testid="datastructureCreateForm"
               aria-label={`${tCommon('form')} ${t('create.basicInfo.title')}`}
-              onSubmit={form.handleSubmit(handleCreateDatastructure)}
+              onSubmit={handleSubmit}
               className={cn('max-w-300 flex flex-col gap-2 pt-2')}
             >
               <DetailsFieldContainer className="pt-0 border-b-0">

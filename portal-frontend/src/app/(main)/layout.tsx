@@ -5,6 +5,7 @@ import { AppHeader } from '@/components/appHeader/AppHeader'
 import { AppSidebar } from '@/components/appSidebar/AppSidebar'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
+import { UnsavedChangesProvider } from '@/contexts/unsaved-changes/UnsavedChangesProvider'
 import { AuthError } from '@/lib/serverFetch'
 import { CurrentUser } from '@/types/currentUser'
 
@@ -30,21 +31,23 @@ const MainLayout = async (props: MainLayoutProps) => {
   return (
     <SidebarProvider>
       <HydrationBoundary state={dehydrate(queryClient)}>
-        <AppSidebar currentUser={currentUser} />
-        <SidebarInset className="h-svh  w-[calc(100%-var(--sidebar-width))] [--header-height:calc(--spacing(13))] [--layout-padding:calc(--spacing(6))] overflow-hidden">
-          <AppHeader />
-          <div className="h-[calc(100%-var(--header-height))] [--title-height:calc(--spacing(30))] [--page-padding:calc(--spacing(4))]">
-            {children}
-          </div>
-          <Toaster
-            toastOptions={{
-              classNames: {
-                toast: 'toast-default',
-                error: 'toast-error',
-              },
-            }}
-          />
-        </SidebarInset>
+        <UnsavedChangesProvider>
+          <AppSidebar currentUser={currentUser} />
+          <SidebarInset className="h-svh  w-[calc(100%-var(--sidebar-width))] [--header-height:calc(--spacing(13))] [--layout-padding:calc(--spacing(6))] overflow-hidden">
+            <AppHeader />
+            <div className="h-[calc(100%-var(--header-height))] [--title-height:calc(--spacing(30))] [--page-padding:calc(--spacing(4))]">
+              {children}
+            </div>
+            <Toaster
+              toastOptions={{
+                classNames: {
+                  toast: 'toast-default',
+                  error: 'toast-error',
+                },
+              }}
+            />
+          </SidebarInset>
+        </UnsavedChangesProvider>
       </HydrationBoundary>
     </SidebarProvider>
   )

@@ -17,6 +17,7 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { useError } from '@/hooks/use-error'
+import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
 import { DatasetCreateFormData, DatasetCreateFormSchema } from '@/types/datasets'
 import { isNameConflictError } from '@/utils/errors'
@@ -40,26 +41,41 @@ export const DatasetCreateForm = () => {
 
   const { handleFormValidationError, handleNameError } = useError()
 
-  const handleCreateDataset = async (formData: DatasetCreateFormData) => {
-    createDataset.mutate(
-      {
+  const handleCreateDataset = async (formData: DatasetCreateFormData): Promise<boolean> => {
+    try {
+      const { data } = await createDataset.mutateAsync({
         name: formData.name,
-      },
-      {
-        onSuccess: ({ data }) => {
-          toast.success(t('messages.createSuccess'))
-          router.push(`/datasets/${data.id}?mode=edit`)
-        },
-        onError: error => {
-          if (isNameConflictError(error)) {
-            handleNameError(form, form.getValues('name'))
-          } else {
-            toast.error(tCommon('errors.unexpectedError'))
-          }
-        },
-      },
-    )
+      })
+      toast.success(t('messages.createSuccess'))
+      router.push(`/datasets/${data.id}?mode=edit`)
+      return true
+    } catch (error) {
+      if (isNameConflictError(error)) {
+        handleNameError(form, form.getValues('name'))
+      } else {
+        toast.error(tCommon('errors.unexpectedError'))
+      }
+      return false
+    }
   }
+
+  const handleSave = async (): Promise<boolean> => {
+    let isSaved = false
+
+    await form.handleSubmit(
+      async formData => {
+        isSaved = await handleCreateDataset(formData)
+      },
+      errors => {
+        handleFormValidationError(errors)
+        isSaved = false
+      },
+    )()
+
+    return isSaved
+  }
+
+  useRegisterUnsavedChanges(form.formState.isDirty, handleSave)
 
   const handleCancel = () => {
     router.push(`/datasets?${searchParams.toString()}`)
@@ -87,7 +103,10 @@ export const DatasetCreateForm = () => {
               id="dataset-create-form"
               data-testid="datasetCreateForm"
               aria-label={`${tCommon('form')} ${t('create.title')}`}
-              onSubmit={form.handleSubmit(handleCreateDataset, handleFormValidationError)}
+              onSubmit={e => {
+                e.preventDefault()
+                void handleSave()
+              }}
               className={cn('max-w-300 flex flex-col gap-2 pt-2')}
             >
               <DetailsFieldContainer className="pt-0 border-b-0">

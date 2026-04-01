@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { useError } from '@/hooks/use-error'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { User, UserFormData, UserFormSchema, UserTab } from '@/types/users'
 import { isEmailConflictError } from '@/utils/errors'
@@ -133,30 +134,27 @@ export const UserOverview = (props: UserOverviewProps) => {
     else handleExit()
   }
 
-  const handleCreateUser = async (formData: UserFormData) => {
+  const handleCreateUser = async (formData: UserFormData): Promise<boolean> => {
     const parsed = UserFormSchema.parse(formData)
     const mappedData = { ...parsed, groups: defaultUserData?.groups || [] }
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createUserData } = mappedData
-    createUser.mutate(
-      { ...createUserData, phone: createUserData.phone || null },
-      {
-        onSuccess: ({ data }) => {
-          toast.success(t('messages.createSuccess'))
-          router.push(`/users/${data.id}?mode=edit`)
-        },
-        onError: error => {
-          if (isEmailConflictError(error)) {
-            handleUserEmailError(form, parsed.email)
-          } else {
-            toast.error(t('errors.creationError'))
-          }
-        },
-      },
-    )
+    try {
+      const { data } = await createUser.mutateAsync({ ...createUserData, phone: createUserData.phone || null })
+      toast.success(t('messages.createSuccess'))
+      router.push(`/users/${data.id}?mode=edit`)
+      return true
+    } catch (error) {
+      if (isEmailConflictError(error)) {
+        handleUserEmailError(form, parsed.email)
+      } else {
+        toast.error(t('errors.creationError'))
+      }
+      return false
+    }
   }
 
-  const handleUpdateUser = async (formData: UserFormData) => {
+  const handleUpdateUser = async (formData: UserFormData): Promise<boolean> => {
     const parsed = UserFormSchema.parse(formData)
     const dirtyFields = form.formState.dirtyFields
     const fieldsToUpdate = pickDirtyValues(parsed, dirtyFields)
@@ -164,30 +162,41 @@ export const UserOverview = (props: UserOverviewProps) => {
       ...fieldsToUpdate,
       phone: !parsed.phone && dirtyFields.phone ? null : fieldsToUpdate.phone,
     }
-    updateUser.mutate(
-      { ...updateData, id: parsed.id },
-      {
-        onSuccess: ({ data }) => {
-          ;[['groups']].forEach(queryKey => queryClient.invalidateQueries({ queryKey }))
-          setDefaultUserData(data)
-          if (isExitModalOpen) setIsExitModalOpen(false)
-          router.refresh()
-          toast.success(t('messages.updateSuccess'))
-        },
-        onError: error => {
-          if (isEmailConflictError(error)) {
-            handleUserEmailError(form, parsed.email)
-          } else {
-            toast.error(t('errors.updateError'))
-          }
-        },
-      },
-    )
+    try {
+      const { data } = await updateUser.mutateAsync({ ...updateData, id: parsed.id })
+      ;[['groups']].forEach(queryKey => queryClient.invalidateQueries({ queryKey }))
+      setDefaultUserData(data)
+      if (isExitModalOpen) setIsExitModalOpen(false)
+      router.refresh()
+      toast.success(t('messages.updateSuccess'))
+      return true
+    } catch (error) {
+      if (isEmailConflictError(error)) {
+        handleUserEmailError(form, parsed.email)
+      } else {
+        toast.error(t('errors.updateError'))
+      }
+      return false
+    }
   }
 
-  const handleSave = isCreateMode
-    ? form.handleSubmit(handleCreateUser, handleFormValidationError)
-    : form.handleSubmit(handleUpdateUser, handleFormValidationError)
+  const handleSave = async () => {
+    let isSaved = false
+
+    await form.handleSubmit(
+      async formData => {
+        isSaved = isCreateMode ? await handleCreateUser(formData) : await handleUpdateUser(formData)
+      },
+      errors => {
+        handleFormValidationError(errors)
+        isSaved = false
+      },
+    )()
+
+    return isSaved
+  }
+
+  useRegisterUnsavedChanges(form.formState.isDirty, handleSave)
 
   const renderTabContent = () => {
     switch (subTabValue) {
@@ -218,7 +227,7 @@ export const UserOverview = (props: UserOverviewProps) => {
       onConfirmClick={handleSave}
       isConfirmButtonDisabled={isSaveButtonDisabled}
       isCancelButtonDisabled={isCancelButtonDisabled}
-      cancelButtonTitle={tCommon('actions.cancel')}
+      cancelButtonTitle={tCommon('actions.exit')}
       hasCard={false}
       className="px-6 py-0"
       wrapperClassname="w-auto"

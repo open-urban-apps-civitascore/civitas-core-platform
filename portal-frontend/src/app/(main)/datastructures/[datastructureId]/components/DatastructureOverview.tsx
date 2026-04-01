@@ -13,6 +13,7 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Form } from '@/components/ui/form'
 import { usePermissions } from '@/hooks/use-permissions'
+import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
   Datastructure,
@@ -57,6 +58,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(true)
+
   const [assignedGroups, setAssignedGroups] = useState<GroupRoleAssignmentTable[]>(initialAssignments)
 
   const {
@@ -76,13 +78,18 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     statusWatch,
   } = useDatastructure({ datastructure, assignedGroups, initialAssignments })
 
+  const hasUnsavedChanges = form.formState.isDirty || areAssignmentsDirty
+
   const handleSave = async () => {
     const isSaved = await saveDatastructure()
     if (isSaved) {
       setIsExitModalOpen(false)
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
     }
+    return isSaved
   }
+
+  useRegisterUnsavedChanges(hasUnsavedChanges, handleSave)
 
   const handleExit = () => {
     resetToInitialState()
@@ -92,7 +99,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   }
 
   const handleExitButtonClick = () => {
-    if (form.formState.isDirty || areAssignmentsDirty) setIsExitModalOpen(true)
+    if (hasUnsavedChanges) setIsExitModalOpen(true)
     else handleExit()
   }
 

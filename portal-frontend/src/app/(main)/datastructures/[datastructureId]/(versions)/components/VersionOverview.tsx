@@ -18,6 +18,7 @@ import { QUERY_PARAMS } from '@/const/searchParams'
 import { useError } from '@/hooks/use-error'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
   Datastructure,
@@ -131,12 +132,26 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     setCanSetAvailable(DatastructureVersionFormAvailableSchema.safeParse(formValues).success)
   }, [formValues])
 
-  const handleSave = form.handleSubmit(async () => {
-    const isSaved = await saveDatastructureVersion(datastructure.id)
-    if (isSaved) {
-      setIsExitModalOpen(false)
-    }
-  }, handleFormValidationError)
+  const handleSave = async () => {
+    let isSaved = false
+
+    await form.handleSubmit(
+      async () => {
+        isSaved = await saveDatastructureVersion(datastructure.id)
+        if (isSaved) {
+          setIsExitModalOpen(false)
+        }
+      },
+      errors => {
+        handleFormValidationError(errors)
+        isSaved = false
+      },
+    )()
+
+    return isSaved
+  }
+
+  useRegisterUnsavedChanges(hasUserChanges, handleSave)
 
   const handleExit = () => {
     resetToInitialState()

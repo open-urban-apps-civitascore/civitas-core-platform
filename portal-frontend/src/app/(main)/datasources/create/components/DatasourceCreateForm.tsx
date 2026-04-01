@@ -17,6 +17,7 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { useError } from '@/hooks/use-error'
+import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
 import { DatasourceCreateData, DatasourceCreateFormSchema } from '@/types/datasources'
 import { isNameConflictError } from '@/utils/errors'
@@ -27,7 +28,7 @@ export const DatasourceCreateForm = () => {
 
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { handleNameError } = useError()
+  const { handleFormValidationError, handleNameError } = useError()
 
   const createDatasource = useCreateDatasource()
   const isLoading = createDatasource.isPending
@@ -39,22 +40,37 @@ export const DatasourceCreateForm = () => {
     },
   })
 
-  const handleCreateDatasource = (formData: DatasourceCreateData) => {
-    createDatasource.mutate(
-      { name: formData.name! },
-      {
-        onSuccess: ({ data }) => {
-          toast.success(tCommon('messages.createSuccess', { item: tCommon('items.datasource') }))
-          router.push(`/datasources/${data.id}`)
-        },
-        onError: error => {
-          if (isNameConflictError(error)) {
-            handleNameError(form, formData.name)
-          } else toast.error(t('errors.creationError'))
-        },
-      },
-    )
+  const handleCreateDatasource = async (formData: DatasourceCreateData): Promise<boolean> => {
+    try {
+      const { data } = await createDatasource.mutateAsync({ name: formData.name! })
+      toast.success(tCommon('messages.createSuccess', { item: tCommon('items.datasource') }))
+      router.push(`/datasources/${data.id}`)
+      return true
+    } catch (error) {
+      if (isNameConflictError(error)) {
+        handleNameError(form, formData.name)
+      } else toast.error(t('errors.creationError'))
+      return false
+    }
   }
+
+  const handleSave = async () => {
+    let isSaved = false
+
+    await form.handleSubmit(
+      async formData => {
+        isSaved = await handleCreateDatasource(formData)
+      },
+      errors => {
+        handleFormValidationError(errors)
+        isSaved = false
+      },
+    )()
+
+    return isSaved
+  }
+
+  useRegisterUnsavedChanges(form.formState.isDirty, handleSave)
 
   const handleCancel = () => {
     router.push(`/datasources?${searchParams.toString()}`)
@@ -81,7 +97,7 @@ export const DatasourceCreateForm = () => {
             <Button
               data-testid="submitButton"
               type="button"
-              onClick={form.handleSubmit(handleCreateDatasource)}
+              onClick={handleSave}
               disabled={!form.formState.isDirty || isLoading}
             >
               {tCommon('actions.saveAndContinue')}
@@ -95,7 +111,10 @@ export const DatasourceCreateForm = () => {
             <form
               data-testid="datasourceCreateForm"
               aria-label={`${tCommon('form')} ${t('create.basicInfo.title')}`}
-              onSubmit={form.handleSubmit(handleCreateDatasource)}
+              onSubmit={e => {
+                e.preventDefault()
+                void handleSave()
+              }}
               className={cn('max-w-300 flex flex-col gap-2 pt-2')}
             >
               <DetailsFieldContainer className="pt-0 border-b-0">
