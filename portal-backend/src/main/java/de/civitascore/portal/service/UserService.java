@@ -95,7 +95,7 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
       user.setGroups(new HashSet<>(groups));
     }
 
-    return getRepository().save(user);
+    return save(user);
   }
 
   @Override
