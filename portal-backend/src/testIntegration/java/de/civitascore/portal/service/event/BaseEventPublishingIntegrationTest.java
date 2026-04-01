@@ -86,6 +86,7 @@ public abstract class BaseEventPublishingIntegrationTest extends BaseKeycloakInt
         realm.setRealm("civitas-core");
         realm.setEnabled(true);
         realm.setDisplayName("Civitas Core Test Realm");
+        realm.setEditUsernameAllowed(true);
         keycloakAdminClient.realms().create(realm);
         log.info("civitas-core realm created successfully");
       }

@@ -38,7 +38,8 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
   public T create(I input) {
     I preProcessedInput = preProcessCreateInput(input);
     T entity = getMapper().toEntity(preProcessedInput);
-    return publishToExternalSystemAndSave(preProcessedInput, entity, "create");
+    ConfigValue preSaveConfigValue = toConfigValuePreSave(entity, preProcessedInput);
+    return publishToExternalSystemAndSave(preProcessedInput, entity, "create", preSaveConfigValue);
   }
 
   @Override
@@ -46,11 +47,13 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
   public T update(UUID id, I input) {
     T entity = findByIdOrThrow(id);
     I preProcessedInput = preProcessUpdateInput(input, entity);
+    ConfigValue preSaveConfigValue = toConfigValuePreSave(entity, preProcessedInput);
     getMapper().updateEntity(entity, preProcessedInput);
-    return publishToExternalSystemAndSave(preProcessedInput, entity, "update");
+    return publishToExternalSystemAndSave(preProcessedInput, entity, "update", preSaveConfigValue);
   }
 
-  private T publishToExternalSystemAndSave(I preProcessedInput, T entity, String operation) {
+  private T publishToExternalSystemAndSave(
+      I preProcessedInput, T entity, String operation, ConfigValue preSaveConfigValue) {
     entity = postConvertToEntity(entity, preProcessedInput);
     entity = preSave(entity);
 
@@ -58,7 +61,8 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
 
     entity = prePublish(entity, preProcessedInput);
 
-    ConfigResultEvent result = preValidateWithExternalSystem(entity, operation);
+    ConfigResultEvent result =
+        preValidateWithExternalSystem(entity, preProcessedInput, operation, preSaveConfigValue);
 
     if (result != null && !Strings.isBlank(result.resourceId())) {
       updateExternalId(entity, result.resourceId());
@@ -73,7 +77,7 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
   public void deleteById(UUID id) {
     T entity = findByIdOrThrow(id);
 
-    preValidateWithExternalSystem(entity, "delete");
+    preValidateWithExternalSystem(entity, null, "delete", null);
 
     getRepository().deleteById(id);
 
@@ -85,19 +89,23 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
    * adapter responds or a timeout is reached.
    *
    * @param entity the entity to publish
+   * @param input the entity extending {@link BaseInputDTO} that has been used for the modification
    * @param operation the operation name ("create", "update", or "delete")
+   * @param preSaveConfigValue nullable {@link ConfigValue} that has been passed from {@link
+   *     #toConfigValuePreSave(Object, BaseInputDTO)}
    * @return the config adapter result, or {@code null} if no publisher is configured
    * @throws ExternalSystemRejectionException if the config adapter rejects the operation
    * @throws ExternalSystemTimeoutException if the config adapter does not respond in time
    */
-  protected ConfigResultEvent preValidateWithExternalSystem(T entity, String operation) {
+  protected ConfigResultEvent preValidateWithExternalSystem(
+      T entity, I input, String operation, ConfigValue preSaveConfigValue) {
     try {
       Topics topic = resolveTopic(operation);
       String targetComponent = getTargetComponent();
       String targetResource = getRealm(entity);
       Operation configOperation = resolveOperation(operation);
       String configPath = getConfigPath();
-      ConfigValue configValue = toConfigValue(entity);
+      ConfigValue configValue = toConfigValuePostSave(entity, input, preSaveConfigValue);
 
       CompletableFuture<ConfigResultEvent> futureResult =
           configEventPublisher.publishConfigEvent(
@@ -168,12 +176,25 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
   protected abstract String getConfigPath();
 
   /**
-   * Converts the entity into a {@link ConfigValue} for the config event payload.
-   *
-   * @param entity the entity to convert
-   * @return the config value representation
+   * Optional pre-save hook, called during updates before the entity is mutated by the mapper.
+   * Receives the entity in its current (old) state and the incoming input. The returned value is
+   * passed as {@code preSaveConfigValue} to {@link #toConfigValuePostSave} to enable
+   * change-detection (e.g. detecting an email address change). Default returns {@code null}.
    */
-  protected abstract ConfigValue toConfigValue(T entity);
+  protected ConfigValue toConfigValuePreSave(T entity, I input) {
+    return null;
+  }
+
+  /**
+   * Builds the {@link ConfigValue} to sync to the external system after save and prePublish.
+   *
+   * @param entity the entity in its post-save state
+   * @param input the input DTO ({@code null} for delete operations)
+   * @param preSaveConfigValue value returned by {@link #toConfigValuePreSave} ({@code null} for
+   *     create/delete operations, or when the pre-save hook returns {@code null})
+   */
+  protected abstract ConfigValue toConfigValuePostSave(
+      T entity, I input, ConfigValue preSaveConfigValue);
 
   /**
    * Extracts the entity ID, used for correlation in config adapter events.
