@@ -3,6 +3,7 @@ package de.civitascore.portal.model.output;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.output.summary.PermissionSummaryDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -21,7 +22,7 @@ public class RoleOutputDTO extends BaseOutputDTO {
   @Schema(example = "DATA")
   private RoleType roleType;
 
-  private List<PermissionSummaryDTO> permissions;
+  private List<PermissionSummaryDTO> permissions = new ArrayList<>();
 
   @Schema(description = "Whether this role can be modified, defaults to false", example = "false")
   private Boolean readonly;

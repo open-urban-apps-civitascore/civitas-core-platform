@@ -2,6 +2,7 @@ package de.civitascore.portal.model.output;
 
 import de.civitascore.portal.model.output.summary.UserSummaryDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -20,7 +21,7 @@ public class GroupOutputDTO extends BaseOutputDTO {
   @Schema(description = "Primary contact user for this group")
   private UserSummaryDTO contactUser;
 
-  private List<UserSummaryDTO> members;
+  private List<UserSummaryDTO> members = new ArrayList<>();
 
-  private List<AssignmentOutputDTO> assignments;
+  private List<AssignmentOutputDTO> assignments = new ArrayList<>();
 }

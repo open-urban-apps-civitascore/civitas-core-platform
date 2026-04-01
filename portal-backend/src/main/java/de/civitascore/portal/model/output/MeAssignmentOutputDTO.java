@@ -2,6 +2,7 @@ package de.civitascore.portal.model.output;
 
 import de.civitascore.portal.model.embedded.ScopeType;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import lombok.Data;
@@ -22,5 +23,5 @@ public class MeAssignmentOutputDTO {
   @Schema(
       description = "Effective permissions granted by this assignment",
       example = "[\"DATASET_READ\", \"DATASET_CREATE\"]")
-  private Set<String> permissions;
+  private Set<String> permissions = new HashSet<>();
 }

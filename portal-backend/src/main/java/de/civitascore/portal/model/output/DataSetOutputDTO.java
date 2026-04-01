@@ -6,6 +6,7 @@ import de.civitascore.portal.model.output.summary.DistributionSummaryDTO;
 import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
 import de.civitascore.portal.model.output.summary.UserSummaryDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -30,9 +31,9 @@ public class DataSetOutputDTO extends BaseOutputDTO {
   @Schema(example = "1.0.0")
   private String version;
 
-  private List<PipelineSummaryDTO> pipelines;
+  private List<PipelineSummaryDTO> pipelines = new ArrayList<>();
 
-  private List<DistributionSummaryDTO> distributions;
+  private List<DistributionSummaryDTO> distributions = new ArrayList<>();
 
   @Schema(description = "Whether this dataset is publicly accessible")
   private Boolean openDataAccess;
