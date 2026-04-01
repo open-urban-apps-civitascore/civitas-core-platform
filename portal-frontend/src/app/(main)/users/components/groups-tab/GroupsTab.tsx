@@ -21,13 +21,14 @@ import GroupsTable from './GroupsTable'
 interface GroupsTabProps {
   userId: string
   formValues: UserFormData
+  originalGroupIds: string[]
   isReadOnly: boolean
   onAssignGroups: (groupIds: string[]) => void
   onRemoveGroup: (id: string) => void
 }
 
 export const GroupsTab = (props: GroupsTabProps) => {
-  const { userId, formValues, isReadOnly, onAssignGroups, onRemoveGroup } = props
+  const { userId, formValues, originalGroupIds, isReadOnly, onAssignGroups, onRemoveGroup } = props
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
   const tGroups = useTranslations('groups')
@@ -39,25 +40,39 @@ export const GroupsTab = (props: GroupsTabProps) => {
   const [groupToRemove, setGroupToRemove] = useState<string | null>(null)
   const [isWarningModalOpen, setIsWarningModalOpen] = useState(false)
 
-  // Primary query: server-side filter by member
-  const memberParams = useMemo(() => new URLSearchParams({ memberId: userId }), [userId])
+  // Build server-side pagination/sort/filter params
+  const memberParams = useMemo(() => {
+    const params = new URLSearchParams({ memberId: userId })
+    params.set('page', String(pageIndex))
+    params.set('size', String(pageSize))
+    if (sorting.length > 0) {
+      params.set('sort', `${sorting[0].id},${sorting[0].desc ? 'desc' : 'asc'}`)
+    }
+    if (searchString) {
+      params.set('name', searchString)
+    }
+    return params
+  }, [userId, pageIndex, pageSize, sorting, searchString])
+
   const {
     data: serverGroupsData,
     isFetching: isLoadingServerGroups,
-    isSuccess: hasServerGroupsLoaded,
     error: serverGroupsError,
   } = useGetGroups({ isEnabled: !!userId, params: memberParams })
 
-  // Derive original group IDs from server state
-  const serverGroupIds = useMemo(() => serverGroupsData?.data.map(g => g.id) || [], [serverGroupsData])
-
-  // Compute locally added group IDs (in form but not on server) — only after server data loaded
+  // Locally added groups: in form but not in the original saved state
   const addedGroupIds = useMemo(
-    () => (hasServerGroupsLoaded ? formValues.groupIds.filter(id => !serverGroupIds.includes(id)) : []),
-    [formValues.groupIds, serverGroupIds, hasServerGroupsLoaded],
+    () => formValues.groupIds.filter(id => !originalGroupIds.includes(id)),
+    [formValues.groupIds, originalGroupIds],
   )
 
-  // Secondary query: fetch locally-added groups that aren't on the server yet
+  // Locally removed groups: in original saved state but removed from form
+  const removedGroupIds = useMemo(
+    () => originalGroupIds.filter(id => !formValues.groupIds.includes(id)),
+    [originalGroupIds, formValues.groupIds],
+  )
+
+  // Fetch locally-added groups that aren't on the server yet
   const addedParams = useMemo(() => {
     const params = new URLSearchParams()
     addedGroupIds.forEach(id => params.append('id', id))
@@ -68,27 +83,15 @@ export const GroupsTab = (props: GroupsTabProps) => {
     params: addedParams,
   })
 
-  // Combine: server groups (minus removed) + added groups
+  // Combine: server page (minus locally removed) + locally added groups on top
   const groups = useMemo(() => {
-    const serverGroups = (serverGroupsData?.data || []).filter(g => formValues.groupIds.includes(g.id))
+    const serverGroups = (serverGroupsData?.data || []).filter(g => !removedGroupIds.includes(g.id))
     const addedGroups = (addedGroupsData?.data || []).filter(g => addedGroupIds.includes(g.id))
-    return mapGroupsApiToListData([...serverGroups, ...addedGroups])
-  }, [serverGroupsData, addedGroupsData, formValues.groupIds, addedGroupIds])
+    return mapGroupsApiToListData([...addedGroups, ...serverGroups])
+  }, [serverGroupsData, addedGroupsData, addedGroupIds, removedGroupIds])
 
-  const filteredGroups = useMemo(() => {
-    if (searchString) {
-      return groups.filter(
-        group =>
-          group.name.toLowerCase().includes(searchString.toLowerCase()) ||
-          group.contactUser?.name.toLowerCase().includes(searchString.toLowerCase()) ||
-          group.description.toLowerCase().includes(searchString.toLowerCase()),
-      )
-    } else {
-      return groups
-    }
-  }, [groups, searchString])
-
-  const rowCount = groups.length
+  const serverTotalElements = serverGroupsData?.totalElements || 0
+  const rowCount = serverTotalElements - removedGroupIds.length + addedGroupIds.length
   const totalPages = Math.ceil(rowCount / pageSize) || 1
 
   const isLoading = isLoadingServerGroups || isLoadingAddedGroups
@@ -122,7 +125,7 @@ export const GroupsTab = (props: GroupsTabProps) => {
             <SearchHeader searchString={searchString} onChangeSearchString={setSearchString} className="my-2" />
             <TableContainer className="[--search-height:calc(--spacing(30))]">
               <GroupsTable
-                groups={filteredGroups}
+                groups={groups}
                 rowCount={rowCount}
                 pageIndex={pageIndex}
                 pageSize={pageSize}

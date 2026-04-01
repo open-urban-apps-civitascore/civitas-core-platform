@@ -238,6 +238,7 @@ export const UserOverview = (props: UserOverviewProps) => {
           <GroupsTab
             userId={userData.id}
             formValues={watch}
+            originalGroupIds={defaultUserData?.groups?.map(g => g.id) || []}
             isReadOnly={isReadOnly || !canUpdateGroups}
             onAssignGroups={handleAssignGroups}
             onRemoveGroup={handleRemoveGroup}
