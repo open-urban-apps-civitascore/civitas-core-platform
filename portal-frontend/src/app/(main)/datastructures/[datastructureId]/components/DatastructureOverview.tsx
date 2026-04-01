@@ -95,13 +95,26 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     resetToInitialState,
     saveDatastructure,
     selectedTab,
+    canSetDraft,
     setSelectedTab,
+    statusHint,
     datastructureStatus,
   } = useDatastructure({ datastructure, assignedGroups, initialAssignments })
 
-  const hasUnsavedChanges = form.formState.isDirty || areAssignmentsDirty
+  const hasUnsavedChanges = datastructureForm.formState.isDirty || areAssignmentsDirty
 
-  const handleSave = async () => {
+  const exitEditMode = () => {
+    resetToInitialState()
+    setAssignedGroups(initialAssignments)
+    updateMode(false)
+  }
+
+  const handleDiscardAndExit = () => {
+    exitEditMode()
+    setIsExitModalOpen(false)
+  }
+
+  const handleSave = async (): Promise<boolean> => {
     const isSaved = await saveDatastructure()
     if (isSaved) {
       setIsExitModalOpen(false)
@@ -111,29 +124,12 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     return isSaved
   }
 
-  useRegisterUnsavedChanges(hasUnsavedChanges, handleSave)
-
   const handleExit = () => {
-    if (datastructureForm.formState.isDirty || areAssignmentsDirty) {
-      setIsExitModalOpen(true)
-    } else {
-      resetToInitialState()
-      updateMode(false)
-      setAssignedGroups(initialAssignments)
-    }
+    if (datastructureForm.formState.isDirty || areAssignmentsDirty) setIsExitModalOpen(true)
+    else exitEditMode()
   }
 
-  const handleDiscardAndExit = () => {
-    setIsExitModalOpen(false)
-    updateMode(false)
-    resetToInitialState()
-    setAssignedGroups(initialAssignments)
-  }
-
-  const handleExitButtonClick = () => {
-    if (hasUnsavedChanges) setIsExitModalOpen(true)
-    else handleExit()
-  }
+  useRegisterUnsavedChanges(hasUnsavedChanges, handleSave)
 
   const renderTabContent = () => {
     switch (selectedTab) {
@@ -183,7 +179,6 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
             statusOptions={Object.values(DATASTRUCTURE_STATUS_TYPES)}
             canSetAvailable={canSetAvailable}
             canRelease={canRelease}
-            canRelease={canRelease}
             statusHint={statusHint}
             confirmButtonType="button"
             onConfirmClick={handleSave}
@@ -200,9 +195,9 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
             onEditClick={() => updateMode(true)}
             cancelButtonTitle={tCommon('actions.exit')}
             wrapperClassname="w-auto"
+            canSetDraft={canSetDraft}
           />
         }
-            canSetDraft={canSetDraft}
       />
       <PageBackground className="overflow-y-auto" hasBackground={!isReadOnly}>
         <Form {...datastructureForm}>
