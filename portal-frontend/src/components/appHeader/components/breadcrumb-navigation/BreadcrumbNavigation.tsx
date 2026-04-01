@@ -94,6 +94,9 @@ export const BreadcrumbNavigation = () => {
 
   const segments = pathname?.split('/').filter(Boolean) ?? []
 
+  // Skip intermediate container route segments that duplicate their child routes
+  const hiddenIntermediateSegments = ['data-flow']
+
   const breadcrumbs: Breadcrumb[] = segments.map((segment, index) => ({
     title: segment,
     href: `/${segments.slice(0, index + 1).join('/')}`,
@@ -104,11 +107,17 @@ export const BreadcrumbNavigation = () => {
 
   const results = useGetBredcrumbs(breadcrumbs)
 
-  const updatedBreadcrumbs = breadcrumbs.map((crumb, index) => {
-    const data = results[index]?.data?.data
-    const title = getTitle(crumb, data, t, isDatastructureVersionBreadcrumb(segments, index))
-    return { ...crumb, title }
-  })
+  const updatedBreadcrumbs = breadcrumbs
+    .map((crumb, index) => {
+      const data = results[index]?.data?.data
+      const title = getTitle(crumb, data, t, isDatastructureVersionBreadcrumb(segments, index))
+      return { ...crumb, title }
+    })
+    .filter((crumb, index) => {
+      const segment = segments[index]
+      return !hiddenIntermediateSegments.includes(segment) || crumb.isLast
+    })
+    .map((crumb, index, arr) => ({ ...crumb, isLast: index === arr.length - 1 }))
 
   const CustomBreadcrumbSeparator = () => (
     <BreadcrumbSeparator aria-hidden className="hidden md:block">
