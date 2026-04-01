@@ -116,6 +116,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * @param input the update input
    * @return the updated dataset
    * @throws InvalidInputException if trying to update a DRAFT dataset
+   * @throws ResourceInUseException if a saga is in-flight for this dataset
    */
   @Transactional
   public DataSet updatePublishedMeta(UUID id, DataSetInputDTO input) {
@@ -125,6 +126,14 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           "dataSetStatus",
           id,
           "This endpoint requires a published dataset (READY or AVAILABLE), current status: DRAFT");
+    }
+
+    if (existingEntity.getPendingSagaType() != null) {
+      throw new ResourceInUseException(
+          "DataSet",
+          id,
+          "Cannot update metadata while a saga is in-flight: "
+              + existingEntity.getPendingSagaType());
     }
 
     Set<Pipeline> previousPipelines = new HashSet<>(existingEntity.getPipelines());
