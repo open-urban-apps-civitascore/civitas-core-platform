@@ -119,11 +119,19 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
             .build();
 
     // Verify Keycloak credentials are valid by making a test API call.
-    validateKeycloakConnection();
+    try {
+      validateKeycloakConnection();
+    } catch (FatalAdapterException e) {
+      throw new IllegalStateException(e.getMessage(), e);
+    }
 
     this.invitationClientId = getAdapterProperty(INVITATION_CLIENT_ID_PROPERTY_KEY);
     this.invitationRedirectUri = getAdapterProperty(INVITATION_REDIRECT_URI_PROPERTY_KEY);
-    validateInvitationConfig();
+    try {
+      validateInvitationConfig();
+    } catch (FatalAdapterException e) {
+      throw new IllegalStateException(e.getMessage(), e);
+    }
 
     logger.info(
         "Keycloak adapter '{}' initialized for: {}",
@@ -145,17 +153,18 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
    * Validates that the Keycloak admin credentials are correct by making a test API call. Fails fast
    * at startup if the adapter cannot authenticate, rather than silently failing on every event.
    *
-   * @throws RuntimeException if the connection or authentication fails
+   * @throws FatalAdapterException if the connection or authentication fails
    */
-  private void validateKeycloakConnection() {
+  private void validateKeycloakConnection() throws FatalAdapterException {
     try {
       keycloakClient.serverInfo().getInfo();
       logger.info("Keycloak connection validated successfully");
     } catch (Exception e) {
-      throw new RuntimeException(
+      throw new FatalAdapterException(
+          AdapterErrorCode.CONFIGURATION_ERROR,
+          e,
           "Failed to connect to Keycloak or authenticate. "
-              + "Please verify the Keycloak URL and admin credentials are correct.",
-          e);
+              + "Please verify the Keycloak URL and admin credentials are correct.");
     }
   }
 
@@ -164,13 +173,14 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
    * invitation.client.id} and {@code invitation.redirect.uri} must be set together or neither
    * should be set.
    *
-   * @throws IllegalArgumentException if only one of the two properties is set
+   * @throws FatalAdapterException if only one of the two properties is set
    */
-  private void validateInvitationConfig() {
+  private void validateInvitationConfig() throws FatalAdapterException {
     boolean hasClientId = invitationClientId != null && !invitationClientId.isBlank();
     boolean hasRedirectUri = invitationRedirectUri != null && !invitationRedirectUri.isBlank();
     if (hasClientId != hasRedirectUri) {
-      throw new IllegalArgumentException(
+      throw new FatalAdapterException(
+          AdapterErrorCode.CONFIGURATION_ERROR,
           "Both 'keycloak.invitation.client.id' and 'keycloak.invitation.redirect.uri' "
               + "must be set together or neither should be set. "
               + "invitation.client.id="
