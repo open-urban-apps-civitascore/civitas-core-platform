@@ -65,7 +65,7 @@ export interface EntityNodeData extends BasePipelineNodeData {
   /** Type of entity this node references */
   entityType: EntityType
   /** ID of the selected entity */
-  entityId?: number | string
+  entityId?: string
   /** Display name of the selected entity */
   entityName?: string
   /** Additional metadata from the selected entity (read-only display) */

@@ -1037,6 +1037,14 @@
       "title": "Import",
       "fromPlatform": "from the platform",
       "fromFile": "from file"
+    },
+    "save": {
+      "success": "Model saved successfully",
+      "error": "Failed to save model. Please try again."
+    },
+    "export": {
+      "success": "Diagram exported successfully",
+      "error": "Failed to export diagram. Please try again."
     }
   }
 }
