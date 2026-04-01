@@ -323,6 +323,17 @@ describe('DataTable layout', () => {
     render(<TestWrapper hasCard={false} />)
     expect(screen.getByTestId('dataTableScrollArea')).not.toHaveClass('rounded-md border-1')
   })
+  it('uses max-h instead of fixed height when pagination is visible', () => {
+    render(<TestWrapper />)
+    const container = screen.getByTestId('dataTable')
+    expect(container).toHaveClass('max-h-full')
+    expect(container).not.toHaveClass('h-full')
+  })
+  it('does not set max-h-full when pagination is hidden', () => {
+    render(<TestWrapper isPaginationHidden />)
+    const container = screen.getByTestId('dataTable')
+    expect(container).not.toHaveClass('max-h-full')
+  })
 })
 
 describe('DataTable truncated cell tooltip', () => {
