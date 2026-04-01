@@ -115,9 +115,14 @@ final class DatasourceParser {
               + "' has no DSN and cannot build one (missing host, database, or username)");
     }
     String driver = DatasourceField.DRIVER.asString(cfg).orElse(DEFAULT_DRIVER);
+    String user = DatasourceField.USERNAME.asString(cfg).orElse(null);
+    Object password = DatasourceField.PASSWORD.asObject(cfg);
     String query = DatasourceField.QUERY.asString(cfg).orElse(null);
+    String table = DatasourceField.TABLE.asString(cfg).orElse(null);
+    List<String> columns = DatasourceField.COLUMNS.asList(cfg);
+    String where = DatasourceField.WHERE.asString(cfg).orElse(null);
 
-    return new ConnectorConfig.Sql(driver, dsn, query);
+    return new ConnectorConfig.Sql(driver, dsn, user, password, query, table, columns, where);
   }
 
   /**
