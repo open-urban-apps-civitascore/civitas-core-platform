@@ -163,8 +163,8 @@ CREATE TABLE groups
     parent_group_id UUID,
     CONSTRAINT pk_groups PRIMARY KEY (id),
     CONSTRAINT uk_group_name UNIQUE (name),
-    CONSTRAINT FK_GROUPS_ON_CONTACT_USER FOREIGN KEY (contact_user_id) REFERENCES users (id),
-    CONSTRAINT FK_GROUPS_ON_PARENT_GROUP FOREIGN KEY (parent_group_id) REFERENCES groups (id)
+    CONSTRAINT fk_groups_on_contact_user FOREIGN KEY (contact_user_id) REFERENCES users (id),
+    CONSTRAINT fk_groups_on_parent_group FOREIGN KEY (parent_group_id) REFERENCES groups (id)
 );
 
 CREATE INDEX idx_group_contact ON groups (contact_user_id);
@@ -184,8 +184,8 @@ CREATE TABLE data_spaces
     external_id         VARCHAR(255),
     CONSTRAINT pk_data_spaces PRIMARY KEY (id),
     CONSTRAINT uk_dataspace_name UNIQUE (name),
-    CONSTRAINT FK_DATA_SPACES_ON_OWNER_USER FOREIGN KEY (owner_user_id) REFERENCES users (id),
-    CONSTRAINT FK_DATA_SPACES_ON_PARENT_DATASPACE FOREIGN KEY (parent_dataspace_id) REFERENCES data_spaces (id)
+    CONSTRAINT fk_data_spaces_on_owner_user FOREIGN KEY (owner_user_id) REFERENCES users (id),
+    CONSTRAINT fk_data_spaces_on_parent_dataspace FOREIGN KEY (parent_dataspace_id) REFERENCES data_spaces (id)
 );
 
 CREATE INDEX idx_dataspace_owner ON data_spaces (owner_user_id);
@@ -218,8 +218,8 @@ CREATE TABLE datasets
     pending_saga_type VARCHAR(30),
     CONSTRAINT pk_datasets PRIMARY KEY (id),
     CONSTRAINT uk_dataset_name UNIQUE (name),
-    CONSTRAINT FK_DATASETS_ON_OWNER_USER FOREIGN KEY (owner_user_id) REFERENCES users (id),
-    CONSTRAINT FK_DATASETS_ON_DATASET_SERIES FOREIGN KEY (dataset_series_id) REFERENCES dataset_series (id)
+    CONSTRAINT fk_datasets_on_owner_user FOREIGN KEY (owner_user_id) REFERENCES users (id),
+    CONSTRAINT fk_datasets_on_dataset_series FOREIGN KEY (dataset_series_id) REFERENCES dataset_series (id)
 );
 
 CREATE INDEX idx_dataset_external_id ON datasets (external_id);
@@ -243,9 +243,9 @@ CREATE TABLE distributions
     format         VARCHAR(100),
     auto_generated BOOLEAN                     NOT NULL DEFAULT FALSE,
     CONSTRAINT pk_distributions PRIMARY KEY (id),
-    CONSTRAINT FK_DISTRIBUTIONS_ON_ACTIVITY FOREIGN KEY (activity_id) REFERENCES activities (id),
-    CONSTRAINT FK_DISTRIBUTIONS_ON_DATASET FOREIGN KEY (dataset_id) REFERENCES datasets (id),
-    CONSTRAINT FK_DISTRIBUTIONS_ON_RESOURCE FOREIGN KEY (resource_id) REFERENCES resources (id)
+    CONSTRAINT fk_distributions_on_activity FOREIGN KEY (activity_id) REFERENCES activities (id),
+    CONSTRAINT fk_distributions_on_dataset FOREIGN KEY (dataset_id) REFERENCES datasets (id),
+    CONSTRAINT fk_distributions_on_resource FOREIGN KEY (resource_id) REFERENCES resources (id)
 );
 
 CREATE INDEX idx_distribution_activity ON distributions (activity_id);
@@ -269,7 +269,7 @@ CREATE TABLE data_structure_versions
     data_structure_id             UUID                        NOT NULL,
     external_id                   VARCHAR(255),
     CONSTRAINT pk_data_structure_versions PRIMARY KEY (id),
-    CONSTRAINT FK_DATA_STRUCTURE_VERSIONS_ON_DATA_STRUCTURE FOREIGN KEY (data_structure_id) REFERENCES data_structures (id),
+    CONSTRAINT fk_data_structure_versions_on_data_structure FOREIGN KEY (data_structure_id) REFERENCES data_structures (id),
     CONSTRAINT uk_data_structure_versions_data_structure_version UNIQUE (data_structure_id, version)
 );
 
@@ -315,7 +315,7 @@ CREATE TABLE pipelines
     model        JSONB,
     version      BIGINT                      NOT NULL DEFAULT 1,
     CONSTRAINT pk_pipelines PRIMARY KEY (id),
-    CONSTRAINT FK_PIPELINES_ON_DATASET FOREIGN KEY (dataset_id) REFERENCES datasets (id)
+    CONSTRAINT fk_pipelines_on_dataset FOREIGN KEY (dataset_id) REFERENCES datasets (id)
 );
 
 CREATE INDEX idx_pipeline_dataset ON pipelines (dataset_id);
@@ -411,8 +411,8 @@ CREATE TABLE pipeline_data_sources
     pipeline_id    UUID NOT NULL,
     data_source_id UUID NOT NULL,
     CONSTRAINT pk_pipeline_data_sources PRIMARY KEY (pipeline_id, data_source_id),
-    CONSTRAINT FK_PIPELINE_DATA_SOURCES_ON_PIPELINE FOREIGN KEY (pipeline_id) REFERENCES pipelines (id),
-    CONSTRAINT FK_PIPELINE_DATA_SOURCES_ON_DATA_SOURCE FOREIGN KEY (data_source_id) REFERENCES data_sources (id)
+    CONSTRAINT fk_pipeline_data_sources_on_pipeline FOREIGN KEY (pipeline_id) REFERENCES pipelines (id),
+    CONSTRAINT fk_pipeline_data_sources_on_data_source FOREIGN KEY (data_source_id) REFERENCES data_sources (id)
 );
 
 CREATE INDEX idx_pipeline_data_sources_pipeline ON pipeline_data_sources (pipeline_id);
@@ -439,13 +439,13 @@ CREATE TABLE assignments
     catalog_id        UUID,
     CONSTRAINT pk_assignments PRIMARY KEY (id),
     CONSTRAINT uk_assignment_group_role_scope UNIQUE NULLS NOT DISTINCT (group_id, role_id, scope_type, data_structure_id, data_source_id, dataset_id, data_space_id, catalog_id),
-    CONSTRAINT FK_ASSIGNMENTS_ON_GROUP FOREIGN KEY (group_id) REFERENCES groups (id),
-    CONSTRAINT FK_ASSIGNMENTS_ON_ROLE FOREIGN KEY (role_id) REFERENCES roles (id),
-    CONSTRAINT FK_ASSIGNMENTS_ON_DATASTRUCTURE FOREIGN KEY (data_structure_id) REFERENCES data_structures (id),
-    CONSTRAINT FK_ASSIGNMENTS_ON_DATASOURCE FOREIGN KEY (data_source_id) REFERENCES data_sources (id),
-    CONSTRAINT FK_ASSIGNMENTS_ON_DATASET FOREIGN KEY (dataset_id) REFERENCES datasets (id),
-    CONSTRAINT FK_ASSIGNMENTS_ON_DATASPACE FOREIGN KEY (data_space_id) REFERENCES data_spaces (id),
-    CONSTRAINT FK_ASSIGNMENTS_ON_CATALOG FOREIGN KEY (catalog_id) REFERENCES catalogs (id)
+    CONSTRAINT fk_assignments_on_group FOREIGN KEY (group_id) REFERENCES groups (id),
+    CONSTRAINT fk_assignments_on_role FOREIGN KEY (role_id) REFERENCES roles (id),
+    CONSTRAINT fk_assignments_on_datastructure FOREIGN KEY (data_structure_id) REFERENCES data_structures (id),
+    CONSTRAINT fk_assignments_on_datasource FOREIGN KEY (data_source_id) REFERENCES data_sources (id),
+    CONSTRAINT fk_assignments_on_dataset FOREIGN KEY (dataset_id) REFERENCES datasets (id),
+    CONSTRAINT fk_assignments_on_dataspace FOREIGN KEY (data_space_id) REFERENCES data_spaces (id),
+    CONSTRAINT fk_assignments_on_catalog FOREIGN KEY (catalog_id) REFERENCES catalogs (id)
 );
 
 CREATE INDEX idx_assignment_group ON assignments (group_id);
