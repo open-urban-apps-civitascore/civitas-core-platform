@@ -1,6 +1,6 @@
 import { PaginationState, SortingState } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
@@ -19,16 +19,14 @@ import { GroupAssignmentModal } from './GroupAssignmentModal'
 import GroupsTable from './GroupsTable'
 
 interface GroupsTabProps {
-  userId: string
   formValues: UserFormData
-  originalGroupIds: string[]
   isReadOnly: boolean
   onAssignGroups: (groupIds: string[]) => void
   onRemoveGroup: (id: string) => void
 }
 
 export const GroupsTab = (props: GroupsTabProps) => {
-  const { userId, formValues, originalGroupIds, isReadOnly, onAssignGroups, onRemoveGroup } = props
+  const { formValues, isReadOnly, onAssignGroups, onRemoveGroup } = props
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
   const tGroups = useTranslations('groups')
@@ -40,9 +38,10 @@ export const GroupsTab = (props: GroupsTabProps) => {
   const [groupToRemove, setGroupToRemove] = useState<string | null>(null)
   const [isWarningModalOpen, setIsWarningModalOpen] = useState(false)
 
-  // Build server-side pagination/sort/filter params
-  const memberParams = useMemo(() => {
-    const params = new URLSearchParams({ memberIds: userId })
+  // Send all group IDs + page/size/sort/search to server (same pattern as UsersTab in groups)
+  const groupParams = useMemo(() => {
+    const params = new URLSearchParams()
+    formValues.groupIds.forEach(id => params.append('id', id))
     params.set('page', String(pageIndex))
     params.set('size', String(pageSize))
     if (sorting.length > 0) {
@@ -52,50 +51,26 @@ export const GroupsTab = (props: GroupsTabProps) => {
       params.set('name', searchString)
     }
     return params
-  }, [userId, pageIndex, pageSize, sorting, searchString])
+  }, [formValues.groupIds, pageIndex, pageSize, sorting, searchString])
 
   const {
-    data: serverGroupsData,
-    isFetching: isLoadingServerGroups,
-    error: serverGroupsError,
-  } = useGetGroups({ isEnabled: !!userId, params: memberParams })
+    data: groupsData,
+    isFetching: isLoadingGroups,
+    error: groupsError,
+  } = useGetGroups({ isEnabled: formValues.groupIds.length > 0, params: groupParams })
 
-  // Locally added groups: in form but not in the original saved state
-  const addedGroupIds = useMemo(
-    () => formValues.groupIds.filter(id => !originalGroupIds.includes(id)),
-    [formValues.groupIds, originalGroupIds],
-  )
+  const groups = useMemo(() => mapGroupsApiToListData(groupsData?.data || []), [groupsData])
 
-  // Locally removed groups: in original saved state but removed from form
-  const removedGroupIds = useMemo(
-    () => originalGroupIds.filter(id => !formValues.groupIds.includes(id)),
-    [originalGroupIds, formValues.groupIds],
-  )
-
-  // Fetch locally-added groups that aren't on the server yet
-  const addedParams = useMemo(() => {
-    const params = new URLSearchParams()
-    addedGroupIds.forEach(id => params.append('id', id))
-    return params
-  }, [addedGroupIds])
-  const { data: addedGroupsData, isFetching: isLoadingAddedGroups } = useGetGroups({
-    isEnabled: addedGroupIds.length > 0,
-    params: addedParams,
-  })
-
-  // Combine: server page (minus locally removed) + locally added groups on top
-  const groups = useMemo(() => {
-    const serverGroups = (serverGroupsData?.data || []).filter(g => !removedGroupIds.includes(g.id))
-    const addedGroups = (addedGroupsData?.data || []).filter(g => addedGroupIds.includes(g.id))
-    return mapGroupsApiToListData([...addedGroups, ...serverGroups])
-  }, [serverGroupsData, addedGroupsData, addedGroupIds, removedGroupIds])
-
-  const serverTotalElements = serverGroupsData?.totalElements || 0
-  const rowCount = serverTotalElements - removedGroupIds.length + addedGroupIds.length
+  const rowCount = groupsData?.totalElements || 0
   const totalPages = Math.ceil(rowCount / pageSize) || 1
 
-  const isLoading = isLoadingServerGroups || isLoadingAddedGroups
-  const error = serverGroupsError
+  // Reset to first page when group list changes (add/remove)
+  useEffect(() => {
+    setPageIndex(0)
+  }, [formValues.groupIds.length])
+
+  const isLoading = isLoadingGroups
+  const error = groupsError
 
   const handlePagination = (newPagination: PaginationState) => {
     setPageIndex(newPagination.pageIndex)

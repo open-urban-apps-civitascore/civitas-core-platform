@@ -223,9 +223,7 @@ export const UserOverview = (props: UserOverviewProps) => {
       case tabValues.groups.value:
         return (
           <GroupsTab
-            userId={userData.id}
             formValues={watch}
-            originalGroupIds={defaultUserData?.groups?.map(g => g.id) || []}
             isReadOnly={isReadOnly || !canUpdateGroups}
             onAssignGroups={handleAssignGroups}
             onRemoveGroup={handleRemoveGroup}
