@@ -4,21 +4,23 @@ import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
-import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
+import PageEditControls from '@/components/page-edit-controls/PageEditControls'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
-import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
-import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { usePermissions } from '@/hooks/use-permissions'
 import { PERMISSION_NAMES } from '@/types/currentUser'
-import { Datastructure, DATASTRUCTURE_STATUS_TYPES, DatastructureTab } from '@/types/datastructures'
+import {
+  Datastructure,
+  DATASTRUCTURE_STATUS_TYPES,
+  DatastructureStatusTypes,
+  DatastructureTab,
+} from '@/types/datastructures'
 import { mapDatastructureVersionsApiToListData } from '@/utils/datastructures'
-import { getHeaderAction } from '@/utils/headerAction'
 
 import { useDatastructure } from '../hooks/useDatastructure'
 import { AccessManagementTab } from './access-management-tab/AccessManagementTab'
@@ -94,36 +96,6 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     else handleExit()
   }
 
-  const ActionButtonsAndStatusSwitch = (
-    <div className="flex gap-6">
-      <StatusDropdown
-        statusOptions={Object.values(DATASTRUCTURE_STATUS_TYPES)}
-        status={statusWatch}
-        onStatusChange={handleStatusChange}
-        canSetAvailable={canSetAvailable}
-        canSetDraft={canSetDraft}
-        canRelease={canRelease}
-        statusHint={statusHint}
-      />
-      <ActionButtons
-        confirmButtonType="button"
-        onCancelClick={handleExitButtonClick}
-        onConfirmClick={handleSave}
-        isConfirmButtonDisabled={isConfirmButtonDisabled}
-        isCancelButtonDisabled={isLoading}
-        cancelButtonTitle={tCommon('actions.exit')}
-        hasCard={false}
-        wrapperClassname="w-auto"
-      />
-    </div>
-  )
-
-  const EditButton = (
-    <Button data-testid="editButton" type="button" onClick={() => setIsReadOnly(false)}>
-      {tCommon('actions.edit')}
-    </Button>
-  )
-
   const renderTabContent = () => {
     switch (selectedTab) {
       case 'basicInfo':
@@ -165,15 +137,32 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
           tabsWithNoCompletionStatus: ['accessManagement'],
           hasCompletionStatus: true,
         }}
-        customElement={getHeaderAction({
-          isReadOnly,
-          canUpdate:
-            datastructure.dataStructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
-              ? canUpdate && canRelease
-              : canUpdate,
-          editButton: EditButton,
-          saveExitButtons: ActionButtonsAndStatusSwitch,
-        })}
+        customElement={
+          <PageEditControls<DatastructureStatusTypes>
+            status={statusWatch}
+            onStatusChange={handleStatusChange}
+            statusOptions={Object.values(DATASTRUCTURE_STATUS_TYPES)}
+            canSetAvailable={canSetAvailable}
+            canSetDraft={canSetDraft}
+            canRelease={canRelease}
+            statusHint={statusHint}
+            confirmButtonType="button"
+            onConfirmClick={handleSave}
+            isConfirmButtonDisabled={isConfirmButtonDisabled}
+            isCancelButtonDisabled={isLoading}
+            onCancelClick={handleExitButtonClick}
+            hasCard={false}
+            isReadOnly={isReadOnly}
+            onEditClick={() => setIsReadOnly(false)}
+            canEdit={
+              datastructure.dataStructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+                ? canUpdate && canRelease
+                : canUpdate
+            }
+            cancelButtonTitle={tCommon('actions.exit')}
+            wrapperClassname="w-auto"
+          />
+        }
       />
       <PageBackground className="overflow-y-auto" hasBackground={!isReadOnly}>
         <Form {...form}>
