@@ -1033,6 +1033,9 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .isEqualTo(DataStructureVersionStatus.DRAFT);
       assertThat(version.getModelAtlasUri()).isNotBlank();
 
+      // Stub Model Atlas download so the publish validation can verify the model exists
+      stubModelDownload(version.getModelAtlasUri());
+
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
               getEndpoint() + "/" + versionId1 + "/publish",
