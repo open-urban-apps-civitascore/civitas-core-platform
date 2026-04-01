@@ -13,22 +13,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.Constants;
 import de.civitascore.configadapter.adapter.ConfigAdapter;
 import de.civitascore.configadapter.configuration.ApplicationConfig;
-import de.civitascore.configadapter.exception.AdapterException;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.messaging.EventConsumer;
 import de.civitascore.configadapter.messaging.EventPublisher;
 import de.civitascore.configadapter.model.AdapterErrorCode;
-import de.civitascore.configadapter.model.ConfigEvent;
 import de.civitascore.configadapter.model.ConfigResultEvent;
-import de.civitascore.configadapter.util.BackoffCalculator;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
 import io.cloudevents.kafka.CloudEventDeserializer;
 import io.cloudevents.kafka.CloudEventSerializer;
 import java.net.URI;
 import java.time.Duration;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -68,17 +64,11 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
   private static final String KAFKA_GROUP_ID = "kafka.group.id";
   private static final String KAFKA_BOOTSTRAP_SERVERS = "kafka.bootstrap.servers";
 
-  // Retry configuration keys
-  private static final String KAFKA_RETRY_MAX_ATTEMPTS = "kafka.retry.max.attempts";
-  private static final String KAFKA_RETRY_INITIAL_BACKOFF_MS = "kafka.retry.initial.backoff.ms";
+  // DLQ configuration keys
   private static final String KAFKA_DLQ_TOPIC = "kafka.dlq.topic";
   private static final String KAFKA_PUBLISH_TIMEOUT_MS = "kafka.publish.timeout.ms";
-  private static final String KAFKA_MAX_POLL_INTERVAL_MS =
-      "kafka." + ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG;
 
   // Default values
-  private static final int DEFAULT_MAX_RETRIES = 3;
-  private static final long DEFAULT_INITIAL_BACKOFF_MS = 1000L;
   private static final String DEFAULT_DLQ_TOPIC = "de.civitascore.idm.dlq";
   private static final long DEFAULT_PUBLISH_TIMEOUT_MS = 5000L;
 
@@ -90,17 +80,12 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
   private KafkaConsumer<String, CloudEvent> kafkaConsumer;
   private KafkaProducer<String, CloudEvent> kafkaProducer;
   private ConfigAdapter adapter;
-  private CloudEventProcessor processor;
+  private RetryHandler retryHandler;
   private final AtomicBoolean running = new AtomicBoolean(false);
   private Thread consumerThread;
   private boolean ready;
 
-  // Retry configuration
-  private int maxRetries;
-  private long initialBackoffMs;
-  private String dlqTopic;
   private long publishTimeoutMs;
-  private BackoffCalculator backoffCalculator;
 
   public KafkaEventHandler() {}
 
@@ -108,13 +93,14 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
   public void initialize(ApplicationConfig config, ConfigAdapter adapter)
       throws FatalAdapterException {
     this.adapter = adapter;
-    this.processor = new CloudEventProcessor(adapter);
 
-    loadRetryConfiguration(config);
+    String dlqTopic = config.getProperty(KAFKA_DLQ_TOPIC, DEFAULT_DLQ_TOPIC);
+    this.publishTimeoutMs =
+        Long.parseLong(
+            config.getProperty(
+                KAFKA_PUBLISH_TIMEOUT_MS, String.valueOf(DEFAULT_PUBLISH_TIMEOUT_MS)));
 
-    this.backoffCalculator = new BackoffCalculator(this.initialBackoffMs, 30000L);
-
-    validateRetryConfiguration(config);
+    RetryHandler.RetryConfig retryConfig = RetryHandler.loadAndValidate(config);
 
     String bootstrapServers = config.getProperty(KAFKA_BOOTSTRAP_SERVERS, "localhost:9092");
     String groupId = config.getProperty(KAFKA_GROUP_ID, "config-adapter-group");
@@ -126,51 +112,16 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
 
     this.kafkaProducer = new KafkaProducer<>(createProducerProperties(bootstrapServers));
 
+    CloudEventProcessor processor = new CloudEventProcessor(adapter);
+    DlqHandler dlqHandler =
+        new DlqHandler(
+            dlqTopic, publishTimeoutMs, retryConfig.maxRetries(), kafkaProducer, adapter);
+    this.retryHandler =
+        new RetryHandler(retryConfig.maxRetries(), retryConfig.calculator(), dlqHandler, processor);
+
     adapter.setEventPublisher(this);
 
-    logInitialization(topicList);
-  }
-
-  private void loadRetryConfiguration(ApplicationConfig config) {
-    this.maxRetries =
-        Integer.parseInt(
-            config.getProperty(KAFKA_RETRY_MAX_ATTEMPTS, String.valueOf(DEFAULT_MAX_RETRIES)));
-    this.initialBackoffMs =
-        Long.parseLong(
-            config.getProperty(
-                KAFKA_RETRY_INITIAL_BACKOFF_MS, String.valueOf(DEFAULT_INITIAL_BACKOFF_MS)));
-    this.dlqTopic = config.getProperty(KAFKA_DLQ_TOPIC, DEFAULT_DLQ_TOPIC);
-    this.publishTimeoutMs =
-        Long.parseLong(
-            config.getProperty(
-                KAFKA_PUBLISH_TIMEOUT_MS, String.valueOf(DEFAULT_PUBLISH_TIMEOUT_MS)));
-  }
-
-  private void validateRetryConfiguration(ApplicationConfig config) throws FatalAdapterException {
-    String pollIntervalStr = config.getProperty(KAFKA_MAX_POLL_INTERVAL_MS, "300000");
-    long maxPollIntervalMs = Long.parseLong(pollIntervalStr);
-
-    long totalPotentialWaitTime = 0;
-    for (int attempt = 1; attempt <= maxRetries; attempt++) {
-      totalPotentialWaitTime += backoffCalculator.calculate(attempt);
-    }
-
-    // use 80% as margin
-    long safeLimit = (long) (maxPollIntervalMs * 0.8);
-
-    if (totalPotentialWaitTime > safeLimit) {
-      String msg =
-          String.format(
-              "Dangerous configuration detected! Total retry backoff (%d ms) exceeds 80%% of %s (%d ms). "
-                  + "Please decrease '%s' or increase '%s'.",
-              totalPotentialWaitTime,
-              KAFKA_MAX_POLL_INTERVAL_MS,
-              maxPollIntervalMs,
-              KAFKA_RETRY_MAX_ATTEMPTS,
-              KAFKA_MAX_POLL_INTERVAL_MS);
-
-      throw new FatalAdapterException(AdapterErrorCode.CONFIGURATION_ERROR, msg);
-    }
+    logInitialization(topicList, retryConfig, dlqTopic);
   }
 
   private Properties createConsumerProperties(String bootstrapServers, String groupId) {
@@ -218,7 +169,8 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
         });
   }
 
-  private void logInitialization(List<String> topicList) {
+  private void logInitialization(
+      List<String> topicList, RetryHandler.RetryConfig retryConfig, String dlqTopic) {
     logger.info(
         "Kafka event consumer initialized for adapter {} with {} topic(s): {}",
         adapter.getClass().getSimpleName(),
@@ -226,8 +178,8 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
         Encode.forJava(String.valueOf(topicList)));
     logger.info(
         "Retry configuration: maxRetries={}, initialBackoffMs={}, dlqTopic={}, publishTimeoutMs={}",
-        maxRetries,
-        initialBackoffMs,
+        retryConfig.maxRetries(),
+        retryConfig.initialBackoffMs(),
         Encode.forJava(dlqTopic),
         publishTimeoutMs);
   }
@@ -263,7 +215,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
           for (var record : records) {
             setupMDC(record);
             try {
-              processWithRetry(record);
+              retryHandler.processWithRetry(record);
               // Commit after each successful processing to maintain event ordering
               kafkaConsumer.commitSync();
             } finally {
@@ -312,159 +264,6 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
     MDC.remove(MDC_CORRELATION_ID);
     MDC.remove(MDC_EVENT_ID);
     MDC.remove(MDC_TOPIC);
-  }
-
-  /**
-   * Processes a record with blocking retry for transient errors.
-   *
-   * @param record the Kafka record to process
-   */
-  private void processWithRetry(ConsumerRecord<String, CloudEvent> record) {
-    int attempts = 0;
-
-    // maxRetries + 1, because first attempt + maxRetries
-    for (int attempt = 0; attempt <= maxRetries + 1; attempt++) {
-      try {
-        processor.handleEvent(record.topic(), record.value());
-        logger.debug(
-            "Successfully processed event {} on attempt {}",
-            Encode.forJava(record.value().getId()),
-            attempts + 1);
-        return; // Success - exit retry loop
-      } catch (RetryableAdapterException e) {
-        attempts++;
-        if (attempts > maxRetries) {
-          logger.error(
-              "Max retries ({}) exceeded for event {}. Sending to DLQ. Error: {}",
-              maxRetries,
-              Encode.forJava(record.value().getId()),
-              Encode.forJava(e.getInternalMessage()));
-          sendToDLQ(record, e, true);
-          return;
-        }
-
-        long backoff = backoffCalculator.calculate(attempts);
-        logger.warn(
-            "Retryable error processing event {} (attempt {}/{}). Retrying in {}ms. Error: {}",
-            Encode.forJava(record.value().getId()),
-            attempts,
-            maxRetries,
-            backoff,
-            Encode.forJava(e.getInternalMessage()));
-
-        try {
-          Thread.sleep(backoff);
-        } catch (InterruptedException ie) {
-          Thread.currentThread().interrupt();
-          logger.warn(
-              "Retry sleep interrupted for event {}", Encode.forJava(record.value().getId()));
-          sendToDLQ(record, e, true);
-          return;
-        }
-      } catch (FatalAdapterException e) {
-        // Failure result already published by AbstractConfigAdapter template method
-        logger.error(
-            "Fatal error processing event {}. Sending to DLQ immediately. Error: {}",
-            Encode.forJava(record.value().getId()),
-            Encode.forJava(e.getInternalMessage()));
-        sendToDLQ(record, e, false);
-        return;
-      } catch (Exception e) {
-        // Wrap unknown exceptions as fatal and send to DLQ
-        // These originate from CloudEventProcessor (e.g., deserialization), not the adapter
-        logger.error(
-            "Unexpected error processing event {}. Wrapping as fatal and sending to DLQ.",
-            Encode.forJava(record.value().getId()),
-            e);
-        FatalAdapterException wrapped =
-            new FatalAdapterException(AdapterErrorCode.UNKNOWN_ERROR, e, e.getMessage());
-        sendToDLQ(record, wrapped, true);
-        return;
-      }
-    }
-  }
-
-  /**
-   * Sends a failed event to the Dead Letter Queue (DLQ). Optionally delegates failure result
-   * publishing to the adapter. This method is synchronous to ensure data safety - if DLQ send
-   * fails, an exception is thrown so the event will be reprocessed on the next poll.
-   *
-   * @param record the original Kafka record
-   * @param exception the adapter exception that caused the failure
-   * @param publishFailure if true, delegates failure result publishing to the adapter (for cases
-   *     where the adapter's template method has not yet published a failure result)
-   * @throws RuntimeException if DLQ send fails, causing the event to be reprocessed
-   */
-  private void sendToDLQ(
-      ConsumerRecord<String, CloudEvent> record,
-      AdapterException exception,
-      boolean publishFailure) {
-    CloudEvent originalEvent = record.value();
-
-    try {
-      // Build DLQ event with safe metadata (no stack traces, no PII)
-      CloudEvent dlqEvent =
-          CloudEventBuilder.from(originalEvent)
-              .withId(UUID.randomUUID().toString())
-              .withExtension("dlqerrorcode", String.valueOf(exception.getNumericCode()))
-              .withExtension("dlqerrormsg", exception.getSafeExternalMessage())
-              .withExtension("dlqoriginaltopic", record.topic())
-              .withExtension("dlqtimestamp", OffsetDateTime.now().toString())
-              .withExtension("dlqretrycount", String.valueOf(maxRetries))
-              .build();
-
-      // Synchronous send - critical for data safety
-      kafkaProducer
-          .send(new ProducerRecord<>(dlqTopic, dlqEvent))
-          .get(publishTimeoutMs, TimeUnit.MILLISECONDS);
-
-      logger.info(
-          "Sent event {} to DLQ topic {}",
-          Encode.forJava(originalEvent.getId()),
-          Encode.forJava(dlqTopic));
-
-      if (publishFailure) {
-        delegateFailureResultToAdapter(originalEvent, exception);
-      }
-
-    } catch (Exception e) {
-      logger.error(
-          "CRITICAL: Failed to send event {} to DLQ. Event will be reprocessed. Error: {}",
-          Encode.forJava(originalEvent.getId()),
-          Encode.forJava(String.valueOf(e.getMessage())),
-          e);
-      // Throw exception so event is not committed and will be reprocessed
-      throw new RuntimeException("DLQ send failed - event will be reprocessed", e);
-    }
-  }
-
-  /**
-   * Delegates failure result publishing to the adapter by deserializing the original CloudEvent
-   * data into a ConfigEvent and calling the adapter's publishFailureResult method.
-   *
-   * @param originalEvent the original CloudEvent that failed
-   * @param exception the adapter exception that caused the failure
-   */
-  private void delegateFailureResultToAdapter(
-      CloudEvent originalEvent, AdapterException exception) {
-    try {
-      if (originalEvent.getData() == null) {
-        logger.debug("Cannot publish failure result: original event has no data");
-        return;
-      }
-
-      ObjectMapper objectMapper = ObjectMapperFactory.createObjectMapper();
-      ConfigEvent configEvent =
-          objectMapper.readValue(originalEvent.getData().toBytes(), ConfigEvent.class);
-
-      adapter.publishFailureResult(configEvent, exception);
-
-    } catch (Exception e) {
-      logger.warn(
-          "Failed to publish failure result for event {}: {}",
-          Encode.forJava(originalEvent.getId()),
-          Encode.forJava(String.valueOf(e.getMessage())));
-    }
   }
 
   public void stop() {
@@ -625,15 +424,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
 
   // Getter methods for testing
   int getMaxRetries() {
-    return maxRetries;
-  }
-
-  long getInitialBackoffMs() {
-    return initialBackoffMs;
-  }
-
-  String getDlqTopic() {
-    return dlqTopic;
+    return retryHandler.getMaxRetries();
   }
 
   long getPublishTimeoutMs() {
