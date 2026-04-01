@@ -20,7 +20,7 @@ public class EncryptionConfig {
   public static final String ENC_PREFIX = "ENC(";
   public static final String ENC_SUFFIX = ")";
 
-  public static final String CREDENTIAL_CONTEXT = "portal-backend:datasource-connector";
+  public static final String CREDENTIAL_CONTEXT = CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT;
 
   /**
    * Creates a {@link TextEncryptor} that wraps encrypted credentials in {@code ENC(...)} format.
