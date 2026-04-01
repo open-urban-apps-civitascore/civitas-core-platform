@@ -1,6 +1,8 @@
 package de.civitascore.portal.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.civitascore.configadapter.crypto.CredentialEncryptor;
+import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
@@ -20,6 +22,8 @@ import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.GeneralSecurityException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,6 +38,24 @@ import org.springframework.boot.test.context.TestComponent;
  */
 @TestComponent
 public class SagaTestDataFactory {
+
+  /**
+   * Must match application-test-integration.yml ({@code civitas.master-key}). Package-visible so
+   * {@link SagaOrchestratorTestHelper} can pass it to the config-adapter via adapter config.
+   */
+  static final String TEST_MASTER_KEY_HEX =
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+  private static final byte[] TEST_STRETCHED_KEY;
+
+  static {
+    try {
+      TEST_STRETCHED_KEY =
+          CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(TEST_MASTER_KEY_HEX));
+    } catch (GeneralSecurityException e) {
+      throw new ExceptionInInitializerError(e);
+    }
+  }
 
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
@@ -78,14 +100,14 @@ public class SagaTestDataFactory {
     ds.setDescription("PostgreSQL datasource for saga test");
     ds.setConnectorType(ConnectorType.SQL);
     ds.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-    ds.setConfiguration(
-        Map.of(
-            "host", "datasource-db",
-            "port", 5432,
-            "database", "testdb",
-            "username", "testuser",
-            "password", "testpass",
-            "query", "SELECT sensor_name, sensor_description FROM sensors"));
+    Map<String, Object> config = new LinkedHashMap<>();
+    config.put("host", "datasource-db");
+    config.put("port", 5432);
+    config.put("database", "testdb");
+    config.put("username", "testuser");
+    config.put("password", encryptCredential("testpass"));
+    config.put("query", "SELECT sensor_name, sensor_description FROM sensors");
+    ds.setConfiguration(config);
     return dataSourceRepository.save(ds);
   }
 
@@ -247,5 +269,21 @@ public class SagaTestDataFactory {
       ((Map<String, Object>) inputMap).put("label", labelStr.replace("PLACEHOLDER", datasourceId));
     }
     return model;
+  }
+
+  /**
+   * Encrypts a credential value using the test master key, matching what portal-backend's {@code
+   * EncryptionConfig} does in production. This ensures saga tests exercise the real
+   * encryption/decryption path through the config-adapter.
+   */
+  private static String encryptCredential(String plaintext) {
+    try {
+      return "ENC("
+          + CredentialEncryptor.encrypt(
+              plaintext, TEST_STRETCHED_KEY, CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT)
+          + ")";
+    } catch (GeneralSecurityException e) {
+      throw new IllegalStateException("Test credential encryption failed", e);
+    }
   }
 }

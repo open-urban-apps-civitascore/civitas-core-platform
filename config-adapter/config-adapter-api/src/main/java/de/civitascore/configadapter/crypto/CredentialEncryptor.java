@@ -30,6 +30,13 @@ import javax.crypto.spec.GCMParameterSpec;
  */
 public final class CredentialEncryptor {
 
+  /**
+   * The credential context used by portal-backend when encrypting datasource connector secrets.
+   * Config-adapter modules that decrypt these values must use the same context to derive the
+   * correct AES key via HKDF-Expand.
+   */
+  public static final String DATASOURCE_CREDENTIAL_CONTEXT = "portal-backend:datasource-connector";
+
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
   private CredentialEncryptor() {}

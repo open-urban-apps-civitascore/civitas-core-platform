@@ -20,6 +20,7 @@ import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.util.PayloadConverter;
 import jakarta.ws.rs.client.Client;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -75,7 +76,19 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
   @Override
   protected void doInitialize(AdapterConfig config) {
     String baseUrl = getProperty("url", DEFAULT_URL);
-    byte[] stretchedKey = CryptoKeyLoader.loadAndStretchKeyFromEnv(MASTER_KEY_ENV);
+    String masterKeyHex = getProperty("master-key", null);
+    byte[] stretchedKey;
+
+    if (masterKeyHex != null) {
+      try {
+        stretchedKey =
+            CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(masterKeyHex));
+      } catch (GeneralSecurityException e) {
+        throw new IllegalStateException("Invalid master key in adapter config", e);
+      }
+    } else {
+      stretchedKey = CryptoKeyLoader.loadAndStretchKeyFromEnv(MASTER_KEY_ENV);
+    }
 
     if (stretchedKey.length == 0) {
       log.warn("{} not set — encrypted credentials cannot be decrypted", MASTER_KEY_ENV);
@@ -235,8 +248,39 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
       Map<String, Object> pipeline, List<Datasource> datasources, String targetUrl)
       throws FatalAdapterException {
     Map<String, Object> data = optionalPipelineMapField(pipeline, FIELD_DATA);
-    data = DatasourceInjector.resolve(data, datasources);
-    return PlaceholderResolver.resolve(data, targetUrl, datasources);
+    List<Datasource> decrypted = decryptDatasourceCredentials(datasources);
+    data = DatasourceInjector.resolve(data, decrypted);
+    return PlaceholderResolver.resolve(data, targetUrl, decrypted);
+  }
+
+  /**
+   * Decrypts ENC(...) credential values in datasource configurations before they are parsed into
+   * DSN strings. Without this, DatasourceParser.buildDsn() would URL-encode the encrypted marker,
+   * making it unrecoverable by the pipeline-level CredentialDecryptor.
+   */
+  private List<Datasource> decryptDatasourceCredentials(List<Datasource> datasources)
+      throws FatalAdapterException {
+    List<Datasource> result = new ArrayList<>(datasources.size());
+    for (Datasource ds : datasources) {
+      Map<String, Object> props = ds.getAdditionalProperties();
+      if (props.isEmpty()) {
+        result.add(ds);
+        continue;
+      }
+      Map<String, Object> decryptedProps = redpandaClient.decryptDatasourceCredentials(props);
+      Datasource copy = new Datasource();
+      copy.setId(ds.getId());
+      copy.setType(ds.getType());
+      copy.setName(ds.getName());
+      copy.setDescription(ds.getDescription());
+      copy.setHost(ds.getHost());
+      copy.setPort(ds.getPort());
+      for (Map.Entry<String, Object> entry : decryptedProps.entrySet()) {
+        copy.handleUnknownProperty(entry.getKey(), entry.getValue());
+      }
+      result.add(copy);
+    }
+    return List.copyOf(result);
   }
 
   private SagaCommandResult pipelineError(

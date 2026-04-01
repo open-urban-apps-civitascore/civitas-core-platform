@@ -113,7 +113,13 @@ public class SagaOrchestratorTestHelper implements AutoCloseable {
         mapConfig(Map.of("apisix.admin.url", apisixMockUrl, "apisix.admin.key", "test-admin-key")));
 
     RedpandaSagaHandler redpandaHandler = new RedpandaSagaHandler();
-    redpandaHandler.initialize(mapConfig(Map.of("redpanda.url", redpandaConnectUrl)));
+    redpandaHandler.initialize(
+        mapConfig(
+            Map.of(
+                "redpanda.url",
+                redpandaConnectUrl,
+                "redpanda.master-key",
+                SagaTestDataFactory.TEST_MASTER_KEY_HEX)));
 
     orchestrator = new DatasetSagaOrchestrator();
     orchestrator.initialize(kafkaBrokers);
