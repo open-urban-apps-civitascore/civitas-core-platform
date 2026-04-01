@@ -179,6 +179,10 @@ class RedpandaConnectClient implements AutoCloseable {
     return serializer.decryptDatasourceCredentials(map);
   }
 
+  String encryptDatasourceValue(String plaintext) throws FatalAdapterException {
+    return serializer.encryptDatasourceValue(plaintext);
+  }
+
   @Override
   public void close() {
     serializer.close();

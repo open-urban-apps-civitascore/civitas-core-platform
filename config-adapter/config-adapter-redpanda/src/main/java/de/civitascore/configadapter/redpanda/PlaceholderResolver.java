@@ -235,7 +235,11 @@ final class PlaceholderResolver {
 
   private static String resolveDatasourceDsn(Datasource ds, int index)
       throws FatalAdapterException {
-    String dsn = DatasourceParser.buildDsnFromDatasource(ds);
+    Map<String, Object> cfg = DatasourceParser.configuration(ds);
+    String dsn = DatasourceField.DSN.asString(cfg).orElse(null);
+    if (dsn == null) {
+      dsn = DatasourceParser.buildDsnFromDatasource(ds);
+    }
     if (dsn == null) {
       throw new FatalAdapterException(
           AdapterErrorCode.INVALID_PAYLOAD,

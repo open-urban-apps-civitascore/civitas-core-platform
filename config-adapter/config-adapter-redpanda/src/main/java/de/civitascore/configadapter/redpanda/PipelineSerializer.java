@@ -106,6 +106,28 @@ class PipelineSerializer implements Closeable {
     }
   }
 
+  /**
+   * Encrypts a datasource-derived plaintext value with the shared datasource credential context and
+   * wraps it as {@code ENC(...)} so it can be safely carried forward until final YAML
+   * serialization.
+   */
+  String encryptDatasourceValue(String plaintext) throws FatalAdapterException {
+    synchronized (lock) {
+      if (closed) {
+        throw new IllegalStateException("PipelineSerializer has been closed");
+      }
+      try {
+        return "ENC("
+            + CredentialEncryptor.encrypt(
+                plaintext, stretchedKey, CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT)
+            + ")";
+      } catch (GeneralSecurityException e) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.REDPANDA_DECRYPTION_ERROR, e, e.getMessage());
+      }
+    }
+  }
+
   @Override
   public void close() {
     synchronized (lock) {

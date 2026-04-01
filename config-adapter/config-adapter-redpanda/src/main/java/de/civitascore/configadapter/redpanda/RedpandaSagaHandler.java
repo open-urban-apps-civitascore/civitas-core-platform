@@ -23,6 +23,7 @@ import jakarta.ws.rs.client.Client;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.owasp.encoder.Encode;
@@ -61,6 +62,7 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
   private static final String FIELD_ID = "id";
   private static final String FIELD_ACTION = "action";
   private static final String FIELD_DATA = "data";
+  private static final String FIELD_CONFIGURATION = "configuration";
 
   private static final String ACTION_ADD = "ADD";
   private static final String ACTION_UPDATE = "UPDATE";
@@ -254,9 +256,8 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Decrypts ENC(...) credential values in datasource configurations before they are parsed into
-   * DSN strings. Without this, DatasourceParser.buildDsn() would URL-encode the encrypted marker,
-   * making it unrecoverable by the pipeline-level CredentialDecryptor.
+   * Decrypts datasource credentials so SQL DSNs can be completed from username/password fields and
+   * then re-encrypts the final DSN as a single ENC(...) value for the remaining pipeline flow.
    */
   private List<Datasource> decryptDatasourceCredentials(List<Datasource> datasources)
       throws FatalAdapterException {
@@ -268,19 +269,58 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
         continue;
       }
       Map<String, Object> decryptedProps = redpandaClient.decryptDatasourceCredentials(props);
-      Datasource copy = new Datasource();
-      copy.setId(ds.getId());
-      copy.setType(ds.getType());
-      copy.setName(ds.getName());
-      copy.setDescription(ds.getDescription());
-      copy.setHost(ds.getHost());
-      copy.setPort(ds.getPort());
-      for (Map.Entry<String, Object> entry : decryptedProps.entrySet()) {
-        copy.handleUnknownProperty(entry.getKey(), entry.getValue());
+      if (ConnectorType.fromRaw(ds.getType()).orElse(null) == ConnectorType.SQL) {
+        decryptedProps = reencryptSqlDsn(ds, decryptedProps);
       }
-      result.add(copy);
+      result.add(copyDatasource(ds, decryptedProps));
     }
     return List.copyOf(result);
+  }
+
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> reencryptSqlDsn(Datasource datasource, Map<String, Object> props)
+      throws FatalAdapterException {
+    if (props == null || props.isEmpty()) {
+      return props;
+    }
+
+    Datasource resolvedDatasource = copyDatasource(datasource, props);
+    Map<String, Object> cfg = DatasourceParser.configuration(resolvedDatasource);
+    String dsn = DatasourceField.DSN.asString(cfg).orElse(null);
+    if (dsn == null) {
+      dsn = DatasourceParser.buildDsn(resolvedDatasource, cfg);
+    } else {
+      dsn = DatasourceParser.mergeCredentialsIntoDsnIfMissing(dsn, cfg);
+    }
+    if (dsn == null) {
+      return props;
+    }
+
+    String encryptedDsn = redpandaClient.encryptDatasourceValue(dsn);
+    Map<String, Object> updatedProps = new LinkedHashMap<>(props);
+
+    if (updatedProps.get(FIELD_CONFIGURATION) instanceof Map<?, ?> nested) {
+      Map<String, Object> updatedConfiguration = new LinkedHashMap<>((Map<String, Object>) nested);
+      updatedConfiguration.put("dsn", encryptedDsn);
+      updatedProps.put(FIELD_CONFIGURATION, updatedConfiguration);
+    } else {
+      updatedProps.put("dsn", encryptedDsn);
+    }
+    return updatedProps;
+  }
+
+  private Datasource copyDatasource(Datasource source, Map<String, Object> props) {
+    Datasource copy = new Datasource();
+    copy.setId(source.getId());
+    copy.setType(source.getType());
+    copy.setName(source.getName());
+    copy.setDescription(source.getDescription());
+    copy.setHost(source.getHost());
+    copy.setPort(source.getPort());
+    for (Map.Entry<String, Object> entry : props.entrySet()) {
+      copy.handleUnknownProperty(entry.getKey(), entry.getValue());
+    }
+    return copy;
   }
 
   private SagaCommandResult pipelineError(

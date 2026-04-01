@@ -84,20 +84,11 @@ sealed interface ConnectorConfig permits ConnectorConfig.Mqtt, ConnectorConfig.S
 
   /** SQL input connector. {@code dsn} may be {@code ENC(...)} encrypted. */
   record Sql(
-      String driver,
-      String dsn,
-      String user,
-      Object password,
-      String query,
-      String table,
-      List<String> columns,
-      String where)
+      String driver, String dsn, String query, String table, List<String> columns, String where)
       implements ConnectorConfig {
 
     private static final String KEY_DRIVER = "driver";
     private static final String KEY_DSN = "dsn";
-    private static final String KEY_USER = "user";
-    private static final String KEY_PASSWORD = "password";
     private static final String KEY_QUERY = "query";
     private static final String KEY_TABLE = "table";
     private static final String KEY_COLUMNS = "columns";
@@ -120,8 +111,6 @@ sealed interface ConnectorConfig permits ConnectorConfig.Mqtt, ConnectorConfig.S
       Map<String, Object> sql = new LinkedHashMap<>();
       sql.put(KEY_DRIVER, driver != null ? driver : DEFAULT_DRIVER);
       if (dsn != null) sql.put(KEY_DSN, dsn);
-      if (user != null) sql.put(KEY_USER, user);
-      if (password != null) sql.put(KEY_PASSWORD, password);
       RedpandaInputType inputType = RedpandaInputType.SQL_RAW;
       if (query != null) {
         sql.put(KEY_QUERY, query);

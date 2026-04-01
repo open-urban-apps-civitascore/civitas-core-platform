@@ -133,6 +133,36 @@ class DatasourceInjectorTest {
     }
 
     @Test
+    @DisplayName("merges optional credentials into pre-built DSN when missing there")
+    void resolve_sqlPlaceholderWithDsnAndSeparateCredentials_mergesIntoDsn() throws Exception {
+      String datasourceId = "ds-sql-merge";
+
+      Datasource datasource = new Datasource();
+      datasource.setId(datasourceId);
+      datasource.setType("sql");
+      datasource.handleUnknownProperty(
+          "configuration",
+          Map.of(
+              "dsn", "postgres://db:5432/mydb?sslmode=disable",
+              "username", "reader",
+              "password", "pw",
+              "query", "SELECT * FROM sensors"));
+
+      Map<String, Object> pipelineData = Map.of("input", inputWithLabel(datasourceId));
+
+      Map<String, Object> result = DatasourceInjector.resolve(pipelineData, List.of(datasource));
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> sqlRaw =
+          (Map<String, Object>) ((Map<String, Object>) result.get("input")).get("sql_raw");
+
+      assertNotNull(sqlRaw);
+      assertEquals("postgres://reader:pw@db:5432/mydb?sslmode=disable", sqlRaw.get("dsn"));
+      assertFalse(sqlRaw.containsKey("user"));
+      assertFalse(sqlRaw.containsKey("password"));
+    }
+
+    @Test
     @DisplayName("resolves SQL placeholder with table and columns as sql_select")
     void resolve_sqlPlaceholderWithTableColumns_injectsSqlSelect() throws Exception {
       String datasourceId = "ds-sql-select-1";
@@ -198,16 +228,16 @@ class DatasourceInjectorTest {
       assertTrue(dsn.contains("db.local"));
       assertTrue(dsn.contains("sensordb"));
       assertTrue(dsn.contains("reader"));
-      assertEquals("reader", sqlSelect.get("user"));
-      assertEquals("ENC(secret)", sqlSelect.get("password"));
+      assertFalse(sqlSelect.containsKey("user"));
+      assertFalse(sqlSelect.containsKey("password"));
       assertEquals("public.measurements", sqlSelect.get("table"));
       assertEquals(List.of("id", "value"), sqlSelect.get("columns"));
       assertEquals("id > 10", sqlSelect.get("where"));
     }
 
     @Test
-    @DisplayName("passes sql user and encrypted password through to sql_raw")
-    void resolve_sqlWithEncryptedPassword_passesCredentialsThrough() throws Exception {
+    @DisplayName("builds sql raw dsn from credentials and omits top-level user and password")
+    void resolve_sqlWithCredentials_buildsDsnAndOmitsTopLevelCredentials() throws Exception {
       String datasourceId = "ds-sql-nopass";
 
       Datasource datasource = new Datasource();
@@ -233,9 +263,8 @@ class DatasourceInjectorTest {
       String dsn = (String) sqlRaw.get("dsn");
       assertNotNull(dsn);
       assertTrue(dsn.contains("db.local"));
-      assertTrue(dsn.contains("ENC%28test-secret%29"));
-      assertEquals("admin", sqlRaw.get("user"));
-      assertEquals("ENC(test-secret)", sqlRaw.get("password"));
+      assertFalse(sqlRaw.containsKey("user"));
+      assertFalse(sqlRaw.containsKey("password"));
     }
 
     @Test

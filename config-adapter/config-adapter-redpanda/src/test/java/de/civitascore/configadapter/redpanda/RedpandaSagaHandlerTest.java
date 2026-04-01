@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -418,6 +419,8 @@ class RedpandaSagaHandlerTest {
     void handle_deployWithLabelAndPlaceholders_resolvesBoth() throws Exception {
       RedpandaConnectClient mockClient = mock(RedpandaConnectClient.class);
       doNothing().when(mockClient).createPipeline(any(), anyMap());
+      when(mockClient.encryptDatasourceValue(anyString()))
+          .thenAnswer(invocation -> "ENC(" + invocation.getArgument(0, String.class) + ")");
 
       try (RedpandaSagaHandler handler = createHandlerWithClient(mockClient)) {
         String datasourceId = "mqtt-ds-123";
@@ -492,7 +495,7 @@ class RedpandaSagaHandlerTest {
             (List<Map<String, Object>>)
                 ((Map<String, Object>) deployed.get("pipeline")).get("processors");
         String dsn = (String) processors.get(0).get("dsn");
-        assertTrue(dsn.startsWith("postgres://admin"));
+        assertTrue(dsn.startsWith("ENC(postgres://admin"));
         assertTrue(dsn.contains("db.local:5432"));
         assertTrue(dsn.contains("testdb"));
       }
@@ -544,6 +547,8 @@ class RedpandaSagaHandlerTest {
     void handle_restoreWithDatasourcePlaceholder_resolvesDsn() throws Exception {
       RedpandaConnectClient mockClient = mock(RedpandaConnectClient.class);
       doNothing().when(mockClient).updatePipeline(any(), anyMap());
+      when(mockClient.encryptDatasourceValue(anyString()))
+          .thenAnswer(invocation -> "ENC(" + invocation.getArgument(0, String.class) + ")");
 
       try (RedpandaSagaHandler handler = createHandlerWithClient(mockClient)) {
         Map<String, Object> pipelineData =
@@ -583,7 +588,7 @@ class RedpandaSagaHandlerTest {
             (List<Map<String, Object>>)
                 ((Map<String, Object>) captor.getValue().get("pipeline")).get("processors");
         String dsn = (String) processors.get(0).get("dsn");
-        assertTrue(dsn.startsWith("postgres://admin:s3cret@db.local:5432/testdb"));
+        assertEquals("ENC(postgres://admin:s3cret@db.local:5432/testdb?sslmode=disable)", dsn);
       }
     }
 
@@ -592,6 +597,8 @@ class RedpandaSagaHandlerTest {
     void handle_deployWithDatasourcePlaceholder_resolvesDsn() throws Exception {
       RedpandaConnectClient mockClient = mock(RedpandaConnectClient.class);
       doNothing().when(mockClient).createPipeline(any(), anyMap());
+      when(mockClient.encryptDatasourceValue(anyString()))
+          .thenAnswer(invocation -> "ENC(" + invocation.getArgument(0, String.class) + ")");
 
       try (RedpandaSagaHandler handler = createHandlerWithClient(mockClient)) {
         Map<String, Object> pipelineData =
@@ -631,16 +638,17 @@ class RedpandaSagaHandlerTest {
             (List<Map<String, Object>>)
                 ((Map<String, Object>) captor.getValue().get("pipeline")).get("processors");
         String dsn = (String) processors.get(0).get("dsn");
-        assertTrue(dsn.startsWith("postgres://admin:s3cret@db.local:5432/testdb"));
+        assertEquals("ENC(postgres://admin:s3cret@db.local:5432/testdb?sslmode=disable)", dsn);
       }
     }
 
     @Test
-    @DisplayName(
-        "deploys pipeline with encrypted datasource password decrypted before DSN construction")
-    void handle_deployWithEncryptedPassword_decryptsBeforeDsnConstruction() throws Exception {
+    @DisplayName("deploys pipeline with encrypted datasource password preserved as encoded in DSN")
+    void handle_deployWithEncryptedPassword_keepsEncodedPasswordInDsn() throws Exception {
       RedpandaConnectClient mockClient = mock(RedpandaConnectClient.class);
       doNothing().when(mockClient).createPipeline(any(), anyMap());
+      when(mockClient.encryptDatasourceValue(anyString()))
+          .thenAnswer(invocation -> "ENC(" + invocation.getArgument(0, String.class) + ")");
 
       try (RedpandaSagaHandler handler = createHandlerWithClient(mockClient)) {
         // Override the default pass-through: simulate actual decryption of ENC(...) values
@@ -655,7 +663,7 @@ class RedpandaSagaHandlerTest {
                     Map<String, Object> cfg =
                         new HashMap<>((Map<String, Object>) result.get("configuration"));
                     if (cfg.get("password") instanceof String s && s.startsWith("ENC(")) {
-                      cfg.put("password", "decrypted-pass");
+                      cfg.put("password", "decrypted%2Fpass");
                     }
                     result.put("configuration", cfg);
                   }
@@ -697,15 +705,17 @@ class RedpandaSagaHandlerTest {
             org.mockito.ArgumentCaptor.forClass(Map.class);
         verify(mockClient).createPipeline(eq("pipeline-enc"), captor.capture());
 
-        // Verify the DSN contains the decrypted password, not the ENC(...) marker
+        // Verify the DSN stays encrypted in the pipeline payload after rebuilding it
         @SuppressWarnings("unchecked")
         Map<String, Object> input = (Map<String, Object>) captor.getValue().get("input");
         @SuppressWarnings("unchecked")
         Map<String, Object> sqlRaw = (Map<String, Object>) input.get("sql_raw");
         assertNotNull(sqlRaw, "input should contain sql_raw block after label resolution");
         String dsn = (String) sqlRaw.get("dsn");
-        assertTrue(dsn.contains("decrypted-pass"), "DSN should contain decrypted password");
-        assertTrue(!dsn.contains("ENC"), "DSN should not contain ENC marker");
+        assertTrue(dsn.startsWith("ENC("), "DSN should stay encrypted in pipeline payload");
+        assertTrue(
+            dsn.contains("decrypted%2Fpass"),
+            "encrypted DSN payload should contain encoded decrypted password before final send");
       }
     }
   }
@@ -945,6 +955,8 @@ class RedpandaSagaHandlerTest {
     try {
       when(mockClient.decryptDatasourceCredentials(anyMap()))
           .thenAnswer(invocation -> invocation.getArgument(0));
+      when(mockClient.encryptDatasourceValue(anyString()))
+          .thenAnswer(invocation -> "ENC(" + invocation.getArgument(0, String.class) + ")");
     } catch (FatalAdapterException e) {
       throw new RuntimeException(e);
     }
