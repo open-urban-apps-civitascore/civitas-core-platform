@@ -10,7 +10,7 @@ import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { apiRequest } from '@/app/services/api/request/apiRequest'
-import { useCreateUser, useUpdateUser } from '@/app/services/api/users/clientRequests'
+import { useCreateUser, useReplaceUserGroups, useUpdateUser } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageContainer } from '@/components/page-container/PageContainer'
@@ -30,7 +30,6 @@ import { mapUserToFormData } from '@/utils/users'
 
 import { UserBasicInfoTab } from './basic-info-tab/UserBasicInfoTab'
 import { GroupsTab } from './groups-tab/GroupsTab'
-import { useGroupMembership } from './hooks/useGroupMembership'
 import { RolesTab } from './roles-tab/RolesTab'
 
 const tabValues: Record<UserTab, Tab<UserTab>> = {
@@ -69,8 +68,8 @@ export const UserOverview = (props: UserOverviewProps) => {
   const { handleFormValidationError } = useError()
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
-  const { saveGroupMemberships, isSavingGroups } = useGroupMembership(defaultUserData)
-  const isLoading = createUser.isPending || updateUser.isPending || isSavingGroups
+  const replaceUserGroups = useReplaceUserGroups()
+  const isLoading = createUser.isPending || updateUser.isPending || replaceUserGroups.isPending
   const { setSubTabValueParam, subTabValue } = useQueryParams()
   const { handleUserEmailError } = useError()
   const { hasPermission } = usePermissions()
@@ -171,9 +170,12 @@ export const UserOverview = (props: UserOverviewProps) => {
     if (!hasUserFieldChanges && !(hasGroupChanges && canUpdateGroups)) return true
 
     try {
-      // Save group membership changes via PATCH /groups/{id}
+      // Save group membership changes via PUT /users/{id}/groups
       if (hasGroupChanges && canUpdateGroups) {
-        await saveGroupMemberships(parsed.id, form.getValues('groupIds'))
+        await replaceUserGroups.mutateAsync({
+          userId: parsed.id,
+          groupIds: form.getValues('groupIds'),
+        })
       }
 
       // Save user field changes via PATCH /users/{id}

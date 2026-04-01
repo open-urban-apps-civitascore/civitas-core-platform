@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { useCreateMutation } from '@/hooks/use-create-mutation'
@@ -33,6 +33,24 @@ export const useUpdateUser = () =>
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while updating the user.',
   })
+
+export const useReplaceUserGroups = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ userId, groupIds }: { userId: string; groupIds: string[] }) =>
+      apiRequest<User>({
+        endpoint: `/users/${userId}/groups`,
+        method: 'PUT',
+        headers: { 'x-api-request': 'true' },
+        data: groupIds,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [key] })
+      queryClient.invalidateQueries({ queryKey: ['groups'] })
+    },
+  })
+}
 
 // Uses raw useQuery instead of useDataQuery — useDataQuery doesn't support
 // custom staleTime or non-standard endpoints (/users/me vs /{key}/{id}).

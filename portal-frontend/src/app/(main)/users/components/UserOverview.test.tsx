@@ -1,6 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-import { useCreateUser, useGetCurrentUser, useUpdateUser } from '@/app/services/api/users/clientRequests'
+import {
+  useCreateUser,
+  useGetCurrentUser,
+  useReplaceUserGroups,
+  useUpdateUser,
+} from '@/app/services/api/users/clientRequests'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 import { User } from '@/types/users'
 
@@ -34,9 +39,12 @@ vi.mock('@/hooks/use-query-params', () => ({
   }),
 }))
 
+const mockReplaceUserGroupsMutateAsync = vi.fn()
+
 vi.mock('@/app/services/api/users/clientRequests', () => ({
   useCreateUser: vi.fn(() => ({ mutateAsync: mockCreateMutateAsync, isPending: false })),
   useUpdateUser: vi.fn(() => ({ mutateAsync: mockUpdateMutateAsync, isPending: false })),
+  useReplaceUserGroups: vi.fn(() => ({ mutateAsync: mockReplaceUserGroupsMutateAsync, isPending: false })),
   useGetCurrentUser: vi.fn(),
 }))
 
@@ -124,6 +132,10 @@ describe('UserOverview', () => {
       mutateAsync: mockUpdateMutateAsync,
       isPending: false,
     } as unknown as ReturnType<typeof useUpdateUser>)
+    vi.mocked(useReplaceUserGroups).mockReturnValue({
+      mutateAsync: mockReplaceUserGroupsMutateAsync,
+      isPending: false,
+    } as unknown as ReturnType<typeof useReplaceUserGroups>)
     mockCurrentUser(allPermissions)
   })
 
