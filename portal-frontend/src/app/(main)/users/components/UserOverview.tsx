@@ -78,6 +78,9 @@ export const UserOverview = (props: UserOverviewProps) => {
     ...(hasPermission(PERMISSION_NAMES.ASSIGNMENT_READ) ? [tabValues.roles] : []),
   ]
 
+  const disabledTabs = isCreateMode ? [tabValues.roles.value] : undefined
+  const disabledTabTooltips = isCreateMode ? { [tabValues.roles.value]: t('rolesTab.disabledHint') } : undefined
+
   const defaultTab = tabValues.userData.value
 
   const handleSelectTab = (newTab: string) => {
@@ -252,6 +255,8 @@ export const UserOverview = (props: UserOverviewProps) => {
           tabs: tabs,
           selectedTab: subTabValue || defaultTab,
           onTabChange: newTab => handleSelectTab(newTab),
+          disabledTabs,
+          disabledTabTooltips,
         }}
         customElement={headerCustomElement}
       />

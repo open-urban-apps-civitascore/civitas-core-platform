@@ -95,7 +95,9 @@ export const MqttStrictSchema = MqttBaseSchema.partial()
   })
 
 export const MqttApiToFormSchema = MqttApiResponseSchema.transform(({ urls, topics, tls, qos, ...rest }) => ({
-  ...Object.fromEntries(Object.entries(rest).map(([k, v]) => [k, v ?? undefined])),
+  ...Object.fromEntries(
+    Object.entries(rest).map(([k, v]) => [k, typeof v === 'string' && v.trim() === '' ? undefined : (v ?? undefined)]),
+  ),
   urls: urls?.join(', '),
   topics: topics?.join(', '),
   qos: qos == null ? undefined : String(qos),

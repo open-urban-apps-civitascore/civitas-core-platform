@@ -158,6 +158,32 @@ build-portal-model:
       - portal-model/target/*.jar
     expire_in: 1 month
 
+# Run portal-model unit tests
+test-portal-model:
+  extends: .only-portal-model-changes
+  image: maven:3.9-eclipse-temurin-21-alpine
+  stage: build-package
+  needs:
+    - job: setup-version-portal-model
+    - job: build-portal-model
+      artifacts: true
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: portal-model-maven
+      files:
+        - portal-model/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd portal-model
+    - mvn test -Drevision=$PORTAL_MODEL_VERSION
+  artifacts:
+    when: always
+    reports:
+      junit: portal-model/target/surefire-reports/TEST-*.xml
+
 # Publish portal-model artifacts to GitLab Maven repository
 # This makes the artifacts available to portal-backend and other projects
 # Runs in deploy-package stage so backend tests can use the published artifacts

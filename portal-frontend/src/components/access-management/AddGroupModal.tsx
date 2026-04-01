@@ -58,7 +58,6 @@ export const AddGroupModal = (props: AddGroupModalProps) => {
 
   const groups = groupsResponse?.data ?? []
   const totalPages = groupsResponse?.totalPages ?? 0
-  const hasData = groups.length > 0 || isLoading
 
   const { selection, selectedItemsRef, assignedIdsSet, handleSelectionChange, newlySelectedCount } =
     useAddItemSelection({ assignedIds: assignedGroupIds, items: groups, open: !!open })
@@ -164,11 +163,7 @@ export const AddGroupModal = (props: AddGroupModalProps) => {
         </DialogHeader>
 
         <div className="relative h-[calc(100%-var(--title-height)-var(--button-height))]">
-          {!hasData && !isError ? (
-            <div className="flex items-center justify-center h-full text-center text-muted-foreground">
-              {t('addGroupModal.noGroupsAvailable')}
-            </div>
-          ) : isError ? (
+          {isError ? (
             <div className="flex items-center justify-center h-full text-center text-muted-foreground">
               {tCommon('errors.loadingError')}
             </div>

@@ -137,7 +137,6 @@
         "name": "Name",
         "description": "Description"
       },
-      "noGroupsAvailable": "No groups available to add",
       "selectAll": "Select all groups",
       "selectGroup": "Select group",
       "selectedGroups": "{number} selected"
@@ -150,7 +149,6 @@
         "description": "Description",
         "roleType": "Type"
       },
-      "noRolesAvailable": "No roles available to add",
       "selectRole": "Select role",
       "selectAll": "Select all roles",
       "selectedRoles": "{number} selected",
@@ -357,7 +355,8 @@
         "dataset": "Dataset-related assignments are made at the respective Dataset.",
         "datasource": "Data source-related assignments are made at the respective Data source.",
         "datastructure": "Data structure-related assignments are made at the respective Data structure."
-      }
+      },
+      "disabledHint": "Assigned roles can be viewed after saving the user."
     },
     "groupsTab": {
       "title": "Group Membership",
@@ -551,6 +550,8 @@
   "roles": {
     "title": "Roles",
     "newRole": "Create Role",
+    "newSystemRole": "Create System Role",
+    "newDataRole": "Create Data Role",
     "overView": "Overview:",
     "systemRoles": "System Roles",
     "dataRoles": "Data Roles",
@@ -873,6 +874,7 @@
     }
   },
   "pipelineEditor": {
+    "title": "Pipeline Editor",
     "canvas": {
       "noPipeline": "No pipeline available"
     },
@@ -992,7 +994,8 @@
         "apiPairing": "API Request node requires an API Response node in the pipeline",
         "nodeNotConfigured": "{label} is not configured",
         "invalidCronExpression": "{label} has an invalid cron expression. Must be a 6-field Quartz syntax.",
-        "orphanNode": "{label} is not connected to any other node"
+        "orphanNode": "{label} is not connected to any other node",
+        "minimumFunctionalNodes": "Pipeline must have at least one functional node between Start and End"
       }
     },
     "toolbar": {
@@ -1006,6 +1009,14 @@
       "deletePipeline": "Delete Pipeline",
       "deleteConfirmTitle": "Delete Pipeline?",
       "deleteConfirmDescription": "Are you sure you want to delete this pipeline? This action cannot be undone."
+    },
+    "header": {
+      "saveAll": "Save All",
+      "savingAll": "Saving...",
+      "exit": "Exit",
+      "validationFailed": "Validation failed for: {names}",
+      "duplicateNames": "Duplicate pipeline names: {names}",
+      "saveFailed": "Failed to save: {names}"
     },
     "tabs": {
       "closeTab": "Close tab",

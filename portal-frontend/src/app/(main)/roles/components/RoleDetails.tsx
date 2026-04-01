@@ -90,6 +90,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const canUpdate = !roleId || hasPermission(PERMISSION_NAMES.ROLE_UPDATE)
   const canDelete = hasPermission(PERMISSION_NAMES.ROLE_DELETE)
+  const canReadAssignments = hasPermission(PERMISSION_NAMES.ASSIGNMENT_READ)
 
   const [isReadOnly, setIsReadOnly] = useState(!!roleId)
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
@@ -121,7 +122,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     error: getAssignmentsError,
   } = useGetAssignments({
     params: assignmentsParams,
-    isEnabled: !!roleId,
+    isEnabled: !!roleId && canReadAssignments,
   })
 
   const initialPlatformAssignments = useMemo(
@@ -232,6 +233,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         name: formValues.name,
         description: formValues.description,
         roleType: (tabValue as Role['roleType']) || DEFAULT_TAB,
+        permissionIds: pendingPermissionIds,
         readonly: formValues.readonly,
       })
       toast.success(tCommon('success.creationSuccess', { item: tCommon('items.role') }))
@@ -347,12 +349,14 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   // Tab configuration
   // - Permission-gated tabs are hidden (no affordance = no confusion)
   // - State-gated tabs (unsaved role) are disabled (visible but greyed out)
-  const disabledTabs = !roleId ? ['permissions', 'groupAssignment'] : undefined
+  const disabledTabs = !roleId ? ['groupAssignment'] : undefined
 
   const subTabs: Tab<RoleTab>[] = [
     subTabValues.basicInformation,
     ...(hasPermission(PERMISSION_NAMES.PERMISSION_READ) ? [subTabValues.permissions] : []),
-    ...(hasPermission(PERMISSION_NAMES.GROUP_READ) ? [subTabValues.groupAssignment] : []),
+    ...(hasPermission(PERMISSION_NAMES.ASSIGNMENT_READ) && hasPermission(PERMISSION_NAMES.GROUP_READ)
+      ? [subTabValues.groupAssignment]
+      : []),
   ]
   const defaultSubTab = subTabValues.basicInformation.value
 

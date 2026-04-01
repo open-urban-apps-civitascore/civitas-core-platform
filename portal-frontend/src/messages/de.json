@@ -136,7 +136,6 @@
         "name": "Name",
         "description": "Beschreibung"
       },
-      "noGroupsAvailable": "Keine Gruppen verfügbar, die hinzugefügt werden können",
       "selectAll": "Alle Gruppen auswählen",
       "selectGroup": "Gruppe auswählen",
       "selectedGroups": "{number} ausgewählt"
@@ -149,7 +148,6 @@
         "description": "Beschreibung",
         "roleType": "Typ"
       },
-      "noRolesAvailable": "Keine Rollen verfügbar, die hinzugefügt werden können",
       "selectRole": "Rolle auswählen",
       "selectAll": "Alle Rollen auswählen",
       "selectedRoles": "{number} ausgewählt",
@@ -354,7 +352,8 @@
         "dataset": "Datensatzbezogene Zuordnungen erfolgen am jeweiligen Datensatz.",
         "datasource": "Datenquellenbezogene Zuordnungen erfolgen an der jeweiligen Datenquelle.",
         "datastructure": "Datenstrukturbezogene Zuordnungen erfolgen an der jeweiligen Datenstruktur."
-      }
+      },
+      "disabledHint": "Zugeordnete Rollen können nach dem Speichern des Nutzers eingesehen werden."
     },
     "groupsTab": {
       "title": "Gruppenmitgliedschaft",
@@ -544,6 +543,8 @@
   "roles": {
     "title": "Rollen",
     "newRole": "Rolle erstellen",
+    "newSystemRole": "Systemrolle erstellen",
+    "newDataRole": "Datenrolle erstellen",
     "overView": "Übersicht:",
     "systemRoles": " Systemrollen",
     "dataRoles": "Datenrollen",
@@ -859,6 +860,7 @@
     }
   },
   "pipelineEditor": {
+    "title": "Pipeline-Editor",
     "canvas": {
       "noPipeline": "Keine Pipeline verfügbar"
     },
@@ -978,7 +980,8 @@
         "apiPairing": "API-Request-Knoten benötigt einen API-Response-Knoten in der Pipeline",
         "nodeNotConfigured": "{label} ist nicht konfiguriert",
         "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein.",
-        "orphanNode": "{label} ist mit keinem anderen Knoten verbunden"
+        "orphanNode": "{label} ist mit keinem anderen Knoten verbunden",
+        "minimumFunctionalNodes": "Pipeline muss mindestens einen funktionalen Knoten zwischen Start und Ende haben"
       }
     },
     "toolbar": {
@@ -992,6 +995,14 @@
       "deletePipeline": "Pipeline löschen",
       "deleteConfirmTitle": "Pipeline löschen?",
       "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "header": {
+      "saveAll": "Alle speichern",
+      "savingAll": "Speichert...",
+      "exit": "Beenden",
+      "validationFailed": "Validierung fehlgeschlagen für: {names}",
+      "duplicateNames": "Doppelte Pipeline-Namen: {names}",
+      "saveFailed": "Speichern fehlgeschlagen: {names}"
     },
     "tabs": {
       "closeTab": "Tab schließen",

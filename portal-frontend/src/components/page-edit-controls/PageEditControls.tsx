@@ -14,12 +14,14 @@ type PageEditControlsProps<T extends StatusTypes> = ActionButtonsProps & {
   status: T
   onStatusChange: (status: T) => void
   canSetAvailable: boolean
+  canSetDraft?: boolean
   canRelease?: boolean
   onEditClick: () => void
   isReadOnly: boolean
   formId?: string
   statusOptions: T[]
   canEdit?: boolean
+  statusHint?: string
 }
 
 const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>): JSX.Element => {
@@ -27,6 +29,7 @@ const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>
     status,
     onStatusChange,
     canSetAvailable,
+    canSetDraft,
     canRelease,
     hasCard = true,
     wrapperClassname,
@@ -36,6 +39,7 @@ const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>
     formId,
     statusOptions,
     canEdit = true,
+    statusHint,
     ...actionButtonsProps
   } = props
 
@@ -53,8 +57,10 @@ const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>
         statusOptions={statusOptions}
         onStatusChange={onStatusChange}
         canSetAvailable={canSetAvailable}
+        canSetDraft={canSetDraft}
         canRelease={canRelease}
         isReadOnly={isReadOnly}
+        statusHint={statusHint}
       />
 
       <div>

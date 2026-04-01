@@ -44,7 +44,7 @@ describe('RoleTemplateSelect', () => {
   ]
 
   it('renders the component with correct options', () => {
-    render(<RoleTemplateSelect setRoleTemplate={setRoleTemplate} allRoles={allRoles} />)
+    render(<RoleTemplateSelect setRoleTemplate={setRoleTemplate} templateRoles={allRoles} />)
 
     const selectTrigger = screen.getByRole('combobox')
     fireEvent.click(selectTrigger)
@@ -54,7 +54,7 @@ describe('RoleTemplateSelect', () => {
   })
 
   it('calls setRoleTemplate with the correct role ID when a role is selected', () => {
-    render(<RoleTemplateSelect setRoleTemplate={setRoleTemplate} allRoles={allRoles} />)
+    render(<RoleTemplateSelect setRoleTemplate={setRoleTemplate} templateRoles={allRoles} />)
 
     const selectTrigger = screen.getByRole('combobox')
     fireEvent.click(selectTrigger)

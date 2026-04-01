@@ -4,6 +4,7 @@ import de.civitascore.portal.mapper.DataSpaceMapper;
 import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.input.DataSpaceInputDTO;
 import de.civitascore.portal.repository.DataSpaceRepository;
+import de.civitascore.portal.util.ResourceInUseException;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -70,5 +71,18 @@ public class DataSpaceService extends BaseService<DataSpace, DataSpaceInputDTO> 
     }
 
     return super.postConvertToEntity(entity, input);
+  }
+
+  @Override
+  protected DataSpace preProcessDelete(UUID id) {
+    DataSpace dataSpace = findByIdOrThrow(id);
+    if (!dataSpace.getChildDataSpaces().isEmpty()) {
+      throw new ResourceInUseException(
+          "DataSpace",
+          dataSpace.getId(),
+          "Cannot delete DataSpace because it has child data spaces. Remove or reassign child"
+              + " data spaces first.");
+    }
+    return dataSpace;
   }
 }

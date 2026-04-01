@@ -4,12 +4,12 @@
  * PipelineToolbar Component
  *
  * Toolbar for pipeline editor actions.
- * Provides Validate, Save, and pipeline settings (gear icon with delete) functionality.
- * Validation results are now shown in the inspector panel.
+ * Provides Validate and pipeline settings (gear icon with delete) functionality.
+ * Validation results are shown in the inspector panel.
  *
  */
 
-import { CheckCircle2, Loader2, Save, Settings, Trash2 } from 'lucide-react'
+import { CheckCircle2, Settings, Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useState } from 'react'
 
@@ -33,24 +33,13 @@ interface PipelineToolbarProps {
 // ============================================================================
 
 /**
- * Toolbar with pipeline name, gear menu, Validate, and Save actions.
- * Save button is only enabled after validation passes.
+ * Toolbar with pipeline name, gear menu, and Validate action.
  * Gear icon opens a dropdown with "Delete Pipeline" option.
  *
  */
 export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = '' }) => {
   const t = useTranslations('pipelineEditor')
-  const {
-    pipeline,
-    runValidation,
-    savePipeline,
-    deletePipeline,
-    isDirty,
-    canSave,
-    isValidationRequired,
-    isSaving,
-    isDeleting,
-  } = useActivePipeline()
+  const { pipeline, runValidation, deletePipeline, isDirty, isDeleting } = useActivePipeline()
 
   const [shouldShowDeleteConfirm, setShouldShowDeleteConfirm] = useState(false)
 
@@ -65,18 +54,6 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
 
     runValidation()
   }, [pipeline, runValidation])
-
-  /**
-   * Handle save button click.
-   * Only enabled when canSave is true (validation passed, no errors).
-   */
-  const handleSave = useCallback(() => {
-    if (!pipeline || !canSave) {
-      return
-    }
-
-    void savePipeline()
-  }, [pipeline, canSave, savePipeline])
 
   /**
    * Handle delete confirmation.
@@ -121,23 +98,11 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
           )}
         </div>
 
-        {/* Center - Validation hint when needed */}
+        {/* Right side - Validate */}
         <div className="flex items-center gap-2">
-          {isDirty && isValidationRequired && (
-            <span className="text-xs text-muted-foreground">{t('toolbar.validateBeforeSave')}</span>
-          )}
-        </div>
-
-        {/* Right side - Actions */}
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleValidate} disabled={!pipeline || isSaving}>
+          <Button variant="outline" size="sm" onClick={handleValidate} disabled={!pipeline}>
             <CheckCircle2 className="mr-1 h-4 w-4" />
             {t('toolbar.validate')}
-          </Button>
-
-          <Button variant="default" size="sm" onClick={handleSave} disabled={!canSave || isSaving}>
-            {isSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
-            {isSaving ? t('toolbar.saving') : t('toolbar.save')}
           </Button>
         </div>
       </div>

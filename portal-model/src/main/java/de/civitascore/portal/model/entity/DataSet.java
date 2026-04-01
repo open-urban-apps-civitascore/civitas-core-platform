@@ -20,7 +20,6 @@ import jakarta.persistence.UniqueConstraint;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -163,7 +162,9 @@ public class DataSet extends BaseDataEntity {
    */
   public void setDistributions(Collection<Distribution> newDistributions) {
     this.distributions.clear();
-    Optional.ofNullable(newDistributions).ifPresent(distributions::addAll);
+    if (newDistributions != null) {
+      this.distributions.addAll(newDistributions);
+    }
   }
 
   /**
@@ -174,7 +175,9 @@ public class DataSet extends BaseDataEntity {
    */
   public void setPipelines(Collection<Pipeline> newPipelines) {
     this.pipelines.clear();
-    Optional.ofNullable(newPipelines).ifPresent(pipelines::addAll);
+    if (newPipelines != null) {
+      this.pipelines.addAll(newPipelines);
+    }
   }
 
   /**

@@ -277,6 +277,34 @@ const validateCronExpression: ValidationRule = {
 }
 
 /**
+ * Rule: Pipeline must have at least one functional node between Start and End.
+ */
+const validateMinimumFunctionalNodes: ValidationRule = {
+  id: 'minimum-functional-nodes',
+  name: 'Minimum Functional Nodes',
+  description: 'Pipeline must have at least one functional node between Start and End',
+  validate: (pipeline: Pipeline) => {
+    const functionalNodes = pipeline.nodes.filter(node => node.type !== 'start' && node.type !== 'end')
+
+    if (functionalNodes.length === 0) {
+      return {
+        errors: [
+          {
+            id: crypto.randomUUID(),
+            type: 'structure',
+            messageKey: 'validation.messages.minimumFunctionalNodes',
+            severity: 'error',
+          },
+        ],
+        warnings: [],
+      }
+    }
+
+    return { errors: [], warnings: [] }
+  },
+}
+
+/**
  * Rule: All nodes must be connected to the pipeline flow.
  */
 const validateOrphanNodes: ValidationRule = {
@@ -325,6 +353,7 @@ const validateOrphanNodes: ValidationRule = {
 export const VALIDATION_RULES: ValidationRule[] = [
   validateStartNode,
   validateEndNode,
+  validateMinimumFunctionalNodes,
   validateApiPairing,
   validateNodeConfiguration,
   validateCronExpression,

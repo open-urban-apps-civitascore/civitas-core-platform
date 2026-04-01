@@ -100,16 +100,18 @@ export interface ActivePipelineContextValue {
   hideValidationPanel: () => void
 
   // ===== Pipeline Operations =====
-  /** Save pipeline to backend API */
-  savePipeline: () => Promise<boolean>
-  /** Whether a save operation is currently in progress */
-  isSaving: boolean
   /** Delete the active pipeline from backend and remove its tab */
   deletePipeline: () => void
   /** Whether a delete operation is currently in progress */
   isDeleting: boolean
   /** Whether pipelines are being loaded from the backend */
   isLoadingPipelines: boolean
+  /** Save all dirty pipelines across all tabs. Returns true if all saves succeeded. */
+  saveAllPipelines: () => Promise<boolean>
+  /** Whether a save-all operation is currently in progress */
+  isSavingAll: boolean
+  /** Whether any session has unsaved changes */
+  hasAnyDirtySession: boolean
 
   // ===== Session Info =====
   /** ID of the active session */

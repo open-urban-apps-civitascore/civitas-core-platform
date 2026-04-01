@@ -152,6 +152,7 @@ export const sessionReducer = (state: PipelineSessionState, action: PipelineSess
                 ...session,
                 name,
                 pipeline: { ...session.pipeline, name },
+                isDirty: true,
                 lastModified: new Date(),
               }
             : session,

@@ -60,7 +60,6 @@ export const AddRoleModal = (props: AddRoleModalProps) => {
 
   const roles = rolesResponse?.data ?? []
   const totalPages = rolesResponse?.totalPages ?? 0
-  const hasData = roles.length > 0 || isLoading
 
   const { selection, selectedItemsRef, assignedIdsSet, handleSelectionChange, newlySelectedCount } =
     useAddItemSelection({ assignedIds: assignedRoleIds, items: roles, open: !!open })
@@ -175,11 +174,7 @@ export const AddRoleModal = (props: AddRoleModalProps) => {
         </DialogHeader>
 
         <div className="relative h-[calc(100%-var(--title-height)-var(--button-height))]">
-          {!hasData && !isError ? (
-            <div className="flex items-center justify-center h-full text-center text-muted-foreground">
-              {t('addRoleModal.noRolesAvailable')}
-            </div>
-          ) : isError ? (
+          {isError ? (
             <div className="flex items-center justify-center h-full text-center text-muted-foreground">
               {tCommon('errors.loadingError')}
             </div>

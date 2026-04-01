@@ -184,7 +184,7 @@ describe('AddRoleModal', () => {
       </NextIntlClientProvider>,
     )
 
-    expect(screen.getByText(/keine rollen verfügbar, die hinzugefügt werden können/i)).toBeInTheDocument()
+    expect(screen.getByText(/es gibt leider keine ergebnisse/i)).toBeInTheDocument()
 
     // Restore default mock
     mockUseGetRoles.mockReturnValue({
