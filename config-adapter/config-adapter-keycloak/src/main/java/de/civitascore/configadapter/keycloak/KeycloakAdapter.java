@@ -118,11 +118,12 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
             .clientId(getAdapterProperty(CLIENT_ID_PROPERTY_KEY, "admin-cli"))
             .build();
 
-    // Read optional invitation redirect configuration for execute-actions-email.
-    // When both are set, the actions email link will redirect the user back to the
-    // specified client after completing all required actions (e.g., password setup).
+    // Verify Keycloak credentials are valid by making a test API call.
+    validateKeycloakConnection();
+
     this.invitationClientId = getAdapterProperty(INVITATION_CLIENT_ID_PROPERTY_KEY);
     this.invitationRedirectUri = getAdapterProperty(INVITATION_REDIRECT_URI_PROPERTY_KEY);
+    validateInvitationConfig();
 
     logger.info(
         "Keycloak adapter '{}' initialized for: {}",
@@ -138,6 +139,45 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
         "Subscribed to {} Kafka topics: {}",
         getSubscribedTopics().size(),
         Encode.forJava(String.valueOf(getSubscribedTopics())));
+  }
+
+  /**
+   * Validates that the Keycloak admin credentials are correct by making a test API call. Fails fast
+   * at startup if the adapter cannot authenticate, rather than silently failing on every event.
+   *
+   * @throws RuntimeException if the connection or authentication fails
+   */
+  private void validateKeycloakConnection() {
+    try {
+      keycloakClient.serverInfo().getInfo();
+      logger.info("Keycloak connection validated successfully");
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Failed to connect to Keycloak or authenticate. "
+              + "Please verify the Keycloak URL and admin credentials are correct.",
+          e);
+    }
+  }
+
+  /**
+   * Validates that the invitation redirect configuration is consistent. Both {@code
+   * invitation.client.id} and {@code invitation.redirect.uri} must be set together or neither
+   * should be set.
+   *
+   * @throws IllegalArgumentException if only one of the two properties is set
+   */
+  private void validateInvitationConfig() {
+    boolean hasClientId = invitationClientId != null && !invitationClientId.isBlank();
+    boolean hasRedirectUri = invitationRedirectUri != null && !invitationRedirectUri.isBlank();
+    if (hasClientId != hasRedirectUri) {
+      throw new IllegalArgumentException(
+          "Both 'keycloak.invitation.client.id' and 'keycloak.invitation.redirect.uri' "
+              + "must be set together or neither should be set. "
+              + "invitation.client.id="
+              + invitationClientId
+              + ", invitation.redirect.uri="
+              + invitationRedirectUri);
+    }
   }
 
   /*
@@ -505,33 +545,32 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
    * client ID and redirect URI in the Keycloak action token, so that after the user completes all
    * required actions (e.g., UPDATE_PASSWORD, VERIFY_EMAIL), Keycloak redirects them back to the
    * portal instead of showing a generic "account updated" page.
+   *
+   * @throws Exception if invitation redirect is configured and the email sending fails
    */
   private void sendActionsEmail(
-      RealmResource realmResource, String userId, List<String> requiredActions) {
+      RealmResource realmResource, String userId, List<String> requiredActions) throws Exception {
     if (requiredActions == null || requiredActions.isEmpty()) {
       return;
     }
-    try {
-      if (invitationClientId != null && invitationRedirectUri != null) {
-        // Use the overload with clientId and redirectUri so Keycloak redirects the user
-        // back to the portal after completing all required actions
+    if (invitationClientId != null && invitationRedirectUri != null) {
         realmResource
-            .users()
-            .get(userId)
-            .executeActionsEmail(invitationClientId, invitationRedirectUri, requiredActions);
-      } else {
-        // Fallback: no redirect configuration, use simple overload
+          .users()
+          .get(userId)
+          .executeActionsEmail(invitationClientId, invitationRedirectUri, requiredActions);
+    } else {
+      try {
         realmResource.users().get(userId).executeActionsEmail(requiredActions);
         logger.info(
             "Sent actions email to user {} for actions: {}",
             Encode.forJava(maskId(userId)),
             Encode.forJava(String.valueOf(requiredActions)));
+      } catch (Exception e) {
+        logger.warn(
+            "Failed to send actions email for user {}: {}",
+            Encode.forJava(maskId(userId)),
+            Encode.forJava(String.valueOf(e.getMessage())));
       }
-    } catch (Exception e) {
-      logger.warn(
-          "Failed to send actions email for user {}: {}",
-          Encode.forJava(maskId(userId)),
-          Encode.forJava(String.valueOf(e.getMessage())));
     }
   }
 

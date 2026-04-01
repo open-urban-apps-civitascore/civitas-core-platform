@@ -183,6 +183,42 @@ abstract class KeycloakAdapterIntegrationTestBase {
     assertEquals(ConfigResultEvent.Status.SUCCESS, events.getFirst().status());
   }
 
+  /**
+   * Creates a KeycloakAdapter with custom properties, useful for testing different configurations.
+   * The returned adapter must be closed by the caller.
+   */
+  protected KeycloakAdapter createAdapterWithProps(Map<String, Object> additionalProps) {
+    String keycloakUrl = "http://" + KEYCLOAK.getHost() + ":" + KEYCLOAK.getMappedPort(8080);
+    Map<String, Object> props = new HashMap<>();
+    props.put("keycloak.url", keycloakUrl);
+    props.put("keycloak.realm", "master");
+    props.put("keycloak.username", "admin");
+    props.put("keycloak.password", "admin");
+    props.put("keycloak.client.id", "admin-cli");
+    props.put(
+        "keycloak.topics",
+        String.join(
+            ",",
+            Topics.USER_CREATED.toString(),
+            Topics.USER_UPDATED.toString(),
+            Topics.USER_DELETED.toString(),
+            Topics.USER_LOCKED.toString(),
+            Topics.USER_UNLOCKED.toString(),
+            Topics.USER_PASSWORD_CHANGED.toString(),
+            Topics.USER_PASSWORD_RESET.toString(),
+            Topics.REALM_CREATED.toString(),
+            Topics.REALM_UPDATED.toString(),
+            Topics.REALM_DELETED.toString(),
+            Topics.CLIENT_CREATED.toString(),
+            Topics.CLIENT_UPDATED.toString(),
+            Topics.CLIENT_DELETED.toString()));
+    props.putAll(additionalProps);
+    AppConfig config = new AppConfig(new MapConfiguration(props));
+    KeycloakAdapter customAdapter = new KeycloakAdapter();
+    customAdapter.initialize(config);
+    return customAdapter;
+  }
+
   protected String getMailpitApiUrl() {
     return "http://" + MAILPIT.getHost() + ":" + MAILPIT.getMappedPort(8025) + "/api/v1/messages";
   }
