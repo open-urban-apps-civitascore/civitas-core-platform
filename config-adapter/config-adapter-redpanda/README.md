@@ -361,7 +361,7 @@ Pipeline configurations may contain sensitive values (database connection string
 
 Non-`ENC(...)` string values pass through unchanged.
 
-For SQL datasources, `user` and `password` are optional in both `sql_raw` and `sql_select`. If `password` is provided as `ENC(...)`, datasource credentials are decrypted before DSN construction so the encrypted marker is not URL-encoded into the DSN string.
+For SQL datasource events, `user` and `password` may arrive alongside `dsn`. Before RedPanda Connect is called, the adapter resolves missing SQL credentials into the DSN. If the DSN does not yet contain user info, the password is decrypted, the DSN is completed, and the resulting full DSN is wrapped again as a single `ENC(...)` value. If the resulting password is already URL-encoded, that encoded form is preserved inside the DSN.
 
 ### Environment Variables
 
@@ -415,9 +415,9 @@ For SQL datasources, the adapter supports two rendering modes:
 | `query` present | `sql_raw` |
 | `table` + non-empty `columns` present | `sql_select` |
 
-The `where`, `user`, and `password` fields are optional. `where` is only rendered for `sql_select`, while `user` and `password` are passed through for both SQL input modes when present.
+The `where` field is optional for `sql_select`. SQL credentials may be present in the incoming datasource event, but the final RedPanda SQL input uses the DSN as the credential carrier.
 
-Before SQL datasource placeholders are rendered, datasource credentials are decrypted with the shared datasource credential context. This ensures encrypted passwords can still be safely incorporated into generated DSN strings without destroying the `ENC(...)` marker through URL encoding.
+Before SQL datasource placeholders are rendered, datasource credentials are decrypted with the shared datasource credential context. If the DSN has no embedded user info, the adapter rebuilds it from the datasource credentials and then re-encrypts the full DSN so it stays protected until final YAML serialization.
 
 #### SQL Input Validation
 
@@ -426,7 +426,7 @@ Structured SQL datasource definitions must be internally consistent:
 - `query` may be used on its own and results in `sql_raw`
 - `table` and non-empty `columns` must always be provided together and result in `sql_select`
 - providing only `table` or only `columns` is rejected as invalid input
-- `user` and `password` are optional for both SQL modes
+- optional datasource credentials can arrive separately and are merged into the DSN when the DSN does not already contain user info
 
 This validation happens before the pipeline is serialized and prevents ambiguous SQL datasource definitions from reaching RedPanda Connect.
 
@@ -565,7 +565,7 @@ For SQL datasource-backed pipelines, also check the rendered input mode:
 - `sql_raw` requires `query`
 - `sql_select` requires both `table` and non-empty `columns`
 - `where` is optional for `sql_select`
-- `user` and `password` are optional for both SQL input modes
+- datasource credentials may arrive separately in the datasource event but are carried in the DSN at RedPanda input level
 
 If only one of `table` or `columns` is provided, the adapter rejects the datasource definition before deployment.
 
