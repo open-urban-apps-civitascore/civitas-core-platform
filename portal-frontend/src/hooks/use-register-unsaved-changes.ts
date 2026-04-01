@@ -24,13 +24,14 @@ export const useRegisterUnsavedChanges = (isDirty: boolean, saveHandler?: () => 
   }, [isDirty, setHasUnsavedChanges])
 
   useEffect(() => {
-    setSaveHandler(hasSaveHandler ? stableSaveHandler : null)
+    if (!hasSaveHandler) return
+    setSaveHandler(stableSaveHandler)
+    return () => setSaveHandler(null)
   }, [hasSaveHandler, setSaveHandler, stableSaveHandler])
 
   useEffect(() => {
     return () => {
       setHasUnsavedChanges(false)
-      setSaveHandler(null)
     }
-  }, [setHasUnsavedChanges, setSaveHandler])
+  }, [setHasUnsavedChanges])
 }

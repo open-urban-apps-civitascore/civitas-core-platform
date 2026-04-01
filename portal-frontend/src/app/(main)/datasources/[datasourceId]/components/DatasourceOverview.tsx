@@ -110,13 +110,18 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     setSelectedDatastructureId(initialDatastructureId)
     setSelectedDatastructureVersionId(initialVersionId)
   }
-  const handleSave = async () =>
+  const handleSave = () =>
     submitDatasource(() => {
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
       router.refresh()
     })
 
-  useRegisterUnsavedChanges(hasUnsavedChanges, handleSave)
+  const handleSaveForUnsavedChanges = () =>
+    submitDatasource(() => {
+      setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
+    })
+
+  useRegisterUnsavedChanges(hasUnsavedChanges, handleSaveForUnsavedChanges)
 
   const handleExit = () => {
     if (hasUnsavedChanges) {
