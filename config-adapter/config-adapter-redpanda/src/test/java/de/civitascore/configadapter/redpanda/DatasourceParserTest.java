@@ -221,6 +221,8 @@ class DatasourceParserTest {
 
       assertEquals("postgres://user:pass@db:5432/mydb?sslmode=disable", sql.dsn());
       assertEquals("postgres", sql.driver());
+      assertNull(sql.user());
+      assertNull(sql.password());
     }
 
     @Test
@@ -237,6 +239,8 @@ class DatasourceParserTest {
       ConnectorConfig.Sql sql = (ConnectorConfig.Sql) DatasourceParser.parse(ds).orElseThrow();
 
       assertEquals("postgres://reader:pw@db.local:5432/sensordb?sslmode=disable", sql.dsn());
+      assertEquals("reader", sql.user());
+      assertEquals("pw", sql.password());
     }
 
     @Test
@@ -303,6 +307,92 @@ class DatasourceParserTest {
       ConnectorConfig.Sql sql = (ConnectorConfig.Sql) DatasourceParser.parse(ds).orElseThrow();
 
       assertEquals("SELECT * FROM t", sql.query());
+    }
+
+    @Test
+    @DisplayName("includes sql user and encrypted password when present")
+    void parseSql_withCredentials_includesUserAndPassword() throws Exception {
+      Datasource ds = new Datasource();
+      ds.setId("ds-credentials");
+      ds.setType("sql");
+      ds.handleUnknownProperty(
+          "configuration",
+          Map.of(
+              "dsn", "postgres://u:p@h:5432/d",
+              "username", "sql-user",
+              "password", "ENC(secret)",
+              "query", "SELECT 1"));
+
+      ConnectorConfig.Sql sql = (ConnectorConfig.Sql) DatasourceParser.parse(ds).orElseThrow();
+
+      assertEquals("sql-user", sql.user());
+      assertEquals("ENC(secret)", sql.password());
+    }
+
+    @Test
+    @DisplayName("keeps sql user and password optional when absent")
+    void parseSql_withoutCredentials_keepsUserAndPasswordNull() throws Exception {
+      Datasource ds = new Datasource();
+      ds.setId("ds-no-credentials");
+      ds.setType("sql");
+      ds.handleUnknownProperty(
+          "configuration",
+          Map.of(
+              "dsn", "postgres://u:p@h:5432/d",
+              "table", "public.device_definitions",
+              "columns", List.of("*")));
+
+      ConnectorConfig.Sql sql = (ConnectorConfig.Sql) DatasourceParser.parse(ds).orElseThrow();
+
+      assertNull(sql.user());
+      assertNull(sql.password());
+    }
+
+    @Test
+    @DisplayName("includes optional where for sql_select inputs")
+    void parseSql_withTableColumnsAndWhere_includesWhere() throws Exception {
+      Datasource ds = new Datasource();
+      ds.setId("ds-select");
+      ds.setType("sql");
+      ds.handleUnknownProperty(
+          "configuration",
+          Map.of(
+              "dsn", "postgres://u:p@h:5432/d",
+              "table", "public.device_definitions",
+              "columns", List.of("*"),
+              "where", "device_id = 1"));
+
+      ConnectorConfig.Sql sql = (ConnectorConfig.Sql) DatasourceParser.parse(ds).orElseThrow();
+
+      assertNull(sql.query());
+      assertEquals("public.device_definitions", sql.table());
+      assertEquals(List.of("*"), sql.columns());
+      assertEquals("device_id = 1", sql.where());
+    }
+
+    @Test
+    @DisplayName("rejects table without columns")
+    void parseSql_withTableButNoColumns_rejectsInvalidSelectInput() {
+      Datasource ds = new Datasource();
+      ds.setId("ds-select-invalid-table");
+      ds.setType("sql");
+      ds.handleUnknownProperty(
+          "configuration",
+          Map.of("dsn", "postgres://u:p@h:5432/d", "table", "public.device_definitions"));
+
+      assertThrows(IllegalArgumentException.class, () -> DatasourceParser.parse(ds));
+    }
+
+    @Test
+    @DisplayName("rejects columns without table")
+    void parseSql_withColumnsButNoTable_rejectsInvalidSelectInput() {
+      Datasource ds = new Datasource();
+      ds.setId("ds-select-invalid-columns");
+      ds.setType("sql");
+      ds.handleUnknownProperty(
+          "configuration", Map.of("dsn", "postgres://u:p@h:5432/d", "columns", List.of("*")));
+
+      assertThrows(IllegalArgumentException.class, () -> DatasourceParser.parse(ds));
     }
   }
 

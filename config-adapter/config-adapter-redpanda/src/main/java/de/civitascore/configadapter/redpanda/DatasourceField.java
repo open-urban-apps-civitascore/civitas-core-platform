@@ -40,6 +40,9 @@ enum DatasourceField {
   DSN("dsn"),
   DRIVER("driver"),
   QUERY("query"),
+  TABLE("table"),
+  COLUMNS("columns"),
+  WHERE("where"),
   DATABASE("database"),
   USERNAME("username", "user"),
   SSL_MODE("ssl_mode");
