@@ -13,7 +13,7 @@ export const TableContainer = (props: GrindContainerProps) => {
     : ''
   const height = `calc(100%${searchBarHeight}${segmentedControlBarHeight})`
   return (
-    <div className={className} style={{ maxHeight: height }}>
+    <div className={className} style={{ height: height }}>
       {children}
     </div>
   )
