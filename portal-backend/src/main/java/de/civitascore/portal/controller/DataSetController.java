@@ -11,7 +11,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -21,6 +23,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -120,6 +123,10 @@ public class DataSetController
       summary = "Update metadata of a published dataset",
       description =
           "Updates only the metadata (name, description) of a published dataset (READY or AVAILABLE status). Cannot modify persistenceId or pipelines. For DRAFT datasets, use PUT /datasets/{id} instead.")
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> updatePublishedMeta(
       @PathVariable UUID id, @Valid @RequestBody DataSetInputDTO input) {
     DataSetInputDTO preProcessedInput = preProcessInput(input);
@@ -203,6 +210,10 @@ public class DataSetController
       summary = "Unrelease a dataset",
       description =
           "Unreleases a dataset by triggering infrastructure teardown via saga. The dataset transitions from AVAILABLE to READY after the saga completes.")
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> unreleaseDataSet(@PathVariable UUID id) {
     DataSet unreleased = dataSetService.unrelease(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(unreleased);
