@@ -548,7 +548,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       return;
     }
     if (invitationClientId != null && invitationRedirectUri != null) {
-        realmResource
+      realmResource
           .users()
           .get(userId)
           .executeActionsEmail(invitationClientId, invitationRedirectUri, requiredActions);
