@@ -3589,9 +3589,9 @@ paths:
         schema:
           type: string
           example: group-456
-      - name: memberId
+      - name: memberIds
         in: query
-        description: Filter by member user ID (exact match).
+        description: Filter by member user ID(s), comma-separated.
         schema:
           type: string
           example: user-456

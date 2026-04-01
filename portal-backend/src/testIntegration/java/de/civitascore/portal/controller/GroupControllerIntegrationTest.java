@@ -309,7 +309,7 @@ class GroupControllerIntegrationTest
       // Create a group without this member
       performCreate(createValidInput());
 
-      Map<String, String> params = Map.of("memberId", user.getId().toString());
+      Map<String, String> params = Map.of("memberIds", user.getId().toString());
       ResponseEntity<RestPage<GroupOutputDTO>> response = performGetAll(params);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -334,7 +334,7 @@ class GroupControllerIntegrationTest
       // Create a group without either member
       performCreate(createValidInput());
 
-      Map<String, String> params = Map.of("memberId", user1.getId() + "," + user2.getId());
+      Map<String, String> params = Map.of("memberIds", user1.getId() + "," + user2.getId());
       ResponseEntity<RestPage<GroupOutputDTO>> response = performGetAll(params);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -347,7 +347,7 @@ class GroupControllerIntegrationTest
     void shouldReturnEmptyForNonExistentMemberId() {
       performCreate(createValidInput());
 
-      Map<String, String> params = Map.of("memberId", UUID.randomUUID().toString());
+      Map<String, String> params = Map.of("memberIds", UUID.randomUUID().toString());
       ResponseEntity<RestPage<GroupOutputDTO>> response = performGetAll(params);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);

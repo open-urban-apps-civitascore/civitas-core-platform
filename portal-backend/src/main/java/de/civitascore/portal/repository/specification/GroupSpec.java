@@ -12,7 +12,7 @@ interface GroupContactUserIdSpec extends NamedEntitySpec<Group> {}
 @Spec(path = "parentGroup.id", params = "parentGroupId", spec = Equal.class)
 interface GroupParentGroupIdSpec extends NamedEntitySpec<Group> {}
 
-@Spec(path = "members.id", params = "memberId", paramSeparator = ',', spec = In.class)
+@Spec(path = "members.id", params = "memberIds", paramSeparator = ',', spec = In.class)
 interface GroupMemberIdSpec extends NamedEntitySpec<Group> {}
 
 /** JPA Specification for filtering {@link Group} entities via query parameters. */

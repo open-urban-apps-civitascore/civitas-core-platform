@@ -42,7 +42,7 @@ export const GroupsTab = (props: GroupsTabProps) => {
 
   // Build server-side pagination/sort/filter params
   const memberParams = useMemo(() => {
-    const params = new URLSearchParams({ memberId: userId })
+    const params = new URLSearchParams({ memberIds: userId })
     params.set('page', String(pageIndex))
     params.set('size', String(pageSize))
     if (sorting.length > 0) {
