@@ -1,7 +1,7 @@
 -- ============================================================================
 -- CIVITAS Core Platform — Database Baseline
 -- ============================================================================
--- Consolidates migrations V1–V22 into a single baseline.
+-- Consolidates migrations V1–V23 into a single baseline.
 -- This file represents the complete schema as of v1.0.0.
 --
 -- For existing environments: drop flyway_schema_history before deploying.
@@ -143,7 +143,7 @@ CREATE TABLE data_structures
     data_structure_status    VARCHAR(50)                 NOT NULL,
     created_from_data_source BOOLEAN                     NOT NULL DEFAULT FALSE,
     CONSTRAINT pk_data_structures PRIMARY KEY (id),
-    CONSTRAINT uq_data_structures_name UNIQUE (name)
+    CONSTRAINT uk_data_structures_name UNIQUE (name)
 );
 
 -- ----------------------------------------------------------------------------
@@ -168,6 +168,7 @@ CREATE TABLE groups
 );
 
 CREATE INDEX idx_group_contact ON groups (contact_user_id);
+CREATE INDEX idx_group_parent ON groups (parent_group_id);
 
 CREATE TABLE data_spaces
 (
@@ -188,6 +189,7 @@ CREATE TABLE data_spaces
 );
 
 CREATE INDEX idx_dataspace_owner ON data_spaces (owner_user_id);
+CREATE INDEX idx_dataspace_parent ON data_spaces (parent_dataspace_id);
 
 CREATE TABLE datasets
 (
@@ -268,7 +270,7 @@ CREATE TABLE data_structure_versions
     external_id                   VARCHAR(255),
     CONSTRAINT pk_data_structure_versions PRIMARY KEY (id),
     CONSTRAINT FK_DATA_STRUCTURE_VERSIONS_ON_DATA_STRUCTURE FOREIGN KEY (data_structure_id) REFERENCES data_structures (id),
-    CONSTRAINT uq_data_structure_versions_data_structure_version UNIQUE (data_structure_id, version)
+    CONSTRAINT uk_data_structure_versions_data_structure_version UNIQUE (data_structure_id, version)
 );
 
 CREATE INDEX idx_data_structure_versions_data_structure ON data_structure_versions (data_structure_id);
@@ -331,6 +333,8 @@ CREATE TABLE group_members
     CONSTRAINT fk_gromem_on_user FOREIGN KEY (user_id) REFERENCES users (id)
 );
 
+CREATE INDEX idx_group_members_user ON group_members (user_id);
+
 CREATE TABLE role_permissions
 (
     permission_id UUID NOT NULL,
@@ -339,6 +343,8 @@ CREATE TABLE role_permissions
     CONSTRAINT fk_rolper_on_permission FOREIGN KEY (permission_id) REFERENCES permissions (id),
     CONSTRAINT fk_rolper_on_role FOREIGN KEY (role_id) REFERENCES roles (id)
 );
+
+CREATE INDEX idx_role_permissions_role ON role_permissions (role_id);
 
 CREATE TABLE activity_agents
 (
@@ -349,6 +355,9 @@ CREATE TABLE activity_agents
     CONSTRAINT fk_actage_on_agent FOREIGN KEY (agent_id) REFERENCES agents (id)
 );
 
+CREATE INDEX idx_activity_agents_activity ON activity_agents (activity_id);
+CREATE INDEX idx_activity_agents_agent ON activity_agents (agent_id);
+
 CREATE TABLE catalog_children
 (
     child_catalog_id  UUID NOT NULL,
@@ -357,6 +366,9 @@ CREATE TABLE catalog_children
     CONSTRAINT fk_catchi_on_child_catalog FOREIGN KEY (child_catalog_id) REFERENCES catalogs (id),
     CONSTRAINT fk_catchi_on_parent_catalog FOREIGN KEY (parent_catalog_id) REFERENCES catalogs (id)
 );
+
+CREATE INDEX idx_catalog_children_parent ON catalog_children (parent_catalog_id);
+CREATE INDEX idx_catalog_children_child ON catalog_children (child_catalog_id);
 
 CREATE TABLE catalog_datasets
 (
@@ -367,6 +379,9 @@ CREATE TABLE catalog_datasets
     CONSTRAINT fk_catdat_on_data_set FOREIGN KEY (dataset_id) REFERENCES datasets (id)
 );
 
+CREATE INDEX idx_catalog_datasets_catalog ON catalog_datasets (catalog_id);
+CREATE INDEX idx_catalog_datasets_dataset ON catalog_datasets (dataset_id);
+
 CREATE TABLE dataset_agents
 (
     agent_id   UUID NOT NULL,
@@ -376,6 +391,9 @@ CREATE TABLE dataset_agents
     CONSTRAINT fk_datage_on_data_set FOREIGN KEY (dataset_id) REFERENCES datasets (id)
 );
 
+CREATE INDEX idx_dataset_agents_dataset ON dataset_agents (dataset_id);
+CREATE INDEX idx_dataset_agents_agent ON dataset_agents (agent_id);
+
 CREATE TABLE dataset_dataspaces
 (
     dataset_id   UUID NOT NULL,
@@ -384,6 +402,9 @@ CREATE TABLE dataset_dataspaces
     CONSTRAINT fk_datdat_on_data_set FOREIGN KEY (dataset_id) REFERENCES datasets (id),
     CONSTRAINT fk_datdat_on_data_space FOREIGN KEY (dataspace_id) REFERENCES data_spaces (id)
 );
+
+CREATE INDEX idx_dataset_dataspaces_dataset ON dataset_dataspaces (dataset_id);
+CREATE INDEX idx_dataset_dataspaces_dataspace ON dataset_dataspaces (dataspace_id);
 
 CREATE TABLE pipeline_data_sources
 (
