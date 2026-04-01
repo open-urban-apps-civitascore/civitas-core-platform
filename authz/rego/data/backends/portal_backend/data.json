@@ -48,10 +48,6 @@
     "/v1/permissions/{id}": {
       "GET": "PERMISSION_READ"
     },
-    "/v1/authorities": {
-      "_collection": true,
-      "GET": null
-    },
     "/v1/roles": {
       "_collection": true,
       "GET": "ROLE_READ",
