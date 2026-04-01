@@ -409,6 +409,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
             sessionManager.updateSessionPipeline(session.id, updatedPipeline)
             sessionManager.markSessionClean(session.id)
           }
+          toast.success(t('header.saveSucces'))
         } catch {
           saveFailedNames.push(session.name)
         }

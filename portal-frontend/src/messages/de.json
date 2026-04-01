@@ -1002,7 +1002,8 @@
       "exit": "Beenden",
       "validationFailed": "Validierung fehlgeschlagen für: {names}",
       "duplicateNames": "Doppelte Pipeline-Namen: {names}",
-      "saveFailed": "Speichern fehlgeschlagen: {names}"
+      "saveFailed": "Speichern fehlgeschlagen: {names}",
+      "saveSucces": "Pipelines erfolgreich gespeichert"
     },
     "tabs": {
       "closeTab": "Tab schließen",
