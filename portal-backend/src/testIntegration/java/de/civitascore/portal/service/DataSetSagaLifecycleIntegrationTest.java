@@ -595,6 +595,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
     void updatePublishedMeta_rejectsDuringSagaInFlight() throws Exception {
       DataSource dataSource = data.createMqttDataSource();
       DataSet dataSet = data.createDataSet("Saga Guard Meta Update Dataset");
+      String originalName = dataSet.getName();
       data.createGeneratePipeline(dataSet, dataSource);
       data.seedGroupAndAssignment(dataSet);
       UUID dataSetId = dataSet.getId();
@@ -616,7 +617,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       DataSet unchanged = dataSetRepository.findByIdWithRelations(dataSetId).orElseThrow();
       assertThat(unchanged.getName())
           .as("Name should not have been modified")
-          .isEqualTo("Saga Guard Meta Update Dataset");
+          .isEqualTo(originalName);
 
       // Let the saga complete and verify dataset is healthy
       DataSet completed = verifier.awaitSagaCompletion(dataSetId);
