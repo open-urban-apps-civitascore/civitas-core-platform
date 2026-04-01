@@ -1,0 +1,50 @@
+meta {
+  name: Replace User Groups
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/users/:id/groups
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{userId}}
+}
+
+body:json {
+  [
+    "{{groupId1}}",
+    "{{groupId2}}"
+  ]
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('userId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Precondition:** `userId` is set.
+
+  **Expected Response**
+  - Status: `200 OK`
+  - Body reflects the updated user with new group memberships
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | User group memberships replaced in `portal_backend` DB |
+  | Config Adapter | Consumes `de.civitascore.idm.user.updated` Kafka event; forwards update to Keycloak |
+  | Keycloak | User group memberships updated in `civitas-core` realm |
+}
