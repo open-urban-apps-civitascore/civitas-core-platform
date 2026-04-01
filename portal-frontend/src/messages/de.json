@@ -352,7 +352,8 @@
         "dataset": "Datensatzbezogene Zuordnungen erfolgen am jeweiligen Datensatz.",
         "datasource": "Datenquellenbezogene Zuordnungen erfolgen an der jeweiligen Datenquelle.",
         "datastructure": "Datenstrukturbezogene Zuordnungen erfolgen an der jeweiligen Datenstruktur."
-      }
+      },
+      "disabledHint": "Zugeordnete Rollen können nach dem Speichern des Nutzers eingesehen werden."
     },
     "groupsTab": {
       "title": "Gruppenmitgliedschaft",

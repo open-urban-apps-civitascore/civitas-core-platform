@@ -95,6 +95,12 @@ describe('RolesTab', () => {
     expect(params.get('roleType')).toBe('SYSTEM')
   })
 
+  it('disables the query when userId is empty', () => {
+    renderRolesTab({ userId: '' })
+    const lastCall = mockUseGetAssignments.mock.calls.at(-1)!
+    expect(lastCall[0].isEnabled).toBe(false)
+  })
+
   it('updates request params when switching segments', () => {
     renderRolesTab()
     fireEvent.click(screen.getByRole('tab', { name: 'Datensätze' }))
