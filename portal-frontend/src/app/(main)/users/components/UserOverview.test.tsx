@@ -208,6 +208,12 @@ describe('UserOverview', () => {
       expect(screen.getByTestId('tab-roles')).toBeInTheDocument()
     })
 
+    it('disables the Roles tab in create mode', () => {
+      mockCurrentUser(allPermissions)
+      renderComponent({ isCreateMode: true })
+      expect(screen.getByTestId('tab-roles')).toBeDisabled()
+    })
+
     it('hides Roles tab without ASSIGNMENT_READ permission', () => {
       mockCurrentUser([])
       renderComponent()

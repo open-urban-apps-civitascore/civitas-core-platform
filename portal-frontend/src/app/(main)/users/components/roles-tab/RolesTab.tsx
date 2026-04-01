@@ -62,7 +62,14 @@ export const RolesTab = (props: RolesTabProps) => {
     return params
   }, [activeSegment, userId, pageIndex, pageSize, searchString, sorting])
 
-  const { data: assignmentsData, isFetching: isLoading, error } = useGetAssignments({ params: requestParams })
+  const {
+    data: assignmentsData,
+    isFetching: isLoading,
+    error,
+  } = useGetAssignments({
+    params: requestParams,
+    isEnabled: !!userId,
+  })
 
   const assignments = assignmentsData?.data ?? []
   const rowCount = assignmentsData?.totalElements ?? 0

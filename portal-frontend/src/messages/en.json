@@ -355,7 +355,8 @@
         "dataset": "Dataset-related assignments are made at the respective Dataset.",
         "datasource": "Data source-related assignments are made at the respective Data source.",
         "datastructure": "Data structure-related assignments are made at the respective Data structure."
-      }
+      },
+      "disabledHint": "Assigned roles can be viewed after saving the user."
     },
     "groupsTab": {
       "title": "Group Membership",
