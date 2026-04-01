@@ -25,7 +25,6 @@
     {
       "description": "Backend dependencies (Spring Boot)",
       "matchFileNames": ["portal-backend/**"],
-      "groupName": "backend dependencies",
       "commitMessagePrefix": "chore(backend):",
       "addLabels": ["cop backend", "team data mgmt"]
     },
