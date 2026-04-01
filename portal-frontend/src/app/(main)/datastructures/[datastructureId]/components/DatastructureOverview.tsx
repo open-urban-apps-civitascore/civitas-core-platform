@@ -1,7 +1,8 @@
 'use client'
 
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
@@ -18,7 +19,7 @@ import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
   Datastructure,
   DATASTRUCTURE_STATUS_TYPES,
-  DatastructureStatusTypes,
+  DatastructureStatusType,
   DatastructureTab,
 } from '@/types/datastructures'
 import { mapDatastructureVersionsApiToListData } from '@/utils/datastructures'
@@ -51,62 +52,89 @@ interface DatastructureOverviewProps {
 export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   const { datastructure, initialAssignments } = props
   const t = useTranslations('datastructures')
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
   const tCommon = useTranslations('common')
   const { hasScopedPermission } = usePermissions()
   const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_UPDATE, 'DATASTRUCTURE', datastructure.id)
   const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_RELEASE, 'DATASTRUCTURE', datastructure.id)
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
-  const [isReadOnly, setIsReadOnly] = useState(true)
-
+  const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit')
   const [assignedGroups, setAssignedGroups] = useState<GroupRoleAssignmentTable[]>(initialAssignments)
+
+  useEffect(() => {
+    setIsReadOnly(searchParams.get('mode') !== 'edit')
+  }, [searchParams])
+
+  const updateMode = useCallback(
+    (isEditing: boolean) => {
+      setIsReadOnly(!isEditing)
+      const params = new URLSearchParams(searchParams.toString())
+      if (isEditing) {
+        params.set('mode', 'edit')
+      } else {
+        params.delete('mode')
+      }
+      const query = params.toString()
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    },
+    [pathname, searchParams, router],
+  )
 
   const {
     areAssignmentsDirty,
     canSetAvailable,
-    canSetDraft,
     completedTabs,
-    form,
+    form: datastructureForm,
     handleStatusChange,
     isConfirmButtonDisabled,
     isLoading,
     resetToInitialState,
     saveDatastructure,
     selectedTab,
+    canSetDraft,
     setSelectedTab,
     statusHint,
-    statusWatch,
+    datastructureStatus,
   } = useDatastructure({ datastructure, assignedGroups, initialAssignments })
 
-  const hasUnsavedChanges = form.formState.isDirty || areAssignmentsDirty
+  const hasUnsavedChanges = datastructureForm.formState.isDirty || areAssignmentsDirty
 
-  const handleSave = async () => {
+  const exitEditMode = () => {
+    resetToInitialState()
+    setAssignedGroups(initialAssignments)
+    updateMode(false)
+  }
+
+  const handleDiscardAndExit = () => {
+    exitEditMode()
+    setIsExitModalOpen(false)
+  }
+
+  const handleSave = async (): Promise<boolean> => {
     const isSaved = await saveDatastructure()
     if (isSaved) {
       setIsExitModalOpen(false)
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
+      updateMode(false)
     }
     return isSaved
   }
 
-  useRegisterUnsavedChanges(hasUnsavedChanges, handleSave)
-
   const handleExit = () => {
-    resetToInitialState()
-    setIsReadOnly(true)
-    setIsExitModalOpen(false)
-    setAssignedGroups(initialAssignments)
+    if (datastructureForm.formState.isDirty || areAssignmentsDirty) setIsExitModalOpen(true)
+    else exitEditMode()
   }
 
-  const handleExitButtonClick = () => {
-    if (hasUnsavedChanges) setIsExitModalOpen(true)
-    else handleExit()
-  }
+  useRegisterUnsavedChanges(hasUnsavedChanges, handleSave)
 
   const renderTabContent = () => {
     switch (selectedTab) {
       case 'basicInfo':
-        return <BasicInfoTab form={form} isReadOnly={isReadOnly} />
+        return <BasicInfoTab form={datastructureForm} isReadOnly={isReadOnly} />
       case 'versions':
         return (
           <VersionsTab
@@ -114,7 +142,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
             versions={mapDatastructureVersionsApiToListData(datastructure.dataStructureVersions)}
             rowCount={datastructure.dataStructureVersions.length}
             isReadOnly={isReadOnly}
-            isDirty={form.formState.isDirty}
+            isDirty={datastructureForm.formState.isDirty}
             isLoading={isLoading}
             onSave={saveDatastructure}
           />
@@ -145,34 +173,34 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
           hasCompletionStatus: true,
         }}
         customElement={
-          <PageEditControls<DatastructureStatusTypes>
-            status={statusWatch}
+          <PageEditControls<DatastructureStatusType>
+            status={datastructureStatus}
             onStatusChange={handleStatusChange}
             statusOptions={Object.values(DATASTRUCTURE_STATUS_TYPES)}
             canSetAvailable={canSetAvailable}
-            canSetDraft={canSetDraft}
             canRelease={canRelease}
             statusHint={statusHint}
             confirmButtonType="button"
             onConfirmClick={handleSave}
             isConfirmButtonDisabled={isConfirmButtonDisabled}
             isCancelButtonDisabled={isLoading}
-            onCancelClick={handleExitButtonClick}
+            onCancelClick={handleExit}
             hasCard={false}
-            isReadOnly={isReadOnly}
-            onEditClick={() => setIsReadOnly(false)}
             canEdit={
               datastructure.dataStructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
                 ? canUpdate && canRelease
                 : canUpdate
             }
+            isReadOnly={isReadOnly}
+            onEditClick={() => updateMode(true)}
             cancelButtonTitle={tCommon('actions.exit')}
             wrapperClassname="w-auto"
+            canSetDraft={canSetDraft}
           />
         }
       />
       <PageBackground className="overflow-y-auto" hasBackground={!isReadOnly}>
-        <Form {...form}>
+        <Form {...datastructureForm}>
           <form
             data-testid="datastructureEditForm"
             aria-label={`${tCommon('form')} ${t('edit.basicInfo.title')}`}
@@ -185,10 +213,10 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
 
       <ExitWarningModal
         open={isExitModalOpen}
-        onOpenChange={() => setIsExitModalOpen(false)}
-        onDiscard={handleExit}
-        onConfirm={handleSave}
         isLoading={isLoading}
+        onOpenChange={setIsExitModalOpen}
+        onDiscard={handleDiscardAndExit}
+        onConfirm={handleSave}
       />
     </PageContainer>
   )

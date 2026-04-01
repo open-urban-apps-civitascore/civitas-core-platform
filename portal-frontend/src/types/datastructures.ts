@@ -13,7 +13,7 @@ export const DATASTRUCTURE_STATUS_TYPES = {
 
 export const DatastructureStatusEnum = enumFromConst(DATASTRUCTURE_STATUS_TYPES)
 
-export type DatastructureStatusTypes = (typeof DATASTRUCTURE_STATUS_TYPES)[keyof typeof DATASTRUCTURE_STATUS_TYPES]
+export type DatastructureStatusType = (typeof DATASTRUCTURE_STATUS_TYPES)[keyof typeof DATASTRUCTURE_STATUS_TYPES]
 
 export type DatastructureTab = 'basicInfo' | 'versions' | 'accessManagement'
 
@@ -106,7 +106,7 @@ export type DatastructureVersionsListData = {
   id: string
   name: string
   description: string
-  status: DatastructureStatusTypes
+  status: DatastructureStatusType
   source: DatastructureVersionSource
   versionNumber: string
 }
@@ -192,7 +192,7 @@ export type DatastructuresListData = {
   id: string
   name: string
   description: string
-  status: DatastructureStatusTypes
+  status: DatastructureStatusType
   source: DatastructureVersionSource | null
   versionNumber: string | null
   versions: DatastructuresListData[]
