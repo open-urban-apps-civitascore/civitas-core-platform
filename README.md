@@ -9,7 +9,7 @@
 
 [![Latest Release](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/badges/release.svg)](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/releases) [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 
-This repository provides the **CIVITAS/CORE Platform (Version 2)**.
+This repository provides the **CIVITAS/CORE Platform Version 2**.
 
 > Für Informationen in deutscher Sprache nutzen Sie gerne die [deutsche Readme](README-de.md) oder besuchen [unsere Vereinsseite](https://www.civitasconnect.digital/civitas-core/).
 
@@ -39,17 +39,13 @@ Compared to version 1, CIVITAS/CORE v2 focuses on:
 * Self-service and automation across the data lifecycle
 * Improved user interfaces for managing data and configurations
 
-The architecture of version 2 is evolving and described in detail in the documentation:
-
-👉 https://docs.core.civitasconnect.digital/docs_v2/intro
+The architecture of version 2 is evolving and described in detail in the [👉 documentation](https://docs.core.civitasconnect.digital/docs_v2/intro)
 
 > Note: Version 2 is a major evolution and not limited to IoT-based use cases anymore. It is designed to support **any type of data and use case complexity**.
 
 ## How to use
 
-To deploy CIVITAS/CORE v2 and work with the platform, please follow the official documentation:
-
-👉 https://docs.core.civitasconnect.digital/docs_v2/intro
+To deploy CIVITAS/CORE v2 and work with the platform, please follow the official [👉 documentation](https://docs.core.civitasconnect.digital/docs_v2/intro)
 
 The setup, architecture and operation of version 2 differ significantly from version 1 and are fully described in the documentation.
 
@@ -63,13 +59,9 @@ CIVITAS/CORE is collaboratively developed by members of the registered associati
 
 Stable versions are released on a regular basis. For the latest release, take a look at the [deployment repository](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-deployment). The current state of development can be followed on our [-> issue board](https://gitlab.com/groups/civitas-connect/civitas-core/-/boards).
 
-**Version 2.x** is the next major evolution of CIVITAS/CORE. It enables implementing use cases of any kind of complexity, even for large organisations, and provides user interfaces that support users to manage all aspects of their data.
+Please see the long-term roadmap [👉 here](https://www.civitasconnect.digital/civitas-core/):
 
-Please see the long-term roadmap here:
-👉 https://www.civitasconnect.digital/civitas-core/
-
-Detailed roadmap for version 2:
-👉 https://gitlab.com/groups/civitas-connect/civitas-core/-/roadmap?label_name[]=v::2
+Detailed roadmap for version 2 [👉 here](https://gitlab.com/groups/civitas-connect/civitas-core/-/roadmap?state=opened&sort=END_DATE_ASC&layout=MONTHS&timeframe_range_type=CURRENT_YEAR&label_name[]=v::2&progress=WEIGHT&show_progress=true&show_milestones=true&milestones_type=ALL&show_labels=false)
 
 ## How to contribute
 
@@ -77,11 +69,11 @@ You found a bug, want to report an issue or contribute code or a feature request
 
 ## Contributors
 
-[-> List of contributors](CONTRIBUTORS.md)
+[👉 List of contributors](CONTRIBUTORS.md)
 
 ## Reporting Security Issues
 
-[-> Security](SECURITY.md)
+[👉 Security](SECURITY.md)
 
 ## Funding
 
