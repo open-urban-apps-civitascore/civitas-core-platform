@@ -138,7 +138,7 @@ const GroupsTable = (props: GroupsTableProps) => {
       totalPages={totalPages}
       onRowClick={onRowClick}
       isLoading={isLoading}
-      hasCard={false}
+      hasCard
     />
   )
 }

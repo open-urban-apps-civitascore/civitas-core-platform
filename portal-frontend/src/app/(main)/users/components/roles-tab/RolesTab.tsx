@@ -6,7 +6,6 @@ import { useMemo, useState } from 'react'
 
 import { useGetAssignments } from '@/app/services/api/assignments/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
-import { PageBackground } from '@/components/page-background/PageBackground'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { SegmentedControlBar, Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { TableContainer } from '@/components/table-container/TableContainer'
@@ -28,11 +27,10 @@ const SCOPE_SEGMENT_PARAMS: Record<ScopeSegment, string[][]> = {
 
 interface RolesTabProps {
   userId: string
-  isReadOnly?: boolean
 }
 
 export const RolesTab = (props: RolesTabProps) => {
-  const { userId, isReadOnly = true } = props
+  const { userId } = props
   const t = useTranslations()
 
   const [activeSegment, setActiveSegment] = useState<ScopeSegment>('platformWide')
@@ -95,42 +93,41 @@ export const RolesTab = (props: RolesTabProps) => {
     setPageSize(newPagination.pageSize)
   }
 
+  if (error) {
+    return (
+      <ContentCard className="h-50">
+        <p className="h-full flex items-center justify-center">{t('common.errors.loadingError')}</p>
+      </ContentCard>
+    )
+  }
   return (
-    <PageBackground hasBackground={!isReadOnly}>
-      {error ? (
-        <ContentCard className="h-50">
-          <p className="h-full flex items-center justify-center">{t('common.errors.loadingError')}</p>
-        </ContentCard>
-      ) : (
-        <>
-          <SearchHeader
-            searchString={searchString}
-            onChangeSearchString={value => {
-              setSearchString(value)
-              setPageIndex(0)
-            }}
-            className="my-2"
-          />
-          <div className="flex items-center justify-between gap-4 mb-4">
-            <SegmentedControlBar tabs={segments} selectedTab={activeSegment} onTabChange={handleSegmentChange} />
-            {infoBannerText && <AlertBox text={infoBannerText} />}
-          </div>
-          <TableContainer shouldRespectSearchHeight shouldRespectSegmentedControlBar>
-            <RolesAssignmentTable
-              assignments={assignments}
-              rowCount={rowCount}
-              pageIndex={pageIndex}
-              pageSize={pageSize}
-              sorting={sorting}
-              totalPages={totalPages}
-              isLoading={isLoading}
-              isPlatformWide={activeSegment === 'platformWide'}
-              onPaginationChange={handlePagination}
-              onSortingChange={setSorting}
-            />
-          </TableContainer>
-        </>
-      )}
-    </PageBackground>
+    <>
+      <SearchHeader
+        searchString={searchString}
+        onChangeSearchString={value => {
+          setSearchString(value)
+          setPageIndex(0)
+        }}
+        className="my-2"
+      />
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <SegmentedControlBar tabs={segments} selectedTab={activeSegment} onTabChange={handleSegmentChange} />
+        {infoBannerText && <AlertBox text={infoBannerText} />}
+      </div>
+      <TableContainer shouldRespectSearchHeight={true} shouldRespectSegmentedControlBar>
+        <RolesAssignmentTable
+          assignments={assignments}
+          rowCount={rowCount}
+          pageIndex={pageIndex}
+          pageSize={pageSize}
+          sorting={sorting}
+          totalPages={totalPages}
+          isLoading={isLoading}
+          isPlatformWide={activeSegment === 'platformWide'}
+          onPaginationChange={handlePagination}
+          onSortingChange={setSorting}
+        />
+      </TableContainer>
+    </>
   )
 }
