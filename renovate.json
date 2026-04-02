@@ -10,9 +10,11 @@
   "semanticCommits": "enabled",
   "separateMajorMinor": true,
   "separateMultipleMajor": true,
+  "minimumReleaseAge": "7 days",
   "vulnerabilityAlerts": {
     "labels": ["security"],
-    "assignees": []
+    "assignees": [],
+    "minimumReleaseAge": "0 days"
   },
   "packageRules": [
     {
