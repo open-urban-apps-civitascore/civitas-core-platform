@@ -65,7 +65,7 @@ Detailed roadmap for version 2 [👉 here](https://gitlab.com/groups/civitas-con
 
 ## How to contribute
 
-You found a bug, want to report an issue or contribute code or a feature request? [-> Contribution guide](CONTRIBUTION-GUIDE.md)
+You found a bug, want to report an issue or contribute code or a feature request? [👉 Contribution guide](CONTRIBUTION-GUIDE.md)
 
 ## Contributors
 
@@ -85,4 +85,4 @@ This work is licensed under [EU PL 1.2](LICENSE) by Civitas Connect e. V., Hafen
 
 This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to all the individual contributors.
 
-Civitas Core is a Trademark. More information can be found [here](TRADEMARK.md).
+CIVITAS/CORE is a Trademark. More information can be found [here](TRADEMARK.md).
