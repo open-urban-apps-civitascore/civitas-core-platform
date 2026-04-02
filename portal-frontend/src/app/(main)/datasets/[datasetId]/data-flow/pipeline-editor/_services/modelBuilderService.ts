@@ -114,6 +114,7 @@ const buildFrostSection = (): { processors: object[]; output: object } => {
                       verb: 'GET',
                       headers: {
                         Accept: 'application/json',
+                        Authorization: 'Basic YWRtaW46YWRtaW4=',
                       },
                       timeout: '10s',
                     },
@@ -168,6 +169,7 @@ const buildFrostSection = (): { processors: object[]; output: object } => {
                       verb: 'GET',
                       headers: {
                         Accept: 'application/json',
+                        Authorization: 'Basic YWRtaW46YWRtaW4=',
                       },
                       timeout: '10s',
                     },
@@ -227,6 +229,7 @@ const buildFrostSection = (): { processors: object[]; output: object } => {
               headers: {
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
+                Authorization: 'Basic YWRtaW46YWRtaW4=',
               },
               timeout: '30s',
               retries: 3,
