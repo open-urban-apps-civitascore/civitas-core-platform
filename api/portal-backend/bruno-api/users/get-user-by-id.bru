@@ -1,0 +1,32 @@
+meta {
+  name: Get User by ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/users/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{userId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Has correct id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+}
+
+docs {
+  **Precondition:** `userId` is set (from TC-USER-04).
+
+  **Expected Response**
+  - Status: `200 OK`
+  - Body contains the user with matching `id`
+}

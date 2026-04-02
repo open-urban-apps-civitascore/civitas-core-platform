@@ -1,8 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/portal_backend
-    username: admin
-    password: admin
+    url: jdbc:postgresql://localhost:5432/portal_backend?sslmode=require
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -11,4 +9,3 @@ spring:
       hibernate:
         jdbc:
           lob.non_contextual_creation: true
-

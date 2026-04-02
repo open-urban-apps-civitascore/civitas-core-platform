@@ -1,0 +1,171 @@
+{
+  "specversion": "1.0",
+  "type": "de.civitascore.datamanagement.dataset.created",
+  "source": "https://portal.civitas.local",
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "time": "2026-01-27T10:30:00Z",
+  "datacontenttype": "application/json",
+  "data": {
+    "id": "b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a",
+    "name": "Neustadt Traffic Counts 2025",
+    "openDataAccess": true,
+    "datasources": [
+      {
+        "id": "0a7b8c9d-1e2f-4a5b-9c0d-1e2f3a4b5c6d",
+        "type": "postgresql",
+        "name": "Neustadt Mobility DB",
+        "description": "Primary PostgreSQL database for mobility and traffic datasets.",
+        "host": "pg-mobility.neustadt.de",
+        "port": 5432,
+        "database": "mobility",
+        "schema": "public",
+        "username": "mobility_reader",
+        "ssl": true,
+        "ssl_mode": "require",
+        "connect_timeout_seconds": 10,
+        "pool": {
+          "min": 1,
+          "max": 10,
+          "idle_timeout_seconds": 300
+        }
+      },
+      {
+        "id": "5f2a1c3e-7b8d-4c9e-a1b2-3c4d5e6f7a8b",
+        "type": "mqtt",
+        "name": "Neustadt IoT MQTT Broker",
+        "description": "MQTT broker for real-time sensor telemetry.",
+        "broker_url": "mqtts://iot-broker.neustadt.de",
+        "host": "iot-broker.neustadt.de",
+        "port": 8883,
+        "client_id": "civitas-core-ingestion",
+        "username": "telemetry_consumer",
+        "qos": 1,
+        "clean_session": false,
+        "keep_alive_seconds": 60,
+        "topics": [
+          "neustadt/traffic/+/counts",
+          "neustadt/weather/+/observations",
+          "neustadt/parking/+/occupancy"
+        ],
+        "tls": {
+          "enabled": true,
+          "ca_cert_path": "/etc/ssl/certs/neustadt-root-ca.pem",
+          "verify_hostname": true
+        },
+        "reconnect": {
+          "max_retries": 20,
+          "initial_delay_seconds": 1,
+          "max_delay_seconds": 30,
+          "backoff_multiplier": 2.0
+        }
+      }
+    ],
+    "datapipelines": [
+      {
+        "id": "db-to-frost-01",
+        "version": "1",
+        "action": "ADD",
+        "data": {
+          "input": {
+            "generate": {
+              "interval": "15s",
+              "mapping": "root = {\"tick\": now()}"
+            }
+          },
+          "pipeline": {
+            "processors": [
+              {
+                "branch": {
+                  "request_map": "root = {}",
+                  "processors": [
+                    {
+                      "sql_select": {
+                        "driver": "postgres",
+                        "dsn": "${DATASOURCE[0]}",
+                        "table": "${DATASOURCE[0].table}",
+                        "columns": ["*"]
+                      }
+                    }
+                  ],
+                  "result_map": "root = this"
+                }
+              },
+              {
+                "unarchive": {
+                  "format": "json_array"
+                }
+              },
+              {
+                "mapping": "root = {\n  \"id\": json(\"id\").or(\"\").string(),\n  \"art\": this.art,\n  \"höhe\": this.\"höhe\",\n  \"alter\": this.alter,\n  \"immergrün\": this.\"immergrün\"\n}"
+              },
+              {
+                "branch": {
+                  "request_map": "root = \"\"\nmeta req_id = this.id",
+                  "processors": [
+                    {
+                      "http": {
+                        "url": "${FROST_BASE}/Things?$filter=properties/id%20eq%20'${! meta(\"req_id\").string().escape_url_query() }'",
+                        "verb": "GET",
+                        "headers": {
+                          "Accept": "application/json"
+                        },
+                        "timeout": "10s"
+                      }
+                    }
+                  ],
+                  "result_map": "meta result = this\nroot = deleted()"
+                }
+              },
+              {
+                "mapping": "let art_str = this.art.or(\"\").string()\n\nlet resp   = meta(\"result\").catch(\"\")\nlet parsed = if $resp == \"\" { null } else { $resp.parse_json().catch(null) }\nlet first  = if $parsed == null { null } else { $parsed.value.index(0).catch(null) }\n\nlet exists = $first != null\n\nmeta is_post   = !$exists\nmeta frost_url = if $exists {\n  \"${FROST_BASE}/Things(\" + ($first.\"@iot.id\").string() + \")\"\n} else {\n  \"${FROST_BASE}/Things\"\n}\n\nroot = {\n  \"name\": \"Baum \" + this.id.string() + \" (\" + $art_str + \")\",\n  \"description\": (\"Automatisch angelegt aus Source-DB; Art: \" + $art_str).or(\"Baum\"),\n  \"properties\": {\n    \"$schema\": this.\"$schema\",\n    \"id\": this.id,\n    \"art\": $art_str,\n    \"höhe\": this.\"höhe\",\n    \"alter\": this.alter,\n    \"immergrün\": this.\"immergrün\"\n  }\n}"
+              }
+            ]
+          },
+          "output": {
+            "switch": {
+              "cases": [
+                {
+                  "check": "meta(\"is_post\") == \"true\"",
+                  "output": {
+                    "http_client": {
+                      "url": "${! meta(\"frost_url\") }",
+                      "verb": "POST",
+                      "headers": {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                      },
+                      "timeout": "30s",
+                      "retries": 3,
+                      "retry_period": "2s"
+                    }
+                  }
+                },
+                {
+                  "check": "meta(\"is_post\") == \"false\"",
+                  "output": {
+                    "http_client": {
+                      "url": "${! meta(\"frost_url\") }",
+                      "verb": "PATCH",
+                      "headers": {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                      },
+                      "timeout": "30s",
+                      "retries": 3,
+                      "retry_period": "2s"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": "db-to-frost-02",
+        "version": "2",
+        "action": "DELETE"
+      }
+    ]
+  }
+}

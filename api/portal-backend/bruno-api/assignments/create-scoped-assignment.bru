@@ -1,0 +1,62 @@
+meta {
+  name: Create Scoped Assignment
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/assignments
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "groupId": "{{groupId}}",
+    "roleId": "{{roleId}}",
+    "scopeType": "{{scopeType}}",
+    "scopeId": "{{scopeId}}"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('assignmentId', res.body.id);
+  }
+}
+
+tests {
+  test("Scoped Assignment created or already exists", function() {
+    const status = res.getStatus();
+    // 201=created, 409=duplicate assignment from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+  test("Has id", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.id).to.be.a('string');
+    }
+  });
+  test("Has scopeType", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.scopeType).to.be.a('string');
+    }
+  });
+}
+
+docs {
+  **Precondition:** `groupId`, `roleId`, `scopeType`, and `scopeId` are set. The role must be of type `DATA` to allow scoped assignments.
+
+  **Expected Response**
+  - Status: `201 Created`
+  - Body contains `id` and `scopeType`
+
+  **Post-condition:** Save `assignmentId` from `body.id`.
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Assignment record created in `portal_backend` DB linking the group to the role within the given scope |
+  | Config Adapter | AuthZ Repository is notified to refresh its authorization data cache |
+  | AuthZ Repository (OPA) | Scoped role-group binding becomes visible in OPA policy data; verify at `http://localhost:8181/v1/data` |
+}

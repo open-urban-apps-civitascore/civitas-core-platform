@@ -1,0 +1,44 @@
+{
+  "specversion": "1.0",
+  "type": "de.civitascore.api.route.created",
+  "source": "civitas.api.provisioning",
+  "id": "event-response-rewrite-headers-001",
+  "datacontenttype": "application/json",
+  "data": {
+    "metadata": {
+      "messageId": "msg-response-rewrite-001",
+      "timestamp": "2025-01-23T10:00:00Z",
+      "source": "api.service",
+      "correlationId": "corr-response-rewrite-001",
+      "configVersion": "1.0",
+      "resultTopic": "api.results"
+    },
+    "payload": {
+      "targetComponent": "apisix",
+      "targetResource": "routes/my-response-rewrite-route",
+      "operation": "CREATE",
+      "config": {
+        "path": "routes/my-response-rewrite-route",
+        "value": {
+          "uri": "/api/v1/response-rewrite/*",
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "upstream_id": "my-backend-upstream",
+          "plugins": {
+            "response-rewrite": {
+              "headers": {
+                "set": {
+                  "X-Server-Id": "server-1",
+                  "X-Environment": "production"
+                },
+                "add": {
+                  "X-Custom-Header": "custom-value"
+                },
+                "remove": ["X-Internal-Header", "X-Debug-Info"]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

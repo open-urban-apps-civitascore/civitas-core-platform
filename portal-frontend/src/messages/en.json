@@ -1,26 +1,114 @@
 {
+  "welcome": {
+    "title": "Welcome to CIVITAS/CORE V2 Beta",
+    "subtitle": "New here?",
+    "docsButton": "Documentation"
+  },
   "common": {
     "type-to-search": "Type to search",
     "search": "Search",
     "noResults": "No results found.",
     "noData": "No Data",
+    "noPermission": "You do not have permission to view this content.",
     "loading": "Loading...",
+    "loadingItems": "Loading {item} ...",
+    "form": "Form",
     "actions": {
       "submit": "Save",
+      "close": "Close",
       "cancel": "Cancel",
       "delete": "Delete",
+      "deleteItem": "Delete {item}",
+      "remove": "Remove",
+      "removeItem": "Remove {item}",
       "add": "Add",
       "edit": "Edit",
-      "open": "open"
+      "editBase": "Edit base",
+      "open": "open",
+      "saveAndContinue": "Save and continue",
+      "exit": "Exit",
+      "assignItem": "Assign {item}",
+      "assignTo": "to {item}",
+      "back": "Back",
+      "import": "Import"
     },
     "errors": {
       "invalidPhone": "Invalid phone number",
       "invalidEmail": "Invalid E-mail address",
+      "invalidNumber": "Enter a valid number",
       "required": "This field is required",
       "atLeast2": "The input must be at least 2 characters.",
+      "atLeast3": "The input must be at least 3 characters.",
       "atLeast10": "The input must be at least 10 characters.",
+      "atLeast1Value": "At least 1 value is required.",
       "minChar": "The input has to be at least {amount} characters.",
-      "notFound": "No {items} found"
+      "itemsNotFound": "No {items} found",
+      "itemNotFound": "{item} not found",
+      "pageNotFound": "The requested page was not found.",
+      "backToHome": "Back to homepage",
+      "notFound": "No {items} found",
+      "loadingError": "Error while loading data",
+      "unexpectedError": "An unexpected error occurred. Please try again.",
+      "nameRequired": "Name is required",
+      "descriptionRequired": "Description is required",
+      "descriptionMaxLength": "Description must be 150 characters or less",
+      "nameMaxLength": "Name must be 100 characters or less",
+      "formInvalid": "All required information must be provided correctly. Please, verify your input.",
+      "statusChangeError": "An error occurred while changing the availability status.",
+      "updateError": "An error occurred while updating the {item}.",
+      "nameExists": "This name is already in use.",
+      "nameExistsToast": "The name {name} is already in use. Please, choose another name.",
+      "emailExists": "This email is already in use.",
+      "emailExistsToast": "The email {email} is already in use. Please, choose another email address.",
+      "insufficientPermissions": "You do not have the necessary permissions to perform this action."
+    },
+    "items": {
+      "data": "data",
+      "users": "Users",
+      "user": "User",
+      "groups": "Groups",
+      "group": "Group",
+      "role": "Role",
+      "roles": "Roles",
+      "datasets": "Datasets",
+      "dataspaces": "Data spaces",
+      "permissions": "Permissions",
+      "datasources": "Data sources",
+      "datasource": "Data source",
+      "datastructures": "Data structures",
+      "datastructure": "Data structure",
+      "datastructureVersion": "Version",
+      "assignments": "Assignments"
+    },
+    "messages": {
+      "updateSuccess": "{item} has been successfully updated",
+      "createSuccess": "{item} has been successfully created",
+      "deleteSuccess": "{item} has been successfully deleted"
+    },
+    "info": {
+      "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
+      "commaSeparated": "comma-separated",
+      "requiredInAvailable": "This field is required in the available mode.",
+      "descriptionHint": "max. 150 characters"
+    },
+    "success": {
+      "statusChangeSuccess": "The availability status has been successfully updated.",
+      "deletionSuccess": "{item} has successfully been deleted.",
+      "creationSuccess": "{item} has been successfully created."
+    },
+    "status": {
+      "DRAFT": "Draft",
+      "AVAILABLE": "Available",
+      "READY": "Ready"
+    },
+    "exitModal": {
+      "title": "Save before exiting?",
+      "description": "There is unsaved information. \"Discard\" cannot be undone.",
+      "discard": "Discard"
+    },
+    "deletionWarningModal": {
+      "title": "Delete {item}?",
+      "description": "This action can not be undone."
     }
   },
   "languages": {
@@ -28,109 +116,206 @@
     "english": "English",
     "selectLanguagePlaceholder": "Select language"
   },
+  "accessManagement": {
+    "title": "Access Management",
+    "subtitle": "Here, responsibilities and access rights are defined.",
+    "addAssignment": "Add Group",
+    "addRole": "Add Role",
+    "deleteGroup": "Remove Group",
+    "tableHeaders": {
+      "group": "Group",
+      "role": "Role",
+      "description": "Description",
+      "action": "Action"
+    },
+    "noDataPage": {
+      "title": "No groups and roles available",
+      "description": "No group has permissions."
+    },
+    "addGroupModal": {
+      "title": "Add Group",
+      "description": "Select a group to assign permissions.",
+      "tableHeaders": {
+        "name": "Name",
+        "description": "Description"
+      },
+      "selectAll": "Select all groups",
+      "selectGroup": "Select group",
+      "selectedGroups": "{number} selected"
+    },
+    "addRoleModal": {
+      "title": "Add Role",
+      "description": "To group {groupName}",
+      "tableHeaders": {
+        "name": "Name",
+        "description": "Description",
+        "roleType": "Type"
+      },
+      "selectRole": "Select role",
+      "selectAll": "Select all roles",
+      "selectedRoles": "{number} selected",
+      "roleTypes": {
+        "default": "Default",
+        "custom": "Custom"
+      }
+    },
+    "infoBoxes": {
+      "firstBox": "Groups with platform-wide permissions on all Data-related elements have access.",
+      "secondBox": "By removing your own group-role assignment, you may lose your permissions."
+    },
+    "messages": {
+      "updateSuccess": "Permissions have been successfully updated.",
+      "groupsWithoutRoles": "Groups without assigned roles have not been saved.",
+      "updateErrorNotDraft": "Permissions can only be updated when the Dataset is in draft status."
+    }
+  },
   "sidebar": {
     "home": "Home",
-    "menu-item": "Menu Item",
-    "sub-item": "Sub Item",
-    "data-catalog": "Data Catalog",
+    "menu-item": "Menu item",
+    "sub-item": "Sub item",
+    "data-catalog": "Data catalog",
     "all-datasets": "All Datasets",
     "documentation": "Documentation",
     "logout": "Log out",
-    "ourData": "Our Data",
-    "datasets": "Our Data",
+    "platform": "Platform",
+    "admin": "Admin",
+    "help": "Help",
+    "ourData": "Our data",
+    "datasets": "Datasets",
     "permissions": "Permissions",
-    "roles": "Role Management",
-    "create": "create",
-    "edit": "edit",
-    "users": "User Management",
+    "roles": "Roles",
+    "create": "Create",
+    "createVersion": "New version",
+    "edit": "Edit",
+    "users": "User",
     "groups": "Groups",
-    "dataspaces": "Data Spaces",
-    "tenants": "Tenant Management",
-    "uml-modeler": "UML Modeler"
+    "dataspaces": "Data spaces",
+    "tenants": "Tenant management",
+    "uml-modeler": "UML modeler",
+    "data-flow": "Data flow",
+    "table-editor": "Table editor",
+    "pipeline-editor": "Pipeline editor",
+    "data-management": "Data management",
+    "datasources": "Data sources",
+    "datastructures": "Data structures",
+    "access-management": "Access management"
   },
   "datasets": {
     "title": "Datasets",
-    "subtitle": "All available datasets of our organization",
+    "subtitle": "All available Datasets of our organization",
     "searchDatasets": "Search Datasets",
-    "newDataset": "New Dataset",
+    "newDataset": "Create Dataset",
     "tableHeaders": {
       "name": "Name",
-      "dataSpace": "Data Space",
-      "department": "Department",
-      "creator": "Contact Person",
+      "createdBy": "Created by",
       "lastUpdated": "Last Updated",
-      "status": "Access Status",
-      "releaseProcess": "Release Process",
-      "distribution": "Distribution"
+      "status": "Status",
+      "action": "Action"
     },
     "tableValues": {
-      "status": {
-        "open": "open",
-        "closed": "closed"
+      "draft": "Draft",
+      "available": "Available",
+      "ready": "Ready",
+      "yesterday": "Yesterday"
+    },
+    "create": {
+      "title": "New Dataset",
+      "subtitle": "New Datasets are only visible internally.",
+      "form": {
+        "title": "Basic Information",
+        "subtitle": "The name can be adjusted later.",
+        "name": "Name"
       }
     },
     "overview": {
-      "title": "Overview: Create Dataset",
       "info": {
         "title": "Base Information",
-        "dataspace": "Data Space",
         "name": "Name",
         "description": "Description",
-        "tags": "Tags",
-        "typeTag": "Type tag..."
+        "descriptionHint": "max. 150 characters"
       },
       "completion": {
         "title": "Creation Progress",
-        "metadata": "Metadata",
-        "groups": "Group & Role Assignment",
-        "configuration": "Data Configuration",
-        "distribution": "Distributions / Applications / APIs",
-        "permissions": "User Data Permissions",
-        "publication": "Publication"
+        "accessManagement": {
+          "title": "Access Management",
+          "button": {
+            "readOnly": "View Groups and Roles",
+            "editable": "Edit Groups and Roles"
+          },
+          "assignments": "Groups and Roles",
+          "noAssignments": "No groups or roles available",
+          "groups": "Groups",
+          "roles": "Roles",
+          "openDataAccess": "Open Data",
+          "openDataAccessHint": "Allow access to this Dataset’s payload data without authentication."
+        },
+        "dataFlow": {
+          "title": "Data flow",
+          "button": {
+            "readOnly": "View Data flow",
+            "editable": "Edit Data flow"
+          },
+          "pipelines": "Pipeline",
+          "sensorThingsAPI": "SensorThings API",
+          "noDataFlow": "No data flow available yet."
+        }
       }
+    },
+    "dataMode": {
+      "selectMode": "In which mode would you like to create the Dataset?",
+      "tableEditor": "Table Editor",
+      "pipelineEditor": "Pipeline Editor",
+      "tableDescription": "An interface oriented towards Excel workflows. For Datasets with a clear data flow – based on file imports, few Data sources, few transformations, …",
+      "pipelineDescription": "An interface oriented towards node based programming. For Datasets with a complex data flow – based on many Data sources, many transformations, …"
+    },
+    "messages": {
+      "createSuccess": "Dataset has been successfully created.",
+      "updateSuccess": "Dataset has been successfully updated.",
+      "deleteSuccess": "Dataset has been successfully deleted.",
+      "deleteError": "An error occurred while deleting the Dataset. Please try again.",
+      "updateAccessManagementSuccess": "Access management has been successfully updated.",
+      "publishSuccess": "Dataset has been successfully published.",
+      "unpublishSuccess": "Dataset has been successfully unpublished.",
+      "releaseSuccess": "Dataset has been successfully released.",
+      "unreleaseSuccess": "Dataset has been successfully unreleased.",
+      "transitionError": "An error occurred while changing the Dataset status. Please try again."
+    },
+    "warningModal": {
+      "title": "Delete Dataset?",
+      "description": "This action cannot be undone. This will permanently delete the Dataset and all associated data.",
+      "confirm": "Delete"
     }
   },
   "users": {
     "title": "Overview: Users",
+    "subtitle": "All users that are available in our tenant.",
     "newUser": "Create User",
     "createUser": "Create User",
     "searchUsers": "Filter...",
-    "notFound": "User not found",
-
     "info": {
       "header": "User Information",
       "subheader": "Personal details and general information.",
       "id": "ID",
-      "displayName": "Display Name",
-      "title": { "title": "Title", "male": "Mr", "female": "Ms" },
+      "displayName": "Name",
+      "title": { "title": "Title", "mr": "Mr", "ms": "Ms", "other": "No Specification" },
       "firstName": "First Name",
       "lastName": "Last Name",
-      "authority": "Authority",
-      "department": "Department",
       "role": "System Role",
       "phone": "Telephone Number",
       "email": "E-Mail",
       "group": "Group",
-      "position": "Position",
-      "description": "Activity Description",
       "status": {
         "title": "Status",
         "active": "Active",
         "inactive": "Inactive"
-      }
+      },
+      "selectTitle": "Select title..."
     },
     "detailsTabs": {
       "userData": "User Data",
       "roles": "Roles",
       "groups": "Groups",
-      "dataspaces": "Data Spaces and Datasets",
       "account": "Account"
-    },
-    "form": {
-      "selectTitle": "Select titel...",
-      "selectAuthority": "Select authority...",
-      "selectDepartment": "Select department...",
-      "selectGroup": "Select group..."
     },
     "roles": {
       "title": "Overview: Roles",
@@ -139,17 +324,57 @@
         "role": "Role",
         "inherited": "Inherited",
         "group": "Group",
-        "assignment": "Assignment"
+        "assignment": "Assignment",
+        "noRolesAssigned": "No {roleType} assigned"
       }
+    },
+    "rolesTab": {
+      "segments": {
+        "platformWide": "Platform-wide",
+        "datasets": "Datasets",
+        "datasources": "Data sources",
+        "datastructures": "Data structures"
+      },
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "role": "Role",
+        "type": "Type",
+        "scope": "Scope"
+      },
+      "roleTypes": {
+        "SYSTEM": "System Role",
+        "DATA": "Data Role"
+      },
+      "types": {
+        "standard": "Standard",
+        "custom": "Custom"
+      },
+      "scopes": {
+        "platform": "Platform"
+      },
+      "scopedInfoBanner": {
+        "dataset": "Dataset-related assignments are made at the respective Dataset.",
+        "datasource": "Data source-related assignments are made at the respective Data source.",
+        "datastructure": "Data structure-related assignments are made at the respective Data structure."
+      },
+      "disabledHint": "Assigned roles can be viewed after saving the user."
     },
     "groupsTab": {
       "title": "Group Membership",
       "addGroup": "Add Group",
       "name": "Name",
-      "memberSince": "Member since",
+      "membersCount": "Users count",
       "contact": "Contact",
-      "description": "Description",
-      "roles": "Roles"
+      "description": "Description"
+    },
+    "messages": {
+      "createSuccess": "User has been successfully created.",
+      "updateSuccess": "User has been successfully updated."
+    },
+    "errors": {
+      "creationError": "An error occurred while creating the user.",
+      "updateError": "An error occurred while updating the user."
     }
   },
   "groups": {
@@ -167,23 +392,56 @@
       "description": "Description"
     },
     "detailsTabs": {
-      "info": "Information",
+      "info": "Base Information",
       "roles": "Roles",
       "users": "Users",
       "subgroups": "Subgroups"
     },
     "details": {
       "baseInfo": "Base Information",
-      "name": "Name of the Group",
-      "description": "Group Description",
-      "contact": { "label": "Contact", "placeholder": "Search by name or email" }
+      "name": "Name",
+      "description": "Description",
+      "contact": { "label": "Contact Person", "placeholder": "Search by name or email" }
     },
     "roles": {
-      "groupInfo": "Group Information",
-      "userNotFound": "User not found",
-      "addRoleDialog": {
-        "title": "Add Role - {category}",
-        "description": "Select a role to add to the user from the available {category} roles."
+      "scopeTabs": {
+        "platform": "Platform-wide",
+        "datasets": "Datasets",
+        "datasources": "Data sources",
+        "datastructures": "Data structures"
+      },
+      "scopePlatform": "Platform",
+      "addRole": "Add Role",
+      "systemRole": "System Role",
+      "dataRole": "Data role",
+      "noRoles": "No Roles",
+      "noRolesDescription": "No roles assigned to the group",
+      "removeRole": "Really remove role?",
+      "removeRoleDescription": "This action cannot be undone. Removing this role will affect the group's access permissions.",
+      "assignSystemRole": "Add system role",
+      "assignSystemRoleDescription": "to group {groupName}",
+      "assignDataRole": "Add data role",
+      "assignDataRoleDescription": "to group {groupName}",
+      "dataRolePlatformWarning": "Roles assigned here authorize the group platform-wide (permissions on all Data-related elements of the platform).",
+      "scopedInfoBanner": {
+        "DATASET": "Dataset-related assignments are made at the respective Dataset.",
+        "DATASOURCE": "Data source-related assignments are made at the respective Data source.",
+        "DATASTRUCTURE": "Data structure-related assignments are made at the respective Data structure."
+      },
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "object": "Object",
+        "type": "Type",
+        "scope": "Scope"
+      },
+      "objectLabels": {
+        "SYSTEM": "System role",
+        "DATA": "Data role"
+      },
+      "originLabels": {
+        "default": "Standard",
+        "custom": "Custom"
       }
     },
     "users": {
@@ -191,7 +449,30 @@
       "toGroup": "to group",
       "assignedAt": "Member since",
       "noUsers": "No Users",
-      "noUsersSub": "No users assigned to this group"
+      "noUsersSub": "No users assigned to this group",
+      "removeUserModal": {
+        "title": "Remove User from Group?",
+        "description": "This action can not be undone."
+      }
+    },
+    "messages": {
+      "createSuccess": "Group has been successfully created.",
+      "updateSuccess": "Group has been successfully updated."
+    },
+    "errors": {
+      "createError": "An error occurred while creating the group",
+      "updateError": "An error occurred while updating the group",
+      "deleteError": "An error occurred while deleting the group",
+      "groupNameExists": "The group name is already in use. Please, chose another name.",
+      "assignmentSaveError": "Group was created, but role assignments could not be saved"
+    },
+    "warningModal": {
+      "title": "Delete the group?",
+      "description": "This action can not be undone."
+    },
+    "infoModal": {
+      "title": "Group can not be deleted",
+      "description": "First, all assignments to users, roles and scopes have to be removed."
     }
   },
   "pagination": {
@@ -218,30 +499,64 @@
     },
     "form": {
       "inputs": {
-        "name": "Data Space Name",
-        "description": "Data Space Description",
-        "protected": "Protect Data Space",
-        "protectedDescription": "Protected Data Spaces require elevated permissions for access"
+        "name": "Data space name",
+        "description": "Data space description",
+        "protected": "Protect Data space",
+        "protectedDescription": "Protected Data spaces require elevated permissions for access"
       }
     }
   },
   "permissions": {
-    "title": "Permissions",
-    "systemPermissions": "System Permissions",
-    "dataPermissions": "Daten Permissions",
-    "governancePermissions": "Governance Permissions",
+    "title": "Overview: {permissionType}",
+    "infoBox": "Permissions are predefined and cannot be edited here.",
+    "systemPermissions": {
+      "title": "System Permissions",
+      "description": "System permissions control access to system-wide functions on the platform.\nThey are grouped into system roles and assigned to groups.",
+      "categories": {
+        "TENANT_ADMINISTRATION": "Tenant Administration",
+        "DATA": "Data Management",
+        "OTHER": "Other"
+      },
+      "entry": "{action} {permission}"
+    },
+    "dataPermissions": {
+      "title": "Data Permissions",
+      "description": "Data permissions control access to Data-related elements on the platform.\nThey are grouped into data roles and assigned to groups within a specific scope."
+    },
+    "actions": {
+      "read": "Read",
+      "create": "Create",
+      "update": "Update",
+      "delete": "Delete",
+      "release": "Release"
+    },
     "tableHeaders": {
-      "title": "Name",
-      "category": "Category"
+      "name": "Object"
+    },
+    "accessible": {
+      "granted": "Granted",
+      "notGranted": "Not granted"
+    },
+    "values": {
+      "ASSIGNMENT": "Assignment",
+      "DATASET": "Dataset",
+      "DATASET_PAYLOAD": "Dataset Payload",
+      "DATASOURCE": "Data source",
+      "DATASTRUCTURE": "Data structure",
+      "GROUP": "Group",
+      "PERMISSION": "Permission",
+      "ROLE": "Role",
+      "USER": "User"
     }
   },
   "roles": {
     "title": "Roles",
     "newRole": "Create Role",
+    "newSystemRole": "Create System Role",
+    "newDataRole": "Create Data Role",
     "overView": "Overview:",
     "systemRoles": "System Roles",
     "dataRoles": "Data Roles",
-    "governanceRoles": "Governance Roles",
     "roles": "Individual Roles",
     "roleSets": "Role Sets",
     "tableHeaders": {
@@ -258,7 +573,7 @@
     "tabLabels": {
       "basicInformation": "Basic Information",
       "permissions": "Permissions",
-      "groupAssignment": "Group Assignments"
+      "groupAssignment": "Groups"
     },
     "baseInfoTab": {
       "heading": "Basic Information",
@@ -283,10 +598,20 @@
         }
       },
       "securityArea": {
-        "heading": "Sicherheitsbereich",
-        "description": "Rolle löschen",
-        "note": "Handlungsanweisung bzw. Beschreibung was passiert.",
-        "deleteButton": "Rolle löschen"
+        "heading": "Security Area",
+        "description": "Delete role",
+        "note": "Instructions or description of what happens.",
+        "deleteButton": "Delete role"
+      },
+      "deleteConfirmModal": {
+        "title": "Delete role?",
+        "description": "This action cannot be undone.",
+        "confirm": "Delete"
+      },
+      "deleteErrorModal": {
+        "title": "Role cannot be deleted",
+        "description": "All assignments to groups and scopes must be removed first.",
+        "close": "Close"
       }
     },
     "permissionsTab": {
@@ -295,6 +620,21 @@
       "selectedPersmissions": "{count} selected",
       "roleTemplate": {
         "placeholder": "Select Role as template"
+      },
+      "categories": {
+        "TENANT_ADMINISTRATION": "Tenant Management",
+        "DATA": "Data Management"
+      },
+      "dataPermissions": {
+        "dataset": "Dataset",
+        "datasetPayload": "Dataset Payload",
+        "datasource": "Data source",
+        "datastructure": "Data structure",
+        "read": "Read",
+        "create": "Create",
+        "update": "Update",
+        "delete": "Delete",
+        "release": "Release"
       }
     },
     "groupAssignmentTab": {
@@ -304,9 +644,410 @@
         "name": "Name",
         "usersCount": "Amount of Users",
         "contact": "Contact Person",
-        "description": "Description"
+        "description": "Description",
+        "scope": "Scope"
       },
-      "noGroupsAssigned": "No groups assigned yet."
+      "noGroupsAssigned": "No groups assigned yet.",
+      "removeAssignment": "Remove assignment",
+      "removeModal": {
+        "title": "Remove Group Assignment",
+        "description": "Are you sure you want to remove the group \"{groupName}\" from this role? This action cannot be undone.",
+        "confirm": "Remove"
+      },
+      "scopeTabs": {
+        "platformWide": "Platform-wide",
+        "dataset": "Dataset",
+        "datasource": "Data source",
+        "datastructure": "Data structure"
+      },
+      "scopeLabels": {
+        "TENANT": "Platform-wide",
+        "DATASET": "Dataset",
+        "DATASOURCE": "Data source",
+        "DATASTRUCTURE": "Data structure"
+      },
+      "infoBox": "Groups that are assigned here, get the type 'platform-wide' (permissions to all Data-related elements inside the platform)",
+      "scopeReadOnlyMessageDATASET": "Dataset-related assignments happen at the corresponding Dataset",
+      "scopeReadOnlyMessageDATASOURCE": "Data source-related assignments happen at the corresponding Data source",
+      "scopeReadOnlyMessageDATASTRUCTURE": "Data structure-related assignments happen at the corresponding Data structure",
+      "modal": {
+        "title": "Add Group",
+        "description": "to Role {roleName}",
+        "tableHeaders": {
+          "name": "Name",
+          "usersCount": "Amount of Users",
+          "description": "Description"
+        }
+      }
+    },
+    "errors": {
+      "createError": "An error occurred while creating the role",
+      "updateError": "An error occurred while updating the role"
+    },
+    "success": {
+      "assignmentSuccess": "The assignments have been successfully updated"
+    }
+  },
+  "datasources": {
+    "title": "Overview: Data sources",
+    "subtitle": "All Data sources available in our tenant.",
+    "newDatasource": "Create Data source",
+    "tableHeaders": {
+      "name": "Name",
+      "description": "Description",
+      "connector": "Connector",
+      "connection": "Connection",
+      "lastActive": "Last active",
+      "status": "Status",
+      "action": "Action"
+    },
+    "status": {
+      "DRAFT": "Draft",
+      "AVAILABLE": "Available"
+    },
+    "deleteModal": {
+      "title": "Really delete Data source?",
+      "description": "This action will permanently delete the Data source. This action cannot be undone."
+    },
+    "availableModal": {
+      "title": "Data source cannot be deleted",
+      "description": "This Data source has the status \"Available\" and cannot be deleted. Please set it to \"Draft\" first."
+    },
+    "errors": {
+      "invalidDsn": "Enter a valid URI (e.g. postgres://host:5432/db)",
+      "invalidBrokerUrl": "Enter a valid broker URL (e.g. tcp://broker:1883)",
+      "creationError": "An error occurred while creating the Data source.",
+      "updateError": "An error occurred while updating the Data source.",
+      "groupsWithoutRoles": "Groups with no assigned roles have not been saved."
+    },
+    "connection": {
+      "active": "active",
+      "inactive": "inactive",
+      "static": "static"
+    },
+    "create": {
+      "title": "New Data source",
+      "subtitle": "New Data sources are only visible internally.",
+      "basicInfo": {
+        "title": "Base Information",
+        "subtitle": "The name can be changed later."
+      }
+    },
+    "edit": {
+      "basicInfo": {
+        "title": "Base Information",
+        "subtitle": "Base information can be changed later."
+      }
+    },
+    "tabs": {
+      "basicInfo": "Base Information",
+      "connector": "Connector",
+      "dataStructure": "Data structure",
+      "accessManagement": "Access Management",
+      "dataspaces": "Data spaces"
+    },
+    "form": {
+      "name": "Name",
+      "namePlaceholder": "Name of the Data source",
+      "description": "Description"
+    },
+    "exitModal": {
+      "title": "Save before exiting?",
+      "description": "There are unsaved changes. \"Discard\" cannot be undone.",
+      "discard": "Discard"
+    },
+    "connectorTab": {
+      "title1": "Connector",
+      "title2": "Configuration",
+      "type": "Type",
+      "typePlaceholder": "Select connector type",
+      "connection": "Connection",
+      "establishConnection": "Establish Connection"
+    },
+    "dataModel": {
+      "placeholder": {
+        "title": "No Data structure imported",
+        "description1": "Import an existing Data structure from the platform to use it in this Data source.",
+        "noDatastructures": "Don't have a Data structure yet?",
+        "creationSteps": {
+          "step1": "Save this Data source as draft",
+          "step2": "Create a Data structure in <link>Data structures</link>",
+          "step3": "Return here and import it"
+        }
+      },
+      "importModal": {
+        "title": "Import Data Model",
+        "to": "into {name}"
+      }
+    },
+    "accessManagementTab": {
+      "infoBoxes": {
+        "firstBox": "Groups that have platform-wide permissions on all Data-related elements have access to this Data source."
+      }
+    }
+  },
+  "datastructures": {
+    "title": "Overview: Data structures",
+    "subtitle": "All Data sources available in our tenant.",
+    "newDatasource": "Create Data structure",
+    "newVersion": "Create version",
+
+    "tableHeaders": {
+      "name": "Name",
+      "description": "Description",
+      "source": "Source",
+      "versionNumber": "Version",
+      "status": "Status"
+    },
+    "create": {
+      "title": "New Data structure",
+      "subtitle": "New Data structures are only visible internally.",
+      "basicInfo": {
+        "title": "Base Information",
+        "subtitle": "The name can be changed later."
+      }
+    },
+    "form": {
+      "name": "Name",
+      "namePlaceholder": "Name of the Data structure",
+      "description": "Description"
+    },
+    "tabs": {
+      "basicInfo": "Base Information",
+      "accessManagement": "Access Management",
+      "versions": "Versions"
+    },
+    "edit": {
+      "basicInfo": {
+        "title": "Base Information",
+        "subtitle": "Base information can be changed later."
+      }
+    },
+    "messages": {
+      "createSuccess": "Data structure has been successfully created.",
+      "updateSuccess": "Data structure  has been successfully updated.",
+      "isInUseStatusHint": "Can not be set to draft since this Data structure is already in use."
+    },
+    "errors": {
+      "deletionError": "An error occurred while deleting the Data structure.",
+      "creationError": "An error occurred while creating the Data structure.",
+      "groupsWithoutRoles": "Groups with no assigned roles have not been saved."
+    },
+    "infoModal": {
+      "title": "Data structure can not be deleted",
+      "description": "This Data structure is in use and can therefore not be deleted."
+    },
+    "unsavedChangesModal": {
+      "title": "Unsaved Changes",
+      "description": "This action will take you to another page and your unsaved changes will be lost. Do you want to save them first?"
+    },
+    "accessManagementTab": {
+      "infoBoxes": {
+        "firstBox": "Via the groups-roles-assignments, permissions are assigned to this Data structure to allow the usage in Datasets and Data sources."
+      }
+    }
+  },
+  "datastructureVersions": {
+    "newVersion": "New Version",
+    "tabs": {
+      "structure": "Structure Definition",
+      "versionInfo": "Version Information"
+    },
+    "versionInfo": {
+      "title": "Version Information",
+      "versionNumber": "Version Number",
+      "versionNumberPlaceholder": "e. g. 1.0",
+      "description": "Version Description",
+      "source": "Source"
+    },
+    "source": {
+      "OWN": "Own"
+    },
+    "messages": {
+      "createSuccess": "The version of the Data structure has been successfully created.",
+      "updateSuccess": "The version of the data has been successfully updated.",
+      "isInUseModelHint": "The data model can not be edited since it is already in use.",
+      "isInUseStatusHint": "Can not be set to draft since this version is already in use.",
+      "isLastAvailableVersion": "Can not be set to draft because this is the last available version in an available Data structure. Set the Data structure to draft first."
+    },
+    "errors": {
+      "creationError": "An error occurred while creating the Data structure version.",
+      "versionAlreadyExists": "A version with the same version number already exists in this Data structure."
+    }
+  },
+  "pipelineEditor": {
+    "title": "Pipeline Editor",
+    "canvas": {
+      "noPipeline": "No pipeline available"
+    },
+    "inspector": {
+      "edgeProperties": "Edge Properties",
+      "source": "Source",
+      "target": "Target",
+      "properties": "Properties",
+      "noNodeSelected": "No node selected",
+      "noNodeSelectedHint": "Select a node on the canvas to view and edit its properties",
+      "configured": "Configured",
+      "notConfigured": "Not configured"
+    },
+    "nodeTypes": {
+      "start": "Start",
+      "end": "End",
+      "dataSource": "Data source",
+      "apiRequest": "API Request",
+      "apiResponse": "API Response",
+      "cronTrigger": "CRON Trigger",
+      "frostStorage": "FROST Server",
+      "mapping": "Mapping"
+    },
+    "palette": {
+      "title": "Nodes"
+    },
+    "categories": {
+      "general": "General",
+      "sources": "Sources",
+      "trigger": "Trigger",
+      "storage": "Storage",
+      "transformation": "Transformation"
+    },
+    "paletteItems": {
+      "flowStart": "Flow Start",
+      "flowStartDesc": "Pipeline entry point. Execution starts here.",
+      "flowEnd": "Flow End",
+      "flowEndDesc": "Pipeline exit point. Execution ends here.",
+      "dataSource": "Data source",
+      "dataSourceDesc": "Data source. Select a configured Data source.",
+      "apiRequest": "API Request",
+      "apiRequestDesc": "REST API request trigger. Creates endpoint that serves data on HTTP request.",
+      "apiResponse": "API Response",
+      "apiResponseDesc": "REST API response. Returns data to client.",
+      "cron": "CRON",
+      "cronDesc": "Scheduled trigger. Executes pipeline on schedule.",
+      "frostServer": "FROST Server",
+      "frostServerDesc": "SensorThings API persistence. Store or retrieve data.",
+      "mapping": "Mapping",
+      "mappingDesc": "Bloblang data transformation. Map and transform data."
+    },
+    "controlPanel": {
+      "entryPoint": "Pipeline Entry Point",
+      "entryPointDesc": "The Start node marks where the pipeline execution begins. Connect it to a trigger or Data source node to define how the pipeline is activated.",
+      "exitPoint": "Pipeline Exit Point",
+      "exitPointDesc": "The End node marks where the pipeline execution completes. All data flow paths should eventually lead to this node.",
+      "nodeInformation": "Node Information",
+      "type": "Type",
+      "configurable": "Configurable",
+      "no": "No"
+    },
+    "cronPanel": {
+      "cronExpression": "CRON Expression",
+      "invalidCron": "Invalid cron expression. Must be 6-field Quartz syntax (seconds minutes hours day-of-month month day-of-week).",
+      "cronHint": "A CRON expression defines when the pipeline should run automatically.",
+      "learnCron": "Learn about CRON expressions",
+      "currentExpression": "Current Expression"
+    },
+    "dataSourcePanel": {
+      "label": "Data source",
+      "placeholder": "Select a Data source...",
+      "details": "Data source details",
+      "connector": "Connector",
+      "connection": "Connection",
+      "status": "Status",
+      "description": "Description",
+      "tags": "Tags",
+      "showDataStructure": "Show Data Structure",
+      "noPermission": "No permission to read datasources"
+    },
+    "apiPanel": {
+      "requestDetails": "API Request Details",
+      "responseDetails": "API Response Details",
+      "apiPath": "API Path"
+    },
+    "frostPanel": {
+      "details": "FROST Server Details",
+      "serverName": "Server Name",
+      "serverUrl": "Server URL",
+      "version": "Version"
+    },
+    "mappingPanel": {
+      "hint": "Define your data transformation mapping using YAML or JSON format.",
+      "mappingCode": "Mapping Code",
+      "loadingEditor": "Loading editor...",
+      "status": "Status",
+      "mappingConfigured": "Mapping configured",
+      "noMappingDefined": "No mapping defined"
+    },
+    "entitySelector": {
+      "selectEntity": "Select an entity...",
+      "errorLoading": "Error loading entities",
+      "clearSelection": "Clear selection"
+    },
+    "validation": {
+      "results": "Validation Results",
+      "pipelineValid": "Pipeline is valid",
+      "allChecksPassed": "All validation checks passed. You can save the pipeline.",
+      "errors": "Errors ({count})",
+      "warnings": "Warnings ({count})",
+      "fixErrors": "Fix the errors above before saving the pipeline.",
+      "hasWarnings": "Pipeline has warnings but can be saved.",
+      "canNotSave": "Unable to save the pipeline. Review the pipeline and validate it before saving.",
+      "messages": {
+        "startNodeRequired": "Pipeline must have at least one Start node",
+        "endNodeRequired": "Pipeline must have at least one End node",
+        "apiPairing": "API Request node requires an API Response node in the pipeline",
+        "nodeNotConfigured": "{label} is not configured",
+        "invalidCronExpression": "{label} has an invalid cron expression. Must be a 6-field Quartz syntax.",
+        "orphanNode": "{label} is not connected to any other node",
+        "minimumFunctionalNodes": "Pipeline must have at least one functional node between Start and End"
+      }
+    },
+    "toolbar": {
+      "unsavedChanges": "(unsaved changes)",
+      "validateBeforeSave": "Click Validate before saving",
+      "validate": "Validate",
+      "save": "Save",
+      "saving": "Saving...",
+      "loading": "Loading pipelines...",
+      "pipelineSettings": "Pipeline settings",
+      "deletePipeline": "Delete Pipeline",
+      "deleteConfirmTitle": "Delete Pipeline?",
+      "deleteConfirmDescription": "Are you sure you want to delete this pipeline? This action cannot be undone."
+    },
+    "header": {
+      "saveAll": "Save All",
+      "savingAll": "Saving...",
+      "exit": "Exit",
+      "validationFailed": "Validation failed for: {names}",
+      "duplicateNames": "Duplicate pipeline names: {names}",
+      "saveFailed": "Failed to save: {names}",
+      "saveSucces": "Pipelines saved successfully"
+    },
+    "tabs": {
+      "closeTab": "Close tab",
+      "newPipeline": "New pipeline",
+      "untitledPipeline": "Untitled Pipeline"
+    },
+    "nodeLabels": {
+      "notConfigured": "Not configured"
+    },
+    "lines": "{count, plural, one {# line} other {# lines}}"
+  },
+  "umlModeler": {
+    "closeTabModal": {
+      "title": "Discard model?",
+      "description": "This action deletes the model. It can not be undone."
+    },
+    "import": {
+      "title": "Import",
+      "fromPlatform": "from the platform",
+      "fromFile": "from file"
+    },
+    "save": {
+      "success": "Model saved successfully",
+      "error": "Failed to save model. Please try again."
+    },
+    "export": {
+      "success": "Diagram exported successfully",
+      "error": "Failed to export diagram. Please try again."
     }
   }
 }

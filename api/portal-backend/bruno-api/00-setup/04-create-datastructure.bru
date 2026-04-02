@@ -1,0 +1,50 @@
+meta {
+  name: Setup - Create DataStructure
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/datastructures
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "API Test DataStructure",
+    "description": "Base data structure for API testing",
+    "createdFromDataSource": false,
+    "dataStructureVersionIds": [],
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataStructureId', res.body.id);
+    bru.setVar('setupDataStructureId', res.body.id);
+  }
+}
+
+tests {
+  test("DataStructure created", function() {
+    const status = res.getStatus();
+    // 201=created, 409=already exists from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+}
+
+docs {
+  **Expected Response:** 201 Created, body contains `id`. 409 if the data structure already existed (idempotent setup).
+
+  **Post-condition:** Save `dataStructureId` and `setupDataStructureId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataStructure record created in `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

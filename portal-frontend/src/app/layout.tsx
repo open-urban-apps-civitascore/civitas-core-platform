@@ -8,6 +8,8 @@ import { getLocale } from 'next-intl/server'
 
 import { SessionManager } from '@/components/session-manager'
 
+import QueryProvider from './providers/queryClient'
+
 const ibmPlexSans = IBM_Plex_Sans({
   variable: '--font-ibm-plex-sans',
   subsets: ['latin'],
@@ -21,8 +23,21 @@ const ibmPlexMono = IBM_Plex_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'CIVITAS/Core v2',
-  description: 'The frontend vor CIVITAS/Core v2',
+  title: 'CIVITAS/CORE V2',
+  description: 'The frontend vor CIVITAS/CORE V2',
+  icons: {
+    icon: [
+      { url: '/favicon-light.ico' },
+      {
+        url: '/favicon-light.ico',
+        media: '(prefers-color-scheme: light)',
+      },
+      {
+        url: '/favicon-dark.ico',
+        media: '(prefers-color-scheme: dark)',
+      },
+    ],
+  },
 }
 
 interface RootLayoutProps {
@@ -35,9 +50,11 @@ const RootLayout = async ({ children }: RootLayoutProps) => {
   return (
     <html lang="en">
       <body className={`${ibmPlexSans.variable}  ${ibmPlexMono.variable} antialiased`}>
-        <SessionProvider refetchInterval={240}>
+        <SessionProvider>
           <SessionManager />
-          <NextIntlClientProvider locale={locale}>{children}</NextIntlClientProvider>
+          <NextIntlClientProvider locale={locale}>
+            <QueryProvider>{children}</QueryProvider>
+          </NextIntlClientProvider>
         </SessionProvider>
       </body>
     </html>

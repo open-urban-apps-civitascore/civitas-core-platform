@@ -1,0 +1,11 @@
+{
+  "_comment": "FROST Server (OGC SensorThings API) via APISIX Gateway proxy. Owner: Team 2",
+  "_version": "2.0.0",
+  "_backend_id": "frost-server",
+
+  "endpoints": {
+    "/datasets/{id}": {
+      "GET": "DATASET_READ"
+    }
+  }
+}

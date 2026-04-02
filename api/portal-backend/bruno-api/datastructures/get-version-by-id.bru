@@ -1,0 +1,31 @@
+meta {
+  name: Get Data Structure Version by ID
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+  id: {{dataStructureVersionId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Has correct id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` and `dataStructureVersionId` are set.
+
+  **Expected Response:** 200 OK, body contains the version with matching `id`.
+}

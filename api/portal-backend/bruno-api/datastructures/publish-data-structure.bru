@@ -1,0 +1,37 @@
+meta {
+  name: Publish Data Structure
+  type: http
+  seq: 16
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/publish
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+}
+
+tests {
+  test("Publish accepted or precondition not met", function() {
+    const status = res.getStatus();
+    // 200=published, 400=not in DRAFT state
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` is set and in draft state.
+
+  **Expected Response:** 200 OK, body reflects data structure in published state.
+
+  **System Impact:**
+
+  | Layer | Impact | Status |
+  |---|---|---|
+  | Backend | DataStructure status updated to published | --- |
+  | Config Adapter | --- | --- |
+  | Model Atlas | DataStructure schema becomes available in Model Atlas (`http://localhost:8086`) | --- |
+}

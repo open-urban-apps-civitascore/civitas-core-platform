@@ -1,0 +1,47 @@
+meta {
+  name: Check Mailpit Emails
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{mailpitUrl}}/api/v1/messages
+  body: none
+  auth: none
+}
+
+script:post-response {
+  if (res.body && res.body.messages) {
+    bru.setVar('emailCount', res.body.messages.length);
+  }
+}
+
+docs {
+  Checks the Mailpit inbox for emails triggered by user creation.
+
+  **Precondition:** A user with email `john.doe@example.com` was created (TC-USER-04).
+
+  **Expected Response**
+  - Status: `200 OK`
+  - Body contains `messages` array with at least one email addressed to `john.doe@example.com`
+}
+
+tests {
+  test("should have received emails", function() {
+    // Mailpit is only available in local dev, skip gracefully in CI
+    if (!res.status) return;
+    expect(res.status).to.equal(200);
+    expect(res.body.messages).to.be.an('array');
+  });
+
+  test("should contain verification email for created user", function() {
+    if (!res.status || !res.body || !res.body.messages) return;
+    const messages = res.body.messages;
+    expect(messages.length).to.be.greaterThan(0);
+
+    const userEmail = messages.find(m =>
+      m.To && m.To.some(to => to.Address === "john.doe@example.com")
+    );
+    expect(userEmail).to.not.be.undefined;
+  });
+}

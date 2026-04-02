@@ -1,0 +1,57 @@
+meta {
+  name: Create Dataset
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/datasets
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Sensor Readings Dataset",
+    "description": "Dataset containing sensor readings",
+    "openDataAccess": false,
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataSetId', res.body.id);
+    bru.setVar('scopeType', 'DATASET');
+    bru.setVar('scopeId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Has id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+  test("Has name", function() {
+    expect(res.body.name).to.be.a('string');
+  });
+  test("Has dataSetStatus", function() {
+    expect(res.body.dataSetStatus).to.be.a('string');
+  });
+}
+
+docs {
+  **Expected Response:** 201 Created, body contains `id`.
+
+  **Post-condition:** Save `dataSetId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSet record created in `portal_backend` DB with status `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}

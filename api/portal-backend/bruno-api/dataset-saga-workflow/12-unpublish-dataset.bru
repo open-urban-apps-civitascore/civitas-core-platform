@@ -1,0 +1,41 @@
+meta {
+  name: 12. Unpublish DataSet
+  type: http
+  seq: 28
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/unpublish
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSetId}}
+}
+
+tests {
+  test("Unpublished or already draft", function() {
+    const status = res.getStatus();
+    // 200=unpublished, 400=pending saga or already DRAFT
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Saga step 12 of 18** — Unpublish the dataset before deleting it.
+
+  Transitions the dataset from `READY` back to `DRAFT`. This must be called after the DATASET_DELETE saga from step 11 has completed. A 400 is returned if a saga is still pending or the dataset is already in `DRAFT`.
+
+  **Precondition:** `sagaDataSetId` is set; dataset is in `READY` state (DATASET_DELETE saga has completed).
+
+  **Expected Response:** 200 OK, body reflects dataset with status `DRAFT`. 400 if a saga is still pending or already `DRAFT`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSet status → `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}

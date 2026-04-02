@@ -1,0 +1,30 @@
+meta {
+  name: Get Dataset Assignments
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id/assignments
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSetId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns assignment list", function() {
+    expect(res.body).to.be.an('array');
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` is set.
+
+  **Expected Response:** 200 OK, body contains the list of assignments for the data set
+}

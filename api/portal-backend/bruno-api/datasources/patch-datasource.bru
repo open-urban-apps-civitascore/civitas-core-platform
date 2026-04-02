@@ -1,0 +1,49 @@
+meta {
+  name: Patch Data Source
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/datasources/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSourceId}}
+}
+
+body:json {
+  {
+    "description": "Patched description"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataSourceId', res.body.id);
+    bru.setVar('scopeType', 'DATASOURCE');
+    bru.setVar('scopeId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Precondition:** `dataSourceId` is set.
+
+  **Expected Response:** 200 OK, body reflects updated `description`; other fields unchanged.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource `description` updated; other fields unchanged |
+  | Config Adapter | — |
+  | External System | — |
+}

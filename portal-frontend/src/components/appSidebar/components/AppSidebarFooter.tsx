@@ -1,8 +1,8 @@
 import { ChevronsUpDown, LogOut } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
-import { signOut } from '@/auth'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { signOutAction } from '@/app/actions/auth'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,17 +12,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { SidebarFooter, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
+import { CurrentUser } from '@/types/currentUser'
 
 interface AppSidebarFooterProps {
-  user?: {
-    name?: string | null
-    email?: string | null
-    image?: string | null
-  } | null
+  currentUser: CurrentUser
 }
 
 export const AppSidebarFooter = (props: AppSidebarFooterProps) => {
-  const { user } = props
+  const { currentUser } = props
+  const fullName = `${currentUser.firstName} ${currentUser.lastName}`
 
   const tNav = useTranslations('sidebar')
 
@@ -34,12 +32,11 @@ export const AppSidebarFooter = (props: AppSidebarFooterProps) => {
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton size="lg">
                 <Avatar className="size-8 rounded-lg">
-                  <AvatarImage src={user?.image || ''} alt={user?.name || ''} />
-                  <AvatarFallback className="rounded-lg">{user?.name?.charAt(0) || 'G'}</AvatarFallback>
+                  <AvatarFallback className="rounded-lg">{currentUser.firstName.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user?.name || 'Guest'}</span>
-                  <span className="truncate text-xs">{user?.email || ''}</span>
+                  <span className="truncate font-medium">{fullName}</span>
+                  <span className="truncate text-xs">{currentUser.email}</span>
                 </div>
                 <ChevronsUpDown className="ml-auto size-4" />
               </SidebarMenuButton>
@@ -53,24 +50,18 @@ export const AppSidebarFooter = (props: AppSidebarFooterProps) => {
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                   <Avatar className="h-8 w-8 rounded-lg">
-                    <AvatarImage src={user?.image || ''} alt={user?.name || ''} />
-                    <AvatarFallback className="rounded-lg">{user?.name?.charAt(0) || 'G'}</AvatarFallback>
+                    <AvatarFallback className="rounded-lg">{currentUser.firstName.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">{user?.name || 'Guest'}</span>
-                    <span className="truncate text-xs">{user?.email || ''}</span>
+                    <span className="truncate font-medium">{fullName}</span>
+                    <span className="truncate text-xs">{currentUser.email}</span>
                   </div>
                 </div>
               </DropdownMenuLabel>
 
               <DropdownMenuSeparator />
 
-              <form
-                action={async () => {
-                  'use server'
-                  await signOut({ redirectTo: '/login' })
-                }}
-              >
+              <form action={signOutAction}>
                 <DropdownMenuItem asChild>
                   <button type="submit" className="w-full flex items-center">
                     <LogOut className="mr-2 size-4" />

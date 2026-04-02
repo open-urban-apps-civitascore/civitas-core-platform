@@ -2,12 +2,16 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.model.embedded.UserTitleType;
+import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.input.UserInputDTO;
+import de.civitascore.portal.model.output.GroupOutputDTO;
 import de.civitascore.portal.model.output.UserOutputDTO;
+import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.RestPage;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -15,6 +19,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -25,6 +30,7 @@ class UserControllerIntegrationTest
   private final String USERS_ENDPOINT = "/users";
 
   @Autowired private UserRepository userRepository;
+  @Autowired private GroupRepository groupRepository;
 
   @Override
   protected String getEndpointPath() {
@@ -33,6 +39,7 @@ class UserControllerIntegrationTest
 
   @Override
   protected void performAdditionalCleanup() {
+    groupRepository.deleteAll();
     userRepository.deleteAll();
   }
 
@@ -41,7 +48,7 @@ class UserControllerIntegrationTest
     UserInputDTO input = new UserInputDTO();
     input.setFirstName("Test");
     input.setLastName("User " + System.currentTimeMillis());
-    input.setEmail("testuser" + System.currentTimeMillis() + "@example.com");
+    input.setEmail("testuser" + UUID.randomUUID().toString().substring(0, 8) + "@example.com");
     input.setPhone("+49123456789");
     input.setActive(true);
     return input;
@@ -57,6 +64,7 @@ class UserControllerIntegrationTest
   @Override
   protected UserInputDTO createUpdateInput() {
     UserInputDTO input = new UserInputDTO();
+    input.setTitle(UserTitleType.MS);
     input.setFirstName("Updated");
     input.setLastName("User");
     input.setEmail("updated.user@example.com");
@@ -80,6 +88,26 @@ class UserControllerIntegrationTest
     return output.getId();
   }
 
+  private UUID createTestGroup(String name) {
+    GroupInputDTO input = new GroupInputDTO();
+    input.setName(name);
+    input.setDescription("Test group");
+    ResponseEntity<GroupOutputDTO> response =
+        exchange(
+            "/groups",
+            HttpMethod.POST,
+            createAuthHeaders(),
+            input,
+            new ParameterizedTypeReference<GroupOutputDTO>() {});
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    return response.getBody().getId();
+  }
+
+  private ResponseEntity<UserOutputDTO> performReplaceGroups(UUID userId, List<UUID> groupIds) {
+    String url = getEndpointPath() + "/" + userId + "/groups";
+    return exchange(url, HttpMethod.PUT, createAuthHeaders(), groupIds, getOutputTypeReference());
+  }
+
   @Nested
   @DisplayName("Create User Tests")
   class CreateUserTests {
@@ -99,6 +127,7 @@ class UserControllerIntegrationTest
 
       UserOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should be generated").isNotNull();
+      assertThat(output.getTitle()).as("Title should match input").isEqualTo(input.getTitle());
       assertThat(output.getFirstName())
           .as("First name should match input")
           .isEqualTo(input.getFirstName());
@@ -143,18 +172,6 @@ class UserControllerIntegrationTest
       assertThat(response.getStatusCode())
           .as("Should return UNAUTHORIZED status")
           .isEqualTo(HttpStatus.UNAUTHORIZED);
-    }
-
-    @Test
-    @DisplayName("Should create user with groups")
-    void shouldCreateUserWithGroups() {
-      UserInputDTO input = createValidInput();
-      input.setGroupIds(Collections.emptyList());
-
-      ResponseEntity<UserOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
     }
 
     @Test
@@ -275,6 +292,7 @@ class UserControllerIntegrationTest
           .isEqualTo(updateInput.getFirstName());
       assertThat(output.getEmail()).as("Email should be updated").isEqualTo(updateInput.getEmail());
       assertThat(output.getModifiedAt()).isNotNull();
+      assertThat(output.getTitle()).as("Title should be updated").isEqualTo(updateInput.getTitle());
     }
 
     @Test
@@ -364,6 +382,9 @@ class UserControllerIntegrationTest
       assertThat(response.getBody().getActive())
           .as("Active should remain unchanged")
           .isEqualTo(initialUser.getActive());
+      assertThat(response.getBody().getTitle())
+          .as("Title should remain unchanged")
+          .isEqualTo(initialUser.getTitle());
     }
 
     @Test
@@ -384,6 +405,7 @@ class UserControllerIntegrationTest
       assertThat(response.getBody().getLastName()).isEqualTo(initialUser.getLastName());
       assertThat(response.getBody().getEmail()).isEqualTo(initialUser.getEmail());
       assertThat(response.getBody().getPhone()).isEqualTo(initialUser.getPhone());
+      assertThat(response.getBody().getTitle()).isEqualTo(initialUser.getTitle());
     }
 
     @Test
@@ -411,6 +433,7 @@ class UserControllerIntegrationTest
       patchMap.put("email", "patched@example.com");
       patchMap.put("phone", "+49999999999");
       patchMap.put("active", false);
+      patchMap.put("title", "MS");
 
       ResponseEntity<UserOutputDTO> response = performPatch(userId, patchMap);
 
@@ -420,6 +443,7 @@ class UserControllerIntegrationTest
       assertThat(response.getBody().getEmail()).isEqualTo("patched@example.com");
       assertThat(response.getBody().getPhone()).isEqualTo("+49999999999");
       assertThat(response.getBody().getActive()).isFalse();
+      assertThat(response.getBody().getTitle()).isEqualTo(UserTitleType.MS);
     }
 
     @Test
@@ -544,19 +568,6 @@ class UserControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getActive()).isFalse();
     }
-
-    @Test
-    @DisplayName("Should handle external ID")
-    void shouldHandleExternalId() {
-      UserInputDTO input = createValidInput();
-      input.setExternalId("ext-123");
-
-      ResponseEntity<UserOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getExternalId()).isEqualTo("ext-123");
-    }
   }
 
   @Nested
@@ -596,6 +607,82 @@ class UserControllerIntegrationTest
       ResponseEntity<UserOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Nested
+  @DisplayName("Replace User Groups Tests")
+  class ReplaceUserGroupsTests {
+
+    @Test
+    @DisplayName("Should replace user groups with new set")
+    void shouldReplaceUserGroups() {
+      UUID userId = createTestEntity();
+      UUID groupA = createTestGroup("Group A " + UUID.randomUUID().toString().substring(0, 8));
+      UUID groupB = createTestGroup("Group B " + UUID.randomUUID().toString().substring(0, 8));
+
+      ResponseEntity<UserOutputDTO> response =
+          performReplaceGroups(userId, List.of(groupA, groupB));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getGroups()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Should clear all groups with empty list")
+    void shouldClearAllGroups() {
+      UUID userId = createTestEntity();
+      UUID groupA = createTestGroup("Group A " + UUID.randomUUID().toString().substring(0, 8));
+      performReplaceGroups(userId, List.of(groupA));
+
+      ResponseEntity<UserOutputDTO> response = performReplaceGroups(userId, List.of());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getGroups()).isNullOrEmpty();
+    }
+
+    @Test
+    @DisplayName("Should return 400 for non-existent group ID")
+    void shouldReturn400ForNonExistentGroup() {
+      UUID userId = createTestEntity();
+
+      ResponseEntity<UserOutputDTO> response =
+          performReplaceGroups(userId, List.of(UUID.randomUUID()));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should return 404 for non-existent user")
+    void shouldReturn404ForNonExistentUser() {
+      UUID groupA = createTestGroup("Group A " + UUID.randomUUID().toString().substring(0, 8));
+
+      ResponseEntity<UserOutputDTO> response =
+          performReplaceGroups(UUID.randomUUID(), List.of(groupA));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("Should replace existing groups with different set")
+    void shouldReplaceExistingGroupsWithDifferentSet() {
+      UUID userId = createTestEntity();
+      UUID groupA = createTestGroup("Group A " + UUID.randomUUID().toString().substring(0, 8));
+      UUID groupB = createTestGroup("Group B " + UUID.randomUUID().toString().substring(0, 8));
+      UUID groupC = createTestGroup("Group C " + UUID.randomUUID().toString().substring(0, 8));
+
+      performReplaceGroups(userId, List.of(groupA, groupB));
+
+      ResponseEntity<UserOutputDTO> response =
+          performReplaceGroups(userId, List.of(groupB, groupC));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getGroups()).hasSize(2);
+      assertThat(response.getBody().getGroups())
+          .extracting("id")
+          .containsExactlyInAnyOrder(groupB, groupC);
     }
   }
 }

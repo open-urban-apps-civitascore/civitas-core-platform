@@ -1,0 +1,66 @@
+meta {
+  name: Update Data Source
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/datasources/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSourceId}}
+}
+
+body:json {
+  {
+    "name": "MQTT Sensor Source",
+    "description": "Updated temperature sensor data source",
+    "connectorType": "MQTT",
+    "configuration": {
+      "urls": ["tcp://broker:1883"],
+      "topics": ["sensor/#"],
+      "qos": 1,
+      "keepalive": "30s",
+      "user": "mqttuser",
+      "password": "secret",
+      "client_id": "civitas-client-1",
+      "connect_timeout": "5s",
+      "tls": {
+        "enabled": false
+      }
+    },
+    "dataStructureVersionId": null,
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataSourceId', res.body.id);
+    bru.setVar('scopeType', 'DATASOURCE');
+    bru.setVar('scopeId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Precondition:** `dataSourceId` is set (MQTT source).
+
+  **Expected Response:** 200 OK, body reflects updated values.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource record updated in `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

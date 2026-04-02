@@ -1,30 +1,58 @@
 package de.civitascore.portal.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataSetMapper;
+import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
+import de.civitascore.portal.messaging.saga.SagaResultPayload;
+import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.Distribution;
+import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
-import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
-import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service for managing {@link DataSet} entities through their full lifecycle: DRAFT, READY, and
+ * AVAILABLE. Orchestrates publishing (generating distributions from pipeline APIs), releasing
+ * (triggering infrastructure provisioning via sagas), and the corresponding reverse operations.
+ * Handles saga completion and failure callbacks to reconcile dataset state.
+ */
+@Slf4j
 @Service
-@RequiredArgsConstructor
-public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
+public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputDTO> {
 
   private final DataSetRepository dataSetRepository;
   private final DataSetMapper dataSetMapper;
-  private final UserService userService;
-  private final DataSpaceService dataSpaceService;
-  private final ObjectMapper objectMapper;
+
+  private final AssignmentFactory assignmentFactory;
+  private final DistributionService distributionService;
+
+  private final DataSetSagaPublisher sagaPublisher;
+
+  public DataSetService(
+      DataSetRepository dataSetRepository,
+      DataSetMapper dataSetMapper,
+      AssignmentFactory assignmentFactory,
+      DistributionService distributionService,
+      DataSetSagaPublisher sagaPublisher) {
+    this.dataSetRepository = dataSetRepository;
+    this.dataSetMapper = dataSetMapper;
+    this.assignmentFactory = assignmentFactory;
+    this.distributionService = distributionService;
+    this.sagaPublisher = sagaPublisher;
+  }
 
   @Override
   protected DataSetRepository getRepository() {
@@ -41,74 +69,384 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
     return DataSet.class.getSimpleName();
   }
 
+  @Override
+  protected AssignmentFactory getAssignmentFactory() {
+    return assignmentFactory;
+  }
+
   /**
    * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
    * DataSet along with owner and dataSpaces in a single JOIN query, preventing N+1 query problems
    * that would occur with lazy loading.
    */
   @Override
-  public DataSet findById(UUID id) {
-    preProcessLoad(id);
-    DataSet entity =
-        dataSetRepository
-            .findByIdWithRelations(id)
-            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
+  public Optional<DataSet> findById(UUID id) {
+    Optional<DataSet> entity = dataSetRepository.findByIdWithRelations(id);
     return postLoad(entity);
   }
 
+  /**
+   * Override update to ensure it can only be called for DRAFT datasets. For published datasets, use
+   * updatePublishedMeta instead.
+   *
+   * @param id the dataset ID
+   * @param input the update input
+   * @return the updated dataset
+   * @throws InvalidInputException if trying to update a non-DRAFT dataset
+   */
   @Override
-  protected DataSet postConvertToEntity(DataSet entity, DataSetInputDTO input) {
-    if (input.getOwnerUserId() != null) {
-      entity.setOwner(userService.findById(input.getOwnerUserId()));
-    } else {
-      entity.setOwner(null);
+  public DataSet update(UUID id, DataSetInputDTO input) {
+    DataSet existingEntity = findByIdOrThrow(id);
+    if (existingEntity.getDataSetStatus() != DataSetStatus.DRAFT) {
+      throw new InvalidInputException(
+          "dataSetStatus",
+          id,
+          "DataSet can only be updated in DRAFT status, current status: "
+              + existingEntity.getDataSetStatus());
+    }
+    return super.update(id, input);
+  }
+
+  /**
+   * Updates only the metadata (name, description) of a published dataset. Cannot modify
+   * persistenceId or pipelines. For AVAILABLE datasets with existing infrastructure, triggers a
+   * saga UPDATE if no saga is currently in-flight.
+   *
+   * @param id the dataset ID
+   * @param input the update input
+   * @return the updated dataset
+   * @throws InvalidInputException if trying to update a DRAFT dataset
+   * @throws ResourceInUseException if a saga is in-flight for this dataset
+   */
+  @Transactional
+  public DataSet updatePublishedMeta(UUID id, DataSetInputDTO input) {
+    DataSet existingEntity = findByIdOrThrow(id);
+    if (existingEntity.getDataSetStatus() == DataSetStatus.DRAFT) {
+      throw new InvalidInputException(
+          "dataSetStatus",
+          id,
+          "This endpoint requires a published dataset (READY or AVAILABLE), current status: DRAFT");
     }
 
-    // Use findAllById for efficient batch loading of dataSpaces instead of N+1 queries
-    if (Objects.nonNull(input.getDataSpaceIds())) {
-      entity.setDataSpaces(new HashSet<>());
-      if (!input.getDataSpaceIds().isEmpty()) {
-        entity.setDataSpaces(
-            new HashSet<>(dataSpaceService.getRepository().findAllById(input.getDataSpaceIds())));
+    if (existingEntity.getPendingSagaType() != null) {
+      throw new ResourceInUseException(
+          "DataSet",
+          id,
+          "Cannot update metadata while a saga is in-flight: "
+              + existingEntity.getPendingSagaType());
+    }
+
+    Set<Pipeline> previousPipelines = new HashSet<>(existingEntity.getPipelines());
+    DataSet updated = super.update(id, input);
+
+    if (updated.getDataSetStatus() == DataSetStatus.AVAILABLE
+        && updated.getProjectId() != null
+        && updated.getPendingSagaType() == null) {
+      updated.setPendingSagaType(PendingSagaType.UPDATE);
+      updated = dataSetRepository.save(updated);
+      sagaPublisher.publishUpdateRequested(updated, previousPipelines);
+    }
+
+    return updated;
+  }
+
+  /**
+   * Publishes a dataset by validating it has at least one pipeline, generating distributions from
+   * pipeline APIs, and setting status to READY.
+   *
+   * @param id the dataset ID
+   * @return the published dataset
+   * @throws InvalidInputException if dataset has no pipelines or is already published
+   */
+  @Transactional
+  public DataSet publish(UUID id) {
+    DataSet dataSet = findByIdOrThrow(id);
+
+    // Validate status is DRAFT
+    if (dataSet.getDataSetStatus() != DataSetStatus.DRAFT) {
+      throw new InvalidInputException("dataSetStatus", id, "DataSet is already published");
+    }
+
+    // Validate name not blank
+    if (StringUtils.isBlank(dataSet.getName())) {
+      throw new InvalidInputException("name", id, "DataSet name must not be blank");
+    }
+
+    // Validate description not blank
+    if (StringUtils.isBlank(dataSet.getDescription())) {
+      throw new InvalidInputException("description", id, "DataSet description must not be blank");
+    }
+
+    // Validate that dataset has at least one pipeline
+    if (dataSet.getPipelines() == null || dataSet.getPipelines().isEmpty()) {
+      throw new InvalidInputException(
+          "pipelines", id, "DataSet must contain at least one Pipeline before publishing");
+    }
+
+    // Each pipeline must have either datasources (feed-in) or APIs (provide)
+    boolean hasDataSourceOrApi =
+        dataSet.getPipelines().stream()
+            .anyMatch(
+                p ->
+                    (p.getDataSources() != null && !p.getDataSources().isEmpty())
+                        || (p.getApis() != null && !p.getApis().isEmpty()));
+    if (!hasDataSourceOrApi) {
+      throw new InvalidInputException(
+          "pipelines", id, "DataSet must have at least one Pipeline with DataSources or APIs");
+    }
+
+    generateDistributions(dataSet);
+
+    dataSet.setDataSetStatus(DataSetStatus.READY);
+    return dataSetRepository.save(dataSet);
+  }
+
+  /**
+   * Unpublishes a dataset, reverting it from READY to DRAFT. Removes auto-generated distributions.
+   *
+   * @param id the dataset ID
+   * @return the unpublished dataset
+   * @throws InvalidInputException if dataset is not in READY status
+   */
+  @Transactional
+  public DataSet unpublish(UUID id) {
+    DataSet dataSet = findByIdOrThrow(id);
+
+    if (dataSet.getDataSetStatus() != DataSetStatus.READY) {
+      throw new InvalidInputException(
+          "dataSetStatus", id, "DataSet can only be unpublished from READY status");
+    }
+
+    dataSet.getDistributions().removeIf(Distribution::getAutoGenerated);
+    dataSet.setDataSetStatus(DataSetStatus.DRAFT);
+    return dataSetRepository.save(dataSet);
+  }
+
+  /**
+   * Releases a dataset, transitioning it from READY to AVAILABLE. Triggers a DATASET_CREATE saga to
+   * provision infrastructure (FROST, APISIX, Redpanda). The Kafka publish is synchronous — if the
+   * broker is unreachable the exception propagates before the transaction commits, rolling back the
+   * status change and preventing the dual-write problem.
+   *
+   * @param id the dataset ID
+   * @return the released dataset
+   * @throws InvalidInputException if dataset is not in READY status
+   */
+  @Transactional
+  public DataSet release(UUID id) {
+    DataSet dataSet =
+        dataSetRepository
+            .findByIdWithPipelineDataSources(id)
+            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
+
+    if (dataSet.getDataSetStatus() != DataSetStatus.READY) {
+      throw new InvalidInputException(
+          "dataSetStatus", id, "DataSet can only be released from READY status");
+    }
+
+    dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+    dataSet.setPendingSagaType(PendingSagaType.CREATE);
+    DataSet saved = dataSetRepository.save(dataSet);
+
+    sagaPublisher.publishCreateRequested(saved);
+
+    return saved;
+  }
+
+  /**
+   * Unreleases a dataset by triggering a DATASET_DELETE saga to tear down infrastructure. On saga
+   * completion, the dataset transitions from AVAILABLE to READY.
+   *
+   * @param id the dataset ID
+   * @return the dataset with pending DELETE saga
+   * @throws InvalidInputException if dataset is not AVAILABLE
+   * @throws ResourceInUseException if a saga is already in-flight
+   */
+  @Transactional
+  public DataSet unrelease(UUID id) {
+    DataSet dataSet = findByIdOrThrow(id);
+
+    if (dataSet.getDataSetStatus() != DataSetStatus.AVAILABLE) {
+      throw new InvalidInputException(
+          "dataSetStatus", id, "DataSet can only be unreleased from AVAILABLE status");
+    }
+
+    if (dataSet.getPendingSagaType() != null) {
+      throw new ResourceInUseException(
+          "DataSet",
+          id,
+          "Cannot unrelease while a saga is in-flight: " + dataSet.getPendingSagaType());
+    }
+
+    dataSet.setPendingSagaType(PendingSagaType.DELETE);
+    DataSet saved = dataSetRepository.save(dataSet);
+
+    sagaPublisher.publishDeleteRequested(saved);
+
+    return saved;
+  }
+
+  /**
+   * Handles a completed saga result. Updates infrastructure fields and transitions state based on
+   * the saga type that was pending.
+   */
+  @Transactional
+  public void handleSagaCompleted(UUID datasetId, SagaResultPayload result) {
+    DataSet dataSet = findByIdOrThrow(datasetId);
+    PendingSagaType pendingType = dataSet.getPendingSagaType();
+
+    if (pendingType == PendingSagaType.DELETE) {
+      dataSet.clearInfrastructureFields();
+      dataSet.setDataSetStatus(DataSetStatus.READY);
+      dataSet.getDistributions().removeIf(Distribution::getAutoGenerated);
+      log.info("Saga DELETE completed for dataset {}, reverted to READY", datasetId);
+    } else if (pendingType == PendingSagaType.CREATE) {
+      applyInfrastructureResult(dataSet, result);
+      boolean hasAutoGenerated =
+          dataSet.getDistributions().stream().anyMatch(Distribution::getAutoGenerated);
+      if (!hasAutoGenerated) {
+        generateDistributions(dataSet);
       }
+      updateDistributionUrls(dataSet);
+      log.info("Saga CREATE completed for dataset {}, infrastructure provisioned", datasetId);
+    } else if (pendingType == PendingSagaType.UPDATE) {
+      applyInfrastructureResult(dataSet, result);
+      log.info("Saga UPDATE completed for dataset {}", datasetId);
+    } else {
+      log.warn(
+          "handleSagaCompleted: no pending saga for dataset {} (duplicate delivery?), skipping",
+          datasetId);
+      return;
     }
 
-    return super.postConvertToEntity(entity, input);
+    dataSet.setPendingSagaType(null);
+    dataSetRepository.save(dataSet);
   }
 
+  /**
+   * Handles a failed saga result. Reverts state as needed based on the pending saga type. For
+   * CREATE failures the dataset reverts to READY; for UPDATE and DELETE failures it stays
+   * AVAILABLE.
+   *
+   * @param datasetId the dataset ID
+   * @param failedStep the saga step that failed
+   * @param error the error message
+   * @param compensated whether compensation was executed
+   */
+  @Transactional
+  public void handleSagaFailed(
+      UUID datasetId, String failedStep, String error, boolean compensated) {
+    DataSet dataSet = findByIdOrThrow(datasetId);
+    PendingSagaType pendingType = dataSet.getPendingSagaType();
+
+    if (pendingType == PendingSagaType.CREATE) {
+      dataSet.setDataSetStatus(DataSetStatus.READY);
+      log.warn(
+          "Saga CREATE failed for dataset {}: step={}, error={}, compensated={}. Reverted to READY",
+          datasetId,
+          Encode.forJava(failedStep),
+          Encode.forJava(error),
+          compensated);
+    } else if (pendingType == PendingSagaType.UPDATE) {
+      log.warn(
+          "Saga UPDATE failed for dataset {}: step={}, error={}, compensated={}. Staying AVAILABLE",
+          datasetId,
+          Encode.forJava(failedStep),
+          Encode.forJava(error),
+          compensated);
+    } else if (pendingType == PendingSagaType.DELETE) {
+      log.warn(
+          "Saga DELETE failed for dataset {}: step={}, error={}, compensated={}. "
+              + "Staying AVAILABLE — stale resources may exist",
+          datasetId,
+          Encode.forJava(failedStep),
+          Encode.forJava(error),
+          compensated);
+    }
+
+    dataSet.setPendingSagaType(null);
+    dataSetRepository.save(dataSet);
+  }
+
+  /**
+   * Deletes a DRAFT dataset immediately. READY datasets cannot be deleted — unpublish first. For
+   * AVAILABLE datasets the controller routes through {@link #triggerDeleteSaga} instead, returning
+   * 202 Accepted for the asynchronous teardown.
+   */
   @Override
-  protected DataSet preSave(DataSet entity) {
-    validateUniqueName(entity);
-    return super.preSave(entity);
+  @Transactional
+  public void deleteById(UUID id) {
+    DataSet dataSet = findByIdOrThrow(id);
+
+    if (dataSet.getDataSetStatus() == DataSetStatus.DRAFT) {
+      super.deleteById(id);
+      return;
+    }
+
+    if (dataSet.getDataSetStatus() == DataSetStatus.READY) {
+      throw new InvalidInputException(
+          "dataSetStatus",
+          id,
+          "Cannot delete a READY dataset. Unpublish it first to return to DRAFT");
+    }
+
+    throw new InvalidInputException(
+        "dataSetStatus",
+        id,
+        "Cannot delete an AVAILABLE dataset. Unrelease it first (POST /datasets/{id}/unrelease) to tear down infrastructure");
   }
 
-  private void validateUniqueName(DataSet entity) {
-    dataSetRepository
-        .findByName(entity.getName())
-        .ifPresent(
-            existing -> {
-              if (!existing.getId().equals(entity.getId())) {
-                throw new UniqueConstraintViolationException(
-                    DataSet.class.getSimpleName(), "name", entity.getName());
-              }
+  /**
+   * Applies infrastructure fields from the saga result payload to the dataset entity. Uses
+   * PATCH-style semantics: only non-null fields in the result are applied. This is intentional
+   * because partial saga results (e.g., UPDATE saga that only touches APISIX) should not null out
+   * fields set by earlier steps.
+   */
+  private void applyInfrastructureResult(DataSet dataSet, SagaResultPayload result) {
+    if (result.projectId() != null) {
+      dataSet.setProjectId(result.projectId());
+    }
+    if (result.baseUrl() != null) {
+      dataSet.setFrostBaseUrl(result.baseUrl());
+    }
+    if (result.routeId() != null) {
+      dataSet.setRouteId(result.routeId());
+    }
+    if (result.serviceId() != null) {
+      dataSet.setServiceId(result.serviceId());
+    }
+    if (result.publicUrl() != null) {
+      dataSet.setPublicUrl(result.publicUrl());
+    }
+    if (result.pipelineIds() != null) {
+      dataSet.setPipelineIds(result.pipelineIds());
+    }
+  }
+
+  private void generateDistributions(DataSet dataSet) {
+    dataSet.getPipelines().stream()
+        .filter(pipeline -> pipeline.getApis() != null)
+        .flatMap(pipeline -> pipeline.getApis().stream())
+        .distinct()
+        .forEach(
+            apiPath -> {
+              Distribution distribution =
+                  distributionService.createFromApiUrlAndDataSet(apiPath, dataSet);
+              dataSet.getDistributions().add(distribution);
             });
   }
 
-  @Override
-  protected DataSetInputDTO preProcessUpdateInput(DataSetInputDTO input, DataSet existingEntity) {
-    try {
-      String inputJson = objectMapper.writeValueAsString(input);
-      JsonNode jsonNode = objectMapper.readTree(inputJson);
-
-      if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
-        throw new InvalidInputException(
-            "name", existingEntity.getId(), "Name cannot be null or blank");
-      }
-    } catch (InvalidInputException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to process update input", e);
+  private void updateDistributionUrls(DataSet dataSet) {
+    if (dataSet.getPublicUrl() == null) {
+      return;
     }
-    return super.preProcessUpdateInput(input, existingEntity);
+    String baseUrl = StringUtils.stripEnd(dataSet.getPublicUrl(), "/");
+    for (Distribution dist : dataSet.getDistributions()) {
+      if (Boolean.TRUE.equals(dist.getAutoGenerated())
+          && dist.getAccessUrl() != null
+          && !dist.getAccessUrl().startsWith(dataSet.getPublicUrl())) {
+        dist.setAccessUrl(baseUrl + dist.getAccessUrl());
+      }
+    }
   }
 }

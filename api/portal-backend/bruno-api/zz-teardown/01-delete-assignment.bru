@@ -1,0 +1,31 @@
+meta {
+  name: Teardown - Delete Assignment
+  type: http
+  seq: 1
+}
+
+delete {
+  url: {{baseUrl}}/assignments/{{assignmentId}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Assignment deleted or already gone", function() {
+    const status = res.getStatus();
+    // 204=deleted, 404=already gone, 400=invalid ID
+    expect(status === 204 || status === 404 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Expected Response:** 204 No Content.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Assignment record removed from `portal_backend` DB |
+  | Config Adapter | AuthZ Repository notified to invalidate its authorization data cache |
+  | AuthZ Repository (OPA) | Role-group binding removed from OPA policy data |
+}

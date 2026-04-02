@@ -1,0 +1,44 @@
+meta {
+  name: Delete Group
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/groups/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{groupId}}
+}
+
+script:post-response {
+  const setupId = bru.getVar('setupGroupId');
+  if (setupId) {
+    bru.setVar('groupId', setupId);
+  }
+}
+
+tests {
+  test("Status code is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  **Precondition:** `groupId` is set.
+
+  **Expected Response:** 204 No Content.
+
+  **Verification:** Issue TC-GROUP-02 for same `groupId` and confirm 404.
+
+  **System Impact:**
+
+  | Component | Effect |
+  |---|---|
+  | **Backend** | Group record removed |
+  | **Config Adapter** | Consumes `de.civitascore.idm.group.deleted` Kafka event; forwards deletion to Keycloak |
+  | **Keycloak** | Group removed from `civitas-core` realm |
+}

@@ -1,21 +1,27 @@
 package de.civitascore.portal.model.output;
 
-import de.civitascore.portal.model.output.summary.GroupSummaryDTO;
-import de.civitascore.portal.model.output.summary.RoleSummaryDTO;
 import de.civitascore.portal.model.output.summary.UserSummaryDTO;
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+/** Output DTO representing a group for API responses. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class GroupOutputDTO extends BaseOutputDTO {
+
+  @Schema(example = "City Data Team")
   private String name;
+
+  @Schema(example = "Responsible for urban mobility datasets")
   private String description;
 
+  @Schema(description = "Primary contact user for this group")
   private UserSummaryDTO contactUser;
-  private GroupSummaryDTO parentGroup;
-  private List<GroupSummaryDTO> childGroups;
-  private List<UserSummaryDTO> members;
-  private List<RoleSummaryDTO> roles;
+
+  private List<UserSummaryDTO> members = new ArrayList<>();
+
+  private List<AssignmentOutputDTO> assignments = new ArrayList<>();
 }

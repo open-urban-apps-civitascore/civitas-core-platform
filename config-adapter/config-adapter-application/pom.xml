@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.civitas</groupId>
+        <groupId>de.civitas-core</groupId>
         <artifactId>config-adapter-parent</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>${revision}</version>
     </parent>
 
     <artifactId>config-adapter-application</artifactId>
@@ -18,32 +17,32 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.civitas</groupId>
+            <groupId>de.civitas-core</groupId>
             <artifactId>config-adapter-api</artifactId>
             <version>${project.version}</version>
         </dependency>
 
         <dependency>
-            <groupId>com.civitas</groupId>
+            <groupId>de.civitas-core</groupId>
             <artifactId>event-handler-kafka</artifactId>
             <version>${project.version}</version>
         </dependency>
 
         <dependency>
-            <groupId>com.civitas</groupId>
+            <groupId>de.civitas-core</groupId>
             <artifactId>config-adapter-keycloak</artifactId>
             <version>${project.version}</version>
         </dependency>
 
         <dependency>
-            <groupId>com.civitas</groupId>
-            <artifactId>config-adapter-examples</artifactId>
+            <groupId>de.civitas-core</groupId>
+            <artifactId>config-adapter-configuration</artifactId>
             <version>${project.version}</version>
         </dependency>
 
         <dependency>
-            <groupId>com.civitas</groupId>
-            <artifactId>config-adapter-configuration</artifactId>
+            <groupId>de.civitas-core</groupId>
+            <artifactId>config-adapter-orchestrator</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -51,15 +50,20 @@
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
-		<dependency>
-			<groupId>com.fasterxml.jackson.datatype</groupId>
-			<artifactId>jackson-datatype-jsr310</artifactId>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
 
-        
+
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.owasp.encoder</groupId>
+            <artifactId>encoder</artifactId>
         </dependency>
 
         <dependency>
@@ -142,7 +146,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.civitas.configadapter.application.Application</mainClass>
+                            <mainClass>de.civitascore.configadapter.application.Application</mainClass>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
                         </manifest>
@@ -151,28 +155,71 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
                 <configuration>
-                    <archive>
-                        <manifest>
-                            <mainClass>com.civitas.configadapter.application.Application</mainClass>
-                        </manifest>
-                    </archive>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
-                    <appendAssemblyId>true</appendAssemblyId>
+                    <transformers>
+                        <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                            <mainClass>de.civitascore.configadapter.application.Application</mainClass>
+                        </transformer>
+                        <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                    </transformers>
+                    <filters>
+                        <filter>
+                            <artifact>*:*</artifact>
+                            <excludes>
+                                <exclude>META-INF/*.SF</exclude>
+                                <exclude>META-INF/*.DSA</exclude>
+                                <exclude>META-INF/*.RSA</exclude>
+                            </excludes>
+                        </filter>
+                    </filters>
+                    <shadedArtifactAttached>false</shadedArtifactAttached>
                 </configuration>
                 <executions>
                     <execution>
-                        <id>make-assembly</id>
                         <phase>package</phase>
                         <goals>
-                            <goal>single</goal>
+                            <goal>shade</goal>
                         </goals>
                     </execution>
                 </executions>
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- Profile for building the distribution fat JAR with all adapter plugins.
+             Adapter modules are discovered via ServiceLoader at runtime and are not
+             needed for compilation or testing. -->
+        <profile>
+            <id>dist</id>
+            <dependencies>
+                <dependency>
+                    <groupId>de.civitas-core</groupId>
+                    <artifactId>config-adapter-apisix</artifactId>
+                    <version>${project.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>de.civitas-core</groupId>
+                    <artifactId>config-adapter-frost</artifactId>
+                    <version>${project.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>de.civitas-core</groupId>
+                    <artifactId>config-adapter-examples</artifactId>
+                    <version>${project.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>de.civitas-core</groupId>
+                    <artifactId>config-adapter-redpanda</artifactId>
+                    <version>${project.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>

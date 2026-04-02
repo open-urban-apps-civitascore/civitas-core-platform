@@ -1,17 +1,20 @@
-import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
-import { useLocale, useTranslations } from 'next-intl'
+import { createColumnHelper, getCoreRowModel, getSortedRowModel, Row, useReactTable } from '@tanstack/react-table'
+import { useTranslations } from 'next-intl'
 
+import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { DataTable } from '@/components/table/DataTable'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { BasicTooltip } from '@/components/tooltip/Tooltip'
-import { Badge } from '@/components/ui/badge'
+import { usePermissions } from '@/hooks/use-permissions'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { UserGroupsListData } from '@/types/groups'
 import { TableProps } from '@/types/table'
-import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
 
 interface GroupsTableProps extends TableProps<UserGroupsListData> {
   groups: UserGroupsListData[]
+  onRemoveGroupClick: (id: string) => void
+  isReadOnly: boolean
 }
 
 const GroupsTable = (props: GroupsTableProps) => {
@@ -26,87 +29,85 @@ const GroupsTable = (props: GroupsTableProps) => {
     onRowClick,
     onPaginationChange,
     onSortingChange,
+    onRemoveGroupClick,
     isLoading,
+    isReadOnly,
   } = props
   const t = useTranslations('users')
-  const locale = useLocale()
+  const tCommon = useTranslations('common')
+  const { hasPermission } = usePermissions()
   const columnHelper = createColumnHelper<UserGroupsListData>()
 
-  console.log(groups)
   const columns = [
     columnHelper.accessor('id', {
       header: 'id',
       cell: info => info.getValue(),
       enableHiding: true,
     }),
-    columnHelper.accessor('title', {
+    columnHelper.accessor('name', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('groupsTab.name')} />,
-      cell: info => info.getValue(),
+      cell: ({ row }) => (
+        <LinkCell href={`/groups/${row.id}`} isDisabled={!hasPermission(PERMISSION_NAMES.GROUP_READ)}>
+          {row.original.name}
+        </LinkCell>
+      ),
       meta: {
+        truncate: true,
         style: {
           width: '22.22%',
           minWidth: '200px',
         },
       },
     }),
-    columnHelper.accessor('memberSince', {
-      header: t('groupsTab.memberSince'),
-      cell: info => formatDate(info.getValue(), locale),
+    columnHelper.accessor('membersCount', {
+      header: t('groupsTab.membersCount'),
+      cell: info => info.getValue() || 0,
+      meta: {
+        style: {
+          width: '22.22%',
+          minWidth: '100px',
+        },
+      },
     }),
-    columnHelper.accessor('contact', {
+    columnHelper.accessor('contactUser', {
       header: t('groupsTab.contact'),
-      cell: info => info.getValue()?.displayName || '-',
+      cell: info => info.getValue()?.name || '-',
+      meta: {
+        style: {
+          width: '22.22%',
+          minWidth: '200px',
+        },
+      },
     }),
     columnHelper.accessor('description', {
       header: t('groupsTab.description'),
       cell: info => info.getValue() || '-',
       meta: {
-        style: {
-          whiteSpace: 'nowrap',
-          maxWidth: '300px',
-          textOverflow: 'ellipsis',
-          overflow: 'hidden',
-        },
+        truncate: true,
       },
     }),
-    columnHelper.accessor('roles', {
-      header: t('groupsTab.roles'),
-      cell: info => {
-        const roles = info.getValue()
-        if (!roles || roles.length === 0) return '-'
-        const tooltipContent = (
-          <div className="flex flex-wrap gap-2">
-            {' '}
-            {roles.slice(2, roles.length).map(role => (
-              <Badge key={role} variant="secondary">
-                {role}
-              </Badge>
-            ))}
-          </div>
-        )
-        const badges = (
-          <>
-            {roles.slice(0, 2).map(role => (
-              <Badge key={role} variant="secondary">
-                {role}
-              </Badge>
-            ))}
-            {roles.length > 2 && (
-              <BasicTooltip tooltipContent={tooltipContent}>
-                <Badge variant="outline">+{roles.length - 2}</Badge>
-              </BasicTooltip>
-            )}
-          </>
-        )
-        return <div className="flex flex-wrap gap-1">{badges}</div>
-      },
-      meta: {
-        style: {
-          width: '22.22%',
-          minWidth: '200px',
-        },
-      },
-    }),
+    ...(!isReadOnly
+      ? [
+          {
+            id: 'actions',
+            cell: ({ row }: { row: Row<UserGroupsListData> }) => (
+              <TableDropdownMenu
+                menuItems={[
+                  {
+                    label: tCommon('actions.removeItem', { item: tCommon('items.group') }),
+                    onClick: () => onRemoveGroupClick(row.original.id),
+                  },
+                ]}
+              />
+            ),
+            meta: {
+              style: {
+                width: '50px',
+              },
+            },
+          },
+        ]
+      : []),
   ]
 
   const table = useReactTable({

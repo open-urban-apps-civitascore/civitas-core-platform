@@ -1,19 +1,108 @@
 logging:
   level:
     root: INFO
-    org.hibernate: INFO
+    org.hibernate: WARN
     org.flywaydb: INFO
 
 app:
   url: http://localhost:8089
 
+civitas:
+  master-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
+server:
+  error:
+    include-message: always
+    include-exception: true
+    include-stacktrace: on_param
+
 spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable
+    username: ${POSTGRES_USER:admin}
+    password: ${POSTGRES_PASSWORD:admin}
   jpa:
     hibernate:
       ddl-auto: validate
     properties:
       hibernate.format_sql: true
 
+  # Kafka local deployment settings
+  kafka:
+    bootstrap-servers: localhost:9092
+
 keycloak:
-  realm: "iot"
+  realm: "civitas-core"
   auth-server-url: http://localhost:8080
+  issuer-uri: http://localhost:8080
+  target-realm: "civitas-core"
+
+kafka:
+  enabled: true
+  bootstrap-servers: localhost:9092
+  acks: all
+  retries: 3
+
+# Security: add Swagger/API docs paths for local development
+security:
+  permit-paths:
+    - /api-docs/**
+    - /api-docs.yaml
+    - /swagger-ui/**
+    - /swagger-ui.html
+    - /swagger-resources/**
+    - /webjars/**
+    - /actuator/health/**
+    - /actuator/info
+
+springdoc:
+  swagger-ui:
+    oauth:
+      client-id: portal-frontend
+      use-pkce-with-authorization-code-grant: true
+      # Dev-only secret for local Swagger UI OAuth — never use in deployed environments
+      client-secret: dev-only-portal-frontend-secret
+
+model-atlas:
+  baseUrl: "http://localhost:8086"
+  scope: civitas
+  stage: draft
+
+# Seed data for local development — activated by the "init" Spring profile.
+# On startup, these groups and users are created in the DB (if they don't exist yet)
+# and synced to Keycloak via config-adapter (if no externalId is set).
+init:
+  groups:
+    - name: 'Local Tenant Admins'
+      roleName: 'Tenant Admin'
+      description: 'Local dev group — system/user management'
+    - name: 'Local Data Owners'
+      roleName: 'Data Owner'
+      scopeType: TENANT
+      description: 'Local dev group — full data CRUD + release'
+    - name: 'Local Data Gatekeepers'
+      roleName: 'Data Gatekeeper'
+      scopeType: TENANT
+      description: 'Local dev group — data governance + release approval'
+    - name: 'Local Data Architects'
+      roleName: 'Data Architect'
+      scopeType: TENANT
+      description: 'Local dev group — data ingestion + processing management'
+    - name: 'Local Data Stewards'
+      roleName: 'Data Steward'
+      scopeType: TENANT
+      description: 'Local dev group — domain data lifecycle management'
+    - name: 'Local Data Consumers'
+      roleName: 'Data Consumer'
+      scopeType: TENANT
+      description: 'Local dev group — read access to published data'
+  users:
+    - firstName: Developer
+      lastName: User
+      email: dev@civitas.local
+      password: dev123
+      title: OTHER
+      groups:
+        - 'Local Tenant Admins'
+        - 'Local Data Owners'
+        - 'Local Data Gatekeepers'

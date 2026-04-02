@@ -1,15 +1,25 @@
 # Use Node.js Alpine for small image size and security
-FROM node:22-alpine
-
+FROM node:22-alpine AS deps
 WORKDIR /app
-
+RUN corepack enable
 COPY package.json pnpm-lock.yaml ./
-RUN npm install -g pnpm@latest && \
-    pnpm install --frozen-lockfile --prod && \
-    pnpm store prune
+RUN pnpm install --frozen-lockfile --prod
 
+FROM node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=80
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json ./package.json
 COPY .next ./.next
 COPY public ./public
+
+# Remove npm (unused at runtime) to eliminate bundled vulnerable deps (tar, glob, diff)
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
+# Create cache directory for Next.js image optimization
+RUN mkdir -p .next/cache/images
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -17,8 +27,7 @@ RUN addgroup -g 1001 -S nodejs && \
     chown -R nextjs:nodejs /app
 USER nextjs
 
-ENV PORT=80
 EXPOSE 80
 ENV NODE_ENV=production
 
-CMD ["pnpm", "start"]
+CMD ["node_modules/.bin/next", "start"]

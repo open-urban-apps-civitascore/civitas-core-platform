@@ -1,16 +1,16 @@
-import { CellContext, createColumnHelper, getCoreRowModel, Row, useReactTable } from '@tanstack/react-table'
+import { CellContext, ColumnDef, createColumnHelper, getCoreRowModel, useReactTable } from '@tanstack/react-table'
+import { Check } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { Button } from '@/components/ui/button'
-import { Permission } from '@/types/permissions'
+import { RoleWithPermissions } from '@/types/permissions'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
-interface PermissionsTableProps extends TableProps<Permission> {
-  permissions: Permission[]
-  onOpenButtonClick: (row: Row<Permission>) => void
+interface PermissionsTableProps extends TableProps<RoleWithPermissions> {
+  permissions: RoleWithPermissions[]
+  shouldShowPermissionColumns?: boolean
 }
 
 export const PermissionsTable = (props: PermissionsTableProps) => {
@@ -23,65 +23,72 @@ export const PermissionsTable = (props: PermissionsTableProps) => {
     totalPages,
     rowSelection,
     rowCount,
-    onOpenButtonClick,
     onPaginationChange,
     onSortingChange,
+    shouldShowPermissionColumns = false,
   } = props
 
   const t = useTranslations('permissions')
-  const tCommon = useTranslations('common')
 
-  const columnHelper = createColumnHelper<Permission>()
+  const columnHelper = createColumnHelper<RoleWithPermissions>()
 
-  const columns = [
-    columnHelper.accessor('id', {
-      header: 'ID',
-      cell: info => info.getValue(),
-      enableHiding: true,
-    }),
-    columnHelper.accessor('title', {
+  const baseColumns = [
+    columnHelper.accessor('name', {
       header: ({ column }) => {
-        return <SortableTableHeader column={column} title={t('tableHeaders.title')} />
+        return <SortableTableHeader column={column} title={t('tableHeaders.name')} />
       },
       cell: info => info.getValue(),
       meta: {
+        truncate: true,
         style: {
-          width: '40%',
+          width: shouldShowPermissionColumns ? '40%' : '100%',
         },
       },
     }),
-    columnHelper.accessor('category', {
-      header: () => t('tableHeaders.category'),
-      cell: info => info.getValue().title,
-    }),
-    {
-      id: 'action',
-      cell: ({ row }: CellContext<Permission, string>) => (
-        <Button
-          className="opacity-0 group-hover:opacity-100 transition-opacity"
-          variant="outline"
-          onClick={() => onOpenButtonClick(row)}
-        >
-          {tCommon('actions.open')}
-        </Button>
-      ),
-      meta: {
-        style: {
-          width: '108px',
-        },
-      },
-    },
   ]
 
+  const permissionCellFunction = (info: CellContext<RoleWithPermissions, boolean>) => {
+    const isGranted = info.getValue()
+    const columnName = info.column.columnDef.header as string
+    const label = `${columnName}: ${isGranted ? t('accessible.granted') : t('accessible.notGranted')}`
+
+    return (
+      <span role="img" aria-label={label}>
+        {isGranted && <Check className="h-4 w-4" />}
+      </span>
+    )
+  }
+  const permissionColumns: ColumnDef<RoleWithPermissions, boolean>[] = [
+    columnHelper.accessor('read', {
+      header: t('actions.read'),
+      cell: permissionCellFunction,
+    }),
+    columnHelper.accessor('create', {
+      header: t('actions.create'),
+      cell: permissionCellFunction,
+    }),
+    columnHelper.accessor('update', {
+      header: t('actions.update'),
+      cell: permissionCellFunction,
+    }),
+    columnHelper.accessor('delete', {
+      header: t('actions.delete'),
+      cell: permissionCellFunction,
+    }),
+    columnHelper.accessor('release', {
+      header: t('actions.release'),
+      cell: permissionCellFunction,
+    }),
+  ]
+
+  const getColumns = () => {
+    return shouldShowPermissionColumns ? [...baseColumns, ...permissionColumns] : baseColumns
+  }
+
   const table = useReactTable({
-    columns: columns,
+    columns: getColumns(),
     data: permissions,
     getCoreRowModel: getCoreRowModel(),
-    initialState: {
-      columnVisibility: {
-        id: false,
-      },
-    },
     rowCount,
     manualPagination: true,
     manualSorting: true,
@@ -93,6 +100,13 @@ export const PermissionsTable = (props: PermissionsTableProps) => {
   })
 
   return (
-    <DataTable table={table} pageIndex={pageIndex} pageSize={pageSize} totalPages={totalPages} isLoading={isLoading} />
+    <DataTable
+      table={table}
+      pageIndex={pageIndex}
+      pageSize={pageSize}
+      totalPages={totalPages}
+      isLoading={isLoading}
+      isPaginationHidden={true}
+    />
   )
 }

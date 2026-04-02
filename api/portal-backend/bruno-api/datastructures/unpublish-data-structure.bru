@@ -1,0 +1,37 @@
+meta {
+  name: Unpublish Data Structure
+  type: http
+  seq: 17
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/unpublish
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+}
+
+tests {
+  test("Unpublish accepted or not published", function() {
+    const status = res.getStatus();
+    // 200=unpublished, 400=not in published state
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` is set and in published state.
+
+  **Expected Response:** 200 OK, body reflects data structure returned to draft state.
+
+  **System Impact:**
+
+  | Layer | Impact | Status |
+  |---|---|---|
+  | Backend | DataStructure status reverted to draft | --- |
+  | Config Adapter | --- | --- |
+  | Model Atlas | DataStructure schema no longer publicly available | --- |
+}

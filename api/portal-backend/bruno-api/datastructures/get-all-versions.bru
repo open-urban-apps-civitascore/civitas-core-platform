@@ -1,0 +1,33 @@
+meta {
+  name: Get All Data Structure Versions (disabled)
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+  ~sort: createdAt,DESC
+}
+
+tests {
+  test("Status code is 405 (endpoint disabled)", function() {
+    expect(res.getStatus()).to.equal(405);
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` is set.
+
+  **Expected Response:** 200 OK, body contains a paginated list of versions for the given DataStructure.
+}

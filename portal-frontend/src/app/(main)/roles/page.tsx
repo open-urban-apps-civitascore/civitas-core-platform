@@ -1,106 +1,75 @@
 'use client'
 
-import { Row, RowSelectionState } from '@tanstack/react-table'
+import { RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useCallback, useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 
+import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
+import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
-import { useQueryParams } from '@/hooks/useQueryParams'
-import { ROLE_TYPES, RoleResponse } from '@/types/roles'
+import { usePermissions } from '@/hooks/use-permissions'
+import { useQueryParams } from '@/hooks/use-query-params'
+import { PERMISSION_NAMES } from '@/types/currentUser'
+import { ROLE_TYPES, RoleType } from '@/types/roles'
 
 import { RolesTable } from './components/RolesTable'
 
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
-
-export const DEFAULT_TAB = ROLE_TYPES.SYSTEM
+export const DEFAULT_TAB: RoleType = ROLE_TYPES.SYSTEM
 
 const RolesPage = () => {
   const t = useTranslations('roles')
   const router = useRouter()
-  const [listRoles, setListRoles] = useState<RoleResponse[] | []>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [rowCount, setRowCount] = useState(0)
+  const { hasPermission } = usePermissions()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
   const tabsValues = {
     systemRoles: { value: ROLE_TYPES.SYSTEM, label: t('systemRoles') },
     dataRoles: { value: ROLE_TYPES.DATA, label: t('dataRoles') },
-    governanceRoles: { value: ROLE_TYPES.GOVERNANCE, label: t('governanceRoles') },
   }
-  const tabs = [tabsValues.systemRoles, tabsValues.dataRoles, tabsValues.governanceRoles]
+  const tabs = [tabsValues.systemRoles, tabsValues.dataRoles]
 
   const {
     setSortingParams,
     setPaginationParams,
     setSearchParam,
-    getApiRequestParamsByUrl,
     setTabValueParam,
-    setTotalPages,
+    getApiRequestParamsByUrl,
     pageIndex,
     pageSize,
     sorting,
     search,
     tabValue,
-    totalPages,
   } = useQueryParams()
-
-  useEffect(() => {
-    if (totalPages && totalPages > 0 && pageIndex + 1 > totalPages) {
-      setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalPages, pageIndex, pageSize])
 
   const [selectedRoleType, setSelectedRoleType] = useState<string>(tabValue || DEFAULT_TAB)
 
-  const getRoles = useCallback(async () => {
+  const requestParams = useMemo(() => {
     const params = getApiRequestParamsByUrl()
+    params.set('roleType', selectedRoleType)
+    return params
+  }, [getApiRequestParamsByUrl, selectedRoleType])
 
-    try {
-      setIsLoading(true)
+  const { data: rolesData, isFetching } = useGetRoles({ params: requestParams })
 
-      const rolesResponse = await fetch(`${URL}/roles?type=${selectedRoleType}&${params.toString()}`)
-      const rolesData: RoleResponse[] = await rolesResponse.json()
-      setListRoles(rolesData)
-
-      const totalCount = Number(rolesResponse.headers.get('X-Total-Count')) || 0
-      if (rowCount !== totalCount) {
-        setRowCount(totalCount)
-      }
-      setTotalPages(Math.ceil(totalCount / pageSize) || 1)
-      setIsLoading(false)
-    } catch (error) {
-      console.error(error)
-
-      setIsLoading(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getApiRequestParamsByUrl, selectedRoleType, rowCount, pageSize])
-
-  useEffect(() => {
-    getRoles()
-  }, [getRoles, sorting, rowCount, pageIndex, pageSize, selectedRoleType])
-
-  const handleRowClick = (row: Row<RoleResponse>) => {
-    router.push(`/roles/${row.original.id}?_tab=${selectedRoleType}`)
-  }
+  const rowCount = rolesData?.totalElements || 0
+  const totalPages = rolesData?.totalPages || 0
 
   return (
     <PageContainer headerType="withPrimaryTabs">
       <PageHeader
         title={`${t('overView')} ${tabs.find(tab => tab.value === selectedRoleType)?.label}`}
-        tabs={{
+        tabsSectionProps={{
           tabs,
           onClick: type => {
             setSelectedRoleType(type)
             setTabValueParam(type)
+            setPaginationParams({ pageIndex: 0, pageSize })
           },
           selectedTab: selectedRoleType,
         }}
@@ -110,25 +79,27 @@ const RolesPage = () => {
           searchString={search}
           onChangeSearchString={setSearchParam}
           customElement={
-            <Button onClick={() => router.push(`/roles/create/?_tab=${selectedRoleType}`)}>
-              <Plus /> {t('newRole')}
-            </Button>
+            hasPermission(PERMISSION_NAMES.ROLE_CREATE) ? (
+              <Button onClick={() => router.push(`/roles/create/?tab=${selectedRoleType}`)}>
+                <Plus /> {selectedRoleType === ROLE_TYPES.SYSTEM ? t('newSystemRole') : t('newDataRole')}
+              </Button>
+            ) : undefined
           }
         />
         <TableContainer>
           <RolesTable
-            roles={listRoles}
-            isLoading={isLoading}
+            roles={isFetching ? [] : rolesData?.data || []}
+            isLoading={isFetching}
             rowCount={rowCount}
             pageIndex={pageIndex}
             pageSize={pageSize}
             totalPages={totalPages}
             sorting={sorting}
-            onRowClick={handleRowClick}
             rowSelection={rowSelection}
             setRowSelection={setRowSelection}
             onSortingChange={setSortingParams}
             onPaginationChange={setPaginationParams}
+            selectedRoleType={selectedRoleType}
           />
         </TableContainer>
       </PageBackground>

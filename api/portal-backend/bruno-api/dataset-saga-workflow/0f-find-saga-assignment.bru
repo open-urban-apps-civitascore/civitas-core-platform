@@ -1,0 +1,38 @@
+meta {
+  name: 0f. Find Existing Saga Assignment
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id/assignments
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSetId}}
+}
+
+script:post-response {
+  // Assignments endpoint returns a flat array
+  if (res.getStatus() === 200 && Array.isArray(res.body) && res.body.length > 0) {
+    bru.setVar('sagaAssignmentId', res.body[0].id);
+  }
+}
+
+tests {
+  test("Lookup succeeded or no dataset yet", function() {
+    const status = res.getStatus();
+    // 200=found, 400/404=dataset doesn't exist yet (first run)
+    expect(status === 200 || status === 400 || status === 404).to.be.true;
+  });
+}
+
+docs {
+  **Purpose:** Idempotency guard — checks whether a scoped assignment for the existing dataset already exists. If found, `sagaAssignmentId` is populated so step 6 can be skipped and step 14 targets the correct record for cleanup.
+
+  **Expected Response:** 200 OK with flat array, or 400/404 if the dataset does not exist yet (first run).
+
+  **Post-condition:** If at least one assignment exists, saves `sagaAssignmentId` from `body[0].id`.
+}

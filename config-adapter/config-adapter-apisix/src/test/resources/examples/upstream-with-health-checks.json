@@ -1,0 +1,75 @@
+{
+  "specversion": "1.0",
+  "type": "de.civitascore.api.backend.created",
+  "source": "civitas.portal-backend",
+  "id": "msg-upstream-hc-001",
+  "time": "2025-01-15T10:30:00Z",
+  "datacontenttype": "application/json",
+  "data": {
+    "metadata": {
+      "messageId": "msg-upstream-hc-001",
+      "timestamp": "2025-01-15T10:30:00Z",
+      "source": "civitas.portal-backend",
+      "correlationId": "corr-upstream-hc-001",
+      "schemaVersion": "1.0",
+      "resultTopic": "de.civitascore.api.processing.result"
+    },
+    "payload": {
+      "targetComponent": "apisix",
+      "targetResource": "upstreams",
+      "operation": "CREATE",
+      "config": {
+        "path": null,
+        "value": {
+          "resourceType": "apisix-upstream",
+          "type": "roundrobin",
+          "nodes": {
+            "backend1:8080": 1,
+            "backend2:8080": 2
+          },
+          "scheme": "https",
+          "timeout": {
+            "connect": 6,
+            "send": 10,
+            "read": 15
+          },
+          "tls": {
+            "sni": "backend.example.com",
+            "verify": true
+          },
+          "checks": {
+            "active": {
+              "type": "http",
+              "http_path": "/health",
+              "timeout": 5,
+              "concurrency": 10,
+              "healthy": {
+                "interval": 2,
+                "successes": 1,
+                "http_statuses": [200, 302]
+              },
+              "unhealthy": {
+                "interval": 1,
+                "http_failures": 3,
+                "tcp_failures": 2,
+                "timeouts": 5,
+                "http_statuses": [429, 500, 503]
+              }
+            },
+            "passive": {
+              "type": "http",
+              "healthy": {
+                "http_statuses": [200, 201],
+                "successes": 3
+              },
+              "unhealthy": {
+                "http_statuses": [500],
+                "http_failures": 3
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

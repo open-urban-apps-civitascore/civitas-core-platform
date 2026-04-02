@@ -1,0 +1,49 @@
+meta {
+  name: Patch Data Structure
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/datastructures/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{dataStructureId}}
+}
+
+body:json {
+  {
+    "description": "Patched description"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataStructureId', res.body.id);
+    bru.setVar('scopeType', 'DATASTRUCTURE');
+    bru.setVar('scopeId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` is set.
+
+  **Expected Response:** 200 OK, body reflects updated `description`; other fields unchanged.
+
+  **System Impact:**
+
+  | Layer | Impact | Status |
+  |---|---|---|
+  | Backend | DataStructure `description` updated; other fields unchanged | --- |
+  | Config Adapter | --- | --- |
+  | External System | --- | --- |
+}

@@ -1,13 +1,15 @@
 import { ScrollArea } from '@radix-ui/react-scroll-area'
 import { flexRender, Row, SortDirection, Table } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { ComponentProps } from 'react'
+import { ComponentProps, ReactNode, useRef } from 'react'
 
+import { useIsTruncated } from '@/hooks/use-is-truncated'
 import { cn } from '@/lib/utils'
 
 import { ScrollBar } from '../ui/scroll-area'
 import { Skeleton } from '../ui/skeleton'
 import { Table as ShadCnTable, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 import TablePagination from './table-pagination/TablePagination'
 
 export const getAriaSort = (sorting: false | SortDirection) => {
@@ -28,17 +30,35 @@ export interface DataTableProps<T> extends ComponentProps<'table'> {
   totalPages: number
   isLoading?: boolean
   hasCard?: boolean
+  isPaginationHidden?: boolean
+  testId?: string
   isRowClickable?: (row: Row<T>) => boolean
   onRowClick?: (row: Row<T>) => void
 }
 
+const TruncatedCell = ({ children }: { children: ReactNode }) => {
+  const ref = useRef<HTMLDivElement>(null)
+  const isTruncated = useIsTruncated(ref)
+
+  return (
+    <Tooltip open={isTruncated ? undefined : false}>
+      <TooltipTrigger asChild>
+        <div ref={ref} tabIndex={0} className="truncate">
+          {children}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent variant="secondary">{children}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 const LoadingSkeleton = () => (
-  <>
+  <div data-testid="loadingSkeleton">
     <Skeleton className="h-10 w-full mb-2.5 mt-2" />
     <Skeleton className="h-10 w-full mb-2.5" />
     <Skeleton className="h-10 w-full mb-2.5" />
     <Skeleton className="h-10 w-full" />
-  </>
+  </div>
 )
 
 export const DataTable = <T,>(props: DataTableProps<T>) => {
@@ -49,18 +69,30 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
     totalPages,
     isLoading,
     hasCard = true,
+    isPaginationHidden = false,
     onRowClick,
     isRowClickable = () => true,
+    testId,
     ...tableProps
   } = props
 
   const t = useTranslations('common')
 
   return (
-    <div className="@container h-full w-full">
-      <div className="h-full [--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))]  [--pagination-padding:calc(--spacing(4))]">
+    <div className={cn('@container w-full', !isPaginationHidden && 'h-full')} data-testid={testId}>
+      <div
+        className={cn(
+          !isPaginationHidden &&
+            'h-full [--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))]  [--pagination-padding:calc(--spacing(4))]',
+        )}
+      >
         <ScrollArea
-          className={cn('h-[calc(100%-var(--pagination-height))] w-full bg-white', hasCard && 'rounded-md border-1')}
+          data-testid="dataTableScrollArea"
+          className={cn(
+            'w-full bg-white',
+            hasCard && 'rounded-md border-1',
+            !isPaginationHidden && 'h-[calc(100%-var(--pagination-height))]',
+          )}
         >
           <ShadCnTable aria-labelledby="subheading" tableContainerProps={{ className: '' }} {...tableProps}>
             <TableHeader>
@@ -93,11 +125,18 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
                   >
                     {row.getVisibleCells().map(cell => (
                       <TableCell
-                        className="whitespace-normal px-3"
+                        className={cn(
+                          'px-3 group/cell relative h-16',
+                          cell.column.columnDef.meta?.truncate ? 'max-w-0' : 'whitespace-normal',
+                        )}
                         key={cell.id}
                         style={cell.column.columnDef.meta?.style}
                       >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        {cell.column.columnDef.meta?.truncate ? (
+                          <TruncatedCell>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TruncatedCell>
+                        ) : (
+                          flexRender(cell.column.columnDef.cell, cell.getContext())
+                        )}
                       </TableCell>
                     ))}
                   </TableRow>
@@ -114,13 +153,15 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
 
-        <TablePagination
-          className="h-[calc(var(--pagination-height))]"
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          totalPages={totalPages}
-          table={table}
-        />
+        {!isPaginationHidden && (
+          <TablePagination
+            className="h-[calc(var(--pagination-height))]"
+            pageIndex={pageIndex}
+            pageSize={pageSize}
+            totalPages={totalPages}
+            table={table}
+          />
+        )}
       </div>
     </div>
   )

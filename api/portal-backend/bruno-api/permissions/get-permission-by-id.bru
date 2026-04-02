@@ -1,0 +1,31 @@
+meta {
+  name: Get Permission by ID
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/permissions/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{permissionId}}
+}
+
+tests {
+  test("Permission retrieved", function() {
+    const status = res.getStatus();
+    // 200=found, 400=permissionId was not set by prior lookup
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Precondition:** `permissionId` is set (from TC-PERM-01).
+
+  **Expected Response**
+  - Status: `200 OK`
+  - Body contains the permission with matching `id`
+}

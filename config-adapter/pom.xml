@@ -3,9 +3,9 @@
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>com.civitas</groupId>
+	<groupId>de.civitas-core</groupId>
 	<artifactId>config-adapter-parent</artifactId>
-	<version>1.0.0-SNAPSHOT</version>
+	<version>${revision}</version>
 	<packaging>pom</packaging>
 
 	<name>Civitas Config Adapter Parent</name>
@@ -13,9 +13,10 @@
 
 	<licenses>
 		<license>
-			<name>European Union Public License 1.2</name>
+			<name>EUPL-1.2</name>
 			<url>https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12</url>
 			<distribution>repo</distribution>
+			<comments>European Union Public License v1.2</comments>
 		</license>
 	</licenses>
 
@@ -25,10 +26,15 @@
 		<module>event-handler-kafka</module>
 		<module>config-adapter-application</module>
 		<module>config-adapter-keycloak</module>
+		<module>config-adapter-apisix</module>
 		<module>config-adapter-examples</module>
+		<module>config-adapter-frost</module>
+		<module>config-adapter-orchestrator</module>
+		<module>config-adapter-redpanda</module>
 	</modules>
 
 	<properties>
+		<revision>1.0.2</revision>
 		<maven.compiler.source>21</maven.compiler.source>
 		<maven.compiler.target>21</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -38,17 +44,23 @@
 		<cloudevents.version>3.0.0</cloudevents.version>
 		<slf4j.version>2.0.9</slf4j.version>
 		<jackson.version>2.16.1</jackson.version>
+		<jakarta.ws.rs.version>3.1.0</jakarta.ws.rs.version>
+		<jersey.version>3.1.5</jersey.version>
 		<commons.configuration2.version>2.11.0</commons.configuration2.version>
-		<junit.version>5.10.1</junit.version>
-		<mockito.version>5.8.0</mockito.version>
+		<junit.version>5.14.2</junit.version>
+		<mockito.version>5.21.0</mockito.version>
 		<testcontainers.version>2.0.2</testcontainers.version>
 		<awaitility.version>4.2.2</awaitility.version>
-		<jacoco.version>0.8.11</jacoco.version>
+		<jacoco.version>0.8.14</jacoco.version>
 		<spotless.version>2.46.1</spotless.version>
 		<commons.beanutils.version>1.11.0</commons.beanutils.version>
 		<commons.io.version>2.21.0</commons.io.version>
 		<commons.lang.version>3.20.0</commons.lang.version>
 		<commons.compress.version>1.28.0</commons.compress.version>
+		<lz4.version>1.8.1</lz4.version>
+		<at.yawk.lz4.version>1.10.1</at.yawk.lz4.version>
+		<owasp.encoder.version>1.4.0</owasp.encoder.version>
+		<cyclonedx-maven-plugin.version>2.9.0</cyclonedx-maven-plugin.version>
 	</properties>
 
 	<dependencyManagement>
@@ -95,6 +107,33 @@
 				<artifactId>jackson-datatype-jsr310</artifactId>
 				<version>${jackson.version}</version>
 			</dependency>
+			<dependency>
+				<groupId>com.fasterxml.jackson.dataformat</groupId>
+				<artifactId>jackson-dataformat-yaml</artifactId>
+				<version>${jackson.version}</version>
+			</dependency>
+
+			<!-- JAX-RS / Jersey -->
+			<dependency>
+				<groupId>jakarta.ws.rs</groupId>
+				<artifactId>jakarta.ws.rs-api</artifactId>
+				<version>${jakarta.ws.rs.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.glassfish.jersey.core</groupId>
+				<artifactId>jersey-client</artifactId>
+				<version>${jersey.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.glassfish.jersey.inject</groupId>
+				<artifactId>jersey-hk2</artifactId>
+				<version>${jersey.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.glassfish.jersey.media</groupId>
+				<artifactId>jersey-media-json-jackson</artifactId>
+				<version>${jersey.version}</version>
+			</dependency>
 
 			<!-- Apache Commons -->
 			<dependency>
@@ -123,6 +162,18 @@
 				<version>${commons.compress.version}</version>
 			</dependency>
 
+			<!-- lz4 -->
+			<dependency>
+				<groupId>org.lz4</groupId>
+				<artifactId>lz4-java</artifactId>
+				<version>${lz4.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>at.yawk.lz4</groupId>
+				<artifactId>lz4-java</artifactId>
+				<version>${at.yawk.lz4.version}</version>
+			</dependency>
+
 			<!-- Logging -->
 			<dependency>
 				<groupId>org.slf4j</groupId>
@@ -133,6 +184,13 @@
 				<groupId>org.slf4j</groupId>
 				<artifactId>slf4j-simple</artifactId>
 				<version>${slf4j.version}</version>
+			</dependency>
+
+			<!-- OWASP Encoder -->
+			<dependency>
+				<groupId>org.owasp.encoder</groupId>
+				<artifactId>encoder</artifactId>
+				<version>${owasp.encoder.version}</version>
 			</dependency>
 
 			<!-- Testing -->
@@ -213,6 +271,25 @@
 		</pluginManagement>
 		<plugins>
 			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<version>3.8.1</version>
+				<executions>
+					<execution>
+						<id>generate-dependency-tree</id>
+						<phase>generate-resources</phase>
+						<goals>
+							<goal>tree</goal>
+						</goals>
+						<configuration>
+							<outputType>json</outputType>
+							<outputFile>${project.basedir}/maven.graph.json</outputFile>
+							<appendOutput>false</appendOutput>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
 				<groupId>com.diffplug.spotless</groupId>
 				<artifactId>spotless-maven-plugin</artifactId>
 				<configuration>
@@ -221,19 +298,20 @@
 							<include>src/main/java/**/*.java</include>
 							<include>src/test/java/**/*.java</include>
 						</includes>
+                        <googleJavaFormat>
+                            <version>1.28.0</version>
+                        </googleJavaFormat>
 						<licenseHeader>
 							<content>/**
- * Copyright (c) 2012 - $YEAR Data In Motion and others. All rights reserved.
+ * &lt;p&gt;This work and the accompanying materials are made available under the terms of the European Union Public License (EU-PL) 1.2 which is available at https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
- * &lt;p&gt;This program and the accompanying materials are made available under the terms of the Eclipse
- * Public License 2.0 which is available at https://www.eclipse.org/legal/epl-2.0/
+ * &lt;p&gt;SPDX-License-Identifier: EUPL-1.2
  *
- * &lt;p&gt;SPDX-License-Identifier: EPL-2.0
+ * &lt;p&gt;This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to all the individual contributors:
+ * Copyright (c) $YEAR Civitas Connect e. V. and others.
  *
- * &lt;p&gt;Contributors: Data In Motion - initial API and implementation
  */</content>
 						</licenseHeader>
-						<googleJavaFormat />
 						<removeUnusedImports />
 						<importOrder />
 						<formatAnnotations />
@@ -270,6 +348,97 @@
 								<format>HTML</format>
 							</formats>
 						</configuration>
+					</execution>
+					<execution>
+						<id>prepare-agent-integration</id>
+						<goals>
+							<goal>prepare-agent-integration</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>report-integration</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>report-integration</goal>
+						</goals>
+						<configuration>
+							<formats>
+								<format>XML</format>
+								<format>CSV</format>
+								<format>HTML</format>
+							</formats>
+						</configuration>
+					</execution>
+					<execution>
+						<id>merge-results</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>merge</goal>
+						</goals>
+						<configuration>
+							<fileSets>
+								<fileSet>
+									<directory>${project.build.directory}</directory>
+									<includes>
+										<include>jacoco.exec</include>
+										<include>jacoco-it.exec</include>
+									</includes>
+								</fileSet>
+							</fileSets>
+							<destFile>${project.build.directory}/jacoco-merged.exec</destFile>
+						</configuration>
+					</execution>
+					<execution>
+						<id>report-merged</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+						<configuration>
+							<dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+							<outputDirectory>${project.reporting.outputDirectory}/jacoco-merged</outputDirectory>
+							<formats>
+								<format>XML</format>
+								<format>CSV</format>
+								<format>HTML</format>
+							</formats>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.cyclonedx</groupId>
+				<artifactId>cyclonedx-maven-plugin</artifactId>
+				<version>${cyclonedx-maven-plugin.version}</version>
+				<configuration>
+					<outputFormat>json</outputFormat>
+					<schemaVersion>1.5</schemaVersion>
+					<includeBomSerialNumber>true</includeBomSerialNumber>
+					<outputName>config-adapter</outputName>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>flatten-maven-plugin</artifactId>
+				<version>1.6.0</version>
+				<configuration>
+					<updatePomFile>true</updatePomFile>
+					<flattenMode>resolveCiFriendliesOnly</flattenMode>
+				</configuration>
+				<executions>
+					<execution>
+						<id>flatten</id>
+						<phase>process-resources</phase>
+						<goals>
+							<goal>flatten</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>flatten.clean</id>
+						<phase>clean</phase>
+						<goals>
+							<goal>clean</goal>
+						</goals>
 					</execution>
 				</executions>
 			</plugin>

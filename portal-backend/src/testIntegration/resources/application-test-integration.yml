@@ -1,3 +1,6 @@
+civitas:
+  master-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
 spring:
   datasource:
     # These will be overridden by @DynamicPropertySource
@@ -6,19 +9,81 @@ spring:
     password: test
     driver-class-name: org.postgresql.Driver
 
-
   jpa:
     hibernate:
-      ddl-auto: create
-    show-sql: true
+      ddl-auto: validate
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1.0.0
+    clean-disabled: false
+    locations: classpath:db/migration
+
+  # Kafka Test Configuration
+  # Note: spring.embedded.kafka.brokers is only available in tests with @EmbeddedKafka
+  # For other tests, this defaults to localhost:9092 (but won't be used if kafka.enabled=false)
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+    consumer:
+      group-id: test-consumer-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+# Kafka Configuration for CloudEventPublisher
+# Only enabled in tests with @EmbeddedKafka (EventPublishingIntegrationTest)
+kafka:
+  enabled: false  # Default to disabled for tests without embedded Kafka
+  bootstrap-servers: ${spring.kafka.bootstrap-servers:localhost:9092}
+  acks: all
+  retries: 3
+  result-topic: de.civitascore.config.results
+  result-timeout-ms: 10000
+  topic-prefix: # Explicitly empty - no prefix for test environment
+  topics:
+    config-adapter-result: de.civitascore.config.result
+
+# Event Configuration for Tests
+event:
+  publish-timeout-seconds: 10
+  config-adapter-timeout-seconds: 15
+  target-component: keycloak
+
+# Keycloak Configuration
+keycloak:
+  target-realm: "civitas-core"  # Target realm for user/group/role management
 
 logging:
   level:
     de.civitascore: INFO
     org.springframework.security: INFO
     org.testcontainers: INFO
+    org.apache.kafka: WARN
+    kafka: WARN
+    org.hibernate: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+security:
+  permit-paths:
+    - /actuator/health/**
+    - /actuator/info
+
+model-atlas:
+  baseUrl: "http://model-atlas:8080"
+  scope: default
+  stage: draft

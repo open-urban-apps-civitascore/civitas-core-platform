@@ -1,0 +1,56 @@
+meta {
+  name: Create Role
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/roles
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Data Manager",
+    "description": "Can manage data resources",
+    "roleType": "DATA",
+    "permissionIds": [],
+    "readonly": false
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('roleId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Has id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+  test("Has name", function() {
+    expect(res.body.name).to.be.a('string');
+  });
+  test("Has roleType", function() {
+    expect(res.body.roleType).to.be.a('string');
+  });
+}
+
+docs {
+  **Expected Response:** 201 Created, body contains `id`.
+
+  **Post-condition:** Save `roleId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | **Backend** | Role record created in `portal_backend` DB |
+  | **Config Adapter** | — |
+  | **External System** | — |
+}

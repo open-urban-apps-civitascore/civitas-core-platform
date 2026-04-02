@@ -1,0 +1,44 @@
+meta {
+  name: Delete Data Structure
+  type: http
+  seq: 19
+}
+
+delete {
+  url: {{baseUrl}}/datastructures/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataStructureId}}
+}
+
+script:post-response {
+  const setupId = bru.getVar('setupDataStructureId');
+  if (setupId) {
+    bru.setVar('dataStructureId', setupId);
+  }
+}
+
+tests {
+  test("Status code is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` is set and not in published state.
+
+  **Expected Response:** 204 No Content.
+
+  **Verification:** Issue TC-DSTR-02 for same `dataStructureId` and confirm 404.
+
+  **System Impact:**
+
+  | Layer | Impact | Status |
+  |---|---|---|
+  | Backend | DataStructure record removed | --- |
+  | Config Adapter | --- | --- |
+  | External System | --- | --- |
+}

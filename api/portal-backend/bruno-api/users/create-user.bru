@@ -1,0 +1,62 @@
+meta {
+  name: Create User
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/users
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "title": "MR",
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john.doe@example.com",
+    "phone": "+1234567890",
+    "active": true
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('userId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Has id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+  test("Has firstName", function() {
+    expect(res.body.firstName).to.be.a('string');
+  });
+  test("Has lastName", function() {
+    expect(res.body.lastName).to.be.a('string');
+  });
+  test("Has email", function() {
+    expect(res.body.email).to.be.a('string');
+  });
+}
+
+docs {
+  **Expected Response**
+  - Status: `201 Created`
+  - Body contains `id` (non-empty string)
+
+  **Post-condition:** Save `userId` from `body.id`.
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | User record created in `portal_backend` DB |
+  | Config Adapter | Consumes `de.civitascore.idm.user.created` Kafka event; forwards user creation to Keycloak |
+  | Keycloak | New user created in `civitas-core` realm (verify in Keycloak Admin Console → Users) |
+}

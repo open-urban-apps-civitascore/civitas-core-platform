@@ -1,0 +1,52 @@
+meta {
+  name: Update Dataset
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/datasets/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSetId}}
+}
+
+body:json {
+  {
+    "name": "Sensor Readings Dataset",
+    "description": "Updated dataset description",
+    "openDataAccess": false,
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataSetId', res.body.id);
+    bru.setVar('scopeType', 'DATASET');
+    bru.setVar('scopeId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` is set.
+
+  **Expected Response:** 200 OK, body reflects updated values.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSet record updated in `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

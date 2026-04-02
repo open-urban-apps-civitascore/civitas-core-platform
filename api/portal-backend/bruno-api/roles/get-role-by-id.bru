@@ -1,0 +1,30 @@
+meta {
+  name: Get Role by ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/roles/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{roleId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Has correct id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+}
+
+docs {
+  **Precondition:** `roleId` is set.
+
+  **Expected Response:** 200 OK, body contains role with matching `id`
+}

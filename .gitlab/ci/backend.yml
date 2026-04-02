@@ -4,14 +4,51 @@
   rules:
     # Always run on tags
     - if: $CI_COMMIT_TAG
-    # Always run on main branch
+    # Always run on main and develop branch
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
     # Run on MR only when backend files change
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - portal-backend/**/*
+        - portal-model/**/* # Backend depends on portal-model, so run when model changes too
         - .gitlab-ci.yml
         - .gitlab/ci/backend.yml
+        - .gitlab/ci/portal-model.yml # Also run when portal-model changes since backend depends on it
+
+# Generate maven dependency graph JSON for license scanning
+# This must always run (needs: []) to ensure dependency scanning has the graph
+# even when the build job is skipped due to no changes
+generate-graph-backend:
+  image: maven:3.9-eclipse-temurin-21-alpine
+  stage: lint
+  needs: []
+  rules:
+    # Always run on tags
+    - if: $CI_COMMIT_TAG
+    # Always run on main and develop branch
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    # Always run on MR pipelines
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: backend-maven
+      files:
+        - portal-backend/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd portal-backend
+    # Only generate dependency tree, no compilation needed
+    - mvn -B dependency:tree -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - portal-backend/maven.graph.json
 
 lint-backend:
   extends: .only-backend-changes
@@ -31,10 +68,10 @@ lint-backend:
     - cd portal-backend
     - mvn spotless:check
 
-test-backend:
+dependency-prune-backend:
   extends: .only-backend-changes
   image: maven:3.9-eclipse-temurin-21-alpine
-  stage: test
+  stage: lint
   needs: []
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
@@ -47,27 +84,25 @@ test-backend:
       - .m2/repository
   script:
     - cd portal-backend
-    - mvn $MAVEN_CLI_OPTS clean org.jacoco:jacoco-maven-plugin:prepare-agent test jacoco:report
-    # To print coverage, picked up by coverage regex
-    - cat target/site/jacoco/index.html| grep -o '<tfoot>.*</tfoot>'
-  coverage: '/Total.*?([0-9]{1,3})%/'
-  artifacts:
-    when: always
-    expire_in: 1 month
-    paths:
-      - portal-backend/target/surefire-reports/
-      - portal-backend/target/site/jacoco/
-    reports:
-      junit: portal-backend/target/surefire-reports/TEST-*.xml
-      coverage_report:
-        coverage_format: jacoco
-        path: portal-backend/target/site/jacoco/jacoco.xml
+    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -DfailOnWarning=true -DignoreNonCompile=false -s ci_settings.xml
+  allow_failure:
+    exit_codes:
+      - 1
 
-build-backend:
+test-backend:
   extends: .only-backend-changes
   image: maven:3.9-eclipse-temurin-21-alpine
-  stage: build
-  needs: ['lint-backend', 'test-backend', 'secret_detection', 'gitlab-advanced-sast', 'dependency-scanning']
+  stage: test
+  needs:
+    - job: build-backend
+      artifacts: true
+    - job: setup-version
+      artifacts: true
+    - job: setup-version-portal-model
+      artifacts: true
+    - job: publish-config-adapter
+      optional: true
+    - job: publish-portal-model
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -77,40 +112,406 @@ build-backend:
         - portal-backend/pom.xml
     paths:
       - .m2/repository
-  script:
+  before_script:
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
     - cd portal-backend
-    - mvn package -DskipTests
+  script:
+    # Compile test sources, then run unit tests
+    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent surefire:test jacoco:report -Dportal-model.version=$PORTAL_MODEL_VERSION -s ci_settings.xml
+  artifacts:
+    when: always
+    expire_in: 1 month
+    paths:
+      - portal-backend/target/classes/
+      - portal-backend/target/surefire-reports/
+      - portal-backend/target/site/jacoco/
+      - portal-backend/target/jacoco.exec
+    reports:
+      junit: portal-backend/target/surefire-reports/TEST-*.xml
+
+integration-test-backend:
+  extends: .only-backend-changes
+  image: maven:3.9-eclipse-temurin-21
+  stage: test
+  needs:
+    - job: build-backend
+      artifacts: true
+    - job: setup-version
+      artifacts: true
+    - job: setup-version-portal-model
+      artifacts: true
+    - job: publish-config-adapter
+      optional: true
+    - job: publish-portal-model
+  services:
+    - name: docker:27-dind
+      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+    DOCKER_DRIVER: overlay2
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ''
+  cache:
+    key:
+      prefix: backend-maven
+      files:
+        - portal-backend/pom.xml
+    paths:
+      - .m2/repository
+  before_script:
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
+    - cd portal-backend
+  script:
+    # Compile test sources, then run integration tests only. Saga-tagged tests are excluded via pom.xml (run in saga-e2e-test-backend)
+    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION
+  artifacts:
+    when: always
+    expire_in: 1 month
+    paths:
+      - portal-backend/target/failsafe-reports/
+      - portal-backend/target/site/jacoco-it/
+      - portal-backend/target/jacoco-it.exec
+    reports:
+      junit: portal-backend/target/failsafe-reports/TEST-*.xml
+
+# Saga E2E integration tests — cross-module tests validating the full dataset saga workflow
+# (portal-backend + config-adapter orchestrator in-process, with real FROST, Kafka, Redpanda Connect).
+# Auto-runs on main/develop, manual trigger on MRs (heavy: ~2 min, 6+ containers).
+saga-e2e-test-backend:
+  image: maven:3.9-eclipse-temurin-21
+  stage: test
+  needs:
+    - job: build-backend
+      artifacts: true
+    - job: setup-version
+      artifacts: true
+    - job: setup-version-portal-model
+      artifacts: true
+    - job: publish-config-adapter
+      optional: true
+    - job: publish-portal-model
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - portal-backend/**/*
+        - portal-model/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/backend.yml
+  services:
+    - name: docker:27-dind
+      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+    DOCKER_DRIVER: overlay2
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ''
+  cache:
+    key:
+      prefix: backend-maven
+      files:
+        - portal-backend/pom.xml
+    paths:
+      - .m2/repository
+  before_script:
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
+    - cd portal-backend
+  script:
+    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION -Psaga -Dfailsafe.rerunFailingTestsCount=1
+  artifacts:
+    when: always
+    expire_in: 1 month
+    paths:
+      - portal-backend/target/failsafe-reports/
+    reports:
+      junit: portal-backend/target/failsafe-reports/TEST-*.xml
+
+# Bruno API smoke tests — spins up a real backend stack (PostgreSQL, Keycloak,
+# Kafka, Portal Backend) via Docker Compose and runs the full Bruno CLI test
+# collection against it. Validates the HTTP API contract from the outside,
+# complementing the Maven-based unit and integration tests.
+# Auto-runs on main/develop, manual on MRs.
+api-test-backend:
+  image: docker:27
+  stage: test # runs after build jobs provide JAR artifacts
+  needs:
+    - job: build-backend
+      artifacts: true
+      optional: true
+    - job: build-config-adapter
+      artifacts: true
+      optional: true
+    - job: build-authz
+      artifacts: true
+      optional: true
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - portal-backend/**/*
+        - config-adapter/**/*
+        - authz/**/*
+        - api/portal-backend/bruno-api/**/*
+        - dev-environment/ci/**/*
+        - dev-environment/apisix/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/backend.yml
+  services:
+    - name: docker:27-dind
+      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
+  variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ''
+  script:
+    - export COMPOSE_FILES="-f dev-environment/ci/docker-compose.api-test.yml"
+    # Check which source JARs are available and add build overrides individually
+    - |
+      NEED_REGISTRY=true
+      if ls portal-backend/target/*.jar >/dev/null 2>&1; then
+        echo "Portal-backend JAR found — building from source"
+        export COMPOSE_FILES="$COMPOSE_FILES -f dev-environment/ci/docker-compose.api-test.build-portal.yml"
+      else
+        echo "Portal-backend JAR not available — using registry image"
+      fi
+      if ls config-adapter/config-adapter-application/target/*.jar >/dev/null 2>&1; then
+        echo "Config-adapter JARs found — building from source"
+        export COMPOSE_FILES="$COMPOSE_FILES -f dev-environment/ci/docker-compose.api-test.build-ca.yml"
+      else
+        echo "Config-adapter JARs not available — using registry image"
+      fi
+      if ls authz/repository/target/*.jar >/dev/null 2>&1; then
+        echo "AuthZ JARs found — building from source"
+        export COMPOSE_FILES="$COMPOSE_FILES -f dev-environment/ci/docker-compose.api-test.build-authz.yml"
+      else
+        echo "AuthZ JARs not available — using registry image"
+      fi
+      # Login to registry if any service still needs a pre-built image
+      echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+    # Start full stack — blocks until all services are healthy
+    - |
+      docker compose -p api-test $COMPOSE_FILES up -d --build --wait --wait-timeout 600 || {
+        echo "--- Container health status ---"
+        docker compose -p api-test $COMPOSE_FILES ps -a
+        echo "--- Unhealthy container logs ---"
+        for c in $(docker compose -p api-test $COMPOSE_FILES ps -a --format '{{.Name}}'); do
+          STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$c" 2>/dev/null)
+          if [ "$STATUS" != "healthy" ] && [ -n "$STATUS" ]; then
+            echo "=== $c ($STATUS) ==="
+            docker logs "$c" --tail 50 2>&1
+          fi
+        done
+        exit 1
+      }
+    # Seed APISIX routes (services, plugin config, portal-backend route)
+    - docker compose -p api-test $COMPOSE_FILES run --rm apisix-seed
+    # Run Bruno API tests from a container on the same Compose network
+    - docker run -d --name bruno-runner --network api-test-net node:22-alpine sleep infinity
+    - docker cp api/portal-backend/bruno-api/. bruno-runner:/tests/
+    - |
+      docker exec bruno-runner sh -c '
+        npm install -g @usebruno/cli 2>/dev/null
+        cd /tests
+        npx @usebruno/cli run --env ci > /tests/bruno-output.txt 2>&1
+        RESULT=$?
+        cat /tests/bruno-output.txt
+        exit $RESULT
+      '
+    - docker cp bruno-runner:/tests/bruno-output.txt bruno-results.txt || true
+  after_script:
+    - docker rm -f bruno-runner 2>/dev/null || true
+    - docker compose -p api-test -f dev-environment/ci/docker-compose.api-test.yml down -v 2>/dev/null || true
+  artifacts:
+    when: always
+    paths:
+      - bruno-results.txt
+    expire_in: 30 days
+
+report-test-backend:
+  extends: .only-backend-changes
+  image: maven:3.9-eclipse-temurin-21
+  stage: test
+  dependencies:
+    - build-backend
+    - test-backend
+    - integration-test-backend
+  needs: ['build-backend', 'test-backend', 'integration-test-backend']
+  before_script:
+    - cd portal-backend
+  script:
+    - mvn jacoco:merge jacoco:report
+    - cat target/site/jacoco/index.html | grep -o 'Total[^%]*%' || true
+  coverage: '/Total.*?([0-9]{1,3})%/'
+  artifacts:
+    when: always
+    expire_in: 1 month
+    paths:
+      - portal-backend/target/*
+    reports:
+      coverage_report:
+        coverage_format: jacoco
+        path: portal-backend/target/site/jacoco/jacoco.xml
+
+build-backend:
+  extends: .only-backend-changes
+  image: maven:3.9-eclipse-temurin-21-alpine
+  stage: build
+  needs:
+    - job: setup-version
+      artifacts: true
+    - job: setup-version-portal-model
+      artifacts: true
+    - lint-backend
+    - dependency-prune-backend
+    - job: publish-config-adapter
+      optional: true
+    - job: publish-portal-model
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: backend-maven
+      files:
+        - portal-backend/pom.xml
+    paths:
+      - .m2/repository
+  before_script:
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
+    - cd portal-backend
+  script:
+    # Use GitLab Maven repository for config-adapter and portal-model dependencies
+    - |
+      mvn package -DskipTests -Dportal-model.version=$PORTAL_MODEL_VERSION -s ci_settings.xml
   artifacts:
     when: on_success
     paths:
       - portal-backend/target/*.jar
     expire_in: 1 month
 
-deploy-backend:
+build-backend-image:
   extends: .only-backend-changes
-  image: docker:27-dind
-  stage: deploy
-  needs: ['build-backend']
+  image: docker:27
+  stage: publish
+  needs:
+    - job: setup-version
+      artifacts: true
+    - job: build-backend
+      artifacts: true
+    - job: test-backend
+    - job: integration-test-backend
+    - job: api-test-backend
+      optional: true
   services:
-    - docker:27-dind
+    - name: docker:27-dind
+      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
     DOCKER_BUILDKIT: 1
   before_script:
     - docker info
+    - |
+      cat > /tmp/buildkitd.toml <<'EOF'
+      [registry."docker.io"]
+        mirrors = ["docker-mirror01.extern.frachtwerk.de"]
+      EOF
     - docker context create buildx-context
-    - docker buildx create --use --driver docker-container --name multiarch buildx-context
+    - docker buildx create --use --driver docker-container --name multiarch --config /tmp/buildkitd.toml buildx-context
     - docker buildx inspect --bootstrap
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
   script:
     - cd portal-backend
     - |
-      export IMAGE_TAG=$(git describe --tags --always)
+      export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/backend-portal:${CI_COMMIT_REF_SLUG}-scan
       docker buildx build \
         --platform linux/amd64,linux/arm64 \
-        --tag $CI_REGISTRY_IMAGE/backend-portal:$IMAGE_TAG \
+        --tag $SCAN_IMAGE_TAG \
         --push \
         .
   after_script:
     - docker buildx rm multiarch || true
+
+container-scan-backend:
+  extends: .only-backend-changes
+  image:
+    name: aquasec/trivy:0.55.1
+    entrypoint: ['']
+  stage: container-qa
+  needs:
+    - job: setup-version
+      artifacts: true
+    - job: build-backend-image
+  variables:
+    TRIVY_USERNAME: $CI_REGISTRY_USER
+    TRIVY_PASSWORD: $CI_REGISTRY_PASSWORD
+  script:
+    - apk add --no-cache curl >/dev/null
+    - curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/gitlab.tpl -o gitlab.tpl
+    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/backend-portal:${CI_COMMIT_REF_SLUG}-scan
+    - trivy image --scanners vuln --format template --template "@gitlab.tpl" --output gl-container-scanning-report.json $SCAN_IMAGE_TAG
+  artifacts:
+    when: always
+    expire_in: 1 month
+    reports:
+      container_scanning: gl-container-scanning-report.json
+
+deploy-backend:
+  extends: .only-backend-changes
+  image: docker:27
+  stage: deploy
+  needs:
+    - job: setup-version
+      artifacts: true
+    - job: container-scan-backend
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: '/certs'
+  before_script:
+    - docker info
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+  script:
+    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/backend-portal:${CI_COMMIT_REF_SLUG}-scan
+    - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/backend-portal:$REVISION
+    - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/backend-portal:$REVISION --tag $CI_REGISTRY_IMAGE/backend-portal:$CI_COMMIT_BRANCH
+      fi
+
+sbom-backend-image:
+  extends: .only-backend-changes
+  image: docker:27
+  stage: report
+  needs:
+    - job: setup-version
+      artifacts: true
+    - job: deploy-backend
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: '/certs'
+  before_script:
+    - apk add --no-cache bash curl >/dev/null
+    - curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin >/dev/null
+    - docker info
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+  script:
+    - cd portal-backend
+    - mkdir -p target
+    - syft registry:$CI_REGISTRY_IMAGE/backend-portal:$REVISION -o cyclonedx-json > target/portal-backend-image.cdx.json
+  artifacts:
+    when: always
+    expire_in: 1 month
+    paths:
+      - portal-backend/target/portal-backend-image.cdx.json
+    # TODO: https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/issues/728
+    # Fix license name resolution
+    # reports:
+    #   cyclonedx: portal-backend/target/portal-backend-image.cdx.json

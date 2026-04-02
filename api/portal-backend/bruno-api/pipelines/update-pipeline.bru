@@ -1,0 +1,54 @@
+meta {
+  name: Update Pipeline
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{pipelineId}}
+}
+
+body:json {
+  {
+    "name": "Traffic Data Pipeline",
+    "description": "Updated pipeline description",
+    "styles": {},
+    "model": {},
+    "dataSourceIds": [],
+    "apis": [],
+    "persistences": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('pipelineId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` and `pipelineId` are set.
+
+  **Expected Response:** 200 OK, body reflects updated values.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Pipeline record updated in `portal_backend` DB |
+  | Config Adapter | -- |
+  | External System | -- (FROST reflects pipeline changes only after the DataSet is re-released) |
+}

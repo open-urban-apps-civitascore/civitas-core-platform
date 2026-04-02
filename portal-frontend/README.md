@@ -1,4 +1,22 @@
+## Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for all environment variables and deployment configuration.
+
+---
+
 ## Getting Started
+
+### Prerequisites
+
+Add the following entry to your `/etc/hosts` file:
+
+```
+127.0.0.1 civitas-keycloak
+```
+
+This is required because the Keycloak JWT issuer must use the same hostname across all services (browser, APISIX gateway, backend). Without this entry, authentication will fail with an issuer mismatch.
+
+### Setup
 
 1. Install the dependencies by running `pnpm install`
 2. Copy file `portal-frontend/.env.local.template` in the same location and call it `portal-frontend/.env.local`

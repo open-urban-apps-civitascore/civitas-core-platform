@@ -1,72 +1,107 @@
+'use client'
+
 import { ChevronRight } from 'lucide-react'
-import { getTranslations } from 'next-intl/server'
+import { usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+
+import { GuardedLink } from '@/components/guarded-link/GuardedLink'
+import { usePermissions } from '@/hooks/use-permissions'
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible'
 import {
   SidebarContent,
   SidebarGroup,
+  SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from '../../ui/sidebar'
-import { appSidebarNavItems } from '../appSidebarMockItems'
+import { appSidebarNavSections, NavItem } from '../appSidebarItems'
 
-export const AppSidebarContent = async () => {
-  const tNav = await getTranslations('sidebar')
+export const AppSidebarContent = () => {
+  const tNav = useTranslations('sidebar')
+  const pathname = usePathname()
+  const { hasPermission } = usePermissions()
 
-  const getMenuItemTitle = (item: { title: string; url: string }) => {
-    const [name, number] = item.title.split(' ')
-    const title = tNav(name)
-    return `${title} ${number ?? ''}`
-  }
+  const isVisible = (item: NavItem) => !item.requiredPermission || hasPermission(item.requiredPermission)
+
+  const visibleSections = appSidebarNavSections
+    .map(section => ({
+      ...section,
+      items: section.items
+        .map(item => ({
+          ...item,
+          items: item.items?.filter(isVisible),
+        }))
+        .filter(item => {
+          if (item.items) return item.items.length > 0
+          return isVisible(item)
+        }),
+    }))
+    .filter(section => section.items.length > 0)
 
   return (
     <SidebarContent>
-      <SidebarGroup>
-        <SidebarMenu>
-          {appSidebarNavItems.map(item => (
-            <Collapsible key={item.title} asChild defaultOpen={item.isActive}>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip={getMenuItemTitle(item)}>
-                  <a href={item.url}>
-                    <item.icon />
-                    <span>{getMenuItemTitle(item)}</span>
-                  </a>
-                </SidebarMenuButton>
-
-                {item.items?.length ? (
-                  <>
+      {visibleSections.map(section => (
+        <SidebarGroup key={section.title}>
+          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden text-base-sidebar-foreground text-sm font-medium font-['IBM_Plex_Sans'] leading-5 line-clamp-1">
+            {tNav(section.title)}
+          </SidebarGroupLabel>
+          <SidebarMenu>
+            {section.items.map(item =>
+              item.items ? (
+                <Collapsible key={item.title} asChild defaultOpen={item.isActive} className="group/collapsible">
+                  <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuAction className="data-[state=open]:rotate-90">
-                        <ChevronRight />
-                        <span className="sr-only">Toggle</span>
-                      </SidebarMenuAction>
+                      <SidebarMenuButton
+                        tooltip={tNav(item.title)}
+                        className="cursor-pointer"
+                        isActive={item.items.some(subItem => pathname === subItem.url)}
+                      >
+                        {item.icon && <item.icon />}
+                        <span>{tNav(item.title)}</span>
+                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      </SidebarMenuButton>
                     </CollapsibleTrigger>
-
                     <CollapsibleContent>
                       <SidebarMenuSub>
-                        {item.items?.map(subItem => (
-                          <SidebarMenuSubItem key={getMenuItemTitle(subItem)}>
-                            <SidebarMenuSubButton asChild>
-                              <a href={subItem.url}>
-                                <span>{getMenuItemTitle(subItem)}</span>
-                              </a>
+                        {item.items.map(subItem => (
+                          <SidebarMenuSubItem key={subItem.title} data-testid={`sidebarMenuItem-${subItem.title}`}>
+                            <SidebarMenuSubButton asChild isActive={pathname === subItem.url}>
+                              <GuardedLink href={subItem.url}>
+                                <span>{tNav(subItem.title)}</span>
+                              </GuardedLink>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         ))}
                       </SidebarMenuSub>
                     </CollapsibleContent>
-                  </>
-                ) : null}
-              </SidebarMenuItem>
-            </Collapsible>
-          ))}
-        </SidebarMenu>
-      </SidebarGroup>
+                  </SidebarMenuItem>
+                </Collapsible>
+              ) : (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild tooltip={tNav(item.title)} isActive={pathname === item.url}>
+                    {item.external ? (
+                      <a href={item.url} target="_blank" rel="noopener noreferrer">
+                        {item.icon && <item.icon />}
+                        <span>{tNav(item.title)}</span>
+                      </a>
+                    ) : (
+                      <GuardedLink href={item.url}>
+                        {item.icon && <item.icon />}
+                        <span>{tNav(item.title)}</span>
+                      </GuardedLink>
+                    )}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ),
+            )}
+          </SidebarMenu>
+        </SidebarGroup>
+      ))}
     </SidebarContent>
   )
 }

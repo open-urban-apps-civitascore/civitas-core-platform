@@ -1,0 +1,40 @@
+meta {
+  name: 0e. Find Existing Saga Pipeline
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{sagaDataSetId}}
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const match = res.body.content.find(p => p.name === 'Saga Test Pipeline');
+    if (match) {
+      bru.setVar('sagaPipelineId', match.id);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded or no dataset yet", function() {
+    const status = res.getStatus();
+    // 200=found, 400/404=dataset doesn't exist yet (first run)
+    expect(status === 200 || status === 400 || status === 404).to.be.true;
+  });
+}
+
+docs {
+  **Purpose:** Idempotency guard — checks whether the "Saga Test Pipeline" for the existing dataset already exists. If found, `sagaPipelineId` is populated so step 5 can be skipped and step 15 targets the correct record for cleanup.
+
+  **Expected Response:** 200 OK with paginated list, or 400/404 if the dataset does not exist yet (first run).
+
+  **Post-condition:** If a match is found, saves `sagaPipelineId` from `body.content[].id`.
+}

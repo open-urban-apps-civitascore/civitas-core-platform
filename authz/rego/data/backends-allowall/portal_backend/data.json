@@ -1,0 +1,158 @@
+{
+  "_comment": "portal-backend — ALLOW-ALL mode. All endpoints null-permission. DEV-ONLY.",
+  "_version": "1.0.0",
+  "_backend_id": "portal-backend",
+  "endpoints": {
+    "/v1/users/me": {
+      "GET": null
+    },
+    "/v1/users": {
+      "GET": null,
+      "POST": null
+    },
+    "/v1/users/{id}": {
+      "GET": null,
+      "PUT": null,
+      "PATCH": null,
+      "DELETE": null
+    },
+    "/v1/users/{id}/groups": {
+      "PUT": null
+    },
+    "/v1/assignments": {
+      "GET": null,
+      "POST": null
+    },
+    "/v1/assignments/{id}": {
+      "GET": null,
+      "DELETE": null
+    },
+    "/v1/groups": {
+      "GET": null,
+      "POST": null
+    },
+    "/v1/groups/{id}": {
+      "GET": null,
+      "PUT": null,
+      "PATCH": null,
+      "DELETE": null
+    },
+    "/v1/permissions": {
+      "GET": null
+    },
+    "/v1/permissions/{id}": {
+      "GET": null
+    },
+    "/v1/roles": {
+      "GET": null,
+      "POST": null
+    },
+    "/v1/roles/{id}": {
+      "GET": null,
+      "PUT": null,
+      "PATCH": null,
+      "DELETE": null
+    },
+    "/v1/datasets": {
+      "GET": null,
+      "POST": null
+    },
+    "/v1/datasets/{id}": {
+      "GET": null,
+      "PUT": null,
+      "PATCH": null,
+      "DELETE": null
+    },
+    "/v1/datasets/{id}/publish": {
+      "POST": null
+    },
+    "/v1/datasets/{id}/unpublish": {
+      "POST": null
+    },
+    "/v1/datasets/{id}/release": {
+      "POST": null
+    },
+    "/v1/datasets/{id}/unrelease": {
+      "POST": null
+    },
+    "/v1/datasets/{id}/published/meta": {
+      "PUT": null
+    },
+    "/v1/datasets/{id}/assignments": {
+      "GET": null
+    },
+    "/v1/datasets/{id}/pipelines": {
+      "GET": null,
+      "POST": null
+    },
+    "/v1/datasets/{id}/pipelines/{id}": {
+      "GET": null,
+      "PUT": null,
+      "PATCH": null,
+      "DELETE": null
+    },
+    "/v1/datasources": {
+      "GET": null,
+      "POST": null
+    },
+    "/v1/datasources/{id}": {
+      "GET": null,
+      "PUT": null,
+      "PATCH": null,
+      "DELETE": null
+    },
+    "/v1/datasources/{id}/publish": {
+      "POST": null
+    },
+    "/v1/datasources/{id}/unpublish": {
+      "POST": null
+    },
+    "/v1/datasources/{id}/published/meta": {
+      "PUT": null
+    },
+    "/v1/datasources/{id}/assignments": {
+      "GET": null
+    },
+    "/v1/datastructures": {
+      "GET": null,
+      "POST": null
+    },
+    "/v1/datastructures/{id}": {
+      "GET": null,
+      "PUT": null,
+      "PATCH": null,
+      "DELETE": null
+    },
+    "/v1/datastructures/{id}/publish": {
+      "POST": null
+    },
+    "/v1/datastructures/{id}/unpublish": {
+      "POST": null
+    },
+    "/v1/datastructures/{id}/published/meta": {
+      "PUT": null
+    },
+    "/v1/datastructures/{id}/assignments": {
+      "GET": null
+    },
+    "/v1/datastructures/{id}/versions": {
+      "GET": null,
+      "POST": null
+    },
+    "/v1/datastructures/{id}/versions/{id}": {
+      "GET": null,
+      "PUT": null,
+      "PATCH": null,
+      "DELETE": null
+    },
+    "/v1/datastructures/{id}/versions/{id}/publish": {
+      "POST": null
+    },
+    "/v1/datastructures/{id}/versions/{id}/unpublish": {
+      "POST": null
+    },
+    "/v1/datastructures/{id}/versions/{id}/published/meta": {
+      "PUT": null
+    }
+  }
+}

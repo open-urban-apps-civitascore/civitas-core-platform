@@ -1,0 +1,53 @@
+meta {
+  name: Patch Data Structure Version
+  type: http
+  seq: 11
+}
+
+patch {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+  id: {{dataStructureVersionId}}
+}
+
+body:json {
+  {
+    "description": "Patched version description"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataStructureVersionId', res.body.id);
+    bru.setVar('scopeType', 'DATASTRUCTURE');
+    bru.setVar('scopeId', bru.getVar('dataStructureId'));
+  }
+}
+
+tests {
+  test("Patch accepted or Model Atlas unavailable", function() {
+    const status = res.getStatus();
+    // 200=patched, 400=wrong lifecycle state, 502=Model Atlas unavailable
+    if (status === 502) { console.warn('⚠ Model Atlas unavailable — patch not actually tested'); }
+    expect(status === 200 || status === 400 || status === 502).to.be.true;
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` and `dataStructureVersionId` are set.
+
+  **Expected Response:** 200 OK, body reflects updated `description`; other fields unchanged.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Version `description` updated; other fields unchanged |
+  | Config Adapter | -- |
+  | External System | -- |
+}

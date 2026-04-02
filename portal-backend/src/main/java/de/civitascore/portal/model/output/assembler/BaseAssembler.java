@@ -41,6 +41,13 @@ public interface BaseAssembler<
     return postProcessOutput(enriched, preProcessed);
   }
 
+  /**
+   * Converts a page of entities to a page of output DTOs using the {@link #toOutput(BaseEntity)}
+   * template method.
+   *
+   * @param entities the page of entities to convert
+   * @return a page of output DTOs
+   */
   default Page<O> toOutput(Page<E> entities) {
     return entities.map(this::toOutput);
   }
@@ -79,8 +86,8 @@ public interface BaseAssembler<
   default ID getIdFromOutput(O output) {
     try {
       return (ID) output.getId();
-    } catch (Exception e) {
-      throw new RuntimeException("Cannot extract ID from output DTO", e);
+    } catch (ClassCastException e) {
+      throw new IllegalStateException("Cannot extract ID from output DTO", e);
     }
   }
 }

@@ -1,0 +1,49 @@
+meta {
+  name: Setup - Create DataSet
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/datasets
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "API Test DataSet",
+    "description": "Base dataset for API testing",
+    "openDataAccess": false,
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataSetId', res.body.id);
+    bru.setVar('setupDataSetId', res.body.id);
+  }
+}
+
+tests {
+  test("DataSet created", function() {
+    const status = res.getStatus();
+    // 201=created, 409=already exists from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+}
+
+docs {
+  **Expected Response:** 201 Created, body contains `id`. 409 if the dataset already existed (idempotent setup).
+
+  **Post-condition:** Save `dataSetId` and `setupDataSetId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSet record created in `portal_backend` DB with status `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}

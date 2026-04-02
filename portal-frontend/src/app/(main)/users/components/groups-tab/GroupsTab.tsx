@@ -1,118 +1,139 @@
 import { PaginationState, SortingState } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
+import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
+import { PageBackground } from '@/components/page-background/PageBackground'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
+import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
-import { Group, UserGroupsListData } from '@/types/groups'
-import { RoleResponse } from '@/types/roles'
+import { cn } from '@/lib/utils'
+import { UserFormData } from '@/types/users'
+import { mapGroupsApiToListData } from '@/utils/groups'
 
+import { GroupAssignmentModal } from './GroupAssignmentModal'
 import GroupsTable from './GroupsTable'
 
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
-
 interface GroupsTabProps {
-  userId: string
+  formValues: UserFormData
+  isReadOnly: boolean
+  onAssignGroups: (groupIds: string[]) => void
+  onRemoveGroup: (id: string) => void
 }
 
-const transformGroupsToListData = (groups: Group[], roles: RoleResponse[], userId: string): UserGroupsListData[] =>
-  groups.map(group => ({
-    id: group.id,
-    title: group.title,
-    description: group.description,
-    roles: group.roles.flatMap(groupRole => {
-      const matchingRole = roles.find(role => role.id === groupRole)
-      return matchingRole ? matchingRole.name : []
-    }),
-    memberSince: group.users.find(user => user.id === userId)?.assignedAt || '',
-    contact: group.contact,
-  }))
-
 export const GroupsTab = (props: GroupsTabProps) => {
-  const { userId } = props
+  const { formValues, isReadOnly, onAssignGroups, onRemoveGroup } = props
   const t = useTranslations('users')
-  const [groups, setGroups] = useState<UserGroupsListData[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const tCommon = useTranslations('common')
+  const tGroups = useTranslations('groups')
   const [searchString, setSearchString] = useState('')
-  const [filteredGroups, setFilteredGroups] = useState(groups)
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(10)
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'title', desc: false }])
-  const rowCount = groups.length
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'name', desc: false }])
+  const [isGroupAssignmentModalOpen, setIsGroupAssignmentModalOpen] = useState(false)
+  const [groupToRemove, setGroupToRemove] = useState<string | null>(null)
+  const [isWarningModalOpen, setIsWarningModalOpen] = useState(false)
+
+  // Send all group IDs + page/size/sort/search to server (same pattern as UsersTab in groups)
+  const groupParams = useMemo(() => {
+    const params = new URLSearchParams()
+    formValues.groupIds.forEach(id => params.append('id', id))
+    params.set('page', String(pageIndex))
+    params.set('size', String(pageSize))
+    if (sorting.length > 0) {
+      params.set('sort', `${sorting[0].id},${sorting[0].desc ? 'desc' : 'asc'}`)
+    }
+    if (searchString) {
+      params.set('name', searchString)
+    }
+    return params
+  }, [formValues.groupIds, pageIndex, pageSize, sorting, searchString])
+
+  const {
+    data: groupsData,
+    isFetching: isLoadingGroups,
+    error: groupsError,
+  } = useGetGroups({ isEnabled: formValues.groupIds.length > 0, params: groupParams })
+
+  const groups = useMemo(() => mapGroupsApiToListData(groupsData?.data || []), [groupsData])
+
+  const rowCount = groupsData?.totalElements || 0
   const totalPages = Math.ceil(rowCount / pageSize) || 1
 
+  // Reset to first page when group list changes (add/remove)
   useEffect(() => {
-    // this implementation has te be adjusted once the backend is ready
-    const fetchGroups = async () => {
-      try {
-        const [groupsResponse, rolesResponse] = await Promise.all([
-          fetch(`${URL}/groups`, {
-            cache: 'no-store',
-          }),
-          fetch(`${URL}/roles`, {
-            cache: 'no-store',
-          }),
-        ])
+    setPageIndex(0)
+  }, [formValues.groupIds.length])
 
-        if (!groupsResponse.ok || !rolesResponse.ok) {
-          throw new Error('Failed to fetch data')
-        }
-
-        const groupsData: Group[] = await groupsResponse.json()
-        const rolesData: RoleResponse[] = await rolesResponse.json()
-
-        const userGroups = groupsData.filter(group => group.users.filter(user => user.id === userId).length > 0)
-        setGroups(transformGroupsToListData(userGroups, rolesData, userId))
-      } catch (error) {
-        console.error('Error fetching data:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    fetchGroups()
-  }, [userId])
-
-  useEffect(() => {
-    if (searchString) {
-      setFilteredGroups(
-        groups.filter(
-          group =>
-            group.title.toLowerCase().includes(searchString.toLowerCase()) ||
-            group.contact?.displayName.toLowerCase().includes(searchString.toLowerCase()) ||
-            group.description.toLowerCase().includes(searchString.toLowerCase()),
-        ),
-      )
-    } else {
-      setFilteredGroups(groups)
-    }
-  }, [searchString, groups])
+  const isLoading = isLoadingGroups
+  const error = groupsError
 
   const handlePagination = (newPagination: PaginationState) => {
     setPageIndex(newPagination.pageIndex)
     setPageSize(newPagination.pageSize)
   }
 
-  const CustomElement = <Button>{t('groupsTab.addGroup')}</Button>
+  const handleRemoveGroupClick = (id: string) => {
+    setGroupToRemove(id)
+    setIsWarningModalOpen(true)
+  }
+
+  const handleWarningModalConfirm = () => {
+    if (groupToRemove) onRemoveGroup(groupToRemove)
+    setGroupToRemove(null)
+    setIsWarningModalOpen(false)
+  }
+
+  const GroupsAssignmentButton = (
+    <Button onClick={() => setIsGroupAssignmentModalOpen(true)}>{t('groupsTab.addGroup')}</Button>
+  )
   return (
-    <ContentCard className="h-full">
-      <SubHeader title={t('groupsTab.title')} customElement={CustomElement} />
-      <SearchHeader searchString={searchString} onChangeSearchString={setSearchString} className="my-2" />
-      <TableContainer className="[--search-height:calc(--spacing(30))]">
-        <GroupsTable
-          groups={filteredGroups}
-          rowCount={rowCount}
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          onPaginationChange={handlePagination}
-          sorting={sorting}
-          onSortingChange={setSorting}
-          totalPages={totalPages}
-          isLoading={isLoading}
+    <PageBackground hasBackground={!isReadOnly}>
+      <ContentCard className={cn(!error && !isLoading ? 'h-full' : 'h-50')}>
+        {!error && !isLoading && (
+          <>
+            <SubHeader title={t('groupsTab.title')} customElement={!isReadOnly ? GroupsAssignmentButton : undefined} />
+            <SearchHeader searchString={searchString} onChangeSearchString={setSearchString} className="my-2" />
+            <TableContainer className="[--search-height:calc(--spacing(30))]">
+              <GroupsTable
+                groups={groups}
+                rowCount={rowCount}
+                pageIndex={pageIndex}
+                pageSize={pageSize}
+                onPaginationChange={handlePagination}
+                sorting={sorting}
+                onSortingChange={setSorting}
+                totalPages={totalPages}
+                isLoading={isLoading}
+                onRemoveGroupClick={handleRemoveGroupClick}
+                isReadOnly={isReadOnly}
+              />
+            </TableContainer>
+          </>
+        )}
+        <GroupAssignmentModal
+          open={isGroupAssignmentModalOpen}
+          userName={`${formValues.firstName} ${formValues.lastName}`}
+          assignedGroups={formValues.groupIds}
+          onAssignGroups={onAssignGroups}
+          onOpenChange={setIsGroupAssignmentModalOpen}
         />
-      </TableContainer>
-    </ContentCard>
+        <WarningModal
+          title={tGroups('users.removeUserModal.title')}
+          description={tGroups('users.removeUserModal.description')}
+          open={isWarningModalOpen}
+          confirmButtonTitle={tCommon('actions.remove')}
+          onOpenChange={setIsWarningModalOpen}
+          onDiscard={() => setIsWarningModalOpen(false)}
+          onConfirm={handleWarningModalConfirm}
+        />
+        {isLoading && <LoadingSpinner className="h-full" />}
+        {error && <p className="h-full flex items-center justify-center">{tCommon('errors.loadingError')}</p>}
+      </ContentCard>
+    </PageBackground>
   )
 }

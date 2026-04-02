@@ -1,0 +1,61 @@
+meta {
+  name: Create Pipeline
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+body:json {
+  {
+    "name": "Traffic Data Pipeline",
+    "description": "Processes traffic sensor data",
+    "styles": {},
+    "model": {},
+    "dataSourceIds": [],
+    "apis": [],
+    "persistences": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('pipelineId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Has id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+  test("Has name", function() {
+    expect(res.body.name).to.be.a('string');
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` is set.
+
+  **Expected Response:** 201 Created, body contains `id`.
+
+  **Post-condition:** Save `pipelineId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Pipeline record created in `portal_backend` DB, linked to the DataSet |
+  | Config Adapter | -- |
+  | External System | -- (FROST is affected when the parent DataSet is released, not on pipeline creation) |
+}

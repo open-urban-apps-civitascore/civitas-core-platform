@@ -1,0 +1,53 @@
+meta {
+  name: Update Group
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/groups/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{groupId}}
+}
+
+body:json {
+  {
+    "name": "Engineering",
+    "description": "Updated engineering team",
+    "contactUserId": null,
+    "parentGroupId": null,
+    "memberIds": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('groupId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Precondition:** `groupId` is set.
+
+  **Expected Response:** 200 OK, body reflects updated values.
+
+  **Post-condition:** Save `groupId` from `body.id`.
+
+  **System Impact:**
+
+  | Component | Effect |
+  |---|---|
+  | **Backend** | Group record updated |
+  | **Config Adapter** | Consumes `de.civitascore.idm.group.updated` Kafka event; forwards update to Keycloak |
+  | **Keycloak** | Group attributes updated |
+}

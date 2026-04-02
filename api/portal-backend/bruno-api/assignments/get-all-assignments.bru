@@ -1,0 +1,36 @@
+meta {
+  name: Get All Assignments
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/assignments
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+  ~sort: createdAt,DESC
+  ~roleId: role-123
+  ~userId: user-456
+  ~groupId: group-789
+  ~scopeId: scope-101112
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns paginated list", function() {
+    expect(res.body.content).to.be.an('array');
+  });
+}
+
+docs {
+  **Expected Response**
+  - Status: `200 OK`
+  - Body is a paginated list of assignment objects
+}

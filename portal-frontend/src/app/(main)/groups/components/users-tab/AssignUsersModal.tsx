@@ -2,87 +2,66 @@ import { DialogProps } from '@radix-ui/react-dialog'
 import {
   createColumnHelper,
   getCoreRowModel,
-  getSortedRowModel,
   PaginationState,
-  RowSelectionState,
   SortingState,
   useReactTable,
 } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
+import { useGetUsers } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
-import { StatusLabel } from '@/components/status-label/StatusLabel'
+import { SearchHeader } from '@/components/search-area/SearchArea'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useQueryParams } from '@/hooks/useQueryParams'
-import { GroupAssignmentUser, UserResponse } from '@/types/users'
+import { useAddItemSelection } from '@/hooks/use-add-item-selection'
+import { useQueryParams } from '@/hooks/use-query-params'
+import { ListUser } from '@/types/users'
 import { isPageIndexHigherThanTotalPages, resolveUpdater } from '@/utils/table'
-import { mapGoupAssignmentUsers } from '@/utils/users'
-
-export type UserSelection = { selectAll: boolean; selectedIds: string[]; excludedIds: string[] }
-
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+import { mapListUsers } from '@/utils/users'
 
 interface AssignUsersModalProps extends DialogProps {
-  originalUsers: { id: string; assignedAt: string }[]
+  assignedFormUsers: string[]
   groupTitle: string
-  onUpdateUsers: (userSelection: RowSelectionState) => void
+  onAssignUsers: (userIds: string[]) => void
   isUpdating?: boolean
 }
 
 export const AssignUsersModal = (props: AssignUsersModalProps) => {
-  const { originalUsers, groupTitle, open, onOpenChange = () => {}, onUpdateUsers, isUpdating = false } = props
+  const { assignedFormUsers, groupTitle, open, onOpenChange = () => {}, onAssignUsers, isUpdating = false } = props
   const t = useTranslations('groups')
   const tCommon = useTranslations('common')
   const tUsers = useTranslations('users')
-  const [users, setUsers] = useState<GroupAssignmentUser[]>([])
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(10)
-  const [isLoading, setIsLoading] = useState(true)
   const [sorting, setSorting] = useState<SortingState>([])
-  const [rowCount, setRowCount] = useState(0)
   const [searchString, setSearchString] = useState('')
-  const [selection, setSelection] = useState<RowSelectionState>({})
-  const totalPages = Math.ceil(rowCount / pageSize)
-  const selectAllCheckbox = useRef<HTMLButtonElement>(null)
   const { getApiRequestParams } = useQueryParams()
 
-  // this implementation has to be adjusted when the backend is implemented
-  // only unassigned users have to be returned from the backend directly
-  const getUserListData = async () => {
-    const requestParams = getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString })
-    try {
-      const usersResponse = await fetch(`${URL}/users?${requestParams.toString()}`, {
-        cache: 'no-store',
-      })
-      if (!usersResponse.ok) {
-        throw new Error('An error occurred while loading form data')
-      }
+  const { data: usersData, isFetching: isFetchingUsers } = useGetUsers({
+    params: getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString }),
+  })
 
-      const usersData: UserResponse[] = await usersResponse.json()
-      const allUsers = mapGoupAssignmentUsers(usersData)
-      const unassignedUsers = allUsers.filter(user => !originalUsers.find(original => original.id === user.id))
-      setUsers(unassignedUsers)
+  const users = useMemo(() => {
+    if (usersData?.data && usersData?.data.length > 0) {
+      return mapListUsers(usersData?.data)
+    } else return []
+  }, [usersData?.data])
 
-      const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
-      if (rowCount !== totalCount) {
-        setRowCount(totalCount)
-      }
-    } catch (error) {
-      console.error('An error occurred while fetching users data:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const rowCount = usersData?.totalElements || 0
+  const totalPages = Math.ceil(rowCount / pageSize)
+
+  const { selection, selectedItemsRef, assignedIdsSet, handleSelectionChange, newlySelectedCount } =
+    useAddItemSelection({ assignedIds: assignedFormUsers, items: users, open: !!open })
 
   useEffect(() => {
     if (!open) {
-      setSelection({})
+      setSearchString('')
+      setPageIndex(0)
+      setSorting([])
     }
   }, [open])
 
@@ -92,18 +71,11 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
     }
   }, [pageIndex, totalPages])
 
-  useEffect(() => {
-    setIsLoading(true)
-    getUserListData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, pageSize, rowCount, sorting, searchString, originalUsers])
-
   const handlePagination = (newPagination: PaginationState) => {
     setPageIndex(newPagination.pageIndex)
     setPageSize(newPagination.pageSize)
   }
 
-  // for accessibility: avoid losing focus after toggeling checkboxes via keyboard
   const setFocus = (elementId: string) => {
     requestAnimationFrame(() => {
       const element = document.getElementById(elementId)
@@ -111,13 +83,12 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
     })
   }
 
-  const columnHelper = createColumnHelper<GroupAssignmentUser>()
+  const columnHelper = createColumnHelper<ListUser>()
 
   const columns = [
     columnHelper.accessor('id', {
       header: () => (
         <Checkbox
-          ref={selectAllCheckbox}
           checked={
             table.getIsAllPageRowsSelected() ? true : table.getIsSomePageRowsSelected() ? 'indeterminate' : false
           }
@@ -125,21 +96,25 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
           id="selectAll"
         />
       ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={value => {
-            row.toggleSelected(!!value)
-            setFocus(row.id)
-          }}
-          aria-label={`Select user ${row.original.displayName}`}
-          id={row.id}
-        />
-      ),
+      cell: ({ row }) => {
+        const isAssigned = assignedIdsSet.has(row.original.id)
+        return (
+          <Checkbox
+            checked={isAssigned || row.getIsSelected()}
+            onCheckedChange={value => {
+              row.toggleSelected(!!value)
+              setFocus(row.id)
+            }}
+            disabled={isAssigned}
+            aria-label={`Select user ${row.original.fullName}`}
+            id={row.id}
+          />
+        )
+      },
       enableSorting: false,
       enableHiding: false,
     }),
-    columnHelper.accessor('displayName', {
+    columnHelper.accessor('fullName', {
       header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.displayName')} />,
       cell: info => info.getValue(),
       meta: {
@@ -153,10 +128,6 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.email')} />,
       cell: info => info.getValue(),
     }),
-    columnHelper.accessor('isActive', {
-      header: tUsers('info.active'),
-      cell: info => <StatusLabel isChecked={info.getValue()} />,
-    }),
   ]
 
   const table = useReactTable({
@@ -169,14 +140,14 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
       sorting,
       rowSelection: selection,
     },
+    enableRowSelection: row => !assignedIdsSet.has(row.original.id),
     manualPagination: true,
     manualSorting: true,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     onPaginationChange: updater => {
       handlePagination(resolveUpdater(updater, { pageIndex, pageSize }))
     },
-    onRowSelectionChange: setSelection,
+    onRowSelectionChange: handleSelectionChange,
     onSortingChange: updater => setSorting(resolveUpdater(updater, sorting)),
   })
 
@@ -203,15 +174,15 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
               pageIndex={pageIndex}
               pageSize={pageSize}
               totalPages={totalPages}
-              isLoading={isLoading}
+              isLoading={isFetchingUsers}
             />
           )}
         </div>
         <ActionButtons
           confirmButtonType="button"
-          onConfirmClick={() => onUpdateUsers(selection)}
+          onConfirmClick={() => onAssignUsers(Array.from(selectedItemsRef.current.keys()))}
           onCancelClick={() => onOpenChange(false)}
-          isConfirmButtonDisabled={isUpdating || isLoading}
+          isConfirmButtonDisabled={isUpdating || newlySelectedCount === 0}
           hasCard={false}
           confirmButtonTitle={tCommon('actions.add')}
         />

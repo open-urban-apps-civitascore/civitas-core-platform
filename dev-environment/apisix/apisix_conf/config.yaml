@@ -1,0 +1,44 @@
+# APISIX Configuration — Traditional Mode
+#
+# Traditional mode with etcd enables the Admin API so the config-adapter
+# can dynamically create/delete routes during dataset saga orchestration.
+# Static routes are seeded via seed-routes.sh after startup.
+
+apisix:
+  node_listen:
+    - 9080
+  enable_http2: true
+  ssl:
+    enable: true
+    listen:
+      - port: 9443
+
+# Increase buffer sizes for large X-Allowed-Scope-Ids headers
+# When users have access to many datasets, the scope ID list can be large.
+nginx_config:
+  http:
+    proxy_buffer_size: 32k
+    proxy_buffers: 4 32k
+
+deployment:
+  role: traditional
+  admin:
+    admin_key:
+      - name: admin
+        key: edd1c9f034335f136f87ad84b625c8f1
+        role: admin
+    admin_listen:
+      port: 9180
+    allow_admin:
+      - 0.0.0.0/0
+  etcd:
+    host:
+      - "http://etcd:2379"
+    prefix: "/apisix"
+
+# Enabled plugins
+plugins:
+  - proxy-rewrite
+  - openid-connect
+  - opa
+  - request-id

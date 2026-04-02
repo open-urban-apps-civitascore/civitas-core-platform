@@ -1,101 +1,79 @@
 'use client'
 
-import { Row, RowSelectionState } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
+import { useGetPermissions } from '@/app/services/api/permissions/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
-import { TableContainer } from '@/components/table-container/TableContainer'
-import { useQueryParams } from '@/hooks/useQueryParams'
-import { Permission } from '@/types/permissions'
+import { InfoBox } from '@/components/text-box/TextBox'
+import { useQueryParams } from '@/hooks/use-query-params'
 import { ROLE_TYPES } from '@/types/roles'
 
-import { PermissionsTable } from './components/PermissionsTable'
-
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+import { DataPermissionsTab } from './components/DataPermissionsTab'
+import { SystemPermissionsTab } from './components/SystemPermissionsTab'
 
 export const DEFAULT_TAB = ROLE_TYPES.SYSTEM
 
 const PermissionsPage = () => {
-  const t = useTranslations('permissions')
-
-  const [permissions, setPermissions] = useState<Permission[] | []>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [rowCount, setRowCount] = useState(0)
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const t = useTranslations()
 
   const tabsValues = {
-    systemPermissions: { value: ROLE_TYPES.SYSTEM, label: t('systemPermissions') },
-    dataPermissions: { value: ROLE_TYPES.DATA, label: t('dataPermissions') },
-    governancePermissions: { value: ROLE_TYPES.GOVERNANCE, label: t('governancePermissions') },
+    systemPermissions: {
+      value: ROLE_TYPES.SYSTEM,
+      label: t('permissions.systemPermissions.title'),
+      description: t('permissions.systemPermissions.description'),
+    },
+    dataPermissions: {
+      value: ROLE_TYPES.DATA,
+      label: t('permissions.dataPermissions.title'),
+      description: t('permissions.dataPermissions.description'),
+    },
   }
-  const tabs = [tabsValues.systemPermissions, tabsValues.dataPermissions, tabsValues.governancePermissions]
 
-  const {
-    setSortingParams,
-    setPaginationParams,
-    setSearchParam,
-    getApiRequestParamsByUrl,
-    setTabValueParam,
-    setTotalPages,
-    pageIndex,
-    pageSize,
-    sorting,
-    search,
-    tabValue,
-    totalPages,
-  } = useQueryParams()
+  const tabs = [tabsValues.systemPermissions, tabsValues.dataPermissions]
+
+  const { setTabValueParam, setTotalPages, getApiRequestParamsByUrl, pageSize, tabValue } = useQueryParams()
 
   const [permissionType, setPermissionsType] = useState<string>(tabValue || DEFAULT_TAB)
 
-  const getPermissions = async () => {
-    const params = getApiRequestParamsByUrl()
+  const requestParams = new URLSearchParams(`type=${permissionType}&${getApiRequestParamsByUrl()}`)
+  const { data: permissionsData, isFetching } = useGetPermissions({ params: requestParams })
 
-    try {
-      setIsLoading(true)
-      const permissionResponse = await fetch(`${URL}/permissions?type=${permissionType}&${params.toString()}`, {
-        cache: 'no-store',
-      })
-      if (!permissionResponse.ok) {
-        throw new Error('An error occurred while loading permissions data')
-      }
-
-      const permissionsData: Permission[] = await permissionResponse.json()
-
-      setPermissions(permissionsData)
-      setIsLoading(false)
-
-      const totalCount = Number(permissionResponse.headers.get('X-Total-Count')) || 0
-      if (rowCount !== totalCount) {
-        setRowCount(totalCount)
-        setTotalPages(Math.ceil(totalCount / pageSize) || 1)
-      }
-    } catch (error) {
-      console.error(error)
-      setIsLoading(false)
-      throw new Error('An error occurred while loading permissions data')
-    }
-  }
+  const rowCount = permissionsData?.totalElements || 0
 
   useEffect(() => {
-    getPermissions()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sorting, rowCount, pageIndex, pageSize, permissionType, search])
+    setTotalPages(Math.ceil(rowCount / pageSize))
+  }, [rowCount, setTotalPages, pageSize])
 
-  const handleOpenButtonClick = (row: Row<Permission>) => {
-    console.log(`/permissions/${row.original.id}?_tab=${permissionType}`)
+  const permissions = permissionsData?.data && !isFetching ? permissionsData.data : []
+
+  const getSystemPermissions = () => {
+    return permissions.filter(permission => permission.permissionType === ROLE_TYPES.SYSTEM)
+  }
+
+  const getDataPermissions = () => {
+    return permissions.filter(permission => permission.permissionType === ROLE_TYPES.DATA)
+  }
+
+  const getTitle = () => {
+    const label = tabs.find(tab => tab.value === permissionType)?.label || ''
+    return t('permissions.title', { permissionType: label })
+  }
+
+  const getDescription = () => {
+    return tabs.find(tab => tab.value === permissionType)?.description || ''
   }
 
   return (
-    <PageContainer headerType="withPrimaryTabs">
+    <PageContainer headerType="withBothTabsRows">
       <PageHeader
-        title={tabs.find(tab => tab.value === permissionType)?.label}
-        tabs={{
+        title={getTitle()}
+        subtitle={getDescription()}
+        tabsSectionProps={{
           tabs,
-          onClick: type => {
+          onClick: (type: string) => {
             setPermissionsType(type)
             setTabValueParam(type)
           },
@@ -103,23 +81,15 @@ const PermissionsPage = () => {
         }}
       />
       <PageBackground>
-        <SearchHeader searchString={search} onChangeSearchString={setSearchParam} />
-        <TableContainer>
-          <PermissionsTable
-            permissions={permissions}
-            isLoading={isLoading}
-            rowCount={rowCount}
-            pageIndex={pageIndex}
-            pageSize={pageSize}
-            totalPages={totalPages}
-            sorting={sorting}
-            onOpenButtonClick={handleOpenButtonClick}
-            rowSelection={rowSelection}
-            setRowSelection={setRowSelection}
-            onSortingChange={setSortingParams}
-            onPaginationChange={setPaginationParams}
-          />
-        </TableContainer>
+        {permissionType === ROLE_TYPES.SYSTEM ? (
+          <SystemPermissionsTab permissions={getSystemPermissions()} isLoading={isFetching} />
+        ) : (
+          <DataPermissionsTab permissions={getDataPermissions()} isLoading={isFetching} rowCount={rowCount} />
+        )}
+
+        <div className="mt-4">
+          <InfoBox text={t('permissions.infoBox')} />
+        </div>
       </PageBackground>
     </PageContainer>
   )

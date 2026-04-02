@@ -1,0 +1,27 @@
+meta {
+  name: 9c. Verify Gateway Auth (unauthenticated)
+  type: http
+  seq: 24
+}
+
+get {
+  url: {{apisixGatewayUrl}}/datasets/{{sagaDataSetId}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("Unauthenticated request rejected by openid-connect", function() {
+    expect(res.getStatus()).to.equal(401);
+  });
+}
+
+docs {
+  **Saga step 9c of 18** — Verify APISIX gateway enforces authentication.
+
+  Sends an unauthenticated GET request through the APISIX gateway to the dataset route. The OpenID-Connect plugin applied by the saga must reject the request with 401.
+
+  **Precondition:** `sagaDataSetId` is set; APISIX gateway reachable at `apisixGatewayUrl`; saga has completed and the route exists.
+
+  **Expected Response:** 401 Unauthorized (no bearer token provided).
+}

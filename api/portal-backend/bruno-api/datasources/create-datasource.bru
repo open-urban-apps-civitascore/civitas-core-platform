@@ -1,0 +1,71 @@
+meta {
+  name: Create Data Source
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "MQTT Sensor Source",
+    "description": "Temperature sensor data source",
+    "connectorType": "MQTT",
+    "configuration": {
+      "urls": ["tcp://broker:1883"],
+      "topics": ["sensor/#"],
+      "qos": 1,
+      "keepalive": "30s",
+      "user": "mqttuser",
+      "password": "secret",
+      "client_id": "civitas-client-1",
+      "connect_timeout": "5s",
+      "tls": {
+        "enabled": false
+      }
+    },
+    "dataStructureVersionId": null,
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataSourceId', res.body.id);
+    bru.setVar('scopeType', 'DATASOURCE');
+    bru.setVar('scopeId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Has id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+  test("Has name", function() {
+    expect(res.body.name).to.be.a('string');
+  });
+  test("Has connectorType", function() {
+    expect(res.body.connectorType).to.be.a('string');
+  });
+}
+
+docs {
+  **Expected Response:** 201 Created, body contains `id`.
+
+  **Post-condition:** Save `dataSourceId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource record created in `portal_backend` DB with status `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}

@@ -1,0 +1,38 @@
+meta {
+  name: Delete Data Structure Version
+  type: http
+  seq: 15
+}
+
+delete {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+  id: {{dataStructureVersionId}}
+}
+
+tests {
+  test("Status code is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is not in published state.
+
+  **Expected Response:** 204 No Content.
+
+  **Verification:** Issue TC-DSTV-02 for same `dataStructureVersionId` and confirm 404.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Version record removed |
+  | Config Adapter | -- |
+  | External System | -- |
+}

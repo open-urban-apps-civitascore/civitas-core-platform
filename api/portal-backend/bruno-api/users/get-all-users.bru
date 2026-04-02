@@ -1,0 +1,37 @@
+meta {
+  name: Get All Users
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/users
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+  ~sort: createdAt,DESC
+  ~firstName: John
+  ~lastName: Doe
+  ~email: john.doe@example.com
+  ~active: true
+  ~q: john
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns paginated list", function() {
+    expect(res.body.content).to.be.an('array');
+  });
+}
+
+docs {
+  **Expected Response**
+  - Status: `200 OK`
+  - Body is a paginated list of user objects
+}

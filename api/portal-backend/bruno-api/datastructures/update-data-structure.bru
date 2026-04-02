@@ -1,0 +1,53 @@
+meta {
+  name: Update Data Structure
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/datastructures/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{dataStructureId}}
+}
+
+body:json {
+  {
+    "name": "Sensor Data Structure",
+    "description": "Updated data structure for sensor readings",
+    "createdFromDataSource": false,
+    "dataStructureVersionIds": [],
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataStructureId', res.body.id);
+    bru.setVar('scopeType', 'DATASTRUCTURE');
+    bru.setVar('scopeId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` is set.
+
+  **Expected Response:** 200 OK, body reflects updated values.
+
+  **System Impact:**
+
+  | Layer | Impact | Status |
+  |---|---|---|
+  | Backend | DataStructure record updated in `portal_backend` DB | --- |
+  | Config Adapter | --- | --- |
+  | External System | --- | --- |
+}

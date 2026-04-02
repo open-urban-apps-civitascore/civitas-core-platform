@@ -1,16 +1,16 @@
 import { createColumnHelper, getCoreRowModel, useReactTable } from '@tanstack/react-table'
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { formatDate } from '@/utils/formatDate'
+import { Role } from '@/types/roles'
+import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
-import { ROLE_ORIGINS, RoleResponse } from '../../../../../types/roles'
-import { TableProps } from '../../../../../types/table'
-
-interface RolesTableProps extends TableProps<RoleResponse> {
-  roles: RoleResponse[]
+interface RolesTableProps extends TableProps<Role> {
+  roles: Role[]
+  selectedRoleType?: string
 }
 
 export const RolesTable = (props: RolesTableProps) => {
@@ -23,14 +23,13 @@ export const RolesTable = (props: RolesTableProps) => {
     totalPages,
     rowSelection,
     rowCount,
-    onRowClick,
     onPaginationChange,
     onSortingChange,
+    selectedRoleType,
   } = props
   const t = useTranslations('roles')
-  const locale = useLocale()
 
-  const columnHelper = createColumnHelper<RoleResponse>()
+  const columnHelper = createColumnHelper<Role>()
 
   const columns = [
     columnHelper.accessor('id', {
@@ -42,8 +41,13 @@ export const RolesTable = (props: RolesTableProps) => {
       header: ({ column }) => {
         return <SortableTableHeader column={column} title={t('tableHeaders.name')} />
       },
-      cell: info => info.getValue(),
+      cell: ({ row }) => (
+        <LinkCell href={`/roles/${row.original.id}${selectedRoleType ? `?tab=${selectedRoleType}` : ''}`}>
+          {row.original.name}
+        </LinkCell>
+      ),
       meta: {
+        truncate: true,
         style: {
           width: '17.5%',
         },
@@ -54,52 +58,43 @@ export const RolesTable = (props: RolesTableProps) => {
       header: () => t('tableHeaders.description'),
       cell: info => info.getValue(),
       meta: {
+        truncate: true,
         style: {
           width: '25%',
           minWidth: '200px',
         },
       },
     }),
-    columnHelper.accessor('groups', {
+    columnHelper.accessor('groupCount', {
       header: () => t('tableHeaders.groups'),
-      cell: info => info.getValue()?.length,
-      meta: {
-        style: {
-          width: '10%',
-        },
-      },
-    }),
-    columnHelper.accessor('users', {
-      header: () => t('tableHeaders.user'),
-      cell: info => info.getValue()?.length,
-      meta: {
-        style: {
-          width: '10%',
-        },
-      },
-    }),
-    columnHelper.accessor('lastUpdated', {
-      header: () => t('tableHeaders.lastUpdated'),
-      cell: info => formatDate(info.getValue(), locale),
-      meta: {
-        style: {
-          width: '12.5%',
-          textAlign: 'center',
-        },
-      },
-    }),
-    columnHelper.accessor('updatedBy', {
-      header: () => t('tableHeaders.updatedBy'),
       cell: info => info.getValue(),
       meta: {
         style: {
+          width: '10%',
+        },
+      },
+    }),
+    columnHelper.accessor('userCount', {
+      header: () => t('tableHeaders.user'),
+      cell: info => info.getValue(),
+      meta: {
+        style: {
+          width: '10%',
+        },
+      },
+    }),
+    columnHelper.accessor('modifiedBy', {
+      header: () => t('tableHeaders.updatedBy'),
+      cell: info => info.getValue()?.name ?? null,
+      meta: {
+        style: {
           width: '12.5%',
         },
       },
     }),
-    columnHelper.accessor('roleOrigin', {
+    columnHelper.accessor('readonly', {
       header: () => t('tableHeaders.roleOrigin'),
-      cell: info => (info.getValue() === ROLE_ORIGINS.DEFAULT ? t('defaultRole') : t('customRole')),
+      cell: info => (info.getValue() ? t('defaultRole') : t('customRole')),
       meta: {
         style: {
           width: '12.5%',
@@ -128,13 +123,6 @@ export const RolesTable = (props: RolesTableProps) => {
   })
 
   return (
-    <DataTable
-      table={table}
-      pageIndex={pageIndex}
-      pageSize={pageSize}
-      totalPages={totalPages}
-      isLoading={isLoading}
-      onRowClick={onRowClick}
-    />
+    <DataTable table={table} pageIndex={pageIndex} pageSize={pageSize} totalPages={totalPages} isLoading={isLoading} />
   )
 }

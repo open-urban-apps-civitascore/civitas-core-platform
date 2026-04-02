@@ -1,3 +1,6 @@
+// For more info, see https://github.com/storybookjs/eslint-plugin-storybook#configuration-flat-config-format
+import storybook from 'eslint-plugin-storybook'
+
 /*
  * ESLint configuration for Civitas Core Platform V2
  * Next.js + TypeScript + Prettier
@@ -24,12 +27,14 @@ const eslintConfig = [
   {
     ignores: [
       'src/components/ui/**',
+      'scripts/**',
       'eslint.config.mjs',
       'next-env.d.ts',
       '.next',
       'coverage',
       'playwright/.auth/**',
       'playwright-report',
+      'storybook-static',
     ],
   },
   ...compat.config({
@@ -63,7 +68,15 @@ const eslintConfig = [
           selector: 'objectLiteralProperty',
           format: null, // no check
           filter: {
-            regex: '^--', // Properties starting with "--"
+            regex: '^--', // CSS custom properties starting with "--"
+            match: true,
+          },
+        },
+        {
+          selector: 'objectLiteralProperty',
+          format: null, // no check - HTTP headers use kebab-case
+          filter: {
+            regex: '-', // Properties containing hyphens (e.g., 'Cache-Control', 'x-api-request')
             match: true,
           },
         },
@@ -94,9 +107,10 @@ const eslintConfig = [
           },
         },
         // Props: camelCase, except when containing React components, then PascalCase
+        // UPPER_CASE allowed for const-object enums (e.g. PERMISSION_NAMES)
         {
           selector: 'property',
-          format: ['camelCase', 'PascalCase'],
+          format: ['camelCase', 'PascalCase', 'UPPER_CASE'],
         },
         // Booleans (variables) start with prefix is/has/should/can
         {
@@ -243,12 +257,11 @@ const eslintConfig = [
       'import/no-extraneous-dependencies': [
         'error',
         {
-          devDependencies: ['**/*.test.ts', '**/*.test.tsx', '**/*.config.js', '**/*.config.ts'],
+          devDependencies: ['**/*.test.ts', '**/*.test.tsx', '**/*.config.js', '**/*.config.ts', '**/*.stories.*', 'e2e/**', 'playwright/**'],
         },
       ],
     },
-  }),
-  // config for use with prettier
+  }), // config for use with prettier
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
     plugins: { prettier: prettierPlugin },
@@ -262,8 +275,7 @@ const eslintConfig = [
         },
       ],
     },
-  },
-  // config for tests
+  }, // config for tests
   {
     files: ['**/*.{spec,test,setup}.{ts,tsx}'],
     ...compat.extends('plugin:jest/recommended')[0],
@@ -277,7 +289,9 @@ const eslintConfig = [
       'import/no-extraneous-dependencies': 'off',
       'max-lines': 'off',
     },
+    // spread in storybook recommended config
   },
+  ...storybook.configs['flat/recommended'],
 ]
 
 export default eslintConfig

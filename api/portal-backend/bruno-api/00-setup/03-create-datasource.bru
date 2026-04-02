@@ -1,0 +1,63 @@
+meta {
+  name: Setup - Create DataSource
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "API Test DataSource",
+    "description": "Base datasource for API testing",
+    "connectorType": "MQTT",
+    "configuration": {
+      "urls": ["tcp://broker:1883"],
+      "topics": ["test/#"],
+      "qos": 1,
+      "keepalive": "30s",
+      "user": "test",
+      "password": "test",
+      "client_id": "test-client",
+      "connect_timeout": "5s",
+      "tls": { "enabled": false }
+    },
+    "dataStructureVersionId": null,
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataSourceId', res.body.id);
+    bru.setVar('setupDataSourceId', res.body.id);
+    bru.setVar('scopeType', 'DATASOURCE');
+    bru.setVar('scopeId', res.body.id);
+  }
+}
+
+tests {
+  test("DataSource created", function() {
+    const status = res.getStatus();
+    // 201=created, 409=already exists from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+}
+
+docs {
+  **Expected Response:** 201 Created, body contains `id`. 409 if the datasource already existed (idempotent setup).
+
+  **Post-condition:** Save `dataSourceId`, `setupDataSourceId`, `scopeType` (`DATASOURCE`), and `scopeId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource record created in `portal_backend` DB with status `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}

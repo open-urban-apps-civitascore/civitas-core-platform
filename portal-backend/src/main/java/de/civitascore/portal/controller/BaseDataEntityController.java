@@ -1,0 +1,116 @@
+package de.civitascore.portal.controller;
+
+import de.civitascore.portal.model.embedded.ScopeType;
+import de.civitascore.portal.model.entity.Assignment;
+import de.civitascore.portal.model.entity.base.BaseDataEntity;
+import de.civitascore.portal.model.input.BaseDataEntityInputDTO;
+import de.civitascore.portal.model.output.AssignmentOutputDTO;
+import de.civitascore.portal.model.output.BaseOutputDTO;
+import de.civitascore.portal.model.output.assembler.AssignmentAssembler;
+import de.civitascore.portal.repository.specification.ScopeFilteringSpecification;
+import de.civitascore.portal.repository.specification.base.BaseSpec;
+import de.civitascore.portal.security.AllowedScopes;
+import de.civitascore.portal.security.AllowedScopesFilter;
+import de.civitascore.portal.service.AssignmentService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+
+/**
+ * Abstract base controller for data-entity resources that support scope-based access control.
+ *
+ * <p>Extends {@link BaseController} with automatic scope filtering on collection queries and an
+ * endpoint for retrieving {@link Assignment}s scoped to the entity. Subclasses must implement
+ * {@link #getScopeType()} to declare their scope category.
+ *
+ * @param <I> the input DTO type
+ * @param <O> the output DTO type
+ * @param <E> the JPA data-entity type
+ * @param <S> the specification type used for filtering
+ */
+public abstract class BaseDataEntityController<
+        I extends BaseDataEntityInputDTO,
+        O extends BaseOutputDTO,
+        E extends BaseDataEntity,
+        S extends BaseSpec<E>>
+    extends BaseController<I, O, E, S> {
+
+  @Autowired private AssignmentService assignmentService;
+  @Autowired private AssignmentAssembler assignmentAssembler;
+  @Autowired private ObjectProvider<AllowedScopes> allowedScopesProvider;
+
+  /**
+   * Returns the scope type that identifies this data entity category for authorization filtering.
+   *
+   * @return the {@link ScopeType} for this controller's entity
+   */
+  protected abstract ScopeType getScopeType();
+
+  /**
+   * Applies scope filtering to all data entity collection queries. Subclasses inherit this
+   * automatically — no need to call {@code applyScopeFilter()} in their own {@code getAll()}
+   * overrides.
+   */
+  @Override
+  protected ResponseEntity<Page<O>> getAll(Specification<E> spec, Pageable pageable) {
+    return super.getAll(applyScopeFilter(spec), pageable);
+  }
+
+  /**
+   * Apply scope-based filtering to a specification.
+   *
+   * <p>Throws {@link AccessDeniedException} if the {@code X-Allowed-Scope-Ids} header is missing.
+   * If wildcard, returns the spec unchanged. Otherwise combines the spec with an IN-clause filter
+   * for the authorized scope IDs.
+   */
+  protected Specification<E> applyScopeFilter(Specification<E> spec) {
+    AllowedScopes scopes = allowedScopesProvider.getObject();
+    if (!scopes.isHeaderPresent()) {
+      throw new AccessDeniedException(
+          "Missing required " + AllowedScopesFilter.HEADER_NAME + " header");
+    }
+    if (scopes.isWildcard()) {
+      return spec;
+    }
+    Specification<E> scopeFilter = ScopeFilteringSpecification.baseEntityById(scopes.getScopeIds());
+    return spec == null ? scopeFilter : spec.and(scopeFilter);
+  }
+
+  /**
+   * Retrieves all role assignments scoped to the specified entity.
+   *
+   * @param id the UUID of the entity whose assignments to retrieve
+   * @return a list of assignment output DTOs with HTTP 200 status
+   */
+  @GetMapping("/{id}/assignments")
+  @Operation(
+      operationId = "get{Entity}Assignments",
+      summary = "Get assignments",
+      description = "Returns all role assignments scoped to this {entity}.")
+  @ApiResponse(responseCode = "200", description = "Assignments returned successfully")
+  @ApiResponse(
+      responseCode = "404",
+      description = "{Entity} not found",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  public ResponseEntity<List<AssignmentOutputDTO>> getAssignments(@PathVariable UUID id) {
+    getService().findByIdOrThrow(id);
+    List<Assignment> assignments =
+        assignmentService.findAllByScopeTypeAndScopeId(getScopeType(), id);
+    List<AssignmentOutputDTO> output =
+        assignments.stream().map(assignmentAssembler::toOutput).toList();
+    return ResponseEntity.ok(output);
+  }
+}

@@ -1,20 +1,22 @@
-import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
-import { useLocale, useTranslations } from 'next-intl'
+import { createColumnHelper, getCoreRowModel, getSortedRowModel, Row, useReactTable } from '@tanstack/react-table'
+import { useTranslations } from 'next-intl'
 
-import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
-import { StatusLabel } from '@/components/status-label/StatusLabel'
+import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { DataTable } from '@/components/table/DataTable'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { TableProps } from '@/types/table'
-import { GroupListUser } from '@/types/users'
-import { formatDate } from '@/utils/formatDate'
+import { ListUser } from '@/types/users'
 import { resolveUpdater } from '@/utils/table'
 
-interface UsersTableProps extends TableProps<GroupListUser> {
-  users: GroupListUser[]
+interface UsersTableProps extends TableProps<ListUser> {
+  users: ListUser[]
+  onRemoveUserClick: (userId: string) => void
+  isReadOnly: boolean
+  isLinkDisabled?: boolean
 }
 
-const UsersTable = (props: UsersTableProps) => {
+export const UsersTable = (props: UsersTableProps) => {
   const {
     users,
     rowCount,
@@ -26,12 +28,15 @@ const UsersTable = (props: UsersTableProps) => {
     onRowClick,
     onPaginationChange,
     onSortingChange,
+    onRemoveUserClick,
     isLoading,
+    isReadOnly,
+    isLinkDisabled,
   } = props
-  const locale = useLocale()
-  const t = useTranslations('groups')
   const tUsers = useTranslations('users')
-  const columnHelper = createColumnHelper<GroupListUser>()
+  const tCommon = useTranslations('common')
+
+  const columnHelper = createColumnHelper<ListUser>()
 
   const columns = [
     columnHelper.accessor('id', {
@@ -39,36 +44,47 @@ const UsersTable = (props: UsersTableProps) => {
       cell: info => info.getValue(),
       enableHiding: true,
     }),
-    columnHelper.accessor('displayName', {
+    columnHelper.accessor('fullName', {
       header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.displayName')} />,
-      cell: info => info.getValue(),
+      cell: ({ row }) => (
+        <LinkCell href={`/users/${row.id}`} isDisabled={isLinkDisabled}>
+          {row.original.fullName}
+        </LinkCell>
+      ),
       meta: {
+        truncate: true,
         style: {
           width: '22.22%',
           minWidth: '200px',
         },
       },
     }),
-    columnHelper.accessor('authority', {
-      header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.authority')} />,
-      cell: info => info.getValue(),
-    }),
-    columnHelper.accessor('department', {
-      header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.department')} />,
-      cell: info => info.getValue(),
-    }),
     columnHelper.accessor('email', {
       header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.email')} />,
       cell: info => info.getValue(),
     }),
-    columnHelper.accessor('assignedAt', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('users.assignedAt')} />,
-      cell: info => formatDate(info.getValue(), locale),
-    }),
-    columnHelper.accessor('isActive', {
-      header: tUsers('info.active'),
-      cell: info => <StatusLabel isChecked={info.getValue()} />,
-    }),
+    ...(!isReadOnly
+      ? [
+          {
+            id: 'actions',
+            cell: ({ row }: { row: Row<ListUser> }) => (
+              <TableDropdownMenu
+                menuItems={[
+                  {
+                    label: tCommon('actions.removeItem', { item: tCommon('items.user') }),
+                    onClick: () => onRemoveUserClick(row.id),
+                  },
+                ]}
+              />
+            ),
+            meta: {
+              style: {
+                width: '50px',
+              },
+            },
+          },
+        ]
+      : []),
   ]
 
   const table = useReactTable({
@@ -92,10 +108,6 @@ const UsersTable = (props: UsersTableProps) => {
     onSortingChange: updater => onSortingChange(resolveUpdater(updater, sorting)),
   })
 
-  if (isLoading) {
-    return <LoadingSpinner className="h-full" />
-  }
-
   return (
     <DataTable
       table={table}
@@ -103,8 +115,7 @@ const UsersTable = (props: UsersTableProps) => {
       pageSize={pageSize}
       totalPages={totalPages}
       onRowClick={onRowClick}
+      isLoading={isLoading}
     />
   )
 }
-
-export default UsersTable

@@ -1,0 +1,51 @@
+meta {
+  name: Update Role
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/roles/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{roleId}}
+}
+
+body:json {
+  {
+    "name": "Data Manager",
+    "description": "Updated description",
+    "roleType": "DATA",
+    "permissionIds": [],
+    "readonly": false
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('roleId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Precondition:** `roleId` is set.
+
+  **Expected Response:** 200 OK, body reflects updated values.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | **Backend** | Role record updated in `portal_backend` DB |
+  | **Config Adapter** | — |
+  | **External System** | — |
+}

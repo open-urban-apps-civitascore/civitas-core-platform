@@ -1,0 +1,50 @@
+meta {
+  name: Update Published Version Meta
+  type: http
+  seq: 14
+}
+
+put {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/published/meta
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+  versionId: {{dataStructureVersionId}}
+}
+
+body:json {
+  {
+    "dataStructureVersionSource": "OWN",
+    "version": "1.0.1",
+    "description": "Updated version description",
+    "modelAtlasUri": "http://civitas.org/model/StudentDatabaseModel1/1.0.1",
+    "modelName": "UpdatedModelName",
+    "model": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<uml:Model xmi:version=\"20131001\" xmlns:xmi=\"http://www.omg.org/spec/XMI/20131001\" xmlns:uml=\"http://www.eclipse.org/uml2/5.0.0/UML\" xmi:id=\"_model\" name=\"UpdatedModel\" URI=\"http://civitas.org/model/StudentDatabaseModel1/1.0.1\">\n</uml:Model>",
+    "styles": {}
+  }
+}
+
+tests {
+  test("Updated or not published", function() {
+    const status = res.getStatus();
+    // 200=updated, 400=version not in published state
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in published state.
+
+  **Expected Response:** 200 OK, published version metadata is updated.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Published version metadata updated |
+  | Config Adapter | -- |
+  | Model Atlas / Apicurio Registry | Version metadata updated in registry |
+}

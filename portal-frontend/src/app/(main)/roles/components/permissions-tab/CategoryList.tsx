@@ -5,15 +5,15 @@ import { type JSX } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { PermissionItem } from '@/types/permissions'
 
-type CategoryListProps = {
+interface CategoryListProps {
   permissionList: PermissionItem[]
   checkedItems: PermissionItem[]
   setCheckedItems: (items: PermissionItem[]) => void
-  isDefaultRole: boolean
+  isReadOnly: boolean
 }
 
 export const CategoryList = (props: CategoryListProps) => {
-  const { permissionList, checkedItems, setCheckedItems, isDefaultRole } = props
+  const { permissionList, checkedItems, setCheckedItems, isReadOnly } = props
   const tRoles = useTranslations('roles')
 
   const checkedItemsByCategory = useMemo(() => {
@@ -74,10 +74,13 @@ export const CategoryList = (props: CategoryListProps) => {
                 onClick={() => {
                   onToggleAllItems()
                 }}
-                disabled={isDefaultRole}
+                disabled={isReadOnly}
               />
             </div>
-            <h2 className="text-xl">{permissionList[0]?.category.title}</h2>
+            <h2 className="text-xl">
+              {tRoles(`permissionsTab.categories.${permissionList[0]?.category.id}`) ||
+                permissionList[0]?.category.title}
+            </h2>
           </div>
           <span className="font-semibold text-xs text-primary">
             {tRoles('permissionsTab.selectedPersmissions', { count: checkedItemsByCategory.length })}
@@ -95,7 +98,7 @@ export const CategoryList = (props: CategoryListProps) => {
             className="w-[16px] h-[16px]"
             onClick={() => onChangeCheckbox(inputItem)}
             checked={checkedItems.some(item => item.value === inputItem.value)}
-            disabled={isDefaultRole}
+            disabled={isReadOnly}
           />
         </div>
         <span>{inputItem.name}</span>

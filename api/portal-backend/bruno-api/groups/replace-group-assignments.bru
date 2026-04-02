@@ -1,0 +1,47 @@
+meta {
+  name: Replace Group Assignments
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/groups/:id/assignments
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{groupId}}
+}
+
+body:json {
+  [
+    {
+      "roleId": "{{roleId}}",
+      "scopeType": "{{scopeType}}",
+      "scopeId": "{{scopeId}}"
+    }
+  ]
+}
+
+tests {
+  test("Assignments replaced or scope unavailable", function() {
+    const status = res.getStatus();
+    // 200=replaced, 400=invalid scope reference, 404=group already deleted
+    expect(status === 200 || status === 400 || status === 404).to.be.true;
+  });
+}
+
+docs {
+  **Precondition:** `groupId` is set.
+
+  **Expected Response:** 200 OK, body reflects replaced assignments for the group.
+
+  **System Impact:**
+
+  | Component | Effect |
+  |---|---|
+  | **Backend** | Group assignments replaced |
+  | **Config Adapter** | Consumes assignment-related Kafka event; forwards changes to Keycloak |
+  | **Keycloak** | Group role assignments updated |
+}

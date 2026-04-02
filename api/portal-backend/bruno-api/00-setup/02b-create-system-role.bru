@@ -1,0 +1,50 @@
+meta {
+  name: Setup - Create Role (SYSTEM)
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/roles
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "API Test System Role",
+    "description": "Base SYSTEM role for unscoped assignments",
+    "roleType": "SYSTEM",
+    "permissionIds": [],
+    "readonly": false
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('systemRoleId', res.body.id);
+    bru.setVar('setupSystemRoleId', res.body.id);
+  }
+}
+
+tests {
+  test("System Role created", function() {
+    const status = res.getStatus();
+    // 201=created, 409=already exists from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+}
+
+docs {
+  **Expected Response:** 201 Created, body contains `id`. 409 if the role already existed (idempotent setup).
+
+  **Post-condition:** Save `systemRoleId` and `setupSystemRoleId` from `body.id`. This SYSTEM role is used for unscoped assignments (no `scopeType` / `scopeId`).
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | SYSTEM role record created in `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

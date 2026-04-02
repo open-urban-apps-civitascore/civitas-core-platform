@@ -2,13 +2,23 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.model.embedded.PermissionType;
 import de.civitascore.portal.model.embedded.RoleType;
+import de.civitascore.portal.model.entity.Permission;
 import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.model.output.RoleOutputDTO;
+import de.civitascore.portal.repository.AssignmentRepository;
+import de.civitascore.portal.repository.GroupRepository;
+import de.civitascore.portal.repository.PermissionRepository;
 import de.civitascore.portal.repository.RoleRepository;
+import de.civitascore.portal.repository.UserRepository;
+import de.civitascore.portal.service.AssignmentService;
+import de.civitascore.portal.service.GroupService;
+import de.civitascore.portal.service.UserService;
 import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +37,17 @@ class RoleControllerIntegrationTest
 
   @Autowired private RoleRepository roleRepository;
 
+  @Autowired private GroupService groupService;
+  @Autowired private GroupRepository groupRepository;
+
+  @Autowired private AssignmentService assignmentService;
+  @Autowired private AssignmentRepository assignmentRepository;
+
+  @Autowired private UserService userService;
+  @Autowired private UserRepository userRepository;
+
+  @Autowired private PermissionRepository permissionRepository;
+
   @Override
   protected String getEndpointPath() {
     return ROLES_ENDPOINT;
@@ -34,15 +55,18 @@ class RoleControllerIntegrationTest
 
   @Override
   protected void performAdditionalCleanup() {
+    assignmentRepository.deleteAll();
     roleRepository.deleteAll();
+    groupRepository.deleteAll();
+    userRepository.deleteAll();
   }
 
   @Override
   protected RoleInputDTO createValidInput() {
     RoleInputDTO input = new RoleInputDTO();
-    input.setName("test_role_" + System.currentTimeMillis());
+    input.setName("test_role_" + UUID.randomUUID().toString().substring(0, 8));
     input.setDescription("A test role for integration testing");
-    input.setRoleType(RoleType.GOVERNANCE);
+    input.setRoleType(RoleType.DATA);
     return input;
   }
 
@@ -59,7 +83,7 @@ class RoleControllerIntegrationTest
     input.setName("updated_role");
     input.setName("Updated Role");
     input.setDescription("Updated description");
-    input.setRoleType(RoleType.GOVERNANCE);
+    input.setRoleType(RoleType.DATA);
     return input;
   }
 
@@ -76,6 +100,17 @@ class RoleControllerIntegrationTest
   @Override
   protected UUID getIdFromOutput(RoleOutputDTO output) {
     return output.getId();
+  }
+
+  private List<UUID> getPermissionIdsByType(PermissionType type) {
+    List<UUID> ids =
+        permissionRepository.findAll().stream()
+            .filter(p -> p.getPermissionType() == type)
+            .map(Permission::getId)
+            .limit(2)
+            .toList();
+    assertThat(ids).as("Expected seeded permissions of type " + type).isNotEmpty();
+    return ids;
   }
 
   @Nested
@@ -132,7 +167,11 @@ class RoleControllerIntegrationTest
     void shouldCreateRoleWithDifferentRoleTypes() {
       for (RoleType type : RoleType.values()) {
         RoleInputDTO input = createValidInput();
-        input.setName("role_" + type.name().toLowerCase() + "_" + System.currentTimeMillis());
+        input.setName(
+            "role_"
+                + type.name().toLowerCase()
+                + "_"
+                + UUID.randomUUID().toString().substring(0, 8));
         input.setName("Role " + type.name());
         input.setRoleType(type);
 
@@ -263,6 +302,128 @@ class RoleControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
     }
+
+    @Test
+    @DisplayName("Should return group count of 0 for new role")
+    void shouldReturnCorrectGroupCountForRole() {
+      UUID roleId = createTestEntity();
+
+      ResponseEntity<RoleOutputDTO> response = performGetById(roleId);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+
+      RoleOutputDTO role = response.getBody();
+      assertThat(role.getGroupCount()).as("Initial group count should be zero").isEqualTo(0);
+    }
+
+    // TODO: implement in V2.1
+    // @Test
+    // @DisplayName("Should return correct group count after assignments")
+    // void shouldReturnCorrectGroupCountAfterAssignments() {
+    //   UUID roleId = createTestEntity();
+    //
+    //   // Create groups
+    //   Triple<Group, Group, Group> groups = createGroupHierarchy();
+    //
+    //   AssignmentInputDTO assignmentInput = new AssignmentInputDTO();
+    //   assignmentInput.setRoleId(roleId);
+    //   assignmentInput.setGroupId(groups.getLeft().getId());
+    //   assignmentInput.setScopeType(ScopeType.TENANT);
+    //   assignmentService.create(assignmentInput);
+    //
+    //   assignmentInput.setGroupId(groups.getMiddle().getId());
+    //   assignmentService.create(assignmentInput);
+    //
+    //   // Retrieve role and verify group count
+    //   ResponseEntity<RoleOutputDTO> response = performGetById(roleId);
+    //
+    //   assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    //   assertThat(response.getBody()).isNotNull();
+    //
+    //   RoleOutputDTO role = response.getBody();
+    //   assertThat(role.getGroupCount())
+    //       .as("Group count should reflect assigned groups")
+    //       .isEqualTo(3);
+    // }
+
+    @Test
+    @DisplayName("Should return user count of 0 for new role")
+    void shouldReturnCorrectUserCountForRole() {
+      UUID roleId = createTestEntity();
+
+      ResponseEntity<RoleOutputDTO> response = performGetById(roleId);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+
+      RoleOutputDTO role = response.getBody();
+      assertThat(role.getUserCount()).as("Initial user count should be zero").isEqualTo(0);
+    }
+
+    // TODO: implement in V2.1
+    // @Test
+    // @DisplayName("Should return correct user count after assignments")
+    // void shouldReturnCorrectUserCountAfterAssignments() {
+    //   UUID roleId = createTestEntity();
+    //
+    //   // Create groups
+    //   Triple<Group, Group, Group> groups = createGroupHierarchy();
+    //
+    //   AssignmentInputDTO assignmentInput = new AssignmentInputDTO();
+    //   assignmentInput.setRoleId(roleId);
+    //   assignmentInput.setGroupId(groups.getLeft().getId());
+    //   assignmentInput.setScopeType(ScopeType.TENANT);
+    //   assignmentService.create(assignmentInput);
+    //
+    //   assignmentInput.setGroupId(groups.getMiddle().getId());
+    //   assignmentService.create(assignmentInput);
+    //
+    //   // Retrieve role and verify user count
+    //   ResponseEntity<RoleOutputDTO> response = performGetById(roleId);
+    //
+    //   assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    //   assertThat(response.getBody()).isNotNull();
+    //
+    //   RoleOutputDTO role = response.getBody();
+    //   assertThat(role.getUserCount()).as("User count should reflect assigned
+    // users").isEqualTo(3);
+    // }
+
+    // TODO: implement in V2.1
+    // private Triple<Group, Group, Group> createGroupHierarchy() {
+    //   UserInputDTO userInput = new UserInputDTO();
+    //   userInput.setFirstName("firstName");
+    //   userInput.setLastName("lastName");
+    //   userInput.setEmail("user1@test.de");
+    //   userInput.setActive(true);
+    //   User user1 = userService.create(userInput);
+    //
+    //   userInput.setEmail("user2@test.de");
+    //   User user2 = userService.create(userInput);
+    //
+    //   userInput.setEmail("user3@test.de");
+    //   User user3 = userService.create(userInput);
+    //
+    //   GroupInputDTO parentGroupInput = new GroupInputDTO();
+    //   parentGroupInput.setName("Parent Group");
+    //   parentGroupInput.setMemberIds(List.of(user1.getId()));
+    //   Group parentGroup = groupService.create(parentGroupInput);
+    //
+    //   GroupInputDTO childGroupInput1 = new GroupInputDTO();
+    //   childGroupInput1.setName("Child Group 1");
+    //   childGroupInput1.setParentGroupId(parentGroup.getId());
+    //   childGroupInput1.setMemberIds(List.of(user1.getId()));
+    //   Group childGroup1 = groupService.create(childGroupInput1);
+    //
+    //   GroupInputDTO childGroupInput2 = new GroupInputDTO();
+    //   childGroupInput2.setName("Child Group 2");
+    //   childGroupInput2.setParentGroupId(parentGroup.getId());
+    //   childGroupInput2.setMemberIds(List.of(user2.getId(), user3.getId()));
+    //   Group childGroup2 = groupService.create(childGroupInput2);
+    //
+    //   return Triple.of(parentGroup, childGroup1, childGroup2);
+    // }
   }
 
   @Nested
@@ -432,6 +593,26 @@ class RoleControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
     }
+
+    @Test
+    @DisplayName("Should fail to update protected role")
+    void shouldFailToUpdateProtectedRole() {
+      RoleInputDTO input = createValidInput();
+      input.setReadonly(true);
+
+      ResponseEntity<RoleOutputDTO> createResponse = performCreate(input);
+
+      assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(createResponse.getBody()).isNotNull();
+
+      UUID protectedRoleId = createResponse.getBody().getId();
+      RoleInputDTO updateInput = createUpdateInput();
+
+      ResponseEntity<RoleOutputDTO> updateResponse = performUpdate(protectedRoleId, updateInput);
+      assertThat(updateResponse.getStatusCode())
+          .as("Should return FORBIDDEN status when updating protected role")
+          .isEqualTo(HttpStatus.FORBIDDEN);
+    }
   }
 
   @Nested
@@ -476,6 +657,25 @@ class RoleControllerIntegrationTest
       assertThat(response.getStatusCode())
           .as("Should return UNAUTHORIZED status")
           .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    @DisplayName("Should fail to delete protected role")
+    void shouldFailToDeleteProtectedRole() {
+      RoleInputDTO input = createValidInput();
+      input.setReadonly(true);
+
+      ResponseEntity<RoleOutputDTO> createResponse = performCreate(input);
+
+      assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(createResponse.getBody()).isNotNull();
+
+      UUID protectedRoleId = createResponse.getBody().getId();
+      ResponseEntity<Void> deleteResponse = performDelete(protectedRoleId);
+
+      assertThat(deleteResponse.getStatusCode())
+          .as("Should return FORBIDDEN status when deleting protected role")
+          .isEqualTo(HttpStatus.FORBIDDEN);
     }
   }
 
@@ -547,6 +747,118 @@ class RoleControllerIntegrationTest
       ResponseEntity<RoleOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Nested
+  @DisplayName("Permission Type Validation Tests")
+  class PermissionTypeValidationTests {
+
+    @Test
+    @DisplayName("Should reject creating DATA role with SYSTEM permissions")
+    void shouldRejectDataRoleWithSystemPermissions() {
+      RoleInputDTO input = createValidInput();
+      input.setRoleType(RoleType.DATA);
+      input.setPermissionIds(getPermissionIdsByType(PermissionType.SYSTEM));
+
+      ResponseEntity<RoleOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST for mismatched permission types")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject creating SYSTEM role with DATA permissions")
+    void shouldRejectSystemRoleWithDataPermissions() {
+      RoleInputDTO input = createValidInput();
+      input.setRoleType(RoleType.SYSTEM);
+      input.setPermissionIds(getPermissionIdsByType(PermissionType.DATA));
+
+      ResponseEntity<RoleOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST for mismatched permission types")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should create SYSTEM role with SYSTEM permissions successfully")
+    void shouldCreateSystemRoleWithSystemPermissions() {
+      RoleInputDTO input = createValidInput();
+      input.setRoleType(RoleType.SYSTEM);
+      input.setPermissionIds(getPermissionIdsByType(PermissionType.SYSTEM));
+
+      ResponseEntity<RoleOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CREATED for matching permission types")
+          .isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getPermissions()).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("Should create DATA role with DATA permissions successfully")
+    void shouldCreateDataRoleWithDataPermissions() {
+      RoleInputDTO input = createValidInput();
+      input.setRoleType(RoleType.DATA);
+      input.setPermissionIds(getPermissionIdsByType(PermissionType.DATA));
+
+      ResponseEntity<RoleOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CREATED for matching permission types")
+          .isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getPermissions()).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("Should reject updating role to add mismatched permissions")
+    void shouldRejectUpdateWithMismatchedPermissions() {
+      RoleInputDTO input = createValidInput();
+      input.setRoleType(RoleType.DATA);
+      ResponseEntity<RoleOutputDTO> createResponse = performCreate(input);
+      assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      UUID roleId = createResponse.getBody().getId();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("permissionIds", getPermissionIdsByType(PermissionType.SYSTEM));
+
+      ResponseEntity<RoleOutputDTO> patchResponse = performPatch(roleId, patchMap);
+
+      assertThat(patchResponse.getStatusCode())
+          .as("Should return BAD_REQUEST when patching with mismatched permissions")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should allow creating role with empty permissions list")
+    void shouldAllowEmptyPermissions() {
+      RoleInputDTO input = createValidInput();
+      input.setRoleType(RoleType.DATA);
+      input.setPermissionIds(Collections.emptyList());
+
+      ResponseEntity<RoleOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CREATED for empty permissions")
+          .isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    @DisplayName("Should allow creating role with null permissions")
+    void shouldAllowNullPermissions() {
+      RoleInputDTO input = createValidInput();
+      input.setRoleType(RoleType.SYSTEM);
+      input.setPermissionIds(null);
+
+      ResponseEntity<RoleOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CREATED for null permissions")
+          .isEqualTo(HttpStatus.CREATED);
     }
   }
 }

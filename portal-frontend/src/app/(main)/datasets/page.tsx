@@ -1,137 +1,21 @@
-'use client'
+import { getDatasets } from '@/app/services/api/datasets/serverRequests'
+import { ApiRequestParams, getApiRequestParams } from '@/utils/requestParams'
 
-import { Row } from '@tanstack/react-table'
-import { Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import DatasetsList from './components/DatasetsList'
 
-import { PageBackground } from '@/components/page-background/PageBackground'
-import { PageContainer } from '@/components/page-container/PageContainer'
-import { PageHeader } from '@/components/page-header/PageHeader'
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
-import { TableContainer } from '@/components/table-container/TableContainer'
-import { Button } from '@/components/ui/button'
-import { useQueryParams } from '@/hooks/useQueryParams'
-import { DatasetResponse, DatasetTableData } from '@/types/datasets'
-
-import DatasetsTable from './components/DatasetsTable'
-
-export const mapDatasetsToListData = (datasets: DatasetResponse[]): DatasetTableData[] => {
-  const datasetsMap = datasets.flatMap(dataset => {
-    try {
-      const data = {
-        id: dataset.id,
-        name: dataset.name,
-        dataspace: dataset.dataspace?.title || '',
-        department: dataset.department?.title || '',
-        creator: dataset.creator.map(creator => `${creator.firstName} ${creator.lastName}`),
-        lastUpdated: dataset.lastUpdated,
-        status: dataset.status,
-        releaseProcess: null,
-        distribution: dataset.distribution
-          ? {
-              format: dataset.distribution?.format,
-              title: dataset.distribution?.title,
-              url: dataset.distribution?.url,
-            }
-          : null,
-      }
-      return data
-    } catch (error) {
-      console.error(dataset, error)
-      return []
-    }
-  })
-  return datasetsMap
+type Props = {
+  searchParams: Promise<ApiRequestParams>
 }
 
-const DatasetsPage = () => {
-  const t = useTranslations('datasets')
-  const router = useRouter()
-  const [datasets, setDatasets] = useState<DatasetTableData[]>([])
-  const [rowCount, setRowCount] = useState(0)
+const Datasets = async ({ searchParams }: Props) => {
+  const params = await searchParams
 
-  const {
-    setSortingParams,
-    setPaginationParams,
-    setSearchParam,
-    getApiRequestParamsByUrl,
-    setTotalPages,
-    pageIndex,
-    pageSize,
-    sorting,
-    search,
-    totalPages,
-  } = useQueryParams()
+  const { apiParams } = getApiRequestParams(params)
 
-  const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+  const datasetResponse = await getDatasets(apiParams)
+  const datasets = datasetResponse.data
 
-  useEffect(() => {
-    const params = getApiRequestParamsByUrl()
-
-    const getDatasets = async () => {
-      try {
-        const datasetsResponse = await fetch(`${URL}/datasets?${params.toString()}`)
-        if (!datasetsResponse.ok) {
-          throw new Error('An error occurred while loading data')
-        }
-        const datasetsData: DatasetResponse[] = await datasetsResponse.json()
-        const datasets = mapDatasetsToListData(datasetsData)
-        setDatasets(datasets)
-        const totalCount = Number(datasetsResponse.headers.get('X-Total-Count')) || 0
-        if (rowCount !== totalCount) {
-          setRowCount(totalCount)
-        }
-        setTotalPages(Math.ceil(totalCount / pageSize))
-      } catch (error) {
-        console.error(error)
-      }
-    }
-    getDatasets()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, pageSize, URL, rowCount, sorting, search, getApiRequestParamsByUrl])
-
-  const handleRowClick = (row: Row<DatasetTableData>) => {
-    if (row.id) {
-      const params = getApiRequestParamsByUrl()
-      router.push(`datasets/${row.id}?${params.toString()}`)
-    }
-  }
-
-  const CustomElement = (
-    <Button onClick={() => router.push(`datasets/create?${getApiRequestParamsByUrl().toString()}`)}>
-      <Plus />
-      {t('newDataset')}
-    </Button>
-  )
-
-  return (
-    <PageContainer headerType="onlyTitle">
-      <PageHeader title={t('title')} />
-      <PageBackground>
-        <SearchHeader
-          searchString={search}
-          onChangeSearchString={setSearchParam}
-          aria-label={t('searchDatasets')}
-          customElement={CustomElement}
-        />
-        <TableContainer>
-          <DatasetsTable
-            datasets={datasets}
-            rowCount={rowCount}
-            pageIndex={pageIndex}
-            pageSize={pageSize}
-            sorting={sorting}
-            totalPages={totalPages}
-            onPaginationChange={setPaginationParams}
-            onSortingChange={setSortingParams}
-            onRowClick={handleRowClick}
-          />
-        </TableContainer>
-      </PageBackground>
-    </PageContainer>
-  )
+  return <DatasetsList datasets={datasets} rowCount={datasetResponse.totalElements || 0} />
 }
 
-export default DatasetsPage
+export default Datasets

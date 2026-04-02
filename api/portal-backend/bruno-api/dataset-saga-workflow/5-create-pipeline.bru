@@ -1,0 +1,76 @@
+meta {
+  name: 5. Create Pipeline
+  type: http
+  seq: 18
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{sagaDataSetId}}
+}
+
+body:json {
+  {
+    "name": "Saga Test Pipeline",
+    "description": "Pipeline for saga workflow test",
+    "dataSourceIds": ["{{sagaDataSourceId}}"],
+    "apis": ["/v1.1/Things"],
+    "persistences": [],
+    "styles": {},
+    "model": {
+      "input": {
+        "generate": {
+          "interval": "1s",
+          "count": 1,
+          "mapping": "root = {\"name\": \"Test Sensor\", \"description\": \"test\"}"
+        }
+      },
+      "output": {
+        "http_client": {
+          "url": "${FROST_BASE}/Things",
+          "verb": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        }
+      }
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaPipelineId', res.body.id);
+  }
+}
+
+tests {
+  test("Pipeline created or already exists", function() {
+    const status = res.getStatus();
+    // 201=created, 409=already exists from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+}
+
+docs {
+  **Saga step 5 of 20** — Prerequisites: DataSource published (step 4b), DataSet created (step 4).
+
+  Creates a Redpanda Connect pipeline ("Saga Test Pipeline") attached to the dataset. The pipeline consumes from the MQTT datasource (`sagaDataSourceId`) and posts to FROST. The datasource must be in AVAILABLE status (published in step 4b) before it can be linked. When the dataset is released, the saga deploys this pipeline to Redpanda Connect.
+
+  **Expected Response:** 201 Created, body contains `id`. 409 if the pipeline already existed (idempotent).
+
+  **Post-condition:** Save `sagaPipelineId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Pipeline record created in `portal_backend` DB linked to the dataset |
+  | Config Adapter | — |
+  | Redpanda Connect | Pipeline is deployed only after the DATASET_CREATE saga runs (step 8) |
+}

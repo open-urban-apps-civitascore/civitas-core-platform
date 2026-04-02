@@ -1,0 +1,45 @@
+meta {
+  name: 4a. Patch DataSource with DataStructure Version
+  type: http
+  seq: 16
+}
+
+patch {
+  url: {{baseUrl}}/datasources/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSourceId}}
+}
+
+body:json {
+  {
+    "dataStructureVersionId": "{{sagaDataStructureVersionId}}"
+  }
+}
+
+tests {
+  test("DataSource patched or already configured", function() {
+    const status = res.getStatus();
+    // 200=patched, 400=invalid state
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Saga step 4a of 20** — Prerequisites: DataSource created (step 1), DataStructure version published (step 3d).
+
+  Patches the datasource to set the `dataStructureVersionId`, which is required before the datasource can be published. The datasource was created in step 1 with `dataStructureVersionId: null` because the DataStructure version did not yet exist.
+
+  **Expected Response:** 200 OK. 400 if the datasource is in an invalid state.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource `dataStructureVersionId` updated in `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

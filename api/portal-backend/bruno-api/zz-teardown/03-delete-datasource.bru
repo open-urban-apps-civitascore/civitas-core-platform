@@ -1,0 +1,31 @@
+meta {
+  name: Teardown - Delete DataSource
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/datasources/{{dataSourceId}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("DataSource deleted or already gone", function() {
+    const status = res.getStatus();
+    // 204=deleted, 404=already gone, 400=not in DRAFT state
+    expect(status === 204 || status === 404 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Expected Response:** 204 No Content. 400 if the datasource is not in `DRAFT` state.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource record removed from `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

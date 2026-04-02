@@ -1,8 +1,9 @@
 # Use JRE Alpine for small image size and security
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21-jre-alpine@sha256:6ad8ed080d9be96b61438ec3ce99388e294af216ed57356000c06070e85c5d5d
 
 LABEL maintainer="CIVITAS/CORE Team"
 LABEL description="CIVITAS/CORE Portal Backend - IoT Schema Service"
+LABEL civitas=true
 
 WORKDIR /app
 
@@ -28,7 +29,7 @@ ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.securit
 
 # Health check with correct endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8089/v2/actuator/health || exit 1
+    CMD curl -f http://localhost:8089/v1/actuator/health || exit 1
 
 # Run the application
 CMD ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]

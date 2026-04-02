@@ -1,0 +1,6 @@
+# Build override: portal-backend only (built from source)
+services:
+  portal-backend:
+    build:
+      context: ../../portal-backend
+      dockerfile: Dockerfile

@@ -11,6 +11,10 @@ import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ReportingPolicy;
 
+/**
+ * MapStruct mapper for converting between {@link UserInputDTO}, {@link UserOutputDTO}, and {@link
+ * User}.
+ */
 @Mapper(
     componentModel = "spring",
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
@@ -25,7 +29,6 @@ public interface UserMapper extends DtoMapper<UserInputDTO, UserOutputDTO, User>
   @Override
   UserOutputDTO toOutput(User entity);
 
-  @Mapping(target = "groupIds", ignore = true)
   @Override
   UserInputDTO toInput(User entity);
 
@@ -36,6 +39,7 @@ public interface UserMapper extends DtoMapper<UserInputDTO, UserOutputDTO, User>
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "groups", ignore = true)
+  @Mapping(target = "externalId", ignore = true)
   @Override
   void updateEntity(@MappingTarget User entity, UserInputDTO input);
 }

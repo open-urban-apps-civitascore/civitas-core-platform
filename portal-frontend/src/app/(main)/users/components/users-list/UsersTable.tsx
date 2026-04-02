@@ -1,0 +1,83 @@
+import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
+import { useTranslations } from 'next-intl'
+
+import { DataTable } from '@/components/table/DataTable'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
+import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { TableProps } from '@/types/table'
+import { ListUser } from '@/types/users'
+import { resolveUpdater } from '@/utils/table'
+
+interface UsersTableProps extends TableProps<ListUser> {
+  users: ListUser[]
+}
+
+const UsersTable = (props: UsersTableProps) => {
+  const {
+    users,
+    rowCount,
+    pageIndex,
+    totalPages,
+    pageSize,
+    sorting,
+    rowSelection,
+    onPaginationChange,
+    onSortingChange,
+  } = props
+  const t = useTranslations('users')
+  const columnHelper = createColumnHelper<ListUser>()
+
+  const params = new URLSearchParams(window.location.search)
+
+  const columns = [
+    columnHelper.accessor('id', {
+      header: 'id',
+      cell: info => info.getValue(),
+      enableHiding: true,
+    }),
+    columnHelper.accessor('fullName', {
+      header: ({ column }) => <SortableTableHeader column={column} title={t('info.displayName')} />,
+      cell: ({ row }) => <LinkCell href={`/users/${row.id}?${params.toString()}`}>{row.original.fullName}</LinkCell>,
+      meta: {
+        truncate: true,
+        style: {
+          width: '27%',
+          minWidth: '200px',
+          color: 'var(--foreground)',
+          fontWeight: '500',
+        },
+      },
+    }),
+    columnHelper.accessor('email', {
+      header: t('info.email'),
+      cell: info => info.getValue(),
+    }),
+  ]
+
+  const table = useReactTable({
+    getRowId: row => row.id,
+    columns: columns,
+    data: users,
+    rowCount,
+    initialState: {
+      columnVisibility: {
+        id: false,
+      },
+    },
+    state: { pagination: { pageIndex, pageSize }, sorting, rowSelection },
+    manualPagination: true,
+    manualSorting: true,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    onPaginationChange: updater => {
+      onPaginationChange(resolveUpdater(updater, { pageIndex, pageSize }))
+    },
+    onSortingChange: updater => onSortingChange(resolveUpdater(updater, sorting)),
+  })
+
+  return (
+    <DataTable testId="usersTable" table={table} pageIndex={pageIndex} pageSize={pageSize} totalPages={totalPages} />
+  )
+}
+
+export default UsersTable

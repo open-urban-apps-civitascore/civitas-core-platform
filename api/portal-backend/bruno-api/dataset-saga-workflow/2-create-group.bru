@@ -1,0 +1,53 @@
+meta {
+  name: 2. Create Group
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/groups
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Saga Test Group",
+    "description": "Group for saga workflow test",
+    "contactUserId": null,
+    "parentGroupId": null,
+    "memberIds": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaGroupId', res.body.id);
+  }
+}
+
+tests {
+  test("Group created or already exists", function() {
+    const status = res.getStatus();
+    // 201=created, 409=already exists from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+}
+
+docs {
+  **Saga step 2 of 18** — Prerequisites: create supporting resources before triggering the saga.
+
+  Creates the group ("Saga Test Group") that will be assigned access to the dataset via a scoped assignment in step 6.
+
+  **Expected Response:** 201 Created, body contains `id`. 409 if the group already existed (idempotent).
+
+  **Post-condition:** Save `sagaGroupId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Group record created in `portal_backend` DB |
+  | Config Adapter | Produces `de.civitascore.idm.group.created` Kafka event; forwards creation to Keycloak |
+  | Keycloak | Group added to `civitas-core` realm |
+}

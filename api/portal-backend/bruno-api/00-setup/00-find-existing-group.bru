@@ -1,0 +1,35 @@
+meta {
+  name: Setup - Find Existing Group
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/groups?search=API Test Group
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const match = res.body.content.find(g => g.name === 'API Test Group');
+    if (match) {
+      bru.setVar('groupId', match.id);
+      bru.setVar('setupGroupId', match.id);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Purpose:** Checks whether an "API Test Group" from a previous run already exists. If found, saves the ID so the creation step (01) can be skipped and teardown targets the correct record.
+
+  **Expected Response:** 200 OK, body is a paginated list (may be empty if this is the first run).
+
+  **Post-condition:** If a match is found, saves `groupId` and `setupGroupId` from `body.content[].id`.
+}

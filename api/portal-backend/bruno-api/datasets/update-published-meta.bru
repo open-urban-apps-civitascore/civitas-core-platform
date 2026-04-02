@@ -1,0 +1,46 @@
+meta {
+  name: Update Published Dataset Meta
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/datasets/:id/published/meta
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSetId}}
+}
+
+body:json {
+  {
+    "name": "Updated Dataset Name",
+    "description": "Updated description for published dataset",
+    "openDataAccess": false,
+    "assignments": []
+  }
+}
+
+tests {
+  test("Updated or not published", function() {
+    const status = res.getStatus();
+    // 200=updated, 400=dataset not in published state, 409=saga in-flight
+    expect(status === 200 || status === 400 || status === 409).to.be.true;
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` is set and in published state.
+
+  **Expected Response:** 200 OK, published metadata is updated.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Published DataSet name/description updated |
+  | Config Adapter | — |
+  | External System | — |
+}

@@ -1,13 +1,13 @@
-import { DetailedHTMLProps, HTMLAttributes, InputHTMLAttributes } from 'react'
+import { DetailedHTMLProps, HTMLAttributes } from 'react'
 import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
+import { InputPropsWithoutForm } from '@/types/common'
 
-interface TextFieldProps<T extends FieldValues>
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, 'form' | 'onChange'> {
+interface TextFieldProps<T extends FieldValues> extends InputPropsWithoutForm {
   form: UseFormReturn<T>
   name: Path<T>
   placeholder: string
@@ -15,10 +15,22 @@ interface TextFieldProps<T extends FieldValues>
   // eslint-disable-next-line react/boolean-prop-naming
   required?: boolean
   formItemProps?: DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>
+  shouldShowErrors?: boolean
+  manualError?: string
 }
 
 export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
-  const { form, name, placeholder, label, required = false, formItemProps, disabled } = props
+  const {
+    form,
+    name,
+    placeholder,
+    label,
+    required = false,
+    formItemProps,
+    disabled,
+    shouldShowErrors = true,
+    manualError,
+  } = props
   const isMobile = useIsMobile()
   return (
     <FormField
@@ -38,13 +50,21 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
           <div>
             <FormControl>
               <Input
-                className="disabled:opacity-100 disabled:text-muted-foreground disabled:border-hidden disabled:shadow-none disabled:h-4 disabled:py-0 "
+                data-testid={`${name}TextField`}
+                data-test-element="formField"
+                className="disabled:opacity-100 disabled:text-muted-foreground disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
                 placeholder={placeholder}
                 {...field}
                 disabled={disabled}
+                aria-invalid={!!manualError || !!form.formState.errors[name]}
               />
             </FormControl>
-            <FormMessage className="mt-2" />
+            {shouldShowErrors && <FormMessage data-testid={`${name}FormMessage`} className="mt-2" />}
+            {manualError && (
+              <FormMessage data-testid={`${name}ManualFormMessage`} className="mt-2">
+                {manualError}
+              </FormMessage>
+            )}
           </div>
         </FormItem>
       )}

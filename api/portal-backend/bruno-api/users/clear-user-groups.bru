@@ -1,0 +1,31 @@
+meta {
+  name: Clear User Groups
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/users/:id/groups
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{userId}}
+}
+
+body:json {
+  []
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Precondition:** `userId` is set.
+
+  Clears all group memberships before user deletion.
+}

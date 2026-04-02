@@ -17,46 +17,60 @@ interface ConfirmButtons extends HTMLAttributes<HTMLDivElement> {
   confirmButtonType: 'button'
 }
 
-type ActionButtonsProps = (FormButtonProps | ConfirmButtons) & {
+export type ActionButtonsProps = (FormButtonProps | ConfirmButtons) & {
   onCancelClick: () => void
   isCancelButtonDisabled?: boolean
   isConfirmButtonDisabled?: boolean
   hasCard?: boolean
   confirmButtonTitle?: string
+  cancelButtonTitle?: string
+  wrapperClassname?: string
+  formId?: string
 }
 
 export const ActionButtons = (props: ActionButtonsProps) => {
   const {
     confirmButtonTitle,
+    cancelButtonTitle,
     confirmButtonType,
     onCancelClick,
     isConfirmButtonDisabled = false,
     isCancelButtonDisabled = false,
     className,
+    wrapperClassname,
     hasCard = true,
+    formId,
   } = props
   const t = useTranslations('common')
 
   const Buttons = (
     <>
-      <Button type="reset" variant="secondary" onClick={onCancelClick} disabled={isCancelButtonDisabled}>
-        {t('actions.cancel')}
+      <Button
+        data-testid="cancelButton"
+        type="reset"
+        variant="secondary"
+        onClick={onCancelClick}
+        disabled={isCancelButtonDisabled}
+      >
+        {cancelButtonTitle || t('actions.cancel')}
       </Button>
       <Button
+        data-testid="confirmButton"
         type={confirmButtonType}
         onClick={confirmButtonType === 'button' ? props.onConfirmClick : undefined}
         disabled={isConfirmButtonDisabled}
+        form={formId}
       >
         {confirmButtonTitle || t('actions.submit')}
       </Button>
     </>
   )
   return (
-    <div className={cn('flex w-full justify-end', className)}>
+    <div className={cn('flex w-full justify-end', wrapperClassname)}>
       {hasCard ? (
-        <ContentCard className="flex gap-4 p-3">{Buttons}</ContentCard>
+        <ContentCard className={cn('flex flex-row gap-2 py-3', className)}>{Buttons}</ContentCard>
       ) : (
-        <div className="flex gap-4 py-3">{Buttons}</div>
+        <div className={cn('flex gap-2 flex-row', className)}>{Buttons}</div>
       )}
     </div>
   )

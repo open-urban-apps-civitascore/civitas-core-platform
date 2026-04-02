@@ -21,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** REST controller for managing role resources. */
 @RestController
 @RequestMapping("/roles")
 @RequiredArgsConstructor
@@ -42,11 +43,29 @@ public class RoleController extends BaseController<RoleInputDTO, RoleOutputDTO, 
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "Full access")),
     @Parameter(
+        name = "roleType",
+        description = "Filter by role type (exact match, comma-separated for multiple).",
+        in = ParameterIn.QUERY,
+        schema = @Schema(type = "string", example = "SYSTEM")),
+    @Parameter(
         name = "q",
         description = "Search in name or description (partial match, case-insensitive).",
         in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "admin"))
+        schema = @Schema(type = "string", example = "admin")),
+    @Parameter(
+        name = "readonly",
+        description = "Filter by readonly flag (exact match).",
+        in = ParameterIn.QUERY,
+        schema = @Schema(type = "boolean", example = "true"))
   })
+  /**
+   * Retrieves a paginated list of roles with optional filtering by name, description, role type, or
+   * free-text search.
+   *
+   * @param spec the role search/filter specification
+   * @param pageable pagination and sorting parameters
+   * @return a page of role output DTOs with HTTP 200 status
+   */
   @Override
   public ResponseEntity<Page<RoleOutputDTO>> getAll(
       @ParameterObject @Parameter(description = "Search/filter spec") RoleSpec spec,
@@ -56,11 +75,13 @@ public class RoleController extends BaseController<RoleInputDTO, RoleOutputDTO, 
     return super.getAll(spec, pageable);
   }
 
+  /** {@inheritDoc} */
   @Override
   protected RoleService getService() {
     return roleService;
   }
 
+  /** {@inheritDoc} */
   @Override
   protected RoleAssembler getAssembler() {
     return roleAssembler;

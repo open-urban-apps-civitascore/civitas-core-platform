@@ -5,26 +5,27 @@ import lombok.Getter;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+/** Thrown when request input fails business-rule validation. */
 @Getter
 @ResponseStatus(HttpStatus.BAD_REQUEST)
 public class InvalidInputException extends RuntimeException {
 
   private final String resourceType;
   private final UUID resourceId;
-  private final String ressourceInfo;
+  private final String resourceInfo;
 
   public InvalidInputException(String resourceType, UUID resourceId, String message) {
     super(message);
     this.resourceType = resourceType;
     this.resourceId = resourceId;
-    this.ressourceInfo = null;
+    this.resourceInfo = null;
   }
 
-  public InvalidInputException(String resourceType, String ressourceInfo, String message) {
+  public InvalidInputException(String resourceType, String resourceInfo, String message) {
     super(message);
     this.resourceType = resourceType;
     this.resourceId = null;
-    this.ressourceInfo = ressourceInfo;
+    this.resourceInfo = resourceInfo;
   }
 
   @Override
@@ -34,7 +35,7 @@ public class InvalidInputException extends RuntimeException {
         + resourceType
         + '\''
         + (resourceId != null ? ", resourceId='" + resourceId + '\'' : "")
-        + (ressourceInfo != null ? ", ressourceInfo='" + ressourceInfo + '\'' : "")
+        + (resourceInfo != null ? ", resourceInfo='" + resourceInfo + '\'' : "")
         + ", message='"
         + getMessage()
         + '\''

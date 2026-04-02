@@ -1,0 +1,39 @@
+meta {
+  name: Setup - Find Existing DataSet
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/datasets?search=API Test DataSet
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const match = res.body.content.find(d => d.name === 'API Test DataSet');
+    if (match) {
+      bru.setVar('dataSetId', match.id);
+      bru.setVar('setupDataSetId', match.id);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Purpose:** Checks whether an "API Test DataSet" from a previous run already exists. If found, saves the ID so the creation step (05) can be skipped and teardown targets the correct record.
+
+  **Expected Response:** 200 OK, body is a paginated list (may be empty if this is the first run).
+
+  **Post-condition:** If a match is found, saves `dataSetId` and `setupDataSetId` from `body.content[].id`.
+}

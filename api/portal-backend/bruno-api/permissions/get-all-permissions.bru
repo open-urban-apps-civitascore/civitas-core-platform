@@ -1,0 +1,37 @@
+meta {
+  name: Get All Permissions
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/permissions
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~name: read
+  ~description: Allows read access
+  ~q: read
+  ~permissionType: SYSTEM
+  ~category: TENANT_ADMINISTRATION
+  ~source: INTERNAL
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns array of permissions", function() {
+    expect(res.body).to.be.an('array');
+  });
+}
+
+docs {
+  **Expected Response**
+  - Status: `200 OK`
+  - Body is an array of permission objects (not paginated)
+
+  **Post-condition:** If the array is non-empty, save the first `id` as `permissionId`.
+}

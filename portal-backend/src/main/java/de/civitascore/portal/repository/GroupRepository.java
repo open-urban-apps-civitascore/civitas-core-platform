@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/** Spring Data JPA repository for {@link Group} entities. */
 @Repository
 public interface GroupRepository extends NamedEntityRepository<Group, UUID> {
 
@@ -17,7 +18,7 @@ public interface GroupRepository extends NamedEntityRepository<Group, UUID> {
    * @param id the group ID
    * @return the group with eagerly fetched contactUser and parentGroup
    */
-  @EntityGraph(attributePaths = {"contactUser", "parentGroup"})
+  @EntityGraph(attributePaths = {"contactUser", "parentGroup", "assignments", "assignments.role"})
   @Query("SELECT g FROM Group g WHERE g.id = :id")
   Optional<Group> findByIdWithRelations(@Param("id") UUID id);
 }

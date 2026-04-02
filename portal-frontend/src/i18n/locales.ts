@@ -1,3 +1,5 @@
+import { de, enUS, Locale as DateFnsLocale } from 'date-fns/locale'
+
 export const LOCALES = [
   {
     name: 'german',
@@ -9,4 +11,9 @@ export const LOCALES = [
   },
 ] as const
 
-export type Locale = (typeof LOCALES)[number]['key']
+export type AppLocale = (typeof LOCALES)[number]['key']
+
+export const DATE_LOCALES: Record<AppLocale, DateFnsLocale> = {
+  de: de,
+  en: enUS,
+}

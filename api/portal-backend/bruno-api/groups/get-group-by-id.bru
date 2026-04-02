@@ -1,0 +1,44 @@
+meta {
+  name: Get Group by ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/groups/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{groupId}}
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    const assignments = (res.body.assignments || []).map(a => ({
+      groupId: a.group.id,
+      roleId: a.role.id,
+      scopeType: a.scopeType || null,
+      scopeId: a.scope?.id || null,
+    }));
+    bru.setVar('groupAssignments', JSON.stringify(assignments));
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Has correct id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+}
+
+docs {
+  **Precondition:** `groupId` is set.
+
+  **Expected Response:** 200 OK, body contains group with matching `id`.
+
+  **Post-condition:** Save `groupAssignments` from `body.assignments`.
+}

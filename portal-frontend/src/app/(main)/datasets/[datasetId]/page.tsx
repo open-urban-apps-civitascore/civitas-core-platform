@@ -1,25 +1,7 @@
-import { DatasetFormData, DatasetResponse } from '@/types/datasets'
-import { DataSpace } from '@/types/dataspaces'
+import { getDataset, getDatasetAssignments } from '@/app/services/api/datasets/serverRequests'
 
-import { DatasetOverview } from '../components/DatasetOverview'
+import { DatasetOverview } from './overview/components/DatasetOverview'
 
-const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
-
-export const transformDatasetToFormData = (dataset: DatasetResponse): DatasetFormData | null => {
-  try {
-    const data = {
-      id: dataset.id,
-      name: dataset.name,
-      dataspace: dataset.dataspace?.id || '',
-      description: dataset.description,
-      tags: dataset.tags,
-    }
-    return data
-  } catch (error) {
-    console.error(dataset, error)
-    return null
-  }
-}
 interface DatasetPageProps {
   params: Promise<{ datasetId: string }>
 }
@@ -27,39 +9,21 @@ interface DatasetPageProps {
 const DatasetPage = async (props: DatasetPageProps) => {
   const { params } = props
   const { datasetId } = await params
-  const getData = async () => {
-    try {
-      const [datasetResponse, dataspacesResponse] = await Promise.all([
-        fetch(`${URL}/datasets/${datasetId}`, {
-          cache: 'no-store',
-        }),
-        fetch(`${URL}/dataspaces`, {
-          cache: 'no-store',
-        }),
-      ])
-      if (!datasetResponse.ok || !dataspacesResponse.ok) {
-        throw new Error('An error occurred while loading data')
-      }
-      const datasetData: DatasetResponse = await datasetResponse.json()
-      const dataspacesData: DataSpace[] = await dataspacesResponse.json()
-      return {
-        dataset: {
-          id: datasetData.id,
-          name: datasetData.name,
-          dataspace: datasetData.dataspace?.id || '',
-          description: datasetData.description,
-          tags: datasetData.tags,
-        },
-        dataspaces: dataspacesData.map(dataspace => ({ value: dataspace.id, label: dataspace.name })),
-      }
-    } catch (error) {
-      throw new Error(`An error occurred while loading data: ${error}`)
-    }
+
+  const { data: dataset } = await getDataset(datasetId)
+
+  const { data: datasetAssignments } = await getDatasetAssignments(datasetId)
+
+  const getUniqueValuesCount = (entity: 'group' | 'role') => {
+    const uniqueGroups = new Set(datasetAssignments.map(a => a[entity]?.id))
+
+    return uniqueGroups.size
   }
 
-  const { dataset, dataspaces } = await getData()
+  const roleCount = getUniqueValuesCount('role')
+  const groupCount = getUniqueValuesCount('group')
 
-  return <DatasetOverview dataset={dataset} dataspaces={dataspaces} isEditMode={true} />
+  return <DatasetOverview testId="datasetPage" dataset={dataset} groupCount={groupCount} roleCount={roleCount} />
 }
 
 export default DatasetPage

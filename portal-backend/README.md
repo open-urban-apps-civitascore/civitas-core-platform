@@ -1,154 +1,247 @@
 # CIVITAS CORE Portal Backend
 
-Spring Boot REST API with OAuth2/Keycloak integration.
+Spring Boot REST API with OAuth2/Keycloak integration, PostgreSQL database, and Kafka event streaming.
+
+Depends on [portal-model](../portal-model/) (shared JPA entities) and [config-adapter](../config-adapter/) (event model and adapters).
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Java 21, Maven 3.6+, Docker & Docker Compose
+
+* Java 21, Maven 3.6+, Docker & Docker Compose
 
 ### 1. Start Infrastructure
 
-> **Recommended:**  
-> For a consistent and tested local development setup, use the Docker configurations in the `dev-environment` directory.
+> **Recommended:**
+> For a consistent and tested local development setup, use the centralized Docker Compose in `dev-environment/backend/`.
 
-Start Postgres:
+**Option A: Automated startup**
+
+Builds Portal Backend + Config Adapter and starts all required services.
+
 ```bash
-cd civitas-core-platform/dev-environment/postgres
-docker-compose docker-compose.yml up -d
+cd ../dev-environment/backend
+./start.sh
 ```
 
-It's also necessary to start Keycloak from the 'dev-environment/keycloak' folder:
+Alternatively, if you only want to start the services defined in Docker Compose **without building**, you can run:
+
 ```bash
-cd /civitias-core-platform/dev-environment/keycloak
-docker-compose docker-compose.yml up -d
+docker compose up --build -d
 ```
 
-### 2. Run Application
+
+**Option B: Manual startup**
+
+
+This option is useful if you want to **run the Portal Backend locally** for development.
+
 ```bash
-mvn spring-boot:run -Dspring-boot.run.profiles=local
+cd ../dev-environment/backend
+docker compose up -d postgres-portal postgres-keycloak keycloak kafka config-adapter apisix
 ```
 
-**Access Points:**
-- API: http://localhost:8089/v2
-- Swagger: http://localhost:8089/v2/swagger-ui.html
-- Keycloak: http://localhost:8080
+Only infrastructure services are started. The Portal Backend container is **not started** in this mode.
+
+
+### 2. Run Application (local without Docker)
+
+Once the infrastructure is running, you can start the backend on your local machine:
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres
+```
+
+### Access Points
+
+* API: [http://localhost:8089/v1](http://localhost:8089/v1)
+* Swagger: [http://localhost:8089/v1/swagger-ui.html](http://localhost:8089/v1/swagger-ui.html)
+* Keycloak: [http://localhost:8080](http://localhost:8080)
+* Kafka UI: [http://localhost:8090](http://localhost:8090)
+* Config Adapter: [http://localhost:8088/health/ready](http://localhost:8088/health/ready)
+
+---
 
 ## 🔧 Configuration
 
 ### Local Services
-| Service | URL               | Port | 
-|---------|-------------------|------|
-| Backend API | localhost:8089/v2 | 8089 | 
-| Keycloak | localhost:8080    | 8080 | 
-| App Database | localhost:5432    | 5432 | 
+
+| Service           | URL / Host        | Port | Credentials       |
+| ----------------- | ----------------- | ---- | ----------------- |
+| Backend API       | localhost:8089/v1 | 8089 | –                 |
+| Config Adapter    | localhost         | 8088 | –                 |
+| Keycloak          | localhost         | 8080 | admin/admin       |
+| App Database      | localhost         | 5432 | admin/admin       |
+| Keycloak Database | localhost         | 5433 | keycloak/keycloak |
+| Kafka             | localhost         | 9092 | –                 |
+| Kafka UI          | localhost         | 8090 | –                 |
 
 ### Key Configuration
+
 ```yaml
-# application-local.yml
+# application.yaml
 server:
   port: 8089
+  servlet:
+    context-path: /v1
+
+# application-local.yaml
+keycloak:
+  realm: civitas-core
+  auth-server-url: http://localhost:8080
+
+# application-postgres.yaml
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/portal_backend
     username: admin
     password: admin
-keycloak:
-  realm: civitas-core
-  auth-server-url: http://localhost:8080
 ```
 
-### Project Structure
+### Spring Profiles
+
+* **local** – local development
+* **init** – on startup, creates the groups and users defined in the `init.*` config properties and syncs them to Keycloak. Local defaults are in `application-local.yaml`.
+* **postgres** – PostgreSQL datasource
+* **docker** – Docker Compose environment (uses container hostnames for Kafka, Keycloak)
+* **debug** – extended logging
+
+---
+
+## 🏗️ Project Structure
+
 ```
 portal-backend/
 ├── src/
-│   ├── main/java/          # Application source
-│   ├── test/java/          # Unit tests
-│   └── testIntegration/    # Integration tests
-├── docker/local/keycloak/
-│   ├── docker-compose-local.yml
-│   └── realms/
-│       └── iot-realm.json  # Keycloak realm import
-├── .gitlab-ci.yml          # CI/CD pipeline
-└── pom.xml                 # Maven configuration
+│   ├── main/java/              # Application source
+│   ├── main/resources/
+│   │   ├── application.yaml
+│   │   ├── application-local.yaml
+│   │   ├── application-postgres.yaml
+│   │   ├── application-docker.yaml
+│   │   └── application-debug.yaml
+│   ├── test/java/              # Unit tests
+│   └── testIntegration/        # Integration tests
+├── Dockerfile                  # Backend container
+└── pom.xml                     # Maven configuration
+
 ```
+
+---
 
 ## 🧪 Testing & Development
 
 ### Essential Commands
+
 ```bash
 # Development
-mvn spring-boot:run -Dspring-boot.run.profiles=local
+mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres
 
 # Testing
 mvn test                    # Unit tests
-mvn verify                  # Full test suite
+mvn verify                  # Full test suite (incl. Testcontainers)
+
+# Formatting
 mvn spotless:apply          # Format code
 mvn spotless:check          # Check formatting
-
-# Infrastructure
-docker-compose -f docker-compose-postgres.yml up -d     # Start
-docker-compose -f docker-compose-postgres.yml down      # Stop
 ```
 
-### CI/CD Pipeline
-- **Validate**: Code formatting (Spotless) + compilation
-- **Test**: Unit tests + Integration tests (Testcontainers) + Coverage merge
-- **Build**: JAR packaging
+### Docker Infrastructure
+
+```bash
+# Start all services
+cd ../dev-environment/backend
+docker compose up -d
+
+# Stop all services
+docker compose down
+
+# Reset environment
+docker compose down -v
+```
+
+---
 
 ## 🔒 Authentication
 
 ### Keycloak Setup
 
-The `civitas-core` realm is automatically imported from `/civitias-core-platform/dev-environment/keycloak/realm-export.json` when starting the infrastructure.
+* **Realm:** `civitas-core`
+* Automatically imported from
+  `../dev-environment/keycloak/realm-export.json`
+* Admin Console: [http://localhost:8080/admin](http://localhost:8080/admin) (admin/admin)
 
 ### Getting JWT Tokens
+
 ```bash
-curl -X POST http://localhost:8080/realms/iot/protocol/openid-connect/token \
+curl -X POST http://localhost:8080/realms/civitas-core/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=password&client_id=your-client&username=user&password=pass"
 ```
 
 ### Using Tokens
+
 ```bash
 curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-     http://localhost:8089/v2/api/your-endpoint
+     http://localhost:8089/v1/api/your-endpoint
 ```
+
+---
+
+## 📡 Kafka Integration
+
+* Portal Backend publishes and consumes events via Kafka
+* Kafka UI available at: [http://localhost:8090](http://localhost:8090)
+
+---
+
+## 🚢 Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for all environment variables, Spring profiles, and docker-compose examples for production deployment.
+
+---
 
 ## 🏗️ Technology Stack
 
-- **Java 21** + Spring Boot 3.5.5
-- **PostgreSQL** with JPA/Hibernate
-- **OAuth2** Resource Server (Keycloak)
-- **OpenAPI 3** + Swagger UI
-- **Testcontainers** for integration testing
-- **Maven** with Spotless, JaCoCo, Surefire/Failsafe
+* **Java 21** + Spring Boot 3.5
+* **PostgreSQL** with JPA/Hibernate
+* **Keycloak** (OAuth2 / OIDC)
+* **Kafka** for event streaming
+* **OpenAPI 3** + Swagger UI
+* **Testcontainers** for integration testing
+* **Maven** with Spotless, JaCoCo, Surefire/Failsafe
+
+---
 
 ## 📚 API Documentation
 
-- **Swagger UI**: http://localhost:8089/v2/swagger-ui.html
-- **OpenAPI Spec**: http://localhost:8089/v2/api-docs
-- **Health Check**: http://localhost:8089/v2/actuator/health
-- **Metrics**: http://localhost:8089/v2/actuator/prometheus
+* **Swagger UI:** [http://localhost:8089/v1/swagger-ui.html](http://localhost:8089/v1/swagger-ui.html)
+* **OpenAPI Spec:** [http://localhost:8089/v1/v3/api-docs](http://localhost:8089/v1/v3/api-docs)
+* **Health Check:** [http://localhost:8089/v1/actuator/health](http://localhost:8089/v1/actuator/health)
+
+---
 
 ## 🔧 Troubleshooting
 
-### Common Issues
+### Common Checks
+
 ```bash
 # Check ports
-lsof -i :8089 :8080 :5432 
+lsof -i :8089 :8088 :8080 :5432 :9092
 
-# Test database
-docker-compose exec postgres-portal psql -U admin -d portal_backend -c "\dt"
+# Database access
+cd ../dev-environment/backend
+docker compose exec postgres-portal psql -U admin -d portal_backend -c "\dt"
 
-# Reset environment
-docker-compose -f docker-compose.yml down -v && docker volume prune
+# Logs
+docker compose logs -f portal-backend
 ```
 
 ### Development Workflow
-1. Start infrastructure: `docker-compose -f docker-compose.yml up -d`
-2. Run application: `mvn spring-boot:run -Dspring-boot.run.profiles=local`
+
+1. Start infrastructure: `cd ../dev-environment/backend && docker compose up -d`
+2. Run application: `mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres`
 3. Make changes
-4. Test: `mvn test` (quick) or `mvn verify` (full)
+4. Test: `mvn test` or `mvn verify`
 5. Format: `mvn spotless:apply`
 6. Commit & push

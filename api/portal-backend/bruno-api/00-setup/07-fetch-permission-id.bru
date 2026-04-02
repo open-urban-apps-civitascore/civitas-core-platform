@@ -1,0 +1,32 @@
+meta {
+  name: Setup - Fetch Permission ID
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/permissions
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  // Permissions endpoint returns a flat array, not paginated
+  if (res.body && Array.isArray(res.body) && res.body.length > 0) {
+    bru.setVar('permissionId', res.body[0].id);
+  }
+}
+
+tests {
+  test("Permissions fetched", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Purpose:** Fetches the list of all available permissions and saves the first one as `permissionId`. This ID can then be used to assign permissions to roles in subsequent test steps.
+
+  **Expected Response:** 200 OK, body is a flat array of permission objects (not paginated).
+
+  **Post-condition:** Save `permissionId` from `body[0].id`.
+}

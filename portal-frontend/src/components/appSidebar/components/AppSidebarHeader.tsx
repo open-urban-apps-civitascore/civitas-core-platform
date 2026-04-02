@@ -1,54 +1,29 @@
-import { DropdownMenu, DropdownMenuContent } from '@radix-ui/react-dropdown-menu'
-import { ChevronsUpDown } from 'lucide-react'
-import React from 'react'
+import Image from 'next/image'
 
-import { DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
 
-import { OrganizationInfo } from './OrganizationInfo'
-
-interface AppSidebarHeaderProps {
-  currentOrganization: { organizationName: string; tenant: string }
-  organizations: { organizationName: string; tenant: string }[]
-}
-
-export const AppSidebarHeader = (props: AppSidebarHeaderProps) => {
-  const { currentOrganization, organizations } = props
+export const AppSidebarHeader = () => {
+  const tenantName = process.env.NEXT_PUBLIC_TENANT_NAME ?? 'Mandanten-Name'
 
   return (
     <SidebarHeader>
       <SidebarMenu>
         <SidebarMenuItem>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <SidebarMenuButton
-                size="lg"
-                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-              >
-                <OrganizationInfo
-                  organizationName={currentOrganization?.organizationName}
-                  tenant={currentOrganization?.tenant}
-                />
-                <ChevronsUpDown className="ml-auto size-4" />
-              </SidebarMenuButton>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent
-              className="w-(--radix-dropdown-menu-trigger-width) min-w-56 bg-white z-10 rounded-lg"
-              align="end"
-              sideOffset={4}
-            >
-              {organizations.map(({ organizationName, tenant }) => (
-                <React.Fragment key={organizationName}>
-                  <DropdownMenuItem asChild>
-                    <OrganizationInfo organizationName={organizationName} tenant={tenant} />
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-                </React.Fragment>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <SidebarMenuButton size="lg" className="pointer-events-none">
+            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-[#036aa1]">
+              <Image
+                src="/images/only_logo_civitas.svg"
+                alt="CIVITAS/CORE Logo"
+                width={20}
+                height={20}
+                className="brightness-0 invert"
+              />
+            </div>
+            <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+              <span className="truncate font-semibold">{tenantName}</span>
+              <span className="truncate text-xs text-muted-foreground">CIVITAS/CORE</span>
+            </div>
+          </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
     </SidebarHeader>

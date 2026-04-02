@@ -1,0 +1,56 @@
+# APISIX Gateway (Traditional Mode with etcd)
+#
+# Gateway-only compose file. AuthZ services (OPA, AuthZ Repository)
+# are in docker-compose.authz.yml and started separately.
+#
+# Traditional mode enables the Admin API so the config-adapter can
+# dynamically create/delete routes during dataset saga orchestration.
+# Static routes (portal-backend /v1/*) are seeded via seed-routes.sh.
+
+services:
+  # etcd - configuration store for APISIX traditional mode
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.16
+    container_name: civitas-etcd
+    restart: always
+    environment:
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_DATA_DIR=/etcd-data
+    volumes:
+      - etcd_data:/etcd-data
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # APISIX - API Gateway with Admin API + JWT validation + OPA authorization
+  apisix:
+    image: apache/apisix:3.14.0-debian
+    container_name: civitas-apisix
+    restart: always
+    volumes:
+      - ./apisix_conf/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+    ports:
+      - "9080:9080"
+      - "9180:9180"
+      - "9443:9443"
+    extra_hosts:
+      - "portal-backend:host-gateway"
+    depends_on:
+      etcd:
+        condition: service_healthy
+    networks:
+      - civitas-network
+
+volumes:
+  etcd_data:
+
+networks:
+  civitas-network:
+    name: civitas-network
+    external: true

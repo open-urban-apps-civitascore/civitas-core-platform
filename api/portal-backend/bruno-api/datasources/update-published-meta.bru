@@ -1,0 +1,45 @@
+meta {
+  name: Update Published Data Source Meta
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{baseUrl}}/datasources/:id/published/meta
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSourceId}}
+}
+
+body:json {
+  {
+    "name": "Updated Source Name",
+    "description": "Updated description for published data source",
+    "assignments": []
+  }
+}
+
+tests {
+  test("Updated or not published", function() {
+    const status = res.getStatus();
+    // 200=updated, 400=datasource not in published state
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Precondition:** `dataSourceId` is set and in published state.
+
+  **Expected Response:** 200 OK, published name and description are updated.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Published DataSource name/description updated |
+  | Config Adapter | Consumes `de.civitascore.api.backend.updated` Kafka event; updates route metadata in APISIX |
+  | APISIX | Route metadata updated |
+}

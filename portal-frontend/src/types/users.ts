@@ -1,0 +1,72 @@
+import { parsePhoneNumberFromString } from 'libphonenumber-js'
+import { z } from 'zod'
+
+import { GroupSummarySchema, Item, WithId } from './common'
+
+export type UserTab = 'userData' | 'roles' | 'groups'
+
+export type Contact = {
+  id: string
+  displayName: string
+  email: string
+}
+
+export type UserGroup = Item
+
+export const TitleSchema = z.enum(['MR', 'MS', 'OTHER'])
+
+export type TitleType = z.infer<typeof TitleSchema>
+
+export const PhoneSchema = z
+  .string()
+  .transform(value => value?.trim())
+  .transform(value => (value === '' ? undefined : value))
+  .refine(value => !value || /^[0-9+()\s-]+$/.test(value), { message: 'common.errors.invalidPhone' })
+  .superRefine((value, ctx) => {
+    if (!value) return
+
+    const phoneNumber = parsePhoneNumberFromString(value, 'DE')
+    if (!phoneNumber || !phoneNumber.isValid()) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'common.errors.invalidPhone',
+      })
+    }
+  })
+
+export const UserApiSchema = z.object({
+  id: z.string(),
+  title: TitleSchema,
+  firstName: z.string().trim().min(2, {
+    message: 'common.errors.atLeast2',
+  }),
+  lastName: z.string().trim().min(2, {
+    message: 'common.errors.atLeast2',
+  }),
+  email: z.string().trim().email({
+    message: 'common.errors.invalidEmail',
+  }),
+  phone: PhoneSchema.nullable(),
+  active: z.boolean(),
+  groups: z.array(GroupSummarySchema).nullable(),
+})
+
+export type User = z.infer<typeof UserApiSchema>
+
+export type ListUser = {
+  id: string
+  fullName: string
+  email: string
+}
+
+export const UserFormSchema = UserApiSchema.omit({
+  groups: true,
+}).extend({
+  phone: PhoneSchema.optional(),
+  groupIds: z.array(z.string()),
+})
+
+export type UserFormData = z.infer<typeof UserFormSchema>
+
+export type CreateUserData = Omit<User, 'id' | 'groups'>
+export type UpdateUserData = Partial<CreateUserData> & WithId

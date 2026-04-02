@@ -1,0 +1,65 @@
+meta {
+  name: 3b. Create DataStructure
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/datastructures
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Saga Sensor Data Structure",
+    "description": "Data structure for saga workflow sensor readings",
+    "createdFromDataSource": false,
+    "dataStructureVersionIds": [],
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaDataStructureId', res.body.id);
+  }
+}
+
+tests {
+  test("DataStructure created or already exists", function() {
+    const status = res.getStatus();
+    // 201=created, 409=already exists from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+
+  test("Has id", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.id).to.be.a('string');
+    }
+  });
+
+  test("Has dataStructureStatus", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.dataStructureStatus).to.be.a('string');
+    }
+  });
+}
+
+docs {
+  **Saga step 3b of 18** — Prerequisites: datasource (step 1), group (step 2), role (step 3).
+
+  Creates the DataStructure "Saga Sensor Data Structure" that defines the schema for sensor readings. The DataStructure must be published (steps 3d/3e) before it can be referenced by a dataset.
+
+  **Expected Response:** 201 Created, body contains `id`. 409 if the DataStructure already exists (idempotent).
+
+  **Post-condition:** Save `sagaDataStructureId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataStructure record created in `portal_backend` DB with status `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}

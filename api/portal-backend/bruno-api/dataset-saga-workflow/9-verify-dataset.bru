@@ -1,0 +1,48 @@
+meta {
+  name: 9. Verify DataSet (after saga)
+  type: http
+  seq: 22
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSetId}}
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.publicUrl) {
+    bru.setVar('sagaPublicUrl', res.body.publicUrl);
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Status is AVAILABLE or READY", function() {
+    const s = res.body.dataSetStatus;
+    expect(s === 'AVAILABLE' || s === 'READY').to.be.true;
+  });
+
+  test("Saga completed or still pending", function() {
+    // Saga may not have finished yet in fast runs
+    const pst = res.body.pendingSagaType;
+    expect(pst === null || pst === 'CREATE').to.be.true;
+  });
+}
+
+docs {
+  **Saga step 9 of 18** — Poll dataset status after releasing.
+
+  Fetches the dataset to verify the DATASET_CREATE saga has completed. The saga runs asynchronously so the dataset may still show `pendingSagaType=CREATE` if polled immediately. Once the saga finishes, `pendingSagaType` becomes `null` and `publicUrl` is populated.
+
+  **Expected Response:** 200 OK. `dataSetStatus` is `AVAILABLE` (saga complete) or `READY` (saga failed with compensation). `pendingSagaType` is `null` (done) or `CREATE` (still running).
+
+  **Post-condition:** If saga completed, saves `sagaPublicUrl` from `body.publicUrl` for downstream gateway verification (step 9d).
+}

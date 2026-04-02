@@ -1,0 +1,30 @@
+meta {
+  name: Get Data Source Assignments
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/datasources/:id/assignments
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSourceId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns assignment list", function() {
+    expect(res.body).to.be.an('array');
+  });
+}
+
+docs {
+  **Precondition:** `dataSourceId` is set.
+
+  **Expected Response:** 200 OK, body is a list of assignments for this data source
+}

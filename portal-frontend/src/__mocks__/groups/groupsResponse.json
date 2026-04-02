@@ -1,0 +1,25 @@
+[
+  {
+    "id": "1",
+    "name": "Group 1",
+    "description": "description for Group 1",
+    "roles": null,
+    "members": [
+      { "id": "user1", "name": "User 1" },
+      { "id": "user2", "name": "User 2" }
+    ],
+    "contactUser": { "id": "c1", "name": "Contact 1" },
+    "createdAt": "",
+    "modifiedAt": ""
+  },
+  {
+    "id": "2",
+    "name": "Group 2",
+    "description": "description for Group 2",
+    "roles": null,
+    "members": null,
+    "contactUser": { "id": "c2", "name": "Contact 2" },
+    "createdAt": "",
+    "modifiedAt": ""
+  }
+]

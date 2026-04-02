@@ -1,104 +1,136 @@
 'use client'
 
+import { PaginationState, SortingState } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 
+import { useGetAssignments } from '@/app/services/api/assignments/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
-import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
-import { Group } from '@/types/groups'
-import { BaseRole, ROLE_TYPES, UserRolesTableData } from '@/types/roles'
+import { PageBackground } from '@/components/page-background/PageBackground'
+import { SearchHeader } from '@/components/search-area/SearchArea'
+import { SegmentedControlBar, Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
+import { TableContainer } from '@/components/table-container/TableContainer'
+import { AlertBox } from '@/components/text-box/TextBox'
 
-import { RoleCategory } from './RoleCategory'
+import { RolesAssignmentTable } from './RolesAssignmentTable'
 
-interface RolesTabProps {
-  groupIds: string[]
+type ScopeSegment = 'platformWide' | 'dataset' | 'datasource' | 'datastructure'
+
+const SCOPE_SEGMENT_PARAMS: Record<ScopeSegment, string[][]> = {
+  platformWide: [
+    ['scopeType', 'TENANT'],
+    ['roleType', 'SYSTEM'],
+  ],
+  dataset: [['scopeType', 'DATASET']],
+  datasource: [['scopeType', 'DATASOURCE']],
+  datastructure: [['scopeType', 'DATASTRUCTURE']],
 }
 
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+interface RolesTabProps {
+  userId: string
+  isReadOnly?: boolean
+}
 
 export const RolesTab = (props: RolesTabProps) => {
-  const { groupIds } = props
-  const t = useTranslations('users')
-  const tRoles = useTranslations('roles')
-  const [roles, setRoles] = useState<UserRolesTableData[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { userId, isReadOnly = true } = props
+  const t = useTranslations()
 
-  const mapRolesData = (roles: BaseRole[], groupData: Group[]) => {
-    const allRoles = groupData.flatMap(group =>
-      group.roles.flatMap(groupRole => {
-        const currentRole = roles.find(role => role.id === groupRole)
-        if (!currentRole) return []
-        return {
-          id: currentRole.id,
-          name: currentRole.name,
-          inherited: false,
-          group: group?.title || null,
-          dataspace: group?.dataspace || null,
-          type: currentRole.type,
-        }
-      }),
-    )
-    return allRoles
+  const [activeSegment, setActiveSegment] = useState<ScopeSegment>('platformWide')
+  const [searchString, setSearchString] = useState('')
+  const [pageIndex, setPageIndex] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'role.name', desc: false }])
+
+  const segments: Tab<ScopeSegment>[] = [
+    { value: 'platformWide', label: 'users.rolesTab.segments.platformWide' },
+    { value: 'dataset', label: 'users.rolesTab.segments.datasets' },
+    { value: 'datasource', label: 'users.rolesTab.segments.datasources' },
+    { value: 'datastructure', label: 'users.rolesTab.segments.datastructures' },
+  ]
+
+  const requestParams = useMemo(() => {
+    const params = new URLSearchParams(SCOPE_SEGMENT_PARAMS[activeSegment])
+    params.set('userId', userId)
+    params.set('page', String(pageIndex))
+    params.set('size', String(pageSize))
+    if (searchString) {
+      params.set('q', searchString)
+    }
+    if (sorting.length > 0) {
+      params.set('sort', `${sorting[0].id},${sorting[0].desc ? 'desc' : 'asc'}`)
+    }
+    return params
+  }, [activeSegment, userId, pageIndex, pageSize, searchString, sorting])
+
+  const {
+    data: assignmentsData,
+    isFetching: isLoading,
+    error,
+  } = useGetAssignments({
+    params: requestParams,
+    isEnabled: !!userId,
+  })
+
+  const assignments = assignmentsData?.data ?? []
+  const rowCount = assignmentsData?.totalElements ?? 0
+  const totalPages = Math.ceil(rowCount / pageSize) || 1
+
+  const getScopedInfoBannerText = (): string | null => {
+    if (activeSegment === 'dataset') return t('users.rolesTab.scopedInfoBanner.dataset')
+    if (activeSegment === 'datasource') return t('users.rolesTab.scopedInfoBanner.datasource')
+    if (activeSegment === 'datastructure') return t('users.rolesTab.scopedInfoBanner.datastructure')
+    return null
   }
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const groupIdParams = groupIds.map(id => `id=${id}`).join('&')
-        const groupsResponse = await fetch(`${URL}/groups?${groupIdParams}`)
+  const infoBannerText = getScopedInfoBannerText()
 
-        if (!groupsResponse.ok) {
-          throw new Error('Failed to fetch data')
-        }
+  const handleSegmentChange = (segment: ScopeSegment) => {
+    setActiveSegment(segment)
+    setPageIndex(0)
+    setSearchString('')
+  }
 
-        const groupsData: Group[] = await groupsResponse.json()
-
-        const roleIds = new Set(groupsData.flatMap(group => group.roles))
-        if (roleIds.size > 0) {
-          const roleIdParams = [...roleIds].map(role => `id=${role}`).join('&')
-          const rolesResponse = await fetch(`${URL}/roles?${roleIdParams}`)
-          if (!rolesResponse.ok) {
-            throw new Error('Failed to fetch data')
-          }
-          const rolesData = mapRolesData(await rolesResponse.json(), groupsData)
-          setRoles(rolesData)
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    if (groupIds.length > 0) fetchData()
-    else setIsLoading(false)
-  }, [groupIds])
+  const handlePagination = (newPagination: PaginationState) => {
+    setPageIndex(newPagination.pageIndex)
+    setPageSize(newPagination.pageSize)
+  }
 
   return (
-    <ContentCard>
-      <DetailsFieldContainer isTitleField>
-        <h2>{t('roles.title')}</h2>
-      </DetailsFieldContainer>
-      <RoleCategory
-        title={tRoles('systemRoles')}
-        rolesType={ROLE_TYPES.SYSTEM}
-        roles={roles.filter(role => role.type === ROLE_TYPES.SYSTEM)}
-        isLoading={isLoading}
-      />
-
-      <RoleCategory
-        title={tRoles('dataRoles')}
-        rolesType={ROLE_TYPES.DATA}
-        roles={roles.filter(role => role.type === ROLE_TYPES.DATA)}
-        isLoading={isLoading}
-      />
-
-      <RoleCategory
-        title={tRoles('governanceRoles')}
-        rolesType={ROLE_TYPES.GOVERNANCE}
-        roles={roles.filter(role => role.type === ROLE_TYPES.GOVERNANCE)}
-        isLoading={isLoading}
-        className="border-b-0"
-      />
-    </ContentCard>
+    <PageBackground hasBackground={!isReadOnly}>
+      {error ? (
+        <ContentCard className="h-50">
+          <p className="h-full flex items-center justify-center">{t('common.errors.loadingError')}</p>
+        </ContentCard>
+      ) : (
+        <>
+          <SearchHeader
+            searchString={searchString}
+            onChangeSearchString={value => {
+              setSearchString(value)
+              setPageIndex(0)
+            }}
+            className="my-2"
+          />
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <SegmentedControlBar tabs={segments} selectedTab={activeSegment} onTabChange={handleSegmentChange} />
+            {infoBannerText && <AlertBox text={infoBannerText} />}
+          </div>
+          <TableContainer shouldRespectSearchHeight shouldRespectSegmentedControlBar>
+            <RolesAssignmentTable
+              assignments={assignments}
+              rowCount={rowCount}
+              pageIndex={pageIndex}
+              pageSize={pageSize}
+              sorting={sorting}
+              totalPages={totalPages}
+              isLoading={isLoading}
+              isPlatformWide={activeSegment === 'platformWide'}
+              onPaginationChange={handlePagination}
+              onSortingChange={setSorting}
+            />
+          </TableContainer>
+        </>
+      )}
+    </PageBackground>
   )
 }

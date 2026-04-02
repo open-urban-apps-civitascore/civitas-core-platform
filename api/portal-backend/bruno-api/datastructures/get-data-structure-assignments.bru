@@ -1,0 +1,30 @@
+meta {
+  name: Get Data Structure Assignments
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/datastructures/:id/assignments
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataStructureId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns assignment list", function() {
+    expect(res.body).to.be.an('array');
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` is set.
+
+  **Expected Response:** 200 OK, body contains the list of assignments for the data structure
+}

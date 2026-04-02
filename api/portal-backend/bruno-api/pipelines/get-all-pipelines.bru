@@ -1,0 +1,39 @@
+meta {
+  name: Get All Pipelines
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+  ~sort: createdAt,DESC
+  ~name: traffic-pipeline
+  ~description: Processing traffic data
+  ~q: traffic
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns paginated list", function() {
+    expect(res.body.content).to.be.an('array');
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` is set.
+
+  **Expected Response:** 200 OK, paginated list of pipeline objects belonging to the data set.
+}

@@ -1,0 +1,76 @@
+import { z } from 'zod'
+
+import { AssignmentApiResponseSchema, AssignmentScopeEnum } from './assignments'
+import { ItemSchema, MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, MIN_NAME_LENGTH, WithId } from './common'
+
+export type GroupTab = 'info' | 'roles' | 'users'
+
+export const GroupRoleTypes = z.enum(['SYSTEM', 'DATA'])
+
+export const GroupRoleScheme = ItemSchema.extend({
+  roleType: GroupRoleTypes,
+})
+
+export const GroupApiResponseSchema = z.object({
+  id: z.string(),
+  name: z.string().min(MIN_NAME_LENGTH, {
+    message: 'common.errors.nameRequired',
+  }),
+  description: z.string(),
+  roles: z.array(GroupRoleScheme).nullable(),
+  members: z.array(ItemSchema).nullable(),
+  contactUser: ItemSchema.nullable(),
+  parentGroup: ItemSchema.nullable().optional(),
+  childGroups: z.array(ItemSchema).nullable().optional(),
+  assignments: z.array(AssignmentApiResponseSchema).nullable(),
+  createdAt: z.string(),
+  modifiedAt: z.string(),
+})
+
+export type Group = z.infer<typeof GroupApiResponseSchema>
+
+export type UserGroupsListData = Pick<Group, 'id' | 'name' | 'description' | 'contactUser'> & {
+  membersCount: number
+}
+
+export const AssignmentFormDataSchema = z.object({
+  groupId: z.string(),
+  roleId: z.string(),
+  scopeType: AssignmentScopeEnum.nullable().optional(),
+  scopeId: z.string().nullable().optional(),
+})
+
+export type AssignmentFormData = z.infer<typeof AssignmentFormDataSchema>
+
+export const GroupApiDataSchema = z.object({
+  id: z.string(),
+  name: z.string().trim().min(MIN_NAME_LENGTH, {
+    message: 'common.errors.nameRequired',
+  }),
+  description: z.string().trim().optional(),
+  contactUserId: z.string().optional(),
+  roleIds: z.array(z.string()).optional(),
+  memberIds: z.array(z.string()).optional(),
+})
+
+export type GroupApiData = z.infer<typeof GroupApiDataSchema>
+
+export const GroupBaseFormDataSchema = z.object({
+  id: z.string(),
+  name: z
+    .string()
+    .trim()
+    .min(MIN_NAME_LENGTH, {
+      message: 'common.errors.nameRequired',
+    })
+    .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
+  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength').optional(),
+  contactUserId: z.string(),
+  members: z.array(z.string()),
+  assignments: z.array(AssignmentFormDataSchema),
+})
+
+export type GroupBaseFormData = z.infer<typeof GroupBaseFormDataSchema>
+
+export type CreateGroupData = Omit<GroupApiData, 'id'> & { name: string }
+export type UpdateGroupData = Partial<CreateGroupData> & WithId

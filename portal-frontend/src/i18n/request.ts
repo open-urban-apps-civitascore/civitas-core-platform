@@ -2,7 +2,7 @@ import { cookies, headers } from 'next/headers'
 import { getRequestConfig } from 'next-intl/server'
 
 import { routing } from './config'
-import { Locale } from './locales'
+import { AppLocale } from './locales'
 
 // get locale from 1. cookie, 2. accept-language header or 3. default value
 const getLocale = async () => {
@@ -16,9 +16,9 @@ const getLocale = async () => {
   const defaultLocale = routing.defaultLocale
 
   if (cookieLocale && (routing.locales as string[]).includes(cookieLocale)) {
-    return cookieLocale as Locale
+    return cookieLocale as AppLocale
   } else if (headerLocale && (routing.locales as string[]).includes(headerLocale)) {
-    return headerLocale as Locale
+    return headerLocale as AppLocale
   } else return defaultLocale
 }
 

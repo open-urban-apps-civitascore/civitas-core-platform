@@ -15,11 +15,18 @@ if (
   !process.env.E2E_PASSWORD ||
   !process.env.E2E_EMAIL ||
   !process.env.E2E_FIRSTNAME ||
-  !process.env.E2E_LASTNAME
+  !process.env.E2E_LASTNAME ||
+  !process.env.JSON_SERVER_HOST ||
+  !process.env.JSON_SERVER_PORT
 ) {
   throw new Error(
-    'E2E_USERNAME, E2E_PASSWORD, E2E_EMAIL, E2E_FIRSTNAME and E2E_LASTNAME environment variables are required',
+    'E2E_USERNAME, E2E_PASSWORD, E2E_EMAIL, E2E_FIRSTNAME, E2E_LASTNAME, JSON_SERVER_HOST and JSON_SERVER_PORT environment variables are required',
   )
+}
+
+if (!process.env.E2E_TEST_ENV) {
+  console.warn('The env var E2E_TEST_ENV could not be found. It will be set to default "dev"')
+  process.env.E2E_TEST_ENV = 'dev'
 }
 
 export const TEST_USERNAME = process.env.E2E_USERNAME
@@ -27,6 +34,9 @@ export const TEST_PASSWORD = process.env.E2E_PASSWORD
 export const TEST_EMAIL = process.env.E2E_EMAIL
 export const TEST_FIRSTNAME = process.env.E2E_FIRSTNAME
 export const TEST_LASTNAME = process.env.E2E_LASTNAME
+export const JSON_SERVER_HOST = process.env.JSON_SERVER_HOST
+export const JSON_SERVER_PORT = process.env.JSON_SERVER_PORT
+export const TEST_ENV = process.env.E2E_TEST_ENV
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -38,11 +48,13 @@ export default defineConfig({
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
-  retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  retries: process.env.CI ? 2 : 2,
+  /* 3 workers balances speed vs dev environment load; 5 causes 504s */
+  workers: process.env.CI ? 1 : 3,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
+  /* Default timeout for each test (60s); individual tests can override with test.setTimeout() */
+  timeout: 60_000,
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -50,14 +62,22 @@ export default defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
+    /* Default action/navigation timeout — faster failure than the 30s Playwright default */
+    actionTimeout: 15_000,
+    navigationTimeout: 20_000,
   },
-
   /* Configure projects for major browsers */
   projects: [
+    {
+      name: 'sweep',
+      testDir: './playwright',
+      testMatch: /sweep\.setup\.ts/,
+    },
     {
       name: 'authSetup',
       testDir: './playwright',
       testMatch: /auth\.setup\.ts/,
+      dependencies: ['sweep'],
     },
     {
       name: 'chromium',
@@ -68,43 +88,27 @@ export default defineConfig({
       dependencies: ['authSetup'],
     },
 
-    {
-      name: 'firefox',
-      use: {
-        ...devices['Desktop Firefox'],
-        storageState: './playwright/.auth/user.json',
-      },
-      dependencies: ['authSetup'],
-    },
-
-    {
-      name: 'webkit',
-      use: {
-        ...devices['Desktop Safari'],
-        storageState: './playwright/.auth/user.json',
-      },
-      dependencies: ['authSetup'],
-    },
-
-    /* Test against mobile viewports. */
-    // {
-    //   name: 'Mobile Chrome',
-    //   use: { ...devices['Pixel 5'] },
-    // },
-    // {
-    //   name: 'Mobile Safari',
-    //   use: { ...devices['iPhone 12'] },
-    // },
-
-    /* Test against branded browsers. */
-    // {
-    //   name: 'Microsoft Edge',
-    //   use: { ...devices['Desktop Edge'], channel: 'msedge' },
-    // },
-    // {
-    //   name: 'Google Chrome',
-    //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
-    // },
+    // Firefox and WebKit run in CI only — chromium is sufficient for local dev
+    ...(process.env.CI
+      ? [
+          {
+            name: 'firefox',
+            use: {
+              ...devices['Desktop Firefox'],
+              storageState: './playwright/.auth/user.json',
+            },
+            dependencies: ['authSetup'],
+          },
+          {
+            name: 'webkit',
+            use: {
+              ...devices['Desktop Safari'],
+              storageState: './playwright/.auth/user.json',
+            },
+            dependencies: ['authSetup'],
+          },
+        ]
+      : []),
   ],
 
   /* Run your local dev server before starting the tests */

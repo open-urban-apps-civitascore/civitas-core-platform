@@ -1,0 +1,50 @@
+meta {
+  name: Create Assignment
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/assignments
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "groupId": "{{groupId}}",
+    "roleId": "{{systemRoleId}}"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('assignmentId', res.body.id);
+  }
+}
+
+tests {
+  test("Assignment created or already exists", function() {
+    const status = res.getStatus();
+    // 201=created, 409=duplicate assignment
+    expect(status === 201 || status === 409).to.be.true;
+  });
+}
+
+docs {
+  **Precondition:** `groupId` and `roleId` are set. `scopeType` and `scopeId` are set to `null` for unscoped assignments.
+
+  **Expected Response**
+  - Status: `201 Created`
+  - Body contains `id`
+
+  **Post-condition:** Save `assignmentId` from `body.id`.
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Assignment record created in `portal_backend` DB linking the group to the role |
+  | Config Adapter | AuthZ Repository is notified to refresh its authorization data cache |
+  | AuthZ Repository (OPA) | Role-group binding becomes visible in OPA policy data; verify at `http://localhost:8181/v1/data` |
+}

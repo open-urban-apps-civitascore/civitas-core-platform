@@ -7,11 +7,16 @@ logging:
 server:
   port: 8089
   servlet:
-    context-path: /v2
+    context-path: /v1
+  # M5.5: Increase max header size for X-Allowed-Scope-Ids from OPA
+  # When users have many dataspaces, the scope ID list can be large
+  max-http-request-header-size: 32KB
+  error:
+    include-stacktrace: never
+    include-message: never
+    include-exception: false
 
 spring:
-  profiles:
-    active: local, postgres
   application:
     name: "CIVITAS/CORE Data Management API"
   security:
@@ -20,7 +25,81 @@ spring:
         jwt:
           jwk-set-uri: "${keycloak.auth-server-url}/realms/${keycloak.realm}/protocol/openid-connect/certs"
           # Token issuer validation
-          issuer-uri: "${keycloak.auth-server-url}/realms/${keycloak.realm}"
+          issuer-uri: "${keycloak.issuer-uri}/realms/${keycloak.realm}"
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  mvc:
+    problemdetails:
+      enabled: true
+
+  data:
+    web:
+      pageable:
+        max-page-size: 200
+
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 1.0.0
+
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+      # Acknowledgement level: "all" (or "-1") waits for all in-sync replicas to acknowledge
+      # Provides strongest durability guarantee - no data loss if at least one replica survives
+      acks: all
+
+      # Maximum retries: Integer.MAX_VALUE (2147483647) for unlimited retry attempts
+      # Combined with idempotence, ensures messages are delivered exactly once
+      retries: 2147483647
+
+      # Batch size in bytes: 16KB (16384 bytes)
+      # Producer will attempt to batch records together into fewer requests
+      # Larger batches = better throughput but higher latency
+      batch-size: 16384
+
+      # Total memory buffer for the producer: 32MB (33554432 bytes)
+      # Used to buffer records waiting to be sent to the server
+      # If buffer fills up, send() will block for max.block.ms (default 60s)
+      buffer-memory: 33554432
+
+      properties:
+        # Idempotent producer: Ensures exactly-once delivery semantics per partition
+        # Prevents duplicate messages even when retries occur
+        # Requires: acks=all, retries>0, max.in.flight.requests<=5
+        enable.idempotence: true
+
+        # Max unacknowledged requests: 5 (maximum allowed with idempotence)
+        # Number of requests that can be sent without blocking while awaiting acknowledgement
+        # Lower value = more ordering guarantees, higher value = better throughput
+        max.in.flight.requests.per.connection: 5
+
+        # Compression codec: Snappy (fast compression with good ratio)
+        # Reduces network bandwidth and storage at the cost of CPU
+        # Alternatives: gzip (better compression), lz4 (faster), zstd (balanced)
+        compression.type: snappy
+
+        # Linger time: 10ms - maximum time to wait before sending a batch
+        # Allows more records to accumulate in the batch for better throughput
+        # Trade-off: slightly higher latency for better efficiency
+        linger.ms: 10
+    consumer:
+      group-id: civitas-portal-backend
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+# Event publishing configuration
+event:
+  # Timeout waiting for config-adapter to process event (seconds)
+  config-adapter-timeout-seconds: 10
 
 management:
   endpoints:
@@ -33,9 +112,22 @@ management:
         enabled: true
 
 springdoc:
+  default-produces-media-type: application/json
+  override-with-generic-response: false
   api-docs:
-    path: /v2/api-docs
+    path: /api-docs
     version: openapi-3-1
   swagger-ui:
     path: /swagger-ui.html
     enabled: true
+
+# Security: paths permitted without authentication
+security:
+  permit-paths:
+    - /actuator/health/**
+    - /actuator/info
+
+model-atlas:
+  baseUrl: "http://model-atlas:8080"
+  scope: civitas
+  stage: draft

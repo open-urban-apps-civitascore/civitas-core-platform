@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.model.input.DataSpaceInputDTO;
 import de.civitascore.portal.model.output.DataSpaceOutputDTO;
+import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
@@ -16,7 +17,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.ActiveProfiles;
 
+@ActiveProfiles({"test-integration", "preview"})
 @DisplayName("DataSpace Controller Integration Tests")
 class DataSpaceControllerIntegrationTest
     extends BaseControllerIntegrationTest<DataSpaceInputDTO, DataSpaceOutputDTO> {
@@ -24,6 +27,7 @@ class DataSpaceControllerIntegrationTest
   private final String DATASPACES_ENDPOINT = "/dataspaces";
 
   @Autowired private DataSpaceRepository dataSpaceRepository;
+  @Autowired private DataSetRepository dataSetRepository;
 
   @Override
   protected String getEndpointPath() {
@@ -32,13 +36,14 @@ class DataSpaceControllerIntegrationTest
 
   @Override
   protected void performAdditionalCleanup() {
+    dataSetRepository.deleteAll();
     dataSpaceRepository.deleteAll();
   }
 
   @Override
   protected DataSpaceInputDTO createValidInput() {
     DataSpaceInputDTO input = new DataSpaceInputDTO();
-    input.setName("test_dataspace_" + System.currentTimeMillis());
+    input.setName("test_dataspace_" + UUID.randomUUID().toString().substring(0, 8));
     input.setDescription("A test dataspace for integration testing");
     input.setExternalId("ext-" + System.currentTimeMillis());
     return input;

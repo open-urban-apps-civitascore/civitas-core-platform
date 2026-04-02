@@ -1,0 +1,45 @@
+meta {
+  name: Delete Dataset
+  type: http
+  seq: 13
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSetId}}
+}
+
+script:post-response {
+  // Restore setup dataset ID so pipelines folder can use it
+  const setupId = bru.getVar('setupDataSetId');
+  if (setupId) {
+    bru.setVar('dataSetId', setupId);
+  }
+}
+
+tests {
+  test("Status code is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` is set and not in released state.
+
+  **Expected Response:** 204 No Content.
+
+  **Verification:** Issue TC-DSET-02 for same `dataSetId` and confirm 404.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSet record removed |
+  | Config Adapter | — |
+  | External System | — |
+}

@@ -2,25 +2,33 @@ import { useTranslations } from 'next-intl'
 import { type JSX, useMemo } from 'react'
 
 import { BasicSelect } from '@/components/basicSelect/BasicSelect'
-import { RoleResponse } from '@/types/roles'
+import { Role } from '@/types/roles'
 
-type Props = {
+interface RoleTemplateSelectProps {
   setRoleTemplate: (roleId: string) => void
-  allRoles: RoleResponse[]
+  templateRoles?: Role[]
+  currentRoleId?: string
 }
 
-export const RoleTemplateSelect = (props: Props): JSX.Element => {
-  const { setRoleTemplate, allRoles } = props
+export const RoleTemplateSelect = (props: RoleTemplateSelectProps): JSX.Element => {
+  const { setRoleTemplate, templateRoles, currentRoleId } = props
   const t = useTranslations('roles.permissionsTab')
 
   const rolesForSelect = useMemo((): { label: string; value: string }[] => {
-    return allRoles.map(role => ({
-      label: role.name,
-      value: role.id,
-    }))
-  }, [allRoles])
+    return (templateRoles ?? [])
+      .filter(role => role.id !== currentRoleId)
+      .map(role => ({
+        label: role.name,
+        value: role.id,
+      }))
+  }, [templateRoles, currentRoleId])
 
   return (
-    <BasicSelect onValueChange={setRoleTemplate} options={rolesForSelect} placeholder={t('roleTemplate.placeholder')} />
+    <BasicSelect
+      onValueChange={setRoleTemplate}
+      options={rolesForSelect}
+      placeholder={t('roleTemplate.placeholder')}
+      triggerClassName="bg-white"
+    />
   )
 }

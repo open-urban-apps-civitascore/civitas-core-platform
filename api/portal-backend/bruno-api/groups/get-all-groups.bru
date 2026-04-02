@@ -1,0 +1,35 @@
+meta {
+  name: Get All Groups
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/groups
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+  ~sort: createdAt,DESC
+  ~name: Engineering
+  ~description: Development team
+  ~contactUserId: user-123
+  ~parentGroupId: group-456
+  ~q: team
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns paginated list", function() {
+    expect(res.body.content).to.be.an('array');
+  });
+}
+
+docs {
+  **Expected Response:** 200 OK, paginated list of group objects
+}

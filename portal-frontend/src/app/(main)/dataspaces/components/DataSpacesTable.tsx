@@ -4,10 +4,9 @@ import { useTranslations } from 'next-intl'
 import { StatusLabel } from '@/components/status-label/StatusLabel'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { DataSpace } from '@/types/dataspaces'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
-
-import { DataSpace } from '../../../../../types/dataspaces'
 
 interface DataSpacesTableProps extends TableProps<DataSpace> {
   dataspaces: DataSpace[]
@@ -40,6 +39,7 @@ export const DataSpacesTable = (props: DataSpacesTableProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.name')} />,
       cell: info => info.getValue(),
       meta: {
+        truncate: true,
         style: {
           width: '25%',
           minWidth: '200px',
@@ -48,14 +48,9 @@ export const DataSpacesTable = (props: DataSpacesTableProps) => {
     }),
     columnHelper.accessor('description', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.description')} />,
-      cell: info => {
-        const description = info.getValue()
-        if (description.length > 100) {
-          return `${description.substring(0, 100)}...`
-        }
-        return description
-      },
+      cell: info => info.getValue(),
       meta: {
+        truncate: true,
         style: {
           width: '50%',
         },

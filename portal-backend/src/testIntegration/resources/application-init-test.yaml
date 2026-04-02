@@ -1,0 +1,25 @@
+# Test seed data — loaded when the "init-test" profile is active.
+# Overrides application-local.yaml init config to provide isolated test data.
+init:
+  groups:
+    - name: "Init Test Admins"
+      roleName: "Tenant Admin"
+      description: "Init test admin group"
+    - name: "Init Test Architects"
+      roleName: "Data Architect"
+      scopeType: TENANT
+      description: "Init test data architect group"
+  users:
+    - firstName: Init
+      lastName: TestUser
+      email: init-test@example.com
+      password: test123
+      title: OTHER
+      groups:
+        - "Init Test Admins"
+    - firstName: Init
+      lastName: SyncUser
+      email: init-sync@example.com
+      title: OTHER
+      groups:
+        - "Init Test Architects"
