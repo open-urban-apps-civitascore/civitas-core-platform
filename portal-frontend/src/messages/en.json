@@ -44,6 +44,8 @@
       "minChar": "The input has to be at least {amount} characters.",
       "itemsNotFound": "No {items} found",
       "itemNotFound": "{item} not found",
+      "pageNotFound": "The requested page was not found.",
+      "backToHome": "Back to homepage",
       "notFound": "No {items} found",
       "loadingError": "Error while loading data",
       "unexpectedError": "An unexpected error occurred. Please try again.",

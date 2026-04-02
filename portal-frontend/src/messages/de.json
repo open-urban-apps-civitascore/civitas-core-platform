@@ -44,6 +44,8 @@
       "minChar": "Die Eingabe muss mindestens {amount} Zeichen lang sein.",
       "itemsNotFound": "Keine {items} gefunden",
       "itemNotFound": "{item} nicht gefunden",
+      "pageNotFound": "Die angeforderte Seite wurde nicht gefunden.",
+      "backToHome": "Zurück zur Startseite",
       "loadingError": "Fehler beim Laden der Daten",
       "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
       "nameRequired": "Name ist erforderlich",
