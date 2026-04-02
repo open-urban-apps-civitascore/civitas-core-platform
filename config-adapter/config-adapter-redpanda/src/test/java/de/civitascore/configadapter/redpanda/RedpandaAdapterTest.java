@@ -132,6 +132,39 @@ class RedpandaAdapterTest {
 
       verify(mockClient).updatePipeline(eq("pipeline-1"), anyMap());
     }
+
+    @Test
+    @DisplayName("falls back to createPipeline when pipeline not found (upsert)")
+    void processConfigEvent_updatePipelineNotFound_fallsBackToCreate() throws Exception {
+      doThrow(
+              new FatalAdapterException(
+                  de.civitascore.configadapter.model.AdapterErrorCode.RESOURCE_NOT_FOUND,
+                  "Pipeline not found: pipeline-1"))
+          .when(mockClient)
+          .updatePipeline(eq("pipeline-1"), anyMap());
+      doNothing().when(mockClient).createPipeline(eq("pipeline-1"), anyMap());
+      ConfigEvent event = createEvent(Operation.UPDATE, "pipeline-1");
+
+      adapter.processConfigEvent("de.civitascore.data.pipeline.updated", event);
+
+      verify(mockClient).createPipeline(eq("pipeline-1"), anyMap());
+    }
+
+    @Test
+    @DisplayName("rethrows FatalAdapterException for non-RESOURCE_NOT_FOUND errors")
+    void processConfigEvent_updatePipelineOtherFatal_rethrows() throws Exception {
+      doThrow(
+              new FatalAdapterException(
+                  de.civitascore.configadapter.model.AdapterErrorCode.REDPANDA_PIPELINE_ERROR,
+                  "pipeline error"))
+          .when(mockClient)
+          .updatePipeline(any(), anyMap());
+      ConfigEvent event = createEvent(Operation.UPDATE, "pipeline-1");
+
+      assertThrows(
+          FatalAdapterException.class,
+          () -> adapter.processConfigEvent("de.civitascore.data.pipeline.updated", event));
+    }
   }
 
   @Nested

@@ -55,6 +55,7 @@ class RedpandaConnectClient implements AutoCloseable {
   private static final int HTTP_SUCCESS_MIN = 200;
   private static final int HTTP_SUCCESS_MAX = 300;
   private static final int HTTP_NOT_FOUND = 404;
+  private static final int HTTP_CONFLICT = 409;
 
   /**
    * Allowed characters for pipeline IDs: alphanumeric start, then alphanumeric, dots, dashes,
@@ -215,6 +216,24 @@ class RedpandaConnectClient implements AutoCloseable {
           Encode.forJava(pipelineId),
           operation.getDescription());
       return;
+    }
+
+    // CREATE idempotency: treat 409 as success (pipeline already exists)
+    if (status == HTTP_CONFLICT && operation == AdapterOperation.PIPELINE_CREATE) {
+      logger.info(
+          "Pipeline {} already exists (HTTP 409), treating {} as success",
+          Encode.forJava(pipelineId),
+          operation.getDescription());
+      return;
+    }
+
+    // UPDATE idempotency: signal missing pipeline so adapter can upsert
+    if (status == HTTP_NOT_FOUND && operation == AdapterOperation.PIPELINE_UPDATE) {
+      logger.info(
+          "Pipeline {} not found during update (HTTP 404), signalling for upsert",
+          Encode.forJava(pipelineId));
+      throw new FatalAdapterException(
+          AdapterErrorCode.RESOURCE_NOT_FOUND, "Pipeline not found: " + pipelineId);
     }
 
     String body = response.readEntity(String.class);
