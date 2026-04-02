@@ -2,7 +2,7 @@
 
 Spring Boot REST API with OAuth2/Keycloak integration, PostgreSQL database, and Kafka event streaming.
 
-Depends on [portal-model](../portal-model/) (shared JPA entities) and [config-adapter-api](../config-adapter/config-adapter-api/) (saga event types).
+Depends on [portal-model](../portal-model/) (shared JPA entities) and [config-adapter](../config-adapter/) (event model and adapters).
 
 ## 🚀 Quick Start
 

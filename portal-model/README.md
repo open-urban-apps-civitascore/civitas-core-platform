@@ -4,14 +4,11 @@ Shared JPA entity library used by [portal-backend](../portal-backend/) and [conf
 
 ## Contents
 
-**Entities** (`de.civitascore.portal.model.entity`):
-DataSet, DataSource, DataSpace, DataStructure, DataStructureVersion, Distribution, Pipeline, Catalog, DataSetSeries, Resource, Agent, Activity, User, Group, Role, Permission, Assignment
-
-**Base classes** (`entity.base`):
-BaseEntity, NamedEntity, BaseDataEntity, AssignableEntity
-
-**Enums** (`de.civitascore.portal.model.embedded`):
-DataSetStatus, DataSourceStatus, DataStructureStatus, DataStructureVersionStatus, ConnectorType, PipelineAction, ScopeType, RoleType, RoleDefault, PendingSagaType, SagaResultType, PermissionName, PermissionType, PermissionCategory, PermissionSource, UserTitleType, DataStructureVersionSource
+| Package | Description |
+|---------|-------------|
+| `de.civitascore.portal.model.entity` | JPA entities (DataSet, DataSource, Pipeline, etc.) |
+| `de.civitascore.portal.model.entity.base` | Abstract base classes (BaseEntity, AssignableEntity, etc.) |
+| `de.civitascore.portal.model.embedded` | Enums for status, roles, permissions, and saga types |
 
 ## Build
 
