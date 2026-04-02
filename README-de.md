@@ -9,7 +9,7 @@
 
 [![Latest Release](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/badges/release.svg)](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/releases) [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 
-Dieses Repository stellt die **CIVITAS/CORE Plattform (Version 2)** bereit.
+Dieses Repository stellt die **CIVITAS/CORE Plattform Version 2** bereit.
 
 > For information in English please see the [English Readme](README.md).
 
@@ -92,4 +92,4 @@ Dieses Werk ist unter der [EU PL 1.2](LICENSE) lizenziert durch Civitas Connect 
 
 Für dieses Projekt ist kein CLA (Contributor License Agreement) erforderlich. Das Urheberrecht liegt bei den einzelnen Mitwirkenden.
 
-Civitas Core ist ein trademark (Markenzeichen). Weitere Informationen sind [hier](TRADEMARK.md) zu finden.
+CIVITAS/CORE ist ein trademark (Markenzeichen). Weitere Informationen sind [hier](TRADEMARK.md) zu finden.
