@@ -92,6 +92,7 @@ describe('buildRedPandaConnectModel', () => {
 
     expect(serialized).toContain('${FROST_BASE}/Things?$filter=')
     expect(serialized).toContain('${FROST_BASE}/Datastreams?$filter=')
+    expect(serialized).toContain('"Authorization":"Basic YWRtaW46YWRtaW4="')
     expect(mappings).toContain('"${FROST_BASE}/Things(" + ($first."@iot.id").string() + ")"')
     expect(mappings).toContain('"${FROST_BASE}/Things"')
     expect(mappings).toContain('"${FROST_BASE}/Observations"')
