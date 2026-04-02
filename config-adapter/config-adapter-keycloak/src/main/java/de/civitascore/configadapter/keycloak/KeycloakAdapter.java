@@ -77,6 +77,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
   private static final String PASSWORD_PROPERTY_KEY = "password";
   private static final String USERNAME_PROPERTY_KEY = "username";
 
+  // Properties for invitation email redirect (execute-actions-email with client_id + redirect_uri)
+  private static final String INVITATION_CLIENT_ID_PROPERTY_KEY = "invitation.client.id";
+  private static final String INVITATION_REDIRECT_URI_PROPERTY_KEY = "invitation.redirect.uri";
+
   private static final String REALM = "realm";
   private static final String URL_PROPERTY = "url";
 
@@ -86,6 +90,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private final ObjectMapper objectMapper;
   private Keycloak keycloakClient;
+
+  // Optional invitation redirect configuration for execute-actions-email
+  private String invitationClientId;
+  private String invitationRedirectUri;
 
   public KeycloakAdapter() {
     this.objectMapper = new ObjectMapper();
@@ -110,14 +118,76 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
             .clientId(getAdapterProperty(CLIENT_ID_PROPERTY_KEY, "admin-cli"))
             .build();
 
+    // Verify Keycloak credentials are valid by making a test API call.
+    try {
+      validateKeycloakConnection();
+    } catch (FatalAdapterException e) {
+      throw new IllegalStateException(e.getMessage(), e);
+    }
+
+    this.invitationClientId = getAdapterProperty(INVITATION_CLIENT_ID_PROPERTY_KEY);
+    this.invitationRedirectUri = getAdapterProperty(INVITATION_REDIRECT_URI_PROPERTY_KEY);
+    try {
+      validateInvitationConfig();
+    } catch (FatalAdapterException e) {
+      throw new IllegalStateException(e.getMessage(), e);
+    }
+
     logger.info(
         "Keycloak adapter '{}' initialized for: {}",
         Encode.forJava(getName()),
         Encode.forJava(getAdapterProperty(URL_PROPERTY, DEFAULT_SERVER_URL)));
+    if (invitationClientId != null && invitationRedirectUri != null) {
+      logger.info(
+          "Invitation redirect configured: clientId={}, redirectUri={}",
+          Encode.forJava(invitationClientId),
+          Encode.forJava(invitationRedirectUri));
+    }
     logger.info(
         "Subscribed to {} Kafka topics: {}",
         getSubscribedTopics().size(),
         Encode.forJava(String.valueOf(getSubscribedTopics())));
+  }
+
+  /**
+   * Validates that the Keycloak admin credentials are correct by making a test API call. Fails fast
+   * at startup if the adapter cannot authenticate, rather than silently failing on every event.
+   *
+   * @throws FatalAdapterException if the connection or authentication fails
+   */
+  private void validateKeycloakConnection() throws FatalAdapterException {
+    try {
+      keycloakClient.serverInfo().getInfo();
+      logger.info("Keycloak connection validated successfully");
+    } catch (Exception e) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.CONFIGURATION_ERROR,
+          e,
+          "Failed to connect to Keycloak or authenticate. "
+              + "Please verify the Keycloak URL and admin credentials are correct.");
+    }
+  }
+
+  /**
+   * Validates that the invitation redirect configuration is consistent. Both {@code
+   * invitation.client.id} and {@code invitation.redirect.uri} must be set together or neither
+   * should be set.
+   *
+   * @throws FatalAdapterException if only one of the two properties is set
+   */
+  private void validateInvitationConfig() throws FatalAdapterException {
+    boolean hasClientId = invitationClientId != null && !invitationClientId.isBlank();
+    boolean hasRedirectUri = invitationRedirectUri != null && !invitationRedirectUri.isBlank();
+    if (hasClientId != hasRedirectUri) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.CONFIGURATION_ERROR,
+          "Both 'keycloak.invitation.client.id' and 'keycloak.invitation.redirect.uri' "
+              + "must be set together or neither should be set. "
+              + "invitation.client.id="
+              + invitationClientId
+              + ", invitation.redirect.uri="
+              + invitationRedirectUri);
+    }
   }
 
   /*
@@ -479,24 +549,32 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
   /**
    * Sends an actions email to a newly created user if required actions are configured. The email
    * contains a link for the user to complete actions like email verification and password setup.
-   * Failures are logged as warnings but do not abort user creation (SMTP may not be configured).
+   *
+   * @throws Exception if invitation redirect is configured and the email sending fails
    */
   private void sendActionsEmail(
-      RealmResource realmResource, String userId, List<String> requiredActions) {
+      RealmResource realmResource, String userId, List<String> requiredActions) throws Exception {
     if (requiredActions == null || requiredActions.isEmpty()) {
       return;
     }
-    try {
-      realmResource.users().get(userId).executeActionsEmail(requiredActions);
-      logger.info(
-          "Sent actions email to user {} for actions: {}",
-          Encode.forJava(maskId(userId)),
-          Encode.forJava(String.valueOf(requiredActions)));
-    } catch (Exception e) {
-      logger.warn(
-          "Failed to send actions email for user {}: {}",
-          Encode.forJava(maskId(userId)),
-          Encode.forJava(String.valueOf(e.getMessage())));
+    if (invitationClientId != null && invitationRedirectUri != null) {
+      realmResource
+          .users()
+          .get(userId)
+          .executeActionsEmail(invitationClientId, invitationRedirectUri, requiredActions);
+    } else {
+      try {
+        realmResource.users().get(userId).executeActionsEmail(requiredActions);
+        logger.info(
+            "Sent actions email to user {} for actions: {}",
+            Encode.forJava(maskId(userId)),
+            Encode.forJava(String.valueOf(requiredActions)));
+      } catch (Exception e) {
+        logger.warn(
+            "Failed to send actions email for user {}: {}",
+            Encode.forJava(maskId(userId)),
+            Encode.forJava(String.valueOf(e.getMessage())));
+      }
     }
   }
 

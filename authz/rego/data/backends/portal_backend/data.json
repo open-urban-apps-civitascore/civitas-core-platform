@@ -18,6 +18,9 @@
       "PATCH": "USER_UPDATE",
       "DELETE": "USER_DELETE"
     },
+    "/v1/users/{id}/groups": {
+      "PUT": "GROUP_UPDATE"
+    },
     "/v1/assignments": {
       "_collection": true,
       "GET": "ASSIGNMENT_READ",
@@ -47,10 +50,6 @@
     },
     "/v1/permissions/{id}": {
       "GET": "PERMISSION_READ"
-    },
-    "/v1/authorities": {
-      "_collection": true,
-      "GET": null
     },
     "/v1/roles": {
       "_collection": true,

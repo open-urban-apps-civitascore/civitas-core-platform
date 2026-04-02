@@ -2,6 +2,8 @@
 
 Spring Boot REST API with OAuth2/Keycloak integration, PostgreSQL database, and Kafka event streaming.
 
+Depends on [portal-model](../portal-model/) (shared JPA entities) and [config-adapter](../config-adapter/) (event model and adapters).
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -47,7 +49,6 @@ Only infrastructure services are started. The Portal Backend container is **not 
 Once the infrastructure is running, you can start the backend on your local machine:
 
 ```bash
-cd /portal-backend
 mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres
 ```
 
@@ -102,6 +103,7 @@ spring:
 * **local** – local development
 * **init** – on startup, creates the groups and users defined in the `init.*` config properties and syncs them to Keycloak. Local defaults are in `application-local.yaml`.
 * **postgres** – PostgreSQL datasource
+* **docker** – Docker Compose environment (uses container hostnames for Kafka, Keycloak)
 * **debug** – extended logging
 
 ---
@@ -116,11 +118,11 @@ portal-backend/
 │   │   ├── application.yaml
 │   │   ├── application-local.yaml
 │   │   ├── application-postgres.yaml
+│   │   ├── application-docker.yaml
 │   │   └── application-debug.yaml
 │   ├── test/java/              # Unit tests
 │   └── testIntegration/        # Integration tests
 ├── Dockerfile                  # Backend container
-├── .gitlab-ci.yml              # CI/CD pipeline
 └── pom.xml                     # Maven configuration
 
 ```
@@ -193,11 +195,17 @@ curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
 
 ---
 
+## 🚢 Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for all environment variables, Spring profiles, and docker-compose examples for production deployment.
+
+---
+
 ## 🏗️ Technology Stack
 
-* **Java 21** + Spring Boot 3.5.7
-* **PostgreSQL 18** with JPA/Hibernate
-* **Keycloak 26.5** (OAuth2 / OIDC)
+* **Java 21** + Spring Boot 3.5
+* **PostgreSQL** with JPA/Hibernate
+* **Keycloak** (OAuth2 / OIDC)
 * **Kafka** for event streaming
 * **OpenAPI 3** + Swagger UI
 * **Testcontainers** for integration testing
@@ -210,7 +218,6 @@ curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
 * **Swagger UI:** [http://localhost:8089/v1/swagger-ui.html](http://localhost:8089/v1/swagger-ui.html)
 * **OpenAPI Spec:** [http://localhost:8089/v1/v3/api-docs](http://localhost:8089/v1/v3/api-docs)
 * **Health Check:** [http://localhost:8089/v1/actuator/health](http://localhost:8089/v1/actuator/health)
-* **Metrics:** [http://localhost:8089/v1/actuator/prometheus](http://localhost:8089/v1/actuator/prometheus)
 
 ---
 

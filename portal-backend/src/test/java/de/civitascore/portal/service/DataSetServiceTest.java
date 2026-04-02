@@ -15,8 +15,10 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.HashSet;
 import java.util.List;
@@ -202,7 +204,7 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("throws when saga already in-flight")
+    @DisplayName("throws ResourceInUseException when saga already in-flight")
     void throwsWhenSagaInFlight() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
@@ -210,7 +212,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().unrelease(id))
-          .isInstanceOf(InvalidInputException.class)
+          .isInstanceOf(ResourceInUseException.class)
           .hasMessageContaining("saga is in-flight");
     }
 
@@ -227,6 +229,78 @@ class DataSetServiceTest {
 
       assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.DELETE);
       verify(sagaPublisher).publishDeleteRequested(result);
+    }
+  }
+
+  @Nested
+  @DisplayName("updatePublishedMeta()")
+  class UpdatePublishedMetaTests {
+
+    @Test
+    @DisplayName("throws ResourceInUseException when CREATE saga is in-flight")
+    void throwsWhenCreateSagaInFlight() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+
+      assertThatThrownBy(() -> createService().updatePublishedMeta(id, input))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("saga is in-flight")
+          .hasMessageContaining("CREATE");
+    }
+
+    @Test
+    @DisplayName("throws ResourceInUseException when UPDATE saga is in-flight")
+    void throwsWhenUpdateSagaInFlight() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+
+      assertThatThrownBy(() -> createService().updatePublishedMeta(id, input))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("saga is in-flight")
+          .hasMessageContaining("UPDATE");
+    }
+
+    @Test
+    @DisplayName("throws ResourceInUseException when DELETE saga is in-flight")
+    void throwsWhenDeleteSagaInFlight() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.DELETE);
+      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+
+      assertThatThrownBy(() -> createService().updatePublishedMeta(id, input))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("saga is in-flight")
+          .hasMessageContaining("DELETE");
+    }
+
+    @Test
+    @DisplayName("allows update when no saga is pending")
+    void allowsUpdateWhenNoSagaPending() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+
+      DataSet result = createService().updatePublishedMeta(id, input);
+      assertThat(result).isNotNull();
+      verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
     }
   }
 
@@ -295,6 +369,111 @@ class DataSetServiceTest {
       assertThat(persisted.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
       assertThat(persisted.getDistributions()).isEmpty();
       assertThat(persisted.getPendingSagaType()).isNull();
+    }
+
+    @Test
+    @DisplayName("CREATE: regenerates distributions when removed by prior DELETE saga")
+    void createRegeneratesDistributionsWhenMissing() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+
+      Pipeline pipeline = new Pipeline();
+      pipeline.setApis(List.of("/v1.1/Things", "/v1.1/Observations"));
+      ds.getPipelines().add(pipeline);
+
+      Distribution createdDist1 = new Distribution();
+      createdDist1.setAutoGenerated(true);
+      createdDist1.setAccessUrl("/Things");
+      Distribution createdDist2 = new Distribution();
+      createdDist2.setAutoGenerated(true);
+      createdDist2.setAccessUrl("/Observations");
+
+      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(distributionService.createFromApiUrlAndDataSet("/v1.1/Things", ds))
+          .thenReturn(createdDist1);
+      when(distributionService.createFromApiUrlAndDataSet("/v1.1/Observations", ds))
+          .thenReturn(createdDist2);
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              "route-1",
+              "svc-1",
+              "https://public.example.com/datasets/" + id,
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      DataSet persisted = saved.getValue();
+      assertThat(persisted.getDistributions()).hasSize(2);
+      assertThat(persisted.getDistributions())
+          .extracting(Distribution::getAccessUrl)
+          .containsExactlyInAnyOrder(
+              "https://public.example.com/datasets/" + id + "/Things",
+              "https://public.example.com/datasets/" + id + "/Observations");
+    }
+
+    @Test
+    @DisplayName(
+        "CREATE: regenerates auto-generated distributions even when manual distributions exist")
+    void createRegeneratesWhenOnlyManualDistributionsRemain() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+
+      Pipeline pipeline = new Pipeline();
+      pipeline.setApis(List.of("/v1.1/Things"));
+      ds.getPipelines().add(pipeline);
+
+      Distribution manualDist = new Distribution();
+      manualDist.setAutoGenerated(false);
+      manualDist.setAccessUrl("https://manual.example.com/data");
+      ds.getDistributions().add(manualDist);
+
+      Distribution createdDist = new Distribution();
+      createdDist.setAutoGenerated(true);
+      createdDist.setAccessUrl("/Things");
+
+      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(distributionService.createFromApiUrlAndDataSet("/v1.1/Things", ds))
+          .thenReturn(createdDist);
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              "route-1",
+              "svc-1",
+              "https://public.example.com/datasets/" + id,
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      DataSet persisted = saved.getValue();
+      assertThat(persisted.getDistributions()).hasSize(2);
+      assertThat(persisted.getDistributions())
+          .extracting(Distribution::getAccessUrl)
+          .containsExactlyInAnyOrder(
+              "https://manual.example.com/data",
+              "https://public.example.com/datasets/" + id + "/Things");
     }
 
     @Test

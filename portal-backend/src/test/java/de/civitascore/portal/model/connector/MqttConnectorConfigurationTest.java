@@ -134,6 +134,22 @@ class MqttConnectorConfigurationTest {
       config.setPassword(null);
       assertThat(config.getPassword()).isNull();
     }
+
+    @Test
+    @DisplayName("Should normalize blank optional MQTT strings to null")
+    void shouldNormalizeBlankOptionalStringsToNull() {
+      MqttConnectorConfiguration config = new MqttConnectorConfiguration();
+
+      config.setClientId("   ");
+      config.setConnectTimeout("");
+      config.setKeepalive(" ");
+      config.setUser("\t");
+
+      assertThat(config.getClientId()).isNull();
+      assertThat(config.getConnectTimeout()).isNull();
+      assertThat(config.getKeepalive()).isNull();
+      assertThat(config.getUser()).isNull();
+    }
   }
 
   @Nested
@@ -181,6 +197,29 @@ class MqttConnectorConfigurationTest {
           MAPPER.convertValue(map, MqttConnectorConfiguration.class);
 
       assertThat(config.getTopics()).isEqualTo(List.of("test"));
+    }
+
+    @Test
+    @DisplayName("Should normalize blank optional strings to null during deserialization")
+    void shouldNormalizeBlankStringsDuringDeserialization() {
+      Map<String, Object> map = new LinkedHashMap<>();
+      map.put("urls", List.of("tcp://broker:1883"));
+      map.put("topics", List.of("sensors/#"));
+      map.put("qos", 1);
+      map.put("client_id", "");
+      map.put("connect_timeout", "   ");
+      map.put("keepalive", " ");
+      map.put("user", "\t");
+      map.put("password", "");
+
+      MqttConnectorConfiguration config =
+          MAPPER.convertValue(map, MqttConnectorConfiguration.class);
+
+      assertThat(config.getClientId()).isNull();
+      assertThat(config.getConnectTimeout()).isNull();
+      assertThat(config.getKeepalive()).isNull();
+      assertThat(config.getUser()).isNull();
+      assertThat(config.getPassword()).isNull();
     }
 
     @Test

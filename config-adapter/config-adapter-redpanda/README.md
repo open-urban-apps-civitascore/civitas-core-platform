@@ -228,8 +228,62 @@ services:
             "sql_raw": {
               "driver": "postgres",
               "dsn": "ENC(base64-encrypted-dsn)",
+              "user": "db-reader",
+              "password": "ENC(base64-encrypted-password)",
               "query": "SELECT * FROM measurements WHERE timestamp > $1",
               "args_mapping": "root = [now().ts_sub(3600).format_timestamp(\"2006-01-02T15:04:05Z\")]"
+            }
+          },
+          "pipeline": {
+            "processors": [
+              {
+                "mapping": "root = this"
+              }
+            ]
+          },
+          "output": {
+            "http_client": {
+              "url": "https://api.example.com/data",
+              "verb": "POST"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Input Event — Structured SQL Source Pipeline
+
+```json
+{
+  "specversion": "1.0",
+  "type": "de.civitascore.data.pipeline.created",
+  "source": "civitas.data.provisioning",
+  "id": "event-457",
+  "data": {
+    "metadata": {
+      "messageId": "msg-790",
+      "correlationId": "corr-013",
+      "resultTopic": "de.civitascore.data.pipeline.processing.result"
+    },
+    "payload": {
+      "targetComponent": "redpanda-connect",
+      "targetResource": "pipelines",
+      "operation": "CREATE",
+      "config": {
+        "path": "redpanda-pipeline",
+        "value": {
+          "input": {
+            "sql_select": {
+              "driver": "postgres",
+              "dsn": "ENC(base64-encrypted-dsn)",
+              "user": "db-reader",
+              "password": "ENC(base64-encrypted-password)",
+              "table": "public.device_definitions",
+              "columns": ["*"],
+              "where": "device_id = 1"
             }
           },
           "pipeline": {
@@ -287,9 +341,9 @@ Pipeline configurations may contain sensitive values (database connection string
 
 ### How It Works
 
-1. Encrypt the credential with AES-256-GCM using `CIVITAS_MASTER_KEY` (PBKDF2 stretch + HKDF-Expand for per-pipeline key isolation)
+1. Encrypt the credential with AES-256-GCM using `CIVITAS_MASTER_KEY` (PBKDF2 stretch + HKDF-Expand for datasource credential key isolation)
 2. Wrap the Base64-encoded ciphertext in `ENC(...)` marker
-3. The `RedpandaConnectClient` decrypts all `ENC(...)` values recursively before YAML conversion, using the pipeline ID as HKDF context
+3. Datasource credentials are decrypted with the shared `CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT` before DSN construction, and remaining `ENC(...)` values are decrypted recursively before YAML conversion using the same shared context
 
 ### Example
 
@@ -299,11 +353,15 @@ Pipeline configurations may contain sensitive values (database connection string
     "username": "api-user",
     "password": "ENC(aGVsbG8gd29ybGQ=...)"
   },
-  "dsn": "ENC(cG9zdGdyZXM6Ly91c2VyOnBhc3NAaG9zdC9kYg==...)"
+  "dsn": "ENC(cG9zdGdyZXM6Ly91c2VyOnBhc3NAaG9zdC9kYg==...)",
+  "user": "db-reader",
+  "password": "ENC(c2VjcmV0LXBhc3N3b3Jk...)"
 }
 ```
 
 Non-`ENC(...)` string values pass through unchanged.
+
+For SQL datasource events, `user` and `password` may arrive alongside `dsn`. Before RedPanda Connect is called, the adapter resolves missing SQL credentials into the DSN. If the DSN does not yet contain user info, the password is decrypted, the DSN is completed, and the resulting full DSN is wrapped again as a single `ENC(...)` value. If the resulting password is already URL-encoded, that encoded form is preserved inside the DSN.
 
 ### Environment Variables
 
@@ -321,6 +379,7 @@ The pipeline definition follows the RedPanda Connect configuration structure:
 |------|-------|-------------|
 | `mqtt` | `MqttInput` | MQTT broker subscription |
 | `sql_raw` | `SqlRawInput` | Raw SQL database queries |
+| `sql_select` | `SqlSelectInput` | Structured SQL selection via `table`, `columns`, optional `where` |
 | *(extensible)* | `additionalProperties` | Unknown inputs preserved via `@JsonAnySetter` |
 
 ### Supported Processors
@@ -348,6 +407,28 @@ In the saga path, pipeline templates can reference datasource properties via pla
 When a pipeline's `input.label` matches the pattern `${datasource-id}`, the `DatasourceInjector` replaces the entire input section with a concrete MQTT or SQL input configuration parsed from the matching datasource.
 
 For example, an input label of `${sensor-mqtt-1}` is resolved against the dataset's datasource list. The matching datasource is parsed into a `ConnectorConfig` (MQTT or SQL), and the template's input section is replaced with the fully configured input block.
+
+For SQL datasources, the adapter supports two rendering modes:
+
+| Datasource configuration | Rendered RedPanda input |
+|---|---|
+| `query` present | `sql_raw` |
+| `table` + non-empty `columns` present | `sql_select` |
+
+The `where` field is optional for `sql_select`. SQL credentials may be present in the incoming datasource event, but the final RedPanda SQL input uses the DSN as the credential carrier.
+
+Before SQL datasource placeholders are rendered, datasource credentials are decrypted with the shared datasource credential context. If the DSN has no embedded user info, the adapter rebuilds it from the datasource credentials and then re-encrypts the full DSN so it stays protected until final YAML serialization.
+
+#### SQL Input Validation
+
+Structured SQL datasource definitions must be internally consistent:
+
+- `query` may be used on its own and results in `sql_raw`
+- `table` and non-empty `columns` must always be provided together and result in `sql_select`
+- providing only `table` or only `columns` is rejected as invalid input
+- optional datasource credentials can arrive separately and are merged into the DSN when the DSN does not already contain user info
+
+This validation happens before the pipeline is serialized and prevents ambiguous SQL datasource definitions from reaching RedPanda Connect.
 
 ### PlaceholderResolver
 
@@ -494,8 +575,16 @@ RedPanda client error during create for pipeline mqtt-pipeline: 400
 
 **Solution:** Validate the pipeline YAML configuration. Common causes: invalid Bloblang mapping syntax, unknown input/output types, malformed configuration structure.
 
-#### 3. Pipeline Not Found (404) on Update
+For SQL datasource-backed pipelines, also check the rendered input mode:
 
+- `sql_raw` requires `query`
+- `sql_select` requires both `table` and non-empty `columns`
+- `where` is optional for `sql_select`
+- datasource credentials may arrive separately in the datasource event but are carried in the DSN at RedPanda input level
+
+If only one of `table` or `columns` is provided, the adapter rejects the datasource definition before deployment.
+
+#### 3. Pipeline Not Found (404) on Delete
 ```
 Signalling for upsert — pipeline not found during update (HTTP 404)
 ```

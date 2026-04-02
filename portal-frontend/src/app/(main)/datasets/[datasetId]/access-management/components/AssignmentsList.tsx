@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
 import { usePatchDataset } from '@/app/services/api/datasets/clientRequests'
@@ -15,6 +16,7 @@ type AssignmentsListProps = {
 export const AssignmentsList = (props: AssignmentsListProps) => {
   const { datasetId, initialAssignments } = props
   const t = useTranslations('accessManagement')
+  const router = useRouter()
 
   const { mutateAsync: patchDataset } = usePatchDataset()
 
@@ -34,6 +36,7 @@ export const AssignmentsList = (props: AssignmentsListProps) => {
       subtitle={t('subtitle')}
       testId="accessManagement"
       hasSecondBox
+      onExit={() => router.push(`/datasets/${datasetId}`)}
     />
   )
 }

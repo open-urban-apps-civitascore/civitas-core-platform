@@ -24,7 +24,7 @@ import {
   DatastructureFormAvailableSchema,
   DatastructureFormDraft,
   DatastructureFormDraftSchema,
-  DatastructureStatusTypes,
+  DatastructureStatusType,
   DatastructureTab,
 } from '@/types/datastructures'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
@@ -69,11 +69,11 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
   })
 
   const formValues = useWatch({ control: form.control })
-  const statusWatch = form.watch('dataStructureStatus')
+  const datastructureStatus = form.watch('dataStructureStatus')
   const nameWatch = form.watch('name')
   const descriptionWatch = form.watch('description')
 
-  const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
+  const isDraftMode = datastructureStatus === DATASTRUCTURE_STATUS_TYPES.DRAFT
   const isInUse = !!datastructure.inUse
   const canSetDraft = !isInUse
 
@@ -104,11 +104,11 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
   }, [form, isDraftMode])
 
   useEffect(() => {
-    if (statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
+    if (datastructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
       form.setValue('dataStructureStatus', DATASTRUCTURE_STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
-  }, [canSetAvailable, form, statusWatch, tCommon])
+  }, [canSetAvailable, form, datastructureStatus, tCommon])
 
   const completedTabs = useMemo((): DatastructureTab[] => {
     const completed: DatastructureTab[] = []
@@ -121,7 +121,7 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
     return completed
   }, [descriptionWatch, hasAvailableVersion, nameWatch])
 
-  const handleStatusChange = (newStatus: DatastructureStatusTypes) => {
+  const handleStatusChange = (newStatus: DatastructureStatusType) => {
     form.setValue('dataStructureStatus', newStatus, { shouldDirty: true })
   }
 
@@ -174,8 +174,10 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
 
     const fieldsToUpdate = pickDirtyValues(parsedValues, dirtyFields)
     const shouldUpdateValue = containsNonStatusField(fieldsToUpdate) || areAssignmentsDirty
-    const shouldPublish = !!dirtyFields.dataStructureStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
-    const shouldUnpublish = !!dirtyFields.dataStructureStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
+    const shouldPublish =
+      !!dirtyFields.dataStructureStatus && datastructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+    const shouldUnpublish =
+      !!dirtyFields.dataStructureStatus && datastructureStatus === DATASTRUCTURE_STATUS_TYPES.DRAFT
 
     let datastructureResponse: Datastructure | null = shouldUpdateValue ? await handleUpdateValues(parsedValues) : null
     if (shouldPublish)
@@ -224,9 +226,9 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
     () =>
       (!form.formState.isDirty && !areAssignmentsDirty) ||
       !!form.formState.errors.name ||
-      (statusWatch !== DATASTRUCTURE_STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
+      (datastructureStatus !== DATASTRUCTURE_STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
       isLoading,
-    [areAssignmentsDirty, form.formState.errors, form.formState.isDirty, isLoading, statusWatch],
+    [areAssignmentsDirty, form.formState.errors, form.formState.isDirty, isLoading, datastructureStatus],
   )
 
   return {
@@ -239,7 +241,7 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
     isLoading,
     saveDatastructure,
     statusHint,
-    statusWatch,
+    datastructureStatus,
     selectedTab,
     handleStatusChange,
     resetToInitialState,

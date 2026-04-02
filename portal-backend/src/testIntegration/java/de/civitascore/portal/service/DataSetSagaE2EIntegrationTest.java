@@ -29,6 +29,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.kafka.KafkaContainer;
+import org.testcontainers.utility.MountableFile;
 
 /**
  * End-to-end integration test for the full Dataset Saga workflow.
@@ -71,6 +72,9 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
           .withEnv("POSTGRES_DB", "testdb")
           .withEnv("POSTGRES_USER", "testuser")
           .withEnv("POSTGRES_PASSWORD", "testpass")
+          .withCopyToContainer(
+              MountableFile.forClasspathResource("datasource-db/init.sql"),
+              "/docker-entrypoint-initdb.d/init.sql")
           .waitingFor(
               org.testcontainers.containers.wait.strategy.Wait.forLogMessage(
                   ".*database system is ready to accept connections.*", 2));
@@ -112,7 +116,6 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
 
   @BeforeAll
   static void seedAndWireSaga() throws Exception {
-    seedDatasourceDb();
     String frostPublicUrl = "http://frost-server:8080/FROST-Server/v1.1";
     sagaHelper =
         new SagaOrchestratorTestHelper(
@@ -266,22 +269,5 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
   private void publishMqttMessage(String topic, String payload) throws Exception {
     mosquitto.execInContainer("mosquitto_pub", "-h", "localhost", "-t", topic, "-r", "-m", payload);
     log.info("Published MQTT message to topic '{}': {}", topic, payload);
-  }
-
-  private static void seedDatasourceDb() throws Exception {
-    datasourcePg.execInContainer(
-        "psql",
-        "-U",
-        "testuser",
-        "-d",
-        "testdb",
-        "-c",
-        "CREATE TABLE IF NOT EXISTS sensors ("
-            + "id SERIAL PRIMARY KEY, "
-            + "sensor_name TEXT NOT NULL, "
-            + "sensor_description TEXT NOT NULL); "
-            + "INSERT INTO sensors (sensor_name, sensor_description) "
-            + "VALUES ('SQL Sensor', 'Created from PostgreSQL');");
-    log.info("Seeded datasource-db with test sensor data");
   }
 }

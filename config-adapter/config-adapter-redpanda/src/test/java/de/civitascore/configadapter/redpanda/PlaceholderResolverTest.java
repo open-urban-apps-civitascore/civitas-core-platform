@@ -91,6 +91,75 @@ class PlaceholderResolverTest {
     }
   }
 
+  // ─── FROST_BASE Projects stripping ──────────────────────────────────────
+
+  @Nested
+  @DisplayName("${FROST_BASE} Projects(...) stripping")
+  class FrostBaseProjectsStripping {
+
+    private static final String TARGET_URL =
+        "http://civitas-frost:8080/FROST-Server/v1.1/Projects(8)";
+
+    private static final String TARGET_URL_ROOT = "http://civitas-frost:8080/FROST-Server/v1.1";
+
+    @Test
+    @DisplayName("keeps /Projects(id) for /Things")
+    void resolve_things_keepsProjectsSuffix() throws Exception {
+      Map<String, Object> data = Map.of("url", "${FROST_BASE}/Things");
+      Map<String, Object> result = PlaceholderResolver.resolve(data, TARGET_URL, List.of());
+      assertEquals(TARGET_URL + "/Things", result.get("url"));
+    }
+
+    @Test
+    @DisplayName("strips /Projects(id) for /Observations")
+    void resolve_observations_stripsProjectsSuffix() throws Exception {
+      Map<String, Object> data = Map.of("url", "${FROST_BASE}/Observations");
+      Map<String, Object> result = PlaceholderResolver.resolve(data, TARGET_URL, List.of());
+      assertEquals(TARGET_URL_ROOT + "/Observations", result.get("url"));
+    }
+
+    @Test
+    @DisplayName("strips /Projects(id) for /Datastreams")
+    void resolve_datastreams_stripsProjectsSuffix() throws Exception {
+      Map<String, Object> data = Map.of("url", "${FROST_BASE}/Datastreams");
+      Map<String, Object> result = PlaceholderResolver.resolve(data, TARGET_URL, List.of());
+      assertEquals(TARGET_URL_ROOT + "/Datastreams", result.get("url"));
+    }
+
+    @Test
+    @DisplayName("strips /Projects with arbitrary id like Projects(42)")
+    void resolve_arbitraryProjectId_stripsCorrectly() throws Exception {
+      String url = "http://frost:8080/FROST-Server/v1.1/Projects(42)";
+      Map<String, Object> data = Map.of("url", "${FROST_BASE}/Datastreams");
+      Map<String, Object> result = PlaceholderResolver.resolve(data, url, List.of());
+      assertEquals("http://frost:8080/FROST-Server/v1.1/Datastreams", result.get("url"));
+    }
+
+    @Test
+    @DisplayName("no-op when targetUrl has no /Projects(...) suffix")
+    void resolve_noProjectsSuffix_usesUrlAsIs() throws Exception {
+      Map<String, Object> data = Map.of("url", "${FROST_BASE}/Observations");
+      Map<String, Object> result = PlaceholderResolver.resolve(data, TARGET_URL_ROOT, List.of());
+      assertEquals(TARGET_URL_ROOT + "/Observations", result.get("url"));
+    }
+
+    @Test
+    @DisplayName("resolves all three entity types in one pipeline")
+    void resolve_mixedEntityTypes_resolvesCorrectly() throws Exception {
+      Map<String, Object> data =
+          Map.of(
+              "things", "${FROST_BASE}/Things",
+              "obs", "${FROST_BASE}/Observations",
+              "ds", "${FROST_BASE}/Datastreams");
+
+      Map<String, Object> result = PlaceholderResolver.resolve(data, TARGET_URL, List.of());
+
+      assertEquals(TARGET_URL + "/Things", result.get("things"));
+      assertEquals(TARGET_URL_ROOT + "/Observations", result.get("obs"));
+      assertEquals(TARGET_URL_ROOT + "/Datastreams", result.get("ds"));
+    }
+  }
+
   // ─── DATASOURCE[n] DSN ────────────────────────────────────────────────────
 
   @Nested

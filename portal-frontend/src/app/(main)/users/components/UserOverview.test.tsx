@@ -1,6 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-import { useCreateUser, useGetCurrentUser, useUpdateUser } from '@/app/services/api/users/clientRequests'
+import {
+  useCreateUser,
+  useGetCurrentUser,
+  useReplaceUserGroups,
+  useUpdateUser,
+} from '@/app/services/api/users/clientRequests'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 import { User } from '@/types/users'
 
@@ -9,8 +14,8 @@ import { UserOverview } from './UserOverview'
 const mockPush = vi.fn()
 const mockRefresh = vi.fn()
 const mockSetSubTabValueParam = vi.fn()
-const mockCreateMutate = vi.fn()
-const mockUpdateMutate = vi.fn()
+const mockCreateMutateAsync = vi.fn()
+const mockUpdateMutateAsync = vi.fn()
 const mockInvalidateQueries = vi.fn()
 
 let mockSubTabValue = ''
@@ -34,14 +39,21 @@ vi.mock('@/hooks/use-query-params', () => ({
   }),
 }))
 
+const mockReplaceUserGroupsMutateAsync = vi.fn()
+
 vi.mock('@/app/services/api/users/clientRequests', () => ({
-  useCreateUser: vi.fn(() => ({ mutate: mockCreateMutate, isPending: false })),
-  useUpdateUser: vi.fn(() => ({ mutate: mockUpdateMutate, isPending: false })),
+  useCreateUser: vi.fn(() => ({ mutateAsync: mockCreateMutateAsync, isPending: false })),
+  useUpdateUser: vi.fn(() => ({ mutateAsync: mockUpdateMutateAsync, isPending: false })),
+  useReplaceUserGroups: vi.fn(() => ({ mutateAsync: mockReplaceUserGroupsMutateAsync, isPending: false })),
   useGetCurrentUser: vi.fn(),
 }))
 
 vi.mock('@/app/services/api/groups/clientRequests', () => ({
   useGetGroups: vi.fn(() => ({ data: { data: [], totalElements: 0 }, isFetching: false, error: null })),
+}))
+
+vi.mock('@/app/services/api/request/apiRequest', () => ({
+  apiRequest: vi.fn(() => Promise.resolve({ data: {} })),
 }))
 
 vi.mock('@/app/services/api/assignments/clientRequests', () => ({
@@ -113,13 +125,17 @@ describe('UserOverview', () => {
     mockSubTabValue = ''
     mockSearchParams = new URLSearchParams()
     vi.mocked(useCreateUser).mockReturnValue({
-      mutate: mockCreateMutate,
+      mutateAsync: mockCreateMutateAsync,
       isPending: false,
     } as unknown as ReturnType<typeof useCreateUser>)
     vi.mocked(useUpdateUser).mockReturnValue({
-      mutate: mockUpdateMutate,
+      mutateAsync: mockUpdateMutateAsync,
       isPending: false,
     } as unknown as ReturnType<typeof useUpdateUser>)
+    vi.mocked(useReplaceUserGroups).mockReturnValue({
+      mutateAsync: mockReplaceUserGroupsMutateAsync,
+      isPending: false,
+    } as unknown as ReturnType<typeof useReplaceUserGroups>)
     mockCurrentUser(allPermissions)
   })
 
@@ -208,6 +224,12 @@ describe('UserOverview', () => {
       expect(screen.getByTestId('tab-roles')).toBeInTheDocument()
     })
 
+    it('disables the Roles tab in create mode', () => {
+      mockCurrentUser(allPermissions)
+      renderComponent({ isCreateMode: true })
+      expect(screen.getByTestId('tab-roles')).toBeDisabled()
+    })
+
     it('hides Roles tab without ASSIGNMENT_READ permission', () => {
       mockCurrentUser([])
       renderComponent()
@@ -269,9 +291,10 @@ describe('UserOverview', () => {
     })
 
     it('Save and Cancel/Exit buttons are disabled while isLoading', () => {
-      vi.mocked(useUpdateUser).mockReturnValue({ mutate: mockUpdateMutate, isPending: true } as unknown as ReturnType<
-        typeof useUpdateUser
-      >)
+      vi.mocked(useUpdateUser).mockReturnValue({
+        mutateAsync: mockUpdateMutateAsync,
+        isPending: true,
+      } as unknown as ReturnType<typeof useUpdateUser>)
       mockSearchParams = new URLSearchParams('mode=edit')
       renderComponent()
       expect(screen.getByTestId('confirmButton')).toBeDisabled()
@@ -356,14 +379,10 @@ describe('UserOverview', () => {
       fireEvent.change(screen.getByTestId('firstNameTextField'), { target: { value: 'NewFirst' } })
       fireEvent.click(screen.getByTestId('confirmButton'))
       await waitFor(() => {
-        expect(mockCreateMutate).toHaveBeenCalledWith(
+        expect(mockCreateMutateAsync).toHaveBeenCalledWith(
           expect.objectContaining({
             firstName: 'NewFirst',
             email: 'test.user2@test.com',
-          }),
-          expect.objectContaining({
-            onSuccess: expect.any(Function),
-            onError: expect.any(Function),
           }),
         )
       })
@@ -374,15 +393,13 @@ describe('UserOverview', () => {
       fireEvent.change(screen.getByTestId('firstNameTextField'), { target: { value: 'NewFirst' } })
       fireEvent.click(screen.getByTestId('confirmButton'))
       await waitFor(() => {
-        expect(mockCreateMutate).toHaveBeenCalledWith(expect.objectContaining({ phone: null }), expect.any(Object))
+        expect(mockCreateMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ phone: null }))
       })
     })
 
     it('shows success toast after create', async () => {
       const { toast } = await import('sonner')
-      mockCreateMutate.mockImplementation((_data, options) => {
-        options?.onSuccess?.({ data: { id: '42' } })
-      })
+      mockCreateMutateAsync.mockResolvedValue({ data: { id: '42' } })
       renderComponent({ isCreateMode: true, userData: validUserData })
       fireEvent.change(screen.getByTestId('firstNameTextField'), { target: { value: 'NewFirst' } })
       fireEvent.click(screen.getByTestId('confirmButton'))
@@ -392,9 +409,7 @@ describe('UserOverview', () => {
     })
 
     it('navigates to /users/{id}?mode=edit after create', async () => {
-      mockCreateMutate.mockImplementation((_data, options) => {
-        options?.onSuccess?.({ data: { id: '42' } })
-      })
+      mockCreateMutateAsync.mockResolvedValue({ data: { id: '42' } })
       renderComponent({ isCreateMode: true, userData: validUserData })
       fireEvent.change(screen.getByTestId('firstNameTextField'), { target: { value: 'NewFirst' } })
       fireEvent.click(screen.getByTestId('confirmButton'))
@@ -405,9 +420,7 @@ describe('UserOverview', () => {
 
     it('shows error toast on failed create', async () => {
       const { toast } = await import('sonner')
-      mockCreateMutate.mockImplementation((_data, options) => {
-        options?.onError?.({ status: 500, response: { data: { message: 'error' } } })
-      })
+      mockCreateMutateAsync.mockRejectedValue({ status: 500, response: { data: { message: 'error' } } })
       renderComponent({ isCreateMode: true, userData: validUserData })
       fireEvent.change(screen.getByTestId('firstNameTextField'), { target: { value: 'NewFirst' } })
       fireEvent.click(screen.getByTestId('confirmButton'))
@@ -418,13 +431,13 @@ describe('UserOverview', () => {
   })
 
   describe('Update User', () => {
-    it('calls updateUser.mutate with only dirty fields', async () => {
+    it('calls updateUser.mutateAsync with only dirty fields', async () => {
       mockSearchParams = new URLSearchParams('mode=edit')
       renderComponent()
       fireEvent.change(screen.getByTestId('firstNameTextField'), { target: { value: 'Updated' } })
       fireEvent.click(screen.getByTestId('confirmButton'))
       await waitFor(() => {
-        const calledData = mockUpdateMutate.mock.calls[0][0]
+        const calledData = mockUpdateMutateAsync.mock.calls[0][0]
         expect(calledData).toEqual({ id: '1', firstName: 'Updated' })
       })
     })
@@ -436,15 +449,13 @@ describe('UserOverview', () => {
       fireEvent.change(screen.getByTestId('phoneTextField'), { target: { value: '' } })
       fireEvent.click(screen.getByTestId('confirmButton'))
       await waitFor(() => {
-        expect(mockUpdateMutate).toHaveBeenCalledWith(expect.objectContaining({ phone: null }), expect.any(Object))
+        expect(mockUpdateMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ phone: null }))
       })
     })
 
     it('shows success toast after update', async () => {
       const { toast } = await import('sonner')
-      mockUpdateMutate.mockImplementation((_data, options) => {
-        options?.onSuccess?.({ data: { ...mockUserData, firstName: 'Updated' } })
-      })
+      mockUpdateMutateAsync.mockResolvedValue({ data: { ...mockUserData, firstName: 'Updated' } })
       mockSearchParams = new URLSearchParams('mode=edit')
       renderComponent()
       fireEvent.change(screen.getByTestId('firstNameTextField'), { target: { value: 'Updated' } })
@@ -456,9 +467,7 @@ describe('UserOverview', () => {
 
     it('shows error toast on failed update', async () => {
       const { toast } = await import('sonner')
-      mockUpdateMutate.mockImplementation((_data, options) => {
-        options?.onError?.({ status: 500, response: { data: { message: 'error' } } })
-      })
+      mockUpdateMutateAsync.mockRejectedValue({ status: 500, response: { data: { message: 'error' } } })
       mockSearchParams = new URLSearchParams('mode=edit')
       renderComponent()
       fireEvent.change(screen.getByTestId('firstNameTextField'), { target: { value: 'Updated' } })
@@ -511,9 +520,7 @@ describe('UserOverview', () => {
     })
 
     it('clicking Save in modal triggers update and closes modal on success', async () => {
-      mockUpdateMutate.mockImplementation((_data, options) => {
-        options?.onSuccess?.({ data: { ...mockUserData, firstName: 'Changed' } })
-      })
+      mockUpdateMutateAsync.mockResolvedValue({ data: { ...mockUserData, firstName: 'Changed' } })
       mockSearchParams = new URLSearchParams('mode=edit')
       renderComponent()
       fireEvent.change(screen.getByTestId('firstNameTextField'), { target: { value: 'Changed' } })
@@ -526,7 +533,7 @@ describe('UserOverview', () => {
       })
       fireEvent.click(screen.getByTestId('saveButton'))
       await waitFor(() => {
-        expect(mockUpdateMutate).toHaveBeenCalled()
+        expect(mockUpdateMutateAsync).toHaveBeenCalled()
         expect(screen.queryByTestId('exitWarningModal')).not.toBeInTheDocument()
       })
     })

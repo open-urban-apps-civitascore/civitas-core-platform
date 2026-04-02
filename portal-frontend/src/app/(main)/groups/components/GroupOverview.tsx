@@ -1,10 +1,9 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -21,6 +20,7 @@ import { Form } from '@/components/ui/form'
 import { useError } from '@/hooks/use-error'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Group, GroupBaseFormData, GroupBaseFormDataSchema, GroupTab } from '@/types/groups'
 import { Role } from '@/types/roles'
@@ -97,67 +97,70 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     setPendingRoles([])
   }, [initialGroupData, form])
 
-  const handleGroupRequestError = (error: AxiosError, defaultMessage: string) => {
-    if (isNameConflictError(error)) handleNameError(form, form.getValues('name'))
-    else toast.error(defaultMessage)
-  }
-
-  const handleCreateGroup = (formData: GroupBaseFormData) => {
+  const handleCreateGroup = async (formData: GroupBaseFormData): Promise<boolean> => {
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createGroupData } = mapGroupFormToApiData(formData)
-    createGroup.mutate(createGroupData, {
-      onSuccess: ({ data }) => {
-        const navigateToGroup = () => {
-          setIsNavigating(true)
-          router.push(`/groups/${data.id}?mode=edit`)
-        }
+    try {
+      const { data } = await createGroup.mutateAsync(createGroupData)
 
-        if (formData.assignments.length > 0) {
-          replaceAssignments.mutate(
-            { groupId: data.id, assignments: formData.assignments },
-            {
-              onSuccess: () => {
-                toast.success(tCommon('messages.createSuccess', { item: tCommon('items.group') }))
-                navigateToGroup()
-              },
-              onError: (error: unknown) => {
-                toast.error(t('errors.assignmentSaveError'))
-                console.error('Failed to save assignments', error)
-                navigateToGroup()
-              },
-            },
-          )
-        } else {
+      const navigateToGroup = () => {
+        setIsNavigating(true)
+        router.push(`/groups/${data.id}?mode=edit`)
+      }
+
+      if (formData.assignments.length > 0) {
+        try {
+          await replaceAssignments.mutateAsync({ groupId: data.id, assignments: formData.assignments })
           toast.success(tCommon('messages.createSuccess', { item: tCommon('items.group') }))
           navigateToGroup()
+        } catch (error: unknown) {
+          toast.error(t('errors.assignmentSaveError'))
+          console.error('Failed to save assignments', error)
+          navigateToGroup()
         }
-      },
-      onError: error => handleGroupRequestError(error, t('errors.createError')),
-    })
+      } else {
+        toast.success(tCommon('messages.createSuccess', { item: tCommon('items.group') }))
+        navigateToGroup()
+      }
+
+      return true
+    } catch (error: unknown) {
+      if (isNameConflictError(error)) {
+        handleNameError(form, form.getValues('name'))
+      } else {
+        toast.error(t('errors.createError'))
+      }
+      return false
+    }
   }
 
-  const handleUpdateGroup = (formData: GroupBaseFormData) => {
-    updateGroup.mutate(mapGroupFormToApiData(formData), {
-      onSuccess: ({ data }) => {
-        replaceAssignments.mutate(
-          { groupId: data.id, assignments: formData.assignments },
-          {
-            onSuccess: ({ data: assignmentData }) => {
-              toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.group') }))
-              setInitialGroupData(assignmentData)
-              setPendingRoles([])
-              setIsExitModalOpen(false)
-            },
-            onError: error => {
-              toast.error(t('errors.updateError'))
-              setInitialGroupData(data)
-              console.error('Failed to save assignments', error)
-            },
-          },
-        )
-      },
-      onError: error => handleGroupRequestError(error, t('errors.updateError')),
-    })
+  const handleUpdateGroup = async (formData: GroupBaseFormData): Promise<boolean> => {
+    try {
+      const { data } = await updateGroup.mutateAsync(mapGroupFormToApiData(formData))
+      try {
+        const { data: assignmentData } = await replaceAssignments.mutateAsync({
+          groupId: data.id,
+          assignments: formData.assignments,
+        })
+        toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.group') }))
+        setInitialGroupData(assignmentData)
+        setPendingRoles([])
+        setIsExitModalOpen(false)
+        return true
+      } catch (error) {
+        toast.error(t('errors.updateError'))
+        setInitialGroupData(data)
+        console.error('Failed to save assignments', error)
+        return false
+      }
+    } catch (error: unknown) {
+      if (isNameConflictError(error)) {
+        handleNameError(form, form.getValues('name'))
+      } else {
+        toast.error(t('errors.updateError'))
+      }
+      return false
+    }
   }
 
   const handleExit = () => {
@@ -175,9 +178,28 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     else handleExit()
   }
 
-  const handleSave = isCreateMode
-    ? form.handleSubmit(handleCreateGroup, handleFormValidationError)
-    : form.handleSubmit(handleUpdateGroup, handleFormValidationError)
+  const handleSave = async () => {
+    let isSaved = false
+
+    await form.handleSubmit(
+      async formData => {
+        isSaved = isCreateMode ? await handleCreateGroup(formData) : await handleUpdateGroup(formData)
+      },
+      errors => {
+        handleFormValidationError(errors)
+        isSaved = false
+      },
+    )()
+
+    return isSaved
+  }
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    void handleSave()
+  }
+
+  useRegisterUnsavedChanges(isFormDirty, handleSave)
 
   const renderTabContent = () => {
     switch (subTabValue) {
@@ -247,7 +269,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
       />
       <PageBackground className="flex flex-col" hasBackground={!isReadOnly}>
         <Form {...form}>
-          <form id="groupEditForm" onSubmit={handleSave} className="flex flex-col justify-between h-full">
+          <form id="groupEditForm" onSubmit={handleSubmit} className="flex flex-col justify-between h-full">
             {isLoading ? <LoadingSpinner className="h-[300px]" /> : renderTabContent()}
           </form>
         </Form>

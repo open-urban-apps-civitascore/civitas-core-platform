@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import de.civitascore.configadapter.crypto.CredentialDecryptor;
+import de.civitascore.configadapter.crypto.CredentialEncryptor;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import java.io.Closeable;
@@ -48,8 +49,9 @@ class PipelineSerializer implements Closeable {
    * Converts pipeline data to YAML, decrypting any {@code ENC(...)} values.
    *
    * @param pipelineData the pipeline definition as a Map
-   * @param credentialContext a non-empty context string for per-credential key isolation (e.g.
-   *     pipeline ID)
+   * @param credentialContext a non-empty context string for per-credential key isolation — must
+   *     match the context used during encryption (see {@link
+   *     de.civitascore.configadapter.crypto.CredentialEncryptor#DATASOURCE_CREDENTIAL_CONTEXT})
    * @return the YAML string representation
    * @throws FatalAdapterException if decryption fails or master key is missing for encrypted values
    * @throws IllegalStateException if this serializer has been closed
@@ -76,6 +78,52 @@ class PipelineSerializer implements Closeable {
       } catch (JsonProcessingException e) {
         throw new FatalAdapterException(
             AdapterErrorCode.REDPANDA_PIPELINE_ERROR, e, e.getMessage());
+      }
+    }
+  }
+
+  /**
+   * Decrypts all {@code ENC(...)} credential values in a map, using the datasource credential
+   * context. Used to pre-decrypt datasource configurations before DSN construction.
+   *
+   * @param map the map containing potentially encrypted values
+   * @return a new map with decrypted values
+   * @throws FatalAdapterException if decryption fails or the serializer is closed
+   */
+  Map<String, Object> decryptDatasourceCredentials(Map<String, Object> map)
+      throws FatalAdapterException {
+    synchronized (lock) {
+      if (closed) {
+        throw new IllegalStateException("PipelineSerializer has been closed");
+      }
+      try {
+        return CredentialDecryptor.decryptMapValues(
+            map, stretchedKey, CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT);
+      } catch (GeneralSecurityException e) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.REDPANDA_DECRYPTION_ERROR, e, e.getMessage());
+      }
+    }
+  }
+
+  /**
+   * Encrypts a datasource-derived plaintext value with the shared datasource credential context and
+   * wraps it as {@code ENC(...)} so it can be safely carried forward until final YAML
+   * serialization.
+   */
+  String encryptDatasourceValue(String plaintext) throws FatalAdapterException {
+    synchronized (lock) {
+      if (closed) {
+        throw new IllegalStateException("PipelineSerializer has been closed");
+      }
+      try {
+        return "ENC("
+            + CredentialEncryptor.encrypt(
+                plaintext, stretchedKey, CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT)
+            + ")";
+      } catch (GeneralSecurityException e) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.REDPANDA_DECRYPTION_ERROR, e, e.getMessage());
       }
     }
   }

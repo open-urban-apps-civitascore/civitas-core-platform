@@ -28,7 +28,10 @@ import org.slf4j.LoggerFactory;
  * <p>Supported placeholders:
  *
  * <ul>
- *   <li>{@code ${FROST_BASE}} — replaced with the target URL
+ *   <li>{@code ${FROST_BASE}} — replaced with the target URL. When followed by {@code
+ *       /Observations} or {@code /Datastreams}, any trailing {@code /Projects(...)} segment is
+ *       stripped from the target URL so those entity types resolve against the FROST root. When
+ *       followed by {@code /Things} (or anything else), the full target URL is used as-is.
  *   <li>{@code ${DATASOURCE[n]}} — replaced with a DSN string for the n-th datasource
  *   <li>{@code ${DATASOURCE[n].property}} — replaced with a single property value
  * </ul>
@@ -39,6 +42,11 @@ import org.slf4j.LoggerFactory;
 final class PlaceholderResolver {
 
   private static final Logger log = LoggerFactory.getLogger(PlaceholderResolver.class);
+
+  private static final Pattern FROST_SUFFIX_PATTERN =
+      Pattern.compile("^/(Things|Observations|Datastreams)");
+
+  private static final Pattern PROJECTS_SUFFIX_PATTERN = Pattern.compile("/Projects\\([^)]*\\)$");
 
   // Core Datasource field names used in getCoreField switch
   private static final String FIELD_ID = "id";
@@ -68,7 +76,8 @@ final class PlaceholderResolver {
    * Returns a deep copy of {@code pipelineData} with all supported placeholders resolved.
    *
    * @param pipelineData the pipeline definition as a Map (may be null)
-   * @param targetUrl the FROST base URL for {@code ${FROST_BASE}} resolution
+   * @param targetUrl the FROST target URL for {@code ${FROST_BASE}} resolution (may contain a
+   *     trailing {@code /Projects(...)} segment that is stripped for non-Things entity types)
    * @param datasources the datasource list for {@code ${DATASOURCE[n]}} resolution
    * @return the resolved map, or null if pipelineData was null
    * @throws FatalAdapterException on invalid placeholder references
@@ -131,7 +140,7 @@ final class PlaceholderResolver {
     StringBuilder sb = new StringBuilder();
     do {
       String expression = matcher.group(1);
-      String replacement = resolvePlaceholder(expression, matcher, targetUrl, datasources);
+      String replacement = resolvePlaceholder(expression, matcher, input, targetUrl, datasources);
       matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
     } while (matcher.find());
     matcher.appendTail(sb);
@@ -153,11 +162,15 @@ final class PlaceholderResolver {
   }
 
   private static String resolvePlaceholder(
-      String expression, Matcher matcher, String targetUrl, List<Datasource> datasources)
+      String expression,
+      Matcher matcher,
+      String input,
+      String targetUrl,
+      List<Datasource> datasources)
       throws FatalAdapterException {
 
     if ("FROST_BASE".equals(expression)) {
-      return resolveFrostBase(targetUrl);
+      return resolveFrostBase(targetUrl, input, matcher.end());
     }
 
     String indexStr = matcher.group(2);
@@ -196,19 +209,37 @@ final class PlaceholderResolver {
     return resolveDatasourceDsn(ds, index);
   }
 
-  private static String resolveFrostBase(String targetUrl) throws FatalAdapterException {
+  private static String resolveFrostBase(String targetUrl, String input, int matchEnd)
+      throws FatalAdapterException {
     if (targetUrl == null || targetUrl.isBlank()) {
       throw new FatalAdapterException(
           AdapterErrorCode.INVALID_PAYLOAD,
           "Placeholder ${FROST_BASE} requires a targetUrl but none was provided");
     }
+
+    // Lookahead: check if ${FROST_BASE} is followed by /Observations or /Datastreams
+    Matcher suffixMatcher = FROST_SUFFIX_PATTERN.matcher(input.substring(matchEnd));
+    if (suffixMatcher.find()) {
+      String entityType = suffixMatcher.group(1);
+      if (!"Things".equals(entityType)) {
+        // Strip trailing /Projects(...) so Observations and Datastreams resolve against FROST root
+        String stripped = PROJECTS_SUFFIX_PATTERN.matcher(targetUrl).replaceFirst("");
+        log.debug("Resolved ${{FROST_BASE}} → [targetUrl without Projects] for /{}", entityType);
+        return stripped;
+      }
+    }
+
     log.debug("Resolved ${{FROST_BASE}} → [targetUrl]");
     return targetUrl;
   }
 
   private static String resolveDatasourceDsn(Datasource ds, int index)
       throws FatalAdapterException {
-    String dsn = DatasourceParser.buildDsnFromDatasource(ds);
+    Map<String, Object> cfg = DatasourceParser.configuration(ds);
+    String dsn = DatasourceField.DSN.asString(cfg).orElse(null);
+    if (dsn == null) {
+      dsn = DatasourceParser.buildDsnFromDatasource(ds);
+    }
     if (dsn == null) {
       throw new FatalAdapterException(
           AdapterErrorCode.INVALID_PAYLOAD,

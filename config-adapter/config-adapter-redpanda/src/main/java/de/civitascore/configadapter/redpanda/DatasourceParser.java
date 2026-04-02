@@ -106,6 +106,8 @@ final class DatasourceParser {
     String dsn = DatasourceField.DSN.asString(cfg).orElse(null);
     if (dsn == null) {
       dsn = buildDsn(datasource, cfg);
+    } else {
+      dsn = mergeCredentialsIntoDsnIfMissing(dsn, cfg);
     }
     if (dsn == null) {
       throw new FatalAdapterException(
@@ -116,8 +118,11 @@ final class DatasourceParser {
     }
     String driver = DatasourceField.DRIVER.asString(cfg).orElse(DEFAULT_DRIVER);
     String query = DatasourceField.QUERY.asString(cfg).orElse(null);
+    String table = DatasourceField.TABLE.asString(cfg).orElse(null);
+    List<String> columns = DatasourceField.COLUMNS.asList(cfg);
+    String where = DatasourceField.WHERE.asString(cfg).orElse(null);
 
-    return new ConnectorConfig.Sql(driver, dsn, query);
+    return new ConnectorConfig.Sql(driver, dsn, query, table, columns, where);
   }
 
   /**
@@ -160,10 +165,7 @@ final class DatasourceParser {
       return null;
     }
     String encUser = URLEncoder.encode(username, StandardCharsets.UTF_8);
-    String credentials =
-        password != null
-            ? encUser + ":" + URLEncoder.encode(String.valueOf(password), StandardCharsets.UTF_8)
-            : encUser;
+    String credentials = password != null ? encUser + ":" + String.valueOf(password) : encUser;
     String encDatabase = URLEncoder.encode(database, StandardCharsets.UTF_8);
     // Host is not URL-encoded: RFC 3986 hostnames are restricted to unreserved
     // characters. IPv6 literals must be bracketed per RFC 3986 §3.2.2.
@@ -186,6 +188,39 @@ final class DatasourceParser {
   static String buildDsnFromDatasource(Datasource datasource) throws FatalAdapterException {
     Map<String, Object> cfg = configuration(datasource);
     return buildDsn(datasource, cfg);
+  }
+
+  static String mergeCredentialsIntoDsnIfMissing(String dsn, Map<String, Object> cfg) {
+    String username = DatasourceField.USERNAME.asString(cfg).orElse(null);
+    if (dsn == null || username == null) {
+      return dsn;
+    }
+
+    int schemeSeparator = dsn.indexOf("://");
+    if (schemeSeparator < 0) {
+      return dsn;
+    }
+
+    int authorityStart = schemeSeparator + 3;
+    int authorityEnd = dsn.length();
+    for (int i = authorityStart; i < dsn.length(); i++) {
+      char ch = dsn.charAt(i);
+      if (ch == '/' || ch == '?' || ch == '#') {
+        authorityEnd = i;
+        break;
+      }
+    }
+
+    String authority = dsn.substring(authorityStart, authorityEnd);
+    if (authority.isEmpty() || authority.contains("@")) {
+      return dsn;
+    }
+
+    Object password = DatasourceField.PASSWORD.asObject(cfg);
+    String encUser = URLEncoder.encode(username, StandardCharsets.UTF_8);
+    String credentials = password != null ? encUser + ":" + String.valueOf(password) : encUser;
+
+    return dsn.substring(0, authorityStart) + credentials + "@" + dsn.substring(authorityStart);
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────────

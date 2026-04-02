@@ -683,7 +683,7 @@
       "clientAuthenticatorType": "client-secret",
       "secret": "dev-only-portal-frontend-secret",
       "redirectUris": [
-        "http://localhost:3000/api/auth/callback/keycloak",
+        "http://localhost:3000/*",
         "http://localhost:8089/v1/swagger-ui/oauth2-redirect.html"
       ],
       "webOrigins": [

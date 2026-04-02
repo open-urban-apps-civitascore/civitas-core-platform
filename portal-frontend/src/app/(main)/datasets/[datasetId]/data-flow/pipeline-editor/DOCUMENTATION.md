@@ -612,7 +612,7 @@ Each node type that contributes to the model registers a handler:
 
 The DataSource input uses the connector type from entity metadata (mqtt, sql, csv, etc.). The backend resolves actual connection credentials from the label.
 
-The FROST section is a fixed template that generates thing/observation upsert logic with `${FROST_BASE}` env variable placeholder (backend resolves at deploy time).
+The FROST section is a fixed template that generates thing/observation upsert logic with `${FROST_BASE}` placeholders, which are resolved by the config-adapter before deployment.
 
 ### Save Flow
 

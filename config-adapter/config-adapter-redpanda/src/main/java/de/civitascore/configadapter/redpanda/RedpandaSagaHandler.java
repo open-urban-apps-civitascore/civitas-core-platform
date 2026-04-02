@@ -20,8 +20,10 @@ import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.util.PayloadConverter;
 import jakarta.ws.rs.client.Client;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.owasp.encoder.Encode;
@@ -60,6 +62,7 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
   private static final String FIELD_ID = "id";
   private static final String FIELD_ACTION = "action";
   private static final String FIELD_DATA = "data";
+  private static final String FIELD_CONFIGURATION = "configuration";
 
   private static final String ACTION_ADD = "ADD";
   private static final String ACTION_UPDATE = "UPDATE";
@@ -75,7 +78,19 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
   @Override
   protected void doInitialize(AdapterConfig config) {
     String baseUrl = getProperty("url", DEFAULT_URL);
-    byte[] stretchedKey = CryptoKeyLoader.loadAndStretchKeyFromEnv(MASTER_KEY_ENV);
+    String masterKeyHex = getProperty("master-key", null);
+    byte[] stretchedKey;
+
+    if (masterKeyHex != null) {
+      try {
+        stretchedKey =
+            CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(masterKeyHex));
+      } catch (GeneralSecurityException e) {
+        throw new IllegalStateException("Invalid master key in adapter config", e);
+      }
+    } else {
+      stretchedKey = CryptoKeyLoader.loadAndStretchKeyFromEnv(MASTER_KEY_ENV);
+    }
 
     if (stretchedKey.length == 0) {
       log.warn("{} not set — encrypted credentials cannot be decrypted", MASTER_KEY_ENV);
@@ -235,8 +250,77 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
       Map<String, Object> pipeline, List<Datasource> datasources, String targetUrl)
       throws FatalAdapterException {
     Map<String, Object> data = optionalPipelineMapField(pipeline, FIELD_DATA);
-    data = DatasourceInjector.resolve(data, datasources);
-    return PlaceholderResolver.resolve(data, targetUrl, datasources);
+    List<Datasource> decrypted = decryptDatasourceCredentials(datasources);
+    data = DatasourceInjector.resolve(data, decrypted);
+    return PlaceholderResolver.resolve(data, targetUrl, decrypted);
+  }
+
+  /**
+   * Decrypts datasource credentials so SQL DSNs can be completed from username/password fields and
+   * then re-encrypts the final DSN as a single ENC(...) value for the remaining pipeline flow.
+   */
+  private List<Datasource> decryptDatasourceCredentials(List<Datasource> datasources)
+      throws FatalAdapterException {
+    List<Datasource> result = new ArrayList<>(datasources.size());
+    for (Datasource ds : datasources) {
+      Map<String, Object> props = ds.getAdditionalProperties();
+      if (props.isEmpty()) {
+        result.add(ds);
+        continue;
+      }
+      Map<String, Object> decryptedProps = redpandaClient.decryptDatasourceCredentials(props);
+      if (ConnectorType.fromRaw(ds.getType()).orElse(null) == ConnectorType.SQL) {
+        decryptedProps = reencryptSqlDsn(ds, decryptedProps);
+      }
+      result.add(copyDatasource(ds, decryptedProps));
+    }
+    return List.copyOf(result);
+  }
+
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> reencryptSqlDsn(Datasource datasource, Map<String, Object> props)
+      throws FatalAdapterException {
+    if (props == null || props.isEmpty()) {
+      return props;
+    }
+
+    Datasource resolvedDatasource = copyDatasource(datasource, props);
+    Map<String, Object> cfg = DatasourceParser.configuration(resolvedDatasource);
+    String dsn = DatasourceField.DSN.asString(cfg).orElse(null);
+    if (dsn == null) {
+      dsn = DatasourceParser.buildDsn(resolvedDatasource, cfg);
+    } else {
+      dsn = DatasourceParser.mergeCredentialsIntoDsnIfMissing(dsn, cfg);
+    }
+    if (dsn == null) {
+      return props;
+    }
+
+    String encryptedDsn = redpandaClient.encryptDatasourceValue(dsn);
+    Map<String, Object> updatedProps = new LinkedHashMap<>(props);
+
+    if (updatedProps.get(FIELD_CONFIGURATION) instanceof Map<?, ?> nested) {
+      Map<String, Object> updatedConfiguration = new LinkedHashMap<>((Map<String, Object>) nested);
+      updatedConfiguration.put("dsn", encryptedDsn);
+      updatedProps.put(FIELD_CONFIGURATION, updatedConfiguration);
+    } else {
+      updatedProps.put("dsn", encryptedDsn);
+    }
+    return updatedProps;
+  }
+
+  private Datasource copyDatasource(Datasource source, Map<String, Object> props) {
+    Datasource copy = new Datasource();
+    copy.setId(source.getId());
+    copy.setType(source.getType());
+    copy.setName(source.getName());
+    copy.setDescription(source.getDescription());
+    copy.setHost(source.getHost());
+    copy.setPort(source.getPort());
+    for (Map.Entry<String, Object> entry : props.entrySet()) {
+      copy.handleUnknownProperty(entry.getKey(), entry.getValue());
+    }
+    return copy;
   }
 
   private SagaCommandResult pipelineError(

@@ -39,7 +39,7 @@ export const WarningModal = (props: WarningModalProps) => {
           </Button>
           {onConfirm && (
             <Button
-              data-testid="saveButton"
+              data-testid="confirmButton"
               type="button"
               onClick={onConfirm}
               disabled={isLoading}

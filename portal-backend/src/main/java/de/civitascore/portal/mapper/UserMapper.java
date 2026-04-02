@@ -29,7 +29,6 @@ public interface UserMapper extends DtoMapper<UserInputDTO, UserOutputDTO, User>
   @Override
   UserOutputDTO toOutput(User entity);
 
-  @Mapping(target = "groupIds", ignore = true)
   @Override
   UserInputDTO toInput(User entity);
 

@@ -59,7 +59,8 @@ final class CryptoUtils {
    * context string provides per-credential key isolation.
    *
    * @param stretchedKey 32-byte output of {@link CryptoKeyLoader#stretchMasterKey(byte[])}
-   * @param context a non-null, non-empty context string (e.g. pipeline ID)
+   * @param context a non-null, non-empty context string (e.g. {@link
+   *     CredentialEncryptor#DATASOURCE_CREDENTIAL_CONTEXT})
    * @return an AES-256 {@link SecretKey} unique to the given context
    * @throws GeneralSecurityException if HMAC computation fails
    * @throws IllegalArgumentException if {@code context} is null or empty

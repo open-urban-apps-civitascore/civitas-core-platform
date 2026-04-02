@@ -20,6 +20,7 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -342,7 +343,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
 
     // pendingSagaType is CREATE — try to unrelease immediately
     assertThatThrownBy(() -> dataSetService.unrelease(dataSetId))
-        .isInstanceOf(InvalidInputException.class)
+        .isInstanceOf(ResourceInUseException.class)
         .hasMessageContaining("saga is in-flight");
 
     DataSet completed = verifier.awaitSagaCompletion(dataSetId);
@@ -587,6 +588,43 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       assertThatThrownBy(() -> dataSetService.updatePublishedMeta(dataSet.getId(), updateInput))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("DRAFT");
+    }
+
+    @Test
+    @DisplayName("updatePublishedMeta rejects when CREATE saga is in-flight (409)")
+    void updatePublishedMeta_rejectsDuringSagaInFlight() throws Exception {
+      DataSource dataSource = data.createMqttDataSource();
+      DataSet dataSet = data.createDataSet("Saga Guard Meta Update Dataset");
+      String originalName = dataSet.getName();
+      data.createGeneratePipeline(dataSet, dataSource);
+      data.seedGroupAndAssignment(dataSet);
+      UUID dataSetId = dataSet.getId();
+
+      // DRAFT → READY → AVAILABLE (pendingSagaType = CREATE while saga runs)
+      dataSetService.publish(dataSetId);
+      dataSetService.release(dataSetId);
+
+      // Attempt metadata update while CREATE saga is in-flight
+      DataSetInputDTO updateInput = new DataSetInputDTO();
+      updateInput.setName("Should Be Rejected " + System.nanoTime());
+
+      assertThatThrownBy(() -> dataSetService.updatePublishedMeta(dataSetId, updateInput))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("saga is in-flight")
+          .hasMessageContaining("CREATE");
+
+      // Verify the name was NOT changed
+      DataSet unchanged = dataSetRepository.findByIdWithRelations(dataSetId).orElseThrow();
+      assertThat(unchanged.getName())
+          .as("Name should not have been modified")
+          .isEqualTo(originalName);
+
+      // Let the saga complete and verify dataset is healthy
+      DataSet completed = verifier.awaitSagaCompletion(dataSetId);
+      assertThat(completed.getPendingSagaType()).isNull();
+      assertThat(completed.getProjectId()).isNotNull();
+
+      log.info("updatePublishedMeta correctly rejected during in-flight CREATE saga");
     }
 
     @Test

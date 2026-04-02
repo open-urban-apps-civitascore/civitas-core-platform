@@ -119,4 +119,41 @@ class PipelineSerializerTest {
     assertTrue(yaml.contains("my-password"));
     assertTrue(yaml.contains("admin"));
   }
+
+  @Test
+  @DisplayName(
+      "decrypts credentials encrypted by portal-backend using DATASOURCE_CREDENTIAL_CONTEXT")
+  void toYaml_portalBackendEncryptedValue_decryptsWithSharedContext()
+      throws GeneralSecurityException, FatalAdapterException {
+    PipelineSerializer serializer = new PipelineSerializer(STRETCHED_KEY);
+
+    // Encrypt with the same context that portal-backend uses (EncryptionConfig.CREDENTIAL_CONTEXT)
+    String encrypted =
+        CredentialEncryptor.encrypt(
+            "my-password", STRETCHED_KEY, CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT);
+
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("password", "ENC(" + encrypted + ")");
+
+    // Decrypt with the shared constant — must match portal-backend's encryption context
+    String yaml = serializer.toYaml(data, CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT);
+
+    assertTrue(yaml.contains("my-password"));
+  }
+
+  @Test
+  @DisplayName("decryption fails when credential context does not match encryption context")
+  void toYaml_contextMismatch_throwsFatalAdapterException() throws GeneralSecurityException {
+    PipelineSerializer serializer = new PipelineSerializer(STRETCHED_KEY);
+
+    String encrypted =
+        CredentialEncryptor.encrypt(
+            "my-password", STRETCHED_KEY, CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT);
+
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("password", "ENC(" + encrypted + ")");
+
+    // Using a different context (e.g. a pipeline ID) must fail
+    assertThrows(FatalAdapterException.class, () -> serializer.toYaml(data, "some-pipeline-id"));
+  }
 }

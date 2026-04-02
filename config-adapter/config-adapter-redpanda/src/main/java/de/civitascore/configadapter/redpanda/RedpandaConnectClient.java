@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.redpanda;
 
+import de.civitascore.configadapter.crypto.CredentialEncryptor;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
@@ -95,7 +96,8 @@ class RedpandaConnectClient implements AutoCloseable {
   void createPipeline(String pipelineId, Map<String, Object> pipelineData)
       throws FatalAdapterException, RetryableAdapterException {
     validatePipelineId(pipelineId);
-    String yaml = serializer.toYaml(pipelineData, pipelineId);
+    String yaml =
+        serializer.toYaml(pipelineData, CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT);
     logger.info("Creating pipeline: {}", Encode.forJava(pipelineId));
 
     try (Response response =
@@ -124,7 +126,8 @@ class RedpandaConnectClient implements AutoCloseable {
   void updatePipeline(String pipelineId, Map<String, Object> pipelineData)
       throws FatalAdapterException, RetryableAdapterException {
     validatePipelineId(pipelineId);
-    String yaml = serializer.toYaml(pipelineData, pipelineId);
+    String yaml =
+        serializer.toYaml(pipelineData, CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT);
     logger.info("Updating pipeline: {}", Encode.forJava(pipelineId));
 
     try (Response response =
@@ -166,6 +169,19 @@ class RedpandaConnectClient implements AutoCloseable {
     } catch (ProcessingException e) {
       throw networkError(pipelineId, e);
     }
+  }
+
+  /**
+   * Decrypts ENC(...) credential values in a datasource configuration map. Delegates to the
+   * serializer which holds the stretched key material.
+   */
+  Map<String, Object> decryptDatasourceCredentials(Map<String, Object> map)
+      throws FatalAdapterException {
+    return serializer.decryptDatasourceCredentials(map);
+  }
+
+  String encryptDatasourceValue(String plaintext) throws FatalAdapterException {
+    return serializer.encryptDatasourceValue(plaintext);
   }
 
   @Override

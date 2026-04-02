@@ -114,6 +114,38 @@ describe('BreadcrumbNavigation', () => {
     })
   })
 
+  it('hides intermediate data-flow segment when followed by child route', async () => {
+    mockUsePathname.mockReturnValue('/datasets/ds-1/data-flow/pipeline-editor')
+    mockUseParams.mockReturnValue({ datasetId: 'ds-1' })
+
+    vi.mocked(apiRequest).mockResolvedValueOnce({
+      data: { name: 'Test Dataset' },
+    })
+
+    renderWithClient()
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Dataset')).toBeInTheDocument()
+      expect(screen.getByText('pipeline-editor')).toBeInTheDocument()
+      expect(screen.queryByText('data-flow')).not.toBeInTheDocument()
+    })
+  })
+
+  it('shows data-flow segment when it is the last segment', async () => {
+    mockUsePathname.mockReturnValue('/datasets/ds-1/data-flow')
+    mockUseParams.mockReturnValue({ datasetId: 'ds-1' })
+
+    vi.mocked(apiRequest).mockResolvedValueOnce({
+      data: { name: 'Test Dataset' },
+    })
+
+    renderWithClient()
+
+    await waitFor(() => {
+      expect(screen.getByText('data-flow')).toBeInTheDocument()
+    })
+  })
+
   it('uses datastructure version endpoint for version breadcrumbs', async () => {
     mockUsePathname.mockReturnValue('/datastructures/ds-1/version-2')
     mockUseParams.mockReturnValue({ datastructureId: 'ds-1', versionId: 'version-2' })

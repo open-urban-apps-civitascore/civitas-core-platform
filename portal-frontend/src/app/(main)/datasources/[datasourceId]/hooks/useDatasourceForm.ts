@@ -193,59 +193,59 @@ export const useDatasourceForm = (
     }
   }
 
-  const submitDatasource = (onSuccess?: () => void) => {
-    void (async () => {
-      const values = form.getValues()
-      const parsed = isDraftMode
-        ? DatasourceFormDraftSchema.safeParse(values)
-        : DatasourceFormAvailableSchema.safeParse(values)
-      if (!parsed.success) {
-        handleFormValidationError(parsed.error)
-        return
+  const submitDatasource = async (onSuccess?: () => void): Promise<boolean> => {
+    const values = form.getValues()
+    const parsed = isDraftMode
+      ? DatasourceFormDraftSchema.safeParse(values)
+      : DatasourceFormAvailableSchema.safeParse(values)
+    if (!parsed.success) {
+      handleFormValidationError(parsed.error)
+      return false
+    }
+
+    const dirtyFields = form.formState.dirtyFields
+    const dirtyValues = pickDirtyValues(parsed.data as Record<string, unknown>, dirtyFields)
+
+    // Transform configuration to API format (needs full values for discriminated union)
+    const connectorParsed = ConnectorFormToApiSchema.safeParse(parsed.data)
+    const configuration = connectorParsed.success
+      ? connectorParsed.data.configuration
+      : (dirtyValues as Record<string, unknown>).configuration
+
+    const assignmentsPayload = mapGroupRoleAssignmentsToApiPayload(assignedGroups)
+    const areAssignmentsDirty = hasAssignmentChanges(assignedGroups, initialAssignments)
+
+    const apiPayload = {
+      ...dirtyValues,
+      ...(dirtyFields.configuration ? { configuration } : {}),
+      ...(areAssignmentsDirty ? { assignments: assignmentsPayload } : {}),
+      id: datasource.id,
+    } as DatasourcePatchData
+
+    const shouldUpdateValues = Object.keys(dirtyValues).some(key => key !== 'dataSourceStatus') || areAssignmentsDirty
+    const shouldPublish = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
+    const shouldUnpublish = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
+
+    try {
+      let datasourceResponse: Datasource | null = shouldUpdateValues ? await handleUpdateValues(apiPayload) : null
+
+      if (shouldPublish) {
+        datasourceResponse = await handleStatusUpdate(publishDatasource.mutateAsync)
+      }
+      if (shouldUnpublish) {
+        datasourceResponse = await handleStatusUpdate(unpublishDatasource.mutateAsync)
       }
 
-      const dirtyFields = form.formState.dirtyFields
-      const dirtyValues = pickDirtyValues(parsed.data as Record<string, unknown>, dirtyFields)
-
-      // Transform configuration to API format (needs full values for discriminated union)
-      const connectorParsed = ConnectorFormToApiSchema.safeParse(parsed.data)
-      const configuration = connectorParsed.success
-        ? connectorParsed.data.configuration
-        : (dirtyValues as Record<string, unknown>).configuration
-
-      const assignmentsPayload = mapGroupRoleAssignmentsToApiPayload(assignedGroups)
-      const areAssignmentsDirty = hasAssignmentChanges(assignedGroups, initialAssignments)
-
-      const apiPayload = {
-        ...dirtyValues,
-        ...(dirtyFields.configuration ? { configuration } : {}),
-        ...(areAssignmentsDirty ? { assignments: assignmentsPayload } : {}),
-        id: datasource.id,
-      } as DatasourcePatchData
-
-      const shouldUpdateValues = Object.keys(dirtyValues).some(key => key !== 'dataSourceStatus') || areAssignmentsDirty
-      const shouldPublish = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
-      const shouldUnpublish = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
-
-      try {
-        let datasourceResponse: Datasource | null = shouldUpdateValues ? await handleUpdateValues(apiPayload) : null
-
-        if (shouldPublish) {
-          datasourceResponse = await handleStatusUpdate(publishDatasource.mutateAsync)
-        }
-        if (shouldUnpublish) {
-          datasourceResponse = await handleStatusUpdate(unpublishDatasource.mutateAsync)
-        }
-
-        if (datasourceResponse) {
-          form.reset(mapDatasourceToFormValues(datasourceResponse))
-        }
-
-        onSuccess?.()
-      } catch (error) {
-        console.error('An error occurred while submitting datasource data.', (error as AxiosError).message)
+      if (datasourceResponse) {
+        form.reset(mapDatasourceToFormValues(datasourceResponse))
       }
-    })()
+
+      onSuccess?.()
+      return true
+    } catch (error) {
+      console.error('An error occurred while submitting datasource data.', (error as AxiosError).message)
+      return false
+    }
   }
 
   const resetToInitialState = () => {

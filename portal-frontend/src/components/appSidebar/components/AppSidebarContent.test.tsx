@@ -9,6 +9,13 @@ import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 vi.mock('next/navigation', () => ({
   usePathname: vi.fn(() => '/'),
 }))
+vi.mock('@/contexts/unsaved-changes/UnsavedChangesContext', () => ({
+  useUnsavedChanges: () => ({
+    hasUnsavedChanges: false,
+    requestNavigation: vi.fn(),
+    requestBack: vi.fn(),
+  }),
+}))
 
 vi.mock('@/components/ui/collapsible', () => ({
   Collapsible: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,

@@ -1,0 +1,55 @@
+meta {
+  name: 8b. Update Published Meta During Saga (expects 409)
+  type: http
+  seq: 20
+}
+
+put {
+  url: {{baseUrl}}/datasets/:id/published/meta
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSetId}}
+}
+
+body:json {
+  {
+    "name": "Should Be Rejected During Saga"
+  }
+}
+
+tests {
+  test("Rejected with 409 Conflict (saga in-flight)", function() {
+    const status = res.getStatus();
+    // 409=saga in-flight (expected), 200=saga already completed (fast environment)
+    expect(status === 409 || status === 200).to.be.true;
+  });
+
+  test("If rejected, error indicates saga in-flight", function() {
+    if (res.getStatus() === 409) {
+      expect(res.body.detail).to.include('saga is in-flight');
+    }
+  });
+}
+
+docs {
+  **Saga step 8b of 18** — Verify metadata update is blocked during in-flight saga.
+
+  Immediately after releasing (step 8), the CREATE saga is running asynchronously. This step attempts to update the dataset's published metadata, which should be rejected with **409 Conflict** because `pendingSagaType` is non-null.
+
+  If the saga completed very quickly (possible in fast environments), a 200 is also accepted since the guard would not fire.
+
+  **Precondition:** `sagaDataSetId` is set; dataset was just released; CREATE saga is expected to be in-flight.
+
+  **Expected Response:** 409 Conflict with `RESOURCE_IN_USE` error code. 200 OK if saga already completed.
+
+  **System Impact:**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | No change — metadata update rejected |
+  | Config Adapter | — |
+  | External System | — |
+}

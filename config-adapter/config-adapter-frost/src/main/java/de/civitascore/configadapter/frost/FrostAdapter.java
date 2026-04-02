@@ -27,11 +27,8 @@ import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.client.Invocation;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.concurrent.TimeUnit;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
@@ -71,10 +68,7 @@ public class FrostAdapter extends AbstractConfigAdapter {
 
   private Client client;
   private String serverUrl;
-  private String apiKey;
-  private String apiKeyHeader;
-  private String basicAuthUsername;
-  private String basicAuthPassword;
+  private FrostAuthStrategy authStrategy;
 
   @Override
   public void initialize(AdapterConfig config) {
@@ -82,18 +76,13 @@ public class FrostAdapter extends AbstractConfigAdapter {
 
     this.serverUrl =
         getAdapterProperty(SERVER_URL_PROPERTY_KEY, DEFAULT_SERVER_URL).replaceAll("/$", "");
-    this.apiKey = getAdapterProperty(API_KEY_PROPERTY_KEY);
-    this.apiKeyHeader = getAdapterProperty(API_KEY_HEADER_PROPERTY_KEY, DEFAULT_API_KEY_HEADER);
-    this.basicAuthUsername = getAdapterProperty(BASIC_AUTH_USERNAME_PROPERTY_KEY);
-    this.basicAuthPassword = getAdapterProperty(BASIC_AUTH_PASSWORD_PROPERTY_KEY);
+    String apiKey = getAdapterProperty(API_KEY_PROPERTY_KEY);
+    String apiKeyHeader = getAdapterProperty(API_KEY_HEADER_PROPERTY_KEY, DEFAULT_API_KEY_HEADER);
+    String basicAuthUsername = getAdapterProperty(BASIC_AUTH_USERNAME_PROPERTY_KEY);
+    String basicAuthPassword = getAdapterProperty(BASIC_AUTH_PASSWORD_PROPERTY_KEY);
 
-    boolean hasApiKey = apiKey != null && !apiKey.isBlank();
-    boolean hasBasicAuth = basicAuthUsername != null && !basicAuthUsername.isBlank();
-    if (!hasApiKey && !hasBasicAuth) {
-      throw new IllegalArgumentException(
-          "The FROST adapter requires authentication: configure frost.api.key or "
-              + "frost.basic.auth.username with frost.basic.auth.password.");
-    }
+    this.authStrategy =
+        FrostAuthStrategy.create(basicAuthUsername, basicAuthPassword, apiKeyHeader, apiKey);
 
     if (this.client == null) {
       this.client = createClient();
@@ -174,7 +163,8 @@ public class FrostAdapter extends AbstractConfigAdapter {
         "FROST " + entityType.name() + " created successfully",
         null,
         () ->
-            withAuth(
+            authStrategy
+                .apply(
                     client //
                         .target(serverUrl) //
                         .path(path) //
@@ -205,7 +195,8 @@ public class FrostAdapter extends AbstractConfigAdapter {
         "FROST " + entityType.name() + " updated successfully",
         entityId,
         () ->
-            withAuth(
+            authStrategy
+                .apply(
                     client
                         .target(serverUrl)
                         .path(basePath + "(" + entityId + ")")
@@ -235,7 +226,8 @@ public class FrostAdapter extends AbstractConfigAdapter {
         "FROST " + entityType.name() + " deleted successfully",
         entityId,
         () ->
-            withAuth(
+            authStrategy
+                .apply(
                     client
                         .target(serverUrl)
                         .path(basePath + "(" + entityId + ")")
@@ -326,18 +318,6 @@ public class FrostAdapter extends AbstractConfigAdapter {
   }
 
   // ============== HELPERS ==============
-
-  private Invocation.Builder withAuth(Invocation.Builder builder) {
-    if (basicAuthUsername != null && !basicAuthUsername.isBlank()) {
-      String password = basicAuthPassword != null ? basicAuthPassword : "";
-      String credentials =
-          Base64.getEncoder()
-              .encodeToString(
-                  (basicAuthUsername + ":" + password).getBytes(StandardCharsets.UTF_8));
-      return builder.header("Authorization", "Basic " + credentials);
-    }
-    return builder.header(apiKeyHeader, apiKey);
-  }
 
   private Object extractEntityConfig(ConfigEvent event) {
     ConfigValue configValue = event.payload().config().value();
