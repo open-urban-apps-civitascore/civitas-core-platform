@@ -347,11 +347,22 @@ services:
 
 The adapter categorizes errors based on HTTP response status:
 
-| HTTP Status | Exception Type | Behavior |
-|-------------|----------------|----------|
-| 5xx (Server Error) | `RetryableAdapterException` | Blocking retry with exponential backoff |
-| 4xx (Client Error) | `FatalAdapterException` | Send to DLQ |
-| Network Error | `RetryableAdapterException` | Blocking retry with exponential backoff |
+| HTTP Status | Operation | Behavior |
+|-------------|-----------|----------|
+| 2xx | Any | Success |
+| 409 Conflict | CREATE | **Idempotent success** — entity already exists |
+| 500 + "Failed to store data." | CREATE | **Idempotent success** — FROST returns 500 instead of 409 on UNIQUE constraint violations (see note below) |
+| 404 Not Found | DELETE | **Idempotent success** — entity already deleted |
+| Other 4xx | Any | `FatalAdapterException` → DLQ |
+| 5xx (other) | Any | `RetryableAdapterException` → exponential backoff retry |
+| Network error | Any | `RetryableAdapterException` → exponential backoff retry |
+
+> **FROST quirk:** The FROST Projects plugin does not return HTTP 409 when a project with a
+> duplicate name is POSTed. Instead it returns HTTP 500 with body
+> `{"code":500,"type":"error","message":"Failed to store data."}`. Both `FrostAdapter` and
+> `FrostSagaHandler` detect this specific response and treat it as an idempotent success.
+> `FrostSagaHandler` additionally performs a fallback `GET /Projects?$filter=name eq '...'` to
+> recover the existing project ID for the saga result.
 
 ### FROST-Specific Error Codes
 

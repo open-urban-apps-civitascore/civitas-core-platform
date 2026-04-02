@@ -318,6 +318,23 @@ class FrostAdapterTest {
     }
 
     @Test
+    void createWithFrostFailedToStoreDataReturnsSuccess()
+        throws RetryableAdapterException, FatalAdapterException {
+      when(mockResponse.getStatus()).thenReturn(500);
+      when(mockResponse.readEntity(String.class))
+          .thenReturn("{\"code\":500,\"type\":\"error\",\"message\":\"Failed to store data.\"}");
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+      ConfigEvent event = createConfigEvent(Operation.CREATE, "Things", Map.of("name", "Existing"));
+
+      adapter.processConfigEvent("de.civitascore.data.thing.created", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+      assertEquals(ConfigResultEvent.Status.SUCCESS, captor.getValue().status());
+    }
+
+    @Test
     void createWithServerErrorThrowsRetryableException() {
       when(mockResponse.getStatus()).thenReturn(500);
       when(mockResponse.readEntity(String.class)).thenReturn("{\"error\":\"Internal error\"}");

@@ -185,6 +185,26 @@ class FrostProjectsIntegrationTest extends AbstractFrostIntegrationTest {
   }
 
   @Test
+  void createProjectTwiceWithSameNameReturnsSuccessForBoth() throws Exception {
+    String projectName = "Idempotent-" + UUID.randomUUID();
+    Map<String, Object> projectData = Map.of("name", projectName, "description", "");
+
+    ConfigEvent firstEvent = createConfigEvent(Operation.CREATE, "Projects", projectData);
+    adapter.processConfigEvent(Topics.FROST_PROJECT_CREATED.toString(), firstEvent);
+
+    ConfigEvent secondEvent = createConfigEvent(Operation.CREATE, "Projects", projectData);
+    adapter.processConfigEvent(Topics.FROST_PROJECT_CREATED.toString(), secondEvent);
+
+    List<ConfigResultEvent> results = eventPublisher.getPublishedEvents();
+    assertEquals(2, results.size());
+    assertEquals(ConfigResultEvent.Status.SUCCESS, results.get(0).status());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS,
+        results.get(1).status(),
+        () -> "Second create (idempotent) failed: " + results.get(1).message());
+  }
+
+  @Test
   void createThingScopedToProjectReturnsSuccessAndEntityExists() throws Exception {
     String projectId =
         createEntityDirectly(
