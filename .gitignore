@@ -9,6 +9,7 @@ gl-dependency-scanning.json
 **/.classpath
 **/.flattened-pom.xml
 **/maven.graph.json
+.DS_Store
 
 /.idea/
 /test-results/
