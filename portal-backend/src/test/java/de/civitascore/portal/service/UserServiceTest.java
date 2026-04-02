@@ -3,9 +3,6 @@ package de.civitascore.portal.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.Topics;
@@ -20,7 +17,6 @@ import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -95,76 +91,6 @@ class UserServiceTest {
 
       assertThatThrownBy(() -> service.preSave(user))
           .isInstanceOf(UniqueConstraintViolationException.class);
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // validateGroupIdsExist (called via preProcessCreateInput / preProcessUpdateInput)
-  // ---------------------------------------------------------------------------
-
-  @Nested
-  @DisplayName("validateGroupIdsExist()")
-  class ValidateGroupIdsExistTests {
-
-    @Test
-    @DisplayName("Should skip validation when groupIds is null")
-    void shouldPassWhenGroupIdsNull() {
-      UserService service = createService();
-      UserInputDTO input = new UserInputDTO();
-      input.setGroupIds(null);
-
-      assertThatNoException().isThrownBy(() -> service.preProcessCreateInput(input));
-      verify(groupRepository, never()).countByIdIn(anyList());
-    }
-
-    @Test
-    @DisplayName("Should skip validation when groupIds is empty")
-    void shouldPassWhenGroupIdsEmpty() {
-      UserService service = createService();
-      UserInputDTO input = new UserInputDTO();
-      input.setGroupIds(List.of());
-
-      assertThatNoException().isThrownBy(() -> service.preProcessCreateInput(input));
-      verify(groupRepository, never()).countByIdIn(anyList());
-    }
-
-    @Test
-    @DisplayName("Should pass when all groups exist")
-    void shouldPassWhenAllGroupsExist() {
-      UserService service = createService();
-      List<UUID> groupIds = List.of(UUID.randomUUID(), UUID.randomUUID());
-      UserInputDTO input = new UserInputDTO();
-      input.setGroupIds(groupIds);
-      when(groupRepository.countByIdIn(groupIds)).thenReturn(2L);
-
-      assertThatNoException().isThrownBy(() -> service.preProcessCreateInput(input));
-    }
-
-    @Test
-    @DisplayName("Should throw when some groups are missing")
-    void shouldThrowWhenGroupsMissing() {
-      UserService service = createService();
-      List<UUID> groupIds = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
-      UserInputDTO input = new UserInputDTO();
-      input.setGroupIds(groupIds);
-      when(groupRepository.countByIdIn(groupIds)).thenReturn(1L);
-
-      assertThatThrownBy(() -> service.preProcessCreateInput(input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessage("One or more groups do not exist.");
-    }
-
-    @Test
-    @DisplayName("Should also validate on update")
-    void shouldValidateOnUpdate() {
-      UserService service = createService();
-      List<UUID> groupIds = List.of(UUID.randomUUID());
-      UserInputDTO input = new UserInputDTO();
-      input.setGroupIds(groupIds);
-      User existingUser = userWithId(UUID.randomUUID());
-      when(groupRepository.countByIdIn(groupIds)).thenReturn(1L);
-
-      assertThatNoException().isThrownBy(() -> service.preProcessUpdateInput(input, existingUser));
     }
   }
 
@@ -382,45 +308,27 @@ class UserServiceTest {
   }
 
   // ---------------------------------------------------------------------------
-  // prePublish (group membership handling)
+  // replaceGroups
   // ---------------------------------------------------------------------------
 
   @Nested
-  @DisplayName("prePublish()")
-  class PrePublishTests {
+  @DisplayName("replaceGroups()")
+  class ReplaceGroupsTests {
 
     @Test
-    @DisplayName("Should load and set groups when groupIds provided")
-    void shouldSetGroupsWhenGroupIdsProvided() {
+    @DisplayName("Should throw when some groups do not exist")
+    void shouldThrowWhenGroupsMissing() {
       UserService service = createService();
-      User user = userWithId(UUID.randomUUID());
-      List<UUID> groupIds = List.of(UUID.randomUUID());
-      UserInputDTO input = new UserInputDTO();
-      input.setGroupIds(groupIds);
+      UUID userId = UUID.randomUUID();
+      User user = userWithId(userId);
+      when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
-      Group group = new Group();
-      group.setId(groupIds.getFirst());
-      when(groupRepository.findAllByIdWithMembers(groupIds)).thenReturn(List.of(group));
+      List<UUID> groupIds = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+      when(groupRepository.findAllById(groupIds)).thenReturn(List.of(new Group()));
 
-      service.prePublish(user, input);
-
-      verify(groupRepository).findAllByIdWithMembers(groupIds);
-      assertThat(user.getGroups()).hasSize(1);
-    }
-
-    @Test
-    @DisplayName("Should skip group loading when groupIds is null")
-    void shouldSkipWhenGroupIdsNull() {
-      UserService service = createService();
-      User user = userWithId(UUID.randomUUID());
-      Set<Group> originalGroups = user.getGroups();
-      UserInputDTO input = new UserInputDTO();
-      input.setGroupIds(null);
-
-      service.prePublish(user, input);
-
-      verify(groupRepository, never()).findAllByIdWithMembers(anyList());
-      assertThat(user.getGroups()).isSameAs(originalGroups);
+      assertThatThrownBy(() -> service.replaceGroups(userId, groupIds))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessage("One or more groups do not exist.");
     }
   }
 

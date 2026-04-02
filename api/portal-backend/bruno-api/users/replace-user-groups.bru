@@ -1,11 +1,11 @@
 meta {
-  name: Update User
+  name: Replace User Groups
   type: http
-  seq: 5
+  seq: 6
 }
 
 put {
-  url: {{baseUrl}}/users/:id
+  url: {{baseUrl}}/users/:id/groups
   body: json
   auth: inherit
 }
@@ -15,14 +15,9 @@ params:path {
 }
 
 body:json {
-  {
-    "title": "MR",
-    "firstName": "John",
-    "lastName": "Doe",
-    "email": "john.doe@example.com",
-    "phone": "+1234567890",
-    "active": true
-  }
+  [
+    "{{groupId}}"
+  ]
 }
 
 script:post-response {
@@ -42,13 +37,13 @@ docs {
 
   **Expected Response**
   - Status: `200 OK`
-  - Body reflects the updated values
+  - Body reflects the updated user with new group memberships
 
   **System Impact**
 
   | System | Expected Change |
   |---|---|
-  | Backend | User record updated in `portal_backend` DB |
+  | Backend | User group memberships replaced in `portal_backend` DB |
   | Config Adapter | Consumes `de.civitascore.idm.user.updated` Kafka event; forwards update to Keycloak |
-  | Keycloak | User attributes updated in `civitas-core` realm |
+  | Keycloak | User group memberships updated in `civitas-core` realm |
 }

@@ -4,8 +4,6 @@ import de.civitascore.portal.model.embedded.UserTitleType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import java.util.List;
-import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -31,7 +29,4 @@ public class UserInputDTO extends BaseInputDTO {
 
   @Schema(description = "Whether the user account is active", example = "true")
   private Boolean active;
-
-  @Schema(description = "IDs of groups to assign the user to")
-  private List<UUID> groupIds;
 }

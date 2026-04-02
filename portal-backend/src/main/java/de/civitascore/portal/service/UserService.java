@@ -11,6 +11,7 @@ import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -24,8 +25,8 @@ import org.springframework.stereotype.Service;
 /**
  * Service for managing {@link User} entities with Keycloak integration. Extends {@link
  * EventPublishingService} to synchronize user lifecycle events (create, update, delete) with
- * Keycloak via the config adapter pipeline. Handles group membership, email uniqueness validation,
- * and external ID tracking.
+ * Keycloak via the config adapter pipeline. Handles email uniqueness validation and external ID
+ * tracking.
  */
 @Service
 @Slf4j
@@ -65,19 +66,6 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   }
 
   /**
-   * Validates that all referenced group IDs exist before creating the user.
-   *
-   * @param input the user creation input
-   * @return the validated input
-   * @throws InvalidInputException if any referenced group does not exist
-   */
-  @Override
-  protected UserInputDTO preProcessCreateInput(UserInputDTO input) {
-    validateGroupIdsExist(input.getGroupIds());
-    return super.preProcessCreateInput(input);
-  }
-
-  /**
    * Validates email uniqueness before persisting the user entity.
    *
    * @param entity the user entity to validate
@@ -90,27 +78,24 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     return super.preSave(entity);
   }
 
-  /**
-   * Resolves and updates group membership from the input before publishing the user to Keycloak.
-   * Fetches groups with eagerly loaded members and updates the bidirectional relationship.
-   *
-   * @param entity the saved user entity
-   * @param input the user input containing group IDs
-   * @return the entity with updated group memberships
-   */
-  @Override
-  protected User prePublish(User entity, UserInputDTO input) {
-    List<UUID> groupUUIDs = input.getGroupIds();
-    // Handle group membership updates after the user has been saved
-    if (groupUUIDs != null) {
-      // Fetch the new groups from the input (with members eagerly loaded)
-      Set<Group> newGroups = new HashSet<>(groupRepository.findAllByIdWithMembers(groupUUIDs));
+  @Transactional
+  public User replaceGroups(UUID userId, List<UUID> groupIds) {
+    User user = findByIdOrThrow(userId);
 
-      // Use the entity's setGroups helper to handle the bidirectional relationship
-      entity.setGroups(newGroups);
+    if (groupIds.isEmpty()) {
+      user.setGroups(new HashSet<>());
+    } else {
+      List<Group> groups = groupRepository.findAllById(groupIds);
+      if (groups.size() != groupIds.size()) {
+        throw new InvalidInputException(
+            "groups",
+            (groupIds.size() - groups.size()) + " groups not found",
+            "One or more groups do not exist.");
+      }
+      user.setGroups(new HashSet<>(groups));
     }
 
-    return super.prePublish(entity, input);
+    return save(user);
   }
 
   @Override
@@ -172,34 +157,6 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
                 throw new UniqueConstraintViolationException("User", "email", entity.getEmail());
               }
             });
-  }
-
-  /**
-   * Validates that all referenced group IDs exist before updating the user.
-   *
-   * @param input the user update input
-   * @param existingEntity the current user entity
-   * @return the validated input
-   * @throws InvalidInputException if any referenced group does not exist
-   */
-  @Override
-  protected UserInputDTO preProcessUpdateInput(UserInputDTO input, User existingEntity) {
-    validateGroupIdsExist(input.getGroupIds());
-    return input;
-  }
-
-  private void validateGroupIdsExist(List<UUID> groupIds) {
-    if (groupIds == null || groupIds.isEmpty()) {
-      return;
-    }
-
-    long foundCount = groupRepository.countByIdIn(groupIds);
-    long missingCount = groupIds.size() - foundCount;
-
-    if (missingCount > 0) {
-      throw new InvalidInputException(
-          "groups", missingCount + " groups not found", "One or more groups do not exist.");
-    }
   }
 
   /**

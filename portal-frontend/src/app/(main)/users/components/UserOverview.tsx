@@ -1,14 +1,14 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useQueryClient } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
-import { useCreateUser, useUpdateUser } from '@/app/services/api/users/clientRequests'
+import { useCreateUser, useReplaceUserGroups, useUpdateUser } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageContainer } from '@/components/page-container/PageContainer'
@@ -62,19 +62,21 @@ export const UserOverview = (props: UserOverviewProps) => {
   const [defaultUserData, setDefaultUserData] = useState(userData)
   const [isReadOnly, setIsReadOnly] = useState(isCreateMode ? false : mode !== 'edit')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
-  const queryClient = useQueryClient()
   const { handleFormValidationError } = useError()
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
-  const isLoading = createUser.isPending || updateUser.isPending
+  const replaceUserGroups = useReplaceUserGroups()
+  const isLoading = createUser.isPending || updateUser.isPending || replaceUserGroups.isPending
   const { setSubTabValueParam, subTabValue } = useQueryParams()
   const { handleUserEmailError } = useError()
   const { hasPermission } = usePermissions()
-  const canUpdate = isCreateMode || hasPermission(PERMISSION_NAMES.USER_UPDATE)
+  const canUpdateUser = isCreateMode || hasPermission(PERMISSION_NAMES.USER_UPDATE)
+  const canUpdateGroups = hasPermission(PERMISSION_NAMES.GROUP_UPDATE)
+  const canUpdate = canUpdateUser || canUpdateGroups
 
   const tabs: Tab<UserTab>[] = [
     tabValues.userData,
-    ...(hasPermission(PERMISSION_NAMES.GROUP_READ) ? [tabValues.groups] : []),
+    ...(!isCreateMode && hasPermission(PERMISSION_NAMES.GROUP_READ) ? [tabValues.groups] : []),
     ...(hasPermission(PERMISSION_NAMES.ASSIGNMENT_READ) ? [tabValues.roles] : []),
   ]
 
@@ -136,9 +138,8 @@ export const UserOverview = (props: UserOverviewProps) => {
 
   const handleCreateUser = async (formData: UserFormData): Promise<boolean> => {
     const parsed = UserFormSchema.parse(formData)
-    const mappedData = { ...parsed, groups: defaultUserData?.groups || [] }
     // eslint-disable-next-line unused-imports/no-unused-vars
-    const { id, ...createUserData } = mappedData
+    const { id, groupIds, ...createUserData } = parsed
     try {
       const { data } = await createUser.mutateAsync({ ...createUserData, phone: createUserData.phone || null })
       toast.success(t('messages.createSuccess'))
@@ -157,21 +158,40 @@ export const UserOverview = (props: UserOverviewProps) => {
   const handleUpdateUser = async (formData: UserFormData): Promise<boolean> => {
     const parsed = UserFormSchema.parse(formData)
     const dirtyFields = form.formState.dirtyFields
-    const fieldsToUpdate = pickDirtyValues(parsed, dirtyFields)
-    const updateData = {
-      ...fieldsToUpdate,
-      phone: !parsed.phone && dirtyFields.phone ? null : fieldsToUpdate.phone,
-    }
+
+    const { groupIds: _groupIds, ...dirtyUserFields } = pickDirtyValues(parsed, dirtyFields)
+    const hasUserFieldChanges = Object.keys(dirtyUserFields).length > 0
+    const hasGroupChanges = !!dirtyFields.groupIds
+
+    // Guard: nothing actionable
+    if (!hasUserFieldChanges && !(hasGroupChanges && canUpdateGroups)) return true
+
     try {
-      const { data } = await updateUser.mutateAsync({ ...updateData, id: parsed.id })
-      ;[['groups']].forEach(queryKey => queryClient.invalidateQueries({ queryKey }))
-      setDefaultUserData(data)
-      if (isExitModalOpen) setIsExitModalOpen(false)
+      // Save group membership changes via PUT /users/{id}/groups
+      if (hasGroupChanges && canUpdateGroups) {
+        const { data } = await replaceUserGroups.mutateAsync({
+          userId: parsed.id,
+          groupIds: form.getValues('groupIds'),
+        })
+        setDefaultUserData(data)
+      }
+
+      // Save user field changes via PATCH /users/{id}
+      if (hasUserFieldChanges && canUpdateUser) {
+        const updateData = {
+          ...dirtyUserFields,
+          phone: !parsed.phone && dirtyFields.phone ? null : dirtyUserFields.phone,
+        }
+        const { data } = await updateUser.mutateAsync({ ...updateData, id: parsed.id })
+        setDefaultUserData(data)
+      }
+
       router.refresh()
       toast.success(t('messages.updateSuccess'))
+      if (isExitModalOpen) setIsExitModalOpen(false)
       return true
-    } catch (error) {
-      if (isEmailConflictError(error)) {
+    } catch (error: unknown) {
+      if (isEmailConflictError(error as AxiosError)) {
         handleUserEmailError(form, parsed.email)
       } else {
         toast.error(t('errors.updateError'))
@@ -204,7 +224,7 @@ export const UserOverview = (props: UserOverviewProps) => {
         return (
           <GroupsTab
             formValues={watch}
-            isReadOnly={isReadOnly}
+            isReadOnly={isReadOnly || !canUpdateGroups}
             onAssignGroups={handleAssignGroups}
             onRemoveGroup={handleRemoveGroup}
           />
@@ -213,7 +233,14 @@ export const UserOverview = (props: UserOverviewProps) => {
         return <RolesTab userId={userData.id} isReadOnly={isReadOnly} />
       case tabValues.userData.value:
       default:
-        return <UserBasicInfoTab userData={userData} form={form} isReadOnly={isReadOnly} isLoading={isLoading} />
+        return (
+          <UserBasicInfoTab
+            userData={userData}
+            form={form}
+            isReadOnly={isReadOnly || !canUpdateUser}
+            isLoading={isLoading}
+          />
+        )
     }
   }
 

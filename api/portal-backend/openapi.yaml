@@ -369,6 +369,73 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  /users/{id}/groups:
+    put:
+      operationId: replaceUserGroups
+      summary: Replace user group memberships
+      description: Replaces all group memberships for a user with the provided list
+        of group IDs.
+      tags:
+      - Users
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+                format: uuid
+      responses:
+        "200":
+          description: Group memberships updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserOutputDTO"
+        "400":
+          description: One or more group IDs do not exist
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                group_not_found:
+                  summary: group_not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Bad Request
+                    status: 400
+                    detail: "One or more group IDs do not exist"
+                    instance: "/users/{id}/groups"
+        "404":
+          description: User not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/users/{id}/groups"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   /roles/{id}:
     get:
       tags:
@@ -3522,6 +3589,12 @@ paths:
         schema:
           type: string
           example: group-456
+      - name: memberIds
+        in: query
+        description: Filter by member user ID(s), comma-separated.
+        schema:
+          type: string
+          example: user-456
       - name: q
         in: query
         description: "Search in name or description (partial match, case-insensitive)."
@@ -5611,12 +5684,6 @@ components:
           type: boolean
           description: Whether the user account is active
           example: true
-        groupIds:
-          type: array
-          description: IDs of groups to assign the user to
-          items:
-            type: string
-            format: uuid
       required:
       - email
       - firstName
@@ -6937,6 +7004,52 @@ components:
           format: int32
         empty:
           type: boolean
+    Pageable:
+      type: object
+      properties:
+        page:
+          type: integer
+          format: int32
+          minimum: 0
+        size:
+          type: integer
+          format: int32
+          minimum: 1
+        sort:
+          type: array
+          items:
+            type: string
+    PageObject:
+      type: object
+      properties:
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items: {}
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
     PageAssignmentOutputDTO:
       type: object
       properties:
@@ -7000,12 +7113,6 @@ components:
           type: boolean
           description: Whether the user account is active
           example: true
-        groupIds:
-          type: array
-          description: IDs of groups to assign the user to
-          items:
-            type: string
-            format: uuid
     PatchRoleInputDTO:
       description: Partial update — only provided fields are modified.
       properties:
