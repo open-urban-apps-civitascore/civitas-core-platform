@@ -7,7 +7,7 @@ export const useError = () => {
   const tCommon = useTranslations('common')
 
   const handleFormValidationError = (errors: FieldErrors | ZodError) => {
-    console.error('Form validation errors: ', errors)
+    console.warn('Form validation errors: ', errors)
     toast.error(tCommon('errors.formInvalid'))
   }
 
