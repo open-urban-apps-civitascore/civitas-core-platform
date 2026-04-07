@@ -966,6 +966,7 @@
       "details": "FROST Server Details",
       "serverName": "Server Name",
       "serverUrl": "Server URL",
+      "internalServer": "Internal Frost Server",
       "version": "Version"
     },
     "mappingPanel": {
