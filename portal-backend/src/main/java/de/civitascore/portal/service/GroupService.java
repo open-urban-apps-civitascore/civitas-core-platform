@@ -101,7 +101,7 @@ public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
   /**
    * Builds a {@link GroupConfig} from a Group entity. Used by both CRUD events and catch-up sync.
    */
-  static GroupConfig buildGroupConfig(Group entity) {
+  public static GroupConfig buildGroupConfig(Group entity) {
     GroupConfig groupConfig = new GroupConfig();
 
     if (entity.getExternalId() != null && !entity.getExternalId().isBlank()) {

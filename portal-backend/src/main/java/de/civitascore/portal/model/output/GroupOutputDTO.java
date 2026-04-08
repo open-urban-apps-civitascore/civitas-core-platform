@@ -13,9 +13,6 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class GroupOutputDTO extends BaseOutputDTO {
 
-  @Schema(description = "Keycloak group ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
-  private String externalId;
-
   @Schema(example = "City Data Team")
   private String name;
 
