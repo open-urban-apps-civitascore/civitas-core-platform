@@ -5,6 +5,7 @@ import de.civitascore.configadapter.model.idm.GroupConfig;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.service.ConfigEventPublisherService;
+import de.civitascore.portal.service.GroupService;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -79,13 +80,7 @@ public class GroupInitializer {
   }
 
   private void publishGroupCreated(Group group) {
-    GroupConfig groupConfig = new GroupConfig();
-    groupConfig.setName(group.getName());
-    groupConfig.setPath("/" + group.getName().toLowerCase().replaceAll("\\s+", "-"));
-
-    if (group.getParentGroup() != null && group.getParentGroup().getExternalId() != null) {
-      groupConfig.setParentId(group.getParentGroup().getExternalId());
-    }
+    GroupConfig groupConfig = GroupService.buildGroupConfig(group);
 
     try {
       ConfigResultEvent result =

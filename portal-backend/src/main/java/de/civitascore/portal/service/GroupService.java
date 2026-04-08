@@ -95,6 +95,13 @@ public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
   @Override
   protected ConfigValue toConfigValuePostSave(
       Group entity, GroupInputDTO input, ConfigValue preSaveConfigValue) {
+    return buildGroupConfig(entity);
+  }
+
+  /**
+   * Builds a {@link GroupConfig} from a Group entity. Used by both CRUD events and catch-up sync.
+   */
+  static GroupConfig buildGroupConfig(Group entity) {
     GroupConfig groupConfig = new GroupConfig();
 
     if (entity.getExternalId() != null && !entity.getExternalId().isBlank()) {
