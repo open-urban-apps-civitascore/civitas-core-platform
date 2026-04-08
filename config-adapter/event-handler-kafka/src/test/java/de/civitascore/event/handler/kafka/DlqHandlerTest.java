@@ -29,6 +29,7 @@ import de.civitascore.configadapter.model.Payload;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
 import java.net.URI;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -191,8 +192,7 @@ class DlqHandlerTest {
 
       when(mockProducer.send(any(ProducerRecord.class))).thenReturn(mockFuture);
       when(mockFuture.get(PUBLISH_TIMEOUT_MS, TimeUnit.MILLISECONDS))
-          .thenThrow(
-              new java.util.concurrent.ExecutionException(new RuntimeException("kafka down")));
+          .thenThrow(new ExecutionException(new RuntimeException("kafka down")));
 
       RuntimeException thrown =
           assertThrows(

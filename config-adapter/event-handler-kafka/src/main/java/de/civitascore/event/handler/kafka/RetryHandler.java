@@ -123,19 +123,16 @@ class RetryHandler {
    * @param record the Kafka record to process
    */
   void processWithRetry(ConsumerRecord<String, CloudEvent> record) {
-    int attempts = 0;
-
-    while (true) {
+    for (int attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         processor.handleEvent(record.topic(), record.value());
         logger.debug(
             "Successfully processed event {} on attempt {}",
             Encode.forJava(record.value().getId()),
-            attempts + 1);
+            attempt + 1);
         return;
       } catch (RetryableAdapterException e) {
-        attempts++;
-        if (attempts > maxRetries) {
+        if (attempt == maxRetries) {
           logger.error(
               "Max retries ({}) exceeded for event {}. Sending to DLQ. Error: {}",
               maxRetries,
@@ -144,23 +141,7 @@ class RetryHandler {
           dlqHandler.sendToDLQ(record, e, true);
           return;
         }
-
-        long backoff = backoffCalculator.calculate(attempts);
-        logger.warn(
-            "Retryable error processing event {} (attempt {}/{}). Retrying in {}ms. Error: {}",
-            Encode.forJava(record.value().getId()),
-            attempts,
-            maxRetries,
-            backoff,
-            Encode.forJava(e.getInternalMessage()));
-
-        try {
-          Thread.sleep(backoff);
-        } catch (InterruptedException ie) {
-          Thread.currentThread().interrupt();
-          logger.warn(
-              "Retry sleep interrupted for event {}", Encode.forJava(record.value().getId()));
-          dlqHandler.sendToDLQ(record, e, true);
+        if (!waitBeforeRetry(record, e, attempt + 1)) {
           return;
         }
       } catch (FatalAdapterException e) {
@@ -175,16 +156,40 @@ class RetryHandler {
             "Unexpected error processing event {}. Wrapping as fatal and sending to DLQ.",
             Encode.forJava(record.value().getId()),
             e);
-        FatalAdapterException wrapped =
-            new FatalAdapterException(AdapterErrorCode.UNKNOWN_ERROR, e, e.getMessage());
-        dlqHandler.sendToDLQ(record, wrapped, true);
+        dlqHandler.sendToDLQ(
+            record,
+            new FatalAdapterException(AdapterErrorCode.UNKNOWN_ERROR, e, e.getMessage()),
+            true);
         return;
       }
     }
   }
 
-  int getMaxRetries() {
-    return maxRetries;
+  /**
+   * Sleeps for the calculated backoff duration before the next retry attempt.
+   *
+   * @return {@code true} if the sleep completed normally, {@code false} if interrupted (thread
+   *     interrupt flag is restored and the record is sent to DLQ)
+   */
+  private boolean waitBeforeRetry(
+      ConsumerRecord<String, CloudEvent> record, RetryableAdapterException cause, int attempt) {
+    long backoff = backoffCalculator.calculate(attempt);
+    logger.warn(
+        "Retryable error processing event {} (attempt {}/{}). Retrying in {}ms. Error: {}",
+        Encode.forJava(record.value().getId()),
+        attempt,
+        maxRetries,
+        backoff,
+        Encode.forJava(cause.getInternalMessage()));
+    try {
+      Thread.sleep(backoff);
+      return true;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      logger.warn("Retry sleep interrupted for event {}", Encode.forJava(record.value().getId()));
+      dlqHandler.sendToDLQ(record, cause, true);
+      return false;
+    }
   }
 
   /** Holds parsed retry configuration values. */

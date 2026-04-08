@@ -69,7 +69,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
   private static final String KAFKA_PUBLISH_TIMEOUT_MS = "kafka.publish.timeout.ms";
 
   // Default values
-  private static final String DEFAULT_DLQ_TOPIC = "de.civitascore.idm.dlq";
+  private static final String DEFAULT_DLQ_TOPIC = "de.civitascore.configadapter.dlq";
   private static final long DEFAULT_PUBLISH_TIMEOUT_MS = 5000L;
 
   // MDC keys
@@ -420,11 +420,6 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
     } catch (Exception e) {
       logger.error("Error closing {}", resourceName, e);
     }
-  }
-
-  // Getter methods for testing
-  int getMaxRetries() {
-    return retryHandler.getMaxRetries();
   }
 
   long getPublishTimeoutMs() {
