@@ -2,12 +2,18 @@ package de.civitascore.portal.service.initializer;
 
 import de.civitascore.configadapter.model.ConfigResultEvent;
 import de.civitascore.configadapter.model.idm.GroupConfig;
+import de.civitascore.portal.configuration.InitProperties;
+import de.civitascore.portal.model.embedded.ScopeType;
+import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.GroupRepository;
+import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.service.ConfigEventPublisherService;
 import de.civitascore.portal.service.GroupService;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -21,16 +27,26 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Catches up groups that exist in the database but have not yet been synced to Keycloak. Runs on
- * every startup (not gated by the {@code init} profile) to ensure all groups have a Keycloak
- * counterpart. Parent groups are synced before children to ensure parentId references resolve.
+ * Initializes groups and syncs them to Keycloak. Runs on every startup:
+ *
+ * <ul>
+ *   <li>With {@code init} profile: creates groups from configuration properties and their
+ *       assignments
+ *   <li>Always: syncs all groups without a Keycloak reference ({@code externalId IS NULL})
+ * </ul>
+ *
+ * <p>Must run before {@link UserInitializer} ({@code @Order(10)}) so that groups have Keycloak
+ * references when user memberships are synced.
  */
 @Component
 @Slf4j
 public class GroupInitializer {
 
   private final GroupRepository groupRepository;
+  private final RoleRepository roleRepository;
+  private final AssignmentRepository assignmentRepository;
   private final ConfigEventPublisherService configEventPublisher;
+  private final Optional<InitProperties> initProperties;
 
   @Value("${keycloak.target-realm}")
   private String targetRealm;
@@ -39,15 +55,88 @@ public class GroupInitializer {
   private int configAdapterTimeoutSeconds;
 
   public GroupInitializer(
-      GroupRepository groupRepository, ConfigEventPublisherService configEventPublisher) {
+      GroupRepository groupRepository,
+      RoleRepository roleRepository,
+      AssignmentRepository assignmentRepository,
+      ConfigEventPublisherService configEventPublisher,
+      Optional<InitProperties> initProperties) {
     this.groupRepository = groupRepository;
+    this.roleRepository = roleRepository;
+    this.assignmentRepository = assignmentRepository;
     this.configEventPublisher = configEventPublisher;
+    this.initProperties = initProperties;
   }
 
   @EventListener(ApplicationReadyEvent.class)
   @Order(10)
   @Transactional
-  public void syncUnsyncedGroups() {
+  public void initialize() {
+    initProperties.ifPresent(this::createGroupsFromConfig);
+    syncUnsyncedGroups();
+  }
+
+  private void createGroupsFromConfig(InitProperties properties) {
+    if (properties.getGroups().isEmpty()) {
+      return;
+    }
+
+    log.info("Creating groups from init configuration");
+
+    for (InitProperties.GroupEntry entry : properties.getGroups()) {
+      Group group =
+          groupRepository
+              .findByName(entry.getName())
+              .orElseGet(
+                  () -> {
+                    Group newGroup = new Group();
+                    newGroup.setName(entry.getName());
+                    newGroup.setDescription(entry.getDescription());
+                    Group saved = groupRepository.save(newGroup);
+                    log.info("Created group '{}'", entry.getName());
+                    return saved;
+                  });
+
+      if (entry.getRoleName() != null) {
+        createAssignmentIfAbsent(group, entry.getRoleName(), entry.getScopeType());
+      }
+    }
+  }
+
+  private void createAssignmentIfAbsent(Group group, String roleName, ScopeType scopeType) {
+    roleRepository
+        .findByName(roleName)
+        .ifPresentOrElse(
+            role -> {
+              boolean exists =
+                  scopeType == null
+                      ? assignmentRepository.existsByGroupAndRoleAndScopeTypeIsNull(group, role)
+                      : assignmentRepository.existsByGroupAndRoleAndScopeType(
+                          group, role, scopeType);
+              if (exists) {
+                log.debug(
+                    "Assignment for group '{}' and role '{}' already exists — skipping",
+                    group.getName(),
+                    role.getName());
+                return;
+              }
+              Assignment assignment = new Assignment();
+              assignment.setGroup(group);
+              assignment.setRole(role);
+              assignment.setScopeType(scopeType);
+              assignmentRepository.save(assignment);
+              log.info(
+                  "Created assignment for group '{}' with role '{}'",
+                  group.getName(),
+                  role.getName());
+            },
+            () ->
+                log.warn(
+                    "Role '{}' not found for group '{}' — skipping assignment",
+                    roleName,
+                    group.getName()));
+  }
+
+  private void syncUnsyncedGroups() {
     List<Group> unsyncedGroups = groupRepository.findByExternalIdIsNull();
 
     if (unsyncedGroups.isEmpty()) {
