@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 export const useError = () => {
   const tCommon = useTranslations('common')
 
-  const handleFormValidationError = () => {
+  const handleFormValidationError = (_errors?: unknown) => {
     toast.error(tCommon('errors.formInvalid'))
   }
 
