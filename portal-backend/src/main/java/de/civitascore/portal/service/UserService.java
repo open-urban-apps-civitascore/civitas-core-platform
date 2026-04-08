@@ -2,6 +2,7 @@ package de.civitascore.portal.service;
 
 import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.ConfigValue;
+import de.civitascore.configadapter.model.idm.GroupConfig;
 import de.civitascore.configadapter.model.idm.UserConfig;
 import de.civitascore.portal.configuration.EventProperties;
 import de.civitascore.portal.configuration.KeycloakProperties;
@@ -84,6 +85,8 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   public User replaceGroups(UUID userId, List<UUID> groupIds) {
     User user = findByIdOrThrow(userId);
 
+    Set<Group> oldGroups = new HashSet<>(user.getGroups());
+
     if (groupIds.isEmpty()) {
       user.setGroups(new HashSet<>());
     } else {
@@ -98,8 +101,37 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     }
 
     user = getRepository().saveAndFlush(user);
-    preValidateWithExternalSystem(user, null, "update", null);
+
+    // Publish GROUP_UPDATED for each group that gained or lost this member
+    Set<Group> newGroups = user.getGroups();
+    Set<Group> affectedGroups = new HashSet<>();
+    // Groups the user was removed from
+    oldGroups.stream().filter(g -> !newGroups.contains(g)).forEach(affectedGroups::add);
+    // Groups the user was added to
+    newGroups.stream().filter(g -> !oldGroups.contains(g)).forEach(affectedGroups::add);
+
+    for (Group group : affectedGroups) {
+      publishGroupUpdated(group);
+    }
+
     return user;
+  }
+
+  private void publishGroupUpdated(Group group) {
+    GroupConfig groupConfig = new GroupConfig();
+
+    if (group.getExternalId() != null && !group.getExternalId().isBlank()) {
+      groupConfig.setId(group.getExternalId());
+    }
+
+    groupConfig.setName(group.getName());
+    groupConfig.setPath("/" + group.getName().toLowerCase().replaceAll("\\s+", "-"));
+
+    if (group.getParentGroup() != null && group.getParentGroup().getExternalId() != null) {
+      groupConfig.setParentId(group.getParentGroup().getExternalId());
+    }
+
+    configEventPublisher.publishGroupUpdated(targetRealm, groupConfig);
   }
 
   @Override
