@@ -1,4 +1,3 @@
-import { ScrollArea } from '@radix-ui/react-scroll-area'
 import { flexRender, Row, SortDirection, Table } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 import { ComponentProps, ReactNode, useRef } from 'react'
@@ -6,7 +5,7 @@ import { ComponentProps, ReactNode, useRef } from 'react'
 import { useIsTruncated } from '@/hooks/use-is-truncated'
 import { cn } from '@/lib/utils'
 
-import { ScrollBar } from '../ui/scroll-area'
+import { ScrollArea, ScrollBar } from '../ui/scroll-area'
 import { Skeleton } from '../ui/skeleton'
 import { Table as ShadCnTable, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
@@ -83,7 +82,7 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
       <div
         className={cn(
           !isPaginationHidden &&
-            'h-full [--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))]  [--pagination-padding:calc(--spacing(4))]',
+            'flex h-full flex-col [--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))] [--pagination-padding:calc(--spacing(4))]',
         )}
       >
         <ScrollArea
@@ -91,10 +90,10 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
           className={cn(
             'w-full bg-white',
             hasCard && 'rounded-md border-1',
-            !isPaginationHidden && 'h-[calc(100%-var(--pagination-height))]',
+            !isPaginationHidden && 'max-h-[calc(100%-var(--pagination-height))]',
           )}
         >
-          <ShadCnTable aria-labelledby="subheading" tableContainerProps={{ className: '' }} {...tableProps}>
+          <ShadCnTable aria-labelledby="subheading" {...tableProps}>
             <TableHeader>
               {table.getHeaderGroups().map(group => (
                 <TableRow key={group.id}>

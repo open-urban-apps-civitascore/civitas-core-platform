@@ -7,7 +7,7 @@ import messages from '@/messages/de.json'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 
 vi.mock('next/navigation', () => ({
-  usePathname: vi.fn(() => '/'),
+  usePathname: () => '/',
 }))
 vi.mock('@/contexts/unsaved-changes/UnsavedChangesContext', () => ({
   useUnsavedChanges: () => ({
@@ -18,7 +18,16 @@ vi.mock('@/contexts/unsaved-changes/UnsavedChangesContext', () => ({
 }))
 
 vi.mock('@/components/ui/collapsible', () => ({
-  Collapsible: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
+  Collapsible: ({
+    children,
+    open,
+    ...props
+    // eslint-disable-next-line react/boolean-prop-naming
+  }: React.HTMLAttributes<HTMLDivElement> & { open?: boolean; onOpenChange?: (open: boolean) => void }) => (
+    <div data-state={open ? 'open' : 'closed'} {...props}>
+      {children}
+    </div>
+  ),
   CollapsibleTrigger: ({ children, ...props }: React.HTMLAttributes<HTMLButtonElement>) => (
     <button data-slot="collapsible-trigger" {...props}>
       {children}
