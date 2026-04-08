@@ -132,15 +132,12 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     setCanSetAvailable(DatastructureVersionFormAvailableSchema.safeParse(formValues).success)
   }, [formValues])
 
-  const handleSave = async () => {
+  const handleSubmit = async () => {
     let isSaved = false
 
     await form.handleSubmit(
       async () => {
         isSaved = await saveDatastructureVersion(datastructure.id)
-        if (isSaved) {
-          setIsExitModalOpen(false)
-        }
       },
       errors => {
         handleFormValidationError(errors)
@@ -151,12 +148,31 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     return isSaved
   }
 
-  useRegisterUnsavedChanges(hasUserChanges, handleSave)
+  useRegisterUnsavedChanges(hasUserChanges, handleSubmit)
+
+  const handleSave = async () => {
+    const isSaved = await handleSubmit()
+    if (isSaved) {
+      setIsExitModalOpen(false)
+    }
+  }
+
+  const exitEditMode = () => {
+    if (isCreateMode) router.push(`/datastructures/${datastructureId}`)
+    else {
+      setIsReadOnly(true)
+      setIsExitModalOpen(false)
+    }
+  }
+
+  const handleExitWarningSave = async () => {
+    const isSaved = await handleSubmit()
+    if (isSaved) exitEditMode()
+  }
 
   const handleExit = () => {
     resetToInitialState()
-    setIsReadOnly(true)
-    setIsExitModalOpen(false)
+    exitEditMode()
   }
 
   const handleExitButtonClick = () => {
@@ -254,7 +270,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         open={isExitModalOpen}
         onOpenChange={() => setIsExitModalOpen(false)}
         onDiscard={handleExit}
-        onConfirm={handleSave}
+        onConfirm={handleExitWarningSave}
         isLoading={isLoading}
       />
     </PageContainer>
