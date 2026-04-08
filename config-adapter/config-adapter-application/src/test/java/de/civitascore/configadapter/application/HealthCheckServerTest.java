@@ -11,7 +11,9 @@ package de.civitascore.configadapter.application;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
+import de.civitascore.configadapter.messaging.EventConsumer;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -105,7 +107,7 @@ class HealthCheckServerTest {
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }
 
-  private List<Object> createMockConsumers(int count) {
-    return IntStream.range(0, count).mapToObj(i -> new Object()).toList();
+  private List<EventConsumer> createMockConsumers(int count) {
+    return IntStream.range(0, count).mapToObj(i -> mock(EventConsumer.class)).toList();
   }
 }
