@@ -6,14 +6,18 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.configadapter.Topics;
+import de.civitascore.configadapter.model.idm.GroupConfig;
 import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
+import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentGroupInputDTO;
 import de.civitascore.portal.repository.GroupRepository;
+import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.HashSet;
 import java.util.List;
@@ -24,7 +28,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
@@ -37,9 +40,19 @@ class GroupServiceTest {
   @Mock private GroupMapper groupMapper;
   @Mock private UserService userService;
   @Mock private AssignmentFactory assignmentFactory;
-  @Mock private ObjectMapper objectMapper;
+  @Mock private ConfigEventPublisherService configEventPublisher;
 
-  @InjectMocks private GroupService groupService;
+  private static final String TARGET_REALM = "test-realm";
+
+  private GroupService createService() {
+    return new GroupService(
+        configEventPublisher,
+        groupRepository,
+        groupMapper,
+        userService,
+        assignmentFactory,
+        TARGET_REALM);
+  }
 
   private Role createRole(UUID id, RoleType roleType) {
     Role role = new Role();
@@ -64,6 +77,7 @@ class GroupServiceTest {
     @Test
     @DisplayName("Should add new assignments for a group")
     void shouldAddNewAssignmentsForGroup() {
+      GroupService groupService = createService();
       UUID groupId = UUID.randomUUID();
       UUID roleId = UUID.randomUUID();
       Role role = createRole(roleId, RoleType.DATA);
@@ -93,6 +107,7 @@ class GroupServiceTest {
     @Test
     @DisplayName("Should throw ResourceNotFoundException when group not found")
     void shouldThrowWhenGroupNotFound() {
+      GroupService groupService = createService();
       UUID groupId = UUID.randomUUID();
       when(groupRepository.findById(groupId)).thenReturn(Optional.empty());
 
@@ -103,6 +118,7 @@ class GroupServiceTest {
     @Test
     @DisplayName("Should silently discard duplicate assignments in input")
     void shouldDiscardDuplicateAssignments() {
+      GroupService groupService = createService();
       UUID groupId = UUID.randomUUID();
       UUID roleId = UUID.randomUUID();
       Role role = createRole(roleId, RoleType.DATA);
@@ -133,6 +149,7 @@ class GroupServiceTest {
     @Test
     @DisplayName("Should handle empty assignment list by clearing all assignments")
     void shouldHandleEmptyAssignmentList() {
+      GroupService groupService = createService();
       UUID groupId = UUID.randomUUID();
       UUID roleId = UUID.randomUUID();
       Role role = createRole(roleId, RoleType.DATA);
@@ -150,6 +167,228 @@ class GroupServiceTest {
 
       assertThat(result.getAssignments()).isEmpty();
       verify(groupRepository).save(any(Group.class));
+    }
+  }
+
+  @Nested
+  @DisplayName("deleteById()")
+  class DeleteByIdTests {
+
+    @Test
+    @DisplayName("Should throw ResourceInUseException when group has child groups")
+    void shouldThrowWhenGroupHasChildGroups() {
+      GroupService service = createService();
+      UUID groupId = UUID.randomUUID();
+
+      Group group = new Group();
+      group.setId(groupId);
+      group.setName("Parent Group");
+
+      Group child = new Group();
+      child.setId(UUID.randomUUID());
+      child.setName("Child Group");
+      child.setParentGroup(group);
+      group.setChildGroups(Set.of(child));
+
+      when(groupRepository.findByIdWithRelations(groupId)).thenReturn(Optional.of(group));
+
+      assertThatThrownBy(() -> service.deleteById(groupId))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("child groups");
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // toConfigValuePostSave
+  // ---------------------------------------------------------------------------
+
+  @Nested
+  @DisplayName("toConfigValuePostSave()")
+  class ToConfigValuePostSaveTests {
+
+    @Test
+    @DisplayName("Should build GroupConfig with name and path")
+    void shouldBuildGroupConfigWithNameAndPath() {
+      GroupService service = createService();
+      Group group = new Group();
+      group.setId(UUID.randomUUID());
+      group.setName("Editors");
+
+      GroupConfig config =
+          (GroupConfig) service.toConfigValuePostSave(group, new GroupInputDTO(), null);
+
+      assertThat(config.getName()).isEqualTo("Editors");
+      assertThat(config.getPath()).isEqualTo("/editors");
+    }
+
+    @Test
+    @DisplayName("Should set externalId as Keycloak id when present")
+    void shouldSetKeycloakIdFromExternalId() {
+      GroupService service = createService();
+      Group group = new Group();
+      group.setId(UUID.randomUUID());
+      group.setName("Editors");
+      group.setExternalId("kc-group-uuid-123");
+
+      GroupConfig config =
+          (GroupConfig) service.toConfigValuePostSave(group, new GroupInputDTO(), null);
+
+      assertThat(config.getId()).isEqualTo("kc-group-uuid-123");
+    }
+
+    @Test
+    @DisplayName("Should not set id when externalId is null")
+    void shouldNotSetIdWhenExternalIdNull() {
+      GroupService service = createService();
+      Group group = new Group();
+      group.setId(UUID.randomUUID());
+      group.setName("Editors");
+      group.setExternalId(null);
+
+      GroupConfig config =
+          (GroupConfig) service.toConfigValuePostSave(group, new GroupInputDTO(), null);
+
+      assertThat(config.getId()).isNull();
+    }
+
+    @Test
+    @DisplayName("Should set parentId from parent group externalId")
+    void shouldSetParentIdFromParentExternalId() {
+      GroupService service = createService();
+      Group parent = new Group();
+      parent.setId(UUID.randomUUID());
+      parent.setExternalId("kc-parent-uuid");
+
+      Group group = new Group();
+      group.setId(UUID.randomUUID());
+      group.setName("Sub Editors");
+      group.setParentGroup(parent);
+
+      GroupConfig config =
+          (GroupConfig) service.toConfigValuePostSave(group, new GroupInputDTO(), null);
+
+      assertThat(config.getParentId()).isEqualTo("kc-parent-uuid");
+    }
+
+    @Test
+    @DisplayName("Should not set parentId when no parent group")
+    void shouldNotSetParentIdWhenNoParent() {
+      GroupService service = createService();
+      Group group = new Group();
+      group.setId(UUID.randomUUID());
+      group.setName("Top Level");
+
+      GroupConfig config =
+          (GroupConfig) service.toConfigValuePostSave(group, new GroupInputDTO(), null);
+
+      assertThat(config.getParentId()).isNull();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // updateExternalId
+  // ---------------------------------------------------------------------------
+
+  @Nested
+  @DisplayName("updateExternalId()")
+  class UpdateExternalIdTests {
+
+    @Test
+    @DisplayName("Should set externalId when value is valid")
+    void shouldSetExternalIdWhenValid() {
+      GroupService service = createService();
+      Group group = new Group();
+
+      service.updateExternalId(group, "kc-group-id-456");
+
+      assertThat(group.getExternalId()).isEqualTo("kc-group-id-456");
+    }
+
+    @Test
+    @DisplayName("Should not set externalId when null")
+    void shouldSkipWhenNull() {
+      GroupService service = createService();
+      Group group = new Group();
+      group.setExternalId("original");
+
+      service.updateExternalId(group, null);
+
+      assertThat(group.getExternalId()).isEqualTo("original");
+    }
+
+    @Test
+    @DisplayName("Should not set externalId when blank")
+    void shouldSkipWhenBlank() {
+      GroupService service = createService();
+      Group group = new Group();
+      group.setExternalId("original");
+
+      service.updateExternalId(group, "   ");
+
+      assertThat(group.getExternalId()).isEqualTo("original");
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // resolveTopic
+  // ---------------------------------------------------------------------------
+
+  @Nested
+  @DisplayName("resolveTopic()")
+  class ResolveTopicTests {
+
+    @Test
+    @DisplayName("Should resolve create topic")
+    void shouldResolveCreateTopic() {
+      assertThat(createService().resolveTopic("create")).isEqualTo(Topics.GROUP_CREATED);
+    }
+
+    @Test
+    @DisplayName("Should resolve update topic")
+    void shouldResolveUpdateTopic() {
+      assertThat(createService().resolveTopic("update")).isEqualTo(Topics.GROUP_UPDATED);
+    }
+
+    @Test
+    @DisplayName("Should resolve delete topic")
+    void shouldResolveDeleteTopic() {
+      assertThat(createService().resolveTopic("delete")).isEqualTo(Topics.GROUP_DELETED);
+    }
+
+    @Test
+    @DisplayName("Should throw on unknown operation")
+    void shouldThrowOnUnknownOperation() {
+      assertThatThrownBy(() -> createService().resolveTopic("unknown"))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("Unknown operation");
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Config adapter metadata
+  // ---------------------------------------------------------------------------
+
+  @Nested
+  @DisplayName("Config adapter metadata")
+  class ConfigAdapterMetadataTests {
+
+    @Test
+    @DisplayName("Should return configured realm")
+    void shouldReturnTargetRealm() {
+      Group group = new Group();
+      assertThat(createService().getRealm(group)).isEqualTo(TARGET_REALM);
+    }
+
+    @Test
+    @DisplayName("Should return 'group' as target component")
+    void shouldReturnGroupComponent() {
+      assertThat(createService().getTargetComponent()).isEqualTo("group");
+    }
+
+    @Test
+    @DisplayName("Should return '/groups' as config path")
+    void shouldReturnGroupsPath() {
+      assertThat(createService().getConfigPath()).isEqualTo("/groups");
     }
   }
 }
