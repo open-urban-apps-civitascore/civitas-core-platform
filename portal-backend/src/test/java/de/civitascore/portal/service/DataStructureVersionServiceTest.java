@@ -67,8 +67,7 @@ class DataStructureVersionServiceTest {
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       version.setDataStructure(ds);
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
-          .thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
 
       assertThatThrownBy(() -> dataStructureVersionService.unpublish(versionId))
@@ -96,8 +95,7 @@ class DataStructureVersionServiceTest {
 
       ds.setDataStructureVersions(Set.of(version, otherVersion));
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
-          .thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
       when(dataStructureVersionRepository.save(version)).thenReturn(version);
 
@@ -123,8 +121,7 @@ class DataStructureVersionServiceTest {
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version.setDataStructure(ds);
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
-          .thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
       when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
 
@@ -144,8 +141,7 @@ class DataStructureVersionServiceTest {
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version.setDataStructure(ds);
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
-          .thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
       when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
 
@@ -185,8 +181,7 @@ class DataStructureVersionServiceTest {
       input.setModel("<xml>new model</xml>");
       input.setStyles(new HashMap<>(Map.of("color", "red")));
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
-          .thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
       // Mock mapper does not update entity, so validateUniqueVersion sees the original "1.0.0"
       when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
@@ -227,8 +222,7 @@ class DataStructureVersionServiceTest {
       input.setStyles(new HashMap<>(Map.of("color", "red")));
       input.setModelName("UpdatedModelName");
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
-          .thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
       when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
               dataStructureId, "1.0.0"))
@@ -255,8 +249,7 @@ class DataStructureVersionServiceTest {
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
-          .thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("1.0.0");
@@ -281,8 +274,7 @@ class DataStructureVersionServiceTest {
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version.setModelAtlasUri("http://example.com/model/missing");
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
-          .thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(modelService.downloadModel("http://example.com/model/missing", "application/xml"))
           .thenThrow(new RuntimeException("Not found"));
 
@@ -300,8 +292,7 @@ class DataStructureVersionServiceTest {
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version.setModelAtlasUri("http://example.com/model/empty");
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
-          .thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(modelService.downloadModel("http://example.com/model/empty", "application/xml"))
           .thenReturn(null);
 
@@ -319,8 +310,7 @@ class DataStructureVersionServiceTest {
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version.setModelAtlasUri("http://example.com/model/valid");
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
-          .thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(modelService.downloadModel("http://example.com/model/valid", "application/xml"))
           .thenReturn("<xml>model content</xml>");
       when(dataStructureVersionRepository.save(version)).thenReturn(version);
@@ -341,8 +331,7 @@ class DataStructureVersionServiceTest {
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version.setModelAtlasUri("  ");
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
-          .thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
 
       assertThatThrownBy(() -> dataStructureVersionService.publish(versionId))
           .isInstanceOf(InvalidInputException.class)
@@ -357,8 +346,7 @@ class DataStructureVersionServiceTest {
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
-          .thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
 
       assertThatThrownBy(() -> dataStructureVersionService.publish(versionId))
           .isInstanceOf(InvalidInputException.class)
@@ -541,7 +529,7 @@ class DataStructureVersionServiceTest {
               })
           .when(dataStructureVersionMapper)
           .updateEntity(any(), any());
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
+      when(dataStructureVersionRepository.findById(versionId))
           .thenReturn(Optional.of(existingEntity));
       when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
               dataStructureId, "2.0.0"))
@@ -609,7 +597,7 @@ class DataStructureVersionServiceTest {
               })
           .when(dataStructureVersionMapper)
           .updateEntity(any(), any());
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
+      when(dataStructureVersionRepository.findById(versionId))
           .thenReturn(Optional.of(existingEntity));
       when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
               dataStructureId, "1.0.0"))
@@ -641,7 +629,7 @@ class DataStructureVersionServiceTest {
       input.setVersion("1.0.0"); // same as existing — self-assignment
 
       // Only match is the entity being updated itself
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
+      when(dataStructureVersionRepository.findById(versionId))
           .thenReturn(Optional.of(existingEntity));
       when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
               dataStructureId, "1.0.0"))
@@ -673,8 +661,7 @@ class DataStructureVersionServiceTest {
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version.setDataStructure(ds);
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
-          .thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
       when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
 
@@ -695,8 +682,7 @@ class DataStructureVersionServiceTest {
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version.setDataStructure(ds);
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
-          .thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
       when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
 
@@ -718,8 +704,7 @@ class DataStructureVersionServiceTest {
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version.setDataStructure(ds);
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
-          .thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
       when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
       doThrow(new RuntimeException("Atlas down"))
@@ -760,7 +745,7 @@ class DataStructureVersionServiceTest {
 
       String uploadResponse = "{\"objectId\":\"dGVzdE9iamVjdElk\",\"objectName\":\"TestModel\"}";
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
+      when(dataStructureVersionRepository.findById(versionId))
           .thenReturn(Optional.of(existingEntity));
       when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
               dataStructureId, "1.0.0"))
@@ -803,7 +788,7 @@ class DataStructureVersionServiceTest {
 
       String uploadResponse = "{\"objectId\":\"dGVzdE9iamVjdElk\",\"objectName\":\"TestModel\"}";
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
+      when(dataStructureVersionRepository.findById(versionId))
           .thenReturn(Optional.of(existingEntity));
       when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
               dataStructureId, "1.0.0"))
@@ -846,7 +831,7 @@ class DataStructureVersionServiceTest {
       String uploadResponse =
           "{\"objectId\":\"aHR0cDovL3Rlc3QvbW9kZWw=\",\"objectName\":\"TestModel\"}";
 
-      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
+      when(dataStructureVersionRepository.findById(versionId))
           .thenReturn(Optional.of(existingEntity));
       when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
               dataStructureId, "1.0.0"))

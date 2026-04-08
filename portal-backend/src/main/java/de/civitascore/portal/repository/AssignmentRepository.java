@@ -10,6 +10,7 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data JPA repository for {@link Assignment} entities. */
@@ -17,9 +18,8 @@ import org.springframework.stereotype.Repository;
 public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
 
   /**
-   * Find an assignment by ID with all related entities eagerly fetched in a single JOIN query. This
-   * prevents N+1 query problems when loading assignments with their relationships. Use this for
-   * read operations (GET/UPDATE) instead of regular findById.
+   * Find an assignment by ID with all related entities eagerly fetched. This prevents N+1 query
+   * problems when loading assignments with their relationships.
    *
    * @param id the assignment ID
    * @return the assignment with eagerly fetched group, role, and scope entities
@@ -34,8 +34,8 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
         "dataSource",
         "dataStructure"
       })
-  @Query("SELECT a FROM Assignment a WHERE a.id = :id")
-  Optional<Assignment> findByIdWithRelations(@Param("id") UUID id);
+  @Override
+  @NonNull Optional<Assignment> findById(@NonNull UUID id);
 
   /**
    * Find all assignments for the given role ID with groups eagerly fetched. This prevents N+1 query

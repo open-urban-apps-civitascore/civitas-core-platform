@@ -9,7 +9,6 @@ import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.util.ResourceInUseException;
 import java.util.HashSet;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -111,15 +110,5 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
   @Override
   protected String getEntityName() {
     return Group.class.getSimpleName();
-  }
-
-  /**
-   * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
-   * Group along with contactUser, parentGroup, members and roles in a single JOIN query
-   */
-  @Override
-  public Optional<Group> findById(UUID id) {
-    Optional<Group> entity = groupRepository.findByIdWithRelations(id);
-    return postLoad(entity);
   }
 }

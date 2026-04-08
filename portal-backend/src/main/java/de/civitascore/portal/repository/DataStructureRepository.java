@@ -4,8 +4,7 @@ import de.civitascore.portal.model.entity.DataStructure;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data JPA repository for {@link DataStructure} entities. */
@@ -20,6 +19,6 @@ public interface DataStructureRepository extends NamedEntityRepository<DataStruc
    * @return the data structure with eagerly fetched dataStructureVersions
    */
   @EntityGraph(attributePaths = {"dataStructureVersions"})
-  @Query("SELECT ds FROM DataStructure ds WHERE ds.id = :id")
-  Optional<DataStructure> findByIdWithRelations(@Param("id") UUID id);
+  @Override
+  @NonNull Optional<DataStructure> findById(@NonNull UUID id);
 }

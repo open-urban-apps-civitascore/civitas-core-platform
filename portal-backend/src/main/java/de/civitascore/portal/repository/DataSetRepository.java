@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data JPA repository for {@link DataSet} entities. */
@@ -19,11 +20,11 @@ public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> 
    * when loading datasets with their relationships.
    *
    * @param id the dataset ID
-   * @return the dataset with eagerly fetched owner
+   * @return the dataset with eagerly fetched owner, pipelines, and distributions
    */
   @EntityGraph(attributePaths = {"owner", "pipelines", "distributions"})
-  @Query("SELECT d FROM DataSet d WHERE d.id = :id")
-  Optional<DataSet> findByIdWithRelations(@Param("id") UUID id);
+  @Override
+  @NonNull Optional<DataSet> findById(@NonNull UUID id);
 
   /**
    * Check if any dataset with the given statuses references the specified data source via its

@@ -204,7 +204,7 @@ class PipelineControllerIntegrationTest
 
       // Verify data sources are associated in database using eager fetch
       UUID pipelineId = response.getBody().getId();
-      Pipeline savedPipeline = pipelineRepository.findByIdWithRelations(pipelineId).orElseThrow();
+      Pipeline savedPipeline = pipelineRepository.findById(pipelineId).orElseThrow();
 
       assertThat(savedPipeline.getDataSources())
           .hasSize(2)
@@ -734,7 +734,7 @@ class PipelineControllerIntegrationTest
       UUID pipelineId = createResponse.getBody().getId();
 
       // Verify associations exist
-      Pipeline pipeline = pipelineRepository.findByIdWithRelations(pipelineId).orElseThrow();
+      Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
       assertThat(pipeline.getDataSources()).hasSize(2);
 
       // Delete pipeline
@@ -938,7 +938,7 @@ class PipelineControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
 
       Pipeline savedPipeline =
-          pipelineRepository.findByIdWithRelations(response.getBody().getId()).orElseThrow();
+          pipelineRepository.findById(response.getBody().getId()).orElseThrow();
       assertThat(savedPipeline.getDataSources()).isEmpty();
     }
   }

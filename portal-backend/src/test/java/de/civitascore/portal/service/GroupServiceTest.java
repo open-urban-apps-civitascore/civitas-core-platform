@@ -79,7 +79,7 @@ class GroupServiceTest {
       input.setRoleId(roleId);
       input.setScopeType(ScopeType.TENANT);
 
-      when(groupRepository.findByIdWithRelations(groupId)).thenReturn(Optional.of(group));
+      when(groupRepository.findById(groupId)).thenReturn(Optional.of(group));
       when(assignmentFactory.build(input)).thenReturn(newAssignment);
       when(groupRepository.save(group)).thenReturn(group);
 
@@ -94,7 +94,7 @@ class GroupServiceTest {
     @DisplayName("Should throw ResourceNotFoundException when group not found")
     void shouldThrowWhenGroupNotFound() {
       UUID groupId = UUID.randomUUID();
-      when(groupRepository.findByIdWithRelations(groupId)).thenReturn(Optional.empty());
+      when(groupRepository.findById(groupId)).thenReturn(Optional.empty());
 
       assertThatThrownBy(() -> groupService.replaceAssignments(groupId, Set.of()))
           .isInstanceOf(ResourceNotFoundException.class);
@@ -118,7 +118,7 @@ class GroupServiceTest {
       input1.setRoleId(roleId);
       input1.setScopeType(ScopeType.TENANT);
 
-      when(groupRepository.findByIdWithRelations(groupId)).thenReturn(Optional.of(group));
+      when(groupRepository.findById(groupId)).thenReturn(Optional.of(group));
       when(assignmentFactory.build(input1)).thenReturn(newAssignment);
       when(groupRepository.save(group)).thenReturn(group);
 
@@ -143,7 +143,7 @@ class GroupServiceTest {
       group.setAssignments(
           new HashSet<>(List.of(createExistingAssignment(role, ScopeType.TENANT))));
 
-      when(groupRepository.findByIdWithRelations(groupId)).thenReturn(Optional.of(group));
+      when(groupRepository.findById(groupId)).thenReturn(Optional.of(group));
       when(groupRepository.save(group)).thenReturn(group);
 
       Group result = groupService.replaceAssignments(groupId, Set.of());

@@ -4,8 +4,7 @@ import de.civitascore.portal.model.entity.Catalog;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data JPA repository for {@link Catalog} entities. */
@@ -20,6 +19,6 @@ public interface CatalogRepository extends NamedEntityRepository<Catalog, UUID> 
    * @return the catalog with eagerly fetched parentCatalog
    */
   @EntityGraph(attributePaths = {"parentCatalog"})
-  @Query("SELECT c FROM Catalog c WHERE c.id = :id")
-  Optional<Catalog> findByIdWithRelations(@Param("id") UUID id);
+  @Override
+  @NonNull Optional<Catalog> findById(@NonNull UUID id);
 }
