@@ -14,10 +14,11 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
 }))
 
 let mockSearchParams = new URLSearchParams('mode=edit')
+const mockPush = vi.fn()
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
-    push: vi.fn(),
+    push: mockPush,
   }),
   useSearchParams: () => mockSearchParams,
   usePathname: () => '/datastructures/test-id/versions/v-1',
@@ -31,9 +32,9 @@ vi.mock('@/hooks/use-query-params', () => ({
 }))
 
 vi.mock('@/components/uml-modeler/hooks/use-multi-session-manager', () => ({
-  useMultiSessionManager: () => ({
+  useMultiSessionManager: ({ initialSession }: { initialSession: { id: string } | null }) => ({
     activeSession: null,
-    activeSessionId: null,
+    activeSessionId: initialSession?.id ?? null,
     setSession: vi.fn(),
     markSessionDirty: vi.fn(),
   }),
@@ -96,6 +97,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockPush.mockReset()
     mockSearchParams = new URLSearchParams('mode=edit')
     vi.mocked(useGetCurrentUser).mockReturnValue({
       data: {
@@ -190,7 +192,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     })
   })
 
-  describe('exit modal - edit mode with hasUserChanges', () => {
+  describe('exit behavior - edit mode', () => {
     it('shows modal when version field is changed', async () => {
       renderComponent()
 
@@ -243,23 +245,15 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       })
     })
 
-    it('closes modal after discard action', async () => {
+    it('exits editing when exit is clicked in edit mode without changes', async () => {
       renderComponent()
 
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      fireEvent.change(versionInput, { target: { value: '2.0.0' } })
-
       const cancelButtons = screen.getAllByTestId('cancelButton')
-      const exitButton = cancelButtons[0]
-      fireEvent.click(exitButton)
+      fireEvent.click(cancelButtons[0])
 
       await waitFor(() => {
-        const discardButton = screen.getByRole('button', { name: /discard|verwerfen/i })
-        fireEvent.click(discardButton)
-      })
-
-      await waitFor(() => {
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        expect(screen.getByTestId('editButton')).toBeInTheDocument()
+        expect(mockPush).not.toHaveBeenCalled()
       })
     })
   })
@@ -317,7 +311,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     })
   })
 
-  describe('exit modal - create mode with hasUserChanges', () => {
+  describe('exit behavior - create mode', () => {
     it('shows modal when version field is filled in create mode', async () => {
       renderComponent({
         version: null,
@@ -336,7 +330,21 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       })
     })
 
-    it('resets form to empty when discard is clicked in create mode', async () => {
+    it('calls router.push when cancel is clicked without changes in create mode', async () => {
+      renderComponent({
+        version: null,
+        isCreateMode: true,
+      })
+
+      const cancelButtons = screen.getAllByTestId('cancelButton')
+      fireEvent.click(cancelButtons[0])
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith(`/datastructures/${mockDatastructure.id}`)
+      })
+    })
+
+    it('opens ExitWarningModal after changes and calls router.push when discard is clicked in create mode', async () => {
       renderComponent({
         version: null,
         isCreateMode: true,
@@ -346,8 +354,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       fireEvent.change(versionInput, { target: { value: '1.0.0' } })
 
       const cancelButtons = screen.getAllByTestId('cancelButton')
-      const exitButton = cancelButtons[0]
-      fireEvent.click(exitButton)
+      fireEvent.click(cancelButtons[0])
 
       await waitFor(() => {
         const discardButton = screen.getByRole('button', { name: /discard|verwerfen/i })
@@ -355,7 +362,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       })
 
       await waitFor(() => {
-        expect(versionInput.value).toBe('')
+        expect(mockPush).toHaveBeenCalledWith(`/datastructures/${mockDatastructure.id}`)
       })
     })
   })
