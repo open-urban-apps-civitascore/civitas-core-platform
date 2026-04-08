@@ -7,7 +7,11 @@ import { ROLE_TYPES, RoleType } from '@/types/roles'
 
 import { PermissionsTab } from './PermissionsTab'
 
-vi.mock('next-intl', () => ({ useTranslations: () => (k: string) => k }))
+const { mockT } = vi.hoisted(() => {
+  const mockT = Object.assign((k: string) => k, { has: () => false })
+  return { mockT }
+})
+vi.mock('next-intl', () => ({ useTranslations: () => mockT }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
