@@ -16,9 +16,9 @@ public interface CatalogRepository extends NamedEntityRepository<Catalog, UUID> 
    * when loading catalogs with their relationships.
    *
    * @param id the catalog ID
-   * @return the catalog with eagerly fetched parentCatalog
+   * @return the catalog with eagerly fetched parentCatalogs
    */
-  @EntityGraph(attributePaths = {"parentCatalog"})
+  @EntityGraph(attributePaths = {"parentCatalogs"})
   @Override
   @NonNull Optional<Catalog> findById(@NonNull UUID id);
 }
