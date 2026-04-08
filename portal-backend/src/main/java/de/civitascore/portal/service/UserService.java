@@ -97,7 +97,9 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
       user.setGroups(new HashSet<>(groups));
     }
 
-    return save(user);
+    user = getRepository().saveAndFlush(user);
+    preValidateWithExternalSystem(user, null, "update", null);
+    return user;
   }
 
   @Override
@@ -143,6 +145,7 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     userConfig.setFirstName(entity.getFirstName());
     userConfig.setLastName(entity.getLastName());
     userConfig.setEnabled(true);
+    userConfig.setGroups(entity.getGroups().stream().map(Group::getName).sorted().toList());
 
     return userConfig;
   }

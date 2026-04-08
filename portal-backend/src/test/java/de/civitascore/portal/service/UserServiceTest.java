@@ -252,6 +252,37 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("Should populate groups with group names from user memberships")
+    void shouldPopulateGroupNames() {
+      UserService service = createService();
+      User user = userWithId(UUID.randomUUID());
+
+      Group group1 = new Group();
+      group1.setName("Editors");
+      Group group2 = new Group();
+      group2.setName("Viewers");
+      user.addGroup(group1);
+      user.addGroup(group2);
+
+      UserConfig config =
+          (UserConfig) service.toConfigValuePostSave(user, new UserInputDTO(), null);
+
+      assertThat(config.getGroups()).containsExactlyInAnyOrder("Editors", "Viewers");
+    }
+
+    @Test
+    @DisplayName("Should set empty groups list when user has no groups")
+    void shouldSetEmptyGroupsWhenNoMemberships() {
+      UserService service = createService();
+      User user = userWithId(UUID.randomUUID());
+
+      UserConfig config =
+          (UserConfig) service.toConfigValuePostSave(user, new UserInputDTO(), null);
+
+      assertThat(config.getGroups()).isEmpty();
+    }
+
+    @Test
     @DisplayName("Should carry over requiredActions and emailVerified from preSaveConfigValue")
     void shouldCarryOverPreSaveFields() {
       UserService service = createService();
