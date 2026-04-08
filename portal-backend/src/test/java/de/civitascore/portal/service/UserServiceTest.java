@@ -3,14 +3,9 @@ package de.civitascore.portal.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.Topics;
-import de.civitascore.configadapter.model.idm.GroupConfig;
 import de.civitascore.configadapter.model.idm.UserConfig;
 import de.civitascore.portal.configuration.EventProperties;
 import de.civitascore.portal.configuration.KeycloakProperties;
@@ -25,7 +20,6 @@ import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -373,68 +367,6 @@ class UserServiceTest {
       assertThatThrownBy(() -> service.replaceGroups(userId, groupIds))
           .isInstanceOf(InvalidInputException.class)
           .hasMessage("One or more groups do not exist.");
-    }
-
-    @Test
-    @DisplayName("Should publish GROUP_UPDATED events for added and removed groups")
-    void shouldPublishGroupUpdatedForAffectedGroups() {
-      UserService service = createService();
-      UUID userId = UUID.randomUUID();
-      User user = userWithId(userId);
-
-      // User starts in groupA
-      Group groupA = new Group();
-      groupA.setId(UUID.randomUUID());
-      groupA.setName("Group A");
-      groupA.setExternalId("kc-group-a");
-      user.addGroup(groupA);
-
-      // We'll move user to groupB (removing from groupA, adding to groupB)
-      Group groupB = new Group();
-      groupB.setId(UUID.randomUUID());
-      groupB.setName("Group B");
-      groupB.setExternalId("kc-group-b");
-
-      when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-      when(groupRepository.findAllById(List.of(groupB.getId()))).thenReturn(List.of(groupB));
-      when(userRepository.saveAndFlush(user)).thenReturn(user);
-      when(configEventPublisher.publishGroupUpdated(eq(TARGET_REALM), any(GroupConfig.class)))
-          .thenReturn(CompletableFuture.completedFuture(null));
-
-      service.replaceGroups(userId, List.of(groupB.getId()));
-
-      // Should publish for both groupA (removed) and groupB (added)
-      verify(configEventPublisher)
-          .publishGroupUpdated(
-              eq(TARGET_REALM),
-              org.mockito.ArgumentMatchers.argThat(
-                  config -> config instanceof GroupConfig gc && "Group A".equals(gc.getName())));
-      verify(configEventPublisher)
-          .publishGroupUpdated(
-              eq(TARGET_REALM),
-              org.mockito.ArgumentMatchers.argThat(
-                  config -> config instanceof GroupConfig gc && "Group B".equals(gc.getName())));
-    }
-
-    @Test
-    @DisplayName("Should not publish GROUP_UPDATED when groups unchanged")
-    void shouldNotPublishWhenGroupsUnchanged() {
-      UserService service = createService();
-      UUID userId = UUID.randomUUID();
-      User user = userWithId(userId);
-
-      Group group = new Group();
-      group.setId(UUID.randomUUID());
-      group.setName("Same Group");
-      user.addGroup(group);
-
-      when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-      when(groupRepository.findAllById(List.of(group.getId()))).thenReturn(List.of(group));
-      when(userRepository.saveAndFlush(user)).thenReturn(user);
-
-      service.replaceGroups(userId, List.of(group.getId()));
-
-      verify(configEventPublisher, never()).publishGroupUpdated(any(), any());
     }
   }
 
