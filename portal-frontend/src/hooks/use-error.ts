@@ -1,13 +1,11 @@
 import { useTranslations } from 'next-intl'
-import { FieldErrors, FieldValues, Path, UseFormReturn } from 'react-hook-form'
+import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 import { toast } from 'sonner'
-import { ZodError } from 'zod'
 
 export const useError = () => {
   const tCommon = useTranslations('common')
 
-  const handleFormValidationError = (errors: FieldErrors | ZodError) => {
-    console.warn('Form validation errors: ', errors)
+  const handleFormValidationError = () => {
     toast.error(tCommon('errors.formInvalid'))
   }
 
