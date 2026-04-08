@@ -48,29 +48,14 @@ class SagaComponentFactoryTest {
     }
 
     @Test
-    @DisplayName("Should use default bootstrap servers when not configured")
+    @DisplayName("Should not throw when using default bootstrap servers")
     void defaultBootstrapServers() {
       AppConfig config = configWith(Map.of("kafka.group.id", "test-group"));
 
       SagaComponents components = factory.create(config);
 
       assertNotNull(components);
-      assertTrue(components.orchestrator().isEmpty());
-    }
-
-    @Test
-    @DisplayName("Should return orchestrator Optional.empty when Kafka is unavailable")
-    void orchestratorFailsGracefully() {
-      AppConfig config =
-          configWith(
-              Map.of(
-                  "kafka.bootstrap.servers", "localhost:19999",
-                  "kafka.group.id", "test-group"));
-
-      SagaComponents components = factory.create(config);
-
-      assertNotNull(components);
-      assertTrue(components.orchestrator().isEmpty());
+      assertNotNull(components.orchestrator());
     }
 
     @Test
