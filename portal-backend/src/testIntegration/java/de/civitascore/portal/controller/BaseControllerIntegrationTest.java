@@ -214,4 +214,159 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
         .as("PATCH producing an invalid entity should return BAD_REQUEST")
         .isEqualTo(HttpStatus.BAD_REQUEST);
   }
+
+  // --- Pagination tests ---
+
+  @Test
+  @DisplayName("Should return paginated results with default page size")
+  void shouldReturnPaginatedResultsWithDefaultPageSize() {
+    createTestEntity();
+    createTestEntity();
+
+    ResponseEntity<RestPage<O>> response = performGetAll();
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().getSize()).isEqualTo(20);
+    assertThat(response.getBody().getTotalElements()).isGreaterThanOrEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("Should respect custom page size")
+  void shouldRespectCustomPageSize() {
+    createTestEntity();
+    createTestEntity();
+
+    ResponseEntity<RestPage<O>> response = performGetAll(Map.of("size", 1));
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().getSize()).isEqualTo(1);
+    assertThat(response.getBody().getNumberOfElements()).isEqualTo(1);
+    assertThat(response.getBody().getTotalElements()).isGreaterThanOrEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("Should return second page")
+  void shouldReturnSecondPage() {
+    createTestEntity();
+    createTestEntity();
+
+    ResponseEntity<RestPage<O>> response = performGetAll(Map.of("size", 1, "page", 1));
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().getNumber()).isEqualTo(1);
+    assertThat(response.getBody().getNumberOfElements()).isEqualTo(1);
+  }
+
+  // --- Error response tests ---
+
+  @Test
+  @DisplayName("Should return 404 when getting non-existent entity")
+  void shouldReturn404WhenGettingNonExistentEntity() {
+    UUID randomId = UUID.randomUUID();
+
+    ResponseEntity<ProblemDetail> response =
+        exchangeForProblem(
+            getEndpointPath() + "/" + randomId, HttpMethod.GET, createAuthHeaders(), null);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("Should return 404 when updating non-existent entity")
+  void shouldReturn404WhenUpdatingNonExistentEntity() {
+    UUID randomId = UUID.randomUUID();
+
+    ResponseEntity<ProblemDetail> response =
+        exchangeForProblem(
+            getEndpointPath() + "/" + randomId,
+            HttpMethod.PUT,
+            createAuthHeaders(),
+            createUpdateInput());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("Should return 404 when patching non-existent entity")
+  void shouldReturn404WhenPatchingNonExistentEntity() {
+    UUID randomId = UUID.randomUUID();
+
+    ResponseEntity<ProblemDetail> response =
+        exchangeForProblem(
+            getEndpointPath() + "/" + randomId,
+            HttpMethod.PATCH,
+            createAuthHeaders(),
+            Map.of("name", "patched"));
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("Should return 404 when deleting non-existent entity")
+  void shouldReturn404WhenDeletingNonExistentEntity() {
+    UUID randomId = UUID.randomUUID();
+
+    ResponseEntity<ProblemDetail> response =
+        exchangeForProblem(
+            getEndpointPath() + "/" + randomId, HttpMethod.DELETE, createAuthHeaders(), null);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("Should return 400 when creating with invalid input")
+  void shouldReturn400WhenCreatingWithInvalidInput() {
+    ResponseEntity<ProblemDetail> response =
+        exchangeForProblem(
+            getEndpointPath(), HttpMethod.POST, createAuthHeaders(), createInvalidInput());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+  }
+
+  // --- Lifecycle tests ---
+
+  @Test
+  @DisplayName("Should return 201 with Location header on create")
+  void shouldReturn201WithLocationHeaderOnCreate() {
+    ResponseEntity<O> response = performCreate(createValidInput());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(response.getBody()).isNotNull();
+    UUID id = getIdFromOutput(response.getBody());
+    assertThat(response.getHeaders().getLocation()).isNotNull();
+    assertThat(response.getHeaders().getLocation().toString()).contains(id.toString());
+  }
+
+  @Test
+  @DisplayName("Should return 204 on successful delete")
+  void shouldReturn204OnSuccessfulDelete() {
+    UUID id = createTestEntity();
+
+    ResponseEntity<Void> response = performDelete(id);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+  }
+
+  @Test
+  @DisplayName("Should return entity by ID after creation")
+  void shouldReturnEntityByIdAfterCreation() {
+    UUID id = createTestEntity();
+
+    ResponseEntity<O> response = performGetById(id);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(getIdFromOutput(response.getBody())).isEqualTo(id);
+  }
+
+  @Test
+  @DisplayName("Should return 401 when no authentication")
+  void shouldReturn401WhenNoAuthentication() {
+    ResponseEntity<String> response = performRequestWithoutAuth("", HttpMethod.GET);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+  }
 }
