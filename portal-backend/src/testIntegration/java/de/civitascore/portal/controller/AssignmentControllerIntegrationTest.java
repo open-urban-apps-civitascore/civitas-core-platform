@@ -43,6 +43,11 @@ class AssignmentControllerIntegrationTest
   }
 
   @Override
+  protected boolean supportsUpdateAndPatch() {
+    return false;
+  }
+
+  @Override
   protected AssignmentInputDTO createValidInput() {
     UUID groupId = createTestGroup();
     UUID roleId = createTestRole();

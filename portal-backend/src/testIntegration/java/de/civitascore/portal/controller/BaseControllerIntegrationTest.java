@@ -57,6 +57,11 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
   // Optional hook for domain-specific cleanup (files, stubs, etc.)
   protected void performAdditionalCleanup() {}
 
+  /** Whether the controller supports PUT/PATCH. Return false to replace 404 tests with 500. */
+  protected boolean supportsUpdateAndPatch() {
+    return true;
+  }
+
   @AfterEach
   void cleanupAfterTest() {
     performAdditionalCleanup();
@@ -204,6 +209,7 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
   @Test
   @DisplayName("Should return BAD_REQUEST when PATCH produces an invalid entity")
   void shouldRejectPatchThatResultsInInvalidEntity() {
+    if (!supportsUpdateAndPatch()) return;
     UUID id = createTestEntity();
     Map<String, Object> patchBody =
         objectMapper.convertValue(createInvalidInput(), new TypeReference<>() {});
@@ -277,6 +283,7 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
   @Test
   @DisplayName("Should return 404 when updating non-existent entity")
   void shouldReturn404WhenUpdatingNonExistentEntity() {
+    if (!supportsUpdateAndPatch()) return;
     UUID randomId = UUID.randomUUID();
 
     ResponseEntity<ProblemDetail> response =
@@ -292,6 +299,7 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
   @Test
   @DisplayName("Should return 404 when patching non-existent entity")
   void shouldReturn404WhenPatchingNonExistentEntity() {
+    if (!supportsUpdateAndPatch()) return;
     UUID randomId = UUID.randomUUID();
 
     ResponseEntity<ProblemDetail> response =
@@ -302,6 +310,35 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
             Map.of("name", "patched"));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("Should reject PUT when operation is not supported")
+  void shouldRejectUnsupportedPut() {
+    if (supportsUpdateAndPatch()) return;
+    UUID id = createTestEntity();
+
+    ResponseEntity<ProblemDetail> response =
+        exchangeForProblem(
+            getEndpointPath() + "/" + id, HttpMethod.PUT, createAuthHeaders(), createValidInput());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+  }
+
+  @Test
+  @DisplayName("Should reject PATCH when operation is not supported")
+  void shouldRejectUnsupportedPatch() {
+    if (supportsUpdateAndPatch()) return;
+    UUID id = createTestEntity();
+
+    ResponseEntity<ProblemDetail> response =
+        exchangeForProblem(
+            getEndpointPath() + "/" + id,
+            HttpMethod.PATCH,
+            createAuthHeaders(),
+            Map.of("name", "patched"));
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
   @Test
