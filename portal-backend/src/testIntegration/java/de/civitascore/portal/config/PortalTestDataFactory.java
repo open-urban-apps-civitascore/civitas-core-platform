@@ -769,12 +769,20 @@ public class PortalTestDataFactory {
   // cleanAll — deletes all entities in FK-safe order
   // ---------------------------------------------------------------------------
 
-  /** Deletes all test entities in the correct order (respecting FK constraints). */
+  /**
+   * Deletes all test entities in the correct order (respecting FK and join-table constraints).
+   *
+   * <p>ManyToMany join tables are owned by: Catalog (catalog_datasets, catalog_children), DataSet
+   * (dataset_dataspaces, dataset_agents), Pipeline (pipeline_data_sources), Activity
+   * (activity_agents), Group (group_members), Role (role_permissions). The owning side must be
+   * deleted before the inverse side.
+   */
   public void cleanAll() {
     assignmentRepository.deleteAll();
     distributionRepository.deleteAll();
     pipelineRepository.deleteAll();
     dataStructureVersionRepository.deleteAll();
+    catalogRepository.deleteAll();
     dataSetRepository.deleteAll();
     dataSourceRepository.deleteAll();
     dataStructureRepository.deleteAll();
@@ -782,7 +790,6 @@ public class PortalTestDataFactory {
     agentRepository.deleteAll();
     resourceRepository.deleteAll();
     dataSetSeriesRepository.deleteAll();
-    catalogRepository.deleteAll();
     dataSpaceRepository.deleteAll();
     groupRepository.deleteAll();
     roleRepository.deleteAll();
