@@ -28,7 +28,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
     classes = PortalBackendApplication.class)
 @ActiveProfiles("test-integration")
 @Testcontainers
-@Import({TestContainerConfiguration.class, SagaTestDataFactory.class})
+@Import({TestContainerConfiguration.class, PortalTestDataFactory.class, InfraTestDataFactory.class})
 @Slf4j(access = AccessLevel.PROTECTED)
 public abstract class BaseKeycloakIntegrationTest {
 

@@ -2,9 +2,9 @@ package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.config.InfraTestDataFactory;
 import de.civitascore.portal.config.SagaInfraVerifier;
 import de.civitascore.portal.config.SagaOrchestratorTestHelper;
-import de.civitascore.portal.config.SagaTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -53,7 +53,7 @@ import org.testcontainers.utility.MountableFile;
     properties = {"kafka.enabled=true", "spring.kafka.listener.missing-topics-fatal=false"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Slf4j
-@Import(SagaTestDataFactory.class)
+@Import(InfraTestDataFactory.class)
 class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
 
   static final Network sagaNetwork = Network.newNetwork();
@@ -106,7 +106,7 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
   @Autowired private DataSetService dataSetService;
   @Autowired private DataSetRepository dataSetRepository;
 
-  @Autowired private SagaTestDataFactory data;
+  @Autowired private InfraTestDataFactory data;
   private SagaInfraVerifier verifier;
 
   @BeforeEach

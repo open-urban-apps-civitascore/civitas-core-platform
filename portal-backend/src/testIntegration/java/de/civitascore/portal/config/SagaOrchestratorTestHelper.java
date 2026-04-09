@@ -119,7 +119,7 @@ public class SagaOrchestratorTestHelper implements AutoCloseable {
                 "redpanda.url",
                 redpandaConnectUrl,
                 "redpanda.master-key",
-                SagaTestDataFactory.TEST_MASTER_KEY_HEX)));
+                InfraTestDataFactory.TEST_MASTER_KEY_HEX)));
 
     orchestrator = new DatasetSagaOrchestrator();
     orchestrator.initialize(kafkaBrokers);
