@@ -3,23 +3,14 @@ package de.civitascore.portal.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
-import de.civitascore.portal.model.entity.Catalog;
-import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.Group;
-import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.assignment.AssignmentInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
-import de.civitascore.portal.repository.AssignmentRepository;
-import de.civitascore.portal.repository.CatalogRepository;
-import de.civitascore.portal.repository.DataSetRepository;
-import de.civitascore.portal.repository.DataSpaceRepository;
-import de.civitascore.portal.repository.GroupRepository;
-import de.civitascore.portal.repository.RoleRepository;
-import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.List;
 import java.util.Map;
@@ -39,13 +30,7 @@ class AssignmentControllerIntegrationTest
 
   private final String ASSIGNMENTS_ENDPOINT = "/assignments";
 
-  @Autowired private AssignmentRepository assignmentRepository;
-  @Autowired private GroupRepository groupRepository;
-  @Autowired private RoleRepository roleRepository;
-  @Autowired private DataSpaceRepository dataSpaceRepository;
-  @Autowired private DataSetRepository dataSetRepository;
-  @Autowired private CatalogRepository catalogRepository;
-  @Autowired private UserRepository userRepository;
+  @Autowired protected PortalTestDataFactory portalData;
 
   @Override
   protected String getEndpointPath() {
@@ -54,13 +39,7 @@ class AssignmentControllerIntegrationTest
 
   @Override
   protected void performAdditionalCleanup() {
-    assignmentRepository.deleteAll();
-    dataSetRepository.deleteAll();
-    dataSpaceRepository.deleteAll();
-    catalogRepository.deleteAll();
-    groupRepository.deleteAll();
-    roleRepository.deleteAll();
-    userRepository.deleteAll();
+    portalData.cleanAll();
   }
 
   @Override
@@ -101,46 +80,43 @@ class AssignmentControllerIntegrationTest
   }
 
   private UUID createTestGroup() {
-    Group group = new Group();
-    group.setName("Test Group " + UUID.randomUUID().toString().substring(0, 8));
-    group.setDescription("Test group for assignment");
-    return groupRepository.save(group).getId();
+    return portalData.group().withDescription("Test group for assignment").build().getId();
   }
 
   private UUID createTestRole(String name) {
-    Role role = new Role();
-    role.setName(name);
-    role.setDescription("Test role for assignment");
-    role.setRoleType(RoleType.DATA);
-    return roleRepository.save(role).getId();
+    return portalData
+        .role()
+        .withName(name)
+        .withDescription("Test role for assignment")
+        .withRoleType(RoleType.DATA)
+        .build()
+        .getId();
   }
 
   private UUID createTestRole() {
-    return createTestRole("Test Role " + System.currentTimeMillis());
+    return portalData.role().withDescription("Test role for assignment").build().getId();
   }
 
   private UUID createTestRole(String name, RoleType roleType) {
-    Role role = new Role();
-    role.setName(name);
-    role.setDescription("Test role for assignment");
-    role.setRoleType(roleType);
-    return roleRepository.save(role).getId();
+    return portalData
+        .role()
+        .withName(name)
+        .withDescription("Test role for assignment")
+        .withRoleType(roleType)
+        .build()
+        .getId();
   }
 
   private User createTestUser() {
-    User user = new User();
-    user.setFirstName("Test");
-    user.setLastName("User " + UUID.randomUUID().toString().substring(0, 8));
-    user.setEmail("test" + UUID.randomUUID().toString().substring(0, 8) + "@example.com");
-    return userRepository.save(user);
+    return portalData.user().build();
   }
 
   private Group createTestGroupWithMember(User user) {
-    Group group = new Group();
-    group.setName("Test Group " + UUID.randomUUID().toString().substring(0, 8));
-    group.setDescription("Test group for assignment");
-    group.setMembers(Set.of(user));
-    return groupRepository.save(group);
+    return portalData
+        .group()
+        .withDescription("Test group for assignment")
+        .withMembers(Set.of(user))
+        .build();
   }
 
   private UUID createTestDataSpace() {
@@ -148,26 +124,15 @@ class AssignmentControllerIntegrationTest
   }
 
   private DataSpace createTestDataSpaceEntity() {
-    DataSpace dataSpace = new DataSpace();
-    dataSpace.setName("Test DataSpace " + UUID.randomUUID().toString().substring(0, 8));
-    dataSpace.setDescription("Test dataspace for assignment");
-    return dataSpaceRepository.save(dataSpace);
+    return portalData.dataSpace().withDescription("Test dataspace for assignment").build();
   }
 
   private UUID createTestDataSet(UUID dataSpaceId) {
-    DataSpace dataSpace = dataSpaceRepository.findById(dataSpaceId).orElseThrow();
-    DataSet dataSet = new DataSet();
-    dataSet.setName("Test DataSet " + UUID.randomUUID().toString().substring(0, 8));
-    dataSet.setDescription("Test dataset for assignment");
-    dataSet.setDataSpaces(Set.of(dataSpace));
-    return dataSetRepository.save(dataSet).getId();
+    return portalData.dataSet().withDescription("Test dataset for assignment").build().getId();
   }
 
   private UUID createTestCatalog() {
-    Catalog catalog = new Catalog();
-    catalog.setName("Test Catalog " + UUID.randomUUID().toString().substring(0, 8));
-    catalog.setDescription("Test catalog for assignment");
-    return catalogRepository.save(catalog).getId();
+    return portalData.catalog().withDescription("Test catalog for assignment").build().getId();
   }
 
   private UUID getScopeIdForType(ScopeType scopeType) {

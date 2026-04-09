@@ -2,6 +2,7 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSet;
@@ -35,6 +36,7 @@ import org.springframework.http.ResponseEntity;
 class PipelineControllerIntegrationTest
     extends BaseControllerIntegrationTest<PipelineInputDTO, PipelineOutputDTO> {
 
+  @Autowired protected PortalTestDataFactory portalData;
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
@@ -74,38 +76,29 @@ class PipelineControllerIntegrationTest
 
   /** Create a test DataSet to associate pipelines with. */
   private DataSet createTestDataSet() {
-    DataSet dataSet = new DataSet();
-    dataSet.setName("test_dataset_for_pipelines_" + System.currentTimeMillis());
-    dataSet.setDescription("Test dataset for pipeline integration tests");
-    dataSet.setDataSetStatus(DataSetStatus.DRAFT);
-    dataSet.setPersistenceId(12345L);
-    dataSet.setIdentifier("test-identifier-" + System.currentTimeMillis());
-    dataSet.setVersion("1.0.0");
-    dataSet.setExternalId("ext-dataset-" + System.currentTimeMillis());
-    dataSet.setFormat("JSON");
-    dataSet.setOpenDataAccess(false);
-    return dataSetRepository.save(dataSet);
+    return portalData
+        .dataSet()
+        .withDescription("Test dataset for pipeline integration tests")
+        .withStatus(DataSetStatus.DRAFT)
+        .build();
   }
 
   /** Create a test DataSource for pipeline associations. */
   private DataSource createTestDataSource() {
-    DataSource dataSource = new DataSource();
-    dataSource.setName("test_data_source_" + System.currentTimeMillis());
-    dataSource.setDescription("Test data source for pipelines");
-    return dataSourceRepository.save(dataSource);
+    return portalData.dataSource().withDescription("Test data source for pipelines").build();
   }
 
   private DataSource createAvailableTestDataSource() {
-    DataSource dataSource = createTestDataSource();
-    dataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-    return dataSourceRepository.save(dataSource);
+    return portalData
+        .dataSource()
+        .withDescription("Test data source for pipelines")
+        .withStatus(DataSourceStatus.AVAILABLE)
+        .build();
   }
 
   @Override
   protected void performAdditionalCleanup() {
-    pipelineRepository.deleteAll();
-    dataSourceRepository.deleteAll();
-    dataSetRepository.deleteAll();
+    portalData.cleanAll();
     testDataSetId = null; // Reset for next test
   }
 

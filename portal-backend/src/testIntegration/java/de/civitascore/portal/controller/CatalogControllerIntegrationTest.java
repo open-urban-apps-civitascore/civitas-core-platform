@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.entity.Catalog;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.repository.CatalogRepository;
@@ -30,6 +31,8 @@ class CatalogControllerIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @Autowired private TestRestTemplate restTemplate;
 
+  @Autowired protected PortalTestDataFactory portalData;
+
   @Autowired private CatalogRepository catalogRepository;
 
   @Autowired private DataSetRepository dataSetRepository;
@@ -44,18 +47,17 @@ class CatalogControllerIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @BeforeEach
   void initTestData() {
+    DataSet dataSet1 =
+        portalData
+            .dataSet()
+            .withName("Test Dataset 1")
+            .withDescription("A test dataset associated with catalog 1")
+            .build();
+    dataSetId1 = dataSet1.getId();
+
     Catalog catalog1 = new Catalog();
     catalog1.setName("Test Catalog 1");
     catalog1.setDescription("This is the first test catalog for DCAT transformation");
-
-    DataSet dataSet1 = new DataSet();
-    dataSet1.setName("Test Dataset 1");
-    dataSet1.setDescription("A test dataset associated with catalog 1");
-    dataSet1.setIdentifier("dataset-1-identifier");
-    dataSet1.setVersion("1.0.0");
-    dataSet1 = dataSetRepository.save(dataSet1);
-    dataSetId1 = dataSet1.getId();
-
     catalog1.getDataSets().add(dataSet1);
     catalog1 = catalogRepository.save(catalog1);
     catalogId1 = catalog1.getId();
@@ -65,17 +67,14 @@ class CatalogControllerIntegrationTest extends BaseKeycloakIntegrationTest {
     Catalog catalog2 = new Catalog();
     catalog2.setName("Test Catalog 2");
     catalog2.setDescription("This is the second test catalog with a parent-child relationship");
-
     catalog2.getChildCatalogs().add(catalog1);
-
     catalog2 = catalogRepository.save(catalog2);
     catalogId2 = catalog2.getId();
   }
 
   @AfterEach
   void cleanup() {
-    catalogRepository.deleteAll();
-    dataSetRepository.deleteAll();
+    portalData.cleanAll();
   }
 
   @Test

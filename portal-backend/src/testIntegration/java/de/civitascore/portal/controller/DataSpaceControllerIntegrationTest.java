@@ -2,10 +2,9 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.input.DataSpaceInputDTO;
 import de.civitascore.portal.model.output.DataSpaceOutputDTO;
-import de.civitascore.portal.repository.DataSetRepository;
-import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,8 +25,7 @@ class DataSpaceControllerIntegrationTest
 
   private final String DATASPACES_ENDPOINT = "/dataspaces";
 
-  @Autowired private DataSpaceRepository dataSpaceRepository;
-  @Autowired private DataSetRepository dataSetRepository;
+  @Autowired protected PortalTestDataFactory portalData;
 
   @Override
   protected String getEndpointPath() {
@@ -36,8 +34,7 @@ class DataSpaceControllerIntegrationTest
 
   @Override
   protected void performAdditionalCleanup() {
-    dataSetRepository.deleteAll();
-    dataSpaceRepository.deleteAll();
+    portalData.cleanAll();
   }
 
   @Override

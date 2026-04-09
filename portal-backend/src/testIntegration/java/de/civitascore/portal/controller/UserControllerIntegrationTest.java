@@ -2,13 +2,11 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.UserTitleType;
-import de.civitascore.portal.model.input.GroupInputDTO;
+import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.input.UserInputDTO;
-import de.civitascore.portal.model.output.GroupOutputDTO;
 import de.civitascore.portal.model.output.UserOutputDTO;
-import de.civitascore.portal.repository.GroupRepository;
-import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
 import java.util.List;
@@ -29,8 +27,7 @@ class UserControllerIntegrationTest
 
   private final String USERS_ENDPOINT = "/users";
 
-  @Autowired private UserRepository userRepository;
-  @Autowired private GroupRepository groupRepository;
+  @Autowired protected PortalTestDataFactory portalData;
 
   @Override
   protected String getEndpointPath() {
@@ -39,8 +36,7 @@ class UserControllerIntegrationTest
 
   @Override
   protected void performAdditionalCleanup() {
-    groupRepository.deleteAll();
-    userRepository.deleteAll();
+    portalData.cleanAll();
   }
 
   @Override
@@ -89,18 +85,8 @@ class UserControllerIntegrationTest
   }
 
   private UUID createTestGroup(String name) {
-    GroupInputDTO input = new GroupInputDTO();
-    input.setName(name);
-    input.setDescription("Test group");
-    ResponseEntity<GroupOutputDTO> response =
-        exchange(
-            "/groups",
-            HttpMethod.POST,
-            createAuthHeaders(),
-            input,
-            new ParameterizedTypeReference<GroupOutputDTO>() {});
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-    return response.getBody().getId();
+    Group group = portalData.group().withName(name).withDescription("Test group").build();
+    return group.getId();
   }
 
   private ResponseEntity<UserOutputDTO> performReplaceGroups(UUID userId, List<UUID> groupIds) {
