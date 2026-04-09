@@ -2,9 +2,8 @@ package de.civitascore.portal.service.event;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.ConfigAdapterTestHelper;
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.input.UserInputDTO;
-import de.civitascore.portal.repository.AssignmentRepository;
-import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.service.UserService;
 import java.util.List;
@@ -38,13 +37,12 @@ public abstract class BaseEventPublishingIntegrationTest extends BaseKeycloakInt
   @Autowired protected UserService userService;
   @Autowired protected UserRepository userRepository;
   @Autowired protected KafkaTemplate<String, String> kafkaTemplate;
+  @Autowired protected PortalTestDataFactory portalData;
 
   @Value("${spring.embedded.kafka.brokers}")
   private String embeddedKafkaBrokers;
 
   private ConfigAdapterTestHelper configAdapterHelper;
-  @Autowired private GroupRepository groupRepository;
-  @Autowired private AssignmentRepository assignmentRepository;
 
   @BeforeEach
   void setUp() {
@@ -68,9 +66,7 @@ public abstract class BaseEventPublishingIntegrationTest extends BaseKeycloakInt
         log.warn("Error closing config adapter helper: {}", e.getMessage());
       }
     }
-    assignmentRepository.deleteAll();
-    groupRepository.deleteAll();
-    userRepository.deleteAll();
+    portalData.cleanAll();
     cleanupKeycloakUsers();
     log.debug("=== Test Teardown Complete ===");
   }

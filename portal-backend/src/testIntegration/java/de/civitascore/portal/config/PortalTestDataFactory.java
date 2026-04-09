@@ -781,10 +781,10 @@ public class PortalTestDataFactory {
     assignmentRepository.deleteAll();
     distributionRepository.deleteAll();
     pipelineRepository.deleteAll();
-    dataStructureVersionRepository.deleteAll();
     catalogRepository.deleteAll();
     dataSetRepository.deleteAll();
     dataSourceRepository.deleteAll();
+    dataStructureVersionRepository.deleteAll();
     dataStructureRepository.deleteAll();
     activityRepository.deleteAll();
     agentRepository.deleteAll();

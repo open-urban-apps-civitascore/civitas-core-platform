@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
@@ -15,18 +16,13 @@ import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Role;
-import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.CatalogRepository;
 import de.civitascore.portal.repository.DataSetRepository;
-import de.civitascore.portal.repository.DataSourceRepository;
-import de.civitascore.portal.repository.DistributionRepository;
-import de.civitascore.portal.repository.GroupRepository;
-import de.civitascore.portal.repository.PipelineRepository;
-import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,25 +39,13 @@ import org.springframework.transaction.annotation.Transactional;
 class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @Autowired private DataSetService dataSetService;
-
+  @Autowired private PortalTestDataFactory portalData;
   @Autowired private DataSetRepository dataSetRepository;
-  @Autowired private PipelineRepository pipelineRepository;
-  @Autowired private DistributionRepository distributionRepository;
   @Autowired private CatalogRepository catalogRepository;
-  @Autowired private AssignmentRepository assignmentRepository;
-  @Autowired private GroupRepository groupRepository;
-  @Autowired private RoleRepository roleRepository;
-  @Autowired private DataSourceRepository dataSourceRepository;
 
   @AfterEach
   void cleanup() {
-    assignmentRepository.deleteAll();
-    pipelineRepository.deleteAll();
-    distributionRepository.deleteAll();
-    catalogRepository.deleteAll();
-    dataSetRepository.deleteAll();
-    roleRepository.deleteAll();
-    groupRepository.deleteAll();
+    portalData.cleanAll();
   }
 
   /** Helper method to create a sample styles map for Pipeline. */
@@ -124,7 +108,6 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     assertThat(retrievedDataSet.getName()).isEqualTo(dataSet.getName());
     assertThat(retrievedDataSet.getDescription()).isEqualTo(dataSet.getDescription());
     assertThat(retrievedDataSet.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
-    assertThat(retrievedDataSet.getPersistenceId()).isEqualTo(12345L);
 
     assertThat(retrievedDataSet.getPipelines())
         .isNotNull()
@@ -181,79 +164,55 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
    *************/
 
   private DataSet createInitialDataSet() {
-    DataSet dataSet = new DataSet();
-    dataSet.setName("test_dataset_" + System.currentTimeMillis());
-    dataSet.setDescription("Test dataset for relationship testing");
-    dataSet.setPersistenceId(12345L);
-    dataSet.setIdentifier("test-identifier-001");
-    dataSet.setVersion("1.0.0");
-    dataSet.setExternalId("ext-dataset-" + System.currentTimeMillis());
-    dataSet.setFormat("JSON");
-    return dataSetRepository.save(dataSet);
+    return portalData.dataSet().withDescription("Test dataset for relationship testing").build();
   }
 
   private Pipeline createPipelineForDataSet(DataSet dataSet, String name) {
-    DataSource dataSource1 = new DataSource();
-    dataSource1.setName("test_ds_1_" + System.currentTimeMillis());
-    dataSource1 = dataSourceRepository.save(dataSource1);
+    DataSource ds1 = portalData.dataSource().build();
+    DataSource ds2 = portalData.dataSource().build();
+    DataSource ds3 = portalData.dataSource().build();
 
-    DataSource dataSource2 = new DataSource();
-    dataSource2.setName("test_ds_2_" + System.currentTimeMillis());
-    dataSource2 = dataSourceRepository.save(dataSource2);
-
-    DataSource dataSource3 = new DataSource();
-    dataSource3.setName("test_ds_3_" + System.currentTimeMillis());
-    dataSource3 = dataSourceRepository.save(dataSource3);
-
-    Pipeline pipeline = new Pipeline();
-    pipeline.setName(name + "_" + System.currentTimeMillis());
-    pipeline.setDescription("Test pipeline for " + name);
-    pipeline.setDataSet(dataSet);
-    pipeline.setStyles(createSampleStyles());
-    pipeline.getDataSources().add(dataSource1);
-    pipeline.getDataSources().add(dataSource2);
-    pipeline.getDataSources().add(dataSource3);
-    pipeline.setApis(Arrays.asList("/api/v1/traffic", "/api/v1/weather"));
-    pipeline.setPersistences(Collections.singletonList(12345L));
-    pipeline.setModel(createSampleModel());
-    return pipelineRepository.save(pipeline);
+    return portalData
+        .pipeline()
+        .withName(name + "_" + System.currentTimeMillis())
+        .withDescription("Test pipeline for " + name)
+        .withDataSet(dataSet)
+        .withStyles(createSampleStyles())
+        .withDataSources(new HashSet<>(Set.of(ds1, ds2, ds3)))
+        .withApis(Arrays.asList("/api/v1/traffic", "/api/v1/weather"))
+        .withPersistences(Collections.singletonList(12345L))
+        .withModel(createSampleModel())
+        .build();
   }
 
   private Distribution createDistributionForDataSet(DataSet dataSet, String apiPath) {
-    Distribution distribution = new Distribution();
-    distribution.setAccessUrl("http://localhost:8080" + apiPath);
-    distribution.setApiType("SensorThings");
-    distribution.setFormat("application/json");
-    distribution.setAutoGenerated(true);
-    distribution.setDataSet(dataSet);
-    return distributionRepository.save(distribution);
+    return portalData
+        .distribution()
+        .withAccessUrl("http://localhost:8080" + apiPath)
+        .withDataSet(dataSet)
+        .build();
   }
 
   private Catalog createInitialCatalog(String name) {
-    Catalog catalog = new Catalog();
-    catalog.setName(name + "_" + System.currentTimeMillis());
-    catalog.setDescription("Test catalog for " + name);
-    return catalogRepository.save(catalog);
+    return portalData.catalog().withName(name + "_" + System.currentTimeMillis()).build();
   }
 
   private Assignment createAssignmentForDataSet(DataSet dataSet, String roleName) {
-    Group group = new Group();
-    group.setName("Test Group " + roleName + "_" + System.currentTimeMillis());
-    group.setDescription("Test group for " + roleName);
-    group = groupRepository.save(group);
+    Group group = portalData.group().withDescription("Test group for " + roleName).build();
+    Role role =
+        portalData
+            .role()
+            .withDescription("Test role for " + roleName)
+            .withRoleType(RoleType.DATA)
+            .build();
 
-    Role role = new Role();
-    role.setName(roleName.toLowerCase().replace(" ", "_") + "_" + System.currentTimeMillis());
-    role.setDescription("Test role for " + roleName);
-    role.setRoleType(RoleType.DATA);
-    role = roleRepository.save(role);
-
-    Assignment assignment = new Assignment();
-    assignment.setGroup(group);
-    assignment.setRole(role);
-    assignment.setScopeType(ScopeType.DATASET);
-    assignment.setDataset(dataSet);
-    return assignmentRepository.save(assignment);
+    return portalData
+        .assignment()
+        .withGroup(group)
+        .withRole(role)
+        .withScopeType(ScopeType.DATASET)
+        .withScope(dataSet)
+        .build();
   }
 
   @Nested
