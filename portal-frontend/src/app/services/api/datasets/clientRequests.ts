@@ -49,7 +49,7 @@ export const useDeleteDataset = () =>
     errorMessage: 'An error occurred while deleting the dataset.',
   })
 
-const useDatasetTransition = (action: 'publish' | 'unpublish' | 'release' | 'unrelease') => {
+const useDatasetTransition = (action: 'markReady' | 'markDraft' | 'release' | 'unrelease') => {
   const queryClient = useQueryClient()
   return useMutation<ApiServiceResponse<Dataset>, unknown, string>({
     mutationFn: (id: string) =>
@@ -68,27 +68,27 @@ const useDatasetTransition = (action: 'publish' | 'unpublish' | 'release' | 'unr
   })
 }
 
-export const usePublishDataset = () => useDatasetTransition('publish')
-export const useUnpublishDataset = () => useDatasetTransition('unpublish')
+export const useMarkReadyDataset = () => useDatasetTransition('markReady')
+export const useMarkDraftDataset = () => useDatasetTransition('markDraft')
 export const useReleaseDataset = () => useDatasetTransition('release')
 export const useUnreleaseDataset = () => useDatasetTransition('unrelease')
 
-export const useUpdatePublishedDatasetMeta = () => {
+export const useUpdateReleasedDatasetMeta = () => {
   const queryClient = useQueryClient()
   return useMutation<ApiServiceResponse<Dataset>, unknown, DatasetUpdateApiData>({
     mutationFn: (data: DatasetUpdateApiData) =>
       apiRequest<Dataset>({
         method: 'PUT',
-        endpoint: `/datasets/${data.id}/published/meta`,
+        endpoint: `/datasets/${data.id}/released/meta`,
         headers: { 'x-api-request': 'true' },
         data,
-        errorMessage: 'An error occurred while updating published dataset metadata',
+        errorMessage: 'An error occurred while updating released dataset metadata',
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [key] })
     },
     onError: error => {
-      console.error('Error updating published dataset metadata:', (error as Error).message)
+      console.error('Error updating released dataset metadata:', (error as Error).message)
     },
   })
 }
