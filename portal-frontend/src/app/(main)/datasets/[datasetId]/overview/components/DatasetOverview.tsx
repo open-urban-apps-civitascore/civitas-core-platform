@@ -207,12 +207,12 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       // Success message
       if (steps.length > 0) {
         const messageMap: Record<string, string> = {
-          'DRAFT->READY': t('messages.publishSuccess'),
-          'READY->DRAFT': t('messages.unpublishSuccess'),
+          'DRAFT->READY': t('messages.markReadySuccess'),
+          'READY->DRAFT': t('messages.markDraftSuccess'),
           'READY->AVAILABLE': t('messages.releaseSuccess'),
           'AVAILABLE->READY': t('messages.unreleaseSuccess'),
           'DRAFT->AVAILABLE': t('messages.releaseSuccess'),
-          'AVAILABLE->DRAFT': t('messages.unpublishSuccess'),
+          'AVAILABLE->DRAFT': t('messages.markDraftSuccess'),
         }
         toast.success(messageMap[`${serverStatus}->${dataSetStatus}`] ?? t('messages.updateSuccess'))
       } else {

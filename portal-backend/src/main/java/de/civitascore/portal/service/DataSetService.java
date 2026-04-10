@@ -166,7 +166,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    *
    * @param id the dataset ID
    * @return the ready dataset
-   * @throws InvalidInputException if dataset has no pipelines or is already published
+   * @throws InvalidInputException if dataset has no pipelines or is not in DRAFT status
    */
   @Transactional
   public DataSet markReady(UUID id) {
@@ -174,7 +174,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
     // Validate status is DRAFT
     if (dataSet.getDataSetStatus() != DataSetStatus.DRAFT) {
-      throw new InvalidInputException("dataSetStatus", id, "DataSet is already published");
+      throw new InvalidInputException(
+          "dataSetStatus", id, "Only DRAFT datasets can be marked as ready");
     }
 
     // Validate name not blank
@@ -190,7 +191,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     // Validate that dataset has at least one pipeline
     if (dataSet.getPipelines() == null || dataSet.getPipelines().isEmpty()) {
       throw new InvalidInputException(
-          "pipelines", id, "DataSet must contain at least one Pipeline before publishing");
+          "pipelines", id, "DataSet must contain at least one Pipeline before marking as ready");
     }
 
     // Each pipeline must have either datasources (feed-in) or APIs (provide)

@@ -83,7 +83,7 @@ export const StatusDropdown = <T extends StatusTypes>(props: StatusDropdownProps
               onClick={() => onStatusChange(option)}
               disabled={
                 // AVAILABLE requires both form validation (canSetAvailable) and *_RELEASE permission (canRelease).
-                // READY is a publish step requiring only *_UPDATE (implied by edit mode) — no RELEASE permission needed.
+                // READY is a mark-ready step requiring only *_UPDATE (implied by edit mode) — no RELEASE permission needed.
                 (option === STATUS_TYPES.AVAILABLE && (!canSetAvailable || !canRelease)) ||
                 (option === STATUS_TYPES.READY && !canSetAvailable) ||
                 (option === STATUS_TYPES.DRAFT && !canSetDraft)

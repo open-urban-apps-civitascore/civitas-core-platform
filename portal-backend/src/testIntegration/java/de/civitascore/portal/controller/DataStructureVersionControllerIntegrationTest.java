@@ -960,8 +960,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should fail to delete last published version of a published data structure")
-    void shouldFailToDeleteLastPublishedVersionOfPublishedDataStructure() {
+    @DisplayName("Should fail to delete last released version of a released data structure")
+    void shouldFailToDeleteLastReleasedVersionOfReleasedDataStructure() {
       DataStructureVersion version1 =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
@@ -971,7 +971,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
       dataStructureRepository.save(dataStructure);
 
-      // Try to delete the only published version - should fail
+      // Try to delete the only released version - should fail
       ResponseEntity<String> response =
           restTemplate.exchange(
               getEndpoint() + "/" + versionId1,
@@ -1139,9 +1139,9 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       dataStructureVersionRepository.save(version1);
 
-      DataStructureVersion publishedVersion =
+      DataStructureVersion releasedVersion =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
-      assertThat(publishedVersion.getDataStructureVersionStatus())
+      assertThat(releasedVersion.getDataStructureVersionStatus())
           .isEqualTo(DataStructureVersionStatus.AVAILABLE);
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
@@ -1217,8 +1217,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should fail to unrelease the only published version of a published DataStructure")
-    void shouldFailToUnreleaseOnlyPublishedVersionOfPublishedDataStructure() {
+    @DisplayName("Should fail to unrelease the only released version of a released DataStructure")
+    void shouldFailToUnreleaseOnlyReleasedVersionOfReleasedDataStructure() {
       DataStructureVersion version1 =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
@@ -1228,7 +1228,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
       dataStructureRepository.save(dataStructure);
 
-      // Try to unrelease the only published version - should fail
+      // Try to unrelease the only released version - should fail
       ResponseEntity<String> response =
           restTemplate.exchange(
               getEndpoint() + "/" + versionId1 + "/unrelease",
@@ -1240,7 +1240,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .as("Should return BAD_REQUEST status")
           .isEqualTo(HttpStatus.BAD_REQUEST);
 
-      // Verify version is still published
+      // Verify version is still released
       DataStructureVersion reloadedVersion =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       assertThat(reloadedVersion.getDataStructureVersionStatus())
@@ -1250,8 +1250,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
     @Test
     @DisplayName(
-        "Should allow unreleasing when DataStructure has multiple published versions and is published")
-    void shouldAllowUnreleasingWhenMultiplePublishedVersionsExist() {
+        "Should allow unreleasing when DataStructure has multiple released versions and is released")
+    void shouldAllowUnreleasingWhenMultipleReleasedVersionsExist() {
       DataStructureVersion version3 = new DataStructureVersion();
       version3.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version3.setDataStructureVersionSource(DataStructureVersionSource.OWN);
@@ -1274,7 +1274,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
       dataStructureRepository.save(dataStructure);
 
-      // Now unrelease one version - should succeed because there's another published version
+      // Now unrelease one version - should succeed because there's another released version
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
               getEndpoint() + "/" + versionId1 + "/unrelease",
@@ -1291,18 +1291,18 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .as("Version 1 should be unreleased")
           .isEqualTo(DataStructureVersionStatus.DRAFT);
 
-      // Verify version3 is still published
+      // Verify version3 is still released
       DataStructureVersion reloadedVersion3 =
           dataStructureVersionRepository.findById(version3Id).orElseThrow();
       assertThat(reloadedVersion3.getDataStructureVersionStatus())
-          .as("Version 3 should still be published")
+          .as("Version 3 should still be released")
           .isEqualTo(DataStructureVersionStatus.AVAILABLE);
 
-      // Verify DataStructure is still published
+      // Verify DataStructure is still released
       DataStructure reloadedDataStructure =
           dataStructureRepository.findById(dataStructureId).orElseThrow();
       assertThat(reloadedDataStructure.getDataStructureStatus())
-          .as("DataStructure should remain published")
+          .as("DataStructure should remain released")
           .isEqualTo(DataStructureStatus.AVAILABLE);
     }
 
@@ -1340,16 +1340,16 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   @DisplayName("Update Released Meta Tests")
   class UpdateReleasedMetaTests {
 
-    private UUID publishedVersionId;
+    private UUID releasedVersionId;
 
     @BeforeEach
-    void publishVersion() {
+    void releaseVersion() {
       DataStructureVersion version1 =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       dataStructureVersionRepository.save(version1);
 
-      publishedVersionId = versionId1;
+      releasedVersionId = versionId1;
     }
 
     @Test
@@ -1359,7 +1359,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("1.1.0");
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setModelName("UpdatedPublishedModel");
+      input.setModelName("UpdatedReleasedModel");
 
       Map<String, Object> newStyles = new HashMap<>();
       newStyles.put("color", "red");
@@ -1368,7 +1368,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + publishedVersionId + "/released/meta",
+              getEndpoint() + "/" + releasedVersionId + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(input, createAuthHeaders()),
               getOutputTypeReference());
@@ -1377,10 +1377,10 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getBody()).as("Response body should not be null").isNotNull();
 
       DataStructureVersionOutputDTO output = response.getBody();
-      assertThat(output.getId()).isEqualTo(publishedVersionId);
+      assertThat(output.getId()).isEqualTo(releasedVersionId);
       assertThat(output.getModelName())
           .as("Model name should be updated")
-          .isEqualTo("UpdatedPublishedModel");
+          .isEqualTo("UpdatedReleasedModel");
       assertThat(output.getVersion()).as("Version should be updated").isEqualTo("1.1.0");
       assertThat(output.getStyles().get("color")).as("Styles should be updated").isEqualTo("red");
       assertThat(output.getDataStructureVersionStatus())
@@ -1404,7 +1404,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + publishedVersionId + "/released/meta",
+              getEndpoint() + "/" + releasedVersionId + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(input, createAuthHeaders()),
               getOutputTypeReference());
@@ -1475,7 +1475,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + publishedVersionId + "/released/meta",
+              getEndpoint() + "/" + releasedVersionId + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(input),
               String.class);
@@ -1521,8 +1521,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   class RegularUpdateRestrictionsTests {
 
     @Test
-    @DisplayName("Should fail to update published version with regular PUT endpoint")
-    void shouldFailToUpdatePublishedVersionWithRegularPut() {
+    @DisplayName("Should fail to update released version with regular PUT endpoint")
+    void shouldFailToUpdateReleasedVersionWithRegularPut() {
       DataStructureVersion version1 =
           dataStructureVersionRepository.findById(versionId1).orElseThrow();
       version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);

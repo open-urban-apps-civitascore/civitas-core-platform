@@ -139,8 +139,8 @@ public class DataStructureService
   }
 
   /**
-   * Override update to ensure it can only be called for DRAFT data structures. For published data
-   * structures, use updatePublishedMeta instead.
+   * Override update to ensure it can only be called for DRAFT data structures. For released data
+   * structures, use updateReleasedMeta instead.
    *
    * @param id the data structure ID
    * @param input the update input
@@ -161,17 +161,17 @@ public class DataStructureService
 
   @Override
   protected void validateRelease(DataStructure entity) {
-    boolean hasPublishedVersion =
+    boolean hasReleasedVersion =
         entity.getDataStructureVersions().stream()
             .anyMatch(
                 version ->
                     version.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT);
 
-    if (!hasPublishedVersion) {
+    if (!hasReleasedVersion) {
       throw new InvalidInputException(
           "dataStructureVersions",
           entity.getId(),
-          "DataStructure must contain at least one published DataStructureVersion before"
+          "DataStructure must contain at least one released DataStructureVersion before"
               + " releasing");
     }
   }

@@ -3,7 +3,7 @@
  * where each entity is in AVAILABLE/READY state, suitable for testing status transition gating.
  *
  * The stack is built bottom-up: datastructure version must be AVAILABLE before datasource
- * can be published, and datasource must be AVAILABLE before dataset can be published.
+ * can be released, and datasource must be AVAILABLE before dataset can be marked ready.
  */
 import { ApiClient } from './apiClient'
 import { type TestResources, uid } from './testSetup'
@@ -36,13 +36,13 @@ export type EntityStack = {
 }
 
 /**
- * Creates a full entity stack with all entities published/available.
+ * Creates a full entity stack with all entities released/available.
  *
  * Final states:
  * - DataStructure: DRAFT (parent status independent of version)
  * - DataStructureVersion: AVAILABLE
  * - DataSource: AVAILABLE
- * - Dataset: READY (published, not released — release triggers a saga)
+ * - Dataset: READY (marked ready, not released — release triggers a saga)
  */
 export const createAvailableEntityStack = async (
   adminApi: ApiClient,

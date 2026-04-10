@@ -38,12 +38,12 @@ class DataStructureServiceTest {
   @InjectMocks private DataStructureService dataStructureService;
 
   @Nested
-  @DisplayName("Unpublish inUse guard")
-  class UnpublishInUseTests {
+  @DisplayName("Unrelease inUse guard")
+  class UnreleaseInUseTests {
 
     @Test
-    @DisplayName("Should block unpublish when any version is in use")
-    void shouldBlockUnpublishWhenVersionInUse() {
+    @DisplayName("Should block unrelease when any version is in use")
+    void shouldBlockUnreleaseWhenVersionInUse() {
       UUID dsId = UUID.randomUUID();
       UUID versionId = UUID.randomUUID();
 
@@ -65,8 +65,8 @@ class DataStructureServiceTest {
     }
 
     @Test
-    @DisplayName("Should allow unpublish when no version is in use")
-    void shouldAllowUnpublishWhenNoVersionInUse() {
+    @DisplayName("Should allow unrelease when no version is in use")
+    void shouldAllowUnreleaseWhenNoVersionInUse() {
       UUID dsId = UUID.randomUUID();
       UUID versionId = UUID.randomUUID();
 

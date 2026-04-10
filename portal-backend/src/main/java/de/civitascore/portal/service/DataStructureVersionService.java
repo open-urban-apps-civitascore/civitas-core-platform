@@ -398,25 +398,25 @@ public class DataStructureVersionService
 
   /**
    * Unreleases a data structure version by setting status back to DRAFT. Validates that unreleasing
-   * won't leave a published DataStructure without any published versions.
+   * won't leave a released DataStructure without any released versions.
    *
    * @param id the version ID
    * @return the unreleased version
    * @throws InvalidInputException if version is already DRAFT or if unreleasing would leave a
-   *     published DataStructure without published versions
+   *     released DataStructure without released versions
    */
   @Transactional
   public DataStructureVersion unrelease(UUID id) {
     DataStructureVersion version = findByIdOrThrow(id);
 
-    // Validate that version is currently published
+    // Validate that version is currently released
     if (version.getDataStructureVersionStatus() == DataStructureVersionStatus.DRAFT) {
       throw new InvalidInputException(
           "dataStructureVersionStatus", id, "DataStructureVersion is already in DRAFT status");
     }
 
     validateNotInUse(id);
-    validateExistenceOfOtherPublishedVersion(
+    validateExistenceOfOtherReleasedVersion(
         version,
         "Cannot unrelease this DataStructureVersion because it is the only released version of a released DataStructure. Please unrelease the DataStructure first.");
 
@@ -426,19 +426,19 @@ public class DataStructureVersionService
 
   /**
    * Validates that the version is not in use by any data source and that deleting it would not
-   * leave a published data structure without any published versions.
+   * leave a released data structure without any released versions.
    *
    * @param id the version ID to delete
    * @return the version entity to be deleted
    * @throws ResourceInUseException if the version is referenced by a data source
-   * @throws InvalidInputException if the version is the only published version of a published data
+   * @throws InvalidInputException if the version is the only released version of a released data
    *     structure
    */
   @Override
   protected DataStructureVersion preProcessDelete(UUID id) {
     DataStructureVersion version = findByIdOrThrow(id);
     validateNotInUse(id);
-    validateExistenceOfOtherPublishedVersion(
+    validateExistenceOfOtherReleasedVersion(
         version,
         "Cannot delete this DataStructureVersion because it is the only released version of a released DataStructure. Please unrelease the DataStructure first.");
 
@@ -454,19 +454,19 @@ public class DataStructureVersionService
     }
   }
 
-  private void validateExistenceOfOtherPublishedVersion(
+  private void validateExistenceOfOtherReleasedVersion(
       DataStructureVersion version, String errorMessage) {
     DataStructure dataStructure = version.getDataStructure();
     if (dataStructure.getDataStructureStatus() == DataStructureStatus.DRAFT) {
       return;
     }
 
-    boolean hasOtherPublishedVersions =
+    boolean hasOtherReleasedVersions =
         dataStructure.getDataStructureVersions().stream()
             .filter(v -> !v.getId().equals(version.getId()))
             .anyMatch(v -> v.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT);
 
-    if (!hasOtherPublishedVersions) {
+    if (!hasOtherReleasedVersions) {
       throw new InvalidInputException("dataStructureVersionStatus", version.getId(), errorMessage);
     }
   }

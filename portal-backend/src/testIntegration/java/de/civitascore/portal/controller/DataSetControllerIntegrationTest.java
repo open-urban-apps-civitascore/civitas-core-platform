@@ -476,8 +476,8 @@ class DataSetControllerIntegrationTest
         value = DataSetStatus.class,
         mode = EnumSource.Mode.EXCLUDE,
         names = {"DRAFT"})
-    @DisplayName("Should fail to update published dataset via regular PUT endpoint")
-    void shouldFailToUpdatePublishedDataSetViaRegularEndpoint(DataSetStatus status) {
+    @DisplayName("Should fail to update non-DRAFT dataset via regular PUT endpoint")
+    void shouldFailToUpdateNonDraftDataSetViaRegularEndpoint(DataSetStatus status) {
       DataSet dataSet = createDataSetWithRelationships();
       dataSet.setDataSetStatus(status);
       dataSet = dataSetRepository.save(dataSet);
@@ -885,12 +885,12 @@ class DataSetControllerIntegrationTest
   }
 
   @Nested
-  @DisplayName("Publish DataSet Tests")
-  class PublishDataSetTests {
+  @DisplayName("Mark Ready DataSet Tests")
+  class MarkReadyDataSetTests {
 
     @Test
-    @DisplayName("Should publish dataset with pipelines successfully")
-    void shouldPublishDataSetWithPipelinesSuccessfully() {
+    @DisplayName("Should mark dataset as ready with pipelines successfully")
+    void shouldMarkReadyDataSetWithPipelinesSuccessfully() {
       DataSet dataSet = new DataSet();
       dataSet.setName("test_dataset_publish_" + System.currentTimeMillis());
       dataSet.setDescription("Test dataset with pipelines");
@@ -938,7 +938,7 @@ class DataSetControllerIntegrationTest
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDataSetStatus())
-          .as("DataSet status should be READY after publishing")
+          .as("DataSet status should be READY after marking ready")
           .isEqualTo(DataSetStatus.READY);
 
       long distributionCount =
@@ -970,8 +970,8 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should publish dataset with provide pipeline (APIs only, no datasources)")
-    void shouldPublishDataSetWithApisOnly() {
+    @DisplayName("Should mark dataset as ready with provide pipeline (APIs only, no datasources)")
+    void shouldMarkReadyDataSetWithApisOnly() {
       DataSet dataSet = new DataSet();
       dataSet.setName("test_dataset_provide_" + System.currentTimeMillis());
       dataSet.setDescription("Test dataset with provide pipeline");
@@ -1001,7 +1001,7 @@ class DataSetControllerIntegrationTest
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDataSetStatus())
-          .as("DataSet status should be READY after publishing")
+          .as("DataSet status should be READY after marking ready")
           .isEqualTo(DataSetStatus.READY);
 
       long distributionCount =
@@ -1015,8 +1015,8 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should fail to publish dataset without pipelines")
-    void shouldFailToPublishDataSetWithoutPipelines() {
+    @DisplayName("Should fail to mark dataset as ready without pipelines")
+    void shouldFailToMarkReadyDataSetWithoutPipelines() {
       DataSet dataSet = new DataSet();
       dataSet.setName("test_dataset_no_pipelines_" + System.currentTimeMillis());
       dataSet.setDescription("Test dataset without pipelines");
@@ -1042,13 +1042,13 @@ class DataSetControllerIntegrationTest
       DataSet unchangedDataSet = dataSetRepository.findById(dataSetId).orElse(null);
       assertThat(unchangedDataSet).isNotNull();
       assertThat(unchangedDataSet.getDataSetStatus())
-          .as("DataSet status should remain DRAFT after failed publish")
+          .as("DataSet status should remain DRAFT after failed markReady")
           .isEqualTo(DataSetStatus.DRAFT);
     }
 
     @Test
-    @DisplayName("Should fail to publish non-existent dataset")
-    void shouldFailToPublishNonExistentDataSet() {
+    @DisplayName("Should fail to mark ready non-existent dataset")
+    void shouldFailToMarkReadyNonExistentDataSet() {
       UUID nonExistentId = UUID.randomUUID();
 
       ResponseEntity<DataSetOutputDTO> response =
