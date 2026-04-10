@@ -28,6 +28,7 @@ import jakarta.ws.rs.client.Invocation;
 import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -127,6 +128,62 @@ class FrostSagaHandlerTest {
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals(
             "http://public-frost:80/v1.1/Projects(42)", result.resultData().get("baseUrl"));
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "returns success when FROST signals duplicate via 500 'Failed to store data.' and project exists")
+    void shouldReturnSuccessWhenFrostSignalsDuplicateAndProjectExists() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response postResponse = mock(Response.class);
+        when(postResponse.getStatus()).thenReturn(500);
+        when(postResponse.readEntity(String.class))
+            .thenReturn("{\"code\":500,\"type\":\"error\",\"message\":\"Failed to store data.\"}");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(postResponse);
+
+        Response getResponse = mock(Response.class);
+        when(getResponse.getStatus()).thenReturn(200);
+        when(getResponse.readEntity(Map.class))
+            .thenReturn(Map.of("value", List.of(Map.of("@iot.id", 42))));
+        when(mockBuilder.get()).thenReturn(getResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Existing Dataset"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("42", result.resultData().get("projectId"));
+        assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
+        assertEquals("42", result.compensationData().get("projectId"));
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "returns failure when FROST signals duplicate via 500 'Failed to store data.' but no project found by name")
+    void shouldReturnFailureWhenFrostSignalsDuplicateButProjectNotFound() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response postResponse = mock(Response.class);
+        when(postResponse.getStatus()).thenReturn(500);
+        when(postResponse.readEntity(String.class))
+            .thenReturn("{\"code\":500,\"type\":\"error\",\"message\":\"Failed to store data.\"}");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(postResponse);
+
+        Response getResponse = mock(Response.class);
+        when(getResponse.getStatus()).thenReturn(200);
+        when(getResponse.readEntity(Map.class)).thenReturn(Map.of("value", List.of()));
+        when(mockBuilder.get()).thenReturn(getResponse);
+
+        SagaCommandMessage command =
+            createCommand("EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Ghost Dataset"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
       }
     }
 
@@ -440,6 +497,7 @@ class FrostSagaHandlerTest {
 
     when(mockClient.target(any(String.class))).thenReturn(mockTarget);
     when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
+    when(mockPathTarget.queryParam(any(String.class), any())).thenReturn(mockPathTarget);
     when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
     when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
 

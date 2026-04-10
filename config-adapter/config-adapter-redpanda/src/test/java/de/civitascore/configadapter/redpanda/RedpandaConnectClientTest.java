@@ -75,6 +75,17 @@ class RedpandaConnectClientTest {
     }
 
     @Test
+    @DisplayName("succeeds on HTTP 409 (idempotent create)")
+    void createPipeline_http409_succeeds() {
+      Response mockResponse = mock(Response.class);
+      when(mockResponse.getStatus()).thenReturn(409);
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+      assertDoesNotThrow(
+          () -> redpandaClient.createPipeline("test-pipeline", Map.of("input", Map.of())));
+    }
+
+    @Test
     @DisplayName("throws FatalAdapterException on HTTP 400")
     void createPipeline_http400_throwsFatalAdapterException() {
       Response mockResponse = mock(Response.class);
@@ -132,16 +143,19 @@ class RedpandaConnectClientTest {
     }
 
     @Test
-    @DisplayName("throws FatalAdapterException on HTTP 404")
-    void updatePipeline_http404_throwsFatalAdapterException() {
+    @DisplayName(
+        "throws FatalAdapterException with RESOURCE_NOT_FOUND on HTTP 404 (signals upsert)")
+    void updatePipeline_http404_throwsFatalWithResourceNotFoundCode() {
       Response mockResponse = mock(Response.class);
       when(mockResponse.getStatus()).thenReturn(404);
-      when(mockResponse.readEntity(String.class)).thenReturn("Not Found");
       when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
 
-      assertThrows(
-          FatalAdapterException.class,
-          () -> redpandaClient.updatePipeline("test-pipeline", Map.of()));
+      FatalAdapterException exception =
+          assertThrows(
+              FatalAdapterException.class,
+              () -> redpandaClient.updatePipeline("test-pipeline", Map.of()));
+
+      assertEquals(AdapterErrorCode.RESOURCE_NOT_FOUND, exception.getErrorCode());
     }
 
     @Test

@@ -50,7 +50,6 @@ public class GenericDcatMapper<T extends BaseOutputDTO> extends DcatMapper<T>
     Class<?> clazz = dto.getClass();
 
     if (!clazz.isAnnotationPresent(JsonLDResource.class)) {
-      // TODO decide on fallback behavior
       throw new IllegalArgumentException(
           "Class " + clazz.getName() + " is not annotated with @JsonLDResource");
     }

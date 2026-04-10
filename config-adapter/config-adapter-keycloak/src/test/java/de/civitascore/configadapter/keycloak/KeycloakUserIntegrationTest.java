@@ -13,6 +13,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.civitascore.configadapter.Topics;
@@ -34,6 +35,7 @@ import org.keycloak.admin.client.CreatedResponseUtil;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.admin.client.resource.RolesResource;
 import org.keycloak.admin.client.resource.UsersResource;
+import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -148,6 +150,12 @@ class KeycloakUserIntegrationTest extends KeycloakAdapterIntegrationTestBase {
     realmRep.setSmtpServer(smtpConfig);
     keycloakClient.realms().create(realmRep);
 
+    ClientRepresentation portalClient = new ClientRepresentation();
+    portalClient.setClientId("test-portal");
+    portalClient.setEnabled(true);
+    portalClient.setRedirectUris(List.of("http://localhost:3000/*"));
+    keycloakClient.realm(realmName).clients().create(portalClient);
+
     UserConfig userConfig = new UserConfig();
     userConfig.setUsername("emailuser");
     userConfig.setEmail("emailuser@test.local");
@@ -219,5 +227,134 @@ class KeycloakUserIntegrationTest extends KeycloakAdapterIntegrationTestBase {
         createConfigEvent("duplicate-user-realm", "user", Operation.CREATE, userConfig));
 
     assertSingleSuccessResult();
+  }
+
+  @Test
+  void shouldCreateUserAndSendActionsEmailWithoutInvitationRedirect()
+      throws FatalAdapterException, RetryableAdapterException {
+    // Test fallback: when invitation config is NOT set, the simple executeActionsEmail overload
+    // is used and failures are logged as warnings (not propagated).
+    String realmName = "email-no-redirect-realm";
+    RealmRepresentation realmRep = new RealmRepresentation();
+    realmRep.setRealm(realmName);
+    realmRep.setEnabled(true);
+
+    Map<String, String> smtpConfig = new HashMap<>();
+    smtpConfig.put("host", "mailpit");
+    smtpConfig.put("port", "1025");
+    smtpConfig.put("from", "noreply@test.local");
+    smtpConfig.put("fromDisplayName", "Test");
+    smtpConfig.put("ssl", "false");
+    smtpConfig.put("starttls", "false");
+    smtpConfig.put("auth", "false");
+    realmRep.setSmtpServer(smtpConfig);
+    keycloakClient.realms().create(realmRep);
+
+    // Create adapter WITHOUT invitation redirect config
+    try (KeycloakAdapter noRedirectAdapter = createAdapterWithProps(Map.of())) {
+      TestEventPublisher testPublisher = new TestEventPublisher();
+      noRedirectAdapter.setEventPublisher(testPublisher);
+
+      UserConfig userConfig = new UserConfig();
+      userConfig.setUsername("no-redirect-user");
+      userConfig.setEmail("no-redirect-user@test.local");
+      userConfig.setFirstName("NoRedirect");
+      userConfig.setLastName("User");
+      userConfig.setEnabled(true);
+      userConfig.setRequiredActions(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
+
+      noRedirectAdapter.processConfigEvent(
+          Topics.USER_CREATED.toString(),
+          createConfigEvent(realmName, "user", Operation.CREATE, userConfig));
+
+      // User should be created successfully
+      List<UserRepresentation> users =
+          keycloakClient.realm(realmName).users().search("no-redirect-user");
+      assertEquals(1, users.size());
+      assertTrue(users.getFirst().getRequiredActions().contains("VERIFY_EMAIL"));
+      assertTrue(users.getFirst().getRequiredActions().contains("UPDATE_PASSWORD"));
+
+      // Email should still be sent via the simple overload
+      String mailpitApiUrl = getMailpitApiUrl();
+      await()
+          .atMost(10, SECONDS)
+          .pollInterval(1, SECONDS)
+          .untilAsserted(
+              () -> {
+                var httpClient = HttpClient.newHttpClient();
+                var request = HttpRequest.newBuilder().uri(URI.create(mailpitApiUrl)).GET().build();
+                var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                assertTrue(response.body().contains("no-redirect-user@test.local"));
+              });
+
+      assertEquals(1, testPublisher.getPublishedEvents().size());
+    }
+  }
+
+  @Test
+  void shouldFailWhenInvitationClientDoesNotExistInRealm() {
+    // When invitation redirect is configured but the client doesn't exist in the realm,
+    // the error must propagate (not be silently swallowed).
+    String realmName = "missing-client-realm";
+    RealmRepresentation realmRep = new RealmRepresentation();
+    realmRep.setRealm(realmName);
+    realmRep.setEnabled(true);
+
+    Map<String, String> smtpConfig = new HashMap<>();
+    smtpConfig.put("host", "mailpit");
+    smtpConfig.put("port", "1025");
+    smtpConfig.put("from", "noreply@test.local");
+    smtpConfig.put("fromDisplayName", "Test");
+    smtpConfig.put("ssl", "false");
+    smtpConfig.put("starttls", "false");
+    smtpConfig.put("auth", "false");
+    realmRep.setSmtpServer(smtpConfig);
+    keycloakClient.realms().create(realmRep);
+    // Note: NOT creating the "test-portal" client in this realm
+
+    UserConfig userConfig = new UserConfig();
+    userConfig.setUsername("fail-user");
+    userConfig.setEmail("fail-user@test.local");
+    userConfig.setFirstName("Fail");
+    userConfig.setLastName("User");
+    userConfig.setEnabled(true);
+    userConfig.setRequiredActions(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
+
+    // The adapter has invitation config set (from setUp), but the client doesn't exist
+    // in this realm — the error should propagate as FatalAdapterException
+    assertThrows(
+        FatalAdapterException.class,
+        () ->
+            adapter.processConfigEvent(
+                Topics.USER_CREATED.toString(),
+                createConfigEvent(realmName, "user", Operation.CREATE, userConfig)));
+  }
+
+  @Test
+  void shouldFailInitializationWithInvalidCredentials() {
+    // Verify that the adapter fails fast at startup when Keycloak credentials are invalid
+    Map<String, Object> badCredentials = new HashMap<>();
+    badCredentials.put("keycloak.username", "wrong-user");
+    badCredentials.put("keycloak.password", "wrong-password");
+
+    assertThrows(IllegalStateException.class, () -> createAdapterWithProps(badCredentials));
+  }
+
+  @Test
+  void shouldFailInitializationWhenOnlyClientIdIsSet() {
+    // Verify that setting only invitation.client.id without redirect.uri fails
+    Map<String, Object> partialConfig = new HashMap<>();
+    partialConfig.put("keycloak.invitation.client.id", "some-client");
+
+    assertThrows(IllegalStateException.class, () -> createAdapterWithProps(partialConfig));
+  }
+
+  @Test
+  void shouldFailInitializationWhenOnlyRedirectUriIsSet() {
+    // Verify that setting only invitation.redirect.uri without client.id fails
+    Map<String, Object> partialConfig = new HashMap<>();
+    partialConfig.put("keycloak.invitation.redirect.uri", "http://localhost:3000/");
+
+    assertThrows(IllegalStateException.class, () -> createAdapterWithProps(partialConfig));
   }
 }

@@ -18,6 +18,7 @@ import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.owasp.encoder.Encode;
 
@@ -87,6 +88,23 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
             .apply(client().target(serverUrl).path("Projects").request(MediaType.APPLICATION_JSON))
             .post(Entity.json(body))) {
 
+      // FROST returns HTTP 500 with "Failed to store data." on UNIQUE constraint violations
+      // (duplicate project name) instead of the expected HTTP 409 Conflict.
+      // Fall back to a name lookup so CREATE_PROJECT is idempotent.
+      if (response.getStatus() == 500) {
+        String responseBody = response.readEntity(String.class);
+        if (responseBody != null
+            && responseBody.contains(FrostAdapter.ERROR_FAILED_TO_STORE_DATA)) {
+          log.info(
+              "FROST returned 500 'Failed to store data.' for CREATE_PROJECT"
+                  + " — checking for existing project with name '{}', saga={}",
+              Encode.forJava(datasetName),
+              Encode.forJava(command.sagaId()));
+          return findExistingProjectByName(command, datasetName);
+        }
+        throw new SagaApiException("CREATE_PROJECT failed: HTTP 500 — " + responseBody, 500);
+      }
+
       checkResponse(response, "CREATE_PROJECT");
 
       String projectId = FrostUtils.extractIdFromLocation(response.getHeaderString("Location"));
@@ -97,6 +115,50 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
 
       log.info(
           "FROST project created: projectId={}, saga={}",
+          Encode.forJava(projectId),
+          Encode.forJava(command.sagaId()));
+
+      return SagaCommandResult.success(
+          command.sagaId(), command.stepId(), resultData, compensationData);
+    }
+  }
+
+  private SagaCommandResult findExistingProjectByName(SagaCommandMessage command, String name) {
+    String escapedName = name.replace("'", "''");
+    try (Response response =
+        authStrategy
+            .apply(
+                client()
+                    .target(serverUrl)
+                    .path("Projects")
+                    .queryParam("$filter", "name eq '" + escapedName + "'")
+                    .request(MediaType.APPLICATION_JSON))
+            .get()) {
+
+      checkResponse(response, "GET_PROJECTS_BY_NAME");
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> result = response.readEntity(Map.class);
+      @SuppressWarnings("unchecked")
+      List<Map<String, Object>> projects = (List<Map<String, Object>>) result.get("value");
+
+      if (projects == null || projects.isEmpty()) {
+        throw new SagaApiException(
+            "CREATE_PROJECT failed: HTTP 500 — Failed to store data."
+                + " (no existing project found with name '"
+                + name
+                + "')",
+            500);
+      }
+
+      String projectId = String.valueOf(projects.get(0).get("@iot.id"));
+      String baseUrl = publicUrl + "/Projects(" + projectId + ")";
+
+      Map<String, Object> resultData = Map.of("projectId", projectId, "baseUrl", baseUrl);
+      Map<String, Object> compensationData = Map.of("projectId", projectId);
+
+      log.info(
+          "FROST project already exists, reusing: projectId={}, saga={}",
           Encode.forJava(projectId),
           Encode.forJava(command.sagaId()));
 

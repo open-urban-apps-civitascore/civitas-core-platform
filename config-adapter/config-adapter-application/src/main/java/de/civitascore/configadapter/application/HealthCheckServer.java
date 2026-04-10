@@ -13,12 +13,14 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import de.civitascore.configadapter.Constants;
+import de.civitascore.configadapter.messaging.EventConsumer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,13 +31,13 @@ public class HealthCheckServer implements AutoCloseable {
   private final HttpServer server;
   private final HealthStatus healthStatus;
 
-  public HealthCheckServer(int port, List<?> consumers) throws IOException {
+  public HealthCheckServer(int port, List<EventConsumer> consumers) throws IOException {
     this.healthStatus = new HealthStatus(consumers);
     this.server = HttpServer.create(new InetSocketAddress(port), 0);
     this.server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
     this.server.createContext("/health", new HealthHandler());
-    this.server.createContext("/health/ready", new ReadinessHandler());
-    this.server.createContext("/health/live", new LivenessHandler());
+    this.server.createContext("/health/ready", new SimpleHealthHandler(healthStatus::isReady));
+    this.server.createContext("/health/live", new SimpleHealthHandler(() -> true));
   }
 
   public void start() {
@@ -57,11 +59,18 @@ public class HealthCheckServer implements AutoCloseable {
     return server.getAddress().getPort();
   }
 
+  private boolean rejectNonGet(HttpExchange exchange) throws IOException {
+    if (!"GET".equals(exchange.getRequestMethod())) {
+      sendResponse(exchange, 405, "Method Not Allowed");
+      return true;
+    }
+    return false;
+  }
+
   private class HealthHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-      if (!"GET".equals(exchange.getRequestMethod())) {
-        sendResponse(exchange, 405, "Method Not Allowed");
+      if (rejectNonGet(exchange)) {
         return;
       }
 
@@ -78,32 +87,24 @@ public class HealthCheckServer implements AutoCloseable {
     }
   }
 
-  private class ReadinessHandler implements HttpHandler {
-    @Override
-    public void handle(HttpExchange exchange) throws IOException {
-      if (!"GET".equals(exchange.getRequestMethod())) {
-        sendResponse(exchange, 405, "Method Not Allowed");
-        return;
-      }
+  private class SimpleHealthHandler implements HttpHandler {
+    private final BooleanSupplier check;
 
-      boolean isReady = healthStatus.isReady();
-      int statusCode = isReady ? 200 : 503;
-      String status = isReady ? "UP" : "DOWN";
-
-      String response = String.format("{\"status\":\"%s\"}", status);
-
-      sendJsonResponse(exchange, statusCode, response);
+    SimpleHealthHandler(BooleanSupplier check) {
+      this.check = check;
     }
-  }
 
-  private class LivenessHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-      if (!"GET".equals(exchange.getRequestMethod())) {
-        sendResponse(exchange, 405, "Method Not Allowed");
+      if (rejectNonGet(exchange)) {
         return;
       }
-      sendJsonResponse(exchange, 200, "{\"status\":\"UP\"}");
+
+      boolean healthy = check.getAsBoolean();
+      int statusCode = healthy ? 200 : 503;
+      String status = healthy ? "UP" : "DOWN";
+
+      sendJsonResponse(exchange, statusCode, String.format("{\"status\":\"%s\"}", status));
     }
   }
 
@@ -123,10 +124,10 @@ public class HealthCheckServer implements AutoCloseable {
   }
 
   static class HealthStatus {
-    private final List<?> consumers;
+    private final List<EventConsumer> consumers;
     private volatile boolean ready;
 
-    public HealthStatus(List<?> consumers) {
+    public HealthStatus(List<EventConsumer> consumers) {
       this.consumers = consumers;
       this.ready = false;
     }

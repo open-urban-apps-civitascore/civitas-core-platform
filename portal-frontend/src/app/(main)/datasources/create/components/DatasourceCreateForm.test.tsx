@@ -1,12 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { InternalAxiosRequestConfig } from 'axios'
 import { AxiosError } from 'axios'
 import { vi } from 'vitest'
 
 import { DatasourceCreateForm } from './DatasourceCreateForm'
 
 const mockPush = vi.fn()
-const mockMutate = vi.fn()
+const mockMutateAsync = vi.fn()
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
@@ -22,7 +23,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/app/services/api/datasources/clientRequests', () => ({
   useCreateDatasource: () => ({
-    mutate: mockMutate,
+    mutateAsync: mockMutateAsync,
     isPending: false,
   }),
 }))
@@ -39,6 +40,7 @@ const setup = () => {
 describe('DatasourceCreateForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockMutateAsync.mockResolvedValue({ data: { id: 'created-datasource-id' } })
   })
 
   test('renders the form with correct elements', () => {
@@ -80,27 +82,25 @@ describe('DatasourceCreateForm', () => {
     fireEvent.click(screen.getByTestId('submitButton'))
 
     await waitFor(() => {
-      expect(mockMutate).toHaveBeenCalledWith(
+      expect(mockMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'Test Datasource',
         }),
-        expect.any(Object),
       )
     })
   })
 
   test('shows a name field error when the request returns a conflict error', async () => {
-    mockMutate.mockImplementation((_data, options) => {
-      options?.onError?.({
-        status: 409,
-        response: {
-          status: 409,
-          data: {
-            detail: 'Datasource with name "Test Datasource" already exists',
-          },
-        },
-      } as AxiosError)
+    const conflictError = new AxiosError('Conflict', 'ERR_BAD_REQUEST', {} as InternalAxiosRequestConfig, undefined, {
+      status: 409,
+      statusText: 'Conflict',
+      headers: {},
+      config: {} as InternalAxiosRequestConfig,
+      data: {
+        detail: 'Datasource with name "Test Datasource" already exists',
+      },
     })
+    mockMutateAsync.mockRejectedValueOnce(conflictError)
 
     setup()
     const nameInput = screen.getByRole('textbox')
@@ -121,7 +121,7 @@ describe('DatasourceCreateForm loading state', () => {
   test('shows loading spinner when form is submitting', () => {
     vi.doMock('@/app/services/api/datasources/clientRequests', () => ({
       useCreateDatasource: () => ({
-        mutate: mockMutate,
+        mutateAsync: mockMutateAsync,
         isPending: true,
       }),
     }))

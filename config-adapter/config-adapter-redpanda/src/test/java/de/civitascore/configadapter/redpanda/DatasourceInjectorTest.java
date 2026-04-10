@@ -128,11 +128,75 @@ class DatasourceInjectorTest {
       assertEquals("postgres", sqlRaw.get("driver"));
       assertEquals("postgres://user:pass@db:5432/mydb?sslmode=disable", sqlRaw.get("dsn"));
       assertEquals("SELECT * FROM sensors", sqlRaw.get("query"));
+      assertNull(sqlRaw.get("user"));
+      assertNull(sqlRaw.get("password"));
     }
 
     @Test
-    @DisplayName("builds DSN from host/port/database/user when dsn is absent")
-    void resolve_sqlWithHostConfig_buildsDsn() throws Exception {
+    @DisplayName("merges optional credentials into pre-built DSN when missing there")
+    void resolve_sqlPlaceholderWithDsnAndSeparateCredentials_mergesIntoDsn() throws Exception {
+      String datasourceId = "ds-sql-merge";
+
+      Datasource datasource = new Datasource();
+      datasource.setId(datasourceId);
+      datasource.setType("sql");
+      datasource.handleUnknownProperty(
+          "configuration",
+          Map.of(
+              "dsn", "postgres://db:5432/mydb?sslmode=disable",
+              "username", "reader",
+              "password", "pw",
+              "query", "SELECT * FROM sensors"));
+
+      Map<String, Object> pipelineData = Map.of("input", inputWithLabel(datasourceId));
+
+      Map<String, Object> result = DatasourceInjector.resolve(pipelineData, List.of(datasource));
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> sqlRaw =
+          (Map<String, Object>) ((Map<String, Object>) result.get("input")).get("sql_raw");
+
+      assertNotNull(sqlRaw);
+      assertEquals("postgres://reader:pw@db:5432/mydb?sslmode=disable", sqlRaw.get("dsn"));
+      assertFalse(sqlRaw.containsKey("user"));
+      assertFalse(sqlRaw.containsKey("password"));
+    }
+
+    @Test
+    @DisplayName("resolves SQL placeholder with table and columns as sql_select")
+    void resolve_sqlPlaceholderWithTableColumns_injectsSqlSelect() throws Exception {
+      String datasourceId = "ds-sql-select-1";
+
+      Datasource datasource = new Datasource();
+      datasource.setId(datasourceId);
+      datasource.setType("postgresql");
+      datasource.handleUnknownProperty(
+          "configuration",
+          Map.of(
+              "dsn", "postgres://user:pass@db:5432/mydb?sslmode=disable",
+              "table", "public.device_definitions",
+              "columns", List.of("*"),
+              "where", "device_id > 0"));
+
+      Map<String, Object> pipelineData = Map.of("input", inputWithLabel(datasourceId));
+
+      Map<String, Object> result = DatasourceInjector.resolve(pipelineData, List.of(datasource));
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> sqlSelect =
+          (Map<String, Object>) ((Map<String, Object>) result.get("input")).get("sql_select");
+
+      assertNotNull(sqlSelect);
+      assertEquals("postgres", sqlSelect.get("driver"));
+      assertEquals("postgres://user:pass@db:5432/mydb?sslmode=disable", sqlSelect.get("dsn"));
+      assertEquals("public.device_definitions", sqlSelect.get("table"));
+      assertEquals(List.of("*"), sqlSelect.get("columns"));
+      assertEquals("device_id > 0", sqlSelect.get("where"));
+    }
+
+    @Test
+    @DisplayName("builds DSN for sql_select when host config includes table and columns")
+    void resolve_sqlWithHostConfig_buildsDsnForSqlSelect() throws Exception {
       String datasourceId = "ds-sql-host";
 
       Datasource datasource = new Datasource();
@@ -145,7 +209,74 @@ class DatasourceInjectorTest {
           Map.of(
               "database", "sensordb",
               "username", "reader",
-              "password", "secret"));
+              "password", "ENC(secret)",
+              "table", "public.measurements",
+              "columns", List.of("id", "value"),
+              "where", "id > 10"));
+
+      Map<String, Object> pipelineData = Map.of("input", inputWithLabel(datasourceId));
+
+      Map<String, Object> result = DatasourceInjector.resolve(pipelineData, List.of(datasource));
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> sqlSelect =
+          (Map<String, Object>) ((Map<String, Object>) result.get("input")).get("sql_select");
+
+      assertNotNull(sqlSelect);
+      String dsn = (String) sqlSelect.get("dsn");
+      assertNotNull(dsn);
+      assertTrue(dsn.contains("db.local"));
+      assertTrue(dsn.contains("sensordb"));
+      assertTrue(dsn.contains("reader"));
+      assertFalse(sqlSelect.containsKey("user"));
+      assertFalse(sqlSelect.containsKey("password"));
+      assertEquals("public.measurements", sqlSelect.get("table"));
+      assertEquals(List.of("id", "value"), sqlSelect.get("columns"));
+      assertEquals("id > 10", sqlSelect.get("where"));
+    }
+
+    @Test
+    @DisplayName("builds sql raw dsn from credentials and omits top-level user and password")
+    void resolve_sqlWithCredentials_buildsDsnAndOmitsTopLevelCredentials() throws Exception {
+      String datasourceId = "ds-sql-nopass";
+
+      Datasource datasource = new Datasource();
+      datasource.setId(datasourceId);
+      datasource.setType("sql");
+      datasource.setHost("db.local");
+      datasource.setPort(5432);
+      datasource.handleUnknownProperty(
+          "configuration",
+          Map.of(
+              "database", "testdb",
+              "username", "admin",
+              "password", "ENC(test-secret)",
+              "query", "SELECT * FROM test_table"));
+
+      Map<String, Object> pipelineData = Map.of("input", inputWithLabel(datasourceId));
+
+      Map<String, Object> result = DatasourceInjector.resolve(pipelineData, List.of(datasource));
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> sqlRaw =
+          (Map<String, Object>) ((Map<String, Object>) result.get("input")).get("sql_raw");
+      String dsn = (String) sqlRaw.get("dsn");
+      assertNotNull(dsn);
+      assertTrue(dsn.contains("db.local"));
+      assertFalse(sqlRaw.containsKey("user"));
+      assertFalse(sqlRaw.containsKey("password"));
+    }
+
+    @Test
+    @DisplayName("omits optional sql user and password when not configured")
+    void resolve_sqlWithoutOptionalCredentials_omitsUserAndPassword() throws Exception {
+      String datasourceId = "ds-sql-no-credentials";
+
+      Datasource datasource =
+          createSqlDatasource(
+              datasourceId,
+              "postgres://user:pass@db:5432/mydb?sslmode=disable",
+              "SELECT * FROM sensors");
 
       Map<String, Object> pipelineData = Map.of("input", inputWithLabel(datasourceId));
 
@@ -156,37 +287,8 @@ class DatasourceInjectorTest {
           (Map<String, Object>) ((Map<String, Object>) result.get("input")).get("sql_raw");
 
       assertNotNull(sqlRaw);
-      String dsn = (String) sqlRaw.get("dsn");
-      assertNotNull(dsn);
-      assertTrue(dsn.contains("db.local"));
-      assertTrue(dsn.contains("sensordb"));
-      assertTrue(dsn.contains("reader"));
-    }
-
-    @Test
-    @DisplayName("builds DSN without password when password is null")
-    void resolve_sqlWithoutPassword_buildsDsnWithoutPassword() throws Exception {
-      String datasourceId = "ds-sql-nopass";
-
-      Datasource datasource = new Datasource();
-      datasource.setId(datasourceId);
-      datasource.setType("sql");
-      datasource.setHost("db.local");
-      datasource.setPort(5432);
-      datasource.handleUnknownProperty(
-          "configuration", Map.of("database", "testdb", "username", "admin"));
-
-      Map<String, Object> pipelineData = Map.of("input", inputWithLabel(datasourceId));
-
-      Map<String, Object> result = DatasourceInjector.resolve(pipelineData, List.of(datasource));
-
-      @SuppressWarnings("unchecked")
-      Map<String, Object> sqlRaw =
-          (Map<String, Object>) ((Map<String, Object>) result.get("input")).get("sql_raw");
-      String dsn = (String) sqlRaw.get("dsn");
-      assertNotNull(dsn);
-      assertTrue(dsn.contains("admin@db.local"));
-      assertFalse(dsn.contains(":null@"));
+      assertFalse(sqlRaw.containsKey("user"));
+      assertFalse(sqlRaw.containsKey("password"));
     }
   }
 

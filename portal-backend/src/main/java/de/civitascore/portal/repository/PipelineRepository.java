@@ -31,4 +31,12 @@ public interface PipelineRepository extends NamedEntityRepository<Pipeline, UUID
    * @return the entity if found
    */
   Set<Pipeline> findAllByNameAndDataSetId(String name, UUID datasetId);
+
+  /**
+   * Check if any pipeline references the given datasource ID.
+   *
+   * @param dataSourceId the datasource ID
+   * @return true if any pipeline references the datasource
+   */
+  boolean existsByDataSourcesId(UUID dataSourceId);
 }

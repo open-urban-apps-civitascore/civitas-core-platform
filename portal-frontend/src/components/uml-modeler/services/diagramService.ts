@@ -247,15 +247,10 @@ export const validateConnection = (diagram: UMLDiagram, connection: Connection):
     return false
   }
 
-  // UML-specific validation rules
-  // const sourceType = sourceNode.data.element.type
-  // const targetType = targetNode.data.element.type
-  // TODO: relationship-specific validation like inheritance, realization, etc. ...
-
   return true
 }
 
-// Enhanced validation for specific relationship types
+// Validation for specific UML relationship types
 export const validateRelationshipConnection = (
   diagram: UMLDiagram,
   connection: Connection,
@@ -275,21 +270,26 @@ export const validateRelationshipConnection = (
   const sourceType = sourceNode.data.element.type
   const targetType = targetNode.data.element.type
 
-  // Relationship-specific validation rules
   switch (relationshipType) {
     case 'inheritance':
-      // Inheritance: class → class/abstractClass only
-      return sourceType === 'class' && (targetType === 'class' || targetType === 'abstractClass')
+      // Classes/abstract classes can inherit from classes/abstract classes
+      // Interfaces can inherit from interfaces
+      if (sourceType === 'interface') return targetType === 'interface'
+      if (sourceType === 'class' || sourceType === 'abstractClass')
+        return targetType === 'class' || targetType === 'abstractClass'
+      return false
 
     case 'realization':
-      // Realization: class → interface only
-      return sourceType === 'class' && targetType === 'interface'
+      // Classes and abstract classes can realize interfaces
+      return (sourceType === 'class' || sourceType === 'abstractClass') && targetType === 'interface'
+
+    case 'composition':
+    case 'aggregation':
+      // The "whole" must be a class or abstract class; the "part" can be any element
+      return sourceType === 'class' || sourceType === 'abstractClass'
 
     case 'association':
-    case 'aggregation':
-    case 'composition':
     case 'dependency':
-      // These relationships are more flexible
       return true
 
     default:

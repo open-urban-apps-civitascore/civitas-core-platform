@@ -45,6 +45,8 @@ import org.slf4j.LoggerFactory;
  * <ul>
  *   <li>Network errors (ProcessingException) → RetryableAdapterException (NETWORK_ERROR)
  *   <li>HTTP 5xx errors → RetryableAdapterException (SERVICE_UNAVAILABLE)
+ *   <li>HTTP 500 + "Failed to store data." on CREATE → success (idempotent: FROST returns 500
+ *       instead of 409 on UNIQUE constraint violations)
  *   <li>HTTP 409 on CREATE → success (idempotent: entity already exists)
  *   <li>HTTP 404 on DELETE → success (idempotent: entity already deleted)
  *   <li>Other HTTP 4xx errors → FatalAdapterException (FROST_ENTITY_ERROR)
@@ -54,6 +56,7 @@ import org.slf4j.LoggerFactory;
 public class FrostAdapter extends AbstractConfigAdapter {
 
   private static final Logger logger = LoggerFactory.getLogger(FrostAdapter.class);
+  static final String ERROR_FAILED_TO_STORE_DATA = "Failed to store data.";
 
   public static final String ADAPTER_NAME = "frost";
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/v1.1";
@@ -246,6 +249,15 @@ public class FrostAdapter extends AbstractConfigAdapter {
     String body = response.readEntity(String.class);
 
     if (status >= 500) {
+      // FROST returns 500 with "Failed to store data." on UNIQUE constraint violations instead of
+      // 409 — treat it as idempotent success for CREATE operations, same as a real 409.
+      if (operation == AdapterOperation.FROST_ENTITY_CREATE
+          && body.contains(ERROR_FAILED_TO_STORE_DATA)) {
+        logger.info(
+            "FROST entity already exists (500 'Failed to store data.'), treating create as"
+                + " success (idempotent)");
+        return;
+      }
       logger.warn(
           "FROST server error during {}: {} {}",
           Encode.forJava(operation.getDescription()),

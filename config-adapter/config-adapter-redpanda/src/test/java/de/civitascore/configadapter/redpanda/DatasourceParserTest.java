@@ -224,6 +224,60 @@ class DatasourceParserTest {
     }
 
     @Test
+    @DisplayName("merges optional credentials from configuration into DSN when missing")
+    void parseSql_dsnWithoutCredentials_mergesOptionalCredentialsIntoDsn() throws Exception {
+      Datasource ds = new Datasource();
+      ds.setId("ds-sql-merge");
+      ds.setType("postgresql");
+      ds.handleUnknownProperty(
+          "configuration",
+          Map.of(
+              "dsn", "postgres://db:5432/mydb?sslmode=disable",
+              "username", "reader",
+              "password", "pw"));
+
+      ConnectorConfig.Sql sql = (ConnectorConfig.Sql) DatasourceParser.parse(ds).orElseThrow();
+
+      assertEquals("postgres://reader:pw@db:5432/mydb?sslmode=disable", sql.dsn());
+    }
+
+    @Test
+    @DisplayName("keeps encoded password unchanged when merging credentials into DSN")
+    void parseSql_dsnWithoutCredentials_keepsEncodedPasswordWhenMerging() throws Exception {
+      Datasource ds = new Datasource();
+      ds.setId("ds-sql-merge-encoded");
+      ds.setType("postgresql");
+      ds.handleUnknownProperty(
+          "configuration",
+          Map.of(
+              "dsn", "postgres://db:5432/mydb?sslmode=disable",
+              "username", "reader",
+              "password", "pa%24%24word"));
+
+      ConnectorConfig.Sql sql = (ConnectorConfig.Sql) DatasourceParser.parse(ds).orElseThrow();
+
+      assertEquals("postgres://reader:pa%24%24word@db:5432/mydb?sslmode=disable", sql.dsn());
+    }
+
+    @Test
+    @DisplayName("keeps embedded DSN credentials when already present")
+    void parseSql_dsnWithEmbeddedCredentials_keepsExistingCredentials() throws Exception {
+      Datasource ds = new Datasource();
+      ds.setId("ds-sql-existing-creds");
+      ds.setType("postgresql");
+      ds.handleUnknownProperty(
+          "configuration",
+          Map.of(
+              "dsn", "postgres://existing:secret@db:5432/mydb?sslmode=disable",
+              "username", "reader",
+              "password", "pw"));
+
+      ConnectorConfig.Sql sql = (ConnectorConfig.Sql) DatasourceParser.parse(ds).orElseThrow();
+
+      assertEquals("postgres://existing:secret@db:5432/mydb?sslmode=disable", sql.dsn());
+    }
+
+    @Test
     @DisplayName("builds DSN from host/database/username when dsn absent")
     void parseSql_noDsn_buildsDsnFromComponents() throws Exception {
       Datasource ds = new Datasource();
@@ -304,6 +358,72 @@ class DatasourceParserTest {
 
       assertEquals("SELECT * FROM t", sql.query());
     }
+
+    @Test
+    @DisplayName("builds sql dsn from credentials when present")
+    void parseSql_withCredentials_buildsDsnWithCredentials() throws Exception {
+      Datasource ds = new Datasource();
+      ds.setId("ds-credentials");
+      ds.setType("sql");
+      ds.handleUnknownProperty(
+          "configuration",
+          Map.of(
+              "dsn", "postgres://u:p@h:5432/d",
+              "username", "sql-user",
+              "password", "ENC(secret)",
+              "query", "SELECT 1"));
+
+      ConnectorConfig.Sql sql = (ConnectorConfig.Sql) DatasourceParser.parse(ds).orElseThrow();
+
+      assertEquals("postgres://u:p@h:5432/d", sql.dsn());
+    }
+
+    @Test
+    @DisplayName("includes optional where for sql_select inputs")
+    void parseSql_withTableColumnsAndWhere_includesWhere() throws Exception {
+      Datasource ds = new Datasource();
+      ds.setId("ds-select");
+      ds.setType("sql");
+      ds.handleUnknownProperty(
+          "configuration",
+          Map.of(
+              "dsn", "postgres://u:p@h:5432/d",
+              "table", "public.device_definitions",
+              "columns", List.of("*"),
+              "where", "device_id = 1"));
+
+      ConnectorConfig.Sql sql = (ConnectorConfig.Sql) DatasourceParser.parse(ds).orElseThrow();
+
+      assertNull(sql.query());
+      assertEquals("public.device_definitions", sql.table());
+      assertEquals(List.of("*"), sql.columns());
+      assertEquals("device_id = 1", sql.where());
+    }
+
+    @Test
+    @DisplayName("rejects table without columns")
+    void parseSql_withTableButNoColumns_rejectsInvalidSelectInput() {
+      Datasource ds = new Datasource();
+      ds.setId("ds-select-invalid-table");
+      ds.setType("sql");
+      ds.handleUnknownProperty(
+          "configuration",
+          Map.of("dsn", "postgres://u:p@h:5432/d", "table", "public.device_definitions"));
+
+      assertThrows(IllegalArgumentException.class, () -> DatasourceParser.parse(ds));
+    }
+
+    @Test
+    @DisplayName("rejects columns without table")
+    void parseSql_withColumnsButNoTable_rejectsInvalidSelectInput() {
+      Datasource ds = new Datasource();
+      ds.setId("ds-select-invalid-columns");
+      ds.setType("sql");
+      ds.handleUnknownProperty(
+          "configuration", Map.of("dsn", "postgres://u:p@h:5432/d", "columns", List.of("*")));
+
+      assertThrows(IllegalArgumentException.class, () -> DatasourceParser.parse(ds));
+    }
   }
 
   // ─── buildDsn() ──────────────────────────────────────────────────────────
@@ -332,6 +452,25 @@ class DatasourceParserTest {
     }
 
     @Test
+    @DisplayName("keeps encoded password unchanged when building DSN")
+    void buildDsn_withEncodedPassword_keepsPasswordEncoded() throws Exception {
+      Datasource ds = new Datasource();
+      ds.setHost("db.local");
+      ds.setPort(5433);
+
+      String dsn =
+          DatasourceParser.buildDsn(
+              ds,
+              Map.of(
+                  "database", "testdb",
+                  "username", "admin",
+                  "password", "pa%24%24word",
+                  "ssl_mode", "require"));
+
+      assertEquals("postgres://admin:pa%24%24word@db.local:5433/testdb?sslmode=require", dsn);
+    }
+
+    @Test
     @DisplayName("builds DSN without password when password is null")
     void buildDsn_withoutPassword_omitsPassword() throws Exception {
       Datasource ds = new Datasource();
@@ -341,6 +480,39 @@ class DatasourceParserTest {
       String dsn = DatasourceParser.buildDsn(ds, Map.of("database", "testdb", "username", "admin"));
 
       assertEquals("postgres://admin@db.local:5432/testdb?sslmode=disable", dsn);
+    }
+
+    @Test
+    @DisplayName("merges credentials into DSN when DSN has no user info")
+    void mergeCredentialsIntoDsnIfMissing_withoutUserInfo_insertsCredentials() {
+      String dsn =
+          DatasourceParser.mergeCredentialsIntoDsnIfMissing(
+              "postgres://db.local:5432/testdb?sslmode=disable",
+              Map.of("username", "admin", "password", "secret"));
+
+      assertEquals("postgres://admin:secret@db.local:5432/testdb?sslmode=disable", dsn);
+    }
+
+    @Test
+    @DisplayName("keeps encoded password unchanged when inserting credentials into DSN")
+    void mergeCredentialsIntoDsnIfMissing_withEncodedPassword_keepsEncodedPassword() {
+      String dsn =
+          DatasourceParser.mergeCredentialsIntoDsnIfMissing(
+              "postgres://db.local:5432/testdb?sslmode=disable",
+              Map.of("username", "admin", "password", "pa%24%24word"));
+
+      assertEquals("postgres://admin:pa%24%24word@db.local:5432/testdb?sslmode=disable", dsn);
+    }
+
+    @Test
+    @DisplayName("keeps DSN unchanged when user info already exists")
+    void mergeCredentialsIntoDsnIfMissing_withUserInfo_keepsDsn() {
+      String dsn =
+          DatasourceParser.mergeCredentialsIntoDsnIfMissing(
+              "postgres://existing:secret@db.local:5432/testdb?sslmode=disable",
+              Map.of("username", "admin", "password", "secret"));
+
+      assertEquals("postgres://existing:secret@db.local:5432/testdb?sslmode=disable", dsn);
     }
 
     @Test
@@ -468,8 +640,8 @@ class DatasourceParserTest {
     }
 
     @Test
-    @DisplayName("URL-encodes special characters in credentials and database")
-    void buildDsn_specialCharactersInCredentials_encodedCorrectly() throws Exception {
+    @DisplayName("preserves already encoded password while encoding username and database")
+    void buildDsn_withEncodedPassword_preservesPasswordEncoding() throws Exception {
       Datasource ds = new Datasource();
       ds.setHost("db.local");
       ds.setPort(5432);
@@ -480,14 +652,12 @@ class DatasourceParserTest {
               Map.of(
                   "database", "my/db",
                   "username", "user@domain",
-                  "password", "p:ss/word"));
+                  "password", "p%3Ass%2Fword"));
 
       assertNotNull(dsn);
-      // Verify that special characters are percent-encoded
       assertTrue(dsn.contains("user%40domain"), "@ in username should be encoded");
-      assertTrue(dsn.contains("p%3Ass%2Fword"), ":/  in password should be encoded");
+      assertTrue(dsn.contains("p%3Ass%2Fword"), "encoded password should be preserved");
       assertTrue(dsn.contains("/my%2Fdb?"), "/ in database should be encoded");
-      // Verify the overall structure is still a valid postgres URI
       assertTrue(dsn.startsWith("postgres://user%40domain:p%3Ass%2Fword@db.local:5432/my%2Fdb"));
     }
   }

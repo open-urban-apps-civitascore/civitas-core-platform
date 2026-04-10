@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataSourceMapper;
 import de.civitascore.portal.model.embedded.ConnectorType;
-import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
@@ -17,6 +16,7 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
+import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
 import de.civitascore.portal.util.InvalidInputException;
@@ -48,6 +48,7 @@ class DataSourceServiceTest {
   @Mock private AssignmentService assignmentService;
   @Mock private DataStructureVersionService dataStructureVersionService;
   @Mock private DataSetRepository dataSetRepository;
+  @Mock private PipelineRepository pipelineRepository;
 
   @InjectMocks private DataSourceService dataSourceService;
 
@@ -276,8 +277,7 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-      when(dataSetRepository.existsByPipelinesDataSourcesIdAndDataSetStatusIn(any(), any()))
-          .thenReturn(false);
+      when(pipelineRepository.existsByDataSourcesId(any())).thenReturn(false);
 
       DataSource result = dataSourceService.unpublish(id);
 
@@ -294,8 +294,7 @@ class DataSourceServiceTest {
       entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      when(dataSetRepository.existsByPipelinesDataSourcesIdAndDataSetStatusIn(any(), any()))
-          .thenReturn(true);
+      when(pipelineRepository.existsByDataSourcesId(any())).thenReturn(true);
 
       assertThatThrownBy(() -> dataSourceService.unpublish(id))
           .isInstanceOf(ResourceInUseException.class);
@@ -322,15 +321,11 @@ class DataSourceServiceTest {
   class UpdatePublishedMetaTests {
 
     private void stubNotInUse(UUID id) {
-      when(dataSetRepository.existsByPipelinesDataSourcesIdAndDataSetStatusIn(
-              id, List.of(DataSetStatus.READY, DataSetStatus.AVAILABLE)))
-          .thenReturn(false);
+      when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(false);
     }
 
     private void stubInUse(UUID id) {
-      when(dataSetRepository.existsByPipelinesDataSourcesIdAndDataSetStatusIn(
-              id, List.of(DataSetStatus.READY, DataSetStatus.AVAILABLE)))
-          .thenReturn(true);
+      when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(true);
     }
 
     @Test

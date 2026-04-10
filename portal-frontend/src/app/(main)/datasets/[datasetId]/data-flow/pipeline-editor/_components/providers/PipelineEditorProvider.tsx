@@ -21,6 +21,7 @@ import {
   useGetPipelines,
   useUpdatePipeline,
 } from '@/app/services/api/pipelines/clientRequests'
+import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
 import { buildPipelinePayload } from '../../_services/payloadBuilderService'
@@ -408,6 +409,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
             sessionManager.updateSessionPipeline(session.id, updatedPipeline)
             sessionManager.markSessionClean(session.id)
           }
+          toast.success(t('header.saveSucces'))
         } catch {
           saveFailedNames.push(session.name)
         }
@@ -423,6 +425,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       setIsSavingAll(false)
     }
   }, [isSavingAll, sessionManager, createPipelineMutation, updatePipelineMutation, t])
+
+  useRegisterUnsavedChanges(hasAnyDirtySession, saveAllPipelines)
 
   // ===== Context Value =====
   const contextValue: ActivePipelineContextValue = useMemo(

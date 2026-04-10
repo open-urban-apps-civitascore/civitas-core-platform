@@ -81,7 +81,7 @@ const buildMappingProcessor = (node: PipelineNode): object | null => {
  *
  * This is a fixed template that is the same for all feed-in pipelines.
  * It replicates the switch + branch pattern from mqtt-to-frost.md.
- * Uses ${FROST_BASE} as env variable placeholder (backend resolves at deploy time).
+ * Uses ${FROST_BASE} as a placeholder that the config-adapter resolves before deployment.
  *
  * Note: eslint naming-convention is disabled for this function because
  * RedPandaConnect config uses snake_case property names (request_map, result_map,
@@ -114,6 +114,7 @@ const buildFrostSection = (): { processors: object[]; output: object } => {
                       verb: 'GET',
                       headers: {
                         Accept: 'application/json',
+                        Authorization: 'Basic YWRtaW46YWRtaW4=',
                       },
                       timeout: '10s',
                     },
@@ -135,9 +136,9 @@ const buildFrostSection = (): { processors: object[]; output: object } => {
                 '# POST vs PATCH als Metadaten setzen (für den switch output)',
                 'meta is_post   = !$exists',
                 'meta frost_url = if $exists {',
-                '  env("FROST_BASE") + "/Things(" + ($first."@iot.id").string() + ")"',
+                '  "${FROST_BASE}/Things(" + ($first."@iot.id").string() + ")"',
                 '} else {',
-                '  env("FROST_BASE") + "/Things"',
+                '  "${FROST_BASE}/Things"',
                 '}',
               ].join('\n'),
             },
@@ -168,6 +169,7 @@ const buildFrostSection = (): { processors: object[]; output: object } => {
                       verb: 'GET',
                       headers: {
                         Accept: 'application/json',
+                        Authorization: 'Basic YWRtaW46YWRtaW4=',
                       },
                       timeout: '10s',
                     },
@@ -189,7 +191,7 @@ const buildFrostSection = (): { processors: object[]; output: object } => {
                 '# POST vs PATCH als Metadaten setzen (für den switch output)',
                 'meta is_post   = $exists',
                 'meta frost_url = if $exists {',
-                '  env("FROST_BASE") + "/Observations"',
+                '  "${FROST_BASE}/Observations"',
                 '} ',
                 '',
                 'if $exists {',
@@ -227,6 +229,7 @@ const buildFrostSection = (): { processors: object[]; output: object } => {
               headers: {
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
+                Authorization: 'Basic YWRtaW46YWRtaW4=',
               },
               timeout: '30s',
               retries: 3,

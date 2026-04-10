@@ -7,6 +7,12 @@ vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }))
 
+vi.mock('@/components/ui/tooltip', () => ({
+  Tooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  TooltipTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  TooltipContent: ({ children }: { children: React.ReactNode }) => <div data-testid="tooltip-content">{children}</div>,
+}))
+
 const tabs: Tab<TestTab>[] = [
   { value: 'tab1', label: 'tabs.tab1' },
   { value: 'tab2', label: 'tabs.tab2' },
@@ -66,6 +72,12 @@ describe('SegmentedControlBar', () => {
 
     expect(screen.getByTestId('tab-tab2')).toBeDisabled()
     expect(screen.getByTestId('tab-tab3')).not.toBeDisabled()
+  })
+
+  test('renders tooltip content for disabled tab when disabledTabTooltips is provided', () => {
+    setup({ disabledTabs: ['tab2'], disabledTabTooltips: { tab2: 'Available after saving.' } })
+
+    expect(screen.getByTestId('tooltip-content')).toHaveTextContent('Available after saving.')
   })
 
   test('completed tabs show check icon', () => {

@@ -395,6 +395,15 @@ public class DataStructureVersionService
           "DataStructureVersion must contain a modelAtlasUri before publishing");
     }
 
+    // Validate that the model is actually retrievable from Model Atlas
+    if (findModelByAtlasUri(version.getModelAtlasUri()).isEmpty()) {
+      throw new InvalidInputException(
+          "modelAtlasUri",
+          id,
+          "Cannot publish: no model found in Model Atlas for modelAtlasUri "
+              + version.getModelAtlasUri());
+    }
+
     version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
     return dataStructureVersionRepository.save(version);
   }

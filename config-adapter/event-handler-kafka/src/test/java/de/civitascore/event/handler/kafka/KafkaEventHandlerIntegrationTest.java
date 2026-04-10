@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.Constants;
 import de.civitascore.configadapter.adapter.ConfigAdapter;
+import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.configuration.AppConfig;
 import de.civitascore.configadapter.exception.AdapterException;
 import de.civitascore.configadapter.exception.FatalAdapterException;
@@ -307,6 +308,9 @@ class KafkaEventHandlerIntegrationTest extends AbstractKafkaIntegrationTest {
     private List<String> subscribedTopics = null;
     private final AtomicInteger attemptCount = new AtomicInteger(0);
     private boolean shouldFailOnce = false;
+
+    @Override
+    public void initialize(AdapterConfig config) {}
 
     public void setShouldFailOnce(boolean shouldFail) {
       this.shouldFailOnce = shouldFail;

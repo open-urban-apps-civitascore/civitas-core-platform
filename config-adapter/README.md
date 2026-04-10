@@ -160,7 +160,53 @@ apisix.topics=de.civitascore.api.backend.created,de.civitascore.api.backend.upda
 
 **Documentation:** For detailed documentation including event formats, error handling, and integration examples, see [APISIX Adapter Documentation](config-adapter-apisix/README.md).
 
-### 7. config-adapter-examples
+### 7. config-adapter-redpanda
+Production implementation of RedPanda Connect adapter for managing data pipelines.
+
+**Key Components:**
+- `RedpandaAdapter` - Manages RedPanda Connect data pipelines via Streams API
+- `RedpandaSagaHandler` - Saga orchestration for multi-pipeline dataset operations
+
+**Supported Operations:**
+- CREATE - Create new data pipelines (idempotent: HTTP 409 → success)
+- UPDATE - Update existing pipelines or create if absent (upsert)
+- DELETE - Delete pipelines (idempotent: HTTP 404 → success)
+
+**Subscribed Topics:**
+- `de.civitascore.data.pipeline.created`
+- `de.civitascore.data.pipeline.updated`
+- `de.civitascore.data.pipeline.deleted`
+
+**Saga Topics:**
+- `de.civitascore.dataset.redpanda.execute`
+- `de.civitascore.dataset.redpanda.compensate`
+
+**Configuration Properties:**
+```properties
+# RedPanda Connect Streams API URL (default: http://localhost:4195)
+redpanda.url=http://localhost:4195
+
+# Topics to subscribe to
+redpanda.topics=de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
+
+# Master key for encrypted credentials (optional, only needed for ENC(...) values)
+# CIVITAS_MASTER_KEY=<256-bit hex-encoded key>
+```
+
+**Features:**
+- Full CRUD operations for RedPanda Connect data pipelines
+- Automatic JSON-to-YAML conversion for pipeline definitions
+- AES-256-GCM credential decryption for sensitive pipeline configuration
+- Idempotent operations with automatic conflict and not-found handling
+- Saga orchestration with forward execution and compensation (rollback)
+- Datasource injection and placeholder resolution for reusable pipeline templates
+- Comprehensive error handling with HTTP status-based categorization
+
+**Usage:** Production-ready adapter that integrates with RedPanda Connect for streaming data pipeline management.
+
+**Documentation:** For detailed documentation including event formats, credential encryption, error handling, and integration examples, see [RedPanda Adapter Documentation](config-adapter-redpanda/README.md).
+
+### 8. config-adapter-examples
 Example adapter implementations for reference and testing.
 
 **Key Components:**
@@ -191,7 +237,7 @@ The framework supports configuring multiple adapters to run independently. Each 
 
 **Multiple Adapters (comma-separated short names)**
 ```properties
-adapters=keycloak,apisix,dummylog
+adapters=keycloak,apisix,redpanda,dummylog
 eventhandler.name=kafka
 ```
 

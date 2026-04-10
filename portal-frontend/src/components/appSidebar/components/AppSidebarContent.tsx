@@ -1,13 +1,11 @@
 'use client'
 
-import { ChevronRight } from 'lucide-react'
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
+import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { usePermissions } from '@/hooks/use-permissions'
 
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible'
 import {
   SidebarContent,
   SidebarGroup,
@@ -15,11 +13,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
 } from '../../ui/sidebar'
 import { appSidebarNavSections, NavItem } from '../appSidebarItems'
+import { CollapsibleNavItem } from './CollapsibleNavItem'
 
 export const AppSidebarContent = () => {
   const tNav = useTranslations('sidebar')
@@ -53,34 +49,12 @@ export const AppSidebarContent = () => {
           <SidebarMenu>
             {section.items.map(item =>
               item.items ? (
-                <Collapsible key={item.title} asChild defaultOpen={item.isActive} className="group/collapsible">
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        tooltip={tNav(item.title)}
-                        className="cursor-pointer"
-                        isActive={item.items.some(subItem => pathname === subItem.url)}
-                      >
-                        {item.icon && <item.icon />}
-                        <span>{tNav(item.title)}</span>
-                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {item.items.map(subItem => (
-                          <SidebarMenuSubItem key={subItem.title} data-testid={`sidebarMenuItem-${subItem.title}`}>
-                            <SidebarMenuSubButton asChild isActive={pathname === subItem.url}>
-                              <Link href={subItem.url}>
-                                <span>{tNav(subItem.title)}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
+                <CollapsibleNavItem
+                  key={item.title}
+                  item={item as NavItem & { items: NavItem[] }}
+                  pathname={pathname}
+                  tNav={tNav}
+                />
               ) : (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild tooltip={tNav(item.title)} isActive={pathname === item.url}>
@@ -90,10 +64,10 @@ export const AppSidebarContent = () => {
                         <span>{tNav(item.title)}</span>
                       </a>
                     ) : (
-                      <Link href={item.url}>
+                      <GuardedLink href={item.url}>
                         {item.icon && <item.icon />}
                         <span>{tNav(item.title)}</span>
-                      </Link>
+                      </GuardedLink>
                     )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>

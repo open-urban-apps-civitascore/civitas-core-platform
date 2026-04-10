@@ -1,17 +1,13 @@
 import { PaginationState, SortingState } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { useGetGroups } from '@/app/services/api/groups/clientRequests'
-import { ContentCard } from '@/components/content-card/ContentCard'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
-import { PageBackground } from '@/components/page-background/PageBackground'
-import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 import { UserFormData } from '@/types/users'
 import { mapGroupsApiToListData } from '@/utils/groups'
 
@@ -38,44 +34,36 @@ export const GroupsTab = (props: GroupsTabProps) => {
   const [groupToRemove, setGroupToRemove] = useState<string | null>(null)
   const [isWarningModalOpen, setIsWarningModalOpen] = useState(false)
 
-  const getGroupsRequestParams = () => {
+  // Send all group IDs + page/size/sort/search to server (same pattern as UsersTab in groups)
+  const groupParams = useMemo(() => {
     const params = new URLSearchParams()
-    formValues.groupIds.forEach(group => {
-      params.append('id', group)
-    })
+    formValues.groupIds.forEach(id => params.append('id', id))
+    params.set('page', String(pageIndex))
+    params.set('size', String(pageSize))
+    if (sorting.length > 0) {
+      params.set('sort', `${sorting[0].id},${sorting[0].desc ? 'desc' : 'asc'}`)
+    }
+    if (searchString) {
+      params.set('name', searchString)
+    }
     return params
-  }
+  }, [formValues.groupIds, pageIndex, pageSize, sorting, searchString])
 
   const {
     data: groupsData,
     isFetching: isLoadingGroups,
     error: groupsError,
-  } = useGetGroups({ isEnabled: formValues.groupIds.length > 0, params: getGroupsRequestParams() })
+  } = useGetGroups({ isEnabled: formValues.groupIds.length > 0, params: groupParams })
 
-  const groups = useMemo(() => {
-    if (groupsData) {
-      const userGroups = groupsData?.data.filter(group => formValues.groupIds?.includes(group.id))
-      return mapGroupsApiToListData(userGroups)
-    } else {
-      return []
-    }
-  }, [groupsData, formValues])
+  const groups = useMemo(() => mapGroupsApiToListData(groupsData?.data || []), [groupsData])
 
-  const filteredGroups = useMemo(() => {
-    if (searchString) {
-      return groups.filter(
-        group =>
-          group.name.toLowerCase().includes(searchString.toLowerCase()) ||
-          group.contactUser?.name.toLowerCase().includes(searchString.toLowerCase()) ||
-          group.description.toLowerCase().includes(searchString.toLowerCase()),
-      )
-    } else {
-      return groups
-    }
-  }, [groups, searchString])
-
-  const rowCount = groups.length
+  const rowCount = groupsData?.totalElements || 0
   const totalPages = Math.ceil(rowCount / pageSize) || 1
+
+  // Reset to first page when group list changes (add/remove)
+  useEffect(() => {
+    setPageIndex(0)
+  }, [formValues.groupIds.length])
 
   const isLoading = isLoadingGroups
   const error = groupsError
@@ -99,49 +87,46 @@ export const GroupsTab = (props: GroupsTabProps) => {
   const GroupsAssignmentButton = (
     <Button onClick={() => setIsGroupAssignmentModalOpen(true)}>{t('groupsTab.addGroup')}</Button>
   )
+  if (isLoading) <LoadingSpinner className="h-full" />
+  if (error) <p className="h-full flex items-center justify-center">{tCommon('errors.loadingError')}</p>
   return (
-    <PageBackground hasBackground={!isReadOnly}>
-      <ContentCard className={cn(!error && !isLoading ? 'h-full' : 'h-50')}>
-        {!error && !isLoading && (
-          <>
-            <SubHeader title={t('groupsTab.title')} customElement={!isReadOnly ? GroupsAssignmentButton : undefined} />
-            <SearchHeader searchString={searchString} onChangeSearchString={setSearchString} className="my-2" />
-            <TableContainer className="[--search-height:calc(--spacing(30))]">
-              <GroupsTable
-                groups={filteredGroups}
-                rowCount={rowCount}
-                pageIndex={pageIndex}
-                pageSize={pageSize}
-                onPaginationChange={handlePagination}
-                sorting={sorting}
-                onSortingChange={setSorting}
-                totalPages={totalPages}
-                isLoading={isLoading}
-                onRemoveGroupClick={handleRemoveGroupClick}
-                isReadOnly={isReadOnly}
-              />
-            </TableContainer>
-          </>
-        )}
-        <GroupAssignmentModal
-          open={isGroupAssignmentModalOpen}
-          userName={`${formValues.firstName} ${formValues.lastName}`}
-          assignedGroups={formValues.groupIds}
-          onAssignGroups={onAssignGroups}
-          onOpenChange={setIsGroupAssignmentModalOpen}
+    <>
+      <SearchHeader
+        searchString={searchString}
+        onChangeSearchString={setSearchString}
+        customElement={!isReadOnly ? GroupsAssignmentButton : undefined}
+      />
+      <TableContainer shouldRespectSearchHeight>
+        <GroupsTable
+          groups={groups}
+          rowCount={rowCount}
+          pageIndex={pageIndex}
+          pageSize={pageSize}
+          onPaginationChange={handlePagination}
+          sorting={sorting}
+          onSortingChange={setSorting}
+          totalPages={totalPages}
+          isLoading={isLoading}
+          onRemoveGroupClick={handleRemoveGroupClick}
+          isReadOnly={isReadOnly}
         />
-        <WarningModal
-          title={tGroups('users.removeUserModal.title')}
-          description={tGroups('users.removeUserModal.description')}
-          open={isWarningModalOpen}
-          confirmButtonTitle={tCommon('actions.remove')}
-          onOpenChange={setIsWarningModalOpen}
-          onDiscard={() => setIsWarningModalOpen(false)}
-          onConfirm={handleWarningModalConfirm}
-        />
-        {isLoading && <LoadingSpinner className="h-full" />}
-        {error && <p className="h-full flex items-center justify-center">{tCommon('errors.loadingError')}</p>}
-      </ContentCard>
-    </PageBackground>
+      </TableContainer>
+      <GroupAssignmentModal
+        open={isGroupAssignmentModalOpen}
+        userName={`${formValues.firstName} ${formValues.lastName}`}
+        assignedGroups={formValues.groupIds}
+        onAssignGroups={onAssignGroups}
+        onOpenChange={setIsGroupAssignmentModalOpen}
+      />
+      <WarningModal
+        title={tGroups('users.removeUserModal.title')}
+        description={tGroups('users.removeUserModal.description')}
+        open={isWarningModalOpen}
+        confirmButtonTitle={tCommon('actions.remove')}
+        onOpenChange={setIsWarningModalOpen}
+        onDiscard={() => setIsWarningModalOpen(false)}
+        onConfirm={handleWarningModalConfirm}
+      />
+    </>
   )
 }

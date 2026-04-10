@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import messages from '@/messages/de.json'
 import { PERMISSION_NAMES } from '@/types/currentUser'
+import { hasAssignmentChanges } from '@/utils/assignments'
 
 import { GroupRoleAssignmentTable } from './AccessManagementTable'
 import { GenericAssignmentsList } from './GenericAssignmentsList'
@@ -29,6 +30,17 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
   useGetCurrentUser: vi.fn(),
 }))
 
+const { hasAssignmentChanges: realHasAssignmentChanges } =
+  await vi.importActual<typeof import('@/utils/assignments')>('@/utils/assignments')
+
+vi.mock('@/utils/assignments', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/utils/assignments')>()
+  return {
+    ...actual,
+    hasAssignmentChanges: vi.fn(actual.hasAssignmentChanges),
+  }
+})
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: vi.fn(),
@@ -51,6 +63,7 @@ const mockAssignments: GroupRoleAssignmentTable[] = [
 
 describe('GenericAssignmentsList', () => {
   beforeEach(() => {
+    vi.mocked(hasAssignmentChanges).mockImplementation(realHasAssignmentChanges)
     vi.mocked(useGetCurrentUser).mockReturnValue({
       data: {
         username: 'test',
@@ -218,6 +231,84 @@ describe('GenericAssignmentsList', () => {
         const submitButton = screen.getByRole('button', { name: /speichern/i })
         expect(submitButton).toBeDisabled()
       })
+    })
+
+    it('calls onExit when exit button is clicked with no changes', async () => {
+      const onExit = vi.fn()
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...defaultProps} onExit={onExit} />
+        </NextIntlClientProvider>,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: /bearbeiten/i }))
+      await waitFor(() => screen.getByRole('button', { name: /beenden/i }))
+      fireEvent.click(screen.getByRole('button', { name: /beenden/i }))
+
+      expect(onExit).toHaveBeenCalledOnce()
+    })
+
+    it('calls onExit when discarding changes via exit modal', async () => {
+      const onExit = vi.fn()
+      // Make hasAssignmentChanges return true so the exit modal appears without UI interaction
+      vi.mocked(hasAssignmentChanges).mockReturnValue(true)
+
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...defaultProps} onExit={onExit} />
+        </NextIntlClientProvider>,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: /bearbeiten/i }))
+      await waitFor(() => screen.getByRole('button', { name: /beenden/i }))
+      fireEvent.click(screen.getByRole('button', { name: /beenden/i }))
+      await waitFor(() => screen.getByRole('button', { name: /verwerfen/i }))
+      fireEvent.click(screen.getByRole('button', { name: /verwerfen/i }))
+
+      expect(onExit).toHaveBeenCalledOnce()
+    })
+
+    it('calls onExit after successfully saving via exit modal', async () => {
+      const onExit = vi.fn()
+      const onPatchEntity = vi.fn().mockResolvedValue(undefined)
+      // Make hasAssignmentChanges return true so the exit modal appears without UI interaction
+      vi.mocked(hasAssignmentChanges).mockReturnValue(true)
+
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...defaultProps} onPatchEntity={onPatchEntity} onExit={onExit} />
+        </NextIntlClientProvider>,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: /bearbeiten/i }))
+      await waitFor(() => screen.getByRole('button', { name: /beenden/i }))
+      fireEvent.click(screen.getByRole('button', { name: /beenden/i }))
+      await waitFor(() => screen.getByRole('button', { name: /speichern/i }))
+      fireEvent.click(screen.getByRole('button', { name: /speichern/i }))
+
+      await waitFor(() => expect(onExit).toHaveBeenCalledOnce())
+    })
+
+    it('does not call onExit when saving via exit modal fails', async () => {
+      const onExit = vi.fn()
+      const onPatchEntity = vi.fn().mockRejectedValue(new Error('save failed'))
+      // Make hasAssignmentChanges return true so the exit modal appears without UI interaction
+      vi.mocked(hasAssignmentChanges).mockReturnValue(true)
+
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...defaultProps} onPatchEntity={onPatchEntity} onExit={onExit} />
+        </NextIntlClientProvider>,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: /bearbeiten/i }))
+      await waitFor(() => screen.getByRole('button', { name: /beenden/i }))
+      fireEvent.click(screen.getByRole('button', { name: /beenden/i }))
+      await waitFor(() => screen.getByRole('button', { name: /speichern/i }))
+      fireEvent.click(screen.getByRole('button', { name: /speichern/i }))
+
+      await waitFor(() => expect(onPatchEntity).toHaveBeenCalled())
+      expect(onExit).not.toHaveBeenCalled()
     })
 
     it('does not call onPatchEntity when submit button is disabled', async () => {

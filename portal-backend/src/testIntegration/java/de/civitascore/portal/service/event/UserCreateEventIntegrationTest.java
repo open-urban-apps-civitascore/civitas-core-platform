@@ -35,6 +35,12 @@ class UserCreateEventIntegrationTest extends BaseEventPublishingIntegrationTest 
               assertThat(keycloakUser.getFirstName()).isEqualTo(input.getFirstName());
               assertThat(keycloakUser.getLastName()).isEqualTo(input.getLastName());
               assertThat(keycloakUser.getId()).isEqualTo(createdUser.getExternalId());
+              assertThat(keycloakUser.isEmailVerified())
+                  .as("emailVerified should be false for a newly created user")
+                  .isFalse();
+              assertThat(keycloakUser.getRequiredActions())
+                  .as("New user should be required to verify email and update password")
+                  .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD");
             });
   }
 
@@ -56,6 +62,12 @@ class UserCreateEventIntegrationTest extends BaseEventPublishingIntegrationTest 
               assertThat(keycloakUser.getFirstName()).isEqualTo("John");
               assertThat(keycloakUser.getLastName()).isEqualTo("Doe");
               assertThat(keycloakUser.getUsername()).isEqualTo(input.getEmail());
+              assertThat(keycloakUser.isEmailVerified())
+                  .as("emailVerified should be false for a newly created user")
+                  .isFalse();
+              assertThat(keycloakUser.getRequiredActions())
+                  .as("New user should be required to verify email and update password")
+                  .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD");
             });
   }
 }

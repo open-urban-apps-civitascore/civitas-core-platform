@@ -23,8 +23,21 @@ const ibmPlexMono = IBM_Plex_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'CIVITAS/Core v2',
-  description: 'The frontend vor CIVITAS/Core v2',
+  title: 'CIVITAS/CORE V2',
+  description: 'The frontend vor CIVITAS/CORE V2',
+  icons: {
+    icon: [
+      { url: '/favicon-light.ico' },
+      {
+        url: '/favicon-light.ico',
+        media: '(prefers-color-scheme: light)',
+      },
+      {
+        url: '/favicon-dark.ico',
+        media: '(prefers-color-scheme: dark)',
+      },
+    ],
+  },
 }
 
 interface RootLayoutProps {

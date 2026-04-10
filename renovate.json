@@ -10,9 +10,11 @@
   "semanticCommits": "enabled",
   "separateMajorMinor": true,
   "separateMultipleMajor": true,
+  "minimumReleaseAge": "7 days",
   "vulnerabilityAlerts": {
     "labels": ["security"],
-    "assignees": []
+    "assignees": [],
+    "minimumReleaseAge": "0 days"
   },
   "packageRules": [
     {
@@ -25,9 +27,24 @@
     {
       "description": "Backend dependencies (Spring Boot)",
       "matchFileNames": ["portal-backend/**"],
-      "groupName": "backend dependencies",
       "commitMessagePrefix": "chore(backend):",
+      "reviewers": ["franklex", "jonasfrz", "lukas.wydra"],
+      "reviewersSampleSize": 1,
       "addLabels": ["cop backend", "team data mgmt"]
+    },
+    {
+      "description": "Automerge minor and patch updates for linting and testing packages",
+      "matchFileNames": ["portal-backend/**"],
+      "matchPackageNames": [
+        "org.testcontainers:testcontainers**",
+        "org.apache.maven.plugins:maven-failsafe-plugin",
+        "org.apache.maven.plugins:maven-surefire-plugin",
+        "org.jacoco:jacoco-maven-plugin",
+        "com.diffplug.spotless:spotless-maven-plugin",
+        "org.wiremock.integrations:wiremock-spring-boot"
+      ],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
     },
     {
       "description": "Config Adapter dependencies",

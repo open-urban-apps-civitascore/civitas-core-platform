@@ -987,15 +987,16 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should return inUse=false when DataSource is only referenced by a DRAFT DataSet")
-    void shouldReturnInUseFalseWhenOnlyDraftDataSetReferences() {
+    @DisplayName(
+        "Should return inUse=true when DataSource is referenced by a Pipeline in a DRAFT DataSet")
+    void shouldReturnInUseTrueWhenReferencedByPipelineInDraftDataSet() {
       DataSource dataSource = createAvailableDataSource();
       linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.DRAFT);
 
       ResponseEntity<DataSourceOutputDTO> response = performGetById(dataSource.getId());
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody().isInUse()).isFalse();
+      assertThat(response.getBody().isInUse()).isTrue();
     }
 
     @Test
@@ -1284,15 +1285,15 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should allow unpublish when DataSource is only referenced by a DRAFT DataSet")
-    void shouldAllowUnpublishWhenOnlyDraftDataSetReferences() {
+    @DisplayName(
+        "Should return 409 when unpublishing a DataSource referenced by a Pipeline in a DRAFT DataSet")
+    void shouldReturn409WhenInUseByDraftDataSet() {
       DataSource dataSource = createAvailableDataSource();
       linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.DRAFT);
 
-      ResponseEntity<DataSourceOutputDTO> response = performUnpublish(dataSource.getId());
+      ResponseEntity<String> response = performUnpublishExpectingError(dataSource.getId());
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody().getDataSourceStatus()).isEqualTo(DataSourceStatus.DRAFT);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
   }
 }

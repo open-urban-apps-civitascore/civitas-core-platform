@@ -36,7 +36,13 @@ public class BackoffCalculator {
     if (attempt <= 0) {
       throw new IllegalArgumentException("attempt must be positive, got: " + attempt);
     }
-    long backoff = initialBackoffMs * (long) Math.pow(2, attempt - 1);
+    // Cap the shift to avoid long overflow: once 2^n exceeds maxBackoffMs/initialBackoffMs,
+    // the result would be capped anyway, so we can short-circuit.
+    int shift = attempt - 1;
+    if (shift >= Long.SIZE - 1 || initialBackoffMs > maxBackoffMs / (1L << Math.min(shift, 62))) {
+      return maxBackoffMs;
+    }
+    long backoff = initialBackoffMs * (1L << shift);
     return Math.min(backoff, maxBackoffMs);
   }
 }

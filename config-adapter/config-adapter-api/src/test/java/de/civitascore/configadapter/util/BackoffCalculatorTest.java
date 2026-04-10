@@ -92,4 +92,15 @@ class BackoffCalculatorTest {
     BackoffCalculator calculator = new BackoffCalculator(1000L, 60000L);
     assertThrows(IllegalArgumentException.class, () -> calculator.calculate(-1));
   }
+
+  @Test
+  @DisplayName("Should return maxBackoff for very high attempt numbers without overflow")
+  void calculate_highAttempt_capsWithoutOverflow() {
+    BackoffCalculator calculator = new BackoffCalculator(1000L, 30000L);
+
+    assertEquals(30000L, calculator.calculate(63));
+    assertEquals(30000L, calculator.calculate(64));
+    assertEquals(30000L, calculator.calculate(100));
+    assertEquals(30000L, calculator.calculate(Integer.MAX_VALUE));
+  }
 }

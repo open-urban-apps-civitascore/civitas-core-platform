@@ -84,7 +84,7 @@ describe('DatastructureTab', () => {
 
     const trigger = screen.getByLabelText('Open menu')
     fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' })
-    fireEvent.click(screen.getByText('fromPlatform'))
+    fireEvent.click(screen.getByText('import.fromPlatform'))
 
     expect(screen.getByTestId('dataModelImportModal')).toBeInTheDocument()
   })
