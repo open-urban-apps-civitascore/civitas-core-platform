@@ -9,8 +9,18 @@ package de.civitascore.portal.model.embedded;
  *   <li>AVAILABLE: Dataset is available for consumption
  * </ul>
  */
-public enum DataSetStatus {
+public enum DataSetStatus implements ReleasableStatus {
   DRAFT,
   READY,
-  AVAILABLE
+  AVAILABLE;
+
+  @Override
+  public boolean isDraft() {
+    return this == DRAFT;
+  }
+
+  @Override
+  public boolean isAvailable() {
+    return this == AVAILABLE;
+  }
 }
