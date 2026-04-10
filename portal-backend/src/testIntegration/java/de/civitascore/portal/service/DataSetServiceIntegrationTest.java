@@ -252,7 +252,8 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
       assertThatThrownBy(() -> dataSetService.markReady(dataSet.getId()))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("DataSet must contain at least one Pipeline before marking as ready");
+          .hasMessageContaining(
+              "DataSet must contain at least one Pipeline before marking as ready");
     }
   }
 }
