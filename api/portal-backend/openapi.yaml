@@ -40,6 +40,43 @@ tags:
 - name: DataSources
   description: Data source management endpoints
 paths:
+  /users/{userId}/groups:
+    put:
+      tags:
+      - Users
+      summary: Replace user group memberships
+      description: Replaces all group memberships for a user with the provided list
+        of group IDs.
+      operationId: replaceUserGroups
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+                format: uuid
+        required: true
+      responses:
+        "200":
+          description: Group memberships updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserOutputDTO"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   /users/{id}:
     get:
       tags:
@@ -363,73 +400,6 @@ paths:
                     status: 409
                     detail: Referenced entity does not exist
                     instance: "/users/{id}"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
-  /users/{id}/groups:
-    put:
-      operationId: replaceUserGroups
-      summary: Replace user group memberships
-      description: Replaces all group memberships for a user with the provided list
-        of group IDs.
-      tags:
-      - Users
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: array
-              items:
-                type: string
-                format: uuid
-      responses:
-        "200":
-          description: Group memberships updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserOutputDTO"
-        "400":
-          description: One or more group IDs do not exist
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-              examples:
-                group_not_found:
-                  summary: group_not_found
-                  value:
-                    type: urn:civitas:error:NOT_FOUND
-                    title: Bad Request
-                    status: 400
-                    detail: "One or more group IDs do not exist"
-                    instance: "/users/{id}/groups"
-        "404":
-          description: User not found
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-              examples:
-                not_found:
-                  summary: not_found
-                  value:
-                    type: urn:civitas:error:NOT_FOUND
-                    title: Not Found
-                    status: 404
-                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
-                    instance: "/users/{id}/groups"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -1459,17 +1429,51 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /datastructures/{dataStructureId}/versions/{versionId}/published/meta:
+  /datastructures/{id}/released/meta:
+    put:
+      tags:
+      - Data Structures
+      summary: Update released metadata
+      description: Updates metadata of a released entity. Only works on entities that
+        are not in DRAFT status.
+      operationId: updateReleasedDataStructureMeta
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataStructureInputDTO"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataStructureOutputDTO"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /datastructures/{dataStructureId}/versions/{versionId}/released/meta:
     put:
       tags:
       - Data Structure Versions
-      summary: Update metadata of a published data structure version
-      description: "Updates a published data structure version (AVAILABLE status).\
+      summary: Update metadata of a released data structure version
+      description: "Updates a released data structure version (AVAILABLE status).\
         \ If the version is not in use by any DataSource, all fields including model,\
         \ modelAtlasUri, version, and styles can be updated. If the version is in\
         \ use, only description and modelName can be changed. For DRAFT versions,\
         \ use PUT /datastructures/{dataStructureId}/versions/{versionId} instead."
-      operationId: updateDataStructureVersionPublishedMeta
+      operationId: updateDataStructureVersionReleasedMeta
       parameters:
       - name: dataStructureId
         in: path
@@ -1491,7 +1495,7 @@ paths:
         required: true
       responses:
         "200":
-          description: Published version metadata updated successfully
+          description: Released version metadata updated successfully
           content:
             application/json:
               schema:
@@ -1510,7 +1514,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: "Validation failed: name must not be blank"
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/published/meta"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/released/meta"
                 validation_failed:
                   summary: validation_failed
                   value:
@@ -1518,7 +1522,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: Request body validation failed
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/published/meta"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/released/meta"
                 malformed_request:
                   summary: malformed_request
                   value:
@@ -1526,7 +1530,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: Failed to read request body
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/published/meta"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/released/meta"
         "404":
           description: Data structure version not found
           content:
@@ -1541,7 +1545,7 @@ paths:
                     title: Not Found
                     status: 404
                     detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/published/meta"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/released/meta"
         "409":
           description: Conflict (e.g. unique constraint violation)
           content:
@@ -1556,7 +1560,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: A resource with this name already exists
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/published/meta"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/released/meta"
                 resource_in_use:
                   summary: resource_in_use
                   value:
@@ -1564,7 +1568,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: "Cannot delete: resource is referenced by other entities"
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/published/meta"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/released/meta"
                 foreign_key_violation:
                   summary: foreign_key_violation
                   value:
@@ -1572,7 +1576,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: Referenced entity does not exist
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/published/meta"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/released/meta"
         "502":
           description: Model Atlas upload failed
           content:
@@ -1587,7 +1591,7 @@ paths:
                     title: Bad Gateway
                     status: 502
                     detail: Model Atlas upload failed
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/published/meta"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/released/meta"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -1968,41 +1972,6 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /datastructures/{dataStructureId}/published/meta:
-    put:
-      tags:
-      - Data Structures
-      summary: Update metadata of a published data structure
-      description: "Updates only the metadata (name, description) of a published data\
-        \ structure (AVAILABLE status). Cannot modify status or createdFromDataSource.\
-        \ For DRAFT data structures, use PUT /datastructures/{dataStructureId} instead."
-      operationId: updateDataStructurePublishedMeta
-      parameters:
-      - name: dataStructureId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DataStructureInputDTO"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DataStructureOutputDTO"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
   /datasources/{id}:
     get:
       tags:
@@ -2332,14 +2301,14 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /datasources/{id}/published/meta:
+  /datasources/{id}/released/meta:
     put:
       tags:
       - DataSources
-      summary: Update metadata of a published data source
-      description: "Updates name, description, connector configuration, and assignments\
-        \ on a data source in AVAILABLE status."
-      operationId: updateDataSourcePublishedMeta
+      summary: Update released metadata
+      description: Updates metadata of a released entity. Only works on entities that
+        are not in DRAFT status.
+      operationId: updateReleasedDataSourceMeta
       parameters:
       - name: id
         in: path
@@ -2412,8 +2381,8 @@ paths:
       tags:
       - DataSets
       summary: Update a DRAFT dataset
-      description: "Updates a dataset in DRAFT status. For published datasets (READY\
-        \ or AVAILABLE), use PUT /datasets/{id}/published/meta instead."
+      description: "Updates a dataset in DRAFT status. For released datasets (READY\
+        \ or AVAILABLE), use PUT /datasets/{id}/released/meta instead."
       operationId: updateDataSet
       parameters:
       - name: id
@@ -2523,9 +2492,9 @@ paths:
       - DataSets
       summary: Delete a dataset
       description: "Deletes a DRAFT dataset immediately (204 No Content). READY datasets\
-        \ cannot be deleted — unpublish first. AVAILABLE datasets cannot be deleted\
-        \ directly — unrelease first (POST /{id}/unrelease) to tear down infrastructure,\
-        \ then delete."
+        \ cannot be deleted — mark as draft first (POST /{id}/markDraft). AVAILABLE\
+        \ datasets cannot be deleted directly — unrelease first (POST /{id}/unrelease)\
+        \ to tear down infrastructure, then delete."
       operationId: deleteDataSet
       parameters:
       - name: id
@@ -2699,15 +2668,14 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /datasets/{id}/published/meta:
+  /datasets/{id}/released/meta:
     put:
       tags:
       - DataSets
-      summary: Update metadata of a published dataset
-      description: "Updates only the metadata (name, description) of a published dataset\
-        \ (READY or AVAILABLE status). Cannot modify persistenceId or pipelines. For\
-        \ DRAFT datasets, use PUT /datasets/{id} instead."
-      operationId: updateDataSetPublishedMeta
+      summary: Update released metadata
+      description: Updates metadata of a released entity. Only works on entities that
+        are not in DRAFT status.
+      operationId: updateReleasedDataSetMeta
       parameters:
       - name: id
         in: path
@@ -2722,12 +2690,37 @@ paths:
               $ref: "#/components/schemas/DataSetInputDTO"
         required: true
       responses:
-        "200":
-          description: OK
+        "409":
+          description: Conflict (saga is in-flight for this dataset)
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: "#/components/schemas/DataSetOutputDTO"
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datasets/{id}/released/meta"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datasets/{id}/released/meta"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datasets/{id}/released/meta"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -3591,7 +3584,7 @@ paths:
           example: group-456
       - name: memberIds
         in: query
-        description: Filter by member user ID(s), comma-separated.
+        description: "Filter by member user ID(s), comma-separated."
         schema:
           type: string
           example: user-456
@@ -3904,6 +3897,60 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  /datastructures/{id}/unrelease:
+    post:
+      tags:
+      - Data Structures
+      summary: Unrelease
+      description: Transitions the entity from AVAILABLE back to DRAFT status.
+      operationId: unreleaseDataStructure
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataStructureOutputDTO"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /datastructures/{id}/release:
+    post:
+      tags:
+      - Data Structures
+      summary: Release
+      description: Transitions the entity from DRAFT to AVAILABLE status.
+      operationId: releaseDataStructure
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataStructureOutputDTO"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   /datastructures/{dataStructureId}/versions:
     post:
       tags:
@@ -4012,15 +4059,15 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /datastructures/{dataStructureId}/versions/{versionId}/unpublish:
+  /datastructures/{dataStructureId}/versions/{versionId}/unrelease:
     post:
       tags:
       - Data Structure Versions
-      summary: Unpublish a data structure version
-      description: Unpublishes a data structure version by setting status back to
-        DRAFT. Cannot unpublish if this is the only published version of a published
-        DataStructure - unpublish the DataStructure first in that case.
-      operationId: unpublishDataStructureVersion
+      summary: Unrelease a data structure version
+      description: Unreleases a data structure version by setting status back to DRAFT.
+        Cannot unrelease if this is the only released version of a released DataStructure
+        - unrelease the DataStructure first in that case.
+      operationId: unreleaseDataStructureVersion
       parameters:
       - name: dataStructureId
         in: path
@@ -4036,13 +4083,13 @@ paths:
           format: uuid
       responses:
         "200":
-          description: Data structure version unpublished successfully
+          description: Data structure version unreleased successfully
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/DataStructureVersionOutputDTO"
         "400":
-          description: Invalid input (e.g. already in DRAFT or only published version)
+          description: Invalid input (e.g. already in DRAFT or only released version)
           content:
             application/problem+json:
               schema:
@@ -4055,7 +4102,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: "Validation failed: name must not be blank"
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unpublish"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unrelease"
                 validation_failed:
                   summary: validation_failed
                   value:
@@ -4063,7 +4110,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: Request body validation failed
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unpublish"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unrelease"
                 malformed_request:
                   summary: malformed_request
                   value:
@@ -4071,7 +4118,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: Failed to read request body
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unpublish"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unrelease"
         "404":
           description: Data structure version not found
           content:
@@ -4086,7 +4133,7 @@ paths:
                     title: Not Found
                     status: 404
                     detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unpublish"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unrelease"
         "409":
           description: Conflict (version is in use by a DataSource)
           content:
@@ -4101,7 +4148,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: A resource with this name already exists
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unpublish"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unrelease"
                 resource_in_use:
                   summary: resource_in_use
                   value:
@@ -4109,7 +4156,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: "Cannot delete: resource is referenced by other entities"
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unpublish"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unrelease"
                 foreign_key_violation:
                   summary: foreign_key_violation
                   value:
@@ -4117,21 +4164,21 @@ paths:
                     title: Conflict
                     status: 409
                     detail: Referenced entity does not exist
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unpublish"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unrelease"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /datastructures/{dataStructureId}/versions/{versionId}/publish:
+  /datastructures/{dataStructureId}/versions/{versionId}/release:
     post:
       tags:
       - Data Structure Versions
-      summary: Publish a data structure version
-      description: Publishes a data structure version by setting status to AVAILABLE.
+      summary: Release a data structure version
+      description: Releases a data structure version by setting status to AVAILABLE.
         Requires modelAtlasUri to be present.
-      operationId: publishDataStructureVersion
+      operationId: releaseDataStructureVersion
       parameters:
       - name: dataStructureId
         in: path
@@ -4147,13 +4194,13 @@ paths:
           format: uuid
       responses:
         "200":
-          description: Data structure version published successfully
+          description: Data structure version released successfully
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/DataStructureVersionOutputDTO"
         "400":
-          description: Invalid input (e.g. already published or missing modelAtlasUri)
+          description: Invalid input (e.g. already released or missing modelAtlasUri)
           content:
             application/problem+json:
               schema:
@@ -4166,7 +4213,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: "Validation failed: name must not be blank"
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/publish"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/release"
                 validation_failed:
                   summary: validation_failed
                   value:
@@ -4174,7 +4221,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: Request body validation failed
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/publish"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/release"
                 malformed_request:
                   summary: malformed_request
                   value:
@@ -4182,7 +4229,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: Failed to read request body
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/publish"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/release"
         "404":
           description: Data structure version not found
           content:
@@ -4197,63 +4244,7 @@ paths:
                     title: Not Found
                     status: 404
                     detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/publish"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
-  /datastructures/{dataStructureId}/unpublish:
-    post:
-      tags:
-      - Data Structures
-      summary: Unpublish a data structure
-      description: Unpublishes a data structure by setting status back to DRAFT. Always
-        allowed.
-      operationId: unpublishDataStructure
-      parameters:
-      - name: dataStructureId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DataStructureOutputDTO"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
-  /datastructures/{dataStructureId}/publish:
-    post:
-      tags:
-      - Data Structures
-      summary: Publish a data structure
-      description: Publishes a data structure by setting status to AVAILABLE. Requires
-        at least one published DataStructureVersion.
-      operationId: publishDataStructure
-      parameters:
-      - name: dataStructureId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DataStructureOutputDTO"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/release"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -4470,13 +4461,13 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /datasources/{id}/unpublish:
+  /datasources/{id}/unrelease:
     post:
       tags:
       - DataSources
-      summary: Unpublish a data source
-      description: Transitions the data source from AVAILABLE back to DRAFT status.
-      operationId: unpublishDataSource
+      summary: Unrelease
+      description: Transitions the entity from AVAILABLE back to DRAFT status.
+      operationId: unreleaseDataSource
       parameters:
       - name: id
         in: path
@@ -4497,14 +4488,13 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /datasources/{id}/publish:
+  /datasources/{id}/release:
     post:
       tags:
       - DataSources
-      summary: Publish a data source
-      description: Validates the connector configuration and transitions the data
-        source from DRAFT to AVAILABLE status.
-      operationId: publishDataSource
+      summary: Release
+      description: Transitions the entity from DRAFT to AVAILABLE status.
+      operationId: releaseDataSource
       parameters:
       - name: id
         in: path
@@ -4723,9 +4713,8 @@ paths:
     post:
       tags:
       - DataSets
-      summary: Unrelease a dataset
-      description: Unreleases a dataset by triggering infrastructure teardown via
-        saga. The dataset transitions from AVAILABLE to READY after the saga completes.
+      summary: Unrelease
+      description: Transitions the entity from AVAILABLE back to DRAFT status.
       operationId: unreleaseDataSet
       parameters:
       - name: id
@@ -4735,40 +4724,37 @@ paths:
           type: string
           format: uuid
       responses:
-        "200":
-          description: OK
+        "409":
+          description: Conflict (saga is in-flight for this dataset)
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: "#/components/schemas/DataSetOutputDTO"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
-  /datasets/{id}/unpublish:
-    post:
-      tags:
-      - DataSets
-      summary: Unpublish a dataset
-      description: Unpublishes a dataset by removing auto-generated distributions
-        and reverting status from READY to DRAFT.
-      operationId: unpublishDataSet
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DataSetOutputDTO"
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datasets/{id}/unrelease"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datasets/{id}/unrelease"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datasets/{id}/unrelease"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -4779,9 +4765,8 @@ paths:
     post:
       tags:
       - DataSets
-      summary: Release a dataset
-      description: Releases a dataset by transitioning it from READY to AVAILABLE
-        and triggering infrastructure provisioning via saga.
+      summary: Release
+      description: Transitions the entity from DRAFT to AVAILABLE status.
       operationId: releaseDataSet
       parameters:
       - name: id
@@ -4803,15 +4788,42 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /datasets/{id}/publish:
+  /datasets/{id}/markReady:
     post:
       tags:
       - DataSets
-      summary: Publish a dataset
-      description: Publishes a dataset by generating distributions from pipeline APIs
-        and setting status to READY. Requires at least one pipeline to be present
-        in the dataset.
-      operationId: publishDataSet
+      summary: Mark a dataset as ready
+      description: "Validates the dataset and generates distributions from pipeline\
+        \ APIs, transitioning status from DRAFT to READY."
+      operationId: markReadyDataSet
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataSetOutputDTO"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /datasets/{id}/markDraft:
+    post:
+      tags:
+      - DataSets
+      summary: Revert a dataset to draft
+      description: Removes auto-generated distributions and reverts the dataset from
+        READY to DRAFT.
+      operationId: markDraftDataSet
       parameters:
       - name: id
         in: path
@@ -5653,60 +5665,6 @@ paths:
           $ref: "#/components/responses/InternalServerError"
 components:
   schemas:
-    UserInputDTO:
-      type: object
-      properties:
-        title:
-          type: string
-          description: "Salutation, defaults to OTHER"
-          enum:
-          - MR
-          - MS
-          - OTHER
-          example: MS
-        firstName:
-          type: string
-          example: Jane
-          minLength: 1
-        lastName:
-          type: string
-          example: Doe
-          minLength: 1
-        email:
-          type: string
-          format: email
-          example: jane.doe@example.com
-          minLength: 1
-        phone:
-          type: string
-          example: +49 170 1234567
-        active:
-          type: boolean
-          description: Whether the user account is active
-          example: true
-      required:
-      - email
-      - firstName
-      - lastName
-    ProblemDetail:
-      type: object
-      properties:
-        type:
-          type: string
-          format: uri
-        title:
-          type: string
-        status:
-          type: integer
-          format: int32
-        detail:
-          type: string
-        instance:
-          type: string
-          format: uri
-        properties:
-          type: object
-          additionalProperties: {}
     GroupSummaryDTO:
       type: object
       properties:
@@ -5769,6 +5727,60 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/GroupSummaryDTO"
+    UserInputDTO:
+      type: object
+      properties:
+        title:
+          type: string
+          description: "Salutation, defaults to OTHER"
+          enum:
+          - MR
+          - MS
+          - OTHER
+          example: MS
+        firstName:
+          type: string
+          example: Jane
+          minLength: 1
+        lastName:
+          type: string
+          example: Doe
+          minLength: 1
+        email:
+          type: string
+          format: email
+          example: jane.doe@example.com
+          minLength: 1
+        phone:
+          type: string
+          example: +49 170 1234567
+        active:
+          type: boolean
+          description: Whether the user account is active
+          example: true
+      required:
+      - email
+      - firstName
+      - lastName
+    ProblemDetail:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+        properties:
+          type: object
+          additionalProperties: {}
     RoleInputDTO:
       type: object
       properties:
@@ -6667,13 +6679,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageableObject:
@@ -6787,13 +6799,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     Sort:
@@ -6867,13 +6879,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageDataStructureOutputDTO:
@@ -6899,13 +6911,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageDataSourceOutputDTO:
@@ -6931,13 +6943,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageDataSetOutputDTO:
@@ -6963,13 +6975,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PagePipelineOutputDTO:
@@ -6995,59 +7007,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
-        empty:
-          type: boolean
-    Pageable:
-      type: object
-      properties:
-        page:
-          type: integer
-          format: int32
-          minimum: 0
-        size:
-          type: integer
-          format: int32
-          minimum: 1
-        sort:
-          type: array
-          items:
-            type: string
-    PageObject:
-      type: object
-      properties:
-        totalElements:
-          type: integer
-          format: int64
-        totalPages:
-          type: integer
-          format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
-        size:
-          type: integer
-          format: int32
-        content:
-          type: array
-          items: {}
-        number:
-          type: integer
-          format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
-        first:
-          type: boolean
-        last:
-          type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PageAssignmentOutputDTO:
@@ -7073,13 +7039,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
         first:
           type: boolean
         last:
           type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
         empty:
           type: boolean
     PatchUserInputDTO:
