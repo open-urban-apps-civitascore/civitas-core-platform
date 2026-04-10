@@ -38,7 +38,7 @@ import tools.jackson.databind.JsonNode;
  * REST controller for managing data structure version resources nested under a parent data
  * structure.
  *
- * <p>Versions support publish/unpublish lifecycle and Model Atlas integration. Responses are
+ * <p>Versions support release/unrelease lifecycle and Model Atlas integration. Responses are
  * enriched with model data fetched from the external Model Atlas service.
  */
 @RestController
@@ -208,26 +208,24 @@ public class DataStructureVersionController
   }
 
   /**
-   * Updates the metadata of a published data structure version.
+   * Updates the metadata of a released data structure version.
    *
    * @param dataStructureId the UUID of the parent data structure
-   * @param versionId the UUID of the published version
+   * @param versionId the UUID of the released version
    * @param input the validated version input DTO containing updated metadata
    * @return the updated version output DTO with HTTP 200 status
    */
-  @PutMapping("/{versionId}/published/meta")
+  @PutMapping("/{versionId}/released/meta")
   @Operation(
-      operationId = "updateDataStructureVersionPublishedMeta",
-      summary = "Update metadata of a published data structure version",
+      operationId = "updateDataStructureVersionReleasedMeta",
+      summary = "Update metadata of a released data structure version",
       description =
-          "Updates a published data structure version (AVAILABLE status). If the version is"
+          "Updates a released data structure version (AVAILABLE status). If the version is"
               + " not in use by any DataSource, all fields including model, modelAtlasUri,"
               + " version, and styles can be updated. If the version is in use, only description"
               + " and modelName can be changed. For DRAFT versions, use PUT"
               + " /datastructures/{dataStructureId}/versions/{versionId} instead.")
-  @ApiResponse(
-      responseCode = "200",
-      description = "Published version metadata updated successfully")
+  @ApiResponse(responseCode = "200", description = "Released version metadata updated successfully")
   @ApiResponse(
       responseCode = "400",
       description = "Invalid input (e.g. version is DRAFT)",
@@ -244,67 +242,65 @@ public class DataStructureVersionController
       responseCode = "502",
       description = "Model Atlas upload failed",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  public ResponseEntity<DataStructureVersionOutputDTO> updatePublishedMeta(
+  public ResponseEntity<DataStructureVersionOutputDTO> updateReleasedMeta(
       @PathVariable UUID dataStructureId,
       @PathVariable UUID versionId,
       @Valid @RequestBody DataStructureVersionInputDTO input) {
     DataStructureVersionInputDTO preProcessedInput = preProcessInput(input);
     DataStructureVersion updated =
-        dataStructureVersionService.updatePublishedMeta(versionId, preProcessedInput);
+        dataStructureVersionService.updateReleasedMeta(versionId, preProcessedInput);
     DataStructureVersionOutputDTO output = dataStructureVersionAssembler.toOutput(updated);
     enrichWithModel(output);
     return ResponseEntity.ok(output);
   }
 
   /**
-   * Publishes a data structure version by setting its status to AVAILABLE.
+   * Releases a data structure version by setting its status to AVAILABLE.
    *
    * @param dataStructureId the UUID of the parent data structure
-   * @param versionId the UUID of the version to publish
-   * @return the published version output DTO with HTTP 200 status
+   * @param versionId the UUID of the version to release
+   * @return the released version output DTO with HTTP 200 status
    */
-  @PostMapping("/{versionId}/publish")
+  @PostMapping("/{versionId}/release")
   @Operation(
-      operationId = "publishDataStructureVersion",
-      summary = "Publish a data structure version",
+      operationId = "releaseDataStructureVersion",
+      summary = "Release a data structure version",
       description =
-          "Publishes a data structure version by setting status to AVAILABLE. Requires"
+          "Releases a data structure version by setting status to AVAILABLE. Requires"
               + " modelAtlasUri to be present.")
-  @ApiResponse(responseCode = "200", description = "Data structure version published successfully")
+  @ApiResponse(responseCode = "200", description = "Data structure version released successfully")
   @ApiResponse(
       responseCode = "400",
-      description = "Invalid input (e.g. already published or missing modelAtlasUri)",
+      description = "Invalid input (e.g. already released or missing modelAtlasUri)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @ApiResponse(
       responseCode = "404",
       description = "Data structure version not found",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  public ResponseEntity<DataStructureVersionOutputDTO> publishDataStructureVersion(
+  public ResponseEntity<DataStructureVersionOutputDTO> releaseDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
-    DataStructureVersion published = dataStructureVersionService.publish(versionId);
-    DataStructureVersionOutputDTO output = dataStructureVersionAssembler.toOutput(published);
+    DataStructureVersion released = dataStructureVersionService.release(versionId);
+    DataStructureVersionOutputDTO output = dataStructureVersionAssembler.toOutput(released);
     enrichWithModel(output);
     return ResponseEntity.ok(output);
   }
 
   /**
-   * Unpublishes a data structure version by reverting its status back to DRAFT.
+   * Unreleases a data structure version by reverting its status back to DRAFT.
    *
    * @param dataStructureId the UUID of the parent data structure
-   * @param versionId the UUID of the version to unpublish
-   * @return the unpublished version output DTO with HTTP 200 status
+   * @param versionId the UUID of the version to unrelease
+   * @return the unreleased version output DTO with HTTP 200 status
    */
-  @PostMapping("/{versionId}/unpublish")
+  @PostMapping("/{versionId}/unrelease")
   @Operation(
-      operationId = "unpublishDataStructureVersion",
-      summary = "Unpublish a data structure version",
+      operationId = "unreleaseDataStructureVersion",
+      summary = "Unrelease a data structure version",
       description =
-          "Unpublishes a data structure version by setting status back to DRAFT. Cannot unpublish"
+          "Unreleases a data structure version by setting status back to DRAFT. Cannot unrelease"
               + " if this is the only published version of a published DataStructure - unpublish"
               + " the DataStructure first in that case.")
-  @ApiResponse(
-      responseCode = "200",
-      description = "Data structure version unpublished successfully")
+  @ApiResponse(responseCode = "200", description = "Data structure version unreleased successfully")
   @ApiResponse(
       responseCode = "400",
       description = "Invalid input (e.g. already in DRAFT or only published version)",
@@ -317,10 +313,10 @@ public class DataStructureVersionController
       responseCode = "409",
       description = "Conflict (version is in use by a DataSource)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  public ResponseEntity<DataStructureVersionOutputDTO> unpublishDataStructureVersion(
+  public ResponseEntity<DataStructureVersionOutputDTO> unreleaseDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
-    DataStructureVersion unpublished = dataStructureVersionService.unpublish(versionId);
-    DataStructureVersionOutputDTO output = dataStructureVersionAssembler.toOutput(unpublished);
+    DataStructureVersion unreleased = dataStructureVersionService.unrelease(versionId);
+    DataStructureVersionOutputDTO output = dataStructureVersionAssembler.toOutput(unreleased);
     enrichWithModel(output);
     return ResponseEntity.ok(output);
   }
