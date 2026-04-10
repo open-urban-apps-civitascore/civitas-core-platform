@@ -162,13 +162,13 @@ DELETE {{baseUrl}}/datastructures/:dataStructureId/versions/:id
 
 ---
 
-## TC-DSTV-07 – Publish DataStructure Version
+## TC-DSTV-07 – Release DataStructure Version
 
 **Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in draft state.
 
 **Request**
 ```
-POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/publish
+POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/release
 ```
 
 **Expected Response**
@@ -185,13 +185,13 @@ POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/publish
 
 ---
 
-## TC-DSTV-08 – Unpublish DataStructure Version
+## TC-DSTV-08 – Unrelease DataStructure Version
 
 **Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in published state.
 
 **Request**
 ```
-POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/unpublish
+POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/unrelease
 ```
 
 **Expected Response**
@@ -208,13 +208,13 @@ POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/unpublish
 
 ---
 
-## TC-DSTV-09 – Update Published Version Meta
+## TC-DSTV-09 – Update Released Version Meta
 
 **Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in published state.
 
 **Request**
 ```
-PUT {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/published/meta
+PUT {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/released/meta
 
 Content-Type: application/json
 

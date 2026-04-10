@@ -1,11 +1,11 @@
 meta {
-  name: 8b. Update Published Meta During Saga (expects 409)
+  name: 8b. Update Released Meta During Saga (expects 409)
   type: http
   seq: 20
 }
 
 put {
-  url: {{baseUrl}}/datasets/:id/published/meta
+  url: {{baseUrl}}/datasets/:id/released/meta
   body: json
   auth: inherit
 }
