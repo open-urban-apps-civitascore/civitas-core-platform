@@ -55,13 +55,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   protected void doInitialize(AdapterConfig config) {
     this.serverUrl = getProperty("url", DEFAULT_SERVER_URL).replaceAll("/$", "");
     this.publicUrl = getProperty("public.url", this.serverUrl);
-    String apiKey = getProperty("api.key");
-    String apiKeyHeader = getProperty("api.key.header", "X-API-Key");
-    String basicAuthUsername = getProperty("basic.auth.username");
-    String basicAuthPassword = getProperty("basic.auth.password");
-
-    this.authStrategy =
-        FrostAuthStrategy.create(basicAuthUsername, basicAuthPassword, apiKeyHeader, apiKey);
+    this.authStrategy = FrostAuthStrategy.fromConfig(config, ADAPTER_NAME);
 
     log.info("FrostSagaHandler initialized for: {}", Encode.forJava(serverUrl));
   }

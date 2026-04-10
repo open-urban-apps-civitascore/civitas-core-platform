@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.frost;
 
+import de.civitascore.configadapter.configuration.AdapterConfig;
 import jakarta.ws.rs.client.Invocation;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -28,6 +29,8 @@ import org.slf4j.LoggerFactory;
 interface FrostAuthStrategy {
 
   Logger log = LoggerFactory.getLogger(FrostAuthStrategy.class);
+
+  String DEFAULT_API_KEY_HEADER = "X-API-Key";
 
   /**
    * Applies authentication to the given request builder.
@@ -95,5 +98,25 @@ interface FrostAuthStrategy {
       return basicAuth(basicAuthUsername, basicAuthPassword);
     }
     return apiKey(apiKeyHeader, apiKey);
+  }
+
+  /**
+   * Creates the appropriate authentication strategy by reading FROST auth properties from the given
+   * configuration. Reads {@code {adapterName}.basic.auth.username}, {@code
+   * {adapterName}.basic.auth.password}, {@code {adapterName}.api.key}, and {@code
+   * {adapterName}.api.key.header} (defaults to {@value DEFAULT_API_KEY_HEADER}).
+   *
+   * @param config the adapter configuration to read properties from
+   * @param adapterName the adapter name used as property prefix
+   * @return the selected authentication strategy
+   * @throws IllegalArgumentException if neither Basic Auth nor API key is configured
+   */
+  static FrostAuthStrategy fromConfig(AdapterConfig config, String adapterName) {
+    String prefix = adapterName + ".";
+    String apiKey = config.getProperty(prefix + "api.key");
+    String apiKeyHeader = config.getProperty(prefix + "api.key.header", DEFAULT_API_KEY_HEADER);
+    String basicAuthUsername = config.getProperty(prefix + "basic.auth.username");
+    String basicAuthPassword = config.getProperty(prefix + "basic.auth.password");
+    return create(basicAuthUsername, basicAuthPassword, apiKeyHeader, apiKey);
   }
 }

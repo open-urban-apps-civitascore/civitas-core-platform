@@ -16,6 +16,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.configadapter.configuration.AdapterConfig;
 import jakarta.ws.rs.client.Invocation;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -165,6 +166,78 @@ class FrostAuthStrategyTest {
       assertThrows(
           IllegalArgumentException.class,
           () -> FrostAuthStrategy.create("  ", null, "X-API-Key", "  "));
+    }
+  }
+
+  @Nested
+  @DisplayName("fromConfig")
+  class FromConfig {
+
+    @Test
+    @DisplayName("reads auth properties from config and selects Basic Auth")
+    void shouldCreateBasicAuthFromConfig() {
+      AdapterConfig config = mock(AdapterConfig.class);
+      when(config.getProperty("frost.basic.auth.username")).thenReturn("user");
+      when(config.getProperty("frost.basic.auth.password")).thenReturn("pass");
+      when(config.getProperty("frost.api.key")).thenReturn(null);
+      when(config.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
+
+      Invocation.Builder builder = mock(Invocation.Builder.class);
+      when(builder.header("Authorization", "Basic dXNlcjpwYXNz")).thenReturn(builder);
+
+      FrostAuthStrategy strategy = FrostAuthStrategy.fromConfig(config, "frost");
+      strategy.apply(builder);
+
+      verify(builder).header("Authorization", "Basic dXNlcjpwYXNz");
+    }
+
+    @Test
+    @DisplayName("reads auth properties from config and selects API key")
+    void shouldCreateApiKeyFromConfig() {
+      AdapterConfig config = mock(AdapterConfig.class);
+      when(config.getProperty("frost.basic.auth.username")).thenReturn(null);
+      when(config.getProperty("frost.basic.auth.password")).thenReturn(null);
+      when(config.getProperty("frost.api.key")).thenReturn("my-key");
+      when(config.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
+
+      Invocation.Builder builder = mock(Invocation.Builder.class);
+      when(builder.header("X-API-Key", "my-key")).thenReturn(builder);
+
+      FrostAuthStrategy strategy = FrostAuthStrategy.fromConfig(config, "frost");
+      strategy.apply(builder);
+
+      verify(builder).header("X-API-Key", "my-key");
+    }
+
+    @Test
+    @DisplayName("uses custom API key header from config")
+    void shouldUseCustomApiKeyHeader() {
+      AdapterConfig config = mock(AdapterConfig.class);
+      when(config.getProperty("frost.basic.auth.username")).thenReturn(null);
+      when(config.getProperty("frost.basic.auth.password")).thenReturn(null);
+      when(config.getProperty("frost.api.key")).thenReturn("my-key");
+      when(config.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("Authorization");
+
+      Invocation.Builder builder = mock(Invocation.Builder.class);
+      when(builder.header("Authorization", "my-key")).thenReturn(builder);
+
+      FrostAuthStrategy strategy = FrostAuthStrategy.fromConfig(config, "frost");
+      strategy.apply(builder);
+
+      verify(builder).header("Authorization", "my-key");
+    }
+
+    @Test
+    @DisplayName("throws when no auth is configured")
+    void shouldThrowWhenNoAuthConfigured() {
+      AdapterConfig config = mock(AdapterConfig.class);
+      when(config.getProperty("frost.basic.auth.username")).thenReturn(null);
+      when(config.getProperty("frost.basic.auth.password")).thenReturn(null);
+      when(config.getProperty("frost.api.key")).thenReturn(null);
+      when(config.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
+
+      assertThrows(
+          IllegalArgumentException.class, () -> FrostAuthStrategy.fromConfig(config, "frost"));
     }
   }
 }
