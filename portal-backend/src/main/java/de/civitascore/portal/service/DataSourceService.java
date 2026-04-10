@@ -33,7 +33,7 @@ import tools.jackson.databind.JsonNode;
 /**
  * Service for managing {@link DataSource} entities through their full lifecycle (DRAFT to
  * AVAILABLE). Handles connector configuration normalization, encryption of sensitive fields, data
- * structure version linking, and publish/unpublish status transitions.
+ * structure version linking, and release/unrelease status transitions.
  */
 @Service
 @RequiredArgsConstructor
@@ -284,7 +284,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       throw new ResourceInUseException(
           getEntityName(),
           id,
-          "Cannot unpublish DataSource because it is referenced by a Pipeline.");
+          "Cannot unrelease DataSource because it is referenced by a Pipeline.");
     }
   }
 
@@ -391,7 +391,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   }
 
   /**
-   * Prevents deletion of data sources in AVAILABLE status. The data source must be unpublished
+   * Prevents deletion of data sources in AVAILABLE status. The data source must be unreleased
    * first.
    *
    * @param id the data source ID

@@ -23,7 +23,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Service for managing {@link DataStructure} entities through their lifecycle (DRAFT to AVAILABLE).
- * Handles version relationship resolution, publish/unpublish status transitions, and validates that
+ * Handles version relationship resolution, release/unrelease status transitions, and validates that
  * no referenced versions are in use before allowing structural changes.
  */
 @Service

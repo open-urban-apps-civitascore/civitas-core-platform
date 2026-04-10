@@ -418,7 +418,7 @@ public class DataStructureVersionService
     validateNotInUse(id);
     validateExistenceOfOtherPublishedVersion(
         version,
-        "Cannot unrelease this DataStructureVersion because it is the only published version of a published DataStructure. Please unpublish the DataStructure first.");
+        "Cannot unrelease this DataStructureVersion because it is the only released version of a released DataStructure. Please unrelease the DataStructure first.");
 
     version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
     return dataStructureVersionRepository.save(version);
@@ -440,7 +440,7 @@ public class DataStructureVersionService
     validateNotInUse(id);
     validateExistenceOfOtherPublishedVersion(
         version,
-        "Cannot delete this DataStructureVersion because it is the only published version of a published DataStructure. Please unpublish the DataStructure first.");
+        "Cannot delete this DataStructureVersion because it is the only released version of a released DataStructure. Please unrelease the DataStructure first.");
 
     return version;
   }
