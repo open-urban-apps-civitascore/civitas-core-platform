@@ -58,11 +58,6 @@ public class FrostAdapter extends AbstractConfigAdapter {
   public static final String ADAPTER_NAME = "frost";
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/v1.1";
   private static final String SERVER_URL_PROPERTY_KEY = "url";
-  private static final String API_KEY_PROPERTY_KEY = "api.key";
-  private static final String API_KEY_HEADER_PROPERTY_KEY = "api.key.header";
-  private static final String DEFAULT_API_KEY_HEADER = "X-API-Key";
-  private static final String BASIC_AUTH_USERNAME_PROPERTY_KEY = "basic.auth.username";
-  private static final String BASIC_AUTH_PASSWORD_PROPERTY_KEY = "basic.auth.password";
 
   private static final String HTTP_STATUS_PREFIX = "HTTP ";
 
@@ -76,13 +71,7 @@ public class FrostAdapter extends AbstractConfigAdapter {
 
     this.serverUrl =
         getAdapterProperty(SERVER_URL_PROPERTY_KEY, DEFAULT_SERVER_URL).replaceAll("/$", "");
-    String apiKey = getAdapterProperty(API_KEY_PROPERTY_KEY);
-    String apiKeyHeader = getAdapterProperty(API_KEY_HEADER_PROPERTY_KEY, DEFAULT_API_KEY_HEADER);
-    String basicAuthUsername = getAdapterProperty(BASIC_AUTH_USERNAME_PROPERTY_KEY);
-    String basicAuthPassword = getAdapterProperty(BASIC_AUTH_PASSWORD_PROPERTY_KEY);
-
-    this.authStrategy =
-        FrostAuthStrategy.create(basicAuthUsername, basicAuthPassword, apiKeyHeader, apiKey);
+    this.authStrategy = FrostAuthStrategy.fromConfig(config, getName());
 
     if (this.client == null) {
       this.client = createClient();
