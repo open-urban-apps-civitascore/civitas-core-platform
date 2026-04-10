@@ -62,6 +62,15 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }))
 
+vi.mock('@/app/services/api/datasets/clientRequests', () => ({
+  usePatchDataset: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useMarkReadyDataset: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useReleaseDataset: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useMarkDraftDataset: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUnreleaseDataset: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateReleasedDatasetMeta: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}))
+
 vi.mock('@/components/ui/input', () => ({
   Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
 }))
