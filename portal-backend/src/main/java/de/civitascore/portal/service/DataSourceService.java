@@ -419,7 +419,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     Map<String, Object> config = entity.getConfiguration();
     if (config == null || config.isEmpty()) {
       throw new InvalidInputException(
-          getEntityName(), entity.getId(), "Configuration is required for publishing");
+          getEntityName(), entity.getId(), "Configuration is required for releasing");
     }
 
     ConnectorHandler handler =
