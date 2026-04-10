@@ -52,7 +52,7 @@ vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
     mutateAsync: mockUpdateMutateAsync,
     isPending: false,
   }),
-  useUpdateDatastructureVersionPublished: () => ({
+  useUpdateDatastructureVersionReleased: () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   }),
