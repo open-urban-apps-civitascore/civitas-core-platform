@@ -9,12 +9,12 @@ import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import {
+  useMarkDraftDataset,
+  useMarkReadyDataset,
   usePatchDataset,
-  usePublishDataset,
   useReleaseDataset,
-  useUnpublishDataset,
   useUnreleaseDataset,
-  useUpdatePublishedDatasetMeta,
+  useUpdateReleasedDatasetMeta,
 } from '@/app/services/api/datasets/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { FooterElement } from '@/components/form/FooterElement'
@@ -83,17 +83,17 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
   const updateDataset = usePatchDataset()
-  const updatePublishedMeta = useUpdatePublishedDatasetMeta()
-  const publishDataset = usePublishDataset()
-  const unpublishDataset = useUnpublishDataset()
+  const updateReleasedMeta = useUpdateReleasedDatasetMeta()
+  const markReadyDataset = useMarkReadyDataset()
+  const markDraftDataset = useMarkDraftDataset()
   const releaseDataset = useReleaseDataset()
   const unreleaseDataset = useUnreleaseDataset()
 
   const isLoading =
     updateDataset.isPending ||
-    updatePublishedMeta.isPending ||
-    publishDataset.isPending ||
-    unpublishDataset.isPending ||
+    updateReleasedMeta.isPending ||
+    markReadyDataset.isPending ||
+    markDraftDataset.isPending ||
     releaseDataset.isPending ||
     unreleaseDataset.isPending
 
@@ -155,12 +155,12 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     if (oldStatus === newStatus) return []
 
     const transitions: Record<string, ((id: string) => Promise<unknown>)[]> = {
-      'DRAFT->READY': [publishDataset.mutateAsync],
-      'READY->DRAFT': [unpublishDataset.mutateAsync],
+      'DRAFT->READY': [markReadyDataset.mutateAsync],
+      'READY->DRAFT': [markDraftDataset.mutateAsync],
       'READY->AVAILABLE': [releaseDataset.mutateAsync],
       'AVAILABLE->READY': [unreleaseDataset.mutateAsync],
-      'DRAFT->AVAILABLE': [publishDataset.mutateAsync, releaseDataset.mutateAsync],
-      'AVAILABLE->DRAFT': [unreleaseDataset.mutateAsync, unpublishDataset.mutateAsync],
+      'DRAFT->AVAILABLE': [markReadyDataset.mutateAsync, releaseDataset.mutateAsync],
+      'AVAILABLE->DRAFT': [unreleaseDataset.mutateAsync, markDraftDataset.mutateAsync],
     }
 
     return transitions[`${oldStatus}->${newStatus}`] ?? []
@@ -194,7 +194,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
         if (serverStatus === DATASET_STATUS_TYPES.DRAFT) {
           await updateDataset.mutateAsync(updateData)
         } else {
-          await updatePublishedMeta.mutateAsync({ ...parsed.data, id: dataset.id })
+          await updateReleasedMeta.mutateAsync({ ...parsed.data, id: dataset.id })
         }
       }
 

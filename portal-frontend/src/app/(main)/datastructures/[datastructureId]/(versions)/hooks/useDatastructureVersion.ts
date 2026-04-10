@@ -12,7 +12,7 @@ import {
   useCreateDatastructureVersion,
   useStatusUpdateDatastructureVersion,
   useUpdateDatastructureVersion,
-  useUpdateDatastructureVersionPublished,
+  useUpdateDatastructureVersionReleased,
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
@@ -71,12 +71,12 @@ export const useDatastructureVersion = ({
   const [initialSession, setInitialSession] = useState(() => buildSessionFromVersion(version))
 
   const updateVersion = useUpdateDatastructureVersion()
-  const updatePublishedVersion = useUpdateDatastructureVersionPublished()
+  const updateReleasedVersion = useUpdateDatastructureVersionReleased()
   const createVersion = useCreateDatastructureVersion()
   const updateStatus = useStatusUpdateDatastructureVersion()
 
   const isLoading =
-    updateVersion.isPending || createVersion.isPending || updateStatus.isPending || updatePublishedVersion.isPending
+    updateVersion.isPending || createVersion.isPending || updateStatus.isPending || updateReleasedVersion.isPending
 
   const modelSessionManager = useMultiSessionManager({ initialSession })
   const nodes = modelSessionManager.activeSession?.diagram.nodes
@@ -172,7 +172,7 @@ export const useDatastructureVersion = ({
 
   const handleStatusUpdate = async (
     versionId: string,
-    endpoint: 'publish' | 'unpublish',
+    endpoint: 'release' | 'unrelease',
     datastructureId: string,
   ): Promise<DatastructureVersion> => {
     try {
@@ -191,7 +191,7 @@ export const useDatastructureVersion = ({
 
   const handleCreateVersion = async (createData: DatastructureVersionCreateData, datastructureId: string) => {
     const isStatusFieldDirty = form.formState.dirtyFields.dataStructureVersionStatus
-    const shouldPublish = !!isStatusFieldDirty && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+    const shouldRelease = !!isStatusFieldDirty && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
 
     let data: DatastructureVersion
     try {
@@ -207,7 +207,7 @@ export const useDatastructureVersion = ({
 
     toast.success(t('messages.createSuccess'))
 
-    if (shouldPublish) await handleStatusUpdate(data.id, 'publish', datastructureId)
+    if (shouldRelease) await handleStatusUpdate(data.id, 'release', datastructureId)
 
     onCreateVersion?.(data)
   }
@@ -219,9 +219,9 @@ export const useDatastructureVersion = ({
     try {
       let response: { data: DatastructureVersion }
       if (initialFormValues.dataStructureVersionStatus === STATUS_TYPES.AVAILABLE) {
-        response = await updatePublishedVersion.mutateAsync({
+        response = await updateReleasedVersion.mutateAsync({
           data: values,
-          endpoint: `/datastructures/${datastructureId}/versions/${values.id}/published/meta`,
+          endpoint: `/datastructures/${datastructureId}/versions/${values.id}/released/meta`,
         })
       } else {
         response = await updateVersion.mutateAsync({
@@ -247,15 +247,15 @@ export const useDatastructureVersion = ({
     const fieldsToUpdate = pickDirtyValues(formValues, dirtyFields)
 
     const shouldUpdateValues = containsNonStatusField(fieldsToUpdate)
-    const shouldPublish =
+    const shouldRelease =
       !!dirtyFields.dataStructureVersionStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
-    const shouldUnpublish = !!dirtyFields.dataStructureVersionStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
+    const shouldUnrelease = !!dirtyFields.dataStructureVersionStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
 
     let versionResponse: DatastructureVersion | null = shouldUpdateValues
       ? await handleUpdateValues(parsedPayload, datastructureId)
       : null
-    if (shouldPublish) versionResponse = await handleStatusUpdate(parsedPayload.id, 'publish', datastructureId)
-    if (shouldUnpublish) versionResponse = await handleStatusUpdate(parsedPayload.id, 'unpublish', datastructureId)
+    if (shouldRelease) versionResponse = await handleStatusUpdate(parsedPayload.id, 'release', datastructureId)
+    if (shouldUnrelease) versionResponse = await handleStatusUpdate(parsedPayload.id, 'unrelease', datastructureId)
 
     const updatedFormValues = versionResponse ? mapDatastructureVersionApiToFormData(versionResponse) : parsedFormValues
 
