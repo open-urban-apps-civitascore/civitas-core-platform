@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.Constants;
 import de.civitascore.configadapter.adapter.ConfigAdapter;
+import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.configuration.AppConfig;
 import de.civitascore.configadapter.exception.AdapterException;
 import de.civitascore.configadapter.exception.FatalAdapterException;
@@ -359,6 +360,10 @@ class KafkaEventHandlerRetryIntegrationTest extends AbstractKafkaIntegrationTest
   static class RetryTestAdapter implements ConfigAdapter {
     private List<String> subscribedTopics = null;
     private final AtomicInteger attemptCount = new AtomicInteger(0);
+
+    @Override
+    public void initialize(AdapterConfig config) {}
+
     private int failuresBeforeSuccess = 0;
     private boolean throwFatalError = false;
     private boolean alwaysFailRetryable = false;
