@@ -6,6 +6,7 @@ import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
@@ -64,6 +65,26 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   @Override
   protected AssignmentFactory getAssignmentFactory() {
     return assignmentFactory;
+  }
+
+  @Override
+  protected ReleasableStatus getEntityStatus(DataSource entity) {
+    return entity.getDataSourceStatus();
+  }
+
+  @Override
+  protected void setEntityStatus(DataSource entity, ReleasableStatus status) {
+    entity.setDataSourceStatus((DataSourceStatus) status);
+  }
+
+  @Override
+  protected ReleasableStatus getDraftStatus() {
+    return DataSourceStatus.DRAFT;
+  }
+
+  @Override
+  protected ReleasableStatus getAvailableStatus() {
+    return DataSourceStatus.AVAILABLE;
   }
 
   /**
@@ -238,62 +259,24 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     return entity;
   }
 
-  /**
-   * Publishes a data source by transitioning it from DRAFT to AVAILABLE status. Validates that a
-   * connector type, data structure version, and valid configuration are present.
-   *
-   * @param id the data source ID
-   * @return the published data source
-   * @throws InvalidInputException if the data source is not in DRAFT status or is missing required
-   *     fields
-   */
-  @Transactional
-  public DataSource publish(UUID id) {
-    DataSource entity = findByIdOrThrow(id);
-
-    if (entity.getDataSourceStatus() != DataSourceStatus.DRAFT) {
-      throw new InvalidInputException(
-          getEntityName(), id, "Only data sources in DRAFT status can be published");
-    }
-
+  @Override
+  protected void validateRelease(DataSource entity) {
     if (entity.getConnectorType() == null) {
       throw new InvalidInputException(
-          getEntityName(), id, "Connector type must be set before publishing");
+          getEntityName(), entity.getId(), "Connector type must be set before releasing");
     }
 
     if (entity.getDataStructureVersion() == null) {
       throw new InvalidInputException(
-          getEntityName(), id, "Data structure version must be set before publishing");
+          getEntityName(), entity.getId(), "Data structure version must be set before releasing");
     }
 
     validateConfiguration(entity);
-
-    entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-    return save(entity);
   }
 
-  /**
-   * Unpublishes a data source by reverting it from AVAILABLE to DRAFT status. Validates that the
-   * data source is not referenced by any READY or AVAILABLE datasets.
-   *
-   * @param id the data source ID
-   * @return the unpublished data source
-   * @throws InvalidInputException if the data source is not in AVAILABLE status
-   * @throws ResourceInUseException if the data source is referenced by an active dataset
-   */
-  @Transactional
-  public DataSource unpublish(UUID id) {
-    DataSource entity = findByIdOrThrow(id);
-
-    if (entity.getDataSourceStatus() != DataSourceStatus.AVAILABLE) {
-      throw new InvalidInputException(
-          getEntityName(), id, "Only data sources in AVAILABLE status can be unpublished");
-    }
-
-    validateNotInUse(id);
-
-    entity.setDataSourceStatus(DataSourceStatus.DRAFT);
-    return save(entity);
+  @Override
+  protected void validateUnrelease(DataSource entity) {
+    validateNotInUse(entity.getId());
   }
 
   private void validateNotInUse(UUID id) {
@@ -316,8 +299,9 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
    * @throws InvalidInputException if the data source is not AVAILABLE or violates in-use
    *     constraints
    */
+  @Override
   @Transactional
-  public DataSource updatePublishedMeta(UUID id, DataSourceInputDTO input) {
+  public DataSource updateReleasedMeta(UUID id, DataSourceInputDTO input) {
     DataSource entity = findByIdOrThrow(id);
 
     if (entity.getDataSourceStatus() != DataSourceStatus.AVAILABLE) {
@@ -420,7 +404,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
 
     if (entity.getDataSourceStatus() == DataSourceStatus.AVAILABLE) {
       throw new InvalidInputException(
-          getEntityName(), id, "Cannot delete a data source in AVAILABLE status");
+          getEntityName(), id, "Cannot delete a released data source. Unrelease it first.");
     }
 
     return entity;
