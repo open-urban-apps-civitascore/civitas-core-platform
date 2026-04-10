@@ -60,7 +60,7 @@ class DataStructureServiceTest {
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
           .thenReturn(true);
 
-      assertThatThrownBy(() -> dataStructureService.unpublish(dsId))
+      assertThatThrownBy(() -> dataStructureService.unrelease(dsId))
           .isInstanceOf(ResourceInUseException.class);
     }
 
@@ -84,7 +84,7 @@ class DataStructureServiceTest {
           .thenReturn(false);
       when(dataStructureRepository.save(ds)).thenReturn(ds);
 
-      dataStructureService.unpublish(dsId);
+      dataStructureService.unrelease(dsId);
 
       verify(dataStructureRepository).save(ds);
     }

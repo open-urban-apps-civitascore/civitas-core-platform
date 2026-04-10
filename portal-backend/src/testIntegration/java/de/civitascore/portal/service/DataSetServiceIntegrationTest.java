@@ -201,8 +201,8 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   }
 
   @Nested
-  @DisplayName("Publish DataSet Tests")
-  class PublishDataSetTests {
+  @DisplayName("Mark Ready DataSet Tests")
+  class MarkReadyDataSetTests {
     @Test
     @Transactional
     @DisplayName("Should publish dataset with pipelines")
@@ -212,7 +212,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       dataSet.getPipelines().add(pipeline);
       dataSet = dataSetRepository.save(dataSet);
 
-      DataSet publishedDataSet = dataSetService.publish(dataSet.getId());
+      DataSet publishedDataSet = dataSetService.markReady(dataSet.getId());
 
       assertThat(publishedDataSet.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
 
@@ -235,10 +235,10 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       dataSet.getPipelines().add(pipeline);
       dataSet = dataSetRepository.save(dataSet);
 
-      DataSet publishedDataSet = dataSetService.publish(dataSet.getId());
+      DataSet publishedDataSet = dataSetService.markReady(dataSet.getId());
       UUID publishedDataSetId = publishedDataSet.getId();
 
-      assertThatThrownBy(() -> dataSetService.publish(publishedDataSetId))
+      assertThatThrownBy(() -> dataSetService.markReady(publishedDataSetId))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("DataSet is already published");
     }
@@ -249,7 +249,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     void shouldThrowExceptionWhenPublishingDataSetWithoutPipelines() {
       DataSet dataSet = createInitialDataSet();
 
-      assertThatThrownBy(() -> dataSetService.publish(dataSet.getId()))
+      assertThatThrownBy(() -> dataSetService.markReady(dataSet.getId()))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("DataSet must contain at least one Pipeline before publishing");
     }

@@ -511,7 +511,7 @@ class DataSetControllerIntegrationTest
         value = DataSetStatus.class,
         mode = EnumSource.Mode.EXCLUDE,
         names = {"DRAFT"})
-    @DisplayName("Should update published dataset metadata via /published/meta endpoint")
+    @DisplayName("Should update released dataset metadata via /released/meta endpoint")
     void shouldUpdatePublishedDataSetMetaViaPublishedEndpoint(DataSetStatus status) {
       DataSet dataSet = createDataSetWithRelationships();
       dataSet.setDataSetStatus(status);
@@ -528,7 +528,7 @@ class DataSetControllerIntegrationTest
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSetId + "/published/meta",
+              getEndpointPath() + "/" + dataSetId + "/released/meta",
               org.springframework.http.HttpMethod.PUT,
               createAuthHeaders(),
               updateInput,
@@ -557,7 +557,7 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should fail to update DRAFT dataset via /published/meta endpoint")
+    @DisplayName("Should fail to update DRAFT dataset via /released/meta endpoint")
     void shouldFailToUpdateDraftDataSetViaPublishedEndpoint() {
       UUID dataSetId = createTestEntity();
 
@@ -568,7 +568,7 @@ class DataSetControllerIntegrationTest
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSetId + "/published/meta",
+              getEndpointPath() + "/" + dataSetId + "/released/meta",
               org.springframework.http.HttpMethod.PUT,
               createAuthHeaders(),
               updateInput,
@@ -929,7 +929,7 @@ class DataSetControllerIntegrationTest
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSetId + "/publish",
+              getEndpointPath() + "/" + dataSetId + "/markReady",
               org.springframework.http.HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -992,7 +992,7 @@ class DataSetControllerIntegrationTest
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSetId + "/publish",
+              getEndpointPath() + "/" + dataSetId + "/markReady",
               org.springframework.http.HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -1029,7 +1029,7 @@ class DataSetControllerIntegrationTest
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSetId + "/publish",
+              getEndpointPath() + "/" + dataSetId + "/markReady",
               org.springframework.http.HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -1053,7 +1053,7 @@ class DataSetControllerIntegrationTest
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + nonExistentId + "/publish",
+              getEndpointPath() + "/" + nonExistentId + "/markReady",
               org.springframework.http.HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -1102,7 +1102,7 @@ class DataSetControllerIntegrationTest
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSetId + "/publish",
+              getEndpointPath() + "/" + dataSetId + "/markReady",
               org.springframework.http.HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -1145,7 +1145,7 @@ class DataSetControllerIntegrationTest
 
       UUID dataSetId = dataSet.getId();
       exchange(
-          getEndpointPath() + "/" + dataSetId + "/publish",
+          getEndpointPath() + "/" + dataSetId + "/markReady",
           HttpMethod.POST,
           createAuthHeaders(),
           null,

@@ -368,7 +368,7 @@ class DataStructureControllerIntegrationTest
 
       // Publish via API
       restTemplate.exchange(
-          ENDPOINT + "/" + dataStructure.getId() + "/publish",
+          ENDPOINT + "/" + dataStructure.getId() + "/release",
           HttpMethod.POST,
           new HttpEntity<>(createAuthHeaders()),
           getOutputTypeReference());
@@ -454,7 +454,7 @@ class DataStructureControllerIntegrationTest
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
-              ENDPOINT + "/" + dataStructureWithPublishedVersionId + "/publish",
+              ENDPOINT + "/" + dataStructureWithPublishedVersionId + "/release",
               HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -490,7 +490,7 @@ class DataStructureControllerIntegrationTest
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
-              ENDPOINT + "/" + dataStructure.getId() + "/publish",
+              ENDPOINT + "/" + dataStructure.getId() + "/release",
               HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -506,7 +506,7 @@ class DataStructureControllerIntegrationTest
     void shouldFailToPublishAlreadyPublishedDataStructure() {
       // First publish
       exchange(
-          ENDPOINT + "/" + dataStructureWithPublishedVersionId + "/publish",
+          ENDPOINT + "/" + dataStructureWithPublishedVersionId + "/release",
           HttpMethod.POST,
           createAuthHeaders(),
           null,
@@ -515,7 +515,7 @@ class DataStructureControllerIntegrationTest
       // Try to publish again
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
-              ENDPOINT + "/" + dataStructureWithPublishedVersionId + "/publish",
+              ENDPOINT + "/" + dataStructureWithPublishedVersionId + "/release",
               HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -531,7 +531,7 @@ class DataStructureControllerIntegrationTest
     void shouldReturn404WhenPublishingNonExistentDataStructure() {
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
-              ENDPOINT + "/" + UUID.randomUUID() + "/publish",
+              ENDPOINT + "/" + UUID.randomUUID() + "/release",
               HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -547,7 +547,7 @@ class DataStructureControllerIntegrationTest
     void shouldFailToPublishWithoutAuth() {
       ResponseEntity<String> response =
           performRequestWithoutAuth(
-              "/" + dataStructureWithPublishedVersionId + "/publish", HttpMethod.POST);
+              "/" + dataStructureWithPublishedVersionId + "/release", HttpMethod.POST);
 
       assertThat(response.getStatusCode())
           .as("Should return UNAUTHORIZED status")
@@ -587,7 +587,7 @@ class DataStructureControllerIntegrationTest
     void shouldUnpublishPublishedDataStructureSuccessfully() {
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
-              ENDPOINT + "/" + publishedDataStructureId + "/unpublish",
+              ENDPOINT + "/" + publishedDataStructureId + "/unrelease",
               HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -615,7 +615,7 @@ class DataStructureControllerIntegrationTest
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
-              ENDPOINT + "/" + draftDataStructure.getId() + "/unpublish",
+              ENDPOINT + "/" + draftDataStructure.getId() + "/unrelease",
               HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -631,7 +631,7 @@ class DataStructureControllerIntegrationTest
     void shouldReturn404WhenUnpublishingNonExistentDataStructure() {
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
-              ENDPOINT + "/" + UUID.randomUUID() + "/unpublish",
+              ENDPOINT + "/" + UUID.randomUUID() + "/unrelease",
               HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -646,7 +646,7 @@ class DataStructureControllerIntegrationTest
     @DisplayName("Should fail to unpublish without authentication")
     void shouldFailToUnpublishWithoutAuth() {
       ResponseEntity<String> response =
-          performRequestWithoutAuth("/" + publishedDataStructureId + "/unpublish", HttpMethod.POST);
+          performRequestWithoutAuth("/" + publishedDataStructureId + "/unrelease", HttpMethod.POST);
 
       assertThat(response.getStatusCode())
           .as("Should return UNAUTHORIZED status")
@@ -691,7 +691,7 @@ class DataStructureControllerIntegrationTest
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
-              ENDPOINT + "/" + publishedDataStructureId + "/published/meta",
+              ENDPOINT + "/" + publishedDataStructureId + "/released/meta",
               HttpMethod.PUT,
               createAuthHeaders(),
               input,
@@ -730,7 +730,7 @@ class DataStructureControllerIntegrationTest
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
-              ENDPOINT + "/" + draftDataStructure.getId() + "/published/meta",
+              ENDPOINT + "/" + draftDataStructure.getId() + "/released/meta",
               HttpMethod.PUT,
               createAuthHeaders(),
               input,
@@ -751,7 +751,7 @@ class DataStructureControllerIntegrationTest
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
-              ENDPOINT + "/" + UUID.randomUUID() + "/published/meta",
+              ENDPOINT + "/" + UUID.randomUUID() + "/released/meta",
               HttpMethod.PUT,
               createAuthHeaders(),
               input,
@@ -767,7 +767,7 @@ class DataStructureControllerIntegrationTest
     void shouldFailToUpdatePublishedMetaWithoutAuth() {
       ResponseEntity<String> response =
           performRequestWithoutAuth(
-              "/" + publishedDataStructureId + "/published/meta", HttpMethod.PUT);
+              "/" + publishedDataStructureId + "/released/meta", HttpMethod.PUT);
 
       assertThat(response.getStatusCode())
           .as("Should return UNAUTHORIZED status")
@@ -784,7 +784,7 @@ class DataStructureControllerIntegrationTest
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
-              ENDPOINT + "/" + publishedDataStructureId + "/published/meta",
+              ENDPOINT + "/" + publishedDataStructureId + "/released/meta",
               HttpMethod.PUT,
               createAuthHeaders(),
               input,
@@ -966,7 +966,7 @@ class DataStructureControllerIntegrationTest
     void shouldReturn409WhenUnpublishingInUseDataStructure() {
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
-              ENDPOINT + "/" + inUseDataStructureId + "/unpublish",
+              ENDPOINT + "/" + inUseDataStructureId + "/unrelease",
               HttpMethod.POST,
               createAuthHeaders(),
               null,

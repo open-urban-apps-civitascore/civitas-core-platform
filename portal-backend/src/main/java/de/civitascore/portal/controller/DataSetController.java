@@ -104,35 +104,10 @@ public class DataSetController
   @Operation(
       summary = "Update a DRAFT dataset",
       description =
-          "Updates a dataset in DRAFT status. For published datasets (READY or AVAILABLE), use PUT /datasets/{id}/published/meta instead.")
+          "Updates a dataset in DRAFT status. For released datasets (READY or AVAILABLE), use PUT /datasets/{id}/released/meta instead.")
   public ResponseEntity<DataSetOutputDTO> update(
       @PathVariable UUID id, @Valid @RequestBody DataSetInputDTO input) {
     return super.update(id, input);
-  }
-
-  /**
-   * Updates only the metadata of a published dataset (READY or AVAILABLE status).
-   *
-   * @param id the UUID of the published dataset
-   * @param input the validated dataset input DTO containing updated metadata
-   * @return the updated dataset output DTO with HTTP 200 status
-   */
-  @PutMapping("/{id}/published/meta")
-  @Operation(
-      operationId = "updateDataSetPublishedMeta",
-      summary = "Update metadata of a published dataset",
-      description =
-          "Updates only the metadata (name, description) of a published dataset (READY or AVAILABLE status). Cannot modify persistenceId or pipelines. For DRAFT datasets, use PUT /datasets/{id} instead.")
-  @ApiResponse(
-      responseCode = "409",
-      description = "Conflict (saga is in-flight for this dataset)",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  public ResponseEntity<DataSetOutputDTO> updatePublishedMeta(
-      @PathVariable UUID id, @Valid @RequestBody DataSetInputDTO input) {
-    DataSetInputDTO preProcessedInput = preProcessInput(input);
-    DataSet updated = dataSetService.updatePublishedMeta(id, preProcessedInput);
-    DataSetOutputDTO output = dataSetAssembler.toOutput(updated);
-    return ResponseEntity.ok(output);
   }
 
   /** {@inheritDoc} */
@@ -141,87 +116,63 @@ public class DataSetController
     return ScopeType.DATASET;
   }
 
-  /**
-   * Publishes a dataset by generating distributions from pipeline APIs and transitioning status to
-   * READY.
-   *
-   * @param id the UUID of the dataset to publish
-   * @return the published dataset output DTO with HTTP 200 status
-   */
-  @PostMapping("/{id}/publish")
+  @PostMapping("/{id}/markReady")
   @Operation(
-      operationId = "publishDataSet",
-      summary = "Publish a dataset",
+      operationId = "markReadyDataSet",
+      summary = "Mark a dataset as ready",
       description =
-          "Publishes a dataset by generating distributions from pipeline APIs and setting status to READY. Requires at least one pipeline to be present in the dataset.")
-  public ResponseEntity<DataSetOutputDTO> publishDataSet(@PathVariable UUID id) {
-    DataSet published = dataSetService.publish(id);
-    DataSetOutputDTO output = dataSetAssembler.toOutput(published);
+          "Validates the dataset and generates distributions from pipeline APIs, transitioning status from DRAFT to READY.")
+  public ResponseEntity<DataSetOutputDTO> markReady(@PathVariable UUID id) {
+    DataSet ready = dataSetService.markReady(id);
+    DataSetOutputDTO output = dataSetAssembler.toOutput(ready);
     return ResponseEntity.ok(output);
   }
 
-  /**
-   * Unpublishes a dataset by removing auto-generated distributions and reverting status to DRAFT.
-   *
-   * @param id the UUID of the dataset to unpublish
-   * @return the unpublished dataset output DTO with HTTP 200 status
-   */
-  @PostMapping("/{id}/unpublish")
+  @PostMapping("/{id}/markDraft")
   @Operation(
-      operationId = "unpublishDataSet",
-      summary = "Unpublish a dataset",
+      operationId = "markDraftDataSet",
+      summary = "Revert a dataset to draft",
       description =
-          "Unpublishes a dataset by removing auto-generated distributions and reverting status from READY to DRAFT.")
-  public ResponseEntity<DataSetOutputDTO> unpublishDataSet(@PathVariable UUID id) {
-    DataSet unpublished = dataSetService.unpublish(id);
-    DataSetOutputDTO output = dataSetAssembler.toOutput(unpublished);
+          "Removes auto-generated distributions and reverts the dataset from READY to DRAFT.")
+  public ResponseEntity<DataSetOutputDTO> markDraft(@PathVariable UUID id) {
+    DataSet draft = dataSetService.markDraft(id);
+    DataSetOutputDTO output = dataSetAssembler.toOutput(draft);
     return ResponseEntity.ok(output);
   }
 
-  /**
-   * Releases a dataset by transitioning it from READY to AVAILABLE and triggering infrastructure
-   * provisioning via saga.
-   *
-   * @param id the UUID of the dataset to release
-   * @return the released dataset output DTO with HTTP 202 (Accepted) status
-   */
-  @PostMapping("/{id}/release")
-  @Operation(
-      operationId = "releaseDataSet",
-      summary = "Release a dataset",
-      description =
-          "Releases a dataset by transitioning it from READY to AVAILABLE and triggering infrastructure provisioning via saga.")
-  public ResponseEntity<DataSetOutputDTO> releaseDataSet(@PathVariable UUID id) {
+  @Override
+  public ResponseEntity<DataSetOutputDTO> release(@PathVariable UUID id) {
     DataSet released = dataSetService.release(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(released);
     return ResponseEntity.accepted().body(output);
   }
 
-  /**
-   * Unreleases a dataset by triggering infrastructure teardown via saga, transitioning from
-   * AVAILABLE to READY.
-   *
-   * @param id the UUID of the dataset to unrelease
-   * @return the unreleased dataset output DTO with HTTP 202 (Accepted) status
-   */
-  @PostMapping("/{id}/unrelease")
-  @Operation(
-      operationId = "unreleaseDataSet",
-      summary = "Unrelease a dataset",
-      description =
-          "Unreleases a dataset by triggering infrastructure teardown via saga. The dataset transitions from AVAILABLE to READY after the saga completes.")
+  @Override
   @ApiResponse(
       responseCode = "409",
       description = "Conflict (saga is in-flight for this dataset)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  public ResponseEntity<DataSetOutputDTO> unreleaseDataSet(@PathVariable UUID id) {
+  public ResponseEntity<DataSetOutputDTO> unrelease(@PathVariable UUID id) {
     DataSet unreleased = dataSetService.unrelease(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(unreleased);
     return ResponseEntity.accepted().body(output);
   }
 
+  @Override
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  public ResponseEntity<DataSetOutputDTO> updateReleasedMeta(
+      @PathVariable UUID id, @Valid @RequestBody DataSetInputDTO input) {
+    DataSetInputDTO preProcessedInput = preProcessInput(input);
+    DataSet updated = dataSetService.updateReleasedMeta(id, preProcessedInput);
+    DataSetOutputDTO output = dataSetAssembler.toOutput(updated);
+    return ResponseEntity.ok(output);
+  }
+
   /**
-   * Deletes a DRAFT dataset. Published or released datasets must be unpublished/unreleased first.
+   * Deletes a DRAFT dataset. READY or released datasets must be marked as draft/unreleased first.
    *
    * @param id the UUID of the dataset to delete
    */
@@ -231,7 +182,7 @@ public class DataSetController
       summary = "Delete a dataset",
       description =
           "Deletes a DRAFT dataset immediately (204 No Content). "
-              + "READY datasets cannot be deleted — unpublish first. "
+              + "READY datasets cannot be deleted — mark as draft first (POST /{id}/markDraft). "
               + "AVAILABLE datasets cannot be deleted directly — unrelease first (POST /{id}/unrelease) to tear down infrastructure, then delete.")
   public void delete(@PathVariable UUID id) {
     dataSetService.deleteById(id);

@@ -122,17 +122,17 @@ class DataSourceControllerIntegrationTest
   }
 
   private ResponseEntity<DataSourceOutputDTO> performPublish(UUID id) {
-    String url = DATASOURCES_ENDPOINT + "/" + id + "/publish";
+    String url = DATASOURCES_ENDPOINT + "/" + id + "/release";
     return exchange(url, HttpMethod.POST, createAuthHeaders(), null, getOutputTypeReference());
   }
 
   private ResponseEntity<DataSourceOutputDTO> performUnpublish(UUID id) {
-    String url = DATASOURCES_ENDPOINT + "/" + id + "/unpublish";
+    String url = DATASOURCES_ENDPOINT + "/" + id + "/unrelease";
     return exchange(url, HttpMethod.POST, createAuthHeaders(), null, getOutputTypeReference());
   }
 
   private ResponseEntity<String> performUnpublishExpectingError(UUID id) {
-    String url = DATASOURCES_ENDPOINT + "/" + id + "/unpublish";
+    String url = DATASOURCES_ENDPOINT + "/" + id + "/unrelease";
     return restTemplate.exchange(
         url, HttpMethod.POST, new HttpEntity<>(createAuthHeaders()), String.class);
   }
@@ -149,7 +149,7 @@ class DataSourceControllerIntegrationTest
   }
 
   private ResponseEntity<String> performPublishExpectingError(UUID id) {
-    String url = DATASOURCES_ENDPOINT + "/" + id + "/publish";
+    String url = DATASOURCES_ENDPOINT + "/" + id + "/release";
     return restTemplate.exchange(
         url, HttpMethod.POST, new HttpEntity<>(createAuthHeaders()), String.class);
   }
@@ -750,7 +750,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpointPath() + "/" + secondId + "/published/meta",
+              getEndpointPath() + "/" + secondId + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(metaUpdate, createAuthHeaders()),
               String.class);
@@ -1000,7 +1000,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + id + "/published/meta",
+              getEndpointPath() + "/" + id + "/released/meta",
               HttpMethod.PUT,
               createAuthHeaders(),
               metaUpdate,
@@ -1026,7 +1026,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + id + "/published/meta",
+              getEndpointPath() + "/" + id + "/released/meta",
               HttpMethod.PUT,
               createAuthHeaders(),
               metaUpdate,
@@ -1058,7 +1058,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + id + "/published/meta",
+              getEndpointPath() + "/" + id + "/released/meta",
               HttpMethod.PUT,
               createAuthHeaders(),
               metaUpdate,
@@ -1089,7 +1089,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + id + "/published/meta",
+              getEndpointPath() + "/" + id + "/released/meta",
               HttpMethod.PUT,
               createAuthHeaders(),
               metaUpdate,
@@ -1108,7 +1108,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpointPath() + "/" + id + "/published/meta",
+              getEndpointPath() + "/" + id + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(metaUpdate, createAuthHeaders()),
               String.class);
@@ -1127,7 +1127,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSource.getId() + "/published/meta",
+              getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
               HttpMethod.PUT,
               createAuthHeaders(),
               metaUpdate,
@@ -1153,7 +1153,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpointPath() + "/" + dataSource.getId() + "/published/meta",
+              getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(metaUpdate, createAuthHeaders()),
               String.class);
@@ -1171,7 +1171,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpointPath() + "/" + dataSource.getId() + "/published/meta",
+              getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(metaUpdate, createAuthHeaders()),
               String.class);
@@ -1194,7 +1194,7 @@ class DataSourceControllerIntegrationTest
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + id + "/published/meta",
+              getEndpointPath() + "/" + id + "/released/meta",
               HttpMethod.PUT,
               createAuthHeaders(),
               fullUpdate,

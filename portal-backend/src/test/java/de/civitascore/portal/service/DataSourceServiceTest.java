@@ -101,7 +101,7 @@ class DataSourceServiceTest {
       when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.MQTT)).thenReturn(mqttHandler);
       when(mqttHandler.validate(any(), any(Class[].class))).thenReturn(Collections.emptyList());
 
-      DataSource result = dataSourceService.publish(id);
+      DataSource result = dataSourceService.release(id);
 
       assertThat(result.getDataSourceStatus()).isEqualTo(DataSourceStatus.AVAILABLE);
     }
@@ -117,7 +117,7 @@ class DataSourceServiceTest {
       when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.SQL)).thenReturn(sqlHandler);
       when(sqlHandler.validate(any(), any(Class[].class))).thenReturn(Collections.emptyList());
 
-      DataSource result = dataSourceService.publish(id);
+      DataSource result = dataSourceService.release(id);
 
       assertThat(result.getDataSourceStatus()).isEqualTo(DataSourceStatus.AVAILABLE);
     }
@@ -132,7 +132,7 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
 
-      assertThatThrownBy(() -> dataSourceService.publish(id))
+      assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("DRAFT");
     }
@@ -148,7 +148,7 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
 
-      assertThatThrownBy(() -> dataSourceService.publish(id))
+      assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("Connector type");
     }
@@ -165,7 +165,7 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
 
-      assertThatThrownBy(() -> dataSourceService.publish(id))
+      assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("Data structure version");
     }
@@ -185,7 +185,7 @@ class DataSourceServiceTest {
       when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.MQTT)).thenReturn(mqttHandler);
       when(mqttHandler.validate(any(), any(Class[].class))).thenReturn(List.of("urls is required"));
 
-      assertThatThrownBy(() -> dataSourceService.publish(id))
+      assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("urls");
     }
@@ -207,7 +207,7 @@ class DataSourceServiceTest {
       when(mqttHandler.validate(any(), any(Class[].class)))
           .thenReturn(List.of("qos must be 0, 1, or 2"));
 
-      assertThatThrownBy(() -> dataSourceService.publish(id))
+      assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("qos");
     }
@@ -229,7 +229,7 @@ class DataSourceServiceTest {
       when(sqlHandler.validate(any(), any(Class[].class)))
           .thenReturn(List.of("driver is required"));
 
-      assertThatThrownBy(() -> dataSourceService.publish(id))
+      assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("driver");
     }
@@ -247,7 +247,7 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
 
-      assertThatThrownBy(() -> dataSourceService.publish(id))
+      assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("Configuration is required");
     }
@@ -258,7 +258,7 @@ class DataSourceServiceTest {
       UUID id = UUID.randomUUID();
       when(dataSourceRepository.findById(id)).thenReturn(Optional.empty());
 
-      assertThatThrownBy(() -> dataSourceService.publish(id))
+      assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(ResourceNotFoundException.class);
     }
   }
@@ -279,7 +279,7 @@ class DataSourceServiceTest {
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
       when(pipelineRepository.existsByDataSourcesId(any())).thenReturn(false);
 
-      DataSource result = dataSourceService.unpublish(id);
+      DataSource result = dataSourceService.unrelease(id);
 
       assertThat(result.getDataSourceStatus()).isEqualTo(DataSourceStatus.DRAFT);
     }
@@ -296,7 +296,7 @@ class DataSourceServiceTest {
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       when(pipelineRepository.existsByDataSourcesId(any())).thenReturn(true);
 
-      assertThatThrownBy(() -> dataSourceService.unpublish(id))
+      assertThatThrownBy(() -> dataSourceService.unrelease(id))
           .isInstanceOf(ResourceInUseException.class);
     }
 
@@ -310,7 +310,7 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
 
-      assertThatThrownBy(() -> dataSourceService.unpublish(id))
+      assertThatThrownBy(() -> dataSourceService.unrelease(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("AVAILABLE");
     }
@@ -346,7 +346,7 @@ class DataSourceServiceTest {
       stubNotInUse(id);
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getName()).isEqualTo("new-name");
       assertThat(result.getDescription()).isEqualTo("new-desc");
@@ -365,7 +365,7 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
 
-      assertThatThrownBy(() -> dataSourceService.updatePublishedMeta(id, input))
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("AVAILABLE");
     }
@@ -387,7 +387,7 @@ class DataSourceServiceTest {
       stubNotInUse(id);
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getName()).isEqualTo("updated-name");
       assertThat(result.getDescription()).isEqualTo("original-desc");
@@ -422,7 +422,7 @@ class DataSourceServiceTest {
       when(mqttHandler.getSensitiveFields()).thenReturn(Set.of());
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getConfiguration()).containsEntry("topics", List.of("new/topic"));
     }
@@ -470,7 +470,7 @@ class DataSourceServiceTest {
       when(sqlHandler.getSensitiveFields()).thenReturn(Set.of("password"));
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getConfiguration()).containsEntry("password", "enc_secret");
       assertThat(result.getConfiguration()).containsEntry("dsn", "postgres://new-host/db");
@@ -496,7 +496,7 @@ class DataSourceServiceTest {
       stubNotInUse(id);
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getConfiguration()).isEqualTo(originalConfig);
     }
@@ -519,7 +519,7 @@ class DataSourceServiceTest {
       stubInUse(id);
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getName()).isEqualTo("new-name");
       assertThat(result.getDescription()).isEqualTo("new-desc");
@@ -542,7 +542,7 @@ class DataSourceServiceTest {
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       stubInUse(id);
 
-      assertThatThrownBy(() -> dataSourceService.updatePublishedMeta(id, input))
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("configuration")
           .hasMessageContaining("in use");
@@ -565,7 +565,7 @@ class DataSourceServiceTest {
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       stubInUse(id);
 
-      assertThatThrownBy(() -> dataSourceService.updatePublishedMeta(id, input))
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("connector type")
           .hasMessageContaining("in use");
@@ -592,7 +592,7 @@ class DataSourceServiceTest {
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       stubInUse(id);
 
-      assertThatThrownBy(() -> dataSourceService.updatePublishedMeta(id, input))
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("data structure version")
           .hasMessageContaining("in use");
@@ -616,7 +616,7 @@ class DataSourceServiceTest {
       stubInUse(id);
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getName()).isEqualTo("new-name");
     }
@@ -638,7 +638,7 @@ class DataSourceServiceTest {
       stubInUse(id);
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getAssignments()).isEmpty();
     }
@@ -661,7 +661,7 @@ class DataSourceServiceTest {
 
       assertThatThrownBy(() -> dataSourceService.deleteById(id))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("AVAILABLE");
+          .hasMessageContaining("released");
     }
 
     @Test

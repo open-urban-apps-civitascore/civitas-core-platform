@@ -157,7 +157,7 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
     UUID pipelineId = sqlPipeline.getId();
 
     // Publish: DRAFT → READY (generates distributions from pipeline APIs)
-    DataSet published = dataSetService.publish(dataSetId);
+    DataSet published = dataSetService.markReady(dataSetId);
     assertThat(published.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
     assertThat(published.getDistributions())
         .as("Publish should create auto-generated distributions from pipeline APIs")
@@ -223,7 +223,7 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
     UUID pipelineId = mqttPipeline.getId();
 
     // Publish: DRAFT → READY
-    DataSet published = dataSetService.publish(dataSetId);
+    DataSet published = dataSetService.markReady(dataSetId);
     assertThat(published.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
     assertThat(published.getDistributions()).isNotEmpty();
 
