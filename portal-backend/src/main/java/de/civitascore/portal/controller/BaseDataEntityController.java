@@ -119,10 +119,8 @@ public abstract class BaseDataEntityController<
     return ResponseEntity.ok(output);
   }
 
-  @SuppressWarnings("unchecked")
-  protected BaseDataEntityService<E, I> getDataEntityService() {
-    return (BaseDataEntityService<E, I>) getService();
-  }
+  @Override
+  protected abstract BaseDataEntityService<E, I> getService();
 
   @PostMapping("/{id}/release")
   @Operation(
@@ -130,7 +128,7 @@ public abstract class BaseDataEntityController<
       summary = "Release",
       description = "Transitions the entity from DRAFT to AVAILABLE status.")
   public ResponseEntity<O> release(@PathVariable UUID id) {
-    E released = getDataEntityService().release(id);
+    E released = getService().release(id);
     O output = getAssembler().toOutput(released);
     return ResponseEntity.ok(output);
   }
@@ -141,7 +139,7 @@ public abstract class BaseDataEntityController<
       summary = "Unrelease",
       description = "Transitions the entity from AVAILABLE back to DRAFT status.")
   public ResponseEntity<O> unrelease(@PathVariable UUID id) {
-    E unreleased = getDataEntityService().unrelease(id);
+    E unreleased = getService().unrelease(id);
     O output = getAssembler().toOutput(unreleased);
     return ResponseEntity.ok(output);
   }
@@ -154,7 +152,7 @@ public abstract class BaseDataEntityController<
           "Updates metadata of a released entity. Only works on entities that are not in DRAFT status.")
   public ResponseEntity<O> updateReleasedMeta(@PathVariable UUID id, @Valid @RequestBody I input) {
     I preProcessedInput = preProcessInput(input);
-    E updated = getDataEntityService().updateReleasedMeta(id, preProcessedInput);
+    E updated = getService().updateReleasedMeta(id, preProcessedInput);
     O output = getAssembler().toOutput(updated);
     return ResponseEntity.ok(output);
   }
