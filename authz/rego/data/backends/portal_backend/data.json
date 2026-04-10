@@ -73,10 +73,10 @@
       "PATCH": "DATASET_UPDATE",
       "DELETE": "DATASET_DELETE"
     },
-    "/v1/datasets/{id}/publish": {
+    "/v1/datasets/{id}/markReady": {
       "POST": "DATASET_UPDATE"
     },
-    "/v1/datasets/{id}/unpublish": {
+    "/v1/datasets/{id}/markDraft": {
       "POST": "DATASET_UPDATE"
     },
     "/v1/datasets/{id}/release": {
@@ -85,7 +85,7 @@
     "/v1/datasets/{id}/unrelease": {
       "POST": "DATASET_RELEASE"
     },
-    "/v1/datasets/{id}/published/meta": {
+    "/v1/datasets/{id}/released/meta": {
       "PUT": ["DATASET_UPDATE", "DATASET_RELEASE"]
     },
     "/v1/datasets/{id}/assignments": {
@@ -112,13 +112,13 @@
       "PATCH": "DATASOURCE_UPDATE",
       "DELETE": "DATASOURCE_DELETE"
     },
-    "/v1/datasources/{id}/publish": {
+    "/v1/datasources/{id}/release": {
       "POST": "DATASOURCE_RELEASE"
     },
-    "/v1/datasources/{id}/unpublish": {
+    "/v1/datasources/{id}/unrelease": {
       "POST": "DATASOURCE_RELEASE"
     },
-    "/v1/datasources/{id}/published/meta": {
+    "/v1/datasources/{id}/released/meta": {
       "PUT": ["DATASOURCE_UPDATE", "DATASOURCE_RELEASE"]
     },
     "/v1/datasources/{id}/assignments": {
@@ -135,13 +135,13 @@
       "PATCH": "DATASTRUCTURE_UPDATE",
       "DELETE": "DATASTRUCTURE_DELETE"
     },
-    "/v1/datastructures/{id}/publish": {
+    "/v1/datastructures/{id}/release": {
       "POST": "DATASTRUCTURE_RELEASE"
     },
-    "/v1/datastructures/{id}/unpublish": {
+    "/v1/datastructures/{id}/unrelease": {
       "POST": "DATASTRUCTURE_RELEASE"
     },
-    "/v1/datastructures/{id}/published/meta": {
+    "/v1/datastructures/{id}/released/meta": {
       "PUT": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
     },
     "/v1/datastructures/{id}/assignments": {
@@ -157,13 +157,13 @@
       "PATCH": "DATASTRUCTURE_UPDATE",
       "DELETE": "DATASTRUCTURE_DELETE"
     },
-    "/v1/datastructures/{id}/versions/{id}/publish": {
+    "/v1/datastructures/{id}/versions/{id}/release": {
       "POST": "DATASTRUCTURE_RELEASE"
     },
-    "/v1/datastructures/{id}/versions/{id}/unpublish": {
+    "/v1/datastructures/{id}/versions/{id}/unrelease": {
       "POST": "DATASTRUCTURE_RELEASE"
     },
-    "/v1/datastructures/{id}/versions/{id}/published/meta": {
+    "/v1/datastructures/{id}/versions/{id}/released/meta": {
       "PUT": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
     },
     "_removed_for_v2": "catalogs and dataspaces removed — not implemented in v2.0 (see #989). OPA denies as unknown_endpoint."
