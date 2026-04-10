@@ -37,6 +37,9 @@
       "PATCH": null,
       "DELETE": null
     },
+    "/v1/groups/{id}/assignments": {
+      "PUT": null
+    },
     "/v1/permissions": {
       "GET": null
     },
