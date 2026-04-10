@@ -22,7 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** REST controller for managing data structure resources, including publish/unpublish lifecycle. */
+/** REST controller for managing data structure resources, including release/unrelease lifecycle. */
 @RestController
 @RequestMapping("/datastructures")
 @RequiredArgsConstructor

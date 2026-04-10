@@ -298,12 +298,12 @@ public class DataStructureVersionController
       summary = "Unrelease a data structure version",
       description =
           "Unreleases a data structure version by setting status back to DRAFT. Cannot unrelease"
-              + " if this is the only published version of a published DataStructure - unpublish"
+              + " if this is the only released version of a released DataStructure - unrelease"
               + " the DataStructure first in that case.")
   @ApiResponse(responseCode = "200", description = "Data structure version unreleased successfully")
   @ApiResponse(
       responseCode = "400",
-      description = "Invalid input (e.g. already in DRAFT or only published version)",
+      description = "Invalid input (e.g. already in DRAFT or only released version)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @ApiResponse(
       responseCode = "404",

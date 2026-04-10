@@ -33,9 +33,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * REST controller for managing dataset resources, including publish/release lifecycle operations.
- */
+/** REST controller for managing dataset resources, including release lifecycle operations. */
 @RestController
 @RequestMapping("/datasets")
 @RequiredArgsConstructor

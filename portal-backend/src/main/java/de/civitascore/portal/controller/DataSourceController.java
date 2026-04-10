@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 
-/** REST controller for managing data source resources, including publish/unpublish lifecycle. */
+/** REST controller for managing data source resources, including release/unrelease lifecycle. */
 @RestController
 @RequestMapping("/datasources")
 @RequiredArgsConstructor
