@@ -1,10 +1,10 @@
 package de.civitascore.portal.service.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.UserInputDTO;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -22,10 +22,9 @@ class LifecycleHooksIntegrationTest extends BaseEventPublishingIntegrationTest {
     UserInputDTO duplicateInput = createValidUserInput();
     duplicateInput.setEmail(email);
 
-    Assertions.assertThrows(
-        Exception.class,
-        () -> userService.create(duplicateInput),
-        "preSave hook should validate unique email");
+    assertThatThrownBy(() -> userService.create(duplicateInput))
+        .as("preSave hook should validate unique email")
+        .isInstanceOf(Exception.class);
   }
 
   @Test
