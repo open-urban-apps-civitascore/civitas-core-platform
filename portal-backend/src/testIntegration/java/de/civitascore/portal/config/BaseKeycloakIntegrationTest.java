@@ -3,7 +3,6 @@ package de.civitascore.portal.config;
 import dasniko.testcontainers.keycloak.KeycloakContainer;
 import de.civitascore.portal.PortalBackendApplication;
 import de.civitascore.portal.util.KeycloakTokenHelper;
-import de.civitascore.portal.util.TestContainerConfiguration;
 import lombok.AccessLevel;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
@@ -30,7 +29,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @ActiveProfiles("test-integration")
 @AutoConfigureTestRestTemplate
 @Testcontainers
-@Import({TestContainerConfiguration.class, PortalTestDataFactory.class, InfraTestDataFactory.class})
+@Import({PortalTestDataFactory.class, InfraTestDataFactory.class})
 @Slf4j(access = AccessLevel.PROTECTED)
 public abstract class BaseKeycloakIntegrationTest {
 
@@ -42,11 +41,13 @@ public abstract class BaseKeycloakIntegrationTest {
         new PostgreSQLContainer("postgres:15")
             .withDatabaseName("iot_schema")
             .withUsername("iot")
-            .withPassword("iot");
+            .withPassword("iot")
+            .withReuse(true);
 
     KEYCLOAK =
         new KeycloakContainer("quay.io/keycloak/keycloak:26.3.4")
-            .withRealmImportFile("keycloak/iot-realm.json");
+            .withRealmImportFile("keycloak/iot-realm.json")
+            .withReuse(true);
 
     POSTGRES.start();
     KEYCLOAK.start();

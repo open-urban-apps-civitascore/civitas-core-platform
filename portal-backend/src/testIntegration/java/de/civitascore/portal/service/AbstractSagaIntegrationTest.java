@@ -4,6 +4,7 @@ import com.github.dockerjava.api.model.ContainerNetwork;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import java.nio.file.Path;
 import java.time.Duration;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Tag;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
@@ -12,15 +13,16 @@ import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.utility.MountableFile;
 
 /**
- * Abstract base for saga integration tests. Provides factory methods for creating the common
- * container set (postgis, frost, kafka, redpandaConnect, mosquitto) with standard configuration,
- * and a utility to resolve the FROST URL using the Docker network gateway IP (required so FROST is
- * reachable from both the host test process and containers on the same saga network).
+ * Abstract base for saga integration tests. Owns the shared container set (postgis, frost, kafka,
+ * redpandaConnect, mosquitto) on a common Docker network. Containers are started once and shared
+ * across all subclasses; each subclass uses {@code @DirtiesContext(AFTER_CLASS)} to rebuild its
+ * Spring context while the containers stay alive.
  *
- * <p>Each concrete subclass creates its own container instances by calling the factory methods,
- * keeping independent lifecycles.
+ * <p>Subclasses that need additional containers (e.g. a datasource PostgreSQL for E2E tests) can
+ * declare them as their own static fields on the shared {@link #sagaNetwork}.
  */
 @Tag("saga")
+@Slf4j
 abstract class AbstractSagaIntegrationTest extends BaseKeycloakIntegrationTest {
 
   static final String FROST_IMAGE = "hylkevds/frost-http-projects:latest";
@@ -28,6 +30,43 @@ abstract class AbstractSagaIntegrationTest extends BaseKeycloakIntegrationTest {
   static final String REDPANDA_CONNECT_IMAGE = "redpandadata/connect:4";
   static final String POSTGIS_IMAGE = "postgis/postgis:16-3.4-alpine";
   static final String MOSQUITTO_IMAGE = "eclipse-mosquitto:2.0.20";
+
+  // ---------------------------------------------------------------------------
+  // Shared containers — started once, reused by all saga test subclasses
+  // ---------------------------------------------------------------------------
+
+  static final Network sagaNetwork = Network.newNetwork();
+
+  static final GenericContainer<?> postgis = createPostgis(sagaNetwork);
+  static final GenericContainer<?> frost = createFrost(sagaNetwork, postgis);
+  static final KafkaContainer kafka = createKafka();
+  static final GenericContainer<?> redpandaConnect = createRedpandaConnect(sagaNetwork);
+  static final GenericContainer<?> mosquitto = createMosquitto(sagaNetwork);
+
+  static final String frostExternalUrl;
+  static final String redpandaExternalUrl;
+
+  static {
+    postgis.start();
+    frost.start();
+    kafka.start();
+    mosquitto.start();
+    redpandaConnect.start();
+
+    frostExternalUrl =
+        "http://" + frost.getHost() + ":" + frost.getMappedPort(8080) + "/FROST-Server/v1.1";
+    redpandaExternalUrl =
+        "http://" + redpandaConnect.getHost() + ":" + redpandaConnect.getMappedPort(4195);
+
+    log.info("Saga containers started:");
+    log.info("  FROST at {}", frostExternalUrl);
+    log.info("  Kafka at {}", kafka.getBootstrapServers());
+    log.info("  Redpanda Connect at {}", redpandaExternalUrl);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Container factory methods
+  // ---------------------------------------------------------------------------
 
   @SuppressWarnings("resource")
   protected static GenericContainer<?> createPostgis(Network network) {
