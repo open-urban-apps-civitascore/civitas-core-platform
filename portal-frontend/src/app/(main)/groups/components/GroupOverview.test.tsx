@@ -12,6 +12,7 @@ const mockPush = vi.fn()
 const mockCreateMutateAsync = vi.fn()
 const mockUpdateMutateAsync = vi.fn()
 const mockReplaceAssignmentsMutateAsync = vi.fn()
+const mockSetSubTabValueParam = vi.fn()
 
 let mockSearchParams = new URLSearchParams()
 let mockSubTabValue = 'info'
@@ -37,12 +38,24 @@ vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }))
 
-vi.mock('@/hooks/use-query-params', () => ({
-  useQueryParams: () => ({
-    setSubTabValueParam: vi.fn(),
-    subTabValue: mockSubTabValue,
-  }),
-}))
+vi.mock('@/hooks/use-query-params', async () => {
+  const React = await vi.importActual<typeof import('react')>('react')
+
+  return {
+    useQueryParams: () => {
+      const [subTabValue, setSubTabValue] = React.useState(mockSubTabValue)
+
+      return {
+        subTabValue,
+        setSubTabValueParam: (value: string) => {
+          mockSubTabValue = value
+          mockSetSubTabValueParam(value)
+          setSubTabValue(value)
+        },
+      }
+    },
+  }
+})
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -179,16 +192,24 @@ describe('GroupOverview', () => {
       expect(screen.getByTestId('nameTextField')).toBeInTheDocument()
     })
 
-    it('renders RolesTab for roles tab', () => {
-      mockSubTabValue = 'roles'
+    it('switches to RolesTab when Roles tab is clicked', async () => {
       renderComponent()
-      expect(screen.getByTestId('roles-tab')).toBeInTheDocument()
+      fireEvent.click(screen.getByTestId('tab-roles'))
+
+      await waitFor(() => {
+        expect(mockSetSubTabValueParam).toHaveBeenCalledWith('roles')
+        expect(screen.getByTestId('roles-tab')).toBeInTheDocument()
+      })
     })
 
-    it('renders UsersTab for users tab', () => {
-      mockSubTabValue = 'users'
+    it('switches to UsersTab when Users tab is clicked', async () => {
       renderComponent()
-      expect(screen.getByTestId('users-tab')).toBeInTheDocument()
+      fireEvent.click(screen.getByTestId('tab-users'))
+
+      await waitFor(() => {
+        expect(mockSetSubTabValueParam).toHaveBeenCalledWith('users')
+        expect(screen.getByTestId('users-tab')).toBeInTheDocument()
+      })
     })
   })
 
