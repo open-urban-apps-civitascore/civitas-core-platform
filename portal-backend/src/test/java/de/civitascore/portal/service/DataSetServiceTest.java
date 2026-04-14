@@ -79,12 +79,12 @@ class DataSetServiceTest {
   }
 
   @Nested
-  @DisplayName("markReady()")
-  class MarkReadyTests {
+  @DisplayName("stage()")
+  class StageTests {
 
     @Test
-    @DisplayName("publishes dataset with feed-in pipeline (has datasources)")
-    void publishesWithDatasources() {
+    @DisplayName("stages dataset with feed-in pipeline (has datasources)")
+    void stagesWithDatasources() {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
       Pipeline p = new Pipeline();
@@ -94,13 +94,13 @@ class DataSetServiceTest {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      DataSet result = createService().markReady(id);
+      DataSet result = createService().stage(id);
       assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
     }
 
     @Test
-    @DisplayName("publishes dataset with provide pipeline (has APIs, no datasources)")
-    void publishesWithApisOnly() {
+    @DisplayName("stages dataset with provide pipeline (has APIs, no datasources)")
+    void stagesWithApisOnly() {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
       Pipeline p = new Pipeline();
@@ -112,7 +112,7 @@ class DataSetServiceTest {
       when(distributionService.createFromApiUrlAndDataSet(any(), any()))
           .thenReturn(new Distribution());
 
-      DataSet result = createService().markReady(id);
+      DataSet result = createService().stage(id);
       assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
     }
 
@@ -125,7 +125,7 @@ class DataSetServiceTest {
 
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
-      assertThatThrownBy(() -> createService().markReady(id))
+      assertThatThrownBy(() -> createService().stage(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("DataSources or APIs");
     }
@@ -138,7 +138,7 @@ class DataSetServiceTest {
 
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
-      assertThatThrownBy(() -> createService().markReady(id))
+      assertThatThrownBy(() -> createService().stage(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("Pipeline");
     }

@@ -11,19 +11,19 @@ import { Dataset } from '@/types/datasets'
 import { DatasetOverview } from './DatasetOverview'
 
 const mockPatchDataset = vi.fn().mockResolvedValue(undefined)
-const mockPublishDataset = vi.fn().mockResolvedValue(undefined)
-const mockUnpublishDataset = vi.fn().mockResolvedValue(undefined)
+const mockStageDataset = vi.fn().mockResolvedValue(undefined)
+const mockUnstageDataset = vi.fn().mockResolvedValue(undefined)
 const mockReleaseDataset = vi.fn().mockResolvedValue(undefined)
 const mockUnreleaseDataset = vi.fn().mockResolvedValue(undefined)
-const mockUpdatePublishedDatasetMeta = vi.fn().mockResolvedValue(undefined)
+const mockUpdateReleasedDatasetMeta = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   usePatchDataset: () => ({ mutateAsync: mockPatchDataset, isPending: false }),
-  usePublishDataset: () => ({ mutateAsync: mockPublishDataset, isPending: false }),
-  useUnpublishDataset: () => ({ mutateAsync: mockUnpublishDataset, isPending: false }),
+  useStageDataset: () => ({ mutateAsync: mockStageDataset, isPending: false }),
+  useUnstageDataset: () => ({ mutateAsync: mockUnstageDataset, isPending: false }),
   useReleaseDataset: () => ({ mutateAsync: mockReleaseDataset, isPending: false }),
   useUnreleaseDataset: () => ({ mutateAsync: mockUnreleaseDataset, isPending: false }),
-  useUpdatePublishedDatasetMeta: () => ({ mutateAsync: mockUpdatePublishedDatasetMeta, isPending: false }),
+  useUpdateReleasedDatasetMeta: () => ({ mutateAsync: mockUpdateReleasedDatasetMeta, isPending: false }),
 }))
 
 vi.mock('@/app/services/api/users/clientRequests', () => ({
@@ -60,15 +60,6 @@ vi.mock('next-intl', () => ({
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
-}))
-
-vi.mock('@/app/services/api/datasets/clientRequests', () => ({
-  usePatchDataset: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useMarkReadyDataset: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useReleaseDataset: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useMarkDraftDataset: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useUnreleaseDataset: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useUpdateReleasedDatasetMeta: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock('@/components/ui/input', () => ({
@@ -366,7 +357,7 @@ describe('DatasetOverview', () => {
       })
     })
 
-    it('calls publishDataset when status changes from DRAFT to READY', async () => {
+    it('calls stageDataset when status changes from DRAFT to READY', async () => {
       renderComponent({
         dataset: makeDraftDataset({ distributions: [{ id: 'd1', accessUrl: 'http://example.com' }] }),
         groupCount: 1,
@@ -379,11 +370,11 @@ describe('DatasetOverview', () => {
       fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
 
       await waitFor(() => {
-        expect(mockPublishDataset).toHaveBeenCalledWith('test-id')
+        expect(mockStageDataset).toHaveBeenCalledWith('test-id')
       })
     })
 
-    it('calls unpublishDataset when status changes from READY to DRAFT', async () => {
+    it('calls unstageDataset when status changes from READY to DRAFT', async () => {
       renderComponent({
         dataset: makeDraftDataset({
           dataSetStatus: 'READY',
@@ -399,7 +390,7 @@ describe('DatasetOverview', () => {
       fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
 
       await waitFor(() => {
-        expect(mockUnpublishDataset).toHaveBeenCalledWith('test-id')
+        expect(mockUnstageDataset).toHaveBeenCalledWith('test-id')
       })
     })
 
@@ -423,7 +414,7 @@ describe('DatasetOverview', () => {
       })
     })
 
-    it('calls unreleaseDataset and unpublishDataset when status changes from AVAILABLE to DRAFT', async () => {
+    it('calls unreleaseDataset and unstageDataset when status changes from AVAILABLE to DRAFT', async () => {
       renderComponent({
         dataset: makeDraftDataset({
           dataSetStatus: 'AVAILABLE',
@@ -440,11 +431,11 @@ describe('DatasetOverview', () => {
 
       await waitFor(() => {
         expect(mockUnreleaseDataset).toHaveBeenCalledWith('test-id')
-        expect(mockUnpublishDataset).toHaveBeenCalledWith('test-id')
+        expect(mockUnstageDataset).toHaveBeenCalledWith('test-id')
       })
     })
 
-    it('calls updatePublishedDatasetMeta when saving form changes on an AVAILABLE dataset', async () => {
+    it('calls updateReleasedDatasetMeta when saving form changes on an AVAILABLE dataset', async () => {
       renderComponent({
         dataset: makeDraftDataset({
           dataSetStatus: 'AVAILABLE',
@@ -462,7 +453,7 @@ describe('DatasetOverview', () => {
       fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
 
       await waitFor(() => {
-        expect(mockUpdatePublishedDatasetMeta).toHaveBeenCalledWith(
+        expect(mockUpdateReleasedDatasetMeta).toHaveBeenCalledWith(
           expect.objectContaining({ name: 'Updated Name', id: 'test-id' }),
         )
       })
@@ -535,7 +526,7 @@ describe('DatasetOverview', () => {
       expect(screen.queryByTestId('exitWarningModal')).not.toBeInTheDocument()
     })
 
-    it('save-and-exit from modal calls mockPublishDataset and closes modal on success', async () => {
+    it('save-and-exit from modal calls mockStageDataset and closes modal on success', async () => {
       renderComponent({
         dataset: makeDraftDataset({ distributions: [{ id: 'd1', accessUrl: 'http://example.com' }] }),
       })
@@ -549,7 +540,7 @@ describe('DatasetOverview', () => {
 
       fireEvent.click(screen.getByTestId('saveButton'))
 
-      expect(mockPublishDataset).toHaveBeenCalledWith('test-id')
+      expect(mockStageDataset).toHaveBeenCalledWith('test-id')
       await waitFor(() => {
         expect(screen.queryByTestId('exitWarningModal')).not.toBeInTheDocument()
       })

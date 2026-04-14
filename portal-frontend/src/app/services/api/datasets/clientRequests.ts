@@ -49,7 +49,7 @@ export const useDeleteDataset = () =>
     errorMessage: 'An error occurred while deleting the dataset.',
   })
 
-const useDatasetTransition = (action: 'markReady' | 'markDraft' | 'release' | 'unrelease') => {
+const useDatasetTransition = (action: 'stage' | 'unstage' | 'release' | 'unrelease') => {
   const queryClient = useQueryClient()
   return useMutation<ApiServiceResponse<Dataset>, unknown, string>({
     mutationFn: (id: string) =>
@@ -68,8 +68,8 @@ const useDatasetTransition = (action: 'markReady' | 'markDraft' | 'release' | 'u
   })
 }
 
-export const useMarkReadyDataset = () => useDatasetTransition('markReady')
-export const useMarkDraftDataset = () => useDatasetTransition('markDraft')
+export const useStageDataset = () => useDatasetTransition('stage')
+export const useUnstageDataset = () => useDatasetTransition('unstage')
 export const useReleaseDataset = () => useDatasetTransition('release')
 export const useUnreleaseDataset = () => useDatasetTransition('unrelease')
 

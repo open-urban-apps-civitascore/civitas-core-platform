@@ -201,18 +201,18 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   }
 
   @Nested
-  @DisplayName("Mark Ready DataSet Tests")
-  class MarkReadyDataSetTests {
+  @DisplayName("Stage DataSet Tests")
+  class StageDataSetTests {
     @Test
     @Transactional
     @DisplayName("Should mark dataset as ready with pipelines")
-    void shouldMarkReadyDataSetWithPipelines() {
+    void shouldStageDataSetWithPipelines() {
       DataSet dataSet = createInitialDataSet();
-      Pipeline pipeline = createPipelineForDataSet(dataSet, "Pipeline for MarkReady");
+      Pipeline pipeline = createPipelineForDataSet(dataSet, "Pipeline for Stage");
       dataSet.getPipelines().add(pipeline);
       dataSet = dataSetRepository.save(dataSet);
 
-      DataSet readyDataSet = dataSetService.markReady(dataSet.getId());
+      DataSet readyDataSet = dataSetService.stage(dataSet.getId());
 
       assertThat(readyDataSet.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
 
@@ -231,16 +231,16 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     @DisplayName("Should throw InvalidInputException when marking already ready dataset as ready")
     void shouldThrowExceptionWhenMarkingReadyAlreadyReadyDataSet() {
       DataSet dataSet = createInitialDataSet();
-      Pipeline pipeline = createPipelineForDataSet(dataSet, "Pipeline for MarkReady");
+      Pipeline pipeline = createPipelineForDataSet(dataSet, "Pipeline for Stage");
       dataSet.getPipelines().add(pipeline);
       dataSet = dataSetRepository.save(dataSet);
 
-      DataSet readyDataSet = dataSetService.markReady(dataSet.getId());
+      DataSet readyDataSet = dataSetService.stage(dataSet.getId());
       UUID readyDataSetId = readyDataSet.getId();
 
-      assertThatThrownBy(() -> dataSetService.markReady(readyDataSetId))
+      assertThatThrownBy(() -> dataSetService.stage(readyDataSetId))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("Only DRAFT datasets can be marked as ready");
+          .hasMessageContaining("Only DRAFT datasets can be staged");
     }
 
     @Test
@@ -250,7 +250,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     void shouldThrowExceptionWhenMarkingReadyDataSetWithoutPipelines() {
       DataSet dataSet = createInitialDataSet();
 
-      assertThatThrownBy(() -> dataSetService.markReady(dataSet.getId()))
+      assertThatThrownBy(() -> dataSetService.stage(dataSet.getId()))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining(
               "DataSet must contain at least one Pipeline before marking as ready");

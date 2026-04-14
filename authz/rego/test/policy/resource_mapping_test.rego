@@ -199,8 +199,8 @@ test_all_resource_paths if {
 # Test: Sub-resource paths resolve correctly
 test_sub_resource_paths if {
 	patterns := [
-		["/v1/datasets/abc/markReady", "/v1/datasets/{id}/markReady"],
-		["/v1/datasets/abc/markDraft", "/v1/datasets/{id}/markDraft"],
+		["/v1/datasets/abc/stage", "/v1/datasets/{id}/stage"],
+		["/v1/datasets/abc/unstage", "/v1/datasets/{id}/unstage"],
 		["/v1/datasets/abc/assignments", "/v1/datasets/{id}/assignments"],
 		["/v1/datasets/abc/pipelines", "/v1/datasets/{id}/pipelines"],
 		["/v1/datasources/abc/release", "/v1/datasources/{id}/release"],

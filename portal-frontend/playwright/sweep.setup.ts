@@ -55,7 +55,7 @@ setup('sweep stale e2e data', async () => {
   )
   for (const d of datasets) {
     try {
-      await api.markDraftDataset(d.id).catch(() => {})
+      await api.unstageDataset(d.id).catch(() => {})
       await api.deleteDataset(d.id)
     } catch {
       warn(`dataset ${d.id}`)

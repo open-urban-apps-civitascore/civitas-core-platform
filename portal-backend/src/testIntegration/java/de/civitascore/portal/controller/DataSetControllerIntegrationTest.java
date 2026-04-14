@@ -885,12 +885,12 @@ class DataSetControllerIntegrationTest
   }
 
   @Nested
-  @DisplayName("Mark Ready DataSet Tests")
-  class MarkReadyDataSetTests {
+  @DisplayName("Stage DataSet Tests")
+  class StageDataSetTests {
 
     @Test
-    @DisplayName("Should mark dataset as ready with pipelines successfully")
-    void shouldMarkReadyDataSetWithPipelinesSuccessfully() {
+    @DisplayName("Should stage dataset with pipelines successfully")
+    void shouldStageDataSetWithPipelinesSuccessfully() {
       DataSet dataSet = new DataSet();
       dataSet.setName("test_dataset_publish_" + System.currentTimeMillis());
       dataSet.setDescription("Test dataset with pipelines");
@@ -929,7 +929,7 @@ class DataSetControllerIntegrationTest
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSetId + "/markReady",
+              getEndpointPath() + "/" + dataSetId + "/stage",
               org.springframework.http.HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -938,7 +938,7 @@ class DataSetControllerIntegrationTest
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDataSetStatus())
-          .as("DataSet status should be READY after marking ready")
+          .as("DataSet status should be READY after staging")
           .isEqualTo(DataSetStatus.READY);
 
       long distributionCount =
@@ -970,8 +970,8 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should mark dataset as ready with provide pipeline (APIs only, no datasources)")
-    void shouldMarkReadyDataSetWithApisOnly() {
+    @DisplayName("Should stage dataset with provide pipeline (APIs only, no datasources)")
+    void shouldStageDataSetWithApisOnly() {
       DataSet dataSet = new DataSet();
       dataSet.setName("test_dataset_provide_" + System.currentTimeMillis());
       dataSet.setDescription("Test dataset with provide pipeline");
@@ -992,7 +992,7 @@ class DataSetControllerIntegrationTest
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSetId + "/markReady",
+              getEndpointPath() + "/" + dataSetId + "/stage",
               org.springframework.http.HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -1001,7 +1001,7 @@ class DataSetControllerIntegrationTest
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDataSetStatus())
-          .as("DataSet status should be READY after marking ready")
+          .as("DataSet status should be READY after staging")
           .isEqualTo(DataSetStatus.READY);
 
       long distributionCount =
@@ -1015,8 +1015,8 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should fail to mark dataset as ready without pipelines")
-    void shouldFailToMarkReadyDataSetWithoutPipelines() {
+    @DisplayName("Should fail to stage dataset without pipelines")
+    void shouldFailToStageDataSetWithoutPipelines() {
       DataSet dataSet = new DataSet();
       dataSet.setName("test_dataset_no_pipelines_" + System.currentTimeMillis());
       dataSet.setDescription("Test dataset without pipelines");
@@ -1029,7 +1029,7 @@ class DataSetControllerIntegrationTest
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSetId + "/markReady",
+              getEndpointPath() + "/" + dataSetId + "/stage",
               org.springframework.http.HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -1042,18 +1042,18 @@ class DataSetControllerIntegrationTest
       DataSet unchangedDataSet = dataSetRepository.findById(dataSetId).orElse(null);
       assertThat(unchangedDataSet).isNotNull();
       assertThat(unchangedDataSet.getDataSetStatus())
-          .as("DataSet status should remain DRAFT after failed markReady")
+          .as("DataSet status should remain DRAFT after failed stage")
           .isEqualTo(DataSetStatus.DRAFT);
     }
 
     @Test
-    @DisplayName("Should fail to mark ready non-existent dataset")
-    void shouldFailToMarkReadyNonExistentDataSet() {
+    @DisplayName("Should fail to stage non-existent dataset")
+    void shouldFailToStageNonExistentDataSet() {
       UUID nonExistentId = UUID.randomUUID();
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + nonExistentId + "/markReady",
+              getEndpointPath() + "/" + nonExistentId + "/stage",
               org.springframework.http.HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -1102,7 +1102,7 @@ class DataSetControllerIntegrationTest
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSetId + "/markReady",
+              getEndpointPath() + "/" + dataSetId + "/stage",
               org.springframework.http.HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -1145,7 +1145,7 @@ class DataSetControllerIntegrationTest
 
       UUID dataSetId = dataSet.getId();
       exchange(
-          getEndpointPath() + "/" + dataSetId + "/markReady",
+          getEndpointPath() + "/" + dataSetId + "/stage",
           HttpMethod.POST,
           createAuthHeaders(),
           null,

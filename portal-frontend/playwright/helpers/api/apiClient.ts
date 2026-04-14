@@ -248,12 +248,12 @@ export class ApiClient {
     return this.post<{ id: string; name: string }>('/datasets', data)
   }
 
-  async markReadyDataset(datasetId: string) {
-    return this.post<{ id: string; dataSetStatus: string }>(`/datasets/${datasetId}/markReady`, {})
+  async stageDataset(datasetId: string) {
+    return this.post<{ id: string; dataSetStatus: string }>(`/datasets/${datasetId}/stage`, {})
   }
 
-  async markDraftDataset(datasetId: string) {
-    return this.post<{ id: string; dataSetStatus: string }>(`/datasets/${datasetId}/markDraft`, {})
+  async unstageDataset(datasetId: string) {
+    return this.post<{ id: string; dataSetStatus: string }>(`/datasets/${datasetId}/unstage`, {})
   }
 
   async deleteDataset(datasetId: string) {

@@ -61,9 +61,9 @@ test_path_pattern_unknown if {
 # SUB-RESOURCE PATH PATTERN TESTS
 # =============================================================================
 
-test_path_pattern_4_segment_markReady if {
-	result := portal_backend.path_pattern with input as portal_request("POST", "/v1/datasets/abc-123/markReady")
-	result == "/v1/datasets/{id}/markReady"
+test_path_pattern_4_segment_stage if {
+	result := portal_backend.path_pattern with input as portal_request("POST", "/v1/datasets/abc-123/stage")
+	result == "/v1/datasets/{id}/stage"
 }
 
 test_path_pattern_4_segment_assignments if {
@@ -185,7 +185,7 @@ test_scope_type_datastructures if {
 
 # Sub-resource resource_id should be the parent resource ID (parts[2])
 test_resource_id_4_segment if {
-	result := portal_backend.resource_id with input as portal_request("POST", "/v1/datasets/abc-123/markReady")
+	result := portal_backend.resource_id with input as portal_request("POST", "/v1/datasets/abc-123/stage")
 	result == "abc-123"
 }
 
@@ -201,7 +201,7 @@ test_resource_id_6_segment if {
 
 # Sub-resource paths are resource endpoints (not collection)
 test_is_resource_endpoint_4_segment if {
-	portal_backend.is_resource_endpoint with input as portal_request("POST", "/v1/datasets/abc-123/markReady")
+	portal_backend.is_resource_endpoint with input as portal_request("POST", "/v1/datasets/abc-123/stage")
 }
 
 test_is_resource_endpoint_5_segment if {
@@ -225,7 +225,7 @@ test_not_collection_endpoint_resource if {
 }
 
 test_not_collection_endpoint_sub_resource if {
-	not portal_backend.is_collection_endpoint with input as portal_request("POST", "/v1/datasets/abc-123/markReady")
+	not portal_backend.is_collection_endpoint with input as portal_request("POST", "/v1/datasets/abc-123/stage")
 }
 
 test_not_collection_endpoint_users_me if {

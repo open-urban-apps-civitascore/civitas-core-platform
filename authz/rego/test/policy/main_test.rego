@@ -560,23 +560,23 @@ test_and_disjoint_scopes_denied if {
 # =============================================================================
 # NEW ENDPOINT INTEGRATION TESTS
 # =============================================================================
-# End-to-end tests for unpublish, ready, unready endpoints.
+# End-to-end tests for stage, unstage, release, unrelease endpoints.
 
-# Test: POST /datasets/{id}/markDraft requires only DATASET_UPDATE
-test_markDraft_allowed if {
+# Test: POST /datasets/{id}/unstage requires only DATASET_UPDATE
+test_unstage_allowed if {
 	result := authz.decision with http.send as mock_send_specific_partial
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v1/datasets/dataset-abc/markDraft")
+		with input as portal_request("POST", "/v1/datasets/dataset-abc/unstage")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.required_permissions == {"DATASET_UPDATE"}
 }
 
-# Test: POST /datasets/{id}/markReady requires DATASET_UPDATE
-test_markReady_single_perm if {
+# Test: POST /datasets/{id}/stage requires DATASET_UPDATE
+test_stage_single_perm if {
 	result := authz.decision with http.send as mock_send_specific_partial
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v1/datasets/dataset-abc/markReady")
+		with input as portal_request("POST", "/v1/datasets/dataset-abc/stage")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.required_permissions == {"DATASET_UPDATE"}

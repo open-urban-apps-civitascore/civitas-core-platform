@@ -272,8 +272,8 @@
       "updateSuccess": "Datensatz wurde erfolgreich aktualisiert.",
       "deleteSuccess": "Datensatz wurde erfolgreich gelöscht.",
       "deleteError": "Fehler beim Löschen des Datensatzes. Bitte versuche es erneut.",
-      "markReadySuccess": "Der Datensatz wurde erfolgreich als bereit markiert.",
-      "markDraftSuccess": "Der Datensatz wurde erfolgreich auf Entwurf zurückgesetzt.",
+      "stageSuccess": "Der Datensatz wurde erfolgreich auf Bereit gesetzt.",
+      "unstageSuccess": "Der Datensatz wurde erfolgreich auf Entwurf zurückgesetzt.",
       "releaseSuccess": "Der Datensatz wurde erfolgreich freigegeben.",
       "unreleaseSuccess": "Die Freigabe des Datensatzes wurde erfolgreich aufgehoben.",
       "transitionError": "Beim Ändern des Datensatzstatus ist ein Fehler aufgetreten. Bitte versuche es erneut."

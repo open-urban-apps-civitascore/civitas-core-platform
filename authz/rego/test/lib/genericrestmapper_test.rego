@@ -17,7 +17,7 @@ mock_endpoints := {
 	"/v1/users/me": {"GET": null},
 	"/v1/datasets": {"GET": "DATASET_READ"},
 	"/v1/datasets/{id}": {"GET": "DATASET_READ", "DELETE": "DATASET_DELETE"},
-	"/v1/datasets/{id}/markReady": {"POST": "DATASET_UPDATE"},
+	"/v1/datasets/{id}/stage": {"POST": "DATASET_UPDATE"},
 	"/v1/datasets/{id}/assignments": {"GET": "DATASET_READ"},
 	"/v1/datasets/{id}/pipelines/{id}": {"GET": "DATASET_READ", "PUT": "DATASET_UPDATE"},
 	"/v1/datasets/{id}/released/meta": {"PUT": ["DATASET_UPDATE", "DATASET_RELEASE"]},
@@ -200,16 +200,16 @@ test_match_pattern_case_sensitive if {
 # 4-SEGMENT SUB-RESOURCE PATTERN MATCHING TESTS
 # =============================================================================
 
-# Pattern match - 4-segment sub-resource (/v1/datasets/{id}/markReady)
+# Pattern match - 4-segment sub-resource (/v1/datasets/{id}/stage)
 test_match_pattern_4_segment_subresource if {
-	result := restmapper.match_pattern("/v1/datasets/abc-123/markReady", mock_endpoints)
-	result == "/v1/datasets/{id}/markReady"
+	result := restmapper.match_pattern("/v1/datasets/abc-123/stage", mock_endpoints)
+	result == "/v1/datasets/{id}/stage"
 }
 
 # Pattern match - 4-segment with UUID
 test_match_pattern_4_segment_uuid if {
-	result := restmapper.match_pattern("/v1/datasets/550e8400-e29b-41d4-a716-446655440000/markReady", mock_endpoints)
-	result == "/v1/datasets/{id}/markReady"
+	result := restmapper.match_pattern("/v1/datasets/550e8400-e29b-41d4-a716-446655440000/stage", mock_endpoints)
+	result == "/v1/datasets/{id}/stage"
 }
 
 # Pattern match - 4-segment assignments sub-resource
@@ -226,7 +226,7 @@ test_match_pattern_4_segment_unknown_subresource if {
 
 # No match - 4-segment with reserved segment as ID
 test_match_pattern_4_segment_reserved_id if {
-	result := restmapper.match_pattern("/v1/datasets/me/markReady", mock_endpoints)
+	result := restmapper.match_pattern("/v1/datasets/me/stage", mock_endpoints)
 	result == ""
 }
 

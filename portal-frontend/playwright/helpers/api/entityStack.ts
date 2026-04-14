@@ -103,12 +103,12 @@ export const createAvailableEntityStack = async (
     description: 'E2E test pipeline',
     dataSourceIds: [datasource.id],
   })
-  await adminApi.markReadyDataset(dataset.id)
+  await adminApi.stageDataset(dataset.id)
 
-  // 4. Mark dataset and datasource back to DRAFT so tests can enter edit mode.
+  // 4. Unstage dataset and datasource back to DRAFT so tests can enter edit mode.
   //    The datastructure + version stay AVAILABLE (can't unrelease while version is referenced).
   //    Order: dataset first (depends on datasource), then datasource.
-  await adminApi.markDraftDataset(dataset.id)
+  await adminApi.unstageDataset(dataset.id)
   await adminApi.unreleaseDatasource(datasource.id)
 
   return { datastructure, version, datasource, dataset, pipeline }

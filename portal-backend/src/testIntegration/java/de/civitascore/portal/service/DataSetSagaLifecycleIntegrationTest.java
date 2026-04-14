@@ -52,9 +52,9 @@ import tools.jackson.databind.json.JsonMapper;
  * <ul>
  *   <li>Full round-trip: CREATE → DELETE → re-CREATE
  *   <li>DELETE saga (unrelease) infrastructure teardown
- *   <li>markReady validation guards
+ *   <li>stage validation guards
  *   <li>Concurrent saga guards
- *   <li>markDraft distribution cleanup
+ *   <li>unstage distribution cleanup
  *   <li>Multi-pipeline dataset
  * </ul>
  *
@@ -153,7 +153,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
     UUID pipelineId = pipeline.getId();
 
     // Phase 1: DRAFT → READY → AVAILABLE (CREATE saga)
-    dataSetService.markReady(dataSetId);
+    dataSetService.stage(dataSetId);
     dataSetService.release(dataSetId);
 
     DataSet created = verifier.awaitSagaCompletion(dataSetId);
@@ -212,7 +212,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
     UUID dataSetId = dataSet.getId();
     UUID pipelineId = pipeline.getId();
 
-    dataSetService.markReady(dataSetId);
+    dataSetService.stage(dataSetId);
     dataSetService.release(dataSetId);
     DataSet created = verifier.awaitSagaCompletion(dataSetId);
 
@@ -258,23 +258,23 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
   }
 
   @Nested
-  @DisplayName("markReady validation")
-  class MarkReadyValidation {
+  @DisplayName("stage validation")
+  class StageValidation {
 
     @Test
-    @DisplayName("markReady() fails without pipelines")
-    void markReadyFailsWithoutPipeline() {
+    @DisplayName("stage() fails without pipelines")
+    void stageFailsWithoutPipeline() {
       DataSet dataSet = data.createDataSet("No Pipeline Dataset");
       data.seedGroupAndAssignment(dataSet);
 
-      assertThatThrownBy(() -> dataSetService.markReady(dataSet.getId()))
+      assertThatThrownBy(() -> dataSetService.stage(dataSet.getId()))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("Pipeline");
     }
 
     @Test
-    @DisplayName("markReady() succeeds with provide pipeline (APIs only, no datasources)")
-    void markReadySucceedsWithApisOnly() {
+    @DisplayName("stage() succeeds with provide pipeline (APIs only, no datasources)")
+    void stageSucceedsWithApisOnly() {
       DataSet dataSet = data.createDataSet("Provide Pipeline Dataset");
       data.seedGroupAndAssignment(dataSet);
 
@@ -288,7 +288,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       dataSet.getPipelines().add(saved);
       dataSetRepository.save(dataSet);
 
-      DataSet readyDataSet = dataSetService.markReady(dataSet.getId());
+      DataSet readyDataSet = dataSetService.stage(dataSet.getId());
       assertThat(readyDataSet.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
       assertThat(readyDataSet.getDistributions())
           .as("Should create distributions for API paths")
@@ -296,8 +296,8 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
     }
 
     @Test
-    @DisplayName("markReady() fails when pipeline has neither datasources nor APIs")
-    void markReadyFailsWithEmptyPipeline() {
+    @DisplayName("stage() fails when pipeline has neither datasources nor APIs")
+    void stageFailsWithEmptyPipeline() {
       DataSet dataSet = data.createDataSet("Empty Pipeline Dataset");
       data.seedGroupAndAssignment(dataSet);
 
@@ -309,24 +309,24 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       dataSet.getPipelines().add(saved);
       dataSetRepository.save(dataSet);
 
-      assertThatThrownBy(() -> dataSetService.markReady(dataSet.getId()))
+      assertThatThrownBy(() -> dataSetService.stage(dataSet.getId()))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("DataSources or APIs");
     }
 
     @Test
-    @DisplayName("markReady() fails on non-DRAFT dataset")
-    void markReadyFailsOnNonDraftStatus() {
+    @DisplayName("stage() fails on non-DRAFT dataset")
+    void stageFailsOnNonDraftStatus() {
       DataSource dataSource = data.createMqttDataSource();
       DataSet dataSet = data.createDataSet("Already Ready Dataset");
       data.createGeneratePipeline(dataSet, dataSource);
       data.seedGroupAndAssignment(dataSet);
 
-      dataSetService.markReady(dataSet.getId());
+      dataSetService.stage(dataSet.getId());
 
-      assertThatThrownBy(() -> dataSetService.markReady(dataSet.getId()))
+      assertThatThrownBy(() -> dataSetService.stage(dataSet.getId()))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("Only DRAFT datasets can be marked as ready");
+          .hasMessageContaining("Only DRAFT datasets can be staged");
     }
   }
 
@@ -339,7 +339,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
     data.seedGroupAndAssignment(dataSet);
     UUID dataSetId = dataSet.getId();
 
-    dataSetService.markReady(dataSetId);
+    dataSetService.stage(dataSetId);
     dataSetService.release(dataSetId);
 
     // pendingSagaType is CREATE — try to unrelease immediately
@@ -355,17 +355,17 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
   }
 
   @Test
-  @DisplayName("markDraft() removes auto-generated distributions but preserves manual ones")
-  void markDraft_removesAutoGeneratedDistributionsOnly() {
+  @DisplayName("unstage() removes auto-generated distributions but preserves manual ones")
+  void unstage_removesAutoGeneratedDistributionsOnly() {
     DataSource dataSource = data.createMqttDataSource();
-    DataSet dataSet = data.createDataSet("MarkDraft Distribution Dataset");
+    DataSet dataSet = data.createDataSet("Unstage Distribution Dataset");
     data.createGeneratePipelineWithMultipleApis(dataSet, dataSource);
     data.seedGroupAndAssignment(dataSet);
     UUID dataSetId = dataSet.getId();
 
-    DataSet readyDataSet = dataSetService.markReady(dataSetId);
+    DataSet readyDataSet = dataSetService.stage(dataSetId);
     assertThat(readyDataSet.getDistributions())
-        .as("markReady should create auto-generated distributions")
+        .as("stage should create auto-generated distributions")
         .isNotEmpty();
 
     int autoGenCount =
@@ -386,7 +386,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
     manual.setDataSet(dataSet);
     distributionRepository.save(manual);
 
-    DataSet draftDataSet = dataSetService.markDraft(dataSetId);
+    DataSet draftDataSet = dataSetService.unstage(dataSetId);
     assertThat(draftDataSet.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
 
     DataSet reloaded = dataSetRepository.findById(dataSetId).orElseThrow();
@@ -403,7 +403,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
     assertThat(remainingManual).as("Manual distribution should be preserved").isEqualTo(1);
 
     log.info(
-        "markDraft verified: {} auto-generated removed, {} manual preserved",
+        "unstage verified: {} auto-generated removed, {} manual preserved",
         autoGenCount,
         remainingManual);
   }
@@ -419,7 +419,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
     data.seedGroupAndAssignment(dataSet);
     UUID dataSetId = dataSet.getId();
 
-    dataSetService.markReady(dataSetId);
+    dataSetService.stage(dataSetId);
     dataSetService.release(dataSetId);
     DataSet completed = verifier.awaitSagaCompletion(dataSetId);
 
@@ -467,7 +467,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
     data.seedGroupAndAssignment(dataSet);
     UUID dataSetId = dataSet.getId();
 
-    dataSetService.markReady(dataSetId);
+    dataSetService.stage(dataSetId);
     dataSetService.release(dataSetId);
 
     DataSet completed = verifier.awaitSagaCompletion(dataSetId);
@@ -510,7 +510,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       UUID dataSetId = dataSet.getId();
 
       // DRAFT → READY → AVAILABLE (CREATE saga completes first)
-      dataSetService.markReady(dataSetId);
+      dataSetService.stage(dataSetId);
       dataSetService.release(dataSetId);
       DataSet created = verifier.awaitSagaCompletion(dataSetId);
       String originalProjectId = created.getProjectId();
@@ -561,7 +561,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       UUID dataSetId = dataSet.getId();
 
       // DRAFT → READY only (no release, no infra)
-      dataSetService.markReady(dataSetId);
+      dataSetService.stage(dataSetId);
 
       DataSetInputDTO updateInput = new DataSetInputDTO();
       updateInput.setName("Updated Ready Name " + System.nanoTime());
@@ -601,7 +601,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       UUID dataSetId = dataSet.getId();
 
       // DRAFT → READY → AVAILABLE (pendingSagaType = CREATE while saga runs)
-      dataSetService.markReady(dataSetId);
+      dataSetService.stage(dataSetId);
       dataSetService.release(dataSetId);
 
       // Attempt metadata update while CREATE saga is in-flight
@@ -638,7 +638,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       UUID dataSetId = dataSet.getId();
 
       // Phase 1: CREATE
-      dataSetService.markReady(dataSetId);
+      dataSetService.stage(dataSetId);
       dataSetService.release(dataSetId);
       DataSet created = verifier.awaitSagaCompletion(dataSetId);
       assertThat(created.getProjectId()).isNotNull();

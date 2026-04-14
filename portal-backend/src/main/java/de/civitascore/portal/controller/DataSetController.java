@@ -114,26 +114,26 @@ public class DataSetController
     return ScopeType.DATASET;
   }
 
-  @PostMapping("/{id}/markReady")
+  @PostMapping("/{id}/stage")
   @Operation(
-      operationId = "markReadyDataSet",
-      summary = "Mark a dataset as ready",
+      operationId = "stageDataSet",
+      summary = "Stage a dataset",
       description =
           "Validates the dataset and generates distributions from pipeline APIs, transitioning status from DRAFT to READY.")
-  public ResponseEntity<DataSetOutputDTO> markReady(@PathVariable UUID id) {
-    DataSet ready = dataSetService.markReady(id);
+  public ResponseEntity<DataSetOutputDTO> stage(@PathVariable UUID id) {
+    DataSet ready = dataSetService.stage(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(ready);
     return ResponseEntity.ok(output);
   }
 
-  @PostMapping("/{id}/markDraft")
+  @PostMapping("/{id}/unstage")
   @Operation(
-      operationId = "markDraftDataSet",
-      summary = "Revert a dataset to draft",
+      operationId = "unstageDataSet",
+      summary = "Unstage a dataset",
       description =
           "Removes auto-generated distributions and reverts the dataset from READY to DRAFT.")
-  public ResponseEntity<DataSetOutputDTO> markDraft(@PathVariable UUID id) {
-    DataSet draft = dataSetService.markDraft(id);
+  public ResponseEntity<DataSetOutputDTO> unstage(@PathVariable UUID id) {
+    DataSet draft = dataSetService.unstage(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(draft);
     return ResponseEntity.ok(output);
   }
@@ -170,7 +170,7 @@ public class DataSetController
   }
 
   /**
-   * Deletes a DRAFT dataset. READY or released datasets must be marked as draft/unreleased first.
+   * Deletes a DRAFT dataset. READY or released datasets must be unstaged/unreleased first.
    *
    * @param id the UUID of the dataset to delete
    */
@@ -180,7 +180,7 @@ public class DataSetController
       summary = "Delete a dataset",
       description =
           "Deletes a DRAFT dataset immediately (204 No Content). "
-              + "READY datasets cannot be deleted — mark as draft first (POST /{id}/markDraft). "
+              + "READY datasets cannot be deleted — unstage first (POST /{id}/unstage). "
               + "AVAILABLE datasets cannot be deleted directly — unrelease first (POST /{id}/unrelease) to tear down infrastructure, then delete.")
   public void delete(@PathVariable UUID id) {
     dataSetService.deleteById(id);

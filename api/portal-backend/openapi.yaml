@@ -2492,7 +2492,7 @@ paths:
       - DataSets
       summary: Delete a dataset
       description: "Deletes a DRAFT dataset immediately (204 No Content). READY datasets\
-        \ cannot be deleted — mark as draft first (POST /{id}/markDraft). AVAILABLE\
+        \ cannot be deleted — unstage first (POST /{id}/unstage). AVAILABLE\
         \ datasets cannot be deleted directly — unrelease first (POST /{id}/unrelease)\
         \ to tear down infrastructure, then delete."
       operationId: deleteDataSet
@@ -4788,14 +4788,14 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /datasets/{id}/markReady:
+  /datasets/{id}/stage:
     post:
       tags:
       - DataSets
-      summary: Mark a dataset as ready
+      summary: Stage a dataset
       description: "Validates the dataset and generates distributions from pipeline\
         \ APIs, transitioning status from DRAFT to READY."
-      operationId: markReadyDataSet
+      operationId: stageDataSet
       parameters:
       - name: id
         in: path
@@ -4816,14 +4816,14 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /datasets/{id}/markDraft:
+  /datasets/{id}/unstage:
     post:
       tags:
       - DataSets
-      summary: Revert a dataset to draft
+      summary: Unstage a dataset
       description: Removes auto-generated distributions and reverts the dataset from
         READY to DRAFT.
-      operationId: markDraftDataSet
+      operationId: unstageDataSet
       parameters:
       - name: id
         in: path

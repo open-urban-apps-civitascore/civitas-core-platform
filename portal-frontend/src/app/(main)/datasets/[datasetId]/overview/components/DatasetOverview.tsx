@@ -9,11 +9,11 @@ import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import {
-  useMarkDraftDataset,
-  useMarkReadyDataset,
   usePatchDataset,
   useReleaseDataset,
+  useStageDataset,
   useUnreleaseDataset,
+  useUnstageDataset,
   useUpdateReleasedDatasetMeta,
 } from '@/app/services/api/datasets/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
@@ -84,16 +84,16 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const updateDataset = usePatchDataset()
   const updateReleasedMeta = useUpdateReleasedDatasetMeta()
-  const markReadyDataset = useMarkReadyDataset()
-  const markDraftDataset = useMarkDraftDataset()
+  const stageDataset = useStageDataset()
+  const unstageDataset = useUnstageDataset()
   const releaseDataset = useReleaseDataset()
   const unreleaseDataset = useUnreleaseDataset()
 
   const isLoading =
     updateDataset.isPending ||
     updateReleasedMeta.isPending ||
-    markReadyDataset.isPending ||
-    markDraftDataset.isPending ||
+    stageDataset.isPending ||
+    unstageDataset.isPending ||
     releaseDataset.isPending ||
     unreleaseDataset.isPending
 
@@ -155,12 +155,12 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     if (oldStatus === newStatus) return []
 
     const transitions: Record<string, ((id: string) => Promise<unknown>)[]> = {
-      'DRAFT->READY': [markReadyDataset.mutateAsync],
-      'READY->DRAFT': [markDraftDataset.mutateAsync],
+      'DRAFT->READY': [stageDataset.mutateAsync],
+      'READY->DRAFT': [unstageDataset.mutateAsync],
       'READY->AVAILABLE': [releaseDataset.mutateAsync],
       'AVAILABLE->READY': [unreleaseDataset.mutateAsync],
-      'DRAFT->AVAILABLE': [markReadyDataset.mutateAsync, releaseDataset.mutateAsync],
-      'AVAILABLE->DRAFT': [unreleaseDataset.mutateAsync, markDraftDataset.mutateAsync],
+      'DRAFT->AVAILABLE': [stageDataset.mutateAsync, releaseDataset.mutateAsync],
+      'AVAILABLE->DRAFT': [unreleaseDataset.mutateAsync, unstageDataset.mutateAsync],
     }
 
     return transitions[`${oldStatus}->${newStatus}`] ?? []
@@ -207,12 +207,12 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       // Success message
       if (steps.length > 0) {
         const messageMap: Record<string, string> = {
-          'DRAFT->READY': t('messages.markReadySuccess'),
-          'READY->DRAFT': t('messages.markDraftSuccess'),
+          'DRAFT->READY': t('messages.stageSuccess'),
+          'READY->DRAFT': t('messages.unstageSuccess'),
           'READY->AVAILABLE': t('messages.releaseSuccess'),
           'AVAILABLE->READY': t('messages.unreleaseSuccess'),
           'DRAFT->AVAILABLE': t('messages.releaseSuccess'),
-          'AVAILABLE->DRAFT': t('messages.markDraftSuccess'),
+          'AVAILABLE->DRAFT': t('messages.unstageSuccess'),
         }
         toast.success(messageMap[`${serverStatus}->${dataSetStatus}`] ?? t('messages.updateSuccess'))
       } else {
