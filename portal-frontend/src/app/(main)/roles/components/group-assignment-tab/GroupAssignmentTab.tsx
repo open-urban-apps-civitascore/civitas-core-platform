@@ -190,7 +190,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div data-testid="groupAssignmentTab" className="flex flex-col gap-4">
       {!isSystemRole && (
         <div className="flex items-center justify-between gap-4">
           <SegmentedControlBar tabs={SCOPE_TABS} selectedTab={selectedScope} onTabChange={setSelectedScope} />

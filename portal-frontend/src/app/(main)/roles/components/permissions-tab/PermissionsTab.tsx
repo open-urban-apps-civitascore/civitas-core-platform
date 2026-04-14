@@ -122,7 +122,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   }
 
   return (
-    <div>
+    <div data-testid="permissionsTab">
       {roleType === ROLE_TYPES.DATA ? (
         !isReadOnly && (
           <div className="mb-4 flex justify-end">
