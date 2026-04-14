@@ -60,12 +60,6 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
     return Pipeline.class.getSimpleName();
   }
 
-  @Override
-  public Optional<Pipeline> findById(UUID id) {
-    Optional<Pipeline> entity = pipelineRepository.findByIdWithRelations(id);
-    return postLoad(entity);
-  }
-
   /**
    * Finds a pipeline by ID and verifies that it belongs to the specified dataset.
    *

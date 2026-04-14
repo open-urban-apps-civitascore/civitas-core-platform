@@ -13,7 +13,6 @@ import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -56,17 +55,6 @@ public class DataStructureService
   @Override
   protected AssignmentFactory getAssignmentFactory() {
     return assignmentFactory;
-  }
-
-  /**
-   * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
-   * DataStructure along with dataStructureVersions in a single JOIN query, preventing N+1 query
-   * problems that would occur with lazy loading.
-   */
-  @Override
-  public Optional<DataStructure> findById(UUID id) {
-    Optional<DataStructure> entity = dataStructureRepository.findByIdWithRelations(id);
-    return postLoad(entity);
   }
 
   /**

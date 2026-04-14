@@ -5,7 +5,6 @@ import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.input.DataSpaceInputDTO;
 import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.util.ResourceInUseException;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,17 +34,6 @@ public class DataSpaceService extends BaseService<DataSpace, DataSpaceInputDTO> 
   @Override
   protected String getEntityName() {
     return DataSpace.class.getSimpleName();
-  }
-
-  /**
-   * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
-   * DataSpace along with owner and parentDataSpace in a single JOIN query, preventing N+1 query
-   * problems that would occur with lazy loading.
-   */
-  @Override
-  public Optional<DataSpace> findById(UUID id) {
-    Optional<DataSpace> entity = dataSpaceRepository.findByIdWithRelations(id);
-    return postLoad(entity);
   }
 
   /**

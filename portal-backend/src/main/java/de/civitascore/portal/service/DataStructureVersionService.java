@@ -64,18 +64,6 @@ public class DataStructureVersionService
   }
 
   /**
-   * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
-   * DataStructureVersion along with dataStructure in a single JOIN query, preventing N+1 query
-   * problems that would occur with lazy loading.
-   */
-  @Override
-  public Optional<DataStructureVersion> findById(UUID id) {
-    Optional<DataStructureVersion> entity =
-        dataStructureVersionRepository.findByIdWithRelations(id);
-    return postLoad(entity);
-  }
-
-  /**
    * Downloads a model from Model Atlas by its URI. Returns empty if the URI is blank or the
    * download fails.
    *

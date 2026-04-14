@@ -56,7 +56,7 @@ class DataStructureServiceTest {
       ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
       ds.setDataStructureVersions(Set.of(version));
 
-      when(dataStructureRepository.findByIdWithRelations(dsId)).thenReturn(Optional.of(ds));
+      when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
           .thenReturn(true);
 
@@ -79,7 +79,7 @@ class DataStructureServiceTest {
       ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
       ds.setDataStructureVersions(Set.of(version));
 
-      when(dataStructureRepository.findByIdWithRelations(dsId)).thenReturn(Optional.of(ds));
+      when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
           .thenReturn(false);
       when(dataStructureRepository.save(ds)).thenReturn(ds);
@@ -108,7 +108,7 @@ class DataStructureServiceTest {
       ds.setDataStructureVersions(Set.of(version));
 
       when(dataStructureRepository.existsById(dsId)).thenReturn(true);
-      when(dataStructureRepository.findByIdWithRelations(dsId)).thenReturn(Optional.of(ds));
+      when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
           .thenReturn(true);
 
@@ -130,7 +130,7 @@ class DataStructureServiceTest {
       ds.setDataStructureVersions(Set.of(version));
 
       when(dataStructureRepository.existsById(dsId)).thenReturn(true);
-      when(dataStructureRepository.findByIdWithRelations(dsId)).thenReturn(Optional.of(ds));
+      when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
           .thenReturn(false);
 

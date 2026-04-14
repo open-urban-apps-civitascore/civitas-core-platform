@@ -91,7 +91,7 @@ class DataSetServiceTest {
       p.setDataSources(new HashSet<>(List.of(new de.civitascore.portal.model.entity.DataSource())));
       ds.getPipelines().add(p);
 
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSet result = createService().publish(id);
@@ -107,7 +107,7 @@ class DataSetServiceTest {
       p.setApis(List.of("/v1.1/Things"));
       ds.getPipelines().add(p);
 
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
       when(distributionService.createFromApiUrlAndDataSet(any(), any()))
           .thenReturn(new Distribution());
@@ -123,7 +123,7 @@ class DataSetServiceTest {
       DataSet ds = draftDataSet(id);
       ds.getPipelines().add(new Pipeline());
 
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().publish(id))
           .isInstanceOf(InvalidInputException.class)
@@ -136,7 +136,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
 
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().publish(id))
           .isInstanceOf(InvalidInputException.class)
@@ -196,7 +196,7 @@ class DataSetServiceTest {
     void throwsWhenNotAvailable() {
       UUID id = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().unrelease(id))
           .isInstanceOf(InvalidInputException.class)
@@ -209,7 +209,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(PendingSagaType.CREATE);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       assertThatThrownBy(() -> createService().unrelease(id))
           .isInstanceOf(ResourceInUseException.class)
@@ -221,7 +221,7 @@ class DataSetServiceTest {
     void setsPendingDeleteAndPublishes() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSetService service = createService();
@@ -242,7 +242,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(PendingSagaType.CREATE);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       DataSetInputDTO input = new DataSetInputDTO();
       input.setName("updated name");
@@ -259,7 +259,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(PendingSagaType.UPDATE);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       DataSetInputDTO input = new DataSetInputDTO();
       input.setName("updated name");
@@ -276,7 +276,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(PendingSagaType.DELETE);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       DataSetInputDTO input = new DataSetInputDTO();
       input.setName("updated name");
@@ -292,7 +292,7 @@ class DataSetServiceTest {
     void allowsUpdateWhenNoSagaPending() {
       UUID id = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSetInputDTO input = new DataSetInputDTO();
@@ -315,7 +315,7 @@ class DataSetServiceTest {
       DataSet ds = readyDataSet(id);
       ds.setDataSetStatus(DataSetStatus.AVAILABLE);
       ds.setPendingSagaType(PendingSagaType.CREATE);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       SagaResultPayload result =
@@ -354,7 +354,7 @@ class DataSetServiceTest {
       Distribution autoDist = new Distribution();
       autoDist.setAutoGenerated(true);
       ds.getDistributions().add(autoDist);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       createService()
@@ -390,7 +390,7 @@ class DataSetServiceTest {
       createdDist2.setAutoGenerated(true);
       createdDist2.setAccessUrl("/Observations");
 
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
       when(distributionService.createFromApiUrlAndDataSet("/v1.1/Things", ds))
           .thenReturn(createdDist1);
@@ -445,7 +445,7 @@ class DataSetServiceTest {
       createdDist.setAutoGenerated(true);
       createdDist.setAccessUrl("/Things");
 
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
       when(distributionService.createFromApiUrlAndDataSet("/v1.1/Things", ds))
           .thenReturn(createdDist);
@@ -482,7 +482,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(null);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
       createService()
           .handleSagaCompleted(
@@ -504,7 +504,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(PendingSagaType.CREATE);
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       createService().handleSagaFailed(id, "FROST", "timeout", true);
@@ -534,7 +534,7 @@ class DataSetServiceTest {
       dist.setAccessUrl("/Things");
       ds.getDistributions().add(dist);
 
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       SagaResultPayload result =
@@ -572,7 +572,7 @@ class DataSetServiceTest {
       dist.setAccessUrl("/");
       ds.getDistributions().add(dist);
 
-      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       SagaResultPayload result =

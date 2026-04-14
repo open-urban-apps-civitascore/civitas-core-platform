@@ -7,7 +7,6 @@ import de.civitascore.portal.model.input.assignment.AssignmentInputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -89,17 +88,6 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
   @Override
   protected Assignment postConvertToEntity(Assignment entity, AssignmentInputDTO input) {
     return assignmentFactory.build(entity, input);
-  }
-
-  /**
-   * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
-   * Assignment along with Group, Role, and ParentAssignment in a single JOIN query, preventing N+1
-   * query problems that would occur with lazy loading.
-   */
-  @Override
-  public Optional<Assignment> findById(UUID id) {
-    Optional<Assignment> entity = assignmentRepository.findByIdWithRelations(id);
-    return postLoad(entity);
   }
 
   /**

@@ -7,8 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data JPA repository for {@link Role} entities. */
@@ -23,8 +22,8 @@ public interface RoleRepository extends NamedEntityRepository<Role, UUID> {
    * @return the role with eagerly fetched permissions
    */
   @EntityGraph(attributePaths = {"permissions"})
-  @Query("SELECT r FROM Role r WHERE r.id = :id")
-  Optional<Role> findByIdWithRelations(@Param("id") UUID id);
+  @Override
+  @NonNull Optional<Role> findById(@NonNull UUID id);
 
   /**
    * Find all roles with permissions eagerly fetched. This prevents LazyInitializationException when

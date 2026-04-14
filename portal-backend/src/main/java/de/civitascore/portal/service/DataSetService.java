@@ -14,7 +14,6 @@ import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.HashSet;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -72,17 +71,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   @Override
   protected AssignmentFactory getAssignmentFactory() {
     return assignmentFactory;
-  }
-
-  /**
-   * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
-   * DataSet along with owner and dataSpaces in a single JOIN query, preventing N+1 query problems
-   * that would occur with lazy loading.
-   */
-  @Override
-  public Optional<DataSet> findById(UUID id) {
-    Optional<DataSet> entity = dataSetRepository.findByIdWithRelations(id);
-    return postLoad(entity);
   }
 
   /**
