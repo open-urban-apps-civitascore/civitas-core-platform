@@ -22,7 +22,6 @@ import org.springframework.test.context.TestPropertySource;
 
 @EmbeddedKafka(
     partitions = 1,
-    brokerProperties = {"listeners=PLAINTEXT://localhost:0", "port=0"},
     topics = {
       "de.civitascore.idm.user.created",
       "de.civitascore.idm.user.updated",
