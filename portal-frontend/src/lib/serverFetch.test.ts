@@ -1,5 +1,6 @@
+import type { ReadonlyHeaders } from 'next/dist/server/web/spec-extension/adapters/headers'
 import { headers as nextHeaders } from 'next/headers'
-import { getToken } from 'next-auth/jwt'
+import { getToken, type JWT } from 'next-auth/jwt'
 import { MockInstance } from 'vitest'
 
 import { AuthError, serverFetch } from './serverFetch'
@@ -15,9 +16,9 @@ vi.mock('next-auth/jwt', () => ({
 const mockedNextHeaders = vi.mocked(nextHeaders)
 const mockedGetToken = vi.mocked(getToken)
 
-const makeHeaders = (entries: Record<string, string | null> = {}) => {
-  return { get: (key: string) => entries[key] ?? null }
-}
+const makeHeaders = (entries: Record<string, string | null> = {}): Pick<ReadonlyHeaders, 'get'> => ({
+  get: (key: string) => entries[key] ?? null,
+})
 
 describe('serverFetch', () => {
   let fetchSpy: MockInstance
@@ -25,8 +26,8 @@ describe('serverFetch', () => {
   beforeEach(() => {
     vi.resetAllMocks()
 
-    mockedNextHeaders.mockResolvedValue(makeHeaders() as never)
-    mockedGetToken.mockResolvedValue({ access_token: 'test-token' } as never)
+    mockedNextHeaders.mockResolvedValue(makeHeaders() as unknown as ReadonlyHeaders)
+    mockedGetToken.mockResolvedValue({ access_token: 'test-token' } as JWT)
 
     fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
@@ -43,25 +44,28 @@ describe('serverFetch', () => {
   })
 
   describe('Authorization and headers', () => {
-    it('Throws AuthError "Not authenticated" when no token is available', async () => {
+    it('throws AuthError "Not authenticated" when no token is available', async () => {
       mockedGetToken.mockResolvedValue(null)
 
-      await expect(serverFetch({ endpoint: '/test' })).rejects.toThrow(AuthError)
-      await expect(serverFetch({ endpoint: '/test' })).rejects.toThrow('Not authenticated')
+      const promise = serverFetch({ endpoint: '/test' })
+      await expect(promise).rejects.toThrow(AuthError)
+      await expect(promise).rejects.toThrow('Not authenticated')
     })
 
-    it('Throws AuthError "No access token available" when token exists but has no access_token', async () => {
-      mockedGetToken.mockResolvedValue({} as never)
+    it('throws AuthError "No access token available" when token exists but has no access_token', async () => {
+      mockedGetToken.mockResolvedValue({} as JWT)
 
-      await expect(serverFetch({ endpoint: '/test' })).rejects.toThrow(AuthError)
-      await expect(serverFetch({ endpoint: '/test' })).rejects.toThrow('No access token available')
+      const promise = serverFetch({ endpoint: '/test' })
+
+      await expect(promise).rejects.toThrow(AuthError)
+      await expect(promise).rejects.toThrow('No access token available')
     })
 
-    it('Throws "Backend URL not configured" when API env vars are missing for API backend', async () => {
+    it('throws "Backend URL not configured" when API env vars are missing for API backend', async () => {
       await expect(serverFetch({ endpoint: '/test', isApiBackend: true })).rejects.toThrow('Backend URL not configured')
     })
 
-    it('Sets Authorization: Bearer <token> header', async () => {
+    it('sets Authorization: Bearer <token> header', async () => {
       await serverFetch({ endpoint: '/test' })
 
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -69,6 +73,34 @@ describe('serverFetch', () => {
         expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: 'Bearer test-token',
+          }),
+        }),
+      )
+    })
+
+    it('merges custom headers with default headers', async () => {
+      await serverFetch({ endpoint: '/test', headers: { 'X-Custom-Header': 'custom-value' } })
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'Bearer test-token',
+            'Content-Type': 'application/json',
+            'X-Custom-Header': 'custom-value',
+          }),
+        }),
+      )
+    })
+
+    it('allows custom headers to override default headers', async () => {
+      await serverFetch({ endpoint: '/test', headers: { 'Content-Type': 'text/plain' } })
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'Content-Type': 'text/plain',
           }),
         }),
       )
@@ -81,7 +113,7 @@ describe('serverFetch', () => {
       ['x-scheme', 'https'],
       ['x-forwarded-proto', 'https'],
     ])('marks secureCookie: true when %s header is "https"', async (headerName, headerValue) => {
-      mockedNextHeaders.mockResolvedValue(makeHeaders({ [headerName]: headerValue }) as never)
+      mockedNextHeaders.mockResolvedValue(makeHeaders({ [headerName]: headerValue }) as unknown as ReadonlyHeaders)
 
       await serverFetch({ endpoint: '/test' })
 
@@ -89,7 +121,7 @@ describe('serverFetch', () => {
     })
 
     it('marks secureCookie: false when no forwarded proto header is present', async () => {
-      mockedNextHeaders.mockResolvedValue(makeHeaders() as never)
+      mockedNextHeaders.mockResolvedValue(makeHeaders() as unknown as ReadonlyHeaders)
 
       await serverFetch({ endpoint: '/test' })
 
@@ -199,18 +231,19 @@ describe('serverFetch', () => {
     })
   })
 
-  it('Throws AuthError on 401 response from backend', async () => {
+  it('throws AuthError on 401 response from backend', async () => {
     fetchSpy.mockResolvedValue({
       ok: false,
       status: 401,
       headers: new Headers(),
     } as Response)
 
-    await expect(serverFetch({ endpoint: '/test' })).rejects.toThrow(AuthError)
-    await expect(serverFetch({ endpoint: '/test' })).rejects.toThrow('Backend responded with status 401')
+    const promise = serverFetch({ endpoint: '/test' })
+    await expect(promise).rejects.toThrow(AuthError)
+    await expect(promise).rejects.toThrow('Backend responded with status 401')
   })
 
-  it('Throws generic Error on non-401 error response', async () => {
+  it('throws generic Error on non-401 error response', async () => {
     fetchSpy.mockResolvedValue({
       ok: false,
       status: 500,
