@@ -54,32 +54,30 @@ public class InfraTestDataFactory {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   public DataSet createDataSet(String name) {
-    return portalData
-        .dataSet()
-        .withName(name + " " + System.nanoTime())
-        .withDescription("Integration test dataset")
-        .withOpenDataAccess(true)
-        .build();
+    return portalData.dataSet(
+        b ->
+            b.name(name + " " + System.nanoTime())
+                .description("Integration test dataset")
+                .openDataAccess(true));
   }
 
   public DataSource createMqttDataSource() {
-    return portalData
-        .dataSource()
-        .withName("mqtt-datasource-" + System.nanoTime())
-        .withDescription("MQTT datasource for saga test")
-        .withConnectorType(ConnectorType.MQTT)
-        .withStatus(DataSourceStatus.AVAILABLE)
-        .withConfiguration(
-            Map.of(
-                "host",
-                "mqtt-broker",
-                "port",
-                1883,
-                "topics",
-                List.of("sensors/e2e"),
-                "client_id",
-                "civitas-e2e-" + System.nanoTime()))
-        .build();
+    return portalData.dataSource(
+        b ->
+            b.name("mqtt-datasource-" + System.nanoTime())
+                .description("MQTT datasource for saga test")
+                .connectorType(ConnectorType.MQTT)
+                .dataSourceStatus(DataSourceStatus.AVAILABLE)
+                .configuration(
+                    Map.of(
+                        "host",
+                        "mqtt-broker",
+                        "port",
+                        1883,
+                        "topics",
+                        List.of("sensors/e2e"),
+                        "client_id",
+                        "civitas-e2e-" + System.nanoTime())));
   }
 
   public DataSource createSqlDataSource() {
@@ -91,14 +89,13 @@ public class InfraTestDataFactory {
     config.put("password", encryptCredential("testpass"));
     config.put("query", "SELECT sensor_name, sensor_description FROM sensors");
 
-    return portalData
-        .dataSource()
-        .withName("sql-datasource-" + System.nanoTime())
-        .withDescription("PostgreSQL datasource for saga test")
-        .withConnectorType(ConnectorType.SQL)
-        .withStatus(DataSourceStatus.AVAILABLE)
-        .withConfiguration(config)
-        .build();
+    return portalData.dataSource(
+        b ->
+            b.name("sql-datasource-" + System.nanoTime())
+                .description("PostgreSQL datasource for saga test")
+                .connectorType(ConnectorType.SQL)
+                .dataSourceStatus(DataSourceStatus.AVAILABLE)
+                .configuration(config));
   }
 
   /**
@@ -112,27 +109,25 @@ public class InfraTestDataFactory {
 
   public Pipeline createGeneratePipeline(
       DataSet dataSet, DataSource dataSource, String apiPath, String nameSuffix) {
-    return portalData
-        .pipeline()
-        .withName("pipeline-" + nameSuffix + "-" + System.nanoTime())
-        .withDescription("Generate → FROST pipeline")
-        .withDataSet(dataSet)
-        .withDataSources(Set.of(dataSource))
-        .withApis(List.of(apiPath))
-        .withModel(loadPipelineConfig("pipelines/generate-pipeline-config.json"))
-        .build();
+    return portalData.pipeline(
+        dataSet,
+        b ->
+            b.name("pipeline-" + nameSuffix + "-" + System.nanoTime())
+                .description("Generate → FROST pipeline")
+                .dataSources(Set.of(dataSource))
+                .apis(List.of(apiPath))
+                .model(loadPipelineConfig("pipelines/generate-pipeline-config.json")));
   }
 
   public Pipeline createGeneratePipelineWithMultipleApis(DataSet dataSet, DataSource dataSource) {
-    return portalData
-        .pipeline()
-        .withName("pipeline-multi-api-" + System.nanoTime())
-        .withDescription("Pipeline with multiple APIs")
-        .withDataSet(dataSet)
-        .withDataSources(Set.of(dataSource))
-        .withApis(List.of("/v1.1/Things", "/v1.1/Datastreams"))
-        .withModel(loadPipelineConfig("pipelines/generate-pipeline-config.json"))
-        .build();
+    return portalData.pipeline(
+        dataSet,
+        b ->
+            b.name("pipeline-multi-api-" + System.nanoTime())
+                .description("Pipeline with multiple APIs")
+                .dataSources(Set.of(dataSource))
+                .apis(List.of("/v1.1/Things", "/v1.1/Datastreams"))
+                .model(loadPipelineConfig("pipelines/generate-pipeline-config.json")));
   }
 
   /**
@@ -141,18 +136,17 @@ public class InfraTestDataFactory {
    * resolves at deploy time using the datasource's UUID.
    */
   public Pipeline createSqlPipeline(DataSet dataSet, DataSource dataSource) {
-    return portalData
-        .pipeline()
-        .withName("sql-pipeline-" + System.nanoTime())
-        .withDescription("SQL → FROST pipeline")
-        .withDataSet(dataSet)
-        .withDataSources(Set.of(dataSource))
-        .withApis(List.of("/v1.1/Things"))
-        .withModel(
-            injectDatasourceId(
-                loadPipelineConfig("pipelines/sql-pipeline-config.json"),
-                dataSource.getId().toString()))
-        .build();
+    return portalData.pipeline(
+        dataSet,
+        b ->
+            b.name("sql-pipeline-" + System.nanoTime())
+                .description("SQL → FROST pipeline")
+                .dataSources(Set.of(dataSource))
+                .apis(List.of("/v1.1/Things"))
+                .model(
+                    injectDatasourceId(
+                        loadPipelineConfig("pipelines/sql-pipeline-config.json"),
+                        dataSource.getId().toString())));
   }
 
   /**
@@ -161,25 +155,24 @@ public class InfraTestDataFactory {
    * resolves at deploy time using the datasource's UUID.
    */
   public Pipeline createMqttPipeline(DataSet dataSet, DataSource dataSource) {
-    return portalData
-        .pipeline()
-        .withName("mqtt-pipeline-" + System.nanoTime())
-        .withDescription("MQTT → FROST pipeline")
-        .withDataSet(dataSet)
-        .withDataSources(Set.of(dataSource))
-        .withApis(List.of("/v1.1/Things"))
-        .withModel(
-            injectDatasourceId(
-                loadPipelineConfig("pipelines/mqtt-pipeline-config.json"),
-                dataSource.getId().toString()))
-        .build();
+    return portalData.pipeline(
+        dataSet,
+        b ->
+            b.name("mqtt-pipeline-" + System.nanoTime())
+                .description("MQTT → FROST pipeline")
+                .dataSources(Set.of(dataSource))
+                .apis(List.of("/v1.1/Things"))
+                .model(
+                    injectDatasourceId(
+                        loadPipelineConfig("pipelines/mqtt-pipeline-config.json"),
+                        dataSource.getId().toString())));
   }
 
   /** Creates a Group, Role (DATA type), and Assignment scoped to the given DataSet. */
   public void seedGroupAndAssignment(DataSet dataSet) {
-    var group = portalData.group().withDescription("Test group for saga").build();
-    var role = portalData.role().withDescription("Test role for saga").build();
-    portalData.assignment().withGroup(group).withRole(role).withScope(dataSet).build();
+    var group = portalData.group(b -> b.description("Test group for saga"));
+    var role = portalData.role(b -> b.description("Test role for saga"));
+    portalData.assignment(group, role, dataSet);
   }
 
   /** Deletes all test entities in the correct order (respecting FK constraints). */

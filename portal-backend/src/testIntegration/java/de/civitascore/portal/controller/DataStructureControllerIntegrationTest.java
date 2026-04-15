@@ -189,34 +189,31 @@ class DataStructureControllerIntegrationTest
     void shouldRetrieveDataStructureById() {
       // Create data structure with relationships
       DataStructure dataStructure =
-          portalData
-              .dataStructure()
-              .withName("Test Data Structure 1")
-              .withDescription("First test data structure")
-              .withStatus(DataStructureStatus.DRAFT)
-              .build();
+          portalData.dataStructure(
+              b ->
+                  b.name("Test Data Structure 1")
+                      .description("First test data structure")
+                      .dataStructureStatus(DataStructureStatus.DRAFT));
 
-      portalData
-          .dataStructureVersion()
-          .withDataStructure(dataStructure)
-          .withVersion("1.0.0")
-          .withDescription("Version 1 Description")
-          .withStatus(DataStructureVersionStatus.DRAFT)
-          .withModelAtlasUri("http://modelatlas.example.com/models/1")
-          .withModelName("Test Model v1")
-          .withStyles(Map.of("color", "blue", "size", "large"))
-          .build();
+      portalData.dataStructureVersion(
+          dataStructure,
+          b ->
+              b.version("1.0.0")
+                  .description("Version 1 Description")
+                  .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
+                  .modelAtlasUri("http://modelatlas.example.com/models/1")
+                  .modelName("Test Model v1")
+                  .styles(Map.of("color", "blue", "size", "large")));
 
-      portalData
-          .dataStructureVersion()
-          .withDataStructure(dataStructure)
-          .withVersion("2.0.0")
-          .withDescription("Version 2 Description")
-          .withStatus(DataStructureVersionStatus.AVAILABLE)
-          .withModelAtlasUri("http://modelatlas.example.com/models/2")
-          .withModelName("Test Model v2")
-          .withStyles(Map.of("color", "red", "size", "medium"))
-          .build();
+      portalData.dataStructureVersion(
+          dataStructure,
+          b ->
+              b.version("2.0.0")
+                  .description("Version 2 Description")
+                  .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
+                  .modelAtlasUri("http://modelatlas.example.com/models/2")
+                  .modelName("Test Model v2")
+                  .styles(Map.of("color", "red", "size", "medium")));
 
       ResponseEntity<DataStructureOutputDTO> response = performGetById(dataStructure.getId());
 
@@ -359,16 +356,15 @@ class DataStructureControllerIntegrationTest
     @DisplayName("Should fail to update published data structure with regular PUT endpoint")
     void shouldFailToUpdatePublishedDataStructureWithRegularPut() {
       DataStructure dataStructure =
-          portalData.dataStructure().withStatus(DataStructureStatus.DRAFT).build();
+          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.DRAFT));
 
-      portalData
-          .dataStructureVersion()
-          .withDataStructure(dataStructure)
-          .withVersion("1.0.0")
-          .withStatus(DataStructureVersionStatus.AVAILABLE)
-          .withModelAtlasUri("http://modelatlas.example.com/models/published")
-          .withModelName("Published Model")
-          .build();
+      portalData.dataStructureVersion(
+          dataStructure,
+          b ->
+              b.version("1.0.0")
+                  .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
+                  .modelAtlasUri("http://modelatlas.example.com/models/published")
+                  .modelName("Published Model"));
 
       // Publish via API
       restTemplate.exchange(
@@ -433,22 +429,20 @@ class DataStructureControllerIntegrationTest
       performAdditionalCleanup();
 
       DataStructure dataStructure =
-          portalData
-              .dataStructure()
-              .withName("Publishable Data Structure")
-              .withDescription("Data structure with published version")
-              .withStatus(DataStructureStatus.DRAFT)
-              .build();
+          portalData.dataStructure(
+              b ->
+                  b.name("Publishable Data Structure")
+                      .description("Data structure with published version")
+                      .dataStructureStatus(DataStructureStatus.DRAFT));
       dataStructureWithPublishedVersionId = dataStructure.getId();
 
-      portalData
-          .dataStructureVersion()
-          .withDataStructure(dataStructure)
-          .withVersion("1.0.0")
-          .withStatus(DataStructureVersionStatus.AVAILABLE)
-          .withModelAtlasUri("http://modelatlas.example.com/models/published")
-          .withModelName("Published Model")
-          .build();
+      portalData.dataStructureVersion(
+          dataStructure,
+          b ->
+              b.version("1.0.0")
+                  .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
+                  .modelAtlasUri("http://modelatlas.example.com/models/published")
+                  .modelName("Published Model"));
     }
 
     @Test
@@ -480,21 +474,19 @@ class DataStructureControllerIntegrationTest
     @DisplayName("Should fail to publish data structure without published versions")
     void shouldFailToPublishDataStructureWithoutPublishedVersions() {
       DataStructure dataStructure =
-          portalData
-              .dataStructure()
-              .withName("No Published Versions")
-              .withDescription("Data structure without published versions")
-              .withStatus(DataStructureStatus.DRAFT)
-              .build();
+          portalData.dataStructure(
+              b ->
+                  b.name("No Published Versions")
+                      .description("Data structure without published versions")
+                      .dataStructureStatus(DataStructureStatus.DRAFT));
 
-      portalData
-          .dataStructureVersion()
-          .withDataStructure(dataStructure)
-          .withVersion("1.0.0")
-          .withStatus(DataStructureVersionStatus.DRAFT)
-          .withModelAtlasUri("http://modelatlas.example.com/models/draft")
-          .withModelName("Draft Model")
-          .build();
+      portalData.dataStructureVersion(
+          dataStructure,
+          b ->
+              b.version("1.0.0")
+                  .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
+                  .modelAtlasUri("http://modelatlas.example.com/models/draft")
+                  .modelName("Draft Model"));
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
@@ -574,22 +566,20 @@ class DataStructureControllerIntegrationTest
       performAdditionalCleanup();
 
       DataStructure dataStructure =
-          portalData
-              .dataStructure()
-              .withName("Published Data Structure")
-              .withDescription("Data structure for unpublish testing")
-              .withStatus(DataStructureStatus.AVAILABLE)
-              .build();
+          portalData.dataStructure(
+              b ->
+                  b.name("Published Data Structure")
+                      .description("Data structure for unpublish testing")
+                      .dataStructureStatus(DataStructureStatus.AVAILABLE));
       publishedDataStructureId = dataStructure.getId();
 
-      portalData
-          .dataStructureVersion()
-          .withDataStructure(dataStructure)
-          .withVersion("1.0.0")
-          .withStatus(DataStructureVersionStatus.AVAILABLE)
-          .withModelAtlasUri("http://modelatlas.example.com/models/published")
-          .withModelName("Published Model")
-          .build();
+      portalData.dataStructureVersion(
+          dataStructure,
+          b ->
+              b.version("1.0.0")
+                  .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
+                  .modelAtlasUri("http://modelatlas.example.com/models/published")
+                  .modelName("Published Model"));
     }
 
     @Test
@@ -617,12 +607,11 @@ class DataStructureControllerIntegrationTest
     @DisplayName("Should fail to unpublish already unpublished data structure")
     void shouldFailToUnpublishDraftDataStructure() {
       DataStructure draftDataStructure =
-          portalData
-              .dataStructure()
-              .withName("Draft Data Structure")
-              .withDescription("Already in draft status")
-              .withStatus(DataStructureStatus.DRAFT)
-              .build();
+          portalData.dataStructure(
+              b ->
+                  b.name("Draft Data Structure")
+                      .description("Already in draft status")
+                      .dataStructureStatus(DataStructureStatus.DRAFT));
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
@@ -676,22 +665,20 @@ class DataStructureControllerIntegrationTest
       performAdditionalCleanup();
 
       DataStructure dataStructure =
-          portalData
-              .dataStructure()
-              .withName("Published Data Structure")
-              .withDescription("Data structure for meta update testing")
-              .withStatus(DataStructureStatus.AVAILABLE)
-              .build();
+          portalData.dataStructure(
+              b ->
+                  b.name("Published Data Structure")
+                      .description("Data structure for meta update testing")
+                      .dataStructureStatus(DataStructureStatus.AVAILABLE));
       publishedDataStructureId = dataStructure.getId();
 
-      portalData
-          .dataStructureVersion()
-          .withDataStructure(dataStructure)
-          .withVersion("1.0.0")
-          .withStatus(DataStructureVersionStatus.AVAILABLE)
-          .withModelAtlasUri("http://modelatlas.example.com/models/published")
-          .withModelName("Published Model")
-          .build();
+      portalData.dataStructureVersion(
+          dataStructure,
+          b ->
+              b.version("1.0.0")
+                  .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
+                  .modelAtlasUri("http://modelatlas.example.com/models/published")
+                  .modelName("Published Model"));
     }
 
     @Test
@@ -730,12 +717,11 @@ class DataStructureControllerIntegrationTest
     @DisplayName("Should fail to update published meta for DRAFT data structure")
     void shouldFailToUpdatePublishedMetaForDraftDataStructure() {
       DataStructure draftDataStructure =
-          portalData
-              .dataStructure()
-              .withName("Draft Data Structure")
-              .withDescription("Draft data structure")
-              .withStatus(DataStructureStatus.DRAFT)
-              .build();
+          portalData.dataStructure(
+              b ->
+                  b.name("Draft Data Structure")
+                      .description("Draft data structure")
+                      .dataStructureStatus(DataStructureStatus.DRAFT));
 
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Trying to update draft");
@@ -815,17 +801,13 @@ class DataStructureControllerIntegrationTest
   class AssignmentTests {
 
     private UUID createTestGroup() {
-      Group group = portalData.group().withDescription("Test group for assignments").build();
+      Group group = portalData.group(b -> b.description("Test group for assignments"));
       return group.getId();
     }
 
     private UUID createTestRole() {
       Role role =
-          portalData
-              .role()
-              .withDescription("Test role for assignments")
-              .withRoleType(RoleType.DATA)
-              .build();
+          portalData.role(b -> b.description("Test role for assignments").roleType(RoleType.DATA));
       return role.getId();
     }
 
@@ -959,29 +941,24 @@ class DataStructureControllerIntegrationTest
       performAdditionalCleanup();
 
       DataStructure ds =
-          portalData
-              .dataStructure()
-              .withName("InUse Data Structure")
-              .withDescription("Data structure with a version referenced by a DataSource")
-              .withStatus(DataStructureStatus.AVAILABLE)
-              .build();
+          portalData.dataStructure(
+              b ->
+                  b.name("InUse Data Structure")
+                      .description("Data structure with a version referenced by a DataSource")
+                      .dataStructureStatus(DataStructureStatus.AVAILABLE));
       inUseDataStructureId = ds.getId();
 
       DataStructureVersion version =
-          portalData
-              .dataStructureVersion()
-              .withDataStructure(ds)
-              .withVersion("1.0.0")
-              .withStatus(DataStructureVersionStatus.AVAILABLE)
-              .withModelAtlasUri("http://modelatlas.example.com/models/inuse")
-              .withModelName("InUse Model")
-              .build();
+          portalData.dataStructureVersion(
+              ds,
+              b ->
+                  b.version("1.0.0")
+                      .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
+                      .modelAtlasUri("http://modelatlas.example.com/models/inuse")
+                      .modelName("InUse Model"));
 
-      portalData
-          .dataSource()
-          .withStatus(DataSourceStatus.DRAFT)
-          .withDataStructureVersion(version)
-          .build();
+      portalData.dataSource(
+          b -> b.dataSourceStatus(DataSourceStatus.DRAFT).dataStructureVersion(version));
     }
 
     @Test
@@ -1026,12 +1003,11 @@ class DataStructureControllerIntegrationTest
     @DisplayName("Should return inUse=false when no DataSource references any version")
     void shouldReturnInUseFalseWhenNoDataSourceReferences() {
       DataStructure ds =
-          portalData
-              .dataStructure()
-              .withName("Not InUse Data Structure")
-              .withDescription("No DataSources reference this")
-              .withStatus(DataStructureStatus.DRAFT)
-              .build();
+          portalData.dataStructure(
+              b ->
+                  b.name("Not InUse Data Structure")
+                      .description("No DataSources reference this")
+                      .dataStructureStatus(DataStructureStatus.DRAFT));
 
       ResponseEntity<DataStructureOutputDTO> response = performGetById(ds.getId());
 

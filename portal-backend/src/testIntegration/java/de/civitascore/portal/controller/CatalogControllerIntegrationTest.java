@@ -48,11 +48,8 @@ class CatalogControllerIntegrationTest extends BaseKeycloakIntegrationTest {
   @BeforeEach
   void initTestData() {
     DataSet dataSet1 =
-        portalData
-            .dataSet()
-            .withName("Test Dataset 1")
-            .withDescription("A test dataset associated with catalog 1")
-            .build();
+        portalData.dataSet(
+            b -> b.name("Test Dataset 1").description("A test dataset associated with catalog 1"));
     dataSetId1 = dataSet1.getId();
 
     Catalog catalog1 = new Catalog();

@@ -76,24 +76,22 @@ class PipelineControllerIntegrationTest
 
   /** Create a test DataSet to associate pipelines with. */
   private DataSet createTestDataSet() {
-    return portalData
-        .dataSet()
-        .withDescription("Test dataset for pipeline integration tests")
-        .withStatus(DataSetStatus.DRAFT)
-        .build();
+    return portalData.dataSet(
+        b ->
+            b.description("Test dataset for pipeline integration tests")
+                .dataSetStatus(DataSetStatus.DRAFT));
   }
 
   /** Create a test DataSource for pipeline associations. */
   private DataSource createTestDataSource() {
-    return portalData.dataSource().withDescription("Test data source for pipelines").build();
+    return portalData.dataSource(b -> b.description("Test data source for pipelines"));
   }
 
   private DataSource createAvailableTestDataSource() {
-    return portalData
-        .dataSource()
-        .withDescription("Test data source for pipelines")
-        .withStatus(DataSourceStatus.AVAILABLE)
-        .build();
+    return portalData.dataSource(
+        b ->
+            b.description("Test data source for pipelines")
+                .dataSourceStatus(DataSourceStatus.AVAILABLE));
   }
 
   @Override

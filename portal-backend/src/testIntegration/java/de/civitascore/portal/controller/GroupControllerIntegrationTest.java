@@ -52,7 +52,7 @@ class GroupControllerIntegrationTest
   }
 
   private User createTestUser() {
-    return portalData.user().build();
+    return portalData.user();
   }
 
   @Override
@@ -680,11 +680,8 @@ class GroupControllerIntegrationTest
 
       // Create role with description and readonly
       Role role =
-          portalData
-              .role()
-              .withDescription("Role for testing assignments")
-              .withRoleType(RoleType.DATA)
-              .build();
+          portalData.role(
+              b -> b.description("Role for testing assignments").roleType(RoleType.DATA));
 
       // Create assignment via dedicated endpoint
       AssignmentGroupInputDTO assignmentInput = new AssignmentGroupInputDTO();
@@ -746,12 +743,11 @@ class GroupControllerIntegrationTest
   class AssignmentManagementTests {
 
     private Role createDataRole(String name) {
-      return portalData
-          .role()
-          .withName(name + " " + UUID.randomUUID().toString().substring(0, 8))
-          .withDescription("Test role: " + name)
-          .withRoleType(RoleType.DATA)
-          .build();
+      return portalData.role(
+          b ->
+              b.name(name + " " + UUID.randomUUID().toString().substring(0, 8))
+                  .description("Test role: " + name)
+                  .roleType(RoleType.DATA));
     }
 
     @Test

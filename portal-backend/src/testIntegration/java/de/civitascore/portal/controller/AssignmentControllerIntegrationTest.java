@@ -85,43 +85,31 @@ class AssignmentControllerIntegrationTest
   }
 
   private UUID createTestGroup() {
-    return portalData.group().withDescription("Test group for assignment").build().getId();
+    return portalData.group(b -> b.description("Test group for assignment")).getId();
   }
 
   private UUID createTestRole(String name) {
     return portalData
-        .role()
-        .withName(name)
-        .withDescription("Test role for assignment")
-        .withRoleType(RoleType.DATA)
-        .build()
+        .role(b -> b.name(name).description("Test role for assignment").roleType(RoleType.DATA))
         .getId();
   }
 
   private UUID createTestRole() {
-    return portalData.role().withDescription("Test role for assignment").build().getId();
+    return portalData.role(b -> b.description("Test role for assignment")).getId();
   }
 
   private UUID createTestRole(String name, RoleType roleType) {
     return portalData
-        .role()
-        .withName(name)
-        .withDescription("Test role for assignment")
-        .withRoleType(roleType)
-        .build()
+        .role(b -> b.name(name).description("Test role for assignment").roleType(roleType))
         .getId();
   }
 
   private User createTestUser() {
-    return portalData.user().build();
+    return portalData.user();
   }
 
   private Group createTestGroupWithMember(User user) {
-    return portalData
-        .group()
-        .withDescription("Test group for assignment")
-        .withMembers(Set.of(user))
-        .build();
+    return portalData.group(b -> b.description("Test group for assignment").members(Set.of(user)));
   }
 
   private UUID createTestDataSpace() {
@@ -129,15 +117,15 @@ class AssignmentControllerIntegrationTest
   }
 
   private DataSpace createTestDataSpaceEntity() {
-    return portalData.dataSpace().withDescription("Test dataspace for assignment").build();
+    return portalData.dataSpace(b -> b.description("Test dataspace for assignment"));
   }
 
   private UUID createTestDataSet(UUID dataSpaceId) {
-    return portalData.dataSet().withDescription("Test dataset for assignment").build().getId();
+    return portalData.dataSet(b -> b.description("Test dataset for assignment")).getId();
   }
 
   private UUID createTestCatalog() {
-    return portalData.catalog().withDescription("Test catalog for assignment").build().getId();
+    return portalData.catalog(b -> b.description("Test catalog for assignment")).getId();
   }
 
   private UUID getScopeIdForType(ScopeType scopeType) {

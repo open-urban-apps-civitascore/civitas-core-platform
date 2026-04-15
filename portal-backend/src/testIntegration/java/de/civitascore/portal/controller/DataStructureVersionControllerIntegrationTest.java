@@ -98,38 +98,35 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
     // Create parent data structure
     DataStructure dataStructure =
-        portalData
-            .dataStructure()
-            .withName("Test Data Structure")
-            .withDescription("Data structure for version testing")
-            .withStatus(DataStructureStatus.DRAFT)
-            .build();
+        portalData.dataStructure(
+            b ->
+                b.name("Test Data Structure")
+                    .description("Data structure for version testing")
+                    .dataStructureStatus(DataStructureStatus.DRAFT));
     dataStructureId = dataStructure.getId();
 
     // Create test versions
     DataStructureVersion version1 =
-        portalData
-            .dataStructureVersion()
-            .withVersion("1.0.0")
-            .withDescription("First version of the test data structure")
-            .withStatus(DataStructureVersionStatus.DRAFT)
-            .withDataStructure(dataStructure)
-            .withModelAtlasUri("https://modelatlas.example.com/model1")
-            .withModelName("TestModel1")
-            .withStyles(Map.of("color", "blue", "size", 10))
-            .build();
+        portalData.dataStructureVersion(
+            dataStructure,
+            b ->
+                b.version("1.0.0")
+                    .description("First version of the test data structure")
+                    .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
+                    .modelAtlasUri("https://modelatlas.example.com/model1")
+                    .modelName("TestModel1")
+                    .styles(Map.of("color", "blue", "size", 10)));
     versionId1 = version1.getId();
 
-    portalData
-        .dataStructureVersion()
-        .withVersion("2.0.0")
-        .withDescription("Second version with updated fields")
-        .withStatus(DataStructureVersionStatus.DRAFT)
-        .withDataStructure(dataStructure)
-        .withModelAtlasUri("https://modelatlas.example.com/model2")
-        .withModelName("TestModel2")
-        .withStyles(Map.of("color", "red", "size", 20))
-        .build();
+    portalData.dataStructureVersion(
+        dataStructure,
+        b ->
+            b.version("2.0.0")
+                .description("Second version with updated fields")
+                .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
+                .modelAtlasUri("https://modelatlas.example.com/model2")
+                .modelName("TestModel2")
+                .styles(Map.of("color", "red", "size", 20)));
   }
 
   @AfterEach

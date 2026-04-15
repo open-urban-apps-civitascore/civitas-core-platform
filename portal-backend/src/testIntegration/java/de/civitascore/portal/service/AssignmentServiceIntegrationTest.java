@@ -44,34 +44,22 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @BeforeEach
   void setUp() {
-    testGroup = portalData.group().withDescription("Test group for assignment testing").build();
+    testGroup = portalData.group(b -> b.description("Test group for assignment testing"));
     testDataRole =
-        portalData
-            .role()
-            .withRoleType(RoleType.DATA)
-            .withDescription("Test DATA role for assignment testing")
-            .build();
+        portalData.role(
+            b -> b.roleType(RoleType.DATA).description("Test DATA role for assignment testing"));
     testSystemRole =
-        portalData
-            .role()
-            .withRoleType(RoleType.SYSTEM)
-            .withDescription("Test SYSTEM role for assignment testing")
-            .build();
+        portalData.role(
+            b ->
+                b.roleType(RoleType.SYSTEM).description("Test SYSTEM role for assignment testing"));
     testDataSpace =
-        portalData.dataSpace().withDescription("Test dataspace for assignment testing").build();
+        portalData.dataSpace(b -> b.description("Test dataspace for assignment testing"));
     testDataSet =
-        portalData
-            .dataSet()
-            .withDescription("Test dataset for assignment testing")
-            .withOpenDataAccess(false)
-            .build();
-    testCatalog =
-        portalData.catalog().withDescription("Test catalog for assignment testing").build();
+        portalData.dataSet(
+            b -> b.description("Test dataset for assignment testing").openDataAccess(false));
+    testCatalog = portalData.catalog(b -> b.description("Test catalog for assignment testing"));
     testDataStructure =
-        portalData
-            .dataStructure()
-            .withDescription("Test datastructure for assignment testing")
-            .build();
+        portalData.dataStructure(b -> b.description("Test datastructure for assignment testing"));
   }
 
   @AfterEach
@@ -697,7 +685,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     @DisplayName("Should return multiple assignments for the same scope")
     void shouldReturnMultipleAssignmentsForSameScope() {
       // Create second group
-      Group secondGroup = portalData.group().withDescription("Second test group").build();
+      Group secondGroup = portalData.group(b -> b.description("Second test group"));
 
       // Create first assignment
       AssignmentInputDTO input1 = new AssignmentInputDTO();
@@ -828,11 +816,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     void shouldHandleMultipleAssignmentsForSameGroupWithDifferentRoles() {
       // Create second DATA role
       Role secondDataRole =
-          portalData
-              .role()
-              .withRoleType(RoleType.DATA)
-              .withDescription("Second test DATA role")
-              .build();
+          portalData.role(b -> b.roleType(RoleType.DATA).description("Second test DATA role"));
 
       // Create assignment with first role
       AssignmentInputDTO input1 = new AssignmentInputDTO();

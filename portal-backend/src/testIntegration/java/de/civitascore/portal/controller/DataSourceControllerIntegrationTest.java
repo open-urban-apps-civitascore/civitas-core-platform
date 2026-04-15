@@ -56,13 +56,10 @@ class DataSourceControllerIntegrationTest
   }
 
   private UUID createAvailableDataStructureVersionId() {
-    var ds = portalData.dataStructure().withStatus(DataStructureStatus.AVAILABLE).build();
+    var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
     DataStructureVersion dsv =
-        portalData
-            .dataStructureVersion()
-            .withStatus(DataStructureVersionStatus.AVAILABLE)
-            .withDataStructure(ds)
-            .build();
+        portalData.dataStructureVersion(
+            ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
     return dsv.getId();
   }
 
@@ -147,8 +144,8 @@ class DataSourceControllerIntegrationTest
   }
 
   private void linkDataSourceToDataSetViaStatus(DataSource dataSource, DataSetStatus status) {
-    DataSet dataSet = portalData.dataSet().withStatus(status).build();
-    portalData.pipeline().withDataSet(dataSet).withDataSources(Set.of(dataSource)).build();
+    DataSet dataSet = portalData.dataSet(b -> b.dataSetStatus(status));
+    portalData.pipeline(dataSet, b -> b.dataSources(Set.of(dataSource)));
   }
 
   private ResponseEntity<String> performPublishExpectingError(UUID id) {
@@ -164,24 +161,18 @@ class DataSourceControllerIntegrationTest
   }
 
   private UUID createDraftDataStructureVersionId() {
-    var ds = portalData.dataStructure().withStatus(DataStructureStatus.AVAILABLE).build();
+    var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
     DataStructureVersion dsv =
-        portalData
-            .dataStructureVersion()
-            .withStatus(DataStructureVersionStatus.DRAFT)
-            .withDataStructure(ds)
-            .build();
+        portalData.dataStructureVersion(
+            ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.DRAFT));
     return dsv.getId();
   }
 
   private UUID createDsvWithDraftParentDataStructure() {
-    var ds = portalData.dataStructure().withStatus(DataStructureStatus.DRAFT).build();
+    var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.DRAFT));
     DataStructureVersion dsv =
-        portalData
-            .dataStructureVersion()
-            .withStatus(DataStructureVersionStatus.AVAILABLE)
-            .withDataStructure(ds)
-            .build();
+        portalData.dataStructureVersion(
+            ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
     return dsv.getId();
   }
 

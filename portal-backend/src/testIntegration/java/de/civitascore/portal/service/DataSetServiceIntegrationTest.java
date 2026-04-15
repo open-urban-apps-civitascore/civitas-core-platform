@@ -7,7 +7,6 @@ import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.RoleType;
-import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Catalog;
 import de.civitascore.portal.model.entity.DataSet;
@@ -164,55 +163,41 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
    *************/
 
   private DataSet createInitialDataSet() {
-    return portalData.dataSet().withDescription("Test dataset for relationship testing").build();
+    return portalData.dataSet(b -> b.description("Test dataset for relationship testing"));
   }
 
   private Pipeline createPipelineForDataSet(DataSet dataSet, String name) {
-    DataSource ds1 = portalData.dataSource().build();
-    DataSource ds2 = portalData.dataSource().build();
-    DataSource ds3 = portalData.dataSource().build();
+    DataSource ds1 = portalData.dataSource();
+    DataSource ds2 = portalData.dataSource();
+    DataSource ds3 = portalData.dataSource();
 
-    return portalData
-        .pipeline()
-        .withName(name + "_" + System.currentTimeMillis())
-        .withDescription("Test pipeline for " + name)
-        .withDataSet(dataSet)
-        .withStyles(createSampleStyles())
-        .withDataSources(new HashSet<>(Set.of(ds1, ds2, ds3)))
-        .withApis(Arrays.asList("/api/v1/traffic", "/api/v1/weather"))
-        .withPersistences(Collections.singletonList(12345L))
-        .withModel(createSampleModel())
-        .build();
+    return portalData.pipeline(
+        dataSet,
+        b ->
+            b.name(name + "_" + System.currentTimeMillis())
+                .description("Test pipeline for " + name)
+                .styles(createSampleStyles())
+                .dataSources(new HashSet<>(Set.of(ds1, ds2, ds3)))
+                .apis(Arrays.asList("/api/v1/traffic", "/api/v1/weather"))
+                .persistences(Collections.singletonList(12345L))
+                .model(createSampleModel()));
   }
 
   private Distribution createDistributionForDataSet(DataSet dataSet, String apiPath) {
-    return portalData
-        .distribution()
-        .withAccessUrl("http://localhost:8080" + apiPath)
-        .withDataSet(dataSet)
-        .build();
+    return portalData.distribution(
+        b -> b.accessUrl("http://localhost:8080" + apiPath).dataSet(dataSet));
   }
 
   private Catalog createInitialCatalog(String name) {
-    return portalData.catalog().withName(name + "_" + System.currentTimeMillis()).build();
+    return portalData.catalog(b -> b.name(name + "_" + System.currentTimeMillis()));
   }
 
   private Assignment createAssignmentForDataSet(DataSet dataSet, String roleName) {
-    Group group = portalData.group().withDescription("Test group for " + roleName).build();
+    Group group = portalData.group(b -> b.description("Test group for " + roleName));
     Role role =
-        portalData
-            .role()
-            .withDescription("Test role for " + roleName)
-            .withRoleType(RoleType.DATA)
-            .build();
+        portalData.role(b -> b.description("Test role for " + roleName).roleType(RoleType.DATA));
 
-    return portalData
-        .assignment()
-        .withGroup(group)
-        .withRole(role)
-        .withScopeType(ScopeType.DATASET)
-        .withScope(dataSet)
-        .build();
+    return portalData.assignment(group, role, dataSet);
   }
 
   @Nested

@@ -85,7 +85,7 @@ class UserControllerIntegrationTest
   }
 
   private UUID createTestGroup(String name) {
-    Group group = portalData.group().withName(name).withDescription("Test group").build();
+    Group group = portalData.group(b -> b.name(name).description("Test group"));
     return group.getId();
   }
 
