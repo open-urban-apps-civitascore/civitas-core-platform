@@ -18,8 +18,12 @@ import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.NotNull;
 import java.util.HashSet;
 import java.util.Set;
+import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 
 /**
  * Represents a named role that bundles a set of {@link Permission Permissions}. The {@link
@@ -38,6 +42,8 @@ import lombok.Setter;
     indexes = {@Index(name = "idx_role_type", columnList = "role_type")})
 @Getter
 @Setter
+@SuperBuilder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @NamedEntityGraph(
     name = "Role.withPermissions",
     attributeNodes = @NamedAttributeNode("permissions"))
@@ -52,8 +58,10 @@ public class Role extends NamedEntity {
       name = "role_permissions",
       joinColumns = @JoinColumn(name = "role_id"),
       inverseJoinColumns = @JoinColumn(name = "permission_id"))
+  @Builder.Default
   private Set<Permission> permissions = new HashSet<>();
 
   @Column(name = "readonly", nullable = false, updatable = false)
+  @Builder.Default
   private boolean readonly = false;
 }

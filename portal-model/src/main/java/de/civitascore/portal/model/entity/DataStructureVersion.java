@@ -13,8 +13,11 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 import java.util.Map;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -29,6 +32,8 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "data_structure_versions")
 @Getter
 @Setter
+@SuperBuilder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class DataStructureVersion extends BaseEntity {
 
   @Column(columnDefinition = "TEXT")
