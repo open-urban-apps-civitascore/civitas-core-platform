@@ -56,7 +56,6 @@ class DataSpaceControllerIntegrationTest
   @Override
   protected DataSpaceInputDTO createUpdateInput() {
     DataSpaceInputDTO input = new DataSpaceInputDTO();
-    input.setName("updated_dataspace");
     input.setName("Updated DataSpace");
     input.setDescription("Updated description");
     return input;
@@ -134,7 +133,6 @@ class DataSpaceControllerIntegrationTest
 
       // Create child dataspace
       DataSpaceInputDTO childInput = createValidInput();
-      childInput.setName("child_dataspace");
       childInput.setName("Child DataSpace");
       childInput.setParentDataSpaceId(parentId);
 
@@ -479,7 +477,6 @@ class DataSpaceControllerIntegrationTest
     void shouldHandleDataSpaceHierarchy() {
       // Create parent dataspace
       DataSpaceInputDTO parentInput = createValidInput();
-      parentInput.setName("parent_dataspace");
       parentInput.setName("Parent DataSpace");
       ResponseEntity<DataSpaceOutputDTO> parentResponse = performCreate(parentInput);
       assertThat(parentResponse.getBody()).isNotNull();
@@ -487,7 +484,6 @@ class DataSpaceControllerIntegrationTest
 
       // Create child dataspace
       DataSpaceInputDTO childInput = createValidInput();
-      childInput.setName("child_dataspace");
       childInput.setName("Child DataSpace");
       childInput.setParentDataSpaceId(parentId);
       ResponseEntity<DataSpaceOutputDTO> childResponse = performCreate(childInput);
@@ -505,7 +501,6 @@ class DataSpaceControllerIntegrationTest
     @DisplayName("Should handle special characters in name")
     void shouldHandleSpecialCharactersInName() {
       DataSpaceInputDTO input = createValidInput();
-      input.setName("dataspace_with_special_äöü");
       input.setName("DataSpace with special chars: äöü ß @#$%");
 
       ResponseEntity<DataSpaceOutputDTO> response = performCreate(input);

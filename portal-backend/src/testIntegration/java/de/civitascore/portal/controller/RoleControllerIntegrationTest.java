@@ -61,7 +61,6 @@ class RoleControllerIntegrationTest
   @Override
   protected RoleInputDTO createUpdateInput() {
     RoleInputDTO input = new RoleInputDTO();
-    input.setName("updated_role");
     input.setName("Updated Role");
     input.setDescription("Updated description");
     input.setRoleType(RoleType.DATA);
@@ -148,11 +147,6 @@ class RoleControllerIntegrationTest
     void shouldCreateRoleWithDifferentRoleTypes() {
       for (RoleType type : RoleType.values()) {
         RoleInputDTO input = createValidInput();
-        input.setName(
-            "role_"
-                + type.name().toLowerCase()
-                + "_"
-                + UUID.randomUUID().toString().substring(0, 8));
         input.setName("Role " + type.name());
         input.setRoleType(type);
 
@@ -699,7 +693,6 @@ class RoleControllerIntegrationTest
     @DisplayName("Should handle special characters in name")
     void shouldHandleSpecialCharactersInName() {
       RoleInputDTO input = createValidInput();
-      input.setName("role_with_special_chars_äöü");
       input.setName("Role with special chars: äöü ß @#$%");
 
       ResponseEntity<RoleOutputDTO> response = performCreate(input);

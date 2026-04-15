@@ -853,7 +853,6 @@ class DataSetControllerIntegrationTest
     @DisplayName("Should handle special characters in name")
     void shouldHandleSpecialCharactersInName() {
       DataSetInputDTO input = createValidInput();
-      input.setName("dataset_with_special_äöü");
       input.setName("DataSet with special chars: äöü ß @#$%");
 
       ResponseEntity<DataSetOutputDTO> response = performCreate(input);
