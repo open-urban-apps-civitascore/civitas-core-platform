@@ -98,6 +98,11 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
     setTotalPages(Math.ceil(rowCount / pageSize))
   }, [rowCount, pageSize, setTotalPages])
 
+  useEffect(() => {
+    setPaginationParams({ pageSize: pageSize ?? 10, pageIndex: 0 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedScope])
+
   // Build a map from group ID to scopeType from assignments
   const groupScopeMap = useMemo(() => {
     const map: Record<string, AssignmentScope | null> = {}
