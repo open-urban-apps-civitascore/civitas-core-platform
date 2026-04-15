@@ -49,7 +49,7 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @Setter
 @SuperBuilder
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor
 public class DataSet extends BaseDataEntity {
 
   /** Status of the dataset in its lifecycle. Default is DRAFT. */

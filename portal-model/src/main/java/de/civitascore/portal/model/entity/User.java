@@ -45,7 +45,7 @@ import org.hibernate.annotations.Formula;
 @Getter
 @Setter
 @SuperBuilder
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor
 public class User extends BaseEntity {
 
   @Enumerated(EnumType.STRING)

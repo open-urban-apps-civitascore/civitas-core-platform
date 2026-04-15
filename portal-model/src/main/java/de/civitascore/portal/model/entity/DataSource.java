@@ -51,7 +51,7 @@ import org.hibernate.type.SqlTypes;
 @Getter
 @Setter
 @SuperBuilder
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor
 public class DataSource extends BaseDataEntity {
 
   @Enumerated(EnumType.STRING)
