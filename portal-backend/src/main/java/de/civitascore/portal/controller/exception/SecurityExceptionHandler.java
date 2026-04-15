@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URI;
 import lombok.extern.slf4j.Slf4j;
+import org.owasp.encoder.Encode;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -44,7 +45,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
   public void commence(
       HttpServletRequest request, HttpServletResponse response, AuthenticationException ex)
       throws IOException {
-    log.warn("Authentication failed: {}", ex.getMessage());
+    log.warn("Authentication failed: {}", Encode.forJava(ex.getMessage()));
     writeProblemDetailResponse(
         request, response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required");
   }
@@ -61,7 +62,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
   public void handle(
       HttpServletRequest request, HttpServletResponse response, AccessDeniedException ex)
       throws IOException {
-    log.warn("Access denied: {}", ex.getMessage());
+    log.warn("Access denied: {}", Encode.forJava(ex.getMessage()));
     writeProblemDetailResponse(
         request, response, HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Insufficient privileges");
   }
@@ -76,7 +77,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
   @ExceptionHandler(JwtException.class)
   @ResponseStatus(HttpStatus.UNAUTHORIZED)
   public ProblemDetail handleJwtException(JwtException ex, HttpServletRequest request) {
-    log.warn("JWT validation failed: {}", ex.getMessage());
+    log.warn("JWT validation failed: {}", Encode.forJava(ex.getMessage()));
     ProblemDetail problemDetail =
         ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "JWT validation failed");
     problemDetail.setType(URI.create(ERROR_URN_PREFIX + "INVALID_TOKEN"));
