@@ -1118,7 +1118,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           restTemplate.exchange(
               getEndpoint() + "/" + versionId1 + "/publish",
               HttpMethod.POST,
-              new HttpEntity<>(null),
+              new HttpEntity<>((HttpHeaders) null),
               String.class);
 
       assertThat(response.getStatusCode())
@@ -1208,7 +1208,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           restTemplate.exchange(
               getEndpoint() + "/" + versionId1 + "/unpublish",
               HttpMethod.POST,
-              new HttpEntity<>(null),
+              new HttpEntity<>((HttpHeaders) null),
               String.class);
 
       assertThat(response.getStatusCode())

@@ -291,7 +291,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       HttpStatusCode status, String errorCode, String detail) {
     ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, detail);
     problemDetail.setType(URI.create(ERROR_URN_PREFIX + errorCode));
-    problemDetail.setTitle(status.getReasonPhrase());
+    problemDetail.setTitle(HttpStatus.valueOf(status.value()).getReasonPhrase());
     return problemDetail;
   }
 

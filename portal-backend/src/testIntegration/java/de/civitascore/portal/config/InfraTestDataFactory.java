@@ -7,6 +7,7 @@ import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Pipeline;
+import java.io.IOException;
 import java.io.InputStream;
 import java.security.GeneralSecurityException;
 import java.util.LinkedHashMap;
@@ -194,7 +195,7 @@ public class InfraTestDataFactory {
         throw new IllegalArgumentException("Pipeline config not found: " + resourcePath);
       }
       return objectMapper.readValue(is, Map.class);
-    } catch (JacksonException e) {
+    } catch (JacksonException | IOException e) {
       throw new RuntimeException("Failed to load pipeline config from " + resourcePath, e);
     }
   }

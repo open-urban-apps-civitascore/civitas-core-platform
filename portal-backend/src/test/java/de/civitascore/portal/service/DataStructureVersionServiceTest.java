@@ -843,12 +843,8 @@ class DataStructureVersionServiceTest {
               "<xml>model</xml>", "https://modelatlas.example.com/model1"))
           .thenReturn(uploadResponse);
 
-      ObjectMapper realMapper =
-          JsonMapper.builder()
-              // TODO readTree was removed from JsonMapper in Jackson 3.
-              .readTree(uploadResponse)
-              .build();
-      JsonNode rootNode;
+      ObjectMapper realMapper = new JsonMapper();
+      JsonNode rootNode = realMapper.readTree(uploadResponse);
       when(objectMapper.readTree(uploadResponse)).thenReturn(rootNode);
 
       dataStructureVersionService.update(versionId, input);

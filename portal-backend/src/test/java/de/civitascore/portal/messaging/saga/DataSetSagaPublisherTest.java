@@ -88,12 +88,8 @@ class DataSetSagaPublisherTest {
 
       publisher.publishCreateRequested(dataSet);
 
-      ObjectMapper mapper =
-          JsonMapper.builder()
-              // TODO readTree was removed from JsonMapper in Jackson 3.
-              .readTree(jsonCaptor.getValue())
-              .build();
-      var payload;
+      ObjectMapper mapper = new JsonMapper();
+      var payload = mapper.readTree(jsonCaptor.getValue());
       var datasources = payload.get("datasources");
       assertThat(datasources).isNotNull();
       assertThat(datasources.size()).as("Shared datasource should appear only once").isEqualTo(1);
@@ -141,12 +137,8 @@ class DataSetSagaPublisherTest {
 
       publisher.publishUpdateRequested(dataSet, previousPipelines);
 
-      ObjectMapper mapper =
-          JsonMapper.builder()
-              // TODO readTree was removed from JsonMapper in Jackson 3.
-              .readTree(jsonCaptor.getValue())
-              .build();
-      var payload;
+      ObjectMapper mapper = new JsonMapper();
+      var payload = mapper.readTree(jsonCaptor.getValue());
       var dataPipelines = payload.get("dataPipelines");
       assertThat(dataPipelines).isNotNull();
       assertThat(dataPipelines.size()).isEqualTo(3);
