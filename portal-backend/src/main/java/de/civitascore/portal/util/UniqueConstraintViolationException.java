@@ -12,19 +12,18 @@ public class UniqueConstraintViolationException extends RuntimeException {
   }
 
   public UniqueConstraintViolationException(String field, String value) {
-    super(String.format("A record with %s '%s' already exists", field, value));
+    super("A record with %s '%s' already exists".formatted(field, value));
   }
 
   public UniqueConstraintViolationException(String entityName, String field, String value) {
-    super(String.format("%s with %s '%s' already exists", entityName, field, value));
+    super("%s with %s '%s' already exists".formatted(entityName, field, value));
   }
 
   public UniqueConstraintViolationException(
       String entityName, String field1, String value1, String field2, String value2) {
     super(
-        String.format(
-            "%s with %s '%s' and %s '%s' already exists",
-            entityName, field1, value1, field2, value2));
+        "%s with %s '%s' and %s '%s' already exists"
+            .formatted(entityName, field1, value1, field2, value2));
   }
 
   public UniqueConstraintViolationException(String message) {

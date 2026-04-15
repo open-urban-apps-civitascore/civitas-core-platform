@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.config.InfraTestDataFactory;
 import de.civitascore.portal.config.SagaInfraVerifier;
 import de.civitascore.portal.config.SagaOrchestratorTestHelper;
@@ -42,6 +41,8 @@ import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.kafka.KafkaContainer;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Extended lifecycle integration tests for the Dataset Saga workflow.
@@ -667,7 +668,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
   class ResultListenerTests {
 
     private static final String SAGA_RESULT_TOPIC = "de.civitascore.saga.result";
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new JsonMapper();
 
     /**
      * Sends a SAGA_COMPLETED message directly to Kafka and verifies the listener persists

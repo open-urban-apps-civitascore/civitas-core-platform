@@ -109,12 +109,12 @@ public record ConfigEventDTO(
 
     // Build resource path
     return switch (aggregateType) {
-      case "user" -> String.format("realms/%s/users/%s", realm, entityId);
-      case "client" -> String.format("realms/%s/clients/%s", realm, entityId);
-      case "role" -> String.format("realms/%s/roles/%s", realm, entityId);
-      case "group" -> String.format("realms/%s/groups/%s", realm, entityId);
-      case "realm" -> String.format("realms/%s", realm);
-      default -> String.format("realms/%s/%ss/%s", realm, aggregateType, entityId);
+      case "user" -> "realms/%s/users/%s".formatted(realm, entityId);
+      case "client" -> "realms/%s/clients/%s".formatted(realm, entityId);
+      case "role" -> "realms/%s/roles/%s".formatted(realm, entityId);
+      case "group" -> "realms/%s/groups/%s".formatted(realm, entityId);
+      case "realm" -> "realms/%s".formatted(realm);
+      default -> "realms/%s/%ss/%s".formatted(realm, aggregateType, entityId);
     };
   }
 }

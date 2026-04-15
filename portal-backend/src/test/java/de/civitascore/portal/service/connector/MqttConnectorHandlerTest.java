@@ -2,7 +2,6 @@ package de.civitascore.portal.service.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.crypto.CredentialDecryptor;
 import de.civitascore.configadapter.crypto.CredentialEncryptor;
 import de.civitascore.configadapter.crypto.CryptoKeyLoader;
@@ -18,6 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
+import tools.jackson.databind.json.JsonMapper;
 
 @DisplayName("MqttConnectorHandler Tests")
 class MqttConnectorHandlerTest {
@@ -57,7 +57,7 @@ class MqttConnectorHandlerTest {
             throw new UnsupportedOperationException();
           }
         };
-    handler = new MqttConnectorHandler(new ObjectMapper(), textEncryptor);
+    handler = new MqttConnectorHandler(new JsonMapper(), textEncryptor);
   }
 
   @Nested

@@ -36,7 +36,7 @@ public class InitProperties {
   public static class GroupEntry {
     @NotBlank private String name;
     private String roleName;
-    private ScopeType scopeType;
+    @Valid private ScopeType scopeType;
     private String description;
   }
 
@@ -47,7 +47,7 @@ public class InitProperties {
     @NotBlank private String lastName;
     @NotBlank @Email private String email;
     private String externalId;
-    private UserTitleType title = UserTitleType.OTHER;
+    @Valid private UserTitleType title = UserTitleType.OTHER;
     private String password;
     private List<String> groups = new ArrayList<>();
   }

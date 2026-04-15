@@ -4,8 +4,8 @@ import de.civitascore.portal.model.entity.Pipeline;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data JPA repository for {@link Pipeline} entities. */

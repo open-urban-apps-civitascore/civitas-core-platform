@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.11</version>
+        <version>4.0.5</version>
         <relativePath/>
     </parent>
 
@@ -26,14 +26,12 @@
     <!--  mvn versions:display-property-updates -->
     <properties>
         <java.version>21</java.version>
-        <springdoc-openapi.version>2.8.16</springdoc-openapi.version>
+        <springdoc-openapi.version>3.0.3</springdoc-openapi.version>
         <testcontainers.version>2.0.4</testcontainers.version>
         <testcontainers-keycloak.version>4.1.1</testcontainers-keycloak.version>
         <specification-arg-resolver.version>3.3.0</specification-arg-resolver.version>
         <hibernate-processor.version>7.3.0.Final</hibernate-processor.version>
         <spotless.version>2.46.1</spotless.version>
-        <surefire.version>3.5.5</surefire.version>
-        <failsafe.version>3.5.5</failsafe.version>
         <skipUnitTests>false</skipUnitTests>
         <jacoco.version>0.8.14</jacoco.version>
         <mapstruct.version>1.6.3</mapstruct.version>
@@ -56,6 +54,11 @@
 
     <dependencyManagement>
         <dependencies>
+      <dependency>
+        <groupId>io.rest-assured</groupId>
+        <artifactId>rest-assured</artifactId>
+        <version>5.5.7</version>
+      </dependency>
             <!-- Override lz4-java to fix CVE-2025-12183 / CVE-2025-66566 -->
             <dependency>
                 <groupId>org.lz4</groupId>
@@ -76,7 +79,7 @@
         <!-- Web, Data, Validation -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -94,8 +97,12 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+            <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
         </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-restclient</artifactId>
+    </dependency>
         <!-- DB + Migrations -->
         <dependency>
             <groupId>org.postgresql</groupId>
@@ -109,17 +116,21 @@
             <artifactId>encoder</artifactId>
             <version>${owasp.encoder.version}</version>
         </dependency>
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok-mapstruct-binding</artifactId>
+      <version>0.2.0</version>
+    </dependency>
 
         <!-- Kafka -->
         <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
-            <version>${spring-kafka.version}</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
         </dependency>
 
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
 
         <dependency>
@@ -149,8 +160,8 @@
 
         <!-- Test -->
         <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-test</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -158,10 +169,14 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc-test</artifactId>
+      <scope>test</scope>
+    </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-junit-jupiter</artifactId>
-            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -191,7 +206,6 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-postgresql</artifactId>
-            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
         <!-- Kafka TestContainers for integration testing -->
@@ -207,6 +221,10 @@
                     <groupId>com.fasterxml.jackson.module</groupId>
                     <artifactId>jackson-module-scala_2.13</artifactId>
                 </exclusion>
+        <exclusion>
+          <groupId>tools.jackson.module</groupId>
+          <artifactId>jackson-module-scala_2.13</artifactId>
+        </exclusion>
             </exclusions>
         </dependency>
         <!-- WireMock for mocking external HTTP services -->
@@ -298,7 +316,6 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-kafka</artifactId>
-            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -372,10 +389,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>${maven-compiler-plugin.version}</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.mapstruct</groupId>
@@ -398,13 +412,13 @@
                             <version>${hibernate-processor.version}</version>
                         </path>
                     </annotationProcessorPaths>
+          <release>${java.version}</release>
                 </configuration>
             </plugin>
             <!-- Build Helper for testIntegration directory -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
-                <version>${build-helper-maven-plugin.version}</version>
                 <executions>
                     <execution>
                         <id>add-integration-test-sources</id>
@@ -471,7 +485,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>${surefire.version}</version>
                 <configuration>
                     <skipTests>${skipTests}</skipTests>
                     <skip>${skipUnitTests}</skip>
@@ -488,7 +501,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
-                <version>${failsafe.version}</version>
                 <executions>
                     <execution>
                         <goals>
@@ -552,7 +564,6 @@
             <plugin>
                 <groupId>org.cyclonedx</groupId>
                 <artifactId>cyclonedx-maven-plugin</artifactId>
-                <version>${cyclonedx-maven-plugin.version}</version>
                 <configuration>
                     <outputFormat>json</outputFormat>
                     <schemaVersion>1.5</schemaVersion>

@@ -129,10 +129,7 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   protected ConfigValue toConfigValuePostSave(
       User entity, UserInputDTO input, ConfigValue preSaveConfigValue) {
 
-    UserConfig userConfig =
-        preSaveConfigValue instanceof UserConfig
-            ? (UserConfig) preSaveConfigValue
-            : new UserConfig();
+    UserConfig userConfig = preSaveConfigValue instanceof UserConfig uc ? uc : new UserConfig();
 
     // Set Keycloak user ID if it exists (required for UPDATE/DELETE operations)
     if (entity.getExternalId() != null && !entity.getExternalId().isBlank()) {

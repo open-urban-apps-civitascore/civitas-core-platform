@@ -3,7 +3,6 @@ package de.civitascore.portal.messaging.saga;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
@@ -24,6 +23,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.test.util.ReflectionTestUtils;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DataSetSagaPublisher Tests")
@@ -35,7 +36,7 @@ class DataSetSagaPublisherTest {
 
   @BeforeEach
   void setUp() {
-    publisher = new DataSetSagaPublisher(kafkaTemplate, new ObjectMapper());
+    publisher = new DataSetSagaPublisher(kafkaTemplate, new JsonMapper());
     ReflectionTestUtils.setField(publisher, "triggerTopic", "test.saga.trigger");
     ReflectionTestUtils.setField(publisher, "publishTimeoutSeconds", 5);
   }
@@ -87,12 +88,16 @@ class DataSetSagaPublisherTest {
 
       publisher.publishCreateRequested(dataSet);
 
-      ObjectMapper mapper = new ObjectMapper();
-      var payload = mapper.readTree(jsonCaptor.getValue());
+      ObjectMapper mapper =
+          JsonMapper.builder()
+              // TODO readTree was removed from JsonMapper in Jackson 3.
+              .readTree(jsonCaptor.getValue())
+              .build();
+      var payload;
       var datasources = payload.get("datasources");
       assertThat(datasources).isNotNull();
       assertThat(datasources.size()).as("Shared datasource should appear only once").isEqualTo(1);
-      assertThat(datasources.get(0).get("id").asText()).isEqualTo(dsId.toString());
+      assertThat(datasources.get(0).get("id").asString()).isEqualTo(dsId.toString());
     }
   }
 
@@ -136,17 +141,21 @@ class DataSetSagaPublisherTest {
 
       publisher.publishUpdateRequested(dataSet, previousPipelines);
 
-      ObjectMapper mapper = new ObjectMapper();
-      var payload = mapper.readTree(jsonCaptor.getValue());
+      ObjectMapper mapper =
+          JsonMapper.builder()
+              // TODO readTree was removed from JsonMapper in Jackson 3.
+              .readTree(jsonCaptor.getValue())
+              .build();
+      var payload;
       var dataPipelines = payload.get("dataPipelines");
       assertThat(dataPipelines).isNotNull();
       assertThat(dataPipelines.size()).isEqualTo(3);
 
       boolean hasAdd = false, hasUpdate = false, hasDelete = false;
       for (var p : dataPipelines) {
-        String action = p.get("action").asText();
-        String pipelineId = p.get("id").asText();
-        String version = p.get("version").asText();
+        String action = p.get("action").asString();
+        String pipelineId = p.get("id").asString();
+        String version = p.get("version").asString();
         if (action.equals("ADD") && pipelineId.equals(newPipelineId.toString())) {
           hasAdd = true;
           assertThat(version).as("ADD pipeline should carry entity version").isEqualTo("3");

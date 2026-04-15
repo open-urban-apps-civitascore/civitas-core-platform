@@ -1,7 +1,5 @@
 package de.civitascore.portal.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.Config;
 import de.civitascore.configadapter.model.ConfigEvent;
@@ -21,6 +19,8 @@ import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Service for publishing configuration events to the config adapter pipeline via CloudEvents. Wraps
@@ -106,7 +106,7 @@ public class ConfigEventPublisherService {
     CloudEvent cloudEvent;
     try {
       cloudEvent = convertToCloudEvent(messageId, topic, configEvent);
-    } catch (JsonProcessingException e) {
+    } catch (JacksonException e) {
       log.error(
           "Error converting ConfigEvent: messageId={}, topic={}", messageId, topic.getValue(), e);
       return CompletableFuture.failedFuture(e);
@@ -154,7 +154,7 @@ public class ConfigEventPublisherService {
   }
 
   private CloudEvent convertToCloudEvent(String messageId, Topics topic, ConfigEvent configEvent)
-      throws JsonProcessingException {
+      throws JacksonException {
     String configEventJson = objectMapper.writeValueAsString(configEvent);
 
     return CloudEventBuilder.v1()

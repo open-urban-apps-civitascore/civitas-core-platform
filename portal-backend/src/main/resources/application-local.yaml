@@ -10,12 +10,6 @@ app:
 civitas:
   master-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
-server:
-  error:
-    include-message: always
-    include-exception: true
-    include-stacktrace: on_param
-
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable
@@ -106,3 +100,9 @@ init:
         - 'Local Tenant Admins'
         - 'Local Data Owners'
         - 'Local Data Gatekeepers'
+
+spring.web.error.include-exception: true
+
+spring.web.error.include-message: always
+
+spring.web.error.include-stacktrace: on_param

@@ -1,6 +1,5 @@
 package de.civitascore.portal.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.portal.mapper.DataSourceMapper;
 import de.civitascore.portal.model.connector.OnPublish;
 import de.civitascore.portal.model.embedded.ConnectorType;
@@ -28,6 +27,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Service for managing {@link DataSource} entities through their full lifecycle (DRAFT to

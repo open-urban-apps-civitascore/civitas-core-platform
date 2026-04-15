@@ -1,6 +1,5 @@
 package de.civitascore.portal.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.crypto.CredentialEncryptor;
 import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import de.civitascore.portal.model.embedded.ConnectorType;
@@ -8,7 +7,6 @@ import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Pipeline;
-import java.io.IOException;
 import java.io.InputStream;
 import java.security.GeneralSecurityException;
 import java.util.LinkedHashMap;
@@ -17,6 +15,9 @@ import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestComponent;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Test helper for creating and cleaning up saga / infrastructure integration test entities.
@@ -51,7 +52,7 @@ public class InfraTestDataFactory {
 
   @Autowired private PortalTestDataFactory portalData;
 
-  private final ObjectMapper objectMapper = new ObjectMapper();
+  private final ObjectMapper objectMapper = new JsonMapper();
 
   public DataSet createDataSet(String name) {
     return portalData.dataSet(
@@ -193,7 +194,7 @@ public class InfraTestDataFactory {
         throw new IllegalArgumentException("Pipeline config not found: " + resourcePath);
       }
       return objectMapper.readValue(is, Map.class);
-    } catch (IOException e) {
+    } catch (JacksonException e) {
       throw new RuntimeException("Failed to load pipeline config from " + resourcePath, e);
     }
   }

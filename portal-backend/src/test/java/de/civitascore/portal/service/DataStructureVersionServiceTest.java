@@ -11,8 +11,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
@@ -37,6 +35,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DataStructureVersionService Unit Tests")
@@ -842,8 +843,12 @@ class DataStructureVersionServiceTest {
               "<xml>model</xml>", "https://modelatlas.example.com/model1"))
           .thenReturn(uploadResponse);
 
-      ObjectMapper realMapper = new ObjectMapper();
-      JsonNode rootNode = realMapper.readTree(uploadResponse);
+      ObjectMapper realMapper =
+          JsonMapper.builder()
+              // TODO readTree was removed from JsonMapper in Jackson 3.
+              .readTree(uploadResponse)
+              .build();
+      JsonNode rootNode;
       when(objectMapper.readTree(uploadResponse)).thenReturn(rootNode);
 
       dataStructureVersionService.update(versionId, input);

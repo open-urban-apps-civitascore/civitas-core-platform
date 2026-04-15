@@ -1,8 +1,5 @@
 package de.civitascore.portal.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
@@ -25,6 +22,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Service for managing {@link DataStructureVersion} entities through their lifecycle (DRAFT to
@@ -253,10 +253,10 @@ public class DataStructureVersionService
       }
       JsonNode objectIdNode = root.get(MODEL_ATLAS_OBJECT_ID_FIELD);
       if (objectIdNode != null && !objectIdNode.isNull()) {
-        entity.setExternalId(objectIdNode.asText());
+        entity.setExternalId(objectIdNode.asString());
         dataStructureVersionRepository.save(entity);
       }
-    } catch (JsonProcessingException e) {
+    } catch (JacksonException e) {
       log.warn("Failed to parse externalId from Model Atlas upload response", e);
     }
   }

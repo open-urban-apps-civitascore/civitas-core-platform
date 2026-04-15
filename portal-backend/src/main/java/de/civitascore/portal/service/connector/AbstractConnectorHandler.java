@@ -3,7 +3,6 @@ package de.civitascore.portal.service.connector;
 import static de.civitascore.portal.configuration.EncryptionConfig.ENC_PREFIX;
 import static de.civitascore.portal.configuration.EncryptionConfig.ENC_SUFFIX;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.model.connector.ConnectorConfiguration;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.util.InvalidInputException;
@@ -19,6 +18,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Base implementation of {@link ConnectorHandler} providing connector-type-agnostic logic for

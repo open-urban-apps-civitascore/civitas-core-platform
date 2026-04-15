@@ -136,8 +136,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
   private String stubModelDownload(String nsUri) {
     String downloadPath =
-        String.format(
-            "/atlas/rest/%s/schema/stages/%s/content?nsUri=%s", TEST_SCOPE, TEST_STAGE, nsUri);
+        "/atlas/rest/%s/schema/stages/%s/content?nsUri=%s".formatted(TEST_SCOPE, TEST_STAGE, nsUri);
     stubFor(
         get(urlEqualTo(downloadPath))
             .willReturn(
@@ -151,9 +150,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
   private String stubModelUpload(String nsUri) {
     String expectedPath =
-        String.format(
-            "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true",
-            TEST_SCOPE, TEST_STAGE, nsUri);
+        "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true"
+            .formatted(TEST_SCOPE, TEST_STAGE, nsUri);
 
     stubFor(
         post(urlEqualTo(expectedPath))
@@ -170,7 +168,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
   private String stubModelDelete(String nsUri) {
     String deletePath =
-        String.format("/atlas/rest/%s/schema/stages/%s?nsUri=%s", TEST_SCOPE, TEST_STAGE, nsUri);
+        "/atlas/rest/%s/schema/stages/%s?nsUri=%s".formatted(TEST_SCOPE, TEST_STAGE, nsUri);
     stubFor(delete(urlEqualTo(deletePath)).willReturn(aResponse().withStatus(200)));
     return deletePath;
   }
@@ -366,9 +364,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @DisplayName("Should return 502 and roll back create when Model Atlas upload fails")
     void shouldRollBackCreateWhenModelAtlasUploadFails() {
       String expectedPath =
-          String.format(
-              "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true",
-              TEST_SCOPE, TEST_STAGE, TEST_NS_URI);
+          "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true"
+              .formatted(TEST_SCOPE, TEST_STAGE, TEST_NS_URI);
 
       stubFor(
           post(urlEqualTo(expectedPath))
@@ -519,9 +516,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .isEqualTo(MOCK_MODEL_RESPONSE);
 
       String expectedDownloadPath =
-          String.format(
-              "/atlas/rest/%s/schema/stages/%s/content?nsUri=%s",
-              TEST_SCOPE, TEST_STAGE, "https://modelatlas.example.com/model1");
+          "/atlas/rest/%s/schema/stages/%s/content?nsUri=%s"
+              .formatted(TEST_SCOPE, TEST_STAGE, "https://modelatlas.example.com/model1");
       verify(getRequestedFor(urlEqualTo(expectedDownloadPath)));
     }
 
@@ -636,9 +632,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       stubModelDelete("https://modelatlas.example.com/model1");
 
       String expectedPath =
-          String.format(
-              "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true",
-              TEST_SCOPE, TEST_STAGE, "https://modelatlas.example.com/model1-updated");
+          "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true"
+              .formatted(TEST_SCOPE, TEST_STAGE, "https://modelatlas.example.com/model1-updated");
 
       stubFor(
           post(urlEqualTo(expectedPath))
@@ -722,9 +717,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       stubModelDelete("https://modelatlas.example.com/model1");
 
       String expectedPath =
-          String.format(
-              "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true",
-              TEST_SCOPE, TEST_STAGE, TEST_NS_URI);
+          "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true"
+              .formatted(TEST_SCOPE, TEST_STAGE, TEST_NS_URI);
 
       stubFor(
           post(urlEqualTo(expectedPath))
@@ -878,9 +872,9 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       verify(
           getRequestedFor(
               urlEqualTo(
-                  String.format(
-                      "/atlas/rest/%s/schema/stages/%s/content?nsUri=%s",
-                      TEST_SCOPE, TEST_STAGE, "https://modelatlas.example.com/model1"))));
+                  "/atlas/rest/%s/schema/stages/%s/content?nsUri=%s"
+                      .formatted(
+                          TEST_SCOPE, TEST_STAGE, "https://modelatlas.example.com/model1"))));
     }
 
     @Test

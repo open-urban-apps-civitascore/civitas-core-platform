@@ -1,7 +1,5 @@
 package de.civitascore.portal.messaging.saga;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.portal.model.embedded.PipelineAction;
@@ -22,6 +20,8 @@ import org.owasp.encoder.Encode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Publishes dataset saga trigger messages to Kafka for the config-adapter orchestrator. Supports
@@ -190,7 +190,7 @@ public class DataSetSagaPublisher {
           Encode.forJava(sagaType),
           Encode.forJava(datasetId),
           Encode.forJava(triggerTopic));
-    } catch (JsonProcessingException e) {
+    } catch (JacksonException e) {
       log.error(
           "Failed to serialize saga trigger for dataset {}: {}",
           Encode.forJava(datasetId),
