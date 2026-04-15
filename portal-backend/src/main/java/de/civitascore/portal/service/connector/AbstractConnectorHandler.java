@@ -18,6 +18,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -56,6 +57,8 @@ public abstract class AbstractConnectorHandler implements ConnectorHandler {
     } catch (IllegalArgumentException e) {
       String detail = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
       return List.of("Invalid configuration format: " + detail);
+    } catch (JacksonException e) {
+      return List.of("Invalid configuration format: " + e.getMessage());
     }
     Class<?>[] effectiveGroups = groups.length > 0 ? groups : new Class<?>[] {Default.class};
     Set<? extends ConstraintViolation<?>> violations = VALIDATOR.validate(pojo, effectiveGroups);
@@ -83,6 +86,8 @@ public abstract class AbstractConnectorHandler implements ConnectorHandler {
     } catch (IllegalArgumentException e) {
       String detail = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
       throw new InvalidInputException("configuration", (String) null, detail);
+    } catch (JacksonException e) {
+      throw new InvalidInputException("configuration", (String) null, e.getMessage());
     }
     Class<?>[] effectiveGroups = groups.length > 0 ? groups : new Class<?>[] {Default.class};
     Set<? extends ConstraintViolation<?>> violations = VALIDATOR.validate(pojo, effectiveGroups);
