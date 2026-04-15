@@ -32,6 +32,12 @@ spring:
     problemdetails:
       enabled: true
 
+  web:
+    error:
+      include-exception: false
+      include-message: never
+      include-stacktrace: never
+
   data:
     web:
       pageable:
@@ -127,9 +133,3 @@ model-atlas:
   baseUrl: "http://model-atlas:8080"
   scope: civitas
   stage: draft
-
-spring.web.error.include-exception: false
-
-spring.web.error.include-message: never
-
-spring.web.error.include-stacktrace: never

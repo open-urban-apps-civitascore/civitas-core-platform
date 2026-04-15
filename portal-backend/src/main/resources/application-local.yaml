@@ -25,6 +25,12 @@ spring:
   kafka:
     bootstrap-servers: localhost:9092
 
+  web:
+    error:
+      include-exception: true
+      include-message: always
+      include-stacktrace: on_param
+
 keycloak:
   realm: "civitas-core"
   auth-server-url: http://localhost:8080
@@ -100,9 +106,3 @@ init:
         - 'Local Tenant Admins'
         - 'Local Data Owners'
         - 'Local Data Gatekeepers'
-
-spring.web.error.include-exception: true
-
-spring.web.error.include-message: always
-
-spring.web.error.include-stacktrace: on_param
