@@ -9,8 +9,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 /** Superclass for entities that own {@link Assignment}s with diff-based replacement semantics. */
+@SuperBuilder
+@NoArgsConstructor
 @MappedSuperclass
 public abstract class AssignableEntity extends NamedEntity {
 

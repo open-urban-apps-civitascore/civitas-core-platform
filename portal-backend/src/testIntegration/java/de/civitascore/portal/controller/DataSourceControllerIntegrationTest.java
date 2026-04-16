@@ -2,23 +2,19 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
-import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
-import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
-import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
-import de.civitascore.portal.repository.DataStructureRepository;
-import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.util.RestPage;
@@ -40,13 +36,12 @@ import org.springframework.http.ResponseEntity;
 
 @DisplayName("DataSource Controller Integration Tests")
 class DataSourceControllerIntegrationTest
-    extends BaseControllerIntegrationTest<DataSourceInputDTO, DataSourceOutputDTO> {
+    extends BaseDataEntityControllerIntegrationTest<DataSourceInputDTO, DataSourceOutputDTO> {
 
   private static final String DATASOURCES_ENDPOINT = "/datasources";
 
+  @Autowired protected PortalTestDataFactory portalData;
   @Autowired private DataSourceRepository dataSourceRepository;
-  @Autowired private DataStructureRepository dataStructureRepository;
-  @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private PipelineRepository pipelineRepository;
 
@@ -57,25 +52,14 @@ class DataSourceControllerIntegrationTest
 
   @Override
   protected void performAdditionalCleanup() {
-    pipelineRepository.deleteAll();
-    dataSetRepository.deleteAll();
-    dataSourceRepository.deleteAll();
-    dataStructureVersionRepository.deleteAll();
-    dataStructureRepository.deleteAll();
+    portalData.cleanAll();
   }
 
   private UUID createAvailableDataStructureVersionId() {
-    DataStructure ds = new DataStructure();
-    ds.setName("ds_" + UUID.randomUUID().toString().substring(0, 8));
-    ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-    ds = dataStructureRepository.save(ds);
-
-    DataStructureVersion dsv = new DataStructureVersion();
-    dsv.setVersion("1.0.0");
-    dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-    dsv.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-    dsv.setDataStructure(ds);
-    dsv = dataStructureVersionRepository.save(dsv);
+    var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+    DataStructureVersion dsv =
+        portalData.dataStructureVersion(
+            ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
     return dsv.getId();
   }
 
@@ -160,17 +144,8 @@ class DataSourceControllerIntegrationTest
   }
 
   private void linkDataSourceToDataSetViaStatus(DataSource dataSource, DataSetStatus status) {
-    DataSet dataSet = new DataSet();
-    dataSet.setName("ds_for_inuse_" + UUID.randomUUID().toString().substring(0, 8));
-    dataSet.setDataSetStatus(status);
-    dataSet.setOpenDataAccess(false);
-    dataSet = dataSetRepository.save(dataSet);
-
-    Pipeline pipeline = new Pipeline();
-    pipeline.setName("pipeline_" + UUID.randomUUID().toString().substring(0, 8));
-    pipeline.setDataSet(dataSet);
-    pipeline.setDataSources(Set.of(dataSource));
-    pipelineRepository.save(pipeline);
+    DataSet dataSet = portalData.dataSet(b -> b.dataSetStatus(status));
+    portalData.pipeline(dataSet, b -> b.dataSources(Set.of(dataSource)));
   }
 
   private ResponseEntity<String> performPublishExpectingError(UUID id) {
@@ -186,32 +161,18 @@ class DataSourceControllerIntegrationTest
   }
 
   private UUID createDraftDataStructureVersionId() {
-    DataStructure ds = new DataStructure();
-    ds.setName("ds_" + UUID.randomUUID().toString().substring(0, 8));
-    ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-    ds = dataStructureRepository.save(ds);
-
-    DataStructureVersion dsv = new DataStructureVersion();
-    dsv.setVersion("1.0.0");
-    dsv.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-    dsv.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-    dsv.setDataStructure(ds);
-    dsv = dataStructureVersionRepository.save(dsv);
+    var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+    DataStructureVersion dsv =
+        portalData.dataStructureVersion(
+            ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.DRAFT));
     return dsv.getId();
   }
 
   private UUID createDsvWithDraftParentDataStructure() {
-    DataStructure ds = new DataStructure();
-    ds.setName("ds_" + UUID.randomUUID().toString().substring(0, 8));
-    ds.setDataStructureStatus(DataStructureStatus.DRAFT);
-    ds = dataStructureRepository.save(ds);
-
-    DataStructureVersion dsv = new DataStructureVersion();
-    dsv.setVersion("1.0.0");
-    dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-    dsv.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-    dsv.setDataStructure(ds);
-    dsv = dataStructureVersionRepository.save(dsv);
+    var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.DRAFT));
+    DataStructureVersion dsv =
+        portalData.dataStructureVersion(
+            ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
     return dsv.getId();
   }
 

@@ -7,8 +7,11 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.util.HashSet;
 import java.util.Set;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 
 /**
  * Represents a downloadable or addressable resource that is exposed through one or more {@link
@@ -18,7 +21,10 @@ import lombok.Setter;
 @Table(name = "resources")
 @Getter
 @Setter
+@SuperBuilder
+@NoArgsConstructor
 public class Resource extends BaseEntity {
   @OneToMany(mappedBy = "resource", fetch = FetchType.LAZY)
+  @Builder.Default
   private Set<Distribution> distributions = new HashSet<>();
 }

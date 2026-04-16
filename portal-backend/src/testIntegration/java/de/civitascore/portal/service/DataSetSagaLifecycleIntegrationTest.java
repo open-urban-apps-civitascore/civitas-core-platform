@@ -6,9 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.civitascore.portal.config.InfraTestDataFactory;
 import de.civitascore.portal.config.SagaInfraVerifier;
 import de.civitascore.portal.config.SagaOrchestratorTestHelper;
-import de.civitascore.portal.config.SagaTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -102,7 +102,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private KafkaTemplate<String, String> kafkaTemplate;
 
-  @Autowired private SagaTestDataFactory data;
+  @Autowired private InfraTestDataFactory data;
   private SagaInfraVerifier verifier;
 
   @BeforeEach

@@ -16,8 +16,11 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 
 /**
  * Represents a dataspace that acts as a logical container for {@link DataSet DataSets}. DataSpaces
@@ -33,6 +36,8 @@ import lombok.Setter;
     indexes = {@Index(name = "idx_dataspace_owner", columnList = "owner_user_id")})
 @Getter
 @Setter
+@SuperBuilder
+@NoArgsConstructor
 public class DataSpace extends NamedEntity {
 
   @ManyToOne(fetch = FetchType.LAZY)
@@ -40,6 +45,7 @@ public class DataSpace extends NamedEntity {
   private User owner;
 
   @ManyToMany(fetch = FetchType.LAZY, mappedBy = "dataSpaces")
+  @Builder.Default
   private Set<DataSet> dataSets = new HashSet<>();
 
   @ManyToOne(fetch = FetchType.LAZY)
@@ -52,6 +58,7 @@ public class DataSpace extends NamedEntity {
       cascade = CascadeType.ALL,
       orphanRemoval = true)
   @Setter(AccessLevel.NONE) // Custom setter needed for orphanRemoval
+  @Builder.Default
   private Set<DataSpace> childDataSpaces = new HashSet<>();
 
   /**
@@ -69,5 +76,6 @@ public class DataSpace extends NamedEntity {
   private String externalId;
 
   @OneToMany(mappedBy = "dataSpace", fetch = FetchType.LAZY)
+  @Builder.Default
   private Set<Assignment> assignments = new HashSet<>();
 }

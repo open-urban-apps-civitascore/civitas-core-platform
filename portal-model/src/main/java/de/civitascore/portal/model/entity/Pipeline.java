@@ -15,8 +15,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -31,6 +34,8 @@ import org.hibernate.type.SqlTypes;
     indexes = {@Index(name = "idx_pipeline_dataset", columnList = "dataset_id")})
 @Getter
 @Setter
+@SuperBuilder
+@NoArgsConstructor
 public class Pipeline extends NamedEntity {
 
   @ManyToOne(fetch = FetchType.LAZY)
@@ -48,6 +53,7 @@ public class Pipeline extends NamedEntity {
       name = "pipeline_data_sources",
       joinColumns = @JoinColumn(name = "pipeline_id"),
       inverseJoinColumns = @JoinColumn(name = "data_source_id"))
+  @Builder.Default
   private Set<DataSource> dataSources = new HashSet<>();
 
   /** Array of API paths (e.g., ["/api/v1/traffic"]). Used to auto-generate Distribution entries. */
@@ -65,5 +71,6 @@ public class Pipeline extends NamedEntity {
 
   /** Auto-incremented on each update, passed through to saga triggers. */
   @Column(name = "version", nullable = false)
+  @Builder.Default
   private long version = 1L;
 }

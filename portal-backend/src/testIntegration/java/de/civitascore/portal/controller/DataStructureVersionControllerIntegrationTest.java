@@ -16,6 +16,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.verify;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
@@ -62,6 +63,8 @@ import org.wiremock.spring.EnableWireMock;
         portProperties = "model-atlas.port"))
 class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrationTest {
 
+  @Autowired protected PortalTestDataFactory portalData;
+
   @Autowired private DataStructureRepository dataStructureRepository;
 
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
@@ -94,54 +97,41 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
             StandardCharsets.UTF_8);
 
     // Create parent data structure
-    DataStructure dataStructure = new DataStructure();
-    dataStructure.setName("Test Data Structure");
-    dataStructure.setDescription("Data structure for version testing");
-    dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
-    dataStructure.setCreatedFromDataSource(false);
-    dataStructure = dataStructureRepository.save(dataStructure);
+    DataStructure dataStructure =
+        portalData.dataStructure(
+            b ->
+                b.name("Test Data Structure")
+                    .description("Data structure for version testing")
+                    .dataStructureStatus(DataStructureStatus.DRAFT));
     dataStructureId = dataStructure.getId();
 
     // Create test versions
-    DataStructureVersion version1 = new DataStructureVersion();
-    version1.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-    version1.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-    version1.setVersion("1.0.0");
-    version1.setDescription("First version of the test data structure");
-    version1.setModelAtlasUri("https://modelatlas.example.com/model1");
-    version1.setModelName("TestModel1");
-    version1.setDataStructure(dataStructure);
-
-    Map<String, Object> styles1 = new HashMap<>();
-    styles1.put("color", "blue");
-    styles1.put("size", 10);
-    version1.setStyles(styles1);
-
-    version1 = dataStructureVersionRepository.save(version1);
+    DataStructureVersion version1 =
+        portalData.dataStructureVersion(
+            dataStructure,
+            b ->
+                b.version("1.0.0")
+                    .description("First version of the test data structure")
+                    .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
+                    .modelAtlasUri("https://modelatlas.example.com/model1")
+                    .modelName("TestModel1")
+                    .styles(Map.of("color", "blue", "size", 10)));
     versionId1 = version1.getId();
 
-    DataStructureVersion version2 = new DataStructureVersion();
-    version2.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-    version2.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-    version2.setVersion("2.0.0");
-    version2.setDescription("Second version with updated fields");
-    version2.setModelAtlasUri("https://modelatlas.example.com/model2");
-    version2.setModelName("TestModel2");
-    version2.setDataStructure(dataStructure);
-
-    Map<String, Object> styles2 = new HashMap<>();
-    styles2.put("color", "red");
-    styles2.put("size", 20);
-    version2.setStyles(styles2);
-
-    dataStructureVersionRepository.save(version2);
+    portalData.dataStructureVersion(
+        dataStructure,
+        b ->
+            b.version("2.0.0")
+                .description("Second version with updated fields")
+                .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
+                .modelAtlasUri("https://modelatlas.example.com/model2")
+                .modelName("TestModel2")
+                .styles(Map.of("color", "red", "size", 20)));
   }
 
   @AfterEach
   void cleanup() {
-    dataSourceRepository.deleteAll();
-    dataStructureVersionRepository.deleteAll();
-    dataStructureRepository.deleteAll();
+    portalData.cleanAll();
   }
 
   private String stubModelDownload(String nsUri) {

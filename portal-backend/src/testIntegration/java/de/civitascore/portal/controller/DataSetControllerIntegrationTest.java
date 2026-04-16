@@ -2,6 +2,7 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
@@ -42,10 +43,11 @@ import org.springframework.http.ResponseEntity;
 
 @DisplayName("DataSet Controller Integration Tests")
 class DataSetControllerIntegrationTest
-    extends BaseControllerIntegrationTest<DataSetInputDTO, DataSetOutputDTO> {
+    extends BaseDataEntityControllerIntegrationTest<DataSetInputDTO, DataSetOutputDTO> {
 
   private final String DATASETS_ENDPOINT = "/datasets";
 
+  @Autowired protected PortalTestDataFactory portalData;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private DistributionRepository distributionRepository;
@@ -81,11 +83,7 @@ class DataSetControllerIntegrationTest
 
   @Override
   protected void performAdditionalCleanup() {
-    pipelineRepository.deleteAll();
-    distributionRepository.deleteAll();
-    dataSetRepository.deleteAll();
-    dataSpaceRepository.deleteAll();
-    userRepository.deleteAll();
+    portalData.cleanAll();
   }
 
   /** Seeds the minimum publish requirement: one datasource linked to the first pipeline. */
@@ -855,7 +853,6 @@ class DataSetControllerIntegrationTest
     @DisplayName("Should handle special characters in name")
     void shouldHandleSpecialCharactersInName() {
       DataSetInputDTO input = createValidInput();
-      input.setName("dataset_with_special_äöü");
       input.setName("DataSet with special chars: äöü ß @#$%");
 
       ResponseEntity<DataSetOutputDTO> response = performCreate(input);

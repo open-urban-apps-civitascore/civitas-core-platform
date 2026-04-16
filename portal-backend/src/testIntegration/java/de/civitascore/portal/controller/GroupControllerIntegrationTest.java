@@ -2,6 +2,7 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Role;
@@ -11,10 +12,6 @@ import de.civitascore.portal.model.input.assignment.AssignmentGroupInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.GroupOutputDTO;
 import de.civitascore.portal.model.output.summary.RoleSummaryDTO;
-import de.civitascore.portal.repository.AssignmentRepository;
-import de.civitascore.portal.repository.GroupRepository;
-import de.civitascore.portal.repository.RoleRepository;
-import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,10 +34,7 @@ class GroupControllerIntegrationTest
 
   private final String GROUPS_ENDPOINT = "/groups";
 
-  @Autowired private GroupRepository groupRepository;
-  @Autowired private RoleRepository roleRepository;
-  @Autowired private AssignmentRepository assignmentRepository;
-  @Autowired private UserRepository userRepository;
+  @Autowired protected PortalTestDataFactory portalData;
 
   @Override
   protected String getEndpointPath() {
@@ -54,18 +48,11 @@ class GroupControllerIntegrationTest
 
   @Override
   protected void performAdditionalCleanup() {
-    assignmentRepository.deleteAll();
-    groupRepository.deleteAll();
-    roleRepository.deleteAll();
-    userRepository.deleteAll();
+    portalData.cleanAll();
   }
 
   private User createTestUser() {
-    User user = new User();
-    user.setFirstName("Test");
-    user.setLastName("User " + UUID.randomUUID().toString().substring(0, 8));
-    user.setEmail("test" + UUID.randomUUID().toString().substring(0, 8) + "@example.com");
-    return userRepository.save(user);
+    return portalData.user();
   }
 
   @Override
@@ -692,11 +679,9 @@ class GroupControllerIntegrationTest
       UUID groupId = createTestEntity();
 
       // Create role with description and readonly
-      Role role = new Role();
-      role.setName("Test Role " + UUID.randomUUID().toString().substring(0, 8));
-      role.setDescription("Role for testing assignments");
-      role.setRoleType(RoleType.DATA);
-      role = roleRepository.save(role);
+      Role role =
+          portalData.role(
+              b -> b.description("Role for testing assignments").roleType(RoleType.DATA));
 
       // Create assignment via dedicated endpoint
       AssignmentGroupInputDTO assignmentInput = new AssignmentGroupInputDTO();
@@ -758,11 +743,11 @@ class GroupControllerIntegrationTest
   class AssignmentManagementTests {
 
     private Role createDataRole(String name) {
-      Role role = new Role();
-      role.setName(name + " " + UUID.randomUUID().toString().substring(0, 8));
-      role.setDescription("Test role: " + name);
-      role.setRoleType(RoleType.DATA);
-      return roleRepository.save(role);
+      return portalData.role(
+          b ->
+              b.name(name + " " + UUID.randomUUID().toString().substring(0, 8))
+                  .description("Test role: " + name)
+                  .roleType(RoleType.DATA));
     }
 
     @Test

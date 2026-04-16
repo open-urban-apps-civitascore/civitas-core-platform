@@ -18,7 +18,9 @@ import jakarta.persistence.UniqueConstraint;
 import java.util.Objects;
 import java.util.stream.Stream;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 
 /**
  * Links a {@link Group} to a {@link Role} with an optional {@link ScopeType scope}, forming the
@@ -57,6 +59,8 @@ import lombok.Setter;
     })
 @Getter
 @Setter
+@SuperBuilder
+@NoArgsConstructor
 public class Assignment extends BaseEntity {
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)

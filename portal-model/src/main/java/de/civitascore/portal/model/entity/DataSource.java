@@ -19,8 +19,11 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -47,10 +50,13 @@ import org.hibernate.type.SqlTypes;
     })
 @Getter
 @Setter
+@SuperBuilder
+@NoArgsConstructor
 public class DataSource extends BaseDataEntity {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "data_source_status", nullable = false)
+  @Builder.Default
   private DataSourceStatus dataSourceStatus = DataSourceStatus.DRAFT;
 
   @Enumerated(EnumType.STRING)
@@ -71,6 +77,7 @@ public class DataSource extends BaseDataEntity {
       cascade = CascadeType.ALL,
       orphanRemoval = true)
   @Setter(AccessLevel.NONE)
+  @Builder.Default
   private Set<Assignment> assignments = new HashSet<>();
 
   /** {@inheritDoc} Links the assignment to this data source by setting its scope. */

@@ -22,8 +22,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 
 /**
  * Represents a dataset with its lifecycle status, infrastructure references, and relationships to
@@ -45,11 +48,14 @@ import lombok.Setter;
     })
 @Getter
 @Setter
+@SuperBuilder
+@NoArgsConstructor
 public class DataSet extends BaseDataEntity {
 
   /** Status of the dataset in its lifecycle. Default is DRAFT. */
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false, length = 20)
+  @Builder.Default
   private DataSetStatus dataSetStatus = DataSetStatus.DRAFT;
 
   /** Master persistence ID (FROST ID). Required for publishing the dataset. */
@@ -61,6 +67,7 @@ public class DataSet extends BaseDataEntity {
       fetch = FetchType.LAZY,
       cascade = CascadeType.ALL,
       orphanRemoval = true)
+  @Builder.Default
   private Set<Pipeline> pipelines = new HashSet<>();
 
   @Column(name = "identifier")
@@ -86,6 +93,7 @@ public class DataSet extends BaseDataEntity {
         @Index(name = "idx_dataset_dataspaces_dataset", columnList = "dataset_id"),
         @Index(name = "idx_dataset_dataspaces_dataspace", columnList = "dataspace_id")
       })
+  @Builder.Default
   private Set<DataSpace> dataSpaces = new HashSet<>();
 
   @ManyToMany(fetch = FetchType.LAZY)
@@ -97,6 +105,7 @@ public class DataSet extends BaseDataEntity {
         @Index(name = "idx_dataset_agents_dataset", columnList = "dataset_id"),
         @Index(name = "idx_dataset_agents_agent", columnList = "agent_id")
       })
+  @Builder.Default
   private Set<Agent> agents = new HashSet<>();
 
   @OneToMany(
@@ -104,9 +113,11 @@ public class DataSet extends BaseDataEntity {
       fetch = FetchType.LAZY,
       cascade = CascadeType.ALL,
       orphanRemoval = true)
+  @Builder.Default
   private Set<Distribution> distributions = new HashSet<>();
 
   @ManyToMany(mappedBy = "dataSets", fetch = FetchType.LAZY)
+  @Builder.Default
   private Set<Catalog> catalogs = new HashSet<>();
 
   @Column(name = "external_id")
@@ -116,6 +127,7 @@ public class DataSet extends BaseDataEntity {
   private String format;
 
   @Column(name = "open_data_access", nullable = false)
+  @Builder.Default
   private Boolean openDataAccess = false;
 
   @Column(name = "project_id")
@@ -146,6 +158,7 @@ public class DataSet extends BaseDataEntity {
       cascade = CascadeType.ALL,
       orphanRemoval = true)
   @Setter(AccessLevel.NONE)
+  @Builder.Default
   private Set<Assignment> assignments = new HashSet<>();
 
   /** {@inheritDoc} Links the assignment to this dataset by setting its scope. */

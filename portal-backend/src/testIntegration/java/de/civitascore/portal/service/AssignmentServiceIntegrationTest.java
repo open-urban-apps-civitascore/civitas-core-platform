@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
@@ -13,19 +14,7 @@ import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
-import de.civitascore.portal.model.input.CatalogInputDTO;
-import de.civitascore.portal.model.input.DataSetInputDTO;
-import de.civitascore.portal.model.input.DataSpaceInputDTO;
-import de.civitascore.portal.model.input.DataStructureInputDTO;
-import de.civitascore.portal.model.input.GroupInputDTO;
-import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentInputDTO;
-import de.civitascore.portal.repository.AssignmentRepository;
-import de.civitascore.portal.repository.CatalogRepository;
-import de.civitascore.portal.repository.DataSetRepository;
-import de.civitascore.portal.repository.DataSpaceRepository;
-import de.civitascore.portal.repository.GroupRepository;
-import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.List;
@@ -43,19 +32,7 @@ import org.springframework.dao.InvalidDataAccessApiUsageException;
 class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @Autowired private AssignmentService assignmentService;
-  @Autowired private GroupService groupService;
-  @Autowired private RoleService roleService;
-  @Autowired private DataSetService dataSetService;
-  @Autowired private DataSpaceService dataSpaceService;
-  @Autowired private CatalogService catalogService;
-
-  @Autowired private AssignmentRepository assignmentRepository;
-  @Autowired private GroupRepository groupRepository;
-  @Autowired private RoleRepository roleRepository;
-  @Autowired private DataSetRepository dataSetRepository;
-  @Autowired private DataSpaceRepository dataSpaceRepository;
-  @Autowired private CatalogRepository catalogRepository;
-  @Autowired private DataStructureService dataStructureService;
+  @Autowired private PortalTestDataFactory portalData;
 
   private Group testGroup;
   private Role testDataRole;
@@ -67,61 +44,27 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @BeforeEach
   void setUp() {
-    // Create test group
-    GroupInputDTO groupInput = new GroupInputDTO();
-    groupInput.setName("Test Group " + UUID.randomUUID().toString().substring(0, 8));
-    groupInput.setDescription("Test group for assignment testing");
-    testGroup = groupService.create(groupInput);
-
-    // Create test DATA role
-    RoleInputDTO dataRoleInput = new RoleInputDTO();
-    dataRoleInput.setName("test_data_role_" + UUID.randomUUID().toString().substring(0, 8));
-    dataRoleInput.setDescription("Test DATA role for assignment testing");
-    dataRoleInput.setRoleType(RoleType.DATA);
-    testDataRole = roleService.create(dataRoleInput);
-
-    // Create test SYSTEM role
-    RoleInputDTO systemRoleInput = new RoleInputDTO();
-    systemRoleInput.setName("test_system_role_" + UUID.randomUUID().toString().substring(0, 8));
-    systemRoleInput.setDescription("Test SYSTEM role for assignment testing");
-    systemRoleInput.setRoleType(RoleType.SYSTEM);
-    testSystemRole = roleService.create(systemRoleInput);
-
-    // Create test DataSpace
-    DataSpaceInputDTO dataSpaceInput = new DataSpaceInputDTO();
-    dataSpaceInput.setName("Test DataSpace " + UUID.randomUUID().toString().substring(0, 8));
-    dataSpaceInput.setDescription("Test dataspace for assignment testing");
-    testDataSpace = dataSpaceService.create(dataSpaceInput);
-
-    // Create test DataSet
-    DataSetInputDTO dataSetInput = new DataSetInputDTO();
-    dataSetInput.setName("Test DataSet " + UUID.randomUUID().toString().substring(0, 8));
-    dataSetInput.setDescription("Test dataset for assignment testing");
-    dataSetInput.setOpenDataAccess(false);
-    testDataSet = dataSetService.create(dataSetInput);
-
-    // Create test Catalog
-    CatalogInputDTO catalogInput = new CatalogInputDTO();
-    catalogInput.setName("Test Catalog " + UUID.randomUUID().toString().substring(0, 8));
-    catalogInput.setDescription("Test catalog for assignment testing");
-    testCatalog = catalogService.create(catalogInput);
-
-    // Create test dataStructure
-    DataStructureInputDTO dataStructureInput = new DataStructureInputDTO();
-    dataStructureInput.setName("Test DataStructure " + System.currentTimeMillis());
-    dataStructureInput.setDescription("Test datastructure for assignment testing");
-    dataStructureInput.setCreatedFromDataSource(false);
-    testDataStructure = dataStructureService.create(dataStructureInput);
+    testGroup = portalData.group(b -> b.description("Test group for assignment testing"));
+    testDataRole =
+        portalData.role(
+            b -> b.roleType(RoleType.DATA).description("Test DATA role for assignment testing"));
+    testSystemRole =
+        portalData.role(
+            b ->
+                b.roleType(RoleType.SYSTEM).description("Test SYSTEM role for assignment testing"));
+    testDataSpace =
+        portalData.dataSpace(b -> b.description("Test dataspace for assignment testing"));
+    testDataSet =
+        portalData.dataSet(
+            b -> b.description("Test dataset for assignment testing").openDataAccess(false));
+    testCatalog = portalData.catalog(b -> b.description("Test catalog for assignment testing"));
+    testDataStructure =
+        portalData.dataStructure(b -> b.description("Test datastructure for assignment testing"));
   }
 
   @AfterEach
   void cleanup() {
-    assignmentRepository.deleteAll();
-    dataSetRepository.deleteAll();
-    dataSpaceRepository.deleteAll();
-    catalogRepository.deleteAll();
-    roleRepository.deleteAll();
-    groupRepository.deleteAll();
+    portalData.cleanAll();
   }
 
   @Nested
@@ -742,10 +685,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     @DisplayName("Should return multiple assignments for the same scope")
     void shouldReturnMultipleAssignmentsForSameScope() {
       // Create second group
-      GroupInputDTO groupInput = new GroupInputDTO();
-      groupInput.setName("Second Group " + UUID.randomUUID().toString().substring(0, 8));
-      groupInput.setDescription("Second test group");
-      Group secondGroup = groupService.create(groupInput);
+      Group secondGroup = portalData.group(b -> b.description("Second test group"));
 
       // Create first assignment
       AssignmentInputDTO input1 = new AssignmentInputDTO();
@@ -875,11 +815,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     @DisplayName("Should handle multiple assignments for same group with different roles")
     void shouldHandleMultipleAssignmentsForSameGroupWithDifferentRoles() {
       // Create second DATA role
-      RoleInputDTO roleInput = new RoleInputDTO();
-      roleInput.setName("test_data_role_2_" + UUID.randomUUID().toString().substring(0, 8));
-      roleInput.setDescription("Second test DATA role");
-      roleInput.setRoleType(RoleType.DATA);
-      Role secondDataRole = roleService.create(roleInput);
+      Role secondDataRole =
+          portalData.role(b -> b.roleType(RoleType.DATA).description("Second test DATA role"));
 
       // Create assignment with first role
       AssignmentInputDTO input1 = new AssignmentInputDTO();

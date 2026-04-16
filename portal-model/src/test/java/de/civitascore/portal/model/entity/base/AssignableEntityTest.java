@@ -20,34 +20,27 @@ import org.junit.jupiter.api.Test;
 class AssignableEntityTest {
 
   private Assignment createAssignment(Group group, Role role, DataSet scope) {
-    Assignment assignment = new Assignment();
-    assignment.setId(UUID.randomUUID());
-    assignment.setGroup(group);
-    assignment.setRole(role);
-    assignment.setScopeType(ScopeType.DATASET);
-    assignment.setDataset(scope);
+    Assignment assignment =
+        Assignment.builder()
+            .id(UUID.randomUUID())
+            .group(group)
+            .role(role)
+            .scopeType(ScopeType.DATASET)
+            .dataset(scope)
+            .build();
     return assignment;
   }
 
   private Group groupWithId() {
-    Group group = new Group();
-    group.setId(UUID.randomUUID());
-    group.setName("TestGroup");
-    return group;
+    return Group.builder().id(UUID.randomUUID()).name("TestGroup").build();
   }
 
   private Role roleWithId() {
-    Role role = new Role();
-    role.setId(UUID.randomUUID());
-    role.setName("TestRole");
-    role.setRoleType(RoleType.SYSTEM);
-    return role;
+    return Role.builder().id(UUID.randomUUID()).name("TestRole").roleType(RoleType.SYSTEM).build();
   }
 
   private DataSet dataSetEntity() {
-    DataSet ds = new DataSet();
-    ds.setId(UUID.randomUUID());
-    ds.setName("TestDataSet");
+    DataSet ds = DataSet.builder().id(UUID.randomUUID()).name("TestDataSet").build();
     ds.setAssignments(new HashSet<>());
     return ds;
   }

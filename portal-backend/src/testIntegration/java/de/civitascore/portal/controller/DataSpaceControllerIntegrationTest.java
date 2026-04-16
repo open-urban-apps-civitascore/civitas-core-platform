@@ -2,10 +2,9 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.input.DataSpaceInputDTO;
 import de.civitascore.portal.model.output.DataSpaceOutputDTO;
-import de.civitascore.portal.repository.DataSetRepository;
-import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,8 +25,7 @@ class DataSpaceControllerIntegrationTest
 
   private final String DATASPACES_ENDPOINT = "/dataspaces";
 
-  @Autowired private DataSpaceRepository dataSpaceRepository;
-  @Autowired private DataSetRepository dataSetRepository;
+  @Autowired protected PortalTestDataFactory portalData;
 
   @Override
   protected String getEndpointPath() {
@@ -36,8 +34,7 @@ class DataSpaceControllerIntegrationTest
 
   @Override
   protected void performAdditionalCleanup() {
-    dataSetRepository.deleteAll();
-    dataSpaceRepository.deleteAll();
+    portalData.cleanAll();
   }
 
   @Override
@@ -59,7 +56,6 @@ class DataSpaceControllerIntegrationTest
   @Override
   protected DataSpaceInputDTO createUpdateInput() {
     DataSpaceInputDTO input = new DataSpaceInputDTO();
-    input.setName("updated_dataspace");
     input.setName("Updated DataSpace");
     input.setDescription("Updated description");
     return input;
@@ -137,7 +133,6 @@ class DataSpaceControllerIntegrationTest
 
       // Create child dataspace
       DataSpaceInputDTO childInput = createValidInput();
-      childInput.setName("child_dataspace");
       childInput.setName("Child DataSpace");
       childInput.setParentDataSpaceId(parentId);
 
@@ -482,7 +477,6 @@ class DataSpaceControllerIntegrationTest
     void shouldHandleDataSpaceHierarchy() {
       // Create parent dataspace
       DataSpaceInputDTO parentInput = createValidInput();
-      parentInput.setName("parent_dataspace");
       parentInput.setName("Parent DataSpace");
       ResponseEntity<DataSpaceOutputDTO> parentResponse = performCreate(parentInput);
       assertThat(parentResponse.getBody()).isNotNull();
@@ -490,7 +484,6 @@ class DataSpaceControllerIntegrationTest
 
       // Create child dataspace
       DataSpaceInputDTO childInput = createValidInput();
-      childInput.setName("child_dataspace");
       childInput.setName("Child DataSpace");
       childInput.setParentDataSpaceId(parentId);
       ResponseEntity<DataSpaceOutputDTO> childResponse = performCreate(childInput);
@@ -508,7 +501,6 @@ class DataSpaceControllerIntegrationTest
     @DisplayName("Should handle special characters in name")
     void shouldHandleSpecialCharactersInName() {
       DataSpaceInputDTO input = createValidInput();
-      input.setName("dataspace_with_special_äöü");
       input.setName("DataSpace with special chars: äöü ß @#$%");
 
       ResponseEntity<DataSpaceOutputDTO> response = performCreate(input);

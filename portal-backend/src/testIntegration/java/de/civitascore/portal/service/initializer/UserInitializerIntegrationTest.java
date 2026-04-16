@@ -12,12 +12,13 @@ import de.civitascore.portal.service.event.BaseEventPublishingIntegrationTest;
 import jakarta.transaction.Transactional;
 import java.util.List;
 import java.util.Optional;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @ActiveProfiles({"test-integration", "init", "init-test"})
 @DisplayName("UserInitializer Integration Tests")
@@ -29,13 +30,25 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
   private static final String TEST_SCOPED_GROUP_NAME = "Init Test Architects";
 
   @Autowired private UserInitializer userInitializer;
+  @Autowired private PermissionInitializer permissionInitializer;
+  @Autowired private RoleInitializer roleInitializer;
   @Autowired private GroupRepository groupRepository;
   @Autowired private AssignmentRepository assignmentRepository;
+  @Autowired private TransactionTemplate txTemplate;
 
-  @AfterEach
-  void tearDownInitTest() {
-    assignmentRepository.deleteAll();
-    groupRepository.deleteAll();
+  /**
+   * Re-seed permissions and roles before each test. The base class {@code tearDown()} calls {@code
+   * portalData.cleanAll()} which deletes all roles. The {@link UserInitializer} depends on seeded
+   * roles ("Tenant Admin", "Data Architect"), so they must be re-created first. Runs inside a
+   * transaction because {@link RoleInitializer} accesses lazy-loaded permission collections.
+   */
+  @BeforeEach
+  void reseedRoles() {
+    txTemplate.executeWithoutResult(
+        status -> {
+          permissionInitializer.initialize();
+          roleInitializer.initialize();
+        });
   }
 
   @Test
