@@ -169,10 +169,4 @@ public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
   protected String getEntityName() {
     return Group.class.getSimpleName();
   }
-
-  @Override
-  public Optional<Group> findById(UUID id) {
-    Optional<Group> entity = groupRepository.findByIdWithRelations(id);
-    return postLoad(entity);
-  }
 }
