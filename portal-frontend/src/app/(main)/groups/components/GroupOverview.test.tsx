@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+const { toast } = await import('sonner')
 
 import { useCreateGroup, useReplaceGroupAssignments, useUpdateGroup } from '@/app/services/api/groups/clientRequests'
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
@@ -345,6 +346,7 @@ describe('GroupOverview', () => {
       })
       fireEvent.click(screen.getByTestId('discardButton'))
       await waitFor(() => {
+        expect(screen.getByTestId('nameTextField')).toHaveValue('Test')
         expect(screen.queryByTestId('exitWarningModal')).not.toBeInTheDocument()
         expect(screen.getByTestId('editButton')).toBeInTheDocument()
       })
@@ -386,7 +388,6 @@ describe('GroupOverview', () => {
     })
 
     it('shows success toast after successful create', async () => {
-      const { toast } = await import('sonner')
       mockCreateMutateAsync.mockResolvedValue({ data: { id: '2' } })
       renderComponent({ isCreateMode: true })
       fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'New Group' } })
@@ -515,6 +516,22 @@ describe('GroupOverview', () => {
     it('shows error toast on failed update', async () => {
       const { toast } = await import('sonner')
       mockUpdateMutateAsync.mockRejectedValue(new Error('update failed'))
+      mockSearchParams = new URLSearchParams('mode=edit')
+      renderComponent()
+      fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Updated Name' } })
+      await waitFor(() => {
+        expect(screen.getByTestId('confirmButton')).not.toBeDisabled()
+      })
+      fireEvent.click(screen.getByTestId('confirmButton'))
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('errors.updateError')
+      })
+    })
+
+    it('shows error toast when update succeeds but replaceAssignments fails', async () => {
+      const { toast } = await import('sonner')
+      mockUpdateMutateAsync.mockResolvedValue({ data: { ...mockGroupData } })
+      mockReplaceAssignmentsMutateAsync.mockRejectedValue(new Error('assignment error'))
       mockSearchParams = new URLSearchParams('mode=edit')
       renderComponent()
       fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Updated Name' } })
