@@ -190,7 +190,7 @@ class GroupServiceTest {
       child.setParentGroup(group);
       group.setChildGroups(Set.of(child));
 
-      when(groupRepository.findByIdWithRelations(groupId)).thenReturn(Optional.of(group));
+      when(groupRepository.findById(groupId)).thenReturn(Optional.of(group));
 
       assertThatThrownBy(() -> service.deleteById(groupId))
           .isInstanceOf(ResourceInUseException.class)
