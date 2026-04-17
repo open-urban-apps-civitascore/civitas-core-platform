@@ -1,0 +1,45 @@
+meta {
+  name: 04 Create FeatureType (Polygon — districts)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/datastores/{{datastore_name}}/featuretypes
+  body: json
+  auth: basic
+}
+
+auth:basic {
+  username: {{geoserver_admin_user}}
+  password: {{geoserver_admin_password}}
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "featureType": {
+      "name": "{{featuretype_polygon}}",
+      "nativeName": "{{featuretype_polygon}}",
+      "title": "City Districts",
+      "abstract": "Administrative districts",
+      "srs": "EPSG:4326",
+      "nativeCRS": "EPSG:4326",
+      "recalculate": "",
+      "store": {
+        "@class": "dataStore",
+        "name": "{{workspace_name}}:{{datastore_name}}"
+      }
+    }
+  }
+}
+
+tests {
+  test("FeatureType created", function() {
+    expect(res.status).to.equal(201);
+  });
+}

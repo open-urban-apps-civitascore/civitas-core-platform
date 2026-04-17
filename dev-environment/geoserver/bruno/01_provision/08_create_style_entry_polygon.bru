@@ -1,0 +1,36 @@
+meta {
+  name: 08 Create Style Entry — Polygon
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/styles
+  body: json
+  auth: basic
+}
+
+auth:basic {
+  username: {{geoserver_admin_user}}
+  password: {{geoserver_admin_password}}
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "style": {
+      "name": "{{style_polygon}}",
+      "filename": "{{style_polygon}}.sld"
+    }
+  }
+}
+
+tests {
+  test("Style entry created", function() {
+    expect(res.status).to.equal(201);
+  });
+}

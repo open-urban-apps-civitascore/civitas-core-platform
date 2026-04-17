@@ -1,0 +1,55 @@
+meta {
+  name: 09 Upload SLD Content — Polygon
+  type: http
+  seq: 9
+}
+
+put {
+  url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/styles/{{style_polygon}}
+  body: text
+  auth: basic
+}
+
+auth:basic {
+  username: {{geoserver_admin_user}}
+  password: {{geoserver_admin_password}}
+}
+
+headers {
+  Content-Type: application/vnd.ogc.sld+xml
+  Accept: application/json
+}
+
+body:text {
+  <?xml version="1.0" encoding="UTF-8"?>
+  <StyledLayerDescriptor xmlns="http://www.opengis.net/sld"
+                         xmlns:ogc="http://www.opengis.net/ogc"
+                         version="1.0.0">
+    <NamedLayer>
+      <Name>civitas_default_polygon</Name>
+      <UserStyle>
+        <Title>CIVITAS Default Polygon</Title>
+        <FeatureTypeStyle>
+          <Rule>
+            <PolygonSymbolizer>
+              <Fill>
+                <CssParameter name="fill">#1e5ba8</CssParameter>
+                <CssParameter name="fill-opacity">0.2</CssParameter>
+              </Fill>
+              <Stroke>
+                <CssParameter name="stroke">#1e5ba8</CssParameter>
+                <CssParameter name="stroke-width">1.5</CssParameter>
+              </Stroke>
+            </PolygonSymbolizer>
+          </Rule>
+        </FeatureTypeStyle>
+      </UserStyle>
+    </NamedLayer>
+  </StyledLayerDescriptor>
+}
+
+tests {
+  test("SLD uploaded", function() {
+    expect(res.status).to.equal(200);
+  });
+}

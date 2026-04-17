@@ -1,0 +1,30 @@
+meta {
+  name: 01 Delete Workspace (full cleanup)
+  type: http
+  seq: 1
+}
+
+// recurse=true removes everything under the workspace in one call:
+// DataStores, FeatureTypes, Layers, workspace-scoped Styles.
+// This is the DATASET_DELETE saga compensation step.
+
+delete {
+  url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}?recurse=true
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{geoserver_admin_user}}
+  password: {{geoserver_admin_password}}
+}
+
+headers {
+  Accept: application/json
+}
+
+tests {
+  test("Workspace deleted", function() {
+    expect(res.status).to.equal(200);
+  });
+}

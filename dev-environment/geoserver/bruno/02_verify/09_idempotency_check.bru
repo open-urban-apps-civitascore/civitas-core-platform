@@ -1,0 +1,39 @@
+meta {
+  name: 09 Idempotency — re-create workspace returns 409
+  type: http
+  seq: 9
+}
+
+// GeoServer returns 500 (not 409) for duplicate featuretypes.
+// The adapter must GET-check before POST to stay idempotent.
+// This test verifies workspace-level behavior (409 = already exists).
+
+post {
+  url: {{geoserver_url}}/rest/workspaces
+  body: json
+  auth: basic
+}
+
+auth:basic {
+  username: {{geoserver_admin_user}}
+  password: {{geoserver_admin_password}}
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "workspace": {
+      "name": "{{workspace_name}}"
+    }
+  }
+}
+
+tests {
+  test("Re-creating existing workspace returns 409 (already exists)", function() {
+    expect(res.status).to.equal(409);
+  });
+}
