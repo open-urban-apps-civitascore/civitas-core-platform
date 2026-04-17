@@ -385,4 +385,39 @@ describe('PermissionsTab', () => {
       expect(onPendingPermissionIdsChange).toHaveBeenCalledWith([])
     })
   })
+
+  describe('No data scenarios', () => {
+    it('renders loading spinner while fetching permissions', () => {
+      vi.mocked(useGetPermissions).mockReturnValue({
+        data: undefined,
+        isFetching: true,
+        error: null,
+      } as unknown as ReturnType<typeof useGetPermissions>)
+      renderTab(ROLE_TYPES.SYSTEM)
+
+      expect(screen.getByText('loading')).toBeInTheDocument()
+    })
+
+    it('renders NoDataPage when permissions request fails', () => {
+      vi.mocked(useGetPermissions).mockReturnValue({
+        data: undefined,
+        isFetching: false,
+        error: new Error('Failed to load'),
+      } as unknown as ReturnType<typeof useGetPermissions>)
+      renderTab(ROLE_TYPES.SYSTEM)
+
+      expect(screen.getByText('errors.loadingError')).toBeInTheDocument()
+    })
+
+    it('renders NoDataPage when roles request fails', () => {
+      mockPermissions([])
+      vi.mocked(useGetRoles).mockReturnValue({
+        data: undefined,
+        error: new Error('Failed to load'),
+      } as unknown as ReturnType<typeof useGetRoles>)
+      renderTab(ROLE_TYPES.SYSTEM)
+
+      expect(screen.getByText('errors.loadingError')).toBeInTheDocument()
+    })
+  })
 })
