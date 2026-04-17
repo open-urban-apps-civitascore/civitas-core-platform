@@ -58,6 +58,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public ProblemDetail handleNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
     log.warn("Resource not found: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 L-5: message echoes back the UUID the client already submitted in the URL.
+    // Resources are UUID-addressed (not enumerable), so returning it is not a disclosure.
     return createProblemDetail(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage(), request);
   }
 
@@ -72,6 +74,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ProblemDetail handleInvalidInput(InvalidInputException ex, HttpServletRequest request) {
     log.warn("Invalid input: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 L-5: message is constructed by our own validation code (not reflected from DB or
+    // framework internals). Clients rely on it to render actionable errors.
     return createProblemDetail(HttpStatus.BAD_REQUEST, "INVALID_INPUT", ex.getMessage(), request);
   }
 
@@ -87,6 +91,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   public ProblemDetail handleUniqueConstraint(
       UniqueConstraintViolationException ex, HttpServletRequest request) {
     log.warn("Unique constraint violation: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 L-5: message contains the column name (public API schema) and the value the client
+    // just submitted. Required for clients to render which field collided.
     return createProblemDetail(
         HttpStatus.CONFLICT, "UNIQUE_CONSTRAINT_VIOLATION", ex.getMessage(), request);
   }
@@ -137,6 +143,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         String dbMessage = ex.getMostSpecificCause().getMessage();
         UniqueConstraintViolationException mapped = extractUniqueViolationException(dbMessage);
         log.warn("Unique constraint violation: {}", Encode.forJava(mapped.getMessage()));
+        // TR-03187 L-5: same rationale as handleUniqueConstraint — column name + submitted value
+        // are needed by clients; extracted via regex from the DB error, not the raw DB message.
         return toProblemDetailResponse(
             HttpStatus.CONFLICT, "UNIQUE_CONSTRAINT_VIOLATION", mapped.getMessage(), request);
       }
