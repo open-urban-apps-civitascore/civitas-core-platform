@@ -1,4 +1,4 @@
-package de.civitascore.portal.configuration;
+package de.civitascore.portal.service.initializer;
 
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.embedded.UserTitleType;

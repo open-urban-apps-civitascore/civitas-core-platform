@@ -1,4 +1,4 @@
-package de.civitascore.portal.config;
+package de.civitascore.portal.configuration;
 
 import de.civitascore.portal.messaging.CloudEventPublisher;
 import de.civitascore.portal.messaging.kafka.KafkaCloudEventPublisher;
