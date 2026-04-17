@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-const { toast } = await import('sonner')
 
 import { useCreateGroup, useReplaceGroupAssignments, useUpdateGroup } from '@/app/services/api/groups/clientRequests'
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
@@ -17,6 +17,10 @@ const mockSetSubTabValueParam = vi.fn()
 
 let mockSearchParams = new URLSearchParams()
 let mockSubTabValue = 'info'
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}))
 
 vi.mock('@/app/services/api/users/clientRequests', () => ({
   useGetCurrentUser: vi.fn(),
@@ -57,10 +61,6 @@ vi.mock('@/hooks/use-query-params', async () => {
     },
   }
 })
-
-vi.mock('sonner', () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-}))
 
 vi.mock('./roles-tab/RolesTab', () => ({
   RolesTab: () => <div data-testid="roles-tab" />,
@@ -414,7 +414,6 @@ describe('GroupOverview', () => {
     })
 
     it('shows error toast on failed create', async () => {
-      const { toast } = await import('sonner')
       mockCreateMutateAsync.mockRejectedValue(new Error('create failed'))
       renderComponent({ isCreateMode: true })
       fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'New Group' } })
@@ -428,7 +427,6 @@ describe('GroupOverview', () => {
     })
 
     it('shows name conflict toast and form field error on name conflict during create', async () => {
-      const { toast } = await import('sonner')
       const nameConflictError = {
         isAxiosError: true,
         status: 409,
@@ -464,7 +462,6 @@ describe('GroupOverview', () => {
     })
 
     it('shows assignment error toast but still navigates when assignment save fails during create', async () => {
-      const { toast } = await import('sonner')
       mockCreateMutateAsync.mockResolvedValue({ data: { id: '42' } })
       mockReplaceAssignmentsMutateAsync.mockRejectedValue(new Error('assignment error'))
       renderComponent({ isCreateMode: true, groupData: mockGroupDataWithAssignment })
@@ -498,7 +495,6 @@ describe('GroupOverview', () => {
     })
 
     it('shows success toast after successful update', async () => {
-      const { toast } = await import('sonner')
       mockUpdateMutateAsync.mockResolvedValue({ data: { ...mockGroupData } })
       mockReplaceAssignmentsMutateAsync.mockResolvedValue({ data: { ...mockGroupData } })
       mockSearchParams = new URLSearchParams('mode=edit')
@@ -514,7 +510,6 @@ describe('GroupOverview', () => {
     })
 
     it('shows error toast on failed update', async () => {
-      const { toast } = await import('sonner')
       mockUpdateMutateAsync.mockRejectedValue(new Error('update failed'))
       mockSearchParams = new URLSearchParams('mode=edit')
       renderComponent()
@@ -529,7 +524,6 @@ describe('GroupOverview', () => {
     })
 
     it('shows error toast when update succeeds but replaceAssignments fails', async () => {
-      const { toast } = await import('sonner')
       mockUpdateMutateAsync.mockResolvedValue({ data: { ...mockGroupData } })
       mockReplaceAssignmentsMutateAsync.mockRejectedValue(new Error('assignment error'))
       mockSearchParams = new URLSearchParams('mode=edit')
@@ -545,7 +539,6 @@ describe('GroupOverview', () => {
     })
 
     it('shows name conflict toast and form field error on name conflict during update', async () => {
-      const { toast } = await import('sonner')
       const nameConflictError = {
         isAxiosError: true,
         status: 409,
