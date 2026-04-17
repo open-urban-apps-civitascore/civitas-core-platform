@@ -186,7 +186,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     if (ex.getCause() instanceof IllegalStateException ise) {
       log.warn("Entity validation failed: {}", Encode.forJava(ise.getMessage()));
       return toProblemDetailResponse(
-          HttpStatus.BAD_REQUEST, "ENTITY_VALIDATION_FAILED", ise.getMessage(), request);
+          HttpStatus.BAD_REQUEST, "ENTITY_VALIDATION_FAILED", "Entity validation failed", request);
     }
     log.error("Persistence error: {}", Encode.forJava(ex.getMessage()), ex);
     return toProblemDetailResponse(
