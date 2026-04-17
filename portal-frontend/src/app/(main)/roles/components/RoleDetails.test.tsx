@@ -1,11 +1,12 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { AxiosError, AxiosHeaders, InternalAxiosRequestConfig } from 'axios'
+import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-
-import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
-import { Role } from '@/types/roles'
 
 import { useGetAssignments } from '@/app/services/api/assignments/clientRequests'
 import { usePermissions } from '@/hooks/use-permissions'
+import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
+import { Role } from '@/types/roles'
 
 import { RoleDetails } from './RoleDetails'
 
@@ -45,14 +46,6 @@ vi.mock('@/hooks/use-query-params', () => ({
 }))
 
 vi.mock('@/hooks/use-permissions', () => ({ usePermissions: vi.fn() }))
-
-vi.mock('@/hooks/use-error', () => ({
-  useError: () => ({
-    handleFormValidationError: vi.fn(),
-    handleNameError: vi.fn(),
-    handlePermissionsError: vi.fn(),
-  }),
-}))
 
 vi.mock('@/hooks/use-register-unsaved-changes', () => ({
   useRegisterUnsavedChanges: vi.fn(),
@@ -106,6 +99,21 @@ const mockHasPermission = (permissions: PermissionName[]) => {
     hasScopedPermission: () => false,
   })
 }
+
+const makeAxiosError = (status: number, detail?: string) =>
+  new AxiosError(
+    'request failed',
+    undefined,
+    { headers: new AxiosHeaders(), method: 'POST', url: '/roles' } as InternalAxiosRequestConfig,
+    undefined,
+    {
+      status,
+      statusText: '',
+      headers: new AxiosHeaders(),
+      config: { headers: new AxiosHeaders(), method: 'POST', url: '/roles' } as InternalAxiosRequestConfig,
+      data: { detail },
+    },
+  )
 
 const mockRole: Role = {
   id: 'role-1',
@@ -184,13 +192,13 @@ describe('RoleDetails', () => {
   })
 
   describe('Edit / read-only toggle', () => {
-    it('starts in read-only mode when roleId is given', () => {
+    it('starts in read-only for updating an existing role (existing roleId)', () => {
       render(<RoleDetails roleId="role-1" />)
       expect(screen.getByTestId('editButton')).toBeInTheDocument()
       expect(screen.queryByTestId('confirmButton')).not.toBeInTheDocument()
     })
 
-    it('starts in edit mode for a new role (no roleId)', () => {
+    it('starts in edit mode for creating a new role (no roleId)', () => {
       render(<RoleDetails />)
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
       expect(screen.getByTestId('confirmButton')).toBeInTheDocument()
@@ -211,6 +219,12 @@ describe('RoleDetails', () => {
       fireEvent.click(screen.getByTestId('cancelButton'))
       expect(screen.getByTestId('editButton')).toBeInTheDocument()
       expect(screen.queryByTestId('confirmButton')).not.toBeInTheDocument()
+    })
+
+    it('navigates to /roles when cancel is clicked when creating a new role', () => {
+      render(<RoleDetails />)
+      fireEvent.click(screen.getByTestId('cancelButton'))
+      expect(mockPush).toHaveBeenCalledWith('/roles')
     })
   })
 
@@ -253,6 +267,18 @@ describe('RoleDetails', () => {
       })
     })
 
+    it('Save button becomes disabled again when group assignments are reset to initial', async () => {
+      mockSubTabValue = 'groupAssignment'
+      render(<RoleDetails roleId="role-1" />)
+      fireEvent.click(screen.getByTestId('editButton'))
+
+      act(() => capturedOnGroupAssignmentUpdate?.(['new-group-id']))
+      await waitFor(() => expect(screen.getByTestId('confirmButton')).not.toBeDisabled())
+
+      act(() => capturedOnGroupAssignmentUpdate?.([]))
+      await waitFor(() => expect(screen.getByTestId('confirmButton')).toBeDisabled())
+    })
+
     it('Save button becomes disabled again when permissions are reset to initial', async () => {
       const roleWithPermissions = {
         ...mockRole,
@@ -285,7 +311,6 @@ describe('RoleDetails', () => {
     })
 
     it('shows success toast and navigates after successful create', async () => {
-      const { toast } = await import('sonner')
       mockCreateMutateAsync.mockResolvedValue({ data: { id: 'new-role-id' } })
       render(<RoleDetails />)
       fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'New Role' } })
@@ -298,14 +323,36 @@ describe('RoleDetails', () => {
     })
 
     it('shows error toast on failed create', async () => {
-      const { toast } = await import('sonner')
-      mockCreateMutateAsync.mockRejectedValue({ status: 500, response: { data: { message: 'error' } } })
+      mockCreateMutateAsync.mockRejectedValue(makeAxiosError(500))
       render(<RoleDetails />)
       fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'New Role' } })
       await waitFor(() => expect(screen.getByTestId('confirmButton')).not.toBeDisabled())
       fireEvent.click(screen.getByTestId('confirmButton'))
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('errors.createError')
+      })
+    })
+
+    it('shows name conflict error toast and form field error on failed create due to existing role name', async () => {
+      mockCreateMutateAsync.mockRejectedValue(makeAxiosError(409, 'A role with name New Role already exists'))
+      render(<RoleDetails />)
+      fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'New Role' } })
+      await waitFor(() => expect(screen.getByTestId('confirmButton')).not.toBeDisabled())
+      fireEvent.click(screen.getByTestId('confirmButton'))
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('errors.nameExistsToast')
+        expect(screen.getByTestId('nameFormMessage')).toHaveTextContent('common.errors.nameExists')
+      })
+    })
+
+    it('shows insufficient permissions toast on failed create due to missing permissions', async () => {
+      mockCreateMutateAsync.mockRejectedValue(makeAxiosError(403))
+      render(<RoleDetails />)
+      fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'New Role' } })
+      await waitFor(() => expect(screen.getByTestId('confirmButton')).not.toBeDisabled())
+      fireEvent.click(screen.getByTestId('confirmButton'))
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('errors.insufficientPermissions')
       })
     })
   })
@@ -330,7 +377,6 @@ describe('RoleDetails', () => {
     })
 
     it('shows success toast after successful update', async () => {
-      const { toast } = await import('sonner')
       render(<RoleDetails roleId="role-1" />)
       fireEvent.click(screen.getByTestId('editButton'))
       fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Changed Name' } })
@@ -342,7 +388,6 @@ describe('RoleDetails', () => {
     })
 
     it('shows error toast on failed update', async () => {
-      const { toast } = await import('sonner')
       mockUpdateMutateAsync.mockRejectedValue({ status: 500, response: { data: { message: 'error' } } })
       render(<RoleDetails roleId="role-1" />)
       fireEvent.click(screen.getByTestId('editButton'))
@@ -351,6 +396,31 @@ describe('RoleDetails', () => {
       fireEvent.click(screen.getByTestId('confirmButton'))
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('errors.updateError')
+      })
+    })
+
+    it('shows name conflict error toast and form field error on failed update due to existing role name', async () => {
+      mockUpdateMutateAsync.mockRejectedValue(makeAxiosError(409, 'A role with name New Role already exists'))
+      render(<RoleDetails roleId="role-1" />)
+      fireEvent.click(screen.getByTestId('editButton'))
+      fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'New Role' } })
+      await waitFor(() => expect(screen.getByTestId('confirmButton')).not.toBeDisabled())
+      fireEvent.click(screen.getByTestId('confirmButton'))
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('errors.nameExistsToast')
+        expect(screen.getByTestId('nameFormMessage')).toHaveTextContent('common.errors.nameExists')
+      })
+    })
+
+    it('shows insufficient permissions toast on failed update due to missing permissions', async () => {
+      mockUpdateMutateAsync.mockRejectedValue(makeAxiosError(403))
+      render(<RoleDetails roleId="role-1" />)
+      fireEvent.click(screen.getByTestId('editButton'))
+      fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Changed Name' } })
+      await waitFor(() => expect(screen.getByTestId('confirmButton')).not.toBeDisabled())
+      fireEvent.click(screen.getByTestId('confirmButton'))
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('errors.insufficientPermissions')
       })
     })
   })
@@ -401,7 +471,6 @@ describe('RoleDetails', () => {
     })
 
     it('shows success toast and navigates to /roles after successful delete', async () => {
-      const { toast } = await import('sonner')
       mockDeleteMutate.mockImplementation((_id: string, { onSuccess }: { onSuccess: () => void }) => onSuccess())
       render(<RoleDetails roleId="role-1" />)
       fireEvent.click(screen.getByTestId('editButton'))
@@ -411,6 +480,34 @@ describe('RoleDetails', () => {
       await waitFor(() => {
         expect(toast.success).toHaveBeenCalledWith('success.deletionSuccess')
         expect(mockPush).toHaveBeenCalledWith('/roles')
+      })
+    })
+
+    it('shows insufficient permissions toast when delete fails due to missing permissions', async () => {
+      mockDeleteMutate.mockImplementation((_id: string, { onError }: { onError: (e: unknown) => void }) =>
+        onError(makeAxiosError(403)),
+      )
+      render(<RoleDetails roleId="role-1" />)
+      fireEvent.click(screen.getByTestId('editButton'))
+      fireEvent.click(screen.getByRole('button', { name: 'securityArea.deleteButton' }))
+      await waitFor(() => expect(screen.getByTestId('exitWarningModal')).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: 'deleteConfirmModal.confirm' }))
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('errors.insufficientPermissions')
+      })
+    })
+
+    it('opens delete error dialog when delete fails with a generic error', async () => {
+      mockDeleteMutate.mockImplementation((_id: string, { onError }: { onError: (e: unknown) => void }) =>
+        onError(makeAxiosError(500)),
+      )
+      render(<RoleDetails roleId="role-1" />)
+      fireEvent.click(screen.getByTestId('editButton'))
+      fireEvent.click(screen.getByRole('button', { name: 'securityArea.deleteButton' }))
+      await waitFor(() => expect(screen.getByTestId('exitWarningModal')).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: 'deleteConfirmModal.confirm' }))
+      await waitFor(() => {
+        expect(screen.getByText('deleteErrorModal.title')).toBeInTheDocument()
       })
     })
   })
