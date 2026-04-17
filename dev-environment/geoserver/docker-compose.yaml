@@ -1,0 +1,60 @@
+name: geoserver
+
+services:
+  geoserver:
+    image: docker.osgeo.org/geoserver:2.26.2
+    container_name: civitas-geoserver
+    hostname: civitas-geoserver
+    environment:
+      - GEOSERVER_ADMIN_USER=${GEOSERVER_ADMIN_USER:-admin}
+      - GEOSERVER_ADMIN_PASSWORD=${GEOSERVER_ADMIN_PASSWORD}
+      - SKIP_DEMO_DATA=true
+      - INSTALL_EXTENSIONS=false
+    volumes:
+      - geoserver_data:/opt/geoserver_data
+    ports:
+      - "8082:8080"
+    depends_on:
+      postgis:
+        condition: service_healthy
+    networks:
+      - geoserver-network
+      - civitas-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/geoserver/web/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  postgis:
+    image: postgis/postgis:17-3.5-alpine
+    container_name: civitas-geoserver-db
+    hostname: civitas-geoserver-db
+    environment:
+      - POSTGRES_DB=geoserver
+      - POSTGRES_USER=geoserver
+      - POSTGRES_PASSWORD=${POSTGIS_PASSWORD}
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d geoserver -U geoserver"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - geoserver-network
+
+volumes:
+  geoserver_data:
+  postgis_data:
+
+networks:
+  geoserver-network:
+    driver: bridge
+  civitas-network:
+    name: civitas-network
+    external: true

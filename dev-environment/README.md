@@ -15,6 +15,7 @@ dev-environment/
 ├── keycloak/   # Keycloak only
 ├── apisix/     # API Gateway + Authorization (OPA, AuthZ Repository)
 ├── frost/      # FROST IoT Server
+├── geoserver/  # GeoServer OGC Services (WFS/WMS)
 └── modelatlas/ # Model Atlas
 ```
 
@@ -193,6 +194,9 @@ cd apisix    && docker compose up -d
 | OPA | http://localhost:8181 | Policy decision point |
 | AuthZ Repository | http://localhost:8091 | User authorization context |
 | Kafka UI | http://localhost:8090 | |
+| FROST Server | http://localhost:8085/FROST-Server/v1.1 | |
+| GeoServer Admin | http://localhost:8082/geoserver/web | admin / see geoserver/.env |
+| GeoServer WFS | http://localhost:9080/geoserver/{workspace}/wfs | via APISIX |
 
 ---
 
@@ -210,6 +214,7 @@ cd kafka     && docker compose down
 cd keycloak  && docker compose down
 cd postgres  && docker compose down
 cd frost     && docker compose down
+cd geoserver && docker compose down
 ```
 
 ## Troubleshooting
