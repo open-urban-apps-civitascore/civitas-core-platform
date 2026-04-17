@@ -14,10 +14,11 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
 }))
 
 let mockSearchParams = new URLSearchParams('mode=edit')
+const mockPush = vi.fn()
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
-    push: vi.fn(),
+    push: mockPush,
   }),
   useSearchParams: () => mockSearchParams,
   usePathname: () => '/datastructures/test-id/versions/v-1',
@@ -31,21 +32,24 @@ vi.mock('@/hooks/use-query-params', () => ({
 }))
 
 vi.mock('@/components/uml-modeler/hooks/use-multi-session-manager', () => ({
-  useMultiSessionManager: () => ({
+  useMultiSessionManager: ({ initialSession }: { initialSession: { id: string } | null }) => ({
     activeSession: null,
-    activeSessionId: null,
+    activeSessionId: initialSession?.id ?? null,
     setSession: vi.fn(),
     markSessionDirty: vi.fn(),
   }),
 }))
 
+const mockUpdateMutateAsync = vi.fn()
+const mockCreateMutateAsync = vi.fn()
+
 vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
   useCreateDatastructureVersion: () => ({
-    mutateAsync: vi.fn(),
+    mutateAsync: mockCreateMutateAsync,
     isPending: false,
   }),
   useUpdateDatastructureVersion: () => ({
-    mutateAsync: vi.fn(),
+    mutateAsync: mockUpdateMutateAsync,
     isPending: false,
   }),
   useUpdateDatastructureVersionPublished: () => ({
@@ -96,6 +100,9 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockPush.mockReset()
+    mockUpdateMutateAsync.mockResolvedValue({ data: mockVersion })
+    mockCreateMutateAsync.mockResolvedValue({ data: mockVersion })
     mockSearchParams = new URLSearchParams('mode=edit')
     vi.mocked(useGetCurrentUser).mockReturnValue({
       data: {
@@ -190,80 +197,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     })
   })
 
-  describe('exit modal - edit mode with hasUserChanges', () => {
-    it('shows modal when version field is changed', async () => {
-      renderComponent()
-
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      fireEvent.change(versionInput, { target: { value: '2.0.0' } })
-
-      const cancelButtons = screen.getAllByTestId('cancelButton')
-      const exitButton = cancelButtons[0]
-      fireEvent.click(exitButton)
-
-      await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument()
-      })
-    })
-
-    it('shows modal when description field is changed', async () => {
-      renderComponent()
-
-      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
-      fireEvent.change(descriptionInput, { target: { value: 'New description' } })
-
-      const cancelButtons = screen.getAllByTestId('cancelButton')
-      const exitButton = cancelButtons[0]
-      fireEvent.click(exitButton)
-
-      await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument()
-      })
-    })
-
-    it('resets form when discard button in modal is clicked', async () => {
-      renderComponent()
-
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      const initialValue = versionInput.value
-
-      fireEvent.change(versionInput, { target: { value: '2.0.0' } })
-
-      const cancelButtons = screen.getAllByTestId('cancelButton')
-      const exitButton = cancelButtons[0]
-      fireEvent.click(exitButton)
-
-      await waitFor(() => {
-        const discardButton = screen.getByRole('button', { name: /discard|verwerfen/i })
-        fireEvent.click(discardButton)
-      })
-
-      await waitFor(() => {
-        expect(versionInput.value).toBe(initialValue)
-      })
-    })
-
-    it('closes modal after discard action', async () => {
-      renderComponent()
-
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      fireEvent.change(versionInput, { target: { value: '2.0.0' } })
-
-      const cancelButtons = screen.getAllByTestId('cancelButton')
-      const exitButton = cancelButtons[0]
-      fireEvent.click(exitButton)
-
-      await waitFor(() => {
-        const discardButton = screen.getByRole('button', { name: /discard|verwerfen/i })
-        fireEvent.click(discardButton)
-      })
-
-      await waitFor(() => {
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-      })
-    })
-  })
-
   describe('Edit button gating when AVAILABLE', () => {
     const availableVersion: DatastructureVersion = {
       ...mockVersion,
@@ -317,8 +250,138 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     })
   })
 
-  describe('exit modal - create mode with hasUserChanges', () => {
-    it('shows modal when version field is filled in create mode', async () => {
+  describe('save button', () => {
+    it('calls update API when save is clicked after changes in edit mode', async () => {
+      renderComponent()
+
+      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
+      fireEvent.change(versionInput, { target: { value: '2.0.0' } })
+
+      const confirmButtons = screen.getAllByTestId('confirmButton')
+      fireEvent.click(confirmButtons[0])
+
+      await waitFor(() => {
+        expect(mockUpdateMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}`,
+          }),
+        )
+      })
+    })
+
+    it('calls create API when save is clicked in create mode', async () => {
+      renderComponent({ version: null, isCreateMode: true })
+
+      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
+      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
+      fireEvent.change(versionInput, { target: { value: '1.0.0' } })
+      fireEvent.change(descriptionInput, { target: { value: 'Some description' } })
+
+      const confirmButtons = screen.getAllByTestId('confirmButton')
+      fireEvent.click(confirmButtons[0])
+
+      await waitFor(() => {
+        expect(mockCreateMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            endpoint: `/datastructures/${mockDatastructure.id}/versions`,
+          }),
+        )
+      })
+    })
+  })
+
+  describe('exit behavior - edit mode', () => {
+    it('switches to read only view when exit is clicked in edit mode without changes', async () => {
+      renderComponent()
+
+      const cancelButtons = screen.getAllByTestId('cancelButton')
+      fireEvent.click(cancelButtons[0])
+
+      await waitFor(() => {
+        expect(screen.getByTestId('editButton')).toBeInTheDocument()
+        expect(mockPush).not.toHaveBeenCalled()
+      })
+    })
+
+    it('shows ExitWarningModal when version field is changed', async () => {
+      renderComponent()
+
+      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
+      fireEvent.change(versionInput, { target: { value: '2.0.0' } })
+
+      const cancelButtons = screen.getAllByTestId('cancelButton')
+      const exitButton = cancelButtons[0]
+      fireEvent.click(exitButton)
+
+      await waitFor(() => {
+        expect(screen.getByRole('dialog')).toBeInTheDocument()
+      })
+    })
+
+    it('shows ExitWarningModal when description field is changed', async () => {
+      renderComponent()
+
+      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
+      fireEvent.change(descriptionInput, { target: { value: 'New description' } })
+
+      const cancelButtons = screen.getAllByTestId('cancelButton')
+      const exitButton = cancelButtons[0]
+      fireEvent.click(exitButton)
+
+      await waitFor(() => {
+        expect(screen.getByRole('dialog')).toBeInTheDocument()
+      })
+    })
+
+    it('resets form when discard button in ExitWarningModal is clicked', async () => {
+      renderComponent()
+
+      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
+      const initialValue = versionInput.value
+
+      fireEvent.change(versionInput, { target: { value: '2.0.0' } })
+
+      const cancelButtons = screen.getAllByTestId('cancelButton')
+      const exitButton = cancelButtons[0]
+      fireEvent.click(exitButton)
+
+      await waitFor(() => {
+        const discardButton = screen.getByRole('button', { name: /discard|verwerfen/i })
+        fireEvent.click(discardButton)
+      })
+
+      await waitFor(() => {
+        expect(versionInput.value).toBe(initialValue)
+      })
+    })
+
+    it('saves when save is clicked in ExitWarningModal', async () => {
+      renderComponent()
+
+      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
+      fireEvent.change(versionInput, { target: { value: '2.0.0' } })
+
+      const cancelButtons = screen.getAllByTestId('cancelButton')
+      fireEvent.click(cancelButtons[0])
+
+      await waitFor(() => {
+        expect(screen.getByTestId('saveButton')).toBeInTheDocument()
+        fireEvent.click(screen.getByTestId('saveButton'))
+      })
+
+      await waitFor(() => {
+        expect(mockUpdateMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}`,
+          }),
+        )
+        expect(mockPush).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('exit behavior - create mode', () => {
+    it('shows ExitWarningModal when version field is filled in create mode', async () => {
       renderComponent({
         version: null,
         isCreateMode: true,
@@ -336,7 +399,21 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       })
     })
 
-    it('resets form to empty when discard is clicked in create mode', async () => {
+    it('navigates back to the datastructure when exit is clicked without changes', async () => {
+      renderComponent({
+        version: null,
+        isCreateMode: true,
+      })
+
+      const cancelButtons = screen.getAllByTestId('cancelButton')
+      fireEvent.click(cancelButtons[0])
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith(`/datastructures/${mockDatastructure.id}`)
+      })
+    })
+
+    it('navigates back to the datastructure when discard is clicked in ExitWarningModal', async () => {
       renderComponent({
         version: null,
         isCreateMode: true,
@@ -346,8 +423,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       fireEvent.change(versionInput, { target: { value: '1.0.0' } })
 
       const cancelButtons = screen.getAllByTestId('cancelButton')
-      const exitButton = cancelButtons[0]
-      fireEvent.click(exitButton)
+      fireEvent.click(cancelButtons[0])
 
       await waitFor(() => {
         const discardButton = screen.getByRole('button', { name: /discard|verwerfen/i })
@@ -355,7 +431,33 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       })
 
       await waitFor(() => {
-        expect(versionInput.value).toBe('')
+        expect(mockPush).toHaveBeenCalledWith(`/datastructures/${mockDatastructure.id}`)
+      })
+    })
+
+    it('saves and navigates back to the datastructure when save is clicked in ExitWarningModal', async () => {
+      renderComponent({ version: null, isCreateMode: true })
+
+      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
+      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
+      fireEvent.change(versionInput, { target: { value: '1.0.0' } })
+      fireEvent.change(descriptionInput, { target: { value: 'Some description' } })
+
+      const cancelButtons = screen.getAllByTestId('cancelButton')
+      fireEvent.click(cancelButtons[0])
+
+      await waitFor(() => {
+        expect(screen.getByTestId('saveButton')).toBeInTheDocument()
+        fireEvent.click(screen.getByTestId('saveButton'))
+      })
+
+      await waitFor(() => {
+        expect(mockCreateMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            endpoint: `/datastructures/${mockDatastructure.id}/versions`,
+          }),
+        )
+        expect(mockPush).toHaveBeenCalled()
       })
     })
   })
