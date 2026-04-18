@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
 
+import { translatePermissionName } from '@/app/(main)/permissions/utils/translatePermissionName'
 import { useGetPermissions } from '@/app/services/api/permissions/clientRequests'
 import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
@@ -23,23 +24,26 @@ interface PermissionsTabProps {
   roleType: RoleType
 }
 
-const formatPermissionName = (name: string): string =>
-  name
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ')
+type TranslationFn = {
+  (key: string, params?: Record<string, string>): string
+  has: (key: string) => boolean
+}
 
-const mapPermissions = (permissionsInput: Permission[]): PermissionItem[] => {
-  return permissionsInput.map(permission => ({
-    name: formatPermissionName(permission.name),
-    value: permission.id,
-    category: { id: permission.category, title: permission.category },
-  }))
+const mapPermissions = (permissionsInput: Permission[], t: TranslationFn): PermissionItem[] => {
+  return permissionsInput.map(permission => {
+    const categoryKey = `permissions.systemPermissions.categories.${permission.category}`
+    const categoryTitle = t.has(categoryKey) ? t(categoryKey) : permission.category
+    return {
+      name: translatePermissionName(permission.name, t),
+      value: permission.id,
+      category: { id: permission.category, title: categoryTitle },
+    }
+  })
 }
 
 export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   const { pendingPermissionIds, onPendingPermissionIdsChange, isReadOnly, currentRoleId, roleType } = props
-  const t = useTranslations('common')
+  const t = useTranslations()
   const tRoles = useTranslations('roles')
   const tCommon = useTranslations('common')
   const [roleTemplate, setRoleTemplate] = useState<string | null>(null)
@@ -68,7 +72,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   })
 
   const templateRoles = templateRolesResponse?.data
-  const permissions = useMemo(() => mapPermissions(permissionsData?.data || []), [permissionsData?.data])
+  const permissions = useMemo(() => mapPermissions(permissionsData?.data || [], t), [permissionsData?.data, t])
 
   const getUniqueCategories = (): string[] => {
     const seen = new Set<string>()
@@ -151,7 +155,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
       )}
 
       {permissions.length === 0 ? (
-        <div className="flex items-center justify-center text-sm mt-3.5">{t('noResults')}</div>
+        <div className="flex items-center justify-center text-sm mt-3.5">{tCommon('noResults')}</div>
       ) : roleType === ROLE_TYPES.DATA ? (
         <DataPermissionsGrid
           permissions={permissions}

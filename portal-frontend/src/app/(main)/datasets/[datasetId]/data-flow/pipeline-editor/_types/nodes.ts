@@ -269,7 +269,7 @@ export const createDefaultNodeData = (nodeType: PipelineNodeType, datasetId?: st
         configured: true, // Auto-configured with fixed server
         entityType: ENTITY_TYPES.Frost,
         serverName: 'Frost Server',
-        serverUrl: 'https://frost.example.com/v1.1',
+        serverUrl: '',
         version: '1.1',
       }
     case PIPELINE_NODE_TYPES.Cron:
