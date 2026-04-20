@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { AxiosError, InternalAxiosRequestConfig } from 'axios'
+import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
@@ -8,8 +9,21 @@ import { Dataset } from '@/types/datasets'
 
 import { DatasetOverview } from './DatasetOverview'
 
-// ─── Mutable handles to replace per-test ───────────────────────────────────
-const mockMutateAsync = vi.fn().mockResolvedValue(undefined)
+const mockPatchDataset = vi.fn().mockResolvedValue(undefined)
+const mockPublishDataset = vi.fn().mockResolvedValue(undefined)
+const mockUnpublishDataset = vi.fn().mockResolvedValue(undefined)
+const mockReleaseDataset = vi.fn().mockResolvedValue(undefined)
+const mockUnreleaseDataset = vi.fn().mockResolvedValue(undefined)
+const mockUpdatePublishedDatasetMeta = vi.fn().mockResolvedValue(undefined)
+
+vi.mock('@/app/services/api/datasets/clientRequests', () => ({
+  usePatchDataset: () => ({ mutateAsync: mockPatchDataset, isPending: false }),
+  usePublishDataset: () => ({ mutateAsync: mockPublishDataset, isPending: false }),
+  useUnpublishDataset: () => ({ mutateAsync: mockUnpublishDataset, isPending: false }),
+  useReleaseDataset: () => ({ mutateAsync: mockReleaseDataset, isPending: false }),
+  useUnreleaseDataset: () => ({ mutateAsync: mockUnreleaseDataset, isPending: false }),
+  useUpdatePublishedDatasetMeta: () => ({ mutateAsync: mockUpdatePublishedDatasetMeta, isPending: false }),
+}))
 
 vi.mock('@/app/services/api/users/clientRequests', () => ({
   useGetCurrentUser: vi.fn(),
@@ -47,111 +61,37 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }))
 
-vi.mock('@/app/services/api/datasets/clientRequests', () => ({
-  usePatchDataset: () => ({ mutateAsync: mockMutateAsync, isPending: false }),
-  usePublishDataset: () => ({ mutateAsync: mockMutateAsync, isPending: false }),
-  useReleaseDataset: () => ({ mutateAsync: mockMutateAsync, isPending: false }),
-  useUnpublishDataset: () => ({ mutateAsync: mockMutateAsync, isPending: false }),
-  useUnreleaseDataset: () => ({ mutateAsync: mockMutateAsync, isPending: false }),
-  useUpdatePublishedDatasetMeta: () => ({ mutateAsync: mockMutateAsync, isPending: false }),
+vi.mock('@/components/ui/input', () => ({
+  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
 }))
 
-vi.mock('@/components/ui/form', () => ({
-  Form: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  FormControl: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  FormField: ({ render }: { render: (args: { field: unknown }) => React.ReactNode }) =>
-    render({ field: { value: false, onChange: vi.fn() } }),
-  FormItem: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  FormLabel: ({ children }: { children: React.ReactNode }) => <label>{children}</label>,
+vi.mock('@/components/ui/textarea', () => ({
+  Textarea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...props} />,
 }))
 
-vi.mock('@/components/page-container/PageContainer', () => ({
-  PageContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}))
-
-vi.mock('@/components/page-header/PageHeader', () => ({
-  PageHeader: ({ customElement }: { customElement: React.ReactNode }) => <div>{customElement}</div>,
-}))
-
-vi.mock('@/components/page-background/PageBackground', () => ({
-  PageBackground: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}))
-
-vi.mock('@/components/content-card/ContentCard', () => ({
-  ContentCard: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}))
-
-vi.mock('@/components/form/FooterElement', () => ({
-  FooterElement: () => null,
-}))
-
-vi.mock('@/components/tooltip/Tooltip', () => ({
-  BasicTooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}))
-
-vi.mock('@/components/ui/checkbox', () => ({
-  Checkbox: () => <input type="checkbox" />,
-}))
-
-// ─── Captured callbacks from child mocks ───────────────────────────────────
-let capturedOnStatusChange: ((status: string) => void) | undefined
-let capturedOnCancelClick: (() => void) | undefined
-let capturedOnEditClick: (() => void) | undefined
-let capturedCanSetAvailable: boolean | undefined
-
-vi.mock('@/components/page-edit-controls/PageEditControls', () => ({
-  __esModule: true,
-  default: ({
-    canEdit,
-    isReadOnly,
-    onEditClick,
-    onCancelClick,
-    onStatusChange,
-    canSetAvailable,
-    status,
+vi.mock('@/components/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  // eslint-disable-next-line react/boolean-prop-naming
+  DropdownMenuTrigger: ({ children, asChild }: { children: React.ReactNode; asChild?: boolean }) =>
+    asChild ? <div>{children}</div> : <div>{children}</div>,
+  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuItem: ({
+    children,
+    onClick,
+    disabled,
+    'data-testid': testId,
   }: {
-    canEdit: boolean
-    isReadOnly: boolean
-    onEditClick: () => void
-    onCancelClick: () => void
-    onStatusChange: (status: string) => void
-    canSetAvailable: boolean
-    status: string
-  }) => {
-    capturedOnStatusChange = onStatusChange
-    capturedOnCancelClick = onCancelClick
-    capturedOnEditClick = onEditClick
-    capturedCanSetAvailable = canSetAvailable
-    return (
-      <div data-testid="pageEditControls" data-status={status} data-can-set-available={String(canSetAvailable)}>
-        {canEdit && isReadOnly && (
-          <button data-testid="editButton" onClick={onEditClick}>
-            Edit
-          </button>
-        )}
-        {canEdit && !isReadOnly && (
-          <>
-            <button data-testid="cancelButton" onClick={onCancelClick}>
-              Cancel
-            </button>
-            <button data-testid="statusDraftButton" onClick={() => onStatusChange('DRAFT')}>
-              Set Draft
-            </button>
-            <button data-testid="statusReadyButton" onClick={() => onStatusChange('READY')}>
-              Set Ready
-            </button>
-            <button data-testid="statusAvailableButton" onClick={() => onStatusChange('AVAILABLE')}>
-              Set Available
-            </button>
-          </>
-        )}
-      </div>
-    )
-  },
+    children: React.ReactNode
+    onClick?: () => void
+    // eslint-disable-next-line react/boolean-prop-naming
+    disabled?: boolean
+    'data-testid'?: string
+  }) => (
+    <button data-testid={testId} onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  ),
 }))
-
-let capturedOnDiscard: (() => void) | undefined
-let capturedOnSave: (() => void) | undefined
 
 vi.mock('@/components/modals/exit-warning-modal/ExitWarningModal', () => ({
   ExitWarningModal: ({
@@ -164,8 +104,6 @@ vi.mock('@/components/modals/exit-warning-modal/ExitWarningModal', () => ({
     onDiscard: () => void
     onConfirm: () => void
   }) => {
-    capturedOnDiscard = onDiscard
-    capturedOnSave = onConfirm
     return isOpen ? (
       <div data-testid="exitWarningModal">
         <button data-testid="discardButton" onClick={onDiscard}>
@@ -177,36 +115,6 @@ vi.mock('@/components/modals/exit-warning-modal/ExitWarningModal', () => ({
       </div>
     ) : null
   },
-}))
-
-vi.mock('../../components/BaseInfoForm', () => ({
-  BaseInfoForm: ({
-    form,
-    isReadOnly,
-  }: {
-    form: {
-      register: (name: string) => { onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }
-      setValue: (name: string, value: unknown, opts?: object) => void
-      formState: { errors: Record<string, { message?: string } | undefined> }
-    }
-    isReadOnly: boolean
-  }) => (
-    <div data-testid="baseInfoForm">
-      <input
-        data-testid="nameInput"
-        disabled={isReadOnly}
-        onChange={e => form.setValue('name', e.target.value, { shouldDirty: true, shouldTouch: true })}
-      />
-      {form.formState.errors.name && <span data-testid="nameError">{form.formState.errors.name.message}</span>}
-      <textarea
-        data-testid="descriptionInput"
-        disabled={isReadOnly}
-        onChange={e =>
-          form.setValue('description', e.target.value, { shouldDirty: true, shouldValidate: true, shouldTouch: true })
-        }
-      />
-    </div>
-  ),
 }))
 
 vi.mock('../../components/CompletionStep', () => ({
@@ -252,17 +160,12 @@ const renderComponent = (props: Partial<typeof defaultProps> = {}) =>
 describe('DatasetOverview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockMutateAsync.mockResolvedValue(undefined)
-    capturedOnStatusChange = undefined
-    capturedOnCancelClick = undefined
-    capturedOnEditClick = undefined
-    capturedCanSetAvailable = undefined
-    capturedOnDiscard = undefined
-    capturedOnSave = undefined
     mockCurrentUser([PERMISSION_NAMES.DATASET_UPDATE, PERMISSION_NAMES.DATASET_RELEASE])
   })
 
-  // ── Permission gating ────────────────────────────────────────────────────
+  const getStatusOption = (status: string) => screen.getByTestId(`statusOption-${status.toLowerCase()}`)
+  const clickEditButton = () => fireEvent.click(screen.getByTestId('editButton'))
+
   describe('Permission gating', () => {
     it('shows Edit button when user has DATASET_UPDATE permission', () => {
       mockCurrentUser([PERMISSION_NAMES.DATASET_UPDATE])
@@ -283,304 +186,211 @@ describe('DatasetOverview', () => {
     })
   })
 
-  // ── Edit mode UI ─────────────────────────────────────────────────────────
   describe('Edit mode UI', () => {
     it('enters edit mode when Edit button is clicked', async () => {
       renderComponent()
-      await act(async () => {
-        fireEvent.click(screen.getByTestId('editButton'))
-      })
+      clickEditButton()
+
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
       expect(screen.getByTestId('cancelButton')).toBeInTheDocument()
     })
 
     it('form is editable after clicking Edit', async () => {
       renderComponent()
-      await act(async () => {
-        fireEvent.click(screen.getByTestId('editButton'))
-      })
-      expect(screen.getByTestId('nameInput')).not.toBeDisabled()
+      expect(screen.getByTestId('nameTextField')).toBeDisabled()
+      expect(screen.getByTestId('descriptionTextArea')).toBeDisabled()
+      clickEditButton()
+      expect(screen.getByTestId('nameTextField')).not.toBeDisabled()
+      expect(screen.getByTestId('descriptionTextArea')).not.toBeDisabled()
     })
   })
 
-  // ── canSetAvailable ──────────────────────────────────────────────────────
-  describe('canSetAvailable computation', () => {
-    it('is false when no distributions and no pipelines, even with assignments and valid form', () => {
-      renderComponent({
-        dataset: makeDraftDataset({ pipelines: [], distributions: [] }),
-        groupCount: 1,
-        roleCount: 1,
-      })
-      expect(capturedCanSetAvailable).toBe(false)
-    })
-
-    it('is false when there are distributions but no assignment', () => {
-      renderComponent({
-        dataset: makeDraftDataset({ distributions: [{ id: 'd1', accessUrl: 'http://example.com' }] }),
-        groupCount: 0,
-        roleCount: 0,
-      })
-      expect(capturedCanSetAvailable).toBe(false)
-    })
-
-    it('is false when there are pipelines and assignments but the form name is too short', async () => {
-      renderComponent({
-        dataset: makeDraftDataset({
-          name: 'AB', // Too short (min 3 chars)
-          pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
-        }),
-        groupCount: 1,
-        roleCount: 1,
-      })
-      expect(capturedCanSetAvailable).toBe(false)
-    })
-
-    it('is false when form description is empty (required for available)', async () => {
-      renderComponent({
-        dataset: makeDraftDataset({
-          description: '',
-          pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
-        }),
-        groupCount: 1,
-        roleCount: 1,
-      })
-      expect(capturedCanSetAvailable).toBe(false)
-    })
-
-    it('is true when pipelines present, assignments set, and form passes strict schema', () => {
-      renderComponent({
-        dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
-        groupCount: 1,
-        roleCount: 1,
-      })
-      expect(capturedCanSetAvailable).toBe(true)
-    })
-
-    it('is true when distributions present (no pipelines needed), assignments set, valid form', () => {
-      renderComponent({
-        dataset: makeDraftDataset({ distributions: [{ id: 'd1', accessUrl: 'http://example.com' }] }),
-        groupCount: 1,
-        roleCount: 1,
-      })
-      expect(capturedCanSetAvailable).toBe(true)
-    })
-
-    it('updates to false when assignments drop to 0 after re-render', () => {
-      const { rerender } = renderComponent({
-        dataset: makeDraftDataset({ distributions: [{ id: 'd1', accessUrl: 'http://example.com' }] }),
-        groupCount: 1,
-        roleCount: 1,
-      })
-      expect(capturedCanSetAvailable).toBe(true)
-
-      rerender(
-        <DatasetOverview
-          dataset={makeDraftDataset({ distributions: [{ id: 'd1', accessUrl: 'http://example.com' }] })}
-          groupCount={0}
-          roleCount={0}
-        />,
-      )
-      expect(capturedCanSetAvailable).toBe(false)
-    })
-
-    it('is false when description is empty', () => {
-      renderComponent({
-        dataset: makeDraftDataset({
-          description: '',
-          distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
-        }),
-        groupCount: 1,
-        roleCount: 1,
+  describe('Status availability and auto-revert', () => {
+    describe('READY and AVAILABLE are disabled when canSetAvailable is false', () => {
+      it('when no distributions and no pipelines are present', async () => {
+        renderComponent({
+          dataset: makeDraftDataset({ pipelines: [], distributions: [] }),
+          groupCount: 1,
+          roleCount: 1,
+        })
+        clickEditButton()
+        expect(getStatusOption('READY')).toBeDisabled()
+        expect(getStatusOption('AVAILABLE')).toBeDisabled()
       })
 
-      expect(screen.getByTestId('pageEditControls').dataset.canSetAvailable).toBe('false')
-    })
-
-    it('is true when description is filled', () => {
-      renderComponent({
-        dataset: makeDraftDataset({
-          description: 'A meaningful description',
-          distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
-        }),
-        groupCount: 1,
-        roleCount: 1,
+      it('when there are distributions but no assignments', async () => {
+        renderComponent({
+          dataset: makeDraftDataset({ distributions: [{ id: 'd1', accessUrl: 'http://example.com' }] }),
+          groupCount: 0,
+          roleCount: 0,
+        })
+        clickEditButton()
+        expect(getStatusOption('READY')).toBeDisabled()
+        expect(getStatusOption('AVAILABLE')).toBeDisabled()
       })
 
-      expect(screen.getByTestId('pageEditControls').dataset.canSetAvailable).toBe('true')
-    })
-
-    it('becomes true when description is filled in edit mode', async () => {
-      renderComponent({
-        dataset: makeDraftDataset({
-          description: '',
-          distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
-        }),
-        groupCount: 1,
-        roleCount: 1,
-      })
-      expect(screen.getByTestId('pageEditControls').dataset.canSetAvailable).toBe('false')
-
-      await act(async () => {
-        capturedOnEditClick?.()
-      })
-      await act(async () => {
-        fireEvent.change(screen.getByTestId('descriptionInput'), { target: { value: 'Now it has a description' } })
+      it('when form name is too short', async () => {
+        renderComponent({
+          dataset: makeDraftDataset({
+            name: 'AB',
+            pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
+          }),
+          groupCount: 1,
+          roleCount: 1,
+        })
+        clickEditButton()
+        expect(getStatusOption('READY')).toBeDisabled()
+        expect(getStatusOption('AVAILABLE')).toBeDisabled()
       })
 
-      expect(screen.getByTestId('pageEditControls').dataset.canSetAvailable).toBe('true')
-    })
-
-    it('becomes false when description is removed from the dataset', () => {
-      const { rerender } = renderComponent({
-        dataset: makeDraftDataset({
-          description: 'A meaningful description',
-          distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
-        }),
-        groupCount: 1,
-        roleCount: 1,
-      })
-      expect(screen.getByTestId('pageEditControls').dataset.canSetAvailable).toBe('true')
-
-      rerender(
-        <DatasetOverview
-          dataset={makeDraftDataset({
+      it('when description is empty', async () => {
+        renderComponent({
+          dataset: makeDraftDataset({
             description: '',
             distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
-          })}
-          groupCount={1}
-          roleCount={1}
-        />,
+          }),
+          groupCount: 1,
+          roleCount: 1,
+        })
+        clickEditButton()
+        expect(getStatusOption('READY')).toBeDisabled()
+        expect(getStatusOption('AVAILABLE')).toBeDisabled()
+      })
+    })
+
+    describe('READY and AVAILABLE are enabled when canSetAvailable is true', () => {
+      it('when pipelines present, assignments set, and form passes strict schema', async () => {
+        renderComponent({
+          dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
+          groupCount: 1,
+          roleCount: 1,
+        })
+        clickEditButton()
+        expect(getStatusOption('READY')).not.toBeDisabled()
+        expect(getStatusOption('AVAILABLE')).not.toBeDisabled()
+      })
+
+      it('when distributions present, assignments set, and form passes strict schema', async () => {
+        renderComponent({
+          dataset: makeDraftDataset({ distributions: [{ id: 'd1', accessUrl: 'http://example.com' }] }),
+          groupCount: 1,
+          roleCount: 1,
+        })
+        clickEditButton()
+        expect(getStatusOption('READY')).not.toBeDisabled()
+        expect(getStatusOption('AVAILABLE')).not.toBeDisabled()
+      })
+
+      it('becomes enabled when description is filled in edit mode', async () => {
+        renderComponent({
+          dataset: makeDraftDataset({
+            description: '',
+            distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+          }),
+          groupCount: 1,
+          roleCount: 1,
+        })
+        clickEditButton()
+        expect(getStatusOption('READY')).toBeDisabled()
+
+        await act(async () => {
+          fireEvent.change(screen.getByTestId('descriptionTextArea'), { target: { value: 'Now it has a description' } })
+        })
+
+        expect(getStatusOption('READY')).not.toBeDisabled()
+        expect(getStatusOption('AVAILABLE')).not.toBeDisabled()
+      })
+    })
+
+    describe('auto-reverts status to DRAFT and shows toast when canSetAvailable becomes false', () => {
+      it.each([{ dataSetStatus: 'READY' as const }, { dataSetStatus: 'AVAILABLE' as const }])(
+        'reverts from $dataSetStatus to DRAFT when assignments drop to 0',
+        async ({ dataSetStatus }) => {
+          const { rerender } = renderComponent({
+            dataset: makeDraftDataset({
+              dataSetStatus,
+              distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+            }),
+            groupCount: 1,
+            roleCount: 1,
+          })
+
+          expect(screen.getByTestId('statusDropdown')).toHaveTextContent(dataSetStatus)
+
+          await act(async () => {
+            rerender(
+              <DatasetOverview
+                dataset={makeDraftDataset({
+                  dataSetStatus,
+                  distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+                })}
+                groupCount={0}
+                roleCount={0}
+              />,
+            )
+          })
+
+          expect(screen.getByTestId('statusDropdown')).toHaveTextContent('DRAFT')
+          expect(toast.info).toHaveBeenCalledWith('info.switchMode')
+        },
       )
 
-      expect(screen.getByTestId('pageEditControls').dataset.canSetAvailable).toBe('false')
-    })
-  })
+      it('reverts from READY to DRAFT and shows toast when description is removed', async () => {
+        const { rerender } = renderComponent({
+          dataset: makeDraftDataset({
+            dataSetStatus: 'READY',
+            description: 'A meaningful description',
+            distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+          }),
+          groupCount: 1,
+          roleCount: 1,
+        })
 
-  // ── Auto-revert from READY/AVAILABLE to DRAFT ────────────────────────────
-  describe('Auto-revert: revalidateDraftMode', () => {
-    it('reverts status from READY to DRAFT when canSetAvailable becomes false', async () => {
-      // Start with a dataset in READY status and valid conditions
-      const { rerender } = renderComponent({
-        dataset: makeDraftDataset({
-          dataSetStatus: 'READY',
-          distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
-        }),
-      })
+        expect(screen.getByTestId('statusDropdown')).toHaveTextContent('READY')
 
-      // Status should still be READY
-      expect(screen.getByTestId('pageEditControls').dataset.status).toBe('READY')
-
-      // Remove all assignments so canSetAvailable becomes false
-      await act(async () => {
         rerender(
           <DatasetOverview
             dataset={makeDraftDataset({
               dataSetStatus: 'READY',
+              description: '',
               distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
             })}
-            groupCount={0}
-            roleCount={0}
+            groupCount={1}
+            roleCount={1}
           />,
         )
+
+        expect(screen.getByTestId('statusDropdown')).toHaveTextContent('DRAFT')
+        expect(toast.info).toHaveBeenCalledWith('info.switchMode')
       })
-
-      expect(screen.getByTestId('pageEditControls').dataset.status).toBe('DRAFT')
-    })
-
-    it('reverts status from AVAILABLE to DRAFT when canSetAvailable becomes false', async () => {
-      const { rerender } = renderComponent({
-        dataset: makeDraftDataset({
-          dataSetStatus: 'AVAILABLE',
-          distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
-        }),
-      })
-
-      expect(screen.getByTestId('pageEditControls').dataset.status).toBe('AVAILABLE')
-
-      await act(async () => {
-        rerender(
-          <DatasetOverview
-            dataset={makeDraftDataset({
-              dataSetStatus: 'AVAILABLE',
-              distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
-            })}
-            groupCount={0}
-            roleCount={0}
-          />,
-        )
-      })
-
-      expect(screen.getByTestId('pageEditControls').dataset.status).toBe('DRAFT')
-    })
-
-    it('shows a toast notification when status is reverted to DRAFT', async () => {
-      const { toast } = await import('sonner')
-      const { rerender } = renderComponent({
-        dataset: makeDraftDataset({
-          dataSetStatus: 'READY',
-          distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
-        }),
-      })
-
-      await act(async () => {
-        rerender(
-          <DatasetOverview
-            dataset={makeDraftDataset({
-              dataSetStatus: 'READY',
-              distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
-            })}
-            groupCount={0}
-            roleCount={0}
-          />,
-        )
-      })
-
-      expect(toast.info).toHaveBeenCalledWith('info.switchMode')
     })
   })
 
-  // ── Save uses pickDirtyValues ─────────────────────────────────────────────
   describe('Save uses pickDirtyValues: only changed fields are sent', () => {
-    it('calls mutateAsync with only changed fields (name) when only name is modified', async () => {
+    it('calls mockPatchDataset with only changed fields (name) when only name is modified', async () => {
       renderComponent()
+      clickEditButton()
 
       await act(async () => {
-        capturedOnEditClick?.()
-      })
-      await act(async () => {
-        fireEvent.change(screen.getByTestId('nameInput'), { target: { value: 'Updated Name' } })
+        fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Updated Name' } })
       })
 
-      const form = document.querySelector('#dataset-form')
-      if (form) {
-        await act(async () => {
-          fireEvent.submit(form)
-        })
-      }
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
 
       await waitFor(() => {
-        expect(mockMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ name: 'Updated Name' }))
+        expect(mockPatchDataset).toHaveBeenCalledWith(expect.objectContaining({ name: 'Updated Name' }))
       })
     })
 
-    it('calls mutateAsync with only changed fields (description) when only description is modified', async () => {
+    it('calls mockPatchDataset with only changed fields (description) when only description is modified', async () => {
       renderComponent()
+      clickEditButton()
 
-      await act(async () => {
-        capturedOnEditClick?.()
-      })
-      await act(async () => {
-        fireEvent.change(screen.getByTestId('descriptionInput'), { target: { value: 'New description text' } })
-      })
-
-      const form = document.querySelector('#dataset-form')
-      if (form) {
-        await act(async () => {
-          fireEvent.submit(form)
-        })
-      }
+      fireEvent.change(screen.getByTestId('descriptionTextArea'), { target: { value: 'New description text' } })
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
 
       await waitFor(() => {
-        expect(mockMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ description: 'New description text' }))
+        expect(mockPatchDataset).toHaveBeenCalledWith(expect.objectContaining({ description: 'New description text' }))
       })
     })
 
@@ -590,28 +400,96 @@ describe('DatasetOverview', () => {
         groupCount: 1,
         roleCount: 1,
       })
+      clickEditButton()
 
-      await act(async () => {
-        capturedOnEditClick?.()
-      })
-      await act(async () => {
-        capturedOnStatusChange?.('READY')
-      })
-
-      const form = document.querySelector('#dataset-form')
-      if (form) {
-        await act(async () => {
-          fireEvent.submit(form)
-        })
-      }
+      fireEvent.click(getStatusOption('READY'))
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
 
       await waitFor(() => {
-        expect(mockMutateAsync).toHaveBeenCalledWith('test-id')
+        expect(mockPublishDataset).toHaveBeenCalledWith('test-id')
       })
     })
 
-    it('shows name error and toast when mutateAsync rejects with a 409 name conflict', async () => {
-      const { toast } = await import('sonner')
+    it('calls unpublishDataset when status changes from READY to DRAFT', async () => {
+      renderComponent({
+        dataset: makeDraftDataset({
+          dataSetStatus: 'READY',
+          distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+        }),
+        groupCount: 1,
+        roleCount: 1,
+      })
+
+      fireEvent.click(getStatusOption('DRAFT'))
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+
+      await waitFor(() => {
+        expect(mockUnpublishDataset).toHaveBeenCalledWith('test-id')
+      })
+    })
+
+    it('calls unreleaseDataset when status changes from AVAILABLE to READY', async () => {
+      renderComponent({
+        dataset: makeDraftDataset({
+          dataSetStatus: 'AVAILABLE',
+          distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+        }),
+        groupCount: 1,
+        roleCount: 1,
+      })
+
+      fireEvent.click(getStatusOption('READY'))
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+
+      await waitFor(() => {
+        expect(mockUnreleaseDataset).toHaveBeenCalledWith('test-id')
+      })
+    })
+
+    it('calls unreleaseDataset and unpublishDataset when status changes from AVAILABLE to DRAFT', async () => {
+      renderComponent({
+        dataset: makeDraftDataset({
+          dataSetStatus: 'AVAILABLE',
+          distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+        }),
+        groupCount: 1,
+        roleCount: 1,
+      })
+
+      fireEvent.click(getStatusOption('DRAFT'))
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+
+      await waitFor(() => {
+        expect(mockUnreleaseDataset).toHaveBeenCalledWith('test-id')
+        expect(mockUnpublishDataset).toHaveBeenCalledWith('test-id')
+      })
+    })
+
+    it('calls updatePublishedDatasetMeta when saving form changes on an AVAILABLE dataset', async () => {
+      renderComponent({
+        dataset: makeDraftDataset({
+          dataSetStatus: 'AVAILABLE',
+          distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+        }),
+        groupCount: 1,
+        roleCount: 1,
+      })
+      clickEditButton()
+
+      await act(async () => {
+        fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Updated Name' } })
+      })
+
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+
+      await waitFor(() => {
+        expect(mockUpdatePublishedDatasetMeta).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'Updated Name', id: 'test-id' }),
+        )
+      })
+    })
+
+    it('shows name error and toast when mockPatchDataset rejects with a 409 name conflict', async () => {
       const conflictError = new AxiosError('Conflict', 'ERR_BAD_REQUEST', {} as InternalAxiosRequestConfig, undefined, {
         status: 409,
         statusText: 'Conflict',
@@ -619,145 +497,84 @@ describe('DatasetOverview', () => {
         config: {} as InternalAxiosRequestConfig,
         data: { detail: 'Dataset with name "Duplicate Name" already exists' },
       })
-      mockMutateAsync.mockRejectedValueOnce(conflictError)
-
+      mockPatchDataset.mockRejectedValueOnce(conflictError)
       renderComponent()
+      clickEditButton()
 
       await act(async () => {
-        capturedOnEditClick?.()
+        fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Duplicate Name' } })
       })
-      await act(async () => {
-        fireEvent.change(screen.getByTestId('nameInput'), { target: { value: 'Duplicate Name' } })
-      })
-
-      const form = document.querySelector('#dataset-form')
-      if (form) {
-        await act(async () => {
-          fireEvent.submit(form)
-        })
-      }
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
 
       await waitFor(() => {
-        expect(screen.getByTestId('nameError')).toHaveTextContent('common.errors.nameExists')
+        expect(screen.getByTestId('nameFormMessage')).toHaveTextContent('common.errors.nameExists')
         expect(toast.error).toHaveBeenCalled()
       })
     })
   })
 
-  // ── Exit / Discard resets form and status ────────────────────────────────
   describe('Exit and discard: form and status reset', () => {
     it('shows ExitWarningModal when Cancel is clicked with unsaved changes', async () => {
       renderComponent()
+      clickEditButton()
 
       await act(async () => {
-        capturedOnEditClick?.()
+        fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Changed Name' } })
       })
-      await act(async () => {
-        fireEvent.change(screen.getByTestId('nameInput'), { target: { value: 'Changed Name' } })
-      })
-      await act(async () => {
-        capturedOnCancelClick?.()
-      })
+
+      fireEvent.click(screen.getByTestId('cancelButton'))
 
       expect(screen.getByTestId('exitWarningModal')).toBeInTheDocument()
     })
 
     it('exits to read-only mode without modal when no unsaved changes', async () => {
       renderComponent()
+      clickEditButton()
 
-      await act(async () => {
-        capturedOnEditClick?.()
-      })
-      // Cancel without editing
-      await act(async () => {
-        capturedOnCancelClick?.()
-      })
+      fireEvent.click(screen.getByTestId('cancelButton'))
 
-      // No modal, back to read-only (Edit button visible)
       expect(screen.queryByTestId('exitWarningModal')).not.toBeInTheDocument()
       expect(screen.getByTestId('editButton')).toBeInTheDocument()
     })
 
-    it('discarding resets form values and status to original dataset values', async () => {
+    it('discarding resets form values and status to original dataset values and clears exit modal', async () => {
       renderComponent({
         dataset: makeDraftDataset({ distributions: [{ id: 'd1', accessUrl: 'http://example.com' }] }),
       })
+      clickEditButton()
 
-      await act(async () => {
-        capturedOnEditClick?.()
-      })
-      // Change status to READY
-      await act(async () => {
-        capturedOnStatusChange?.('READY')
-      })
-      expect(screen.getByTestId('pageEditControls').dataset.status).toBe('READY')
+      fireEvent.click(getStatusOption('READY'))
 
-      // Trigger cancel → modal
-      await act(async () => {
-        capturedOnCancelClick?.()
-      })
-      // Click Discard
-      await act(async () => {
-        capturedOnDiscard?.()
-      })
+      expect(screen.getByTestId('statusDropdown')).toHaveTextContent('READY')
 
-      // Status should revert to DRAFT
-      expect(screen.getByTestId('pageEditControls').dataset.status).toBe('DRAFT')
-      // Should be back in read-only mode
+      fireEvent.click(screen.getByTestId('cancelButton'))
+      fireEvent.click(screen.getByTestId('discardButton'))
+
+      expect(screen.getByTestId('statusDropdown')).toHaveTextContent('DRAFT')
       expect(screen.getByTestId('editButton')).toBeInTheDocument()
-    })
-
-    it('discarding clears exit modal', async () => {
-      renderComponent()
-
-      await act(async () => {
-        capturedOnEditClick?.()
-      })
-      await act(async () => {
-        fireEvent.change(screen.getByTestId('nameInput'), { target: { value: 'Changed' } })
-      })
-      await act(async () => {
-        capturedOnCancelClick?.()
-      })
-
-      expect(screen.getByTestId('exitWarningModal')).toBeInTheDocument()
-
-      await act(async () => {
-        capturedOnDiscard?.()
-      })
-
       expect(screen.queryByTestId('exitWarningModal')).not.toBeInTheDocument()
     })
 
-    it('save-and-exit from modal calls mutateAsync and closes modal on success', async () => {
+    it('save-and-exit from modal calls mockPublishDataset and closes modal on success', async () => {
       renderComponent({
         dataset: makeDraftDataset({ distributions: [{ id: 'd1', accessUrl: 'http://example.com' }] }),
       })
 
-      await act(async () => {
-        capturedOnEditClick?.()
-      })
-      await act(async () => {
-        capturedOnStatusChange?.('READY')
-      })
-      await act(async () => {
-        capturedOnCancelClick?.()
-      })
+      clickEditButton()
+      fireEvent.click(getStatusOption('READY'))
+      fireEvent.click(screen.getByTestId('cancelButton'))
 
       expect(screen.getByTestId('exitWarningModal')).toBeInTheDocument()
 
-      await act(async () => {
-        capturedOnSave?.()
-      })
+      fireEvent.click(screen.getByTestId('saveButton'))
 
-      expect(mockMutateAsync).toHaveBeenCalledWith('test-id')
+      expect(mockPublishDataset).toHaveBeenCalledWith('test-id')
       await waitFor(() => {
         expect(screen.queryByTestId('exitWarningModal')).not.toBeInTheDocument()
       })
     })
   })
 
-  // ── Completion step indicators ───────────────────────────────────────────
   describe('Completion steps', () => {
     it('renders data flow completion card', () => {
       renderComponent()
