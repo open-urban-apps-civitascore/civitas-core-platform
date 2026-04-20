@@ -47,16 +47,6 @@
         <portal-model.version>1.0.0</portal-model.version>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>io.rest-assured</groupId>
-                <artifactId>rest-assured</artifactId>
-                <version>6.0.0</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
     <dependencies>
         <!-- Shared JPA entities -->
         <dependency>
@@ -181,12 +171,6 @@
             <version>${commons-io.version}</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>io.rest-assured</groupId>
-            <artifactId>rest-assured</artifactId>
-            <scope>test</scope>
-        </dependency>
-
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-postgresql</artifactId>
@@ -319,7 +303,6 @@
                         <ignoredUnusedDeclaredDependency>org.apache.jena:apache-jena-libs</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>org.springdoc:*</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>commons-io:commons-io</ignoredUnusedDeclaredDependency>
-                        <ignoredUnusedDeclaredDependency>io.rest-assured:rest-assured</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>org.hibernate.orm:hibernate-processor</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>de.civitas-core:event-handler-kafka</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>org.postgresql:postgresql</ignoredUnusedDeclaredDependency>
