@@ -4,11 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { ASSIGNMENT_SCOPE_TYPES, type Assignment } from '@/types/assignments'
+import { type Assignment, ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import type { Group } from '@/types/groups'
+import { ROLE_TYPES } from '@/types/roles'
 
 import { GroupAssignmentTab } from './GroupAssignmentTab'
-import { ROLE_TYPES } from '@/types/roles'
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
@@ -143,7 +143,8 @@ const defaultProps = {
   initialAssignments: [],
 }
 
-describe('GroupAssignmentTab permission gating', () => {
+// canEdit = !isReadOnly && isTenantScope
+describe('Add group and Delete group button Visibility', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(usePermissions).mockReturnValue({
@@ -158,17 +159,29 @@ describe('GroupAssignmentTab permission gating', () => {
     vi.mocked(useQueryParams).mockReturnValue(makeDefaultQueryParams() as unknown as ReturnType<typeof useQueryParams>)
   })
 
-  it('canEdit is only true for tenant scope', () => {
-
-  })
-
-  it('hides add-group button and delete buttons in read-only mode on tenant scope', () => {
+  it('hides buttons when isReadOnly=true on tenant scope (canEdit=false)', () => {
     render(<GroupAssignmentTab {...defaultProps} />)
     expect(screen.queryByText('addGroup')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument()
   })
 
-  it('System role - shows add-group and delete buttons in edit mode', () => {
+  it('hides buttons for data role on non-tenant scope when isReadOnly=false (canEdit=false)', () => {
+    render(
+      <GroupAssignmentTab
+        {...defaultProps}
+        isReadOnly={false}
+        selectedGroupIds={['group-3']}
+        initialAssignments={mockDataRoleAssignments}
+        onGroupAssignmentUpdate={onGroupAssignmentUpdate}
+      />,
+    )
+    fireEvent.click(screen.getByText('roles.groupAssignmentTab.scopeTabs.dataset'))
+    expect(screen.getByText('Group 3')).toBeInTheDocument()
+    expect(screen.queryByText('addGroup')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument()
+  })
+
+  it('shows buttons for system role when isReadOnly=false on tenant scope (canEdit=true)', () => {
     render(
       <GroupAssignmentTab
         {...defaultProps}
@@ -184,7 +197,7 @@ describe('GroupAssignmentTab permission gating', () => {
     expect(screen.getByRole('button', { name: 'Open menu' })).toBeInTheDocument()
   })
 
-  it('Data role - shows add-group and delete buttons in edit mode', () => {
+  it('shows buttons for data role when isReadOnly=false on tenant scope (canEdit=true)', () => {
     render(
       <GroupAssignmentTab
         {...defaultProps}
@@ -198,39 +211,9 @@ describe('GroupAssignmentTab permission gating', () => {
     expect(screen.getByText('addGroup')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open menu' })).toBeInTheDocument()
   })
+})
 
-  it('Data role - shows add-group and delete buttons in edit mode on tenant scope', () => {
-    render(
-      <GroupAssignmentTab
-        {...defaultProps}
-        isReadOnly={false}
-        selectedGroupIds={['group-2']}
-        initialAssignments={mockDataRoleAssignments}
-        onGroupAssignmentUpdate={onGroupAssignmentUpdate}
-      />,
-    )
-    expect(screen.getByText('Group 2')).toBeInTheDocument()
-    expect(screen.getByText('addGroup')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Open menu' })).toBeInTheDocument()
-  })
-
-  it('Data Role - hides add-group and delete buttons in edit mode on non-tenant scope', () => {
-    render(
-      <GroupAssignmentTab
-        {...defaultProps}
-        isReadOnly={false}
-        selectedGroupIds={['group-3']}
-        initialAssignments={mockDataRoleAssignments}
-        onGroupAssignmentUpdate={onGroupAssignmentUpdate}
-      />,
-    )
-    const datasetTab = screen.getByText('roles.groupAssignmentTab.scopeTabs.dataset')
-    fireEvent.click(datasetTab)
-    expect(screen.getByText('Group 3')).toBeInTheDocument()
-    expect(screen.queryByText('addGroup')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument()
-  })
-
+describe('GroupAssignmentTab permission gating', () => {
   it('hides add-group button in edit mode when user lacks ASSIGNMENT_CREATE', () => {
     vi.mocked(usePermissions).mockReturnValue({
       hasPermission: () => false,
@@ -239,6 +222,16 @@ describe('GroupAssignmentTab permission gating', () => {
     })
     render(<GroupAssignmentTab {...defaultProps} isReadOnly={false} />)
     expect(screen.queryByText('addGroup')).not.toBeInTheDocument()
+  })
+
+  it('shows add-group button in edit mode when user has ASSIGNMENT_CREATE', () => {
+    vi.mocked(usePermissions).mockReturnValue({
+      hasPermission: (perm: string) => perm === 'ASSIGNMENT_CREATE',
+      hasAnyPermission: () => false,
+      hasScopedPermission: () => false,
+    })
+    render(<GroupAssignmentTab {...defaultProps} isReadOnly={false} />)
+    expect(screen.getByText('addGroup')).toBeInTheDocument()
   })
 })
 
