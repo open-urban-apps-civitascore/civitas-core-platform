@@ -4,9 +4,6 @@ meta {
   seq: 1
 }
 
-// Used when a Data Steward updates WFS layer metadata (title, abstract, keywords).
-// recalculate=nativebbox,latlonbbox forces GeoServer to re-read bounding box from PostGIS.
-
 put {
   url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/datastores/{{datastore_name}}/featuretypes/{{featuretype_point}}?recalculate=nativebbox,latlonbbox
   body: json

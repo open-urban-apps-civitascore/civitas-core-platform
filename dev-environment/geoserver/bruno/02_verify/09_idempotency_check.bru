@@ -4,10 +4,6 @@ meta {
   seq: 9
 }
 
-// GeoServer returns 500 (not 409) for duplicate featuretypes.
-// The adapter must GET-check before POST to stay idempotent.
-// This test verifies workspace-level behavior (409 = already exists).
-
 post {
   url: {{geoserver_url}}/rest/workspaces
   body: json

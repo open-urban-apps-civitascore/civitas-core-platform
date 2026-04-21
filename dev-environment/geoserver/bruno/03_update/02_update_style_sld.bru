@@ -4,9 +4,6 @@ meta {
   seq: 2
 }
 
-// A Data Steward has uploaded a custom SLD for the WMS layer.
-// This replaces the default style content. The layer assignment (defaultStyle) stays unchanged.
-
 put {
   url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/styles/{{style_point}}
   body: text
@@ -20,7 +17,6 @@ auth:basic {
 
 headers {
   Content-Type: application/vnd.ogc.sld+xml
-  Accept: application/json
 }
 
 body:text {

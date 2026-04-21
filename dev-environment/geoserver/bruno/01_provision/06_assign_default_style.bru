@@ -1,12 +1,8 @@
 meta {
-  name: 07 Assign Default Style to Layer
+  name: 06 Assign Default Style to Layer
   type: http
-  seq: 7
+  seq: 6
 }
-
-// Without this step the WMS layer has no default style assigned.
-// GeoServer would fall back to its built-in generic style (red shapes).
-// The layer resource is auto-created by GeoServer when the FeatureType is created.
 
 put {
   url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/layers/{{featuretype_point}}

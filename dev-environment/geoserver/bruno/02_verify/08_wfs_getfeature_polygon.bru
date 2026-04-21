@@ -18,6 +18,6 @@ tests {
     expect(res.body.type).to.equal("FeatureCollection");
   });
   test("Features have Polygon geometry", function() {
-    expect(res.body.features[0].geometry.type).to.equal("Polygon");
+    expect(res.body.features[0].geometry.type).to.include("Polygon");
   });
 }

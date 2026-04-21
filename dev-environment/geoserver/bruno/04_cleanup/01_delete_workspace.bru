@@ -4,10 +4,6 @@ meta {
   seq: 1
 }
 
-// recurse=true removes everything under the workspace in one call:
-// DataStores, FeatureTypes, Layers, workspace-scoped Styles.
-// This is the DATASET_DELETE saga compensation step.
-
 delete {
   url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}?recurse=true
   body: none

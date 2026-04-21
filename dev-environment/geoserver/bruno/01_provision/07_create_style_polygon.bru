@@ -1,11 +1,11 @@
 meta {
-  name: 09 Upload SLD Content — Polygon
+  name: 07 Create + Upload Style (Polygon)
   type: http
-  seq: 9
+  seq: 7
 }
 
-put {
-  url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/styles/{{style_polygon}}
+post {
+  url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/styles?name={{style_polygon}}
   body: text
   auth: basic
 }
@@ -17,7 +17,6 @@ auth:basic {
 
 headers {
   Content-Type: application/vnd.ogc.sld+xml
-  Accept: application/json
 }
 
 body:text {
@@ -49,7 +48,7 @@ body:text {
 }
 
 tests {
-  test("SLD uploaded", function() {
-    expect(res.status).to.equal(200);
+  test("Style created", function() {
+    expect(res.status).to.equal(201);
   });
 }

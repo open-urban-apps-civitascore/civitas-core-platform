@@ -4,8 +4,6 @@ meta {
   seq: 7
 }
 
-// Confirms step 07 of provision worked — defaultStyle is set, not GeoServer's fallback.
-
 get {
   url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/layers/{{featuretype_point}}
   body: none

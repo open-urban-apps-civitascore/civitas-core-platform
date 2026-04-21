@@ -1,14 +1,11 @@
 meta {
-  name: 06 Upload SLD Content
+  name: 05 Create + Upload Style (Point)
   type: http
-  seq: 6
+  seq: 5
 }
 
-// Step 2 of 2: uploads the actual SLD XML to the style entry created in step 05.
-// Content-Type must be application/vnd.ogc.sld+xml — GeoServer rejects other types.
-
-put {
-  url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/styles/{{style_point}}
+post {
+  url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/styles?name={{style_point}}
   body: text
   auth: basic
 }
@@ -20,7 +17,6 @@ auth:basic {
 
 headers {
   Content-Type: application/vnd.ogc.sld+xml
-  Accept: application/json
 }
 
 body:text {
@@ -58,7 +54,7 @@ body:text {
 }
 
 tests {
-  test("SLD uploaded", function() {
-    expect(res.status).to.equal(200);
+  test("Style created", function() {
+    expect(res.status).to.equal(201);
   });
 }

@@ -4,10 +4,6 @@ meta {
   seq: 3
 }
 
-// Removes one layer from the workspace without touching the others.
-// recurse=true removes the layer resource too (not just the featuretype metadata).
-// Use this when a Data Steward removes a single WFS/WMS layer — not the full dataset.
-
 delete {
   url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/datastores/{{datastore_name}}/featuretypes/{{featuretype_polygon}}?recurse=true
   body: none
