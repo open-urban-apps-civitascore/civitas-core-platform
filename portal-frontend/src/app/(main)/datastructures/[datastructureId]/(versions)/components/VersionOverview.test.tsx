@@ -5,7 +5,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import messages from '@/messages/de.json'
 import { PERMISSION_NAMES } from '@/types/currentUser'
-import { Datastructure, DATASTRUCTURE_STATUS_TYPES, DatastructureVersion } from '@/types/datastructures'
+import {
+  Datastructure,
+  DATASTRUCTURE_STATUS_TYPES,
+  DATASTRUCTURE_VERSION_SOURCE,
+  DatastructureVersion,
+} from '@/types/datastructures'
 
 import { VersionOverview } from './VersionOverview'
 
@@ -376,6 +381,168 @@ describe('VersionOverview - hasUserChanges Modal', () => {
           }),
         )
         expect(mockPush).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('edit/read-only toggle', () => {
+    it('renders edit button in read-only mode when mode param is absent', () => {
+      mockSearchParams = new URLSearchParams()
+      renderComponent()
+
+      expect(screen.getByTestId('editButton')).toBeInTheDocument()
+      expect(screen.queryAllByTestId('confirmButton')).toHaveLength(0)
+    })
+
+    it('renders action buttons in edit mode', () => {
+      renderComponent()
+
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+      expect(screen.getAllByTestId('confirmButton').length).toBeGreaterThan(0)
+    })
+
+    it('switches to edit mode when edit button is clicked', async () => {
+      mockSearchParams = new URLSearchParams()
+      renderComponent()
+
+      fireEvent.click(screen.getByTestId('editButton'))
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+        expect(screen.getAllByTestId('confirmButton').length).toBeGreaterThan(0)
+      })
+    })
+
+    it('version field is disabled in read-only mode', () => {
+      mockSearchParams = new URLSearchParams()
+      renderComponent()
+
+      expect(screen.getByTestId('versionTextField')).toBeDisabled()
+    })
+
+    it('version field is enabled in edit mode', () => {
+      renderComponent()
+
+      expect(screen.getByTestId('versionTextField')).not.toBeDisabled()
+    })
+  })
+
+  describe('canSetDraft logic', () => {
+    const openStatusDropdown = async () => {
+      const trigger = screen.getByTestId('statusDropdown')
+      fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false })
+      await waitFor(() => {
+        expect(trigger).toHaveAttribute('data-state', 'open')
+      })
+    }
+
+    it('disables DRAFT option when the version is in use', async () => {
+      const inUseVersion: DatastructureVersion = { ...mockVersion, inUse: true }
+      renderComponent({ version: inUseVersion })
+
+      await openStatusDropdown()
+
+      expect(screen.getByTestId('statusOption-draft')).toHaveAttribute('data-disabled')
+    })
+
+    it('disables DRAFT option when this is the last available version in an available datastructure', async () => {
+      const availableDatastructure: Datastructure = {
+        ...mockDatastructure,
+        dataStructureStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
+        dataStructureVersions: [],
+      }
+      renderComponent({ datastructure: availableDatastructure })
+
+      await openStatusDropdown()
+
+      expect(screen.getByTestId('statusOption-draft')).toHaveAttribute('data-disabled')
+    })
+
+    it('enables DRAFT option when version is not in use and datastructure is DRAFT', async () => {
+      renderComponent()
+
+      await openStatusDropdown()
+
+      expect(screen.getByTestId('statusOption-draft')).not.toHaveAttribute('data-disabled')
+    })
+  })
+
+  describe('versionAlreadyExistsError', () => {
+    const otherVersionSummary = {
+      id: 'v-2',
+      version: '2.0.0',
+      description: 'Other version',
+      dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
+      dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
+      createdAt: '2024-01-01',
+      modifiedAt: '2024-01-01',
+      dataStructureId: 'ds-1',
+    }
+
+    it('shows an error when the entered version already exists', async () => {
+      const datastructureWithOtherVersion: Datastructure = {
+        ...mockDatastructure,
+        dataStructureVersions: [otherVersionSummary],
+      }
+      renderComponent({ datastructure: datastructureWithOtherVersion })
+
+      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
+      fireEvent.change(versionInput, { target: { value: '2.0.0' } })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('versionManualFormMessage')).toBeInTheDocument()
+      })
+    })
+
+    it('shows no error when the entered version is unique', async () => {
+      const datastructureWithOtherVersion: Datastructure = {
+        ...mockDatastructure,
+        dataStructureVersions: [otherVersionSummary],
+      }
+      renderComponent({ datastructure: datastructureWithOtherVersion })
+
+      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
+      fireEvent.change(versionInput, { target: { value: '3.0.0' } })
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('versionManualFormMessage')).not.toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('completedTabs', () => {
+    it('marks versionInfo tab as completed when version, description and source are filled', () => {
+      renderComponent()
+
+      const versionInfoTab = screen.getByTestId('tab-versionInfo')
+      expect(versionInfoTab.querySelector('svg')).toHaveClass('text-green-600')
+    })
+
+    it('does not mark structure tab as completed when there are no nodes or model', () => {
+      renderComponent()
+
+      const structureTab = screen.getByTestId('tab-structure')
+      expect(structureTab.querySelector('svg')).not.toHaveClass('text-green-600')
+    })
+
+    it('does not mark versionInfo tab as completed in create mode with empty fields', () => {
+      renderComponent({ version: null, isCreateMode: true })
+
+      const versionInfoTab = screen.getByTestId('tab-versionInfo')
+      expect(versionInfoTab.querySelector('svg')).not.toHaveClass('text-green-600')
+    })
+
+    it('marks versionInfo tab as completed after filling version and description', async () => {
+      renderComponent({ version: null, isCreateMode: true })
+
+      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
+      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
+      fireEvent.change(versionInput, { target: { value: '1.0.0' } })
+      fireEvent.change(descriptionInput, { target: { value: 'A description' } })
+
+      await waitFor(() => {
+        const versionInfoTab = screen.getByTestId('tab-versionInfo')
+        expect(versionInfoTab.querySelector('svg')).toHaveClass('text-green-600')
       })
     })
   })
