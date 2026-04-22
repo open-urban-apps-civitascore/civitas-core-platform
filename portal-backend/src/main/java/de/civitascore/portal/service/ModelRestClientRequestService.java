@@ -31,7 +31,7 @@ public class ModelRestClientRequestService {
   private final RestClient.Builder restClientBuilder;
 
   private String getBaseUrl() {
-    return String.format("%s/atlas/rest", modelAtlasConfig.getBaseUrl());
+    return "%s/atlas/rest".formatted(modelAtlasConfig.getBaseUrl());
   }
 
   private String getUploadEndpoint(String nsUri) {

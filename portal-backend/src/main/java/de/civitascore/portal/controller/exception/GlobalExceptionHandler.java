@@ -287,22 +287,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return ResponseEntity.badRequest().body(problemDetail);
   }
 
-  private ProblemDetail createProblemDetail(HttpStatus status, String errorCode, String detail) {
+  private ProblemDetail createProblemDetail(
+      HttpStatusCode status, String errorCode, String detail) {
     ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, detail);
     problemDetail.setType(URI.create(ERROR_URN_PREFIX + errorCode));
-    problemDetail.setTitle(status.getReasonPhrase());
+    problemDetail.setTitle(HttpStatus.valueOf(status.value()).getReasonPhrase());
     return problemDetail;
   }
 
   private ProblemDetail createProblemDetail(
-      HttpStatus status, String errorCode, String detail, HttpServletRequest request) {
+      HttpStatusCode status, String errorCode, String detail, HttpServletRequest request) {
     ProblemDetail problemDetail = createProblemDetail(status, errorCode, detail);
     problemDetail.setInstance(URI.create(request.getRequestURI()));
     return problemDetail;
   }
 
   private ResponseEntity<ProblemDetail> toProblemDetailResponse(
-      HttpStatus status, String errorCode, String detail, HttpServletRequest request) {
+      HttpStatusCode status, String errorCode, String detail, HttpServletRequest request) {
     return ResponseEntity.status(status)
         .body(createProblemDetail(status, errorCode, detail, request));
   }

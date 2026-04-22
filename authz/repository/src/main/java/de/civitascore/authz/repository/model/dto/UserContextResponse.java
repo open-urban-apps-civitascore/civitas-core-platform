@@ -2,8 +2,10 @@ package de.civitascore.authz.repository.model.dto;
 
 import java.util.List;
 import java.util.UUID;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * DTO representing a user's full authorization context.
@@ -14,6 +16,8 @@ import lombok.Data;
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class UserContextResponse {
   private UUID userId;
   private String externalId;
@@ -21,6 +25,8 @@ public class UserContextResponse {
 
   @Data
   @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
   public static class GroupContext {
     private UUID id;
     private String name;
@@ -29,6 +35,8 @@ public class UserContextResponse {
 
   @Data
   @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
   public static class AssignmentContext {
     private UUID roleId;
     private String roleName;

@@ -2,7 +2,7 @@ package de.civitascore.portal.service;
 
 import com.github.dockerjava.api.model.ContainerNetwork;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.time.Duration;
 import org.junit.jupiter.api.Tag;
 import org.testcontainers.containers.GenericContainer;
@@ -88,8 +88,7 @@ abstract class AbstractSagaIntegrationTest extends BaseKeycloakIntegrationTest {
         .withExposedPorts(1883)
         .withCopyFileToContainer(
             MountableFile.forHostPath(
-                Paths.get("src/testIntegration/resources/mosquitto/mosquitto.conf")
-                    .toAbsolutePath()),
+                Path.of("src/testIntegration/resources/mosquitto/mosquitto.conf").toAbsolutePath()),
             "/mosquitto/config/mosquitto.conf")
         .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(30)));
   }

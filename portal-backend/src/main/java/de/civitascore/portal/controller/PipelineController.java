@@ -1,6 +1,5 @@
 package de.civitascore.portal.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.PipelineInputDTO;
 import de.civitascore.portal.model.output.PipelineOutputDTO;
@@ -29,6 +28,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
 
 /** REST controller for managing pipeline resources nested under a parent dataset. */
 @RestController

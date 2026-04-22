@@ -1,6 +1,5 @@
 package de.civitascore.portal.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.input.assignment.AssignmentInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
@@ -26,6 +25,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
 
 /** REST controller for managing role-to-user/group assignment resources. */
 @RestController

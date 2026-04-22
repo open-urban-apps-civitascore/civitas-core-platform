@@ -3,6 +3,7 @@ package de.civitascore.portal.configuration;
 import de.civitascore.portal.messaging.CloudEventPublisher;
 import de.civitascore.portal.messaging.kafka.KafkaCloudEventPublisher;
 import io.cloudevents.kafka.CloudEventSerializer;
+import jakarta.validation.Valid;
 import java.util.Properties;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -20,7 +21,7 @@ public class KafkaEventPublisherConfig {
 
   @Bean
   @ConditionalOnProperty(name = "kafka.enabled", havingValue = "true")
-  CloudEventPublisher kafkaCloudEventPublisher(KafkaConfigProperties kafkaProperties) {
+  CloudEventPublisher kafkaCloudEventPublisher(@Valid KafkaConfigProperties kafkaProperties) {
 
     log.info(
         "Initializing Kafka CloudEvent publisher with bootstrap servers: {}",

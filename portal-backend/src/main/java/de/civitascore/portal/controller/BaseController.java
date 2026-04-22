@@ -1,7 +1,5 @@
 package de.civitascore.portal.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.model.entity.base.BaseEntity;
 import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.model.output.BaseOutputDTO;
@@ -50,6 +48,8 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Abstract base controller providing standard CRUD operations for all entity types.

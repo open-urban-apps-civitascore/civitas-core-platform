@@ -2,8 +2,6 @@ package de.civitascore.portal.service;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.Operation;
 import de.civitascore.configadapter.model.idm.UserConfig;
@@ -11,6 +9,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 class ConfigEventPublisherServiceTest {
@@ -20,8 +20,7 @@ class ConfigEventPublisherServiceTest {
 
   @BeforeEach
   void setUp() {
-    objectMapper = new ObjectMapper();
-    objectMapper.registerModule(new JavaTimeModule());
+    objectMapper = new JsonMapper();
     // Initialize without Kafka producer (will only log events)
     configEventPublisher = new ConfigEventPublisherService(null, objectMapper);
   }

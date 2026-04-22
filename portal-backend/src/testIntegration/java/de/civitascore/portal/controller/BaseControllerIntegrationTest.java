@@ -2,8 +2,6 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.model.output.BaseOutputDTO;
@@ -28,6 +26,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.util.UriComponentsBuilder;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Base class for controller integration tests providing common test utilities.

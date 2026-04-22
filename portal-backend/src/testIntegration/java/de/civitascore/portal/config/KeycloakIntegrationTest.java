@@ -2,7 +2,7 @@ package de.civitascore.portal.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.civitascore.portal.security.dto.PrincipalUserDetails;
+import de.civitascore.portal.model.output.PrincipalUserOutput;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -52,13 +52,13 @@ class KeycloakIntegrationTest extends BaseKeycloakIntegrationTest {
       String accessToken = getValidAccessToken();
       HttpHeaders headers = createAuthHeaders(accessToken);
 
-      ResponseEntity<PrincipalUserDetails> response =
+      ResponseEntity<PrincipalUserOutput> response =
           restTemplate.exchange(
-              "/users/me", HttpMethod.GET, new HttpEntity<>(headers), PrincipalUserDetails.class);
+              "/users/me", HttpMethod.GET, new HttpEntity<>(headers), PrincipalUserOutput.class);
 
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).as("Response body should not be null").isNotNull();
-      assertThat(response.getBody().getUsername())
+      assertThat(response.getBody().username())
           .as("Username should match expected value")
           .isEqualTo("testuser");
     }
