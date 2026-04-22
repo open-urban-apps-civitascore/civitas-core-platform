@@ -264,7 +264,7 @@ describe('GroupAssignmentTab scope filtering', () => {
         initialAssignments={mockDataRoleAssignments}
       />,
     )
-    expect(screen.queryByTestId('segmentedControlBar')).toBeInTheDocument()
+    expect(screen.getByTestId('segmentedControlBar')).toBeInTheDocument()
   })
   it('shows only scope-specific groups after switching to a non-TENANT scope tab', () => {
     render(
