@@ -388,7 +388,7 @@ describe('RoleDetails', () => {
     })
 
     it('shows error toast on failed update', async () => {
-      mockUpdateMutateAsync.mockRejectedValue({ status: 500, response: { data: { message: 'error' } } })
+      mockUpdateMutateAsync.mockRejectedValue(makeAxiosError(500, 'error'))
       render(<RoleDetails roleId="role-1" />)
       fireEvent.click(screen.getByTestId('editButton'))
       fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Changed Name' } })
