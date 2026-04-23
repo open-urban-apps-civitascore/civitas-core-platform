@@ -3,8 +3,9 @@ import { NextIntlClientProvider } from 'next-intl'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
+import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import messages from '@/messages/de.json'
-import { PERMISSION_NAMES } from '@/types/currentUser'
+import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 import {
   Datastructure,
   DATASTRUCTURE_STATUS_TYPES,
@@ -20,10 +21,12 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
 
 let mockSearchParams = new URLSearchParams('mode=edit')
 const mockPush = vi.fn()
+const mockRefresh = vi.fn()
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
+    refresh: mockRefresh,
   }),
   useSearchParams: () => mockSearchParams,
   usePathname: () => '/datastructures/test-id/versions/v-1',
@@ -37,16 +40,18 @@ vi.mock('@/hooks/use-query-params', () => ({
 }))
 
 vi.mock('@/components/uml-modeler/hooks/use-multi-session-manager', () => ({
-  useMultiSessionManager: ({ initialSession }: { initialSession: { id: string } | null }) => ({
+  useMultiSessionManager: vi.fn(({ initialSession }: { initialSession: { id: string } | null }) => ({
     activeSession: null,
     activeSessionId: initialSession?.id ?? null,
     setSession: vi.fn(),
     markSessionDirty: vi.fn(),
-  }),
+  })),
 }))
 
 const mockUpdateMutateAsync = vi.fn()
+const mockUpdatePublishedMutateAsync = vi.fn()
 const mockCreateMutateAsync = vi.fn()
+const mockStatusUpdateMutateAsync = vi.fn()
 
 vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
   useCreateDatastructureVersion: () => ({
@@ -58,11 +63,11 @@ vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
     isPending: false,
   }),
   useUpdateDatastructureVersionPublished: () => ({
-    mutateAsync: vi.fn(),
+    mutateAsync: mockUpdatePublishedMutateAsync,
     isPending: false,
   }),
   useStatusUpdateDatastructureVersion: () => ({
-    mutateAsync: vi.fn(),
+    mutateAsync: mockStatusUpdateMutateAsync,
     isPending: false,
   }),
 }))
@@ -94,6 +99,65 @@ const mockVersion: DatastructureVersion = {
   dataStructure: mockDatastructure,
 }
 
+const mockVersionWithModel: DatastructureVersion = {
+  ...mockVersion,
+  modelAtlasUri: `http://civitas.org/model/${mockDatastructure.id}/${mockVersion.version}`,
+  modelName: 'Test Model',
+  styles: {
+    id: 'diagram-1',
+    name: 'Test Model',
+    nodes: [
+      {
+        id: 'n-1',
+        type: 'class',
+        position: { x: 100, y: 100 },
+        data: {
+          element: {
+            id: 'element-1',
+            name: 'TestClass',
+            type: 'class',
+            attributes: [],
+            operations: [],
+          },
+          label: 'TestClass',
+        },
+      },
+    ],
+    edges: [],
+    lastModified: new Date('2024-01-01'),
+    isDirty: false,
+  },
+}
+
+const createModelSessionManagerMock = (version: DatastructureVersion) =>
+  ({
+    activeSession: {
+      id: version.styles?.id ?? 'session-1',
+      isDirty: false,
+      diagram: version.styles!,
+      dirtyFields: new Set(),
+      lastModified: version.styles?.lastModified ?? new Date('2024-01-01'),
+      created: version.styles?.lastModified ?? new Date('2024-01-01'),
+      name: version.modelName ?? version.styles?.name ?? 'Test Model',
+    },
+    activeSessionId: version.styles?.id ?? 'session-1',
+    setSession: vi.fn(),
+    markSessionDirty: vi.fn(),
+  }) as unknown as ReturnType<typeof useMultiSessionManager>
+
+const setCurrentUserPermissions = (permissions: PermissionName[]) => {
+  vi.mocked(useGetCurrentUser).mockReturnValue({
+    data: {
+      username: 'test-user-1',
+      email: 'test.user1@test.com',
+      title: 'MR' as const,
+      firstName: 'Test',
+      lastName: 'User',
+      assignments: [{ scopeType: 'TENANT', scopeId: null, permissions }],
+    },
+  } as ReturnType<typeof useGetCurrentUser>)
+}
+
 describe('VersionOverview - hasUserChanges Modal', () => {
   const defaultProps = {
     title: 'Edit Version',
@@ -103,12 +167,33 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     testId: 'version-overview',
   }
 
+  const openStatusDropdown = async () => {
+    const trigger = screen.getByTestId('statusDropdown')
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false })
+    await waitFor(() => {
+      expect(trigger).toHaveAttribute('data-state', 'open')
+    })
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
     mockPush.mockReset()
+    mockRefresh.mockReset()
     mockUpdateMutateAsync.mockResolvedValue({ data: mockVersion })
+    mockUpdatePublishedMutateAsync.mockResolvedValue({ data: mockVersion })
     mockCreateMutateAsync.mockResolvedValue({ data: mockVersion })
+    mockStatusUpdateMutateAsync.mockResolvedValue({ data: mockVersion })
     mockSearchParams = new URLSearchParams('mode=edit')
+    vi.mocked(useMultiSessionManager).mockReset()
+    vi.mocked(useMultiSessionManager).mockImplementation(
+      ({ initialSession }) =>
+        ({
+          activeSession: null,
+          activeSessionId: initialSession?.id ?? null,
+          setSession: vi.fn(),
+          markSessionDirty: vi.fn(),
+        }) as unknown as ReturnType<typeof useMultiSessionManager>,
+    )
     vi.mocked(useGetCurrentUser).mockReturnValue({
       data: {
         username: 'test',
@@ -163,99 +248,247 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     })
   })
 
-  describe('form fields are editable', () => {
-    it('version input can be changed', async () => {
-      renderComponent()
-
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      fireEvent.change(versionInput, { target: { value: '2.0.0' } })
-
-      await waitFor(() => {
-        expect(versionInput.value).toBe('2.0.0')
-      })
-    })
-
-    it('description input can be changed', async () => {
-      renderComponent()
-
-      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
-      fireEvent.change(descriptionInput, { target: { value: 'Updated description' } })
-
-      await waitFor(() => {
-        expect(descriptionInput.value).toBe('Updated description')
-      })
-    })
-
-    it('multiple fields can be changed together', async () => {
-      renderComponent()
-
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
-
-      fireEvent.change(versionInput, { target: { value: '2.0.0' } })
-      fireEvent.change(descriptionInput, { target: { value: 'New description' } })
-
-      await waitFor(() => {
-        expect(versionInput.value).toBe('2.0.0')
-        expect(descriptionInput.value).toBe('New description')
-      })
-    })
-  })
-
-  describe('Edit button gating when AVAILABLE', () => {
+  describe('Edit button permissions gating when AVAILABLE', () => {
     const availableVersion: DatastructureVersion = {
       ...mockVersion,
       dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
     }
 
-    it('shows Edit button when AVAILABLE and user has both UPDATE and RELEASE', () => {
+    it('shows Edit button when user has DATASTRUCTURE_UPDATE and DATASTRUCTURE_RELEASE', async () => {
       mockSearchParams = new URLSearchParams()
-      vi.mocked(useGetCurrentUser).mockReturnValue({
-        data: {
-          username: 'test',
-          email: 'test@test.com',
-          title: 'MR' as const,
-          firstName: 'Test',
-          lastName: 'User',
-          assignments: [
-            {
-              scopeType: 'TENANT',
-              scopeId: null,
-              permissions: [PERMISSION_NAMES.DATASTRUCTURE_UPDATE, PERMISSION_NAMES.DATASTRUCTURE_RELEASE],
-            },
-          ],
-        },
-      } as ReturnType<typeof useGetCurrentUser>)
+      setCurrentUserPermissions([PERMISSION_NAMES.DATASTRUCTURE_UPDATE, PERMISSION_NAMES.DATASTRUCTURE_RELEASE])
 
       renderComponent({ version: availableVersion })
+      await waitFor(() => {
+        expect(screen.getByTestId('editButton')).toBeInTheDocument()
+      })
+    })
+
+    it('hides Edit button when user has only DATASTRUCTURE_UPDATE or DATASTRUCTURE_RELEASE', async () => {
+      mockSearchParams = new URLSearchParams()
+
+      for (const permissions of [[PERMISSION_NAMES.DATASTRUCTURE_UPDATE], [PERMISSION_NAMES.DATASTRUCTURE_RELEASE]]) {
+        setCurrentUserPermissions(permissions)
+
+        renderComponent({ version: availableVersion })
+        await waitFor(() => {
+          expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+        })
+      }
+    })
+
+    it('hides Edit button when user has neither DATASTRUCTURE_UPDATE nor DATASTRUCTURE_RELEASE', async () => {
+      mockSearchParams = new URLSearchParams()
+      setCurrentUserPermissions([])
+
+      renderComponent({ version: availableVersion })
+      await waitFor(() => {
+        expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('Edit button permissions gating when DRAFT', () => {
+    it('shows Edit button when user has DATASTRUCTURE_UPDATE (DATASTRUCTURE_RELEASE not required)', () => {
+      mockSearchParams = new URLSearchParams()
+      setCurrentUserPermissions([PERMISSION_NAMES.DATASTRUCTURE_UPDATE])
+
+      renderComponent()
       expect(screen.getByTestId('editButton')).toBeInTheDocument()
     })
 
-    it('hides Edit button when AVAILABLE and user has UPDATE but lacks RELEASE', () => {
+    it('hides Edit button when user lacks DATASTRUCTURE_UPDATE', () => {
       mockSearchParams = new URLSearchParams()
-      vi.mocked(useGetCurrentUser).mockReturnValue({
-        data: {
-          username: 'test',
-          email: 'test@test.com',
-          title: 'MR' as const,
-          firstName: 'Test',
-          lastName: 'User',
-          assignments: [
-            {
-              scopeType: 'TENANT',
-              scopeId: null,
-              permissions: [PERMISSION_NAMES.DATASTRUCTURE_UPDATE],
-            },
-          ],
-        },
-      } as ReturnType<typeof useGetCurrentUser>)
+      setCurrentUserPermissions([])
 
-      renderComponent({ version: availableVersion })
+      renderComponent()
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
     })
   })
 
+  describe('edit/read-only toggle', () => {
+    it('renders edit button in read-only mode when mode param is absent', () => {
+      mockSearchParams = new URLSearchParams()
+      renderComponent()
+
+      expect(screen.getByTestId('editButton')).toBeInTheDocument()
+      expect(screen.queryAllByTestId('confirmButton')).toHaveLength(0)
+    })
+
+    it('renders action buttons in edit mode', () => {
+      renderComponent()
+
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+      expect(screen.getAllByTestId('confirmButton').length).toBeGreaterThan(0)
+    })
+
+    it('switches to edit mode when edit button is clicked', async () => {
+      mockSearchParams = new URLSearchParams()
+      renderComponent()
+
+      fireEvent.click(screen.getByTestId('editButton'))
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+        expect(screen.getAllByTestId('confirmButton').length).toBeGreaterThan(0)
+      })
+    })
+
+    it('version field is disabled in read-only mode', () => {
+      mockSearchParams = new URLSearchParams()
+      renderComponent()
+
+      expect(screen.getByTestId('versionTextField')).toBeDisabled()
+    })
+
+    it('version field is enabled in edit mode', () => {
+      renderComponent()
+
+      expect(screen.getByTestId('versionTextField')).not.toBeDisabled()
+    })
+  })
+
+  describe('completedTabs', () => {
+    it('does not mark versionInfo tab as completed in create mode with empty fields', () => {
+      renderComponent({ version: null, isCreateMode: true })
+
+      const versionInfoTab = screen.getByTestId('tab-versionInfo')
+      expect(versionInfoTab.querySelector('svg')).not.toHaveClass('text-green-600')
+    })
+
+    it('marks versionInfo tab as completed after filling version and description', async () => {
+      renderComponent({ version: null, isCreateMode: true })
+
+      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
+      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
+      fireEvent.change(versionInput, { target: { value: '1.0.0' } })
+      fireEvent.change(descriptionInput, { target: { value: 'A description' } })
+
+      await waitFor(() => {
+        const versionInfoTab = screen.getByTestId('tab-versionInfo')
+        expect(versionInfoTab.querySelector('svg')).toHaveClass('text-green-600')
+      })
+    })
+
+    it('does not mark structure tab as completed when there is no datastructure defined', () => {
+      renderComponent()
+
+      const structureTab = screen.getByTestId('tab-structure')
+      expect(structureTab.querySelector('svg')).not.toHaveClass('text-green-600')
+    })
+
+    it('marks structure tab as completed when version has a data structure', async () => {
+      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
+      renderComponent({ version: mockVersionWithModel })
+
+      await waitFor(() => {
+        const structureTab = screen.getByTestId('tab-structure')
+        expect(structureTab.querySelector('svg')).toHaveClass('text-green-600')
+      })
+    })
+  })
+
+  describe('canSetDraft logic', () => {
+    const openStatusDropdown = async () => {
+      const trigger = screen.getByTestId('statusDropdown')
+      fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false })
+      await waitFor(() => {
+        expect(trigger).toHaveAttribute('data-state', 'open')
+      })
+    }
+
+    it('disables DRAFT option when the version is in use', async () => {
+      const inUseVersion: DatastructureVersion = { ...mockVersion, inUse: true }
+      renderComponent({ version: inUseVersion })
+
+      await openStatusDropdown()
+
+      expect(screen.getByTestId('statusOption-draft')).toHaveAttribute('data-disabled')
+    })
+
+    it('disables DRAFT option when this is the last available version in an available datastructure', async () => {
+      const availableDatastructure: Datastructure = {
+        ...mockDatastructure,
+        dataStructureStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
+        dataStructureVersions: [],
+      }
+      renderComponent({ datastructure: availableDatastructure })
+
+      await openStatusDropdown()
+
+      expect(screen.getByTestId('statusOption-draft')).toHaveAttribute('data-disabled')
+    })
+
+    it('enables DRAFT option when version is not in use and not the last available version', async () => {
+      renderComponent()
+
+      await openStatusDropdown()
+
+      expect(screen.getByTestId('statusOption-draft')).not.toHaveAttribute('data-disabled')
+    })
+  })
+
+  describe('canSetAvailable logic', () => {
+    it('disables AVAILABLE option when there is no datastructure defined', async () => {
+      renderComponent()
+
+      await openStatusDropdown()
+
+      expect(screen.getByTestId('statusOption-available')).toHaveAttribute('data-disabled')
+    })
+
+    it('disables AVAILABLE option when user lacks DATASTRUCTURE_RELEASE permission', async () => {
+      setCurrentUserPermissions([PERMISSION_NAMES.DATASTRUCTURE_UPDATE])
+      renderComponent()
+
+      await openStatusDropdown()
+
+      expect(screen.getByTestId('statusOption-available')).toHaveAttribute('data-disabled')
+    })
+
+    it('enables AVAILABLE option when all tabs are completed', async () => {
+      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
+      renderComponent({ version: mockVersionWithModel })
+
+      await openStatusDropdown()
+
+      expect(screen.getByTestId('statusOption-available')).not.toHaveAttribute('data-disabled')
+    })
+
+    it('reverts status from AVAILABLE to DRAFT when the form does not meet the AVAILABLE schema', async () => {
+      const availableVersionWithNoModel: DatastructureVersion = {
+        ...mockVersion,
+        dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
+        modelAtlasUri: null,
+        modelName: null,
+      }
+      renderComponent({ version: availableVersionWithNoModel })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('statusDropdown')).toHaveTextContent('Entwurf')
+      })
+    })
+  })
+
   describe('save button', () => {
+    it('is disabled when no values have been changed', () => {
+      renderComponent()
+
+      const confirmButton = screen.getAllByTestId('confirmButton')[0]
+      expect(confirmButton).toBeDisabled()
+    })
+
+    it('is enabled after a value has been changed', async () => {
+      renderComponent()
+
+      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
+      fireEvent.change(versionInput, { target: { value: '2.0.0' } })
+
+      await waitFor(() => {
+        expect(screen.getAllByTestId('confirmButton')[0]).not.toBeDisabled()
+      })
+    })
+
     it('calls update API when save is clicked after changes in edit mode', async () => {
       renderComponent()
 
@@ -269,6 +502,29 @@ describe('VersionOverview - hasUserChanges Modal', () => {
         expect(mockUpdateMutateAsync).toHaveBeenCalledWith(
           expect.objectContaining({
             endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}`,
+          }),
+        )
+      })
+    })
+
+    it('calls the meta endpoint when an AVAILABLE version is updated', async () => {
+      const availableVersionWithModel = {
+        ...mockVersionWithModel,
+        dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
+      }
+      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(availableVersionWithModel))
+      renderComponent({ version: availableVersionWithModel })
+
+      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
+      fireEvent.change(descriptionInput, { target: { value: 'Updated description' } })
+
+      const confirmButtons = screen.getAllByTestId('confirmButton')
+      fireEvent.click(confirmButtons[0])
+
+      await waitFor(() => {
+        expect(mockUpdatePublishedMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}/published/meta`,
           }),
         )
       })
@@ -289,6 +545,48 @@ describe('VersionOverview - hasUserChanges Modal', () => {
         expect(mockCreateMutateAsync).toHaveBeenCalledWith(
           expect.objectContaining({
             endpoint: `/datastructures/${mockDatastructure.id}/versions`,
+          }),
+        )
+      })
+    })
+
+    it('calls the publish API when status is set from DRAFT to AVAILABLE', async () => {
+      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(mockVersionWithModel))
+      renderComponent({ version: mockVersionWithModel })
+
+      await openStatusDropdown()
+
+      fireEvent.click(screen.getByTestId('statusOption-available'))
+      const confirmButtons = screen.getAllByTestId('confirmButton')
+      fireEvent.click(confirmButtons[0])
+
+      await waitFor(() => {
+        expect(mockStatusUpdateMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}/publish`,
+          }),
+        )
+      })
+    })
+
+    it('calls the unpublish API when status is set from AVAILABLE to DRAFT', async () => {
+      const availableVersionWithModel = {
+        ...mockVersionWithModel,
+        dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
+      }
+      vi.mocked(useMultiSessionManager).mockReturnValue(createModelSessionManagerMock(availableVersionWithModel))
+      renderComponent({ version: availableVersionWithModel })
+
+      await openStatusDropdown()
+
+      fireEvent.click(screen.getByTestId('statusOption-draft'))
+      const confirmButtons = screen.getAllByTestId('confirmButton')
+      fireEvent.click(confirmButtons[0])
+
+      await waitFor(() => {
+        expect(mockStatusUpdateMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}/unpublish`,
           }),
         )
       })
@@ -385,88 +683,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     })
   })
 
-  describe('edit/read-only toggle', () => {
-    it('renders edit button in read-only mode when mode param is absent', () => {
-      mockSearchParams = new URLSearchParams()
-      renderComponent()
-
-      expect(screen.getByTestId('editButton')).toBeInTheDocument()
-      expect(screen.queryAllByTestId('confirmButton')).toHaveLength(0)
-    })
-
-    it('renders action buttons in edit mode', () => {
-      renderComponent()
-
-      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
-      expect(screen.getAllByTestId('confirmButton').length).toBeGreaterThan(0)
-    })
-
-    it('switches to edit mode when edit button is clicked', async () => {
-      mockSearchParams = new URLSearchParams()
-      renderComponent()
-
-      fireEvent.click(screen.getByTestId('editButton'))
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
-        expect(screen.getAllByTestId('confirmButton').length).toBeGreaterThan(0)
-      })
-    })
-
-    it('version field is disabled in read-only mode', () => {
-      mockSearchParams = new URLSearchParams()
-      renderComponent()
-
-      expect(screen.getByTestId('versionTextField')).toBeDisabled()
-    })
-
-    it('version field is enabled in edit mode', () => {
-      renderComponent()
-
-      expect(screen.getByTestId('versionTextField')).not.toBeDisabled()
-    })
-  })
-
-  describe('canSetDraft logic', () => {
-    const openStatusDropdown = async () => {
-      const trigger = screen.getByTestId('statusDropdown')
-      fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false })
-      await waitFor(() => {
-        expect(trigger).toHaveAttribute('data-state', 'open')
-      })
-    }
-
-    it('disables DRAFT option when the version is in use', async () => {
-      const inUseVersion: DatastructureVersion = { ...mockVersion, inUse: true }
-      renderComponent({ version: inUseVersion })
-
-      await openStatusDropdown()
-
-      expect(screen.getByTestId('statusOption-draft')).toHaveAttribute('data-disabled')
-    })
-
-    it('disables DRAFT option when this is the last available version in an available datastructure', async () => {
-      const availableDatastructure: Datastructure = {
-        ...mockDatastructure,
-        dataStructureStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
-        dataStructureVersions: [],
-      }
-      renderComponent({ datastructure: availableDatastructure })
-
-      await openStatusDropdown()
-
-      expect(screen.getByTestId('statusOption-draft')).toHaveAttribute('data-disabled')
-    })
-
-    it('enables DRAFT option when version is not in use and datastructure is DRAFT', async () => {
-      renderComponent()
-
-      await openStatusDropdown()
-
-      expect(screen.getByTestId('statusOption-draft')).not.toHaveAttribute('data-disabled')
-    })
-  })
-
   describe('versionAlreadyExistsError', () => {
     const otherVersionSummary = {
       id: 'v-2',
@@ -506,43 +722,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
       await waitFor(() => {
         expect(screen.queryByTestId('versionManualFormMessage')).not.toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('completedTabs', () => {
-    it('marks versionInfo tab as completed when version, description and source are filled', () => {
-      renderComponent()
-
-      const versionInfoTab = screen.getByTestId('tab-versionInfo')
-      expect(versionInfoTab.querySelector('svg')).toHaveClass('text-green-600')
-    })
-
-    it('does not mark structure tab as completed when there are no nodes or model', () => {
-      renderComponent()
-
-      const structureTab = screen.getByTestId('tab-structure')
-      expect(structureTab.querySelector('svg')).not.toHaveClass('text-green-600')
-    })
-
-    it('does not mark versionInfo tab as completed in create mode with empty fields', () => {
-      renderComponent({ version: null, isCreateMode: true })
-
-      const versionInfoTab = screen.getByTestId('tab-versionInfo')
-      expect(versionInfoTab.querySelector('svg')).not.toHaveClass('text-green-600')
-    })
-
-    it('marks versionInfo tab as completed after filling version and description', async () => {
-      renderComponent({ version: null, isCreateMode: true })
-
-      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      const descriptionInput = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
-      fireEvent.change(versionInput, { target: { value: '1.0.0' } })
-      fireEvent.change(descriptionInput, { target: { value: 'A description' } })
-
-      await waitFor(() => {
-        const versionInfoTab = screen.getByTestId('tab-versionInfo')
-        expect(versionInfoTab.querySelector('svg')).toHaveClass('text-green-600')
       })
     })
   })
