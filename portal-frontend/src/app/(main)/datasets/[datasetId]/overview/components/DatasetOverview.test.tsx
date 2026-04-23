@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -69,54 +70,6 @@ vi.mock('@/components/ui/textarea', () => ({
   Textarea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...props} />,
 }))
 
-vi.mock('@/components/ui/dropdown-menu', () => ({
-  DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  // eslint-disable-next-line react/boolean-prop-naming
-  DropdownMenuTrigger: ({ children, asChild }: { children: React.ReactNode; asChild?: boolean }) =>
-    asChild ? <div>{children}</div> : <div>{children}</div>,
-  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DropdownMenuItem: ({
-    children,
-    onClick,
-    disabled,
-    'data-testid': testId,
-  }: {
-    children: React.ReactNode
-    onClick?: () => void
-    // eslint-disable-next-line react/boolean-prop-naming
-    disabled?: boolean
-    'data-testid'?: string
-  }) => (
-    <button data-testid={testId} onClick={onClick} disabled={disabled}>
-      {children}
-    </button>
-  ),
-}))
-
-vi.mock('@/components/modals/exit-warning-modal/ExitWarningModal', () => ({
-  ExitWarningModal: ({
-    open: isOpen,
-    onDiscard,
-    onConfirm,
-  }: {
-    // eslint-disable-next-line react/boolean-prop-naming
-    open: boolean
-    onDiscard: () => void
-    onConfirm: () => void
-  }) => {
-    return isOpen ? (
-      <div data-testid="exitWarningModal">
-        <button data-testid="discardButton" onClick={onDiscard}>
-          Discard
-        </button>
-        <button data-testid="saveButton" onClick={onConfirm}>
-          Save
-        </button>
-      </div>
-    ) : null
-  },
-}))
-
 vi.mock('../../components/CompletionStep', () => ({
   CompletionStep: (props: { step: { title: string } }) => <div data-testid={`completionStep-${props.step.title}`} />,
 }))
@@ -165,6 +118,7 @@ describe('DatasetOverview', () => {
 
   const getStatusOption = (status: string) => screen.getByTestId(`statusOption-${status.toLowerCase()}`)
   const clickEditButton = () => fireEvent.click(screen.getByTestId('editButton'))
+  const openStatusDropdown = () => userEvent.click(screen.getByTestId('statusDropdown'))
 
   describe('Permission gating', () => {
     it('shows Edit button when user has DATASET_UPDATE permission', () => {
@@ -214,8 +168,9 @@ describe('DatasetOverview', () => {
           roleCount: 1,
         })
         clickEditButton()
-        expect(getStatusOption('READY')).toBeDisabled()
-        expect(getStatusOption('AVAILABLE')).toBeDisabled()
+        await openStatusDropdown()
+        expect(getStatusOption('READY')).toHaveAttribute('aria-disabled', 'true')
+        expect(getStatusOption('AVAILABLE')).toHaveAttribute('aria-disabled', 'true')
       })
 
       it('when there are distributions but no assignments', async () => {
@@ -225,8 +180,9 @@ describe('DatasetOverview', () => {
           roleCount: 0,
         })
         clickEditButton()
-        expect(getStatusOption('READY')).toBeDisabled()
-        expect(getStatusOption('AVAILABLE')).toBeDisabled()
+        await openStatusDropdown()
+        expect(getStatusOption('READY')).toHaveAttribute('aria-disabled', 'true')
+        expect(getStatusOption('AVAILABLE')).toHaveAttribute('aria-disabled', 'true')
       })
 
       it('when form name is too short', async () => {
@@ -239,8 +195,9 @@ describe('DatasetOverview', () => {
           roleCount: 1,
         })
         clickEditButton()
-        expect(getStatusOption('READY')).toBeDisabled()
-        expect(getStatusOption('AVAILABLE')).toBeDisabled()
+        await openStatusDropdown()
+        expect(getStatusOption('READY')).toHaveAttribute('aria-disabled', 'true')
+        expect(getStatusOption('AVAILABLE')).toHaveAttribute('aria-disabled', 'true')
       })
 
       it('when description is empty', async () => {
@@ -253,8 +210,9 @@ describe('DatasetOverview', () => {
           roleCount: 1,
         })
         clickEditButton()
-        expect(getStatusOption('READY')).toBeDisabled()
-        expect(getStatusOption('AVAILABLE')).toBeDisabled()
+        await openStatusDropdown()
+        expect(getStatusOption('READY')).toHaveAttribute('aria-disabled', 'true')
+        expect(getStatusOption('AVAILABLE')).toHaveAttribute('aria-disabled', 'true')
       })
     })
 
@@ -266,8 +224,9 @@ describe('DatasetOverview', () => {
           roleCount: 1,
         })
         clickEditButton()
-        expect(getStatusOption('READY')).not.toBeDisabled()
-        expect(getStatusOption('AVAILABLE')).not.toBeDisabled()
+        await openStatusDropdown()
+        expect(getStatusOption('READY')).not.toHaveAttribute('aria-disabled', 'true')
+        expect(getStatusOption('AVAILABLE')).not.toHaveAttribute('aria-disabled', 'true')
       })
 
       it('when distributions present, assignments set, and form passes strict schema', async () => {
@@ -277,8 +236,9 @@ describe('DatasetOverview', () => {
           roleCount: 1,
         })
         clickEditButton()
-        expect(getStatusOption('READY')).not.toBeDisabled()
-        expect(getStatusOption('AVAILABLE')).not.toBeDisabled()
+        await openStatusDropdown()
+        expect(getStatusOption('READY')).not.toHaveAttribute('aria-disabled', 'true')
+        expect(getStatusOption('AVAILABLE')).not.toHaveAttribute('aria-disabled', 'true')
       })
 
       it('becomes enabled when description is filled in edit mode', async () => {
@@ -291,14 +251,17 @@ describe('DatasetOverview', () => {
           roleCount: 1,
         })
         clickEditButton()
-        expect(getStatusOption('READY')).toBeDisabled()
+        await openStatusDropdown()
+        expect(getStatusOption('READY')).toHaveAttribute('aria-disabled', 'true')
 
+        await userEvent.keyboard('{Escape}')
         await act(async () => {
           fireEvent.change(screen.getByTestId('descriptionTextArea'), { target: { value: 'Now it has a description' } })
         })
 
-        expect(getStatusOption('READY')).not.toBeDisabled()
-        expect(getStatusOption('AVAILABLE')).not.toBeDisabled()
+        await openStatusDropdown()
+        expect(getStatusOption('READY')).not.toHaveAttribute('aria-disabled', 'true')
+        expect(getStatusOption('AVAILABLE')).not.toHaveAttribute('aria-disabled', 'true')
       })
     })
 
@@ -402,7 +365,8 @@ describe('DatasetOverview', () => {
       })
       clickEditButton()
 
-      fireEvent.click(getStatusOption('READY'))
+      await openStatusDropdown()
+      await userEvent.click(getStatusOption('READY'))
       fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
 
       await waitFor(() => {
@@ -419,8 +383,10 @@ describe('DatasetOverview', () => {
         groupCount: 1,
         roleCount: 1,
       })
+      clickEditButton()
 
-      fireEvent.click(getStatusOption('DRAFT'))
+      await openStatusDropdown()
+      await userEvent.click(getStatusOption('DRAFT'))
       fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
 
       await waitFor(() => {
@@ -437,8 +403,10 @@ describe('DatasetOverview', () => {
         groupCount: 1,
         roleCount: 1,
       })
+      clickEditButton()
 
-      fireEvent.click(getStatusOption('READY'))
+      await openStatusDropdown()
+      await userEvent.click(getStatusOption('READY'))
       fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
 
       await waitFor(() => {
@@ -455,8 +423,10 @@ describe('DatasetOverview', () => {
         groupCount: 1,
         roleCount: 1,
       })
+      clickEditButton()
 
-      fireEvent.click(getStatusOption('DRAFT'))
+      await openStatusDropdown()
+      await userEvent.click(getStatusOption('DRAFT'))
       fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
 
       await waitFor(() => {
@@ -543,7 +513,8 @@ describe('DatasetOverview', () => {
       })
       clickEditButton()
 
-      fireEvent.click(getStatusOption('READY'))
+      await openStatusDropdown()
+      await userEvent.click(getStatusOption('READY'))
 
       expect(screen.getByTestId('statusDropdown')).toHaveTextContent('READY')
 
@@ -561,7 +532,8 @@ describe('DatasetOverview', () => {
       })
 
       clickEditButton()
-      fireEvent.click(getStatusOption('READY'))
+      await openStatusDropdown()
+      await userEvent.click(getStatusOption('READY'))
       fireEvent.click(screen.getByTestId('cancelButton'))
 
       expect(screen.getByTestId('exitWarningModal')).toBeInTheDocument()
