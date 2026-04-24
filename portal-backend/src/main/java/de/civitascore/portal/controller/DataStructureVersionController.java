@@ -1,6 +1,5 @@
 package de.civitascore.portal.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.output.DataStructureVersionOutputDTO;
@@ -33,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.MethodNotAllowedException;
+import tools.jackson.databind.JsonNode;
 
 /**
  * REST controller for managing data structure version resources nested under a parent data

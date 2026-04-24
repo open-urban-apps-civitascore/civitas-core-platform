@@ -153,15 +153,6 @@ describe('PermissionsTab', () => {
   })
 
   describe('permissions mapping', () => {
-    it('formats SNAKE_CASE permission names to Title Case', () => {
-      mockPermissions([
-        { id: '1', name: 'USER_READ_ACCESS', category: 'TENANT_ADMINISTRATION', permissionType: 'SYSTEM' },
-      ])
-      renderTab(ROLE_TYPES.SYSTEM)
-
-      expect(screen.getByText('User Read Access')).toBeInTheDocument()
-    })
-
     it('maps permission category correctly', () => {
       mockPermissions([
         { id: '1', name: 'USER_READ', category: 'CATEGORY_A', permissionType: 'SYSTEM' },

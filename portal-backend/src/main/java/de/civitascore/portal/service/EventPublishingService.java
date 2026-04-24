@@ -115,9 +115,8 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
 
       if (result != null && result.status() == ConfigResultEvent.Status.FAILURE) {
         throw new ExternalSystemRejectionException(
-            String.format(
-                "Config Adapter rejected %s: %s - %s",
-                operation, result.errorCode(), result.message()));
+            "Config Adapter rejected %s: %s - %s"
+                .formatted(operation, result.errorCode(), result.message()));
       }
 
       return result;

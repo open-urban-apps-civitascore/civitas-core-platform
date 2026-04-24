@@ -14,8 +14,9 @@ import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.admin.client.resource.UsersResource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.resttestclient.TestRestTemplate;
+import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -27,6 +28,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     classes = PortalBackendApplication.class)
 @ActiveProfiles("test-integration")
+@AutoConfigureTestRestTemplate
 @Testcontainers
 @Import({TestContainerConfiguration.class, PortalTestDataFactory.class, InfraTestDataFactory.class})
 @Slf4j(access = AccessLevel.PROTECTED)

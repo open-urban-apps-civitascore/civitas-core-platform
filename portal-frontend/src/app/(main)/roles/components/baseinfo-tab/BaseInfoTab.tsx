@@ -41,7 +41,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
 
   return (
     <Form {...form}>
-      <form onSubmit={e => e.preventDefault()} className="flex flex-col gap-5 h-full">
+      <form data-testid="baseInfoForm" onSubmit={e => e.preventDefault()} className="flex flex-col gap-5 h-full">
         <ContentCard>
           <DetailsFieldContainer className="pt-0 pb-3 text-xl">
             <SubHeader title={tRolesBaseInfo('heading')} />

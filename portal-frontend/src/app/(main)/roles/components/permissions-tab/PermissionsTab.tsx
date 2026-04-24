@@ -35,6 +35,7 @@ const mapPermissions = (permissionsInput: Permission[], t: TranslationFn): Permi
     const categoryTitle = t.has(categoryKey) ? t(categoryKey) : permission.category
     return {
       name: translatePermissionName(permission.name, t),
+      rawName: permission.name,
       value: permission.id,
       category: { id: permission.category, title: categoryTitle },
     }
@@ -126,7 +127,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   }
 
   return (
-    <div>
+    <div data-testid="permissionsTab">
       {roleType === ROLE_TYPES.DATA ? (
         !isReadOnly && (
           <div className="mb-4 flex justify-end">

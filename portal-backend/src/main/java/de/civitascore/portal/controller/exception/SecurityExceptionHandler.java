@@ -1,6 +1,5 @@
 package de.civitascore.portal.controller.exception;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -18,6 +17,8 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Security exception handler that produces RFC 9457 Problem Detail responses for authentication and
@@ -31,7 +32,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 public class SecurityExceptionHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
 
   private static final String ERROR_URN_PREFIX = "urn:civitas:error:";
-  private final ObjectMapper mapper = new ObjectMapper();
+  private final ObjectMapper mapper = new JsonMapper();
 
   /**
    * Handles unauthenticated requests by writing a 401 Problem Detail response.

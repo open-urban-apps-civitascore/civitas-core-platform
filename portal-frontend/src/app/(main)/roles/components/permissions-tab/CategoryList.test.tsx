@@ -13,11 +13,13 @@ vi.mock('next-intl', () => ({
 
 describe('CategoryList', () => {
   const permissionList: PermissionItem[] = [
-    { value: 'read', name: 'Read', category: { id: '1', title: 'General' } },
-    { value: 'write', name: 'Write', category: { id: '1', title: 'General' } },
+    { value: 'read', name: 'Read', rawName: 'READ', category: { id: '1', title: 'General' } },
+    { value: 'write', name: 'Write', rawName: 'WRITE', category: { id: '1', title: 'General' } },
   ]
 
-  const checkedItems: PermissionItem[] = [{ value: 'read', name: 'Read', category: { id: '1', title: 'General' } }]
+  const checkedItems: PermissionItem[] = [
+    { value: 'read', name: 'Read', rawName: 'READ', category: { id: '1', title: 'General' } },
+  ]
 
   const setCheckedItems = vi.fn()
 
@@ -57,7 +59,7 @@ describe('CategoryList', () => {
 
     expect(setCheckedItems).toHaveBeenCalledWith([
       ...checkedItems,
-      { value: 'write', name: 'Write', category: { id: '1', title: 'General' } },
+      { value: 'write', name: 'Write', rawName: 'WRITE', category: { id: '1', title: 'General' } },
     ])
   })
 

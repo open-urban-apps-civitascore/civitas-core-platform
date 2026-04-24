@@ -4,8 +4,8 @@ import dasniko.testcontainers.keycloak.KeycloakContainer;
 import java.time.Duration;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 @TestConfiguration(proxyBeanMethods = false)
@@ -17,8 +17,8 @@ public class TestContainerConfiguration {
   private static final String REALM_IMPORT_FILE = "keycloak/iot-realm.json";
 
   @Bean
-  PostgreSQLContainer<?> postgresContainer() {
-    return new PostgreSQLContainer<>(DockerImageName.parse(POSTGRES_IMAGE))
+  PostgreSQLContainer postgresContainer() {
+    return new PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))
         .withDatabaseName("iot_schema")
         .withUsername("iot")
         .withPassword("iot")

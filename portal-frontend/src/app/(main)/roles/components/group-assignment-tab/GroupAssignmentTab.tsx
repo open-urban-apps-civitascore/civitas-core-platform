@@ -98,6 +98,11 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
     setTotalPages(Math.ceil(rowCount / pageSize))
   }, [rowCount, pageSize, setTotalPages])
 
+  useEffect(() => {
+    setPaginationParams({ pageSize: pageSize ?? 10, pageIndex: 0 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedScope])
+
   // Build a map from group ID to scopeType from assignments
   const groupScopeMap = useMemo(() => {
     const map: Record<string, AssignmentScope | null> = {}
@@ -190,7 +195,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div data-testid="groupAssignmentTab" className="flex flex-col gap-4">
       {!isSystemRole && (
         <div className="flex items-center justify-between gap-4">
           <SegmentedControlBar tabs={SCOPE_TABS} selectedTab={selectedScope} onTabChange={setSelectedScope} />

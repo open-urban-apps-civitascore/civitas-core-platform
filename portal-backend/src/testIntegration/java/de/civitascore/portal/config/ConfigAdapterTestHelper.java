@@ -1,7 +1,5 @@
 package de.civitascore.portal.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import dasniko.testcontainers.keycloak.KeycloakContainer;
 import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.configuration.AppConfig;
@@ -24,6 +22,8 @@ import org.springframework.kafka.listener.KafkaMessageListenerContainer;
 import org.springframework.kafka.listener.MessageListener;
 import org.springframework.kafka.test.utils.ContainerTestUtils;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Helper class to run the Config Adapter in-process during integration tests.
@@ -43,8 +43,7 @@ public class ConfigAdapterTestHelper implements AutoCloseable {
       String kafkaBrokers,
       KafkaTemplate<String, String> kafkaTemplate) {
 
-    this.objectMapper = new ObjectMapper();
-    this.objectMapper.registerModule(new JavaTimeModule());
+    this.objectMapper = new JsonMapper();
 
     log.info("Initializing Config Adapter test helper");
 

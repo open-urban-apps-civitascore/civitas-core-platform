@@ -167,8 +167,8 @@ public class GenericDcatMapper<T extends BaseOutputDTO> extends DcatMapper<T>
 
     if (propertyAnnotation != null
         && !propertyAnnotation.language().isEmpty()
-        && value instanceof String) {
-      literal = model.createLiteral((String) value, propertyAnnotation.language());
+        && value instanceof String string) {
+      literal = model.createLiteral(string, propertyAnnotation.language());
     } else {
       literal = model.createTypedLiteral(value);
     }
