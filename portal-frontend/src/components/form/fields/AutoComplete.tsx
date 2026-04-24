@@ -79,8 +79,8 @@ export const AutoComplete = <T extends FieldValues>(props: AutoCompleteProps<T>)
               <PopoverTrigger asChild>
                 <CommandInput
                   id={id}
-                  placeholder={placeholder}
                   className={cn('h-9', hasValue && 'disabled:text-foreground disabled:opacity-100')}
+                  placeholder={disabled ? undefined : placeholder}
                   onValueChange={onInputChange}
                   wrapperProps={{
                     className: cn('border rounded-md', form.formState.errors[name] && 'border-destructive'),

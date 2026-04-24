@@ -67,7 +67,7 @@ export const FormTextArea = <T extends FieldValues>(props: FormTextAreaProps<T>)
                   'disabled:opacity-100 disabled:border-transparent disabled:shadow-none disabled:min-h-9 disabled:py-2 disabled:resize-none disabled:pointer-events-none',
                   className,
                 )}
-                placeholder={placeholder}
+                placeholder={disabled ? undefined : placeholder}
                 maxLength={maxLength}
                 {...field}
                 disabled={disabled}
