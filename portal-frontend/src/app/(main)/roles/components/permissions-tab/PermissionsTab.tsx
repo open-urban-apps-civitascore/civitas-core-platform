@@ -35,6 +35,7 @@ const mapPermissions = (permissionsInput: Permission[], t: TranslationFn): Permi
     const categoryTitle = t.has(categoryKey) ? t(categoryKey) : permission.category
     return {
       name: translatePermissionName(permission.name, t),
+      rawName: permission.name,
       value: permission.id,
       category: { id: permission.category, title: categoryTitle },
     }

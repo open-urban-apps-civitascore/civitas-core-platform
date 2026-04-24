@@ -10,6 +10,11 @@ import { Role } from '@/types/roles'
 
 import { RoleDetails } from './RoleDetails'
 
+const { mockT } = vi.hoisted(() => {
+  const mockT = Object.assign((k: string) => k, { has: () => false })
+  return { mockT }
+})
+
 const mockPush = vi.fn()
 let mockSubTabValue = 'basicInformation'
 let mockTabValue = 'SYSTEM'
@@ -26,7 +31,7 @@ let mockRoleResponse: { data: { data: Role } | null; isFetching: boolean; refetc
 
 let capturedOnGroupAssignmentUpdate: ((groupIds: string[]) => void) | null = null
 
-vi.mock('next-intl', () => ({ useTranslations: () => (k: string) => k }))
+vi.mock('next-intl', () => ({ useTranslations: () => mockT }))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, refresh: vi.fn() }),

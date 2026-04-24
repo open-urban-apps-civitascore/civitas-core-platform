@@ -13,6 +13,7 @@ export type PermissionCategory = {
 
 export type PermissionItem = {
   name: Permission['name']
+  rawName: Permission['name']
   value: Permission['id']
   category: PermissionCategory
 }
