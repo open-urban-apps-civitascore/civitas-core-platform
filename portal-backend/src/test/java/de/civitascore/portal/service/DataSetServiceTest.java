@@ -356,6 +356,135 @@ class DataSetServiceTest {
     }
 
     @Test
+    @DisplayName("CREATE: writes per-slug routeIds across multiple named APIs")
+    void createWritesMultipleRouteIds() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = new DataSet();
+      ds.setId(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      ds.setPipelines(new HashSet<>());
+      ds.setDistributions(new HashSet<>());
+      NamedApi traffic = new NamedApi();
+      traffic.setName("Traffic");
+      traffic.setSlug("traffic");
+      traffic.setStandard("STA");
+      NamedApi weather = new NamedApi();
+      weather.setName("Weather");
+      weather.setSlug("weather");
+      weather.setStandard("STA");
+      ds.setNamedApis(new HashSet<>(Set.of(traffic, weather)));
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("traffic", "route-1", "weather", "route-2"),
+              "svc-1",
+              "https://public.example.com",
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().getNamedApis())
+          .extracting(NamedApi::getSlug, NamedApi::getRouteId)
+          .containsExactlyInAnyOrder(
+              org.assertj.core.api.Assertions.tuple("traffic", "route-1"),
+              org.assertj.core.api.Assertions.tuple("weather", "route-2"));
+    }
+
+    @Test
+    @DisplayName("CREATE: partial routeIds map leaves unmatched entries with null routeId")
+    void createPartialRouteIdsLeavesEntriesUnchanged() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = new DataSet();
+      ds.setId(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      ds.setPipelines(new HashSet<>());
+      ds.setDistributions(new HashSet<>());
+      NamedApi traffic = new NamedApi();
+      traffic.setName("Traffic");
+      traffic.setSlug("traffic");
+      traffic.setStandard("STA");
+      NamedApi weather = new NamedApi();
+      weather.setName("Weather");
+      weather.setSlug("weather");
+      weather.setStandard("STA");
+      ds.setNamedApis(new HashSet<>(Set.of(traffic, weather)));
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      // Saga returned only one of the two slugs
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("traffic", "route-1"),
+              "svc-1",
+              "https://public.example.com",
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      assertThat(saved.getValue().getNamedApis())
+          .extracting(NamedApi::getSlug, NamedApi::getRouteId)
+          .containsExactlyInAnyOrder(
+              org.assertj.core.api.Assertions.tuple("traffic", "route-1"),
+              org.assertj.core.api.Assertions.tuple("weather", null));
+    }
+
+    @Test
+    @DisplayName("CREATE: orphan slug in saga result is silently skipped (logged as warning)")
+    void createOrphanSlugSilentlySkipped() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      // Saga returned a slug that doesn't exist on the entity (drift)
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("traffic", "route-1", "ghost", "route-orphan"),
+              "svc-1",
+              "https://public.example.com",
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
+      verify(dataSetRepository).save(saved.capture());
+      // The matching slug still gets its routeId; orphan is ignored without throwing.
+      assertThat(saved.getValue().getNamedApis())
+          .extracting(NamedApi::getSlug, NamedApi::getRouteId)
+          .containsExactly(org.assertj.core.api.Assertions.tuple("traffic", "route-1"));
+    }
+
+    @Test
     @DisplayName("DELETE: clears infrastructure fields and reverts to READY")
     void deleteClearsAndReverts() {
       UUID id = UUID.randomUUID();

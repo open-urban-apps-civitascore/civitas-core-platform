@@ -124,8 +124,8 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
     String firstProjectId = created.getProjectId();
     assertThat(firstProjectId).as("First CREATE: projectId").isNotNull();
     assertThat(created.getNamedApis())
-        .as("First CREATE: named APIs should carry routeIds")
-        .anyMatch(api -> api.getRouteId() != null);
+        .as("First CREATE: named APIs should carry the deterministic routeId (= datasetId)")
+        .anyMatch(api -> dataSetId.toString().equals(api.getRouteId()));
     assertThat(created.getPipelineIds()).as("First CREATE: pipelineIds").isNotNull();
 
     // Phase 2: AVAILABLE → unrelease → DELETE saga → READY
@@ -159,8 +159,8 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
         .isNotNull()
         .isNotEqualTo(firstProjectId);
     assertThat(reCreated.getNamedApis())
-        .as("Re-create: routeIds populated again")
-        .anyMatch(api -> api.getRouteId() != null);
+        .as("Re-create: deterministic routeIds populated again")
+        .anyMatch(api -> dataSetId.toString().equals(api.getRouteId()));
     assertThat(reCreated.getPipelineIds()).as("Re-create: pipelineIds").isNotNull();
     assertThat(reCreated.getDataSetStatus())
         .as("Re-create: status AVAILABLE")
@@ -444,8 +444,8 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
 
     assertThat(completed.getProjectId()).as("FROST project should be created").isNotNull();
     assertThat(completed.getNamedApis())
-        .as("APISIX route(s) should be created on the named APIs")
-        .anyMatch(api -> api.getRouteId() != null);
+        .as("APISIX route(s) should carry the deterministic routeId (= datasetId)")
+        .anyMatch(api -> dataSetId.toString().equals(api.getRouteId()));
     assertThat(completed.getPublicUrl()).as("Public URL should be set").isNotNull();
     assertThat(completed.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
 

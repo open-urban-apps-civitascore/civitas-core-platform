@@ -224,7 +224,7 @@ class DataSetSagaPublisherTest {
     }
 
     @Test
-    @DisplayName("DatasetCreate trigger carries namedApis from the entity collection")
+    @DisplayName("DatasetCreate trigger carries namedApis but omits routeIds")
     void createTriggerCarriesNamedApis() throws Exception {
       DataSet dataSet = datasetWithNamedApis(null, null); // no routeIds yet on CREATE
       var jsonCaptor = stubKafkaSend();
@@ -232,6 +232,10 @@ class DataSetSagaPublisherTest {
       publisher.publishCreateRequested(dataSet);
 
       assertNamedApisInPayload(jsonCaptor.getValue());
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.has("routeIds"))
+          .as("CREATE trigger has no routeIds: routes are provisioned by this saga")
+          .isFalse();
     }
 
     @Test
@@ -268,6 +272,30 @@ class DataSetSagaPublisherTest {
       var routeIds = payload.get("routeIds");
       assertThat(routeIds).isNotNull();
       assertThat(routeIds.size()).isEqualTo(2);
+      assertThat(routeIds.get("traffic").asString()).isEqualTo("route-1");
+      assertThat(routeIds.get("weather").asString()).isEqualTo("route-2");
+    }
+
+    @Test
+    @DisplayName("UPDATE trigger routeIds map omits entries with null routeId (mid-saga state)")
+    void updateTriggerOmitsEntriesWithoutRouteId() throws Exception {
+      // One entry has a routeId (already provisioned), the other doesn't yet.
+      DataSet dataSet = datasetWithNamedApis("route-1", null);
+      dataSet.setProjectId("proj-1");
+      dataSet.setServiceId("svc-1");
+      dataSet.setPipelines(Set.of());
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishUpdateRequested(dataSet, Set.of());
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var routeIds = payload.get("routeIds");
+      assertThat(routeIds).isNotNull();
+      assertThat(routeIds.size()).isEqualTo(1);
+      assertThat(routeIds.has("traffic")).isTrue();
+      assertThat(routeIds.has("weather"))
+          .as("entries without a routeId should not appear in the map")
+          .isFalse();
     }
 
     @Test

@@ -143,8 +143,8 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
         .isNotNull()
         .contains("Projects(" + completed.getProjectId() + ")");
     assertThat(completed.getNamedApis())
-        .as("named API entries should carry per-slug routeIds from APISIX step")
-        .anyMatch(api -> api.getRouteId() != null);
+        .as("named API entries should carry the deterministic per-slug routeId from APISIX step")
+        .anyMatch(api -> dataSetId.toString().equals(api.getRouteId()));
     assertThat(completed.getServiceId())
         .as("serviceId from APISIX step (deterministic = datasetId)")
         .isEqualTo(dataSetId.toString());
@@ -205,7 +205,8 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
     assertThat(completed.getFrostBaseUrl())
         .isNotNull()
         .contains("Projects(" + completed.getProjectId() + ")");
-    assertThat(completed.getNamedApis()).anyMatch(api -> api.getRouteId() != null);
+    assertThat(completed.getNamedApis())
+        .anyMatch(api -> dataSetId.toString().equals(api.getRouteId()));
     assertThat(completed.getServiceId()).isEqualTo(dataSetId.toString());
     assertThat(completed.getPublicUrl()).isNotNull().contains("/datasets/" + dataSetId);
     assertThat(completed.getPipelineIds()).isNotNull().containsExactly(pipelineId.toString());
