@@ -7,7 +7,6 @@ import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.summary.DataSetSummaryDTO;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -56,23 +55,27 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Override
   DataSetOutputDTO toOutput(DataSet entity);
 
+  /**
+   * {@inheritDoc} Used by {@link
+   * de.civitascore.portal.controller.BaseController#patch(java.util.UUID,
+   * com.fasterxml.jackson.databind.JsonNode)} to build the "current state" DTO that the JSON-merge
+   * patch body is applied on top of. The {@link DataSetInputDTO#getNamedApis() namedApis} field is
+   * forced to {@code null} (see {@link #nullOutNamedApisAfterToInput}) so PATCH semantics work
+   * correctly: {@link #linkNamedApis(DataSetInputDTO, DataSet)} treats null as "no namedApis field
+   * in the patch body, leave the entity untouched". If we round-tripped the existing collection
+   * here, a PATCH that omits {@code namedApis} would resurface it through the merge and then
+   * recreate every entry with fresh ids — losing {@code routeId}, audit metadata, and breaking any
+   * FK relationships.
+   */
   @Mapping(target = "assignments", ignore = true)
+  @Mapping(target = "namedApis", ignore = true)
   @Override
   DataSetInputDTO toInput(DataSet entity);
 
-  /**
-   * Maps the entity's named APIs back to input DTOs for PATCH round-tripping. Triggered by {@link
-   * #toInput(DataSet)} via the {@code namedApis} field name match.
-   */
-  default List<NamedApiInputDTO> namedApisToInputDtos(Set<NamedApi> entities) {
-    if (entities == null) {
-      return new ArrayList<>();
-    }
-    List<NamedApiInputDTO> result = new ArrayList<>(entities.size());
-    for (NamedApi e : entities) {
-      result.add(toNamedApiInputDto(e));
-    }
-    return result;
+  /** Overrides the {@code DataSetInputDTO.namedApis} field default of {@code new ArrayList<>()}. */
+  @AfterMapping
+  default void nullOutNamedApisAfterToInput(@MappingTarget DataSetInputDTO dto) {
+    dto.setNamedApis(null);
   }
 
   DataSetSummaryDTO toSummary(DataSet entity);
@@ -92,7 +95,10 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Mapping(target = "publicUrl", ignore = true)
   @Mapping(target = "pipelineIds", ignore = true)
   @Mapping(target = "pendingSagaType", ignore = true)
-  // Same rationale as toEntity: route through setNamedApis(...) for FK linkage.
+  // Routed through linkNamedApis (below) so PATCH null-vs-empty semantics are applied
+  // uniformly with toEntity. MapStruct would otherwise call entity.setNamedApis(mappedSet)
+  // here directly, which would clear the collection on every PATCH whose currentDto carries a
+  // (non-null) round-tripped list — see #1315 PATCH bug fix in nullOutNamedApisAfterToInput.
   @Mapping(target = "namedApis", ignore = true)
   @Override
   void updateEntity(@MappingTarget DataSet entity, DataSetInputDTO input);
