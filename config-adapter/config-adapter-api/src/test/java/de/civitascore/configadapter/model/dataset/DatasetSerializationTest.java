@@ -136,6 +136,24 @@ class DatasetSerializationTest {
   }
 
   @Test
+  void shouldDeserializeNamedApis() {
+    assertNotNull(dataset.namedApis());
+    assertEquals(2, dataset.namedApis().size());
+
+    NamedApi traffic = dataset.namedApis().get(0);
+    assertEquals("Traffic Sensor Readings", traffic.name());
+    assertEquals("traffic", traffic.slug());
+    assertEquals("STA", traffic.standard());
+    assertEquals("1.1", traffic.version());
+
+    NamedApi weather = dataset.namedApis().get(1);
+    assertEquals("Weather Sensor Readings", weather.name());
+    assertEquals("weather", weather.slug());
+    assertEquals("STA", weather.standard());
+    assertEquals("1.1", weather.version());
+  }
+
+  @Test
   void shouldRoundTripSerializeDataset() throws Exception {
     String json = objectMapper.writeValueAsString(dataset);
     Dataset roundTripped = objectMapper.readValue(json, Dataset.class);
@@ -146,5 +164,8 @@ class DatasetSerializationTest {
     assertEquals(dataset.datapipelines().size(), roundTripped.datapipelines().size());
     assertEquals(dataset.datasources().get(0), roundTripped.datasources().get(0));
     assertEquals(dataset.datasources().get(1), roundTripped.datasources().get(1));
+    assertEquals(dataset.namedApis().size(), roundTripped.namedApis().size());
+    assertEquals(dataset.namedApis().get(0), roundTripped.namedApis().get(0));
+    assertEquals(dataset.namedApis().get(1), roundTripped.namedApis().get(1));
   }
 }
