@@ -123,6 +123,14 @@ springdoc:
     path: /swagger-ui.html
     enabled: true
 
+# CIVITAS platform configuration
+civitas:
+  api:
+    # Data-plane host used to build public preview URLs for named APIs
+    # (per concept #1380, ADR #1387). MUST point at the data-plane host, not the management host.
+    # No default — fail-fast on missing configuration.
+    domain: ${CIVITAS_API_DOMAIN:}
+
 # Security: paths permitted without authentication
 security:
   permit-paths:

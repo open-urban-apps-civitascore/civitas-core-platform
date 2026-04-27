@@ -1,5 +1,8 @@
 civitas:
   master-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+  api:
+    # Data-plane host used to build named-API previewUrl values in integration tests.
+    domain: api.test.example.com
 
 spring:
   datasource:

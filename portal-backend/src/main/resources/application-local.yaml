@@ -9,6 +9,9 @@ app:
 
 civitas:
   master-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+  api:
+    # Data-plane host used to build public preview URLs for named APIs (per concept #1380, ADR #1387).
+    domain: api.core.civitasconnect.local
 
 spring:
   datasource:
