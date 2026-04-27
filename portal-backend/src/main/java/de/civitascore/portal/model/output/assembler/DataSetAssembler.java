@@ -43,7 +43,7 @@ public class DataSetAssembler implements BaseAssembler<DataSet, DataSetOutputDTO
           .findByExternalId(entity.getCreatedBy().toString())
           .ifPresent(user -> dto.setCreatedBy(userMapper.toSummary(user)));
     }
-    if (entity.getId() != null && dto.getNamedApis() != null) {
+    if (entity.getId() != null && !dto.getNamedApis().isEmpty()) {
       String baseUrl =
           "https://" + civitasProperties.api().domain() + "/v1/datasets/" + entity.getId();
       dto.getNamedApis().forEach(api -> api.setPreviewUrl(baseUrl + "/" + api.getSlug()));

@@ -2,7 +2,6 @@ package de.civitascore.portal.model.output;
 
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
-import de.civitascore.portal.model.input.NamedApiDTO;
 import de.civitascore.portal.model.output.summary.DistributionSummaryDTO;
 import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
 import de.civitascore.portal.model.output.summary.UserSummaryDTO;
@@ -40,7 +39,7 @@ public class DataSetOutputDTO extends BaseOutputDTO {
       description =
           "Named API endpoints exposed by this dataset (per concepts #1379 and #1383). Each"
               + " entry's previewUrl is server-populated from the configured data-plane domain.")
-  private List<NamedApiDTO> namedApis = new ArrayList<>();
+  private List<NamedApiOutputDTO> namedApis = new ArrayList<>();
 
   @Schema(description = "Whether this dataset is publicly accessible")
   private Boolean openDataAccess;

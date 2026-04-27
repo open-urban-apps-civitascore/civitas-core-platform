@@ -26,5 +26,5 @@ public class DataSetInputDTO extends BaseDataEntityInputDTO {
           "Named API endpoints exposed by this dataset (per concepts #1379 and #1383). Each entry"
               + " produces one published distribution and one APISIX route after release. Slug"
               + " uniqueness within the dataset is enforced at publish time (#1312).")
-  private List<NamedApiDTO> namedApis = new ArrayList<>();
+  private List<NamedApiInputDTO> namedApis = new ArrayList<>();
 }
