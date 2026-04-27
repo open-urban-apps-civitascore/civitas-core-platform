@@ -360,5 +360,48 @@ class DataSetSagaPublisherTest {
       assertThat(roundTripped.routeIds()).containsEntry("traffic", "route-1");
       assertThat(roundTripped.routeIds()).containsEntry("weather", "route-2");
     }
+
+    @Test
+    @DisplayName("Legacy singular 'routeId' key is silently ignored (pre-#1311 wire shape)")
+    void legacyRouteIdKeyIsIgnored() throws Exception {
+      // Document behavior: a stale producer or DLQ replay carrying the pre-#1311 singular
+      // routeId key deserializes cleanly via @JsonIgnoreProperties(ignoreUnknown=true), and
+      // routeIds is null on the parsed payload. If we ever want bridge compatibility this test
+      // forces an explicit decision rather than a silent drop.
+      String legacyJson =
+          "{\"datasetId\":\""
+              + UUID.randomUUID()
+              + "\",\"projectId\":\"proj-1\",\"routeId\":\"legacy-route\"}";
+
+      SagaResultPayload parsed = new JsonMapper().readValue(legacyJson, SagaResultPayload.class);
+
+      assertThat(parsed.projectId()).isEqualTo("proj-1");
+      assertThat(parsed.routeIds())
+          .as("singular legacy 'routeId' is dropped — no bridge from pre-#1311 wire shape")
+          .isNull();
+    }
+
+    @Test
+    @DisplayName("Null routeIds round-trips as null (distinct from empty map)")
+    void nullRouteIdsRoundTrip() throws Exception {
+      SagaResultPayload result =
+          new SagaResultPayload(
+              UUID.randomUUID().toString(),
+              "proj-1",
+              "http://frost",
+              null,
+              "svc-1",
+              "http://public",
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      ObjectMapper mapper = new JsonMapper();
+      String json = mapper.writeValueAsString(result);
+      SagaResultPayload roundTripped = mapper.readValue(json, SagaResultPayload.class);
+
+      assertThat(roundTripped.routeIds()).isNull();
+    }
   }
 }

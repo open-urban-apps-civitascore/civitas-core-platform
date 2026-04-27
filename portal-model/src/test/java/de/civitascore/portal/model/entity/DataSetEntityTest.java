@@ -191,5 +191,20 @@ class DataSetEntityTest {
 
       assertThat(dataSet.getNamedApis()).isEmpty();
     }
+
+    @Test
+    @DisplayName("Should not wipe the collection when called with its own reference")
+    void shouldNotWipeOnSelfReference() {
+      DataSet dataSet = dataSetWithId(UUID.randomUUID());
+      NamedApi traffic = namedApi("traffic");
+      dataSet.getNamedApis().add(traffic);
+
+      // setNamedApis(getNamedApis()) would naively clear() the same set being added back,
+      // wiping the entity. Verify the guard prevents that.
+      dataSet.setNamedApis(dataSet.getNamedApis());
+
+      assertThat(dataSet.getNamedApis()).containsExactly(traffic);
+      assertThat(traffic.getDataSet()).isSameAs(dataSet);
+    }
   }
 }
