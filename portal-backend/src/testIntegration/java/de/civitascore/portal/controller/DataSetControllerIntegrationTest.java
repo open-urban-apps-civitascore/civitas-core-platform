@@ -12,6 +12,7 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.Distribution;
+import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.DataSetInputDTO;
@@ -60,6 +61,7 @@ class DataSetControllerIntegrationTest
   @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private DataSetService dataSetService;
   @Autowired private CivitasProperties civitasProperties;
+  @Autowired private org.springframework.transaction.support.TransactionTemplate txTemplate;
 
   @Override
   protected String getEndpointPath() {
@@ -519,17 +521,25 @@ class DataSetControllerIntegrationTest
 
       DataSetOutputDTO created = performCreate(input).getBody();
       assertThat(created).isNotNull();
-      DataSet beforePatch = dataSetRepository.findById(created.getId()).orElseThrow();
-      var trafficEntity = beforePatch.getNamedApis().iterator().next();
-      // Simulate the saga having populated routeId post-release (so we can verify the PATCH
-      // does not overwrite it). Saved directly via the repository to bypass the DTO surface.
-      trafficEntity.setRouteId("route-saga-1");
-      dataSetRepository.save(beforePatch);
-      UUID originalEntryId = trafficEntity.getId();
+      UUID dataSetId = created.getId();
+
+      // Seed the saga-populated routeId directly on the entity (the saga normally does this
+      // post-release; we shortcut that here so we can assert the PATCH preserves it).
+      // namedApis is FetchType.LAZY, so the read + mutation happens inside a transactional
+      // boundary. Capture the entry id for later equality assertion.
+      UUID originalEntryId =
+          txTemplate.execute(
+              status -> {
+                DataSet ds = dataSetRepository.findById(dataSetId).orElseThrow();
+                NamedApi traffic = ds.getNamedApis().iterator().next();
+                traffic.setRouteId("route-saga-1");
+                return traffic.getId();
+              });
+      assertThat(originalEntryId).isNotNull();
 
       // PATCH only the description — namedApis must stay intact (slug, id, AND routeId)
       ResponseEntity<DataSetOutputDTO> patch =
-          performPatch(created.getId(), Map.of("description", "patched"));
+          performPatch(dataSetId, Map.of("description", "patched"));
       assertThat(patch.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(patch.getBody()).isNotNull();
       assertThat(patch.getBody().getDescription()).isEqualTo("patched");
@@ -538,9 +548,10 @@ class DataSetControllerIntegrationTest
           .containsExactly("traffic");
 
       // Re-fetch to verify the underlying entity row was not destroyed and recreated.
-      DataSet afterPatch = dataSetRepository.findById(created.getId()).orElseThrow();
+      // findById eagerly loads namedApis via @EntityGraph, so no transaction wrapper needed.
+      DataSet afterPatch = dataSetRepository.findById(dataSetId).orElseThrow();
       assertThat(afterPatch.getNamedApis())
-          .as("PATCH that omits namedApis must preserve the entity rows (same id, same routeId)")
+          .as("PATCH that omits namedApis must preserve entity rows (same id, same routeId)")
           .singleElement()
           .satisfies(
               api -> {
