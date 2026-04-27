@@ -7286,6 +7286,14 @@ components:
         openDataAccess:
           type: boolean
           description: "Whether this dataset is publicly accessible, defaults to false"
+        namedApis:
+          type: array
+          items:
+            $ref: "#/components/schemas/NamedApiDTO"
+          description: |
+            Replaces the dataset's named API list when provided (per concepts
+            #1379 and #1383). Omit the field to leave the existing list
+            unchanged.
     PatchPipelineInputDTO:
       description: Partial update — only provided fields are modified.
       properties:
