@@ -6455,6 +6455,56 @@ components:
           type: boolean
           description: Whether this data source is currently referenced by a pipeline
           readOnly: true
+    NamedApiDTO:
+      type: object
+      description: |
+        A named, URL-slug-addressable API endpoint exposed by a dataset. Each
+        named API declares an explicit API standard per ADR #1362. Authored at
+        dataset level (not per pipeline) per concept #1379 and #1383.
+      properties:
+        name:
+          type: string
+          description: |
+            Human-readable display label for this named API. Free-form text;
+            not used in the URL. Required.
+          example: Traffic Sensor Readings
+        slug:
+          type: string
+          pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+          maxLength: 32
+          description: |
+            URL slug used as the path segment in the public route:
+            `/v1/datasets/{datasetId}/{slug}`. Lowercase alphanumeric with
+            internal hyphens, max 32 characters, unique within the dataset.
+            Immutable once the dataset reaches AVAILABLE.
+          example: traffic
+        standard:
+          type: string
+          enum: [WFS, WMS, STA, CUSTOM]
+          description: |
+            API standard per ADR #1362. `CUSTOM` allows free-form,
+            non-standard APIs. Immutable once the dataset reaches AVAILABLE.
+          example: STA
+        version:
+          type: string
+          description: |
+            Optional standard version (e.g. `"1.1"` for STA). Free-form
+            string.
+          example: "1.1"
+        previewUrl:
+          type: string
+          format: uri
+          readOnly: true
+          description: |
+            Predicted public URL once the dataset reaches AVAILABLE:
+            `https://api.{domain}/v1/datasets/{datasetId}/{slug}`. Built
+            server-side from the configured data-plane domain (per concept
+            #1380 and ADR #1387). Absent before the dataset has been
+            persisted.
+      required:
+      - name
+      - slug
+      - standard
     DataSetInputDTO:
       type: object
       properties:
