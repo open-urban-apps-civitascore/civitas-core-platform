@@ -218,6 +218,10 @@ public class DataSet extends BaseDataEntity {
    * Resets all infrastructure-related fields (projectId, frostBaseUrl, serviceId, publicUrl,
    * pipelineIds) and clears the per-named-API {@code routeId} on each entry. The named-API entries
    * themselves are preserved (they are user-authored). Typically called during unrelease.
+   *
+   * <p><b>Transactional precondition:</b> {@link #namedApis} is lazily fetched. Call this method
+   * within an active Hibernate session (e.g. inside {@code @Transactional}); calling it on a
+   * detached entity throws {@code LazyInitializationException}.
    */
   public void clearInfrastructureFields() {
     this.projectId = null;

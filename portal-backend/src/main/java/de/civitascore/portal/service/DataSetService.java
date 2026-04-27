@@ -423,6 +423,32 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       dataSet.setFrostBaseUrl(result.baseUrl());
     }
     if (result.routeIds() != null && !result.routeIds().isEmpty()) {
+      java.util.Set<String> entitySlugs =
+          dataSet.getNamedApis().stream()
+              .map(de.civitascore.portal.model.entity.NamedApi::getSlug)
+              .collect(java.util.stream.Collectors.toSet());
+      java.util.Set<String> resultSlugs = result.routeIds().keySet();
+
+      java.util.Set<String> orphanSlugs = new java.util.HashSet<>(resultSlugs);
+      orphanSlugs.removeAll(entitySlugs);
+      if (!orphanSlugs.isEmpty()) {
+        log.warn(
+            "Saga result for dataset {} contains routeIds for slugs not present on the entity:"
+                + " {}. Routes may have leaked.",
+            Encode.forJava(dataSet.getId().toString()),
+            Encode.forJava(orphanSlugs.toString()));
+      }
+
+      java.util.Set<String> unprovisionedSlugs = new java.util.HashSet<>(entitySlugs);
+      unprovisionedSlugs.removeAll(resultSlugs);
+      if (!unprovisionedSlugs.isEmpty()) {
+        log.warn(
+            "Saga result for dataset {} did not return routeIds for slugs: {}. Those endpoints"
+                + " will be unrouted.",
+            Encode.forJava(dataSet.getId().toString()),
+            Encode.forJava(unprovisionedSlugs.toString()));
+      }
+
       dataSet
           .getNamedApis()
           .forEach(
