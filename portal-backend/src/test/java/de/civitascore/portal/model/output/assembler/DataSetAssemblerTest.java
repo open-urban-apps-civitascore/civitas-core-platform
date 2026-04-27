@@ -13,6 +13,7 @@
 package de.civitascore.portal.model.output.assembler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -21,8 +22,8 @@ import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.User;
-import de.civitascore.portal.model.input.NamedApiDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
+import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.summary.UserSummaryDTO;
 import de.civitascore.portal.repository.UserRepository;
 import java.util.List;
@@ -47,8 +48,8 @@ class DataSetAssemblerTest {
     return new DataSetAssembler(dataSetMapper, userRepository, userMapper, civitasProperties);
   }
 
-  private NamedApiDTO namedApiDto(String slug) {
-    NamedApiDTO dto = new NamedApiDTO();
+  private NamedApiOutputDTO namedApiDto(String slug) {
+    NamedApiOutputDTO dto = new NamedApiOutputDTO();
     dto.setName("API " + slug);
     dto.setSlug(slug);
     dto.setStandard("STA");
@@ -112,12 +113,12 @@ class DataSetAssemblerTest {
     DataSetOutputDTO enriched = assembler().enrichDto(dto, dataSet);
 
     assertThat(enriched.getNamedApis())
-        .extracting(NamedApiDTO::getSlug, NamedApiDTO::getPreviewUrl)
+        .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getPreviewUrl)
         .containsExactlyInAnyOrder(
-            org.assertj.core.api.Assertions.tuple(
+            tuple(
                 "traffic",
                 "https://api.example.com/v1/datasets/b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a/traffic"),
-            org.assertj.core.api.Assertions.tuple(
+            tuple(
                 "weather",
                 "https://api.example.com/v1/datasets/b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a/weather"));
   }
@@ -135,6 +136,35 @@ class DataSetAssemblerTest {
     assertThat(enriched.getNamedApis().get(0).getPreviewUrl())
         .as("previewUrl is absent until the dataset is persisted (no id, no URL)")
         .isNull();
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "[{index}] domain={0}")
+  @org.junit.jupiter.params.provider.CsvSource({
+    "api.example.com,                  https://api.example.com",
+    "api.example.com:8443,             https://api.example.com:8443",
+    "api.test.example.com,             https://api.test.example.com",
+    "localhost:8089,                   https://localhost:8089",
+  })
+  void buildsPreviewUrlAcrossSupportedDomainShapes(String domain, String expectedPrefix) {
+    // Locks the contract: civitas.api.domain MUST be a bare host (with optional port), no scheme,
+    // no trailing slash. The assembler concatenates "https://" in front, so any other shape would
+    // produce malformed URLs in production. If we add domain normalization later, update this
+    // test to reflect the new contract.
+    CivitasProperties props = new CivitasProperties("test-key", new CivitasProperties.Api(domain));
+    DataSetAssembler customAssembler =
+        new DataSetAssembler(dataSetMapper, userRepository, userMapper, props);
+
+    UUID dataSetId = UUID.randomUUID();
+    DataSet dataSet = new DataSet();
+    dataSet.setId(dataSetId);
+
+    DataSetOutputDTO dto = new DataSetOutputDTO();
+    dto.setNamedApis(List.of(namedApiDto("traffic")));
+
+    customAssembler.enrichDto(dto, dataSet);
+
+    assertThat(dto.getNamedApis().get(0).getPreviewUrl())
+        .isEqualTo(expectedPrefix + "/v1/datasets/" + dataSetId + "/traffic");
   }
 
   @Test

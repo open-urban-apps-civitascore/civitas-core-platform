@@ -1,8 +1,10 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import de.civitascore.portal.config.PortalTestDataFactory;
+import de.civitascore.portal.configuration.CivitasProperties;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
@@ -13,8 +15,9 @@ import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.DataSetInputDTO;
-import de.civitascore.portal.model.input.NamedApiDTO;
+import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
+import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
@@ -56,7 +59,7 @@ class DataSetControllerIntegrationTest
   @Autowired private UserRepository userRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private DataSetService dataSetService;
-  @Autowired private de.civitascore.portal.configuration.CivitasProperties civitasProperties;
+  @Autowired private CivitasProperties civitasProperties;
 
   @Override
   protected String getEndpointPath() {
@@ -312,12 +315,12 @@ class DataSetControllerIntegrationTest
       // Per concept #1379: named APIs are dataset-level; per #1315 AC: round-trip works through
       // POST /datasets and GET /datasets/{id}, with previewUrl built from civitas.api.domain.
       DataSetInputDTO input = createValidInput();
-      NamedApiDTO traffic = new NamedApiDTO();
+      NamedApiInputDTO traffic = new NamedApiInputDTO();
       traffic.setName("Traffic Sensor Readings");
       traffic.setSlug("traffic");
       traffic.setStandard("STA");
       traffic.setVersion("1.1");
-      NamedApiDTO weather = new NamedApiDTO();
+      NamedApiInputDTO weather = new NamedApiInputDTO();
       weather.setName("Weather Sensor Readings");
       weather.setSlug("weather");
       weather.setStandard("STA");
@@ -335,20 +338,162 @@ class DataSetControllerIntegrationTest
 
       // POST response: namedApis populated with previewUrl
       assertThat(created.getNamedApis())
-          .extracting(NamedApiDTO::getSlug, NamedApiDTO::getStandard, NamedApiDTO::getPreviewUrl)
+          .extracting(
+              NamedApiOutputDTO::getSlug,
+              NamedApiOutputDTO::getStandard,
+              NamedApiOutputDTO::getPreviewUrl)
           .containsExactlyInAnyOrder(
-              org.assertj.core.api.Assertions.tuple("traffic", "STA", trafficUrl),
-              org.assertj.core.api.Assertions.tuple("weather", "STA", weatherUrl));
+              tuple("traffic", "STA", trafficUrl), tuple("weather", "STA", weatherUrl));
 
       // GET round-trip returns the same shape
       ResponseEntity<DataSetOutputDTO> get = performGetById(created.getId());
       assertThat(get.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(get.getBody()).isNotNull();
       assertThat(get.getBody().getNamedApis())
-          .extracting(NamedApiDTO::getSlug, NamedApiDTO::getPreviewUrl)
-          .containsExactlyInAnyOrder(
-              org.assertj.core.api.Assertions.tuple("traffic", trafficUrl),
-              org.assertj.core.api.Assertions.tuple("weather", weatherUrl));
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getPreviewUrl)
+          .containsExactlyInAnyOrder(tuple("traffic", trafficUrl), tuple("weather", weatherUrl));
+
+      // GET-all (paginated) returns namedApis on each result (#1315 AC)
+      ResponseEntity<de.civitascore.portal.util.RestPage<DataSetOutputDTO>> page = performGetAll();
+      assertThat(page.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(page.getBody()).isNotNull();
+      DataSetOutputDTO fromPage =
+          page.getBody().getContent().stream()
+              .filter(d -> created.getId().equals(d.getId()))
+              .findFirst()
+              .orElseThrow();
+      assertThat(fromPage.getNamedApis())
+          .as("paginated GET must include namedApis with previewUrl")
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getPreviewUrl)
+          .containsExactlyInAnyOrder(tuple("traffic", trafficUrl), tuple("weather", weatherUrl));
+    }
+
+    @Test
+    @DisplayName("Should replace namedApis list on PATCH (array replace, not merge) (#1315)")
+    void shouldReplaceNamedApisOnPatch() {
+      // Setup: dataset with two namedApis
+      DataSetInputDTO input = createValidInput();
+      NamedApiInputDTO traffic = new NamedApiInputDTO();
+      traffic.setName("Traffic");
+      traffic.setSlug("traffic");
+      traffic.setStandard("STA");
+      NamedApiInputDTO weather = new NamedApiInputDTO();
+      weather.setName("Weather");
+      weather.setSlug("weather");
+      weather.setStandard("STA");
+      input.setNamedApis(List.of(traffic, weather));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+      UUID id = created.getId();
+
+      // PATCH with single-entry namedApis array — must REPLACE, not merge into existing entries
+      Map<String, Object> patchBody =
+          Map.of(
+              "namedApis",
+              List.of(Map.of("name", "Air Quality", "slug", "air", "standard", "STA")));
+
+      ResponseEntity<DataSetOutputDTO> patch = performPatch(id, patchBody);
+      assertThat(patch.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patch.getBody()).isNotNull();
+      assertThat(patch.getBody().getNamedApis())
+          .as("PATCH with namedApis array replaces the list — no traffic/weather, only air")
+          .extracting(NamedApiOutputDTO::getSlug)
+          .containsExactly("air");
+
+      // GET confirms persistence
+      assertThat(performGetById(id).getBody().getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug)
+          .containsExactly("air");
+    }
+
+    @Test
+    @DisplayName("Should clear namedApis on PATCH with empty array (#1315)")
+    void shouldClearNamedApisOnPatchWithEmptyArray() {
+      DataSetInputDTO input = createValidInput();
+      NamedApiInputDTO traffic = new NamedApiInputDTO();
+      traffic.setName("Traffic");
+      traffic.setSlug("traffic");
+      traffic.setStandard("STA");
+      input.setNamedApis(List.of(traffic));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+
+      ResponseEntity<DataSetOutputDTO> patch =
+          performPatch(created.getId(), Map.of("namedApis", List.of()));
+      assertThat(patch.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patch.getBody()).isNotNull();
+      assertThat(patch.getBody().getNamedApis()).isEmpty();
+      assertThat(performGetById(created.getId()).getBody().getNamedApis()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should reject namedApis entry with blank name (#1315)")
+    void shouldRejectBlankNamedApiName() {
+      DataSetInputDTO input = createValidInput();
+      NamedApiInputDTO bad = new NamedApiInputDTO();
+      bad.setName("   "); // whitespace, exercises @NotBlank (vs @NotNull)
+      bad.setSlug("traffic");
+      bad.setStandard("STA");
+      input.setNamedApis(List.of(bad));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode())
+          .as("blank name on a namedApis entry should be rejected via @Valid cascade")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject namedApis entry with blank slug (#1315)")
+    void shouldRejectBlankNamedApiSlug() {
+      DataSetInputDTO input = createValidInput();
+      NamedApiInputDTO bad = new NamedApiInputDTO();
+      bad.setName("Traffic");
+      bad.setSlug("");
+      bad.setStandard("STA");
+      input.setNamedApis(List.of(bad));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject namedApis entry with blank standard (#1315)")
+    void shouldRejectBlankNamedApiStandard() {
+      DataSetInputDTO input = createValidInput();
+      NamedApiInputDTO bad = new NamedApiInputDTO();
+      bad.setName("Traffic");
+      bad.setSlug("traffic");
+      bad.setStandard(null);
+      input.setNamedApis(List.of(bad));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should leave namedApis untouched when PATCH body omits the field (#1315)")
+    void shouldLeaveNamedApisUntouchedWhenPatchOmitsField() {
+      DataSetInputDTO input = createValidInput();
+      NamedApiInputDTO traffic = new NamedApiInputDTO();
+      traffic.setName("Traffic");
+      traffic.setSlug("traffic");
+      traffic.setStandard("STA");
+      input.setNamedApis(List.of(traffic));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+
+      // PATCH only the description — namedApis must stay intact
+      ResponseEntity<DataSetOutputDTO> patch =
+          performPatch(created.getId(), Map.of("description", "patched"));
+      assertThat(patch.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patch.getBody()).isNotNull();
+      assertThat(patch.getBody().getDescription()).isEqualTo("patched");
+      assertThat(patch.getBody().getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug)
+          .containsExactly("traffic");
     }
 
     @Test
