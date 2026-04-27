@@ -1,7 +1,9 @@
 package de.civitascore.portal.mapper;
 
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.NamedApiDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.summary.DataSetSummaryDTO;
 import org.mapstruct.BeanMapping;
@@ -32,7 +34,6 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Mapping(target = "pipelines", ignore = true)
   @Mapping(target = "projectId", ignore = true)
   @Mapping(target = "frostBaseUrl", ignore = true)
-  @Mapping(target = "namedApis", ignore = true)
   @Mapping(target = "serviceId", ignore = true)
   @Mapping(target = "publicUrl", ignore = true)
   @Mapping(target = "pipelineIds", ignore = true)
@@ -62,11 +63,32 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Mapping(target = "assignments", ignore = true)
   @Mapping(target = "projectId", ignore = true)
   @Mapping(target = "frostBaseUrl", ignore = true)
-  @Mapping(target = "namedApis", ignore = true)
   @Mapping(target = "serviceId", ignore = true)
   @Mapping(target = "publicUrl", ignore = true)
   @Mapping(target = "pipelineIds", ignore = true)
   @Mapping(target = "pendingSagaType", ignore = true)
   @Override
   void updateEntity(@MappingTarget DataSet entity, DataSetInputDTO input);
+
+  /**
+   * Maps a {@link NamedApiDTO} to a {@link NamedApi} entity. {@code routeId} stays null on input
+   * (saga populates it post-release), {@code dataSet} back-reference is set by {@link
+   * DataSet#setNamedApis(java.util.Collection)} when the collection is replaced, audit fields are
+   * managed by JPA Auditing.
+   */
+  @Mapping(target = "id", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "modifiedAt", ignore = true)
+  @Mapping(target = "createdBy", ignore = true)
+  @Mapping(target = "modifiedBy", ignore = true)
+  @Mapping(target = "dataSet", ignore = true)
+  @Mapping(target = "routeId", ignore = true)
+  NamedApi toNamedApiEntity(NamedApiDTO dto);
+
+  /**
+   * Maps a {@link NamedApi} entity to a {@link NamedApiDTO}. {@code previewUrl} is populated by
+   * {@code DataSetAssembler}, not the mapper, since it depends on configuration.
+   */
+  @Mapping(target = "previewUrl", ignore = true)
+  NamedApiDTO toNamedApiDto(NamedApi entity);
 }
