@@ -6581,6 +6581,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DistributionSummaryDTO"
+        namedApis:
+          type: array
+          items:
+            $ref: "#/components/schemas/NamedApiDTO"
+          description: |
+            Named API endpoints exposed by this dataset (per concepts #1379
+            and #1383). Each entry includes a server-populated `previewUrl`
+            built from the configured data-plane domain.
         openDataAccess:
           type: boolean
           description: Whether this dataset is publicly accessible
