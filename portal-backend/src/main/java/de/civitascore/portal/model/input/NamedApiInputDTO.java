@@ -26,15 +26,14 @@ public class NamedApiInputDTO {
       description =
           "URL slug used as the path segment in the public route"
               + " /v1/datasets/{datasetId}/{slug}. Lowercase alphanumeric with internal hyphens,"
-              + " max 32 characters, unique within a dataset, immutable while AVAILABLE."
-              + " Format/length validation lands in #1312.",
+              + " max 32 characters, unique within a dataset, immutable while AVAILABLE.",
       example = "traffic")
   private String slug;
 
   @NotBlank(message = "Standard is required") @Schema(
       description =
           "API standard per ADR #1362. CUSTOM allows free-form, non-standard APIs. Immutable"
-              + " once the dataset reaches AVAILABLE. Vocabulary validation lands in #1312.",
+              + " once the dataset reaches AVAILABLE.",
       allowableValues = {"WFS", "WMS", "STA", "CUSTOM"},
       example = "STA")
   private String standard;

@@ -2,6 +2,7 @@ package de.civitascore.portal.configuration;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -22,7 +23,15 @@ public record CivitasProperties(@NotBlank String masterKey, @Valid Api api) {
    *
    * @param domain the data-plane host (per concept #1380 + ADR #1387) used to build public preview
    *     URLs in the form {@code https://{domain}/v1/datasets/{datasetId}/{slug}}. Must point at the
-   *     data-plane host, not the management host.
+   *     data-plane host, not the management host. Must be a bare host (with optional port), no
+   *     scheme, no trailing slash — {@code DataSetAssembler} prepends {@code https://} and the URL
+   *     path. The pattern fails at startup on common misconfigurations (e.g. {@code
+   *     https://api.example.com/}).
    */
-  public record Api(@NotBlank String domain) {}
+  public record Api(
+      @NotBlank @Pattern(
+              regexp = "^[a-zA-Z0-9.-]+(:[0-9]+)?$",
+              message =
+                  "Domain must be a bare host with optional port (no scheme, no trailing slash)")
+          String domain) {}
 }

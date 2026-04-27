@@ -66,6 +66,16 @@ class DataSetControllerIntegrationTest
     return DATASETS_ENDPOINT;
   }
 
+  /** Helper to construct a {@link NamedApiInputDTO} with the four explicit fields. */
+  private NamedApiInputDTO namedApi(String name, String slug, String standard, String version) {
+    NamedApiInputDTO dto = new NamedApiInputDTO();
+    dto.setName(name);
+    dto.setSlug(slug);
+    dto.setStandard(standard);
+    dto.setVersion(version);
+    return dto;
+  }
+
   /** Helper method to create a sample styles map for Pipeline. */
   private Map<String, Object> createSampleStyles() {
     Map<String, Object> styles = new HashMap<>();
@@ -310,21 +320,15 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should round-trip namedApis with server-populated previewUrl (#1315)")
+    @DisplayName("Should round-trip namedApis with server-populated previewUrl")
     void shouldRoundTripNamedApisWithPreviewUrl() {
       // Per concept #1379: named APIs are dataset-level; per #1315 AC: round-trip works through
       // POST /datasets and GET /datasets/{id}, with previewUrl built from civitas.api.domain.
       DataSetInputDTO input = createValidInput();
-      NamedApiInputDTO traffic = new NamedApiInputDTO();
-      traffic.setName("Traffic Sensor Readings");
-      traffic.setSlug("traffic");
-      traffic.setStandard("STA");
-      traffic.setVersion("1.1");
-      NamedApiInputDTO weather = new NamedApiInputDTO();
-      weather.setName("Weather Sensor Readings");
-      weather.setSlug("weather");
-      weather.setStandard("STA");
-      input.setNamedApis(List.of(traffic, weather));
+      input.setNamedApis(
+          List.of(
+              namedApi("Traffic Sensor Readings", "traffic", "STA", "1.1"),
+              namedApi("Weather Sensor Readings", "weather", "STA", null)));
 
       ResponseEntity<DataSetOutputDTO> create = performCreate(input);
       assertThat(create.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -369,19 +373,14 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should replace namedApis list on PATCH (array replace, not merge) (#1315)")
+    @DisplayName("Should replace namedApis list on PATCH (array replace, not merge)")
     void shouldReplaceNamedApisOnPatch() {
       // Setup: dataset with two namedApis
       DataSetInputDTO input = createValidInput();
-      NamedApiInputDTO traffic = new NamedApiInputDTO();
-      traffic.setName("Traffic");
-      traffic.setSlug("traffic");
-      traffic.setStandard("STA");
-      NamedApiInputDTO weather = new NamedApiInputDTO();
-      weather.setName("Weather");
-      weather.setSlug("weather");
-      weather.setStandard("STA");
-      input.setNamedApis(List.of(traffic, weather));
+      input.setNamedApis(
+          List.of(
+              namedApi("Traffic", "traffic", "STA", null),
+              namedApi("Weather", "weather", "STA", null)));
 
       DataSetOutputDTO created = performCreate(input).getBody();
       assertThat(created).isNotNull();
@@ -408,14 +407,10 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should clear namedApis on PATCH with empty array (#1315)")
+    @DisplayName("Should clear namedApis on PATCH with empty array")
     void shouldClearNamedApisOnPatchWithEmptyArray() {
       DataSetInputDTO input = createValidInput();
-      NamedApiInputDTO traffic = new NamedApiInputDTO();
-      traffic.setName("Traffic");
-      traffic.setSlug("traffic");
-      traffic.setStandard("STA");
-      input.setNamedApis(List.of(traffic));
+      input.setNamedApis(List.of(namedApi("Traffic", "traffic", "STA", null)));
 
       DataSetOutputDTO created = performCreate(input).getBody();
       assertThat(created).isNotNull();
@@ -429,7 +424,7 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should reject namedApis entry with blank name (#1315)")
+    @DisplayName("Should reject namedApis entry with blank name")
     void shouldRejectBlankNamedApiName() {
       DataSetInputDTO input = createValidInput();
       NamedApiInputDTO bad = new NamedApiInputDTO();
@@ -445,7 +440,7 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should reject namedApis entry with blank slug (#1315)")
+    @DisplayName("Should reject namedApis entry with blank slug")
     void shouldRejectBlankNamedApiSlug() {
       DataSetInputDTO input = createValidInput();
       NamedApiInputDTO bad = new NamedApiInputDTO();
@@ -459,7 +454,7 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should reject namedApis entry with blank standard (#1315)")
+    @DisplayName("Should reject namedApis entry with blank standard")
     void shouldRejectBlankNamedApiStandard() {
       DataSetInputDTO input = createValidInput();
       NamedApiInputDTO bad = new NamedApiInputDTO();
@@ -473,19 +468,66 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should leave namedApis untouched when PATCH body omits the field (#1315)")
-    void shouldLeaveNamedApisUntouchedWhenPatchOmitsField() {
+    @DisplayName("Should reject when an invalid entry follows a valid entry (cascade visits all)")
+    void shouldRejectWhenSecondNamedApiEntryIsInvalid() {
       DataSetInputDTO input = createValidInput();
-      NamedApiInputDTO traffic = new NamedApiInputDTO();
-      traffic.setName("Traffic");
-      traffic.setSlug("traffic");
-      traffic.setStandard("STA");
-      input.setNamedApis(List.of(traffic));
+      NamedApiInputDTO good = new NamedApiInputDTO();
+      good.setName("Traffic");
+      good.setSlug("traffic");
+      good.setStandard("STA");
+      NamedApiInputDTO bad = new NamedApiInputDTO();
+      bad.setName("");
+      bad.setSlug("weather");
+      bad.setStandard("STA");
+      input.setNamedApis(List.of(good, bad));
+
+      // Pins that @Valid cascade visits every element, not just the first. A future regression
+      // (e.g. someone short-circuits validation on first valid entry) would not be caught by the
+      // single-entry tests above.
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should round-trip null version alongside a populated version")
+    void shouldRoundTripNullVersion() {
+      DataSetInputDTO input = createValidInput();
+      // version on weather is intentionally null — must round-trip as null, not empty string
+      input.setNamedApis(
+          List.of(
+              namedApi("Traffic", "traffic", "STA", "1.1"),
+              namedApi("Weather", "weather", "STA", null)));
 
       DataSetOutputDTO created = performCreate(input).getBody();
       assertThat(created).isNotNull();
+      assertThat(created.getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getVersion)
+          .containsExactlyInAnyOrder(tuple("traffic", "1.1"), tuple("weather", null));
 
-      // PATCH only the description — namedApis must stay intact
+      DataSetOutputDTO refetched = performGetById(created.getId()).getBody();
+      assertThat(refetched).isNotNull();
+      assertThat(refetched.getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getVersion)
+          .containsExactlyInAnyOrder(tuple("traffic", "1.1"), tuple("weather", null));
+    }
+
+    @Test
+    @DisplayName("Should preserve NamedApi rows (id + routeId) when PATCH body omits namedApis")
+    void shouldLeaveNamedApisUntouchedWhenPatchOmitsField() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(List.of(namedApi("Traffic", "traffic", "STA", null)));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+      DataSet beforePatch = dataSetRepository.findById(created.getId()).orElseThrow();
+      var trafficEntity = beforePatch.getNamedApis().iterator().next();
+      // Simulate the saga having populated routeId post-release (so we can verify the PATCH
+      // does not overwrite it). Saved directly via the repository to bypass the DTO surface.
+      trafficEntity.setRouteId("route-saga-1");
+      dataSetRepository.save(beforePatch);
+      UUID originalEntryId = trafficEntity.getId();
+
+      // PATCH only the description — namedApis must stay intact (slug, id, AND routeId)
       ResponseEntity<DataSetOutputDTO> patch =
           performPatch(created.getId(), Map.of("description", "patched"));
       assertThat(patch.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -494,6 +536,17 @@ class DataSetControllerIntegrationTest
       assertThat(patch.getBody().getNamedApis())
           .extracting(NamedApiOutputDTO::getSlug)
           .containsExactly("traffic");
+
+      // Re-fetch to verify the underlying entity row was not destroyed and recreated.
+      DataSet afterPatch = dataSetRepository.findById(created.getId()).orElseThrow();
+      assertThat(afterPatch.getNamedApis())
+          .as("PATCH that omits namedApis must preserve the entity rows (same id, same routeId)")
+          .singleElement()
+          .satisfies(
+              api -> {
+                assertThat(api.getId()).isEqualTo(originalEntryId);
+                assertThat(api.getRouteId()).isEqualTo("route-saga-1");
+              });
     }
 
     @Test
