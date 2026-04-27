@@ -37,24 +37,38 @@ class DataSetEntityTest {
   class ClearInfrastructureFieldsTests {
 
     @Test
-    @DisplayName("Should clear all infrastructure fields")
+    @DisplayName("Should clear all infrastructure fields and per-API route IDs")
     void shouldClearAllInfrastructureFields() {
       DataSet dataSet = dataSetWithId(UUID.randomUUID());
       dataSet.setProjectId("project-1");
       dataSet.setFrostBaseUrl("http://frost.example.com");
-      dataSet.setRouteId("route-1");
       dataSet.setServiceId("service-1");
       dataSet.setPublicUrl("http://public.example.com");
       dataSet.setPipelineIds(List.of("pipeline-1", "pipeline-2"));
+
+      NamedApi traffic = new NamedApi();
+      traffic.setName("Traffic Sensor Readings");
+      traffic.setSlug("traffic");
+      traffic.setStandard("STA");
+      traffic.setRouteId("route-1");
+      NamedApi weather = new NamedApi();
+      weather.setName("Weather Sensor Readings");
+      weather.setSlug("weather");
+      weather.setStandard("STA");
+      weather.setRouteId("route-2");
+      dataSet.setNamedApis(Set.of(traffic, weather));
 
       dataSet.clearInfrastructureFields();
 
       assertThat(dataSet.getProjectId()).isNull();
       assertThat(dataSet.getFrostBaseUrl()).isNull();
-      assertThat(dataSet.getRouteId()).isNull();
       assertThat(dataSet.getServiceId()).isNull();
       assertThat(dataSet.getPublicUrl()).isNull();
       assertThat(dataSet.getPipelineIds()).isNull();
+      assertThat(dataSet.getNamedApis())
+          .as("named-API entries are preserved on unrelease")
+          .hasSize(2);
+      assertThat(dataSet.getNamedApis()).allSatisfy(api -> assertThat(api.getRouteId()).isNull());
     }
 
     @Test
@@ -66,10 +80,10 @@ class DataSetEntityTest {
 
       assertThat(dataSet.getProjectId()).isNull();
       assertThat(dataSet.getFrostBaseUrl()).isNull();
-      assertThat(dataSet.getRouteId()).isNull();
       assertThat(dataSet.getServiceId()).isNull();
       assertThat(dataSet.getPublicUrl()).isNull();
       assertThat(dataSet.getPipelineIds()).isNull();
+      assertThat(dataSet.getNamedApis()).isEmpty();
     }
   }
 
