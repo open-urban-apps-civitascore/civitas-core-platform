@@ -20,9 +20,9 @@ public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> 
    * when loading datasets with their relationships.
    *
    * @param id the dataset ID
-   * @return the dataset with eagerly fetched owner, pipelines, and distributions
+   * @return the dataset with eagerly fetched owner, pipelines, distributions, and namedApis
    */
-  @EntityGraph(attributePaths = {"owner", "pipelines", "distributions"})
+  @EntityGraph(attributePaths = {"owner", "pipelines", "distributions", "namedApis"})
   @Override
   @NonNull Optional<DataSet> findById(@NonNull UUID id);
 
@@ -45,7 +45,14 @@ public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> 
    * @return the dataset with eagerly fetched owner, pipelines, pipeline data sources, and
    *     distributions
    */
-  @EntityGraph(attributePaths = {"owner", "pipelines", "pipelines.dataSources", "distributions"})
+  @EntityGraph(
+      attributePaths = {
+        "owner",
+        "pipelines",
+        "pipelines.dataSources",
+        "distributions",
+        "namedApis"
+      })
   @Query("SELECT d FROM DataSet d WHERE d.id = :id")
   Optional<DataSet> findByIdWithPipelineDataSources(@Param("id") UUID id);
 }
