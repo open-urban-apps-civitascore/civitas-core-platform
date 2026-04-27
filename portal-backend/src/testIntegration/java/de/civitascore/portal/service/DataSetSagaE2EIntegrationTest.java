@@ -142,9 +142,9 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
         .as("frostBaseUrl should contain the projectId")
         .isNotNull()
         .contains("Projects(" + completed.getProjectId() + ")");
-    assertThat(completed.getRouteId())
-        .as("routeId from APISIX step (deterministic = datasetId)")
-        .isEqualTo(dataSetId.toString());
+    assertThat(completed.getNamedApis())
+        .as("named API entries should carry per-slug routeIds from APISIX step")
+        .anyMatch(api -> api.getRouteId() != null);
     assertThat(completed.getServiceId())
         .as("serviceId from APISIX step (deterministic = datasetId)")
         .isEqualTo(dataSetId.toString());
@@ -173,9 +173,9 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
     verifier.verifyFrostHasThings("SQL Sensor");
 
     log.info(
-        "SQL E2E saga completed: projectId={}, routeId={}, pipelineIds={}",
+        "SQL E2E saga completed: projectId={}, namedApis={}, pipelineIds={}",
         completed.getProjectId(),
-        completed.getRouteId(),
+        completed.getNamedApis(),
         completed.getPipelineIds());
   }
 
@@ -205,7 +205,7 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
     assertThat(completed.getFrostBaseUrl())
         .isNotNull()
         .contains("Projects(" + completed.getProjectId() + ")");
-    assertThat(completed.getRouteId()).isEqualTo(dataSetId.toString());
+    assertThat(completed.getNamedApis()).anyMatch(api -> api.getRouteId() != null);
     assertThat(completed.getServiceId()).isEqualTo(dataSetId.toString());
     assertThat(completed.getPublicUrl()).isNotNull().contains("/datasets/" + dataSetId);
     assertThat(completed.getPipelineIds()).isNotNull().containsExactly(pipelineId.toString());
@@ -227,9 +227,9 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
     verifier.verifyFrostHasThings("MQTT Sensor");
 
     log.info(
-        "MQTT E2E saga completed: projectId={}, routeId={}, pipelineIds={}",
+        "MQTT E2E saga completed: projectId={}, namedApis={}, pipelineIds={}",
         completed.getProjectId(),
-        completed.getRouteId(),
+        completed.getNamedApis(),
         completed.getPipelineIds());
   }
 

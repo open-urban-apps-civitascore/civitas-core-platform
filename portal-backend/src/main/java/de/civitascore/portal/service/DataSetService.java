@@ -422,8 +422,16 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     if (result.baseUrl() != null) {
       dataSet.setFrostBaseUrl(result.baseUrl());
     }
-    if (result.routeId() != null) {
-      dataSet.setRouteId(result.routeId());
+    if (result.routeIds() != null && !result.routeIds().isEmpty()) {
+      dataSet
+          .getNamedApis()
+          .forEach(
+              api -> {
+                String routeId = result.routeIds().get(api.getSlug());
+                if (routeId != null) {
+                  api.setRouteId(routeId);
+                }
+              });
     }
     if (result.serviceId() != null) {
       dataSet.setServiceId(result.serviceId());

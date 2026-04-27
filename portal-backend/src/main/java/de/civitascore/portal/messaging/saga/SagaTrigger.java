@@ -3,8 +3,10 @@ package de.civitascore.portal.messaging.saga;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.Datasource;
+import de.civitascore.configadapter.model.dataset.NamedApi;
 import de.civitascore.configadapter.model.saga.SagaType;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Typed saga trigger payloads sent to the orchestrator topic. Each record carries {@code sagaType}
@@ -40,7 +42,8 @@ public sealed interface SagaTrigger
       String description,
       boolean openDataAccess,
       List<Datasource> datasources,
-      List<DataPipeline> dataPipelines)
+      List<DataPipeline> dataPipelines,
+      List<NamedApi> namedApis)
       implements SagaTrigger {
 
     /**
@@ -52,6 +55,7 @@ public sealed interface SagaTrigger
      * @param openDataAccess whether the dataset has open data access
      * @param datasources the data sources referenced by pipelines
      * @param dataPipelines the pipelines to provision
+     * @param namedApis the named API endpoints to expose (one APISIX route per entry)
      * @return a new create trigger
      */
     public static DatasetCreate of(
@@ -60,7 +64,8 @@ public sealed interface SagaTrigger
         String description,
         boolean openDataAccess,
         List<Datasource> datasources,
-        List<DataPipeline> dataPipelines) {
+        List<DataPipeline> dataPipelines,
+        List<NamedApi> namedApis) {
       return new DatasetCreate(
           SagaType.DATASET_CREATE,
           datasetId,
@@ -68,7 +73,8 @@ public sealed interface SagaTrigger
           description,
           openDataAccess,
           datasources,
-          dataPipelines);
+          dataPipelines,
+          namedApis);
     }
   }
 
@@ -85,11 +91,12 @@ public sealed interface SagaTrigger
       String description,
       boolean openDataAccess,
       String projectId,
-      String routeId,
+      Map<String, String> routeIds,
       String serviceId,
       List<String> pipelineIds,
       List<Datasource> datasources,
-      List<DataPipeline> dataPipelines)
+      List<DataPipeline> dataPipelines,
+      List<NamedApi> namedApis)
       implements SagaTrigger {
 
     /**
@@ -100,11 +107,12 @@ public sealed interface SagaTrigger
      * @param description the dataset description
      * @param openDataAccess whether the dataset has open data access
      * @param projectId the existing FROST project ID
-     * @param routeId the existing APISIX route ID
-     * @param serviceId the existing APISIX service ID
+     * @param routeIds existing APISIX route IDs keyed by named-API slug
+     * @param serviceId the existing APISIX service ID (shared upstream)
      * @param pipelineIds the existing Redpanda pipeline IDs
      * @param datasources the data sources referenced by pipelines
      * @param dataPipelines the pipeline diff (ADD, UPDATE, DELETE actions)
+     * @param namedApis the named API endpoints in the desired state
      * @return a new update trigger
      */
     public static DatasetUpdate of(
@@ -113,11 +121,12 @@ public sealed interface SagaTrigger
         String description,
         boolean openDataAccess,
         String projectId,
-        String routeId,
+        Map<String, String> routeIds,
         String serviceId,
         List<String> pipelineIds,
         List<Datasource> datasources,
-        List<DataPipeline> dataPipelines) {
+        List<DataPipeline> dataPipelines,
+        List<NamedApi> namedApis) {
       return new DatasetUpdate(
           SagaType.DATASET_UPDATE,
           datasetId,
@@ -125,16 +134,17 @@ public sealed interface SagaTrigger
           description,
           openDataAccess,
           projectId,
-          routeId,
+          routeIds,
           serviceId,
           pipelineIds,
           datasources,
-          dataPipelines);
+          dataPipelines,
+          namedApis);
     }
   }
 
   /**
-   * Trigger for {@link SagaType#DATASET_DELETE}: tears down Redpanda pipeline → APISIX route →
+   * Trigger for {@link SagaType#DATASET_DELETE}: tears down Redpanda pipeline → APISIX routes →
    * FROST project (reverse order, best-effort). Only infrastructure IDs are needed — no dataset
    * content.
    */
@@ -144,9 +154,10 @@ public sealed interface SagaTrigger
       String datasetId,
       String projectId,
       String frostBaseUrl,
-      String routeId,
+      Map<String, String> routeIds,
       String serviceId,
-      List<String> pipelineIds)
+      List<String> pipelineIds,
+      List<NamedApi> namedApis)
       implements SagaTrigger {
 
     /**
@@ -155,26 +166,29 @@ public sealed interface SagaTrigger
      * @param datasetId the dataset UUID
      * @param projectId the FROST project ID to tear down
      * @param frostBaseUrl the FROST base URL
-     * @param routeId the APISIX route ID to remove
+     * @param routeIds APISIX route IDs to remove, keyed by named-API slug
      * @param serviceId the APISIX service ID to remove
      * @param pipelineIds the Redpanda pipeline IDs to remove
+     * @param namedApis the named API endpoints whose routes are being torn down
      * @return a new delete trigger
      */
     public static DatasetDelete of(
         String datasetId,
         String projectId,
         String frostBaseUrl,
-        String routeId,
+        Map<String, String> routeIds,
         String serviceId,
-        List<String> pipelineIds) {
+        List<String> pipelineIds,
+        List<NamedApi> namedApis) {
       return new DatasetDelete(
           SagaType.DATASET_DELETE,
           datasetId,
           projectId,
           frostBaseUrl,
-          routeId,
+          routeIds,
           serviceId,
-          pipelineIds);
+          pipelineIds,
+          namedApis);
     }
   }
 }

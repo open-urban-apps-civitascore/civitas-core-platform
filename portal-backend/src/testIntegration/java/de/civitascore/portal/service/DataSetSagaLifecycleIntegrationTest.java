@@ -123,7 +123,9 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
     DataSet created = verifier.awaitSagaCompletion(dataSetId);
     String firstProjectId = created.getProjectId();
     assertThat(firstProjectId).as("First CREATE: projectId").isNotNull();
-    assertThat(created.getRouteId()).as("First CREATE: routeId").isNotNull();
+    assertThat(created.getNamedApis())
+        .as("First CREATE: named APIs should carry routeIds")
+        .anyMatch(api -> api.getRouteId() != null);
     assertThat(created.getPipelineIds()).as("First CREATE: pipelineIds").isNotNull();
 
     // Phase 2: AVAILABLE → unrelease → DELETE saga → READY
@@ -137,7 +139,9 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
         .isEqualTo(DataSetStatus.READY);
     assertThat(deleted.getProjectId()).as("After DELETE: projectId cleared").isNull();
     assertThat(deleted.getFrostBaseUrl()).as("After DELETE: frostBaseUrl cleared").isNull();
-    assertThat(deleted.getRouteId()).as("After DELETE: routeId cleared").isNull();
+    assertThat(deleted.getNamedApis())
+        .as("After DELETE: per-API routeIds cleared")
+        .allMatch(api -> api.getRouteId() == null);
     assertThat(deleted.getServiceId()).as("After DELETE: serviceId cleared").isNull();
     assertThat(deleted.getPublicUrl()).as("After DELETE: publicUrl cleared").isNull();
     assertThat(deleted.getPipelineIds()).as("After DELETE: pipelineIds cleared").isNull();
@@ -154,7 +158,9 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
         .as("Re-create: new projectId should differ from first")
         .isNotNull()
         .isNotEqualTo(firstProjectId);
-    assertThat(reCreated.getRouteId()).as("Re-create: routeId").isNotNull();
+    assertThat(reCreated.getNamedApis())
+        .as("Re-create: routeIds populated again")
+        .anyMatch(api -> api.getRouteId() != null);
     assertThat(reCreated.getPipelineIds()).as("Re-create: pipelineIds").isNotNull();
     assertThat(reCreated.getDataSetStatus())
         .as("Re-create: status AVAILABLE")
@@ -196,7 +202,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
     assertThat(deleted.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
     assertThat(deleted.getProjectId()).isNull();
     assertThat(deleted.getFrostBaseUrl()).isNull();
-    assertThat(deleted.getRouteId()).isNull();
+    assertThat(deleted.getNamedApis()).allMatch(api -> api.getRouteId() == null);
     assertThat(deleted.getServiceId()).isNull();
     assertThat(deleted.getPublicUrl()).isNull();
     assertThat(deleted.getPipelineIds()).isNull();
@@ -437,7 +443,9 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
     DataSet completed = verifier.awaitSagaCompletion(dataSetId);
 
     assertThat(completed.getProjectId()).as("FROST project should be created").isNotNull();
-    assertThat(completed.getRouteId()).as("APISIX route should be created").isNotNull();
+    assertThat(completed.getNamedApis())
+        .as("APISIX route(s) should be created on the named APIs")
+        .anyMatch(api -> api.getRouteId() != null);
     assertThat(completed.getPublicUrl()).as("Public URL should be set").isNotNull();
     assertThat(completed.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
 
@@ -478,10 +486,14 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       dataSetService.release(dataSetId);
       DataSet created = verifier.awaitSagaCompletion(dataSetId);
       String originalProjectId = created.getProjectId();
-      String originalRouteId = created.getRouteId();
+      Map<String, String> originalRouteIds =
+          created.getNamedApis().stream()
+              .filter(api -> api.getRouteId() != null)
+              .collect(
+                  java.util.stream.Collectors.toMap(api -> api.getSlug(), api -> api.getRouteId()));
 
       assertThat(originalProjectId).isNotNull();
-      assertThat(originalRouteId).isNotNull();
+      assertThat(originalRouteIds).as("CREATE should populate per-slug routeIds").isNotEmpty();
 
       // Update metadata on AVAILABLE dataset → triggers UPDATE saga
       DataSetInputDTO updateInput = new DataSetInputDTO();
@@ -501,9 +513,14 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       assertThat(completed.getProjectId())
           .as("projectId should be preserved after UPDATE")
           .isEqualTo(originalProjectId);
-      assertThat(completed.getRouteId())
-          .as("routeId should be preserved after UPDATE")
-          .isEqualTo(originalRouteId);
+      Map<String, String> completedRouteIds =
+          completed.getNamedApis().stream()
+              .filter(api -> api.getRouteId() != null)
+              .collect(
+                  java.util.stream.Collectors.toMap(api -> api.getSlug(), api -> api.getRouteId()));
+      assertThat(completedRouteIds)
+          .as("per-slug routeIds should be preserved after UPDATE")
+          .isEqualTo(originalRouteIds);
       assertThat(completed.getPendingSagaType()).as("pendingSagaType should be cleared").isNull();
       assertThat(completed.getPipelineIds())
           .as("pipelineIds should still contain the pipeline")
@@ -663,7 +680,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
                       "datasetId", dataSetId.toString(),
                       "projectId", projectId,
                       "baseUrl", "http://frost:8080/FROST-Server/v1.1/Projects(" + projectId + ")",
-                      "routeId", dataSetId.toString(),
+                      "routeIds", Map.of("traffic", dataSetId.toString()),
                       "serviceId", dataSetId.toString(),
                       "publicUrl", "http://gateway/datasets/" + dataSetId,
                       "pipelineIds", List.of("pipe-1"))));
@@ -682,7 +699,8 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       DataSet persisted = dataSetRepository.findById(dataSetId).orElseThrow();
       assertThat(persisted.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
       assertThat(persisted.getFrostBaseUrl()).contains(projectId);
-      assertThat(persisted.getRouteId()).isEqualTo(dataSetId.toString());
+      assertThat(persisted.getNamedApis())
+          .anyMatch(api -> dataSetId.toString().equals(api.getRouteId()));
       assertThat(persisted.getServiceId()).isEqualTo(dataSetId.toString());
       assertThat(persisted.getPublicUrl()).contains("/datasets/" + dataSetId);
       assertThat(persisted.getPipelineIds()).containsExactly("pipe-1");
@@ -752,7 +770,13 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       // Simulate an AVAILABLE dataset with infra, pending DELETE
       dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
       dataSet.setProjectId("proj-existing");
-      dataSet.setRouteId("route-existing");
+      de.civitascore.portal.model.entity.NamedApi api =
+          new de.civitascore.portal.model.entity.NamedApi();
+      api.setName("Existing API");
+      api.setSlug("existing");
+      api.setStandard("STA");
+      api.setRouteId("route-existing");
+      dataSet.setNamedApis(java.util.Set.of(api));
       dataSet.setPendingSagaType(PendingSagaType.DELETE);
       dataSetRepository.save(dataSet);
 

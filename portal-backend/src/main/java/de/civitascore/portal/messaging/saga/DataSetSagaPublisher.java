@@ -2,6 +2,7 @@ package de.civitascore.portal.messaging.saga;
 
 import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.Datasource;
+import de.civitascore.configadapter.model.dataset.NamedApi;
 import de.civitascore.portal.model.embedded.PipelineAction;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -62,7 +63,8 @@ public class DataSetSagaPublisher {
             dataset.getDescription(),
             dataset.getOpenDataAccess(),
             buildDatasources(dataset),
-            buildPipelines(dataset.getPipelines(), PipelineAction.ADD));
+            buildPipelines(dataset.getPipelines(), PipelineAction.ADD),
+            buildNamedApis(dataset));
     sendTrigger(trigger);
   }
 
@@ -81,11 +83,12 @@ public class DataSetSagaPublisher {
             dataset.getDescription(),
             dataset.getOpenDataAccess(),
             dataset.getProjectId(),
-            dataset.getRouteId(),
+            buildRouteIds(dataset),
             dataset.getServiceId(),
             dataset.getPipelineIds(),
             buildDatasources(dataset),
-            buildPipelineDiff(previousPipelines, dataset.getPipelines()));
+            buildPipelineDiff(previousPipelines, dataset.getPipelines()),
+            buildNamedApis(dataset));
     sendTrigger(trigger);
   }
 
@@ -101,9 +104,10 @@ public class DataSetSagaPublisher {
             dataset.getId().toString(),
             dataset.getProjectId(),
             dataset.getFrostBaseUrl(),
-            dataset.getRouteId(),
+            buildRouteIds(dataset),
             dataset.getServiceId(),
-            dataset.getPipelineIds());
+            dataset.getPipelineIds(),
+            buildNamedApis(dataset));
     sendTrigger(trigger);
   }
 
@@ -159,6 +163,37 @@ public class DataSetSagaPublisher {
     }
 
     return result;
+  }
+
+  /**
+   * Maps the dataset's named APIs from the portal-model entity collection to the config-adapter-api
+   * record list consumed by the orchestrator. Returns {@code null} (omitted from the JSON via
+   * {@code @JsonInclude(NON_NULL)}) when the dataset has no named APIs.
+   */
+  private List<NamedApi> buildNamedApis(DataSet dataset) {
+    if (dataset.getNamedApis() == null || dataset.getNamedApis().isEmpty()) {
+      return null;
+    }
+    return dataset.getNamedApis().stream()
+        .map(api -> new NamedApi(api.getName(), api.getSlug(), api.getStandard(), api.getVersion()))
+        .toList();
+  }
+
+  /**
+   * Projects the dataset's named-API entries into the slug-keyed {@code routeIds} map expected by
+   * the saga payload. Skips entries whose {@code routeId} is null (not yet provisioned). Returns
+   * {@code null} if no entry has a populated {@code routeId}, so the field is omitted from the JSON
+   * via {@code @JsonInclude(NON_NULL)}.
+   */
+  private Map<String, String> buildRouteIds(DataSet dataset) {
+    if (dataset.getNamedApis() == null || dataset.getNamedApis().isEmpty()) {
+      return null;
+    }
+    Map<String, String> routeIds =
+        dataset.getNamedApis().stream()
+            .filter(api -> api.getRouteId() != null)
+            .collect(Collectors.toMap(api -> api.getSlug(), api -> api.getRouteId()));
+    return routeIds.isEmpty() ? null : routeIds;
   }
 
   private DataPipeline toPipelineEntry(Pipeline pipeline, PipelineAction action) {

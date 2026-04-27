@@ -14,6 +14,7 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.Distribution;
+import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
@@ -22,7 +23,9 @@ import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -53,6 +56,11 @@ class DataSetServiceTest {
     ds.setDataSetStatus(DataSetStatus.READY);
     ds.setPipelines(new java.util.HashSet<>());
     ds.setDistributions(new HashSet<>());
+    NamedApi api = new NamedApi();
+    api.setName("Traffic Sensor Readings");
+    api.setSlug("traffic");
+    api.setStandard("STA");
+    ds.setNamedApis(new HashSet<>(Set.of(api)));
     return ds;
   }
 
@@ -60,7 +68,7 @@ class DataSetServiceTest {
     DataSet ds = readyDataSet(id);
     ds.setDataSetStatus(DataSetStatus.AVAILABLE);
     ds.setProjectId("proj-1");
-    ds.setRouteId("route-1");
+    ds.getNamedApis().forEach(api -> api.setRouteId("route-1"));
     ds.setServiceId("svc-1");
     ds.setPublicUrl("https://example.com");
     ds.setPipelineIds(List.of("pipe-1"));
@@ -323,7 +331,7 @@ class DataSetServiceTest {
               id.toString(),
               "proj-1",
               "https://frost.example.com",
-              "route-1",
+              Map.of("traffic", "route-1"),
               "svc-1",
               "https://public.example.com",
               List.of("pipe-1"),
@@ -338,7 +346,9 @@ class DataSetServiceTest {
       DataSet persisted = saved.getValue();
       assertThat(persisted.getProjectId()).isEqualTo("proj-1");
       assertThat(persisted.getFrostBaseUrl()).isEqualTo("https://frost.example.com");
-      assertThat(persisted.getRouteId()).isEqualTo("route-1");
+      assertThat(persisted.getNamedApis())
+          .extracting(NamedApi::getSlug, NamedApi::getRouteId)
+          .containsExactly(org.assertj.core.api.Assertions.tuple("traffic", "route-1"));
       assertThat(persisted.getServiceId()).isEqualTo("svc-1");
       assertThat(persisted.getPublicUrl()).isEqualTo("https://public.example.com");
       assertThat(persisted.getPipelineIds()).containsExactly("pipe-1");
@@ -402,7 +412,7 @@ class DataSetServiceTest {
               id.toString(),
               "proj-1",
               "https://frost.example.com",
-              "route-1",
+              Map.of("traffic", "route-1"),
               "svc-1",
               "https://public.example.com/datasets/" + id,
               List.of("pipe-1"),
@@ -455,7 +465,7 @@ class DataSetServiceTest {
               id.toString(),
               "proj-1",
               "https://frost.example.com",
-              "route-1",
+              Map.of("traffic", "route-1"),
               "svc-1",
               "https://public.example.com/datasets/" + id,
               List.of("pipe-1"),
@@ -542,7 +552,7 @@ class DataSetServiceTest {
               id.toString(),
               "proj-1",
               "https://frost.example.com",
-              "route-1",
+              Map.of("traffic", "route-1"),
               "svc-1",
               "https://public.example.com/datasets/" + id,
               List.of(),
@@ -580,7 +590,7 @@ class DataSetServiceTest {
               id.toString(),
               "proj-1",
               "https://frost.example.com",
-              "route-1",
+              Map.of("traffic", "route-1"),
               "svc-1",
               "https://public.example.com/datasets/" + id,
               List.of(),

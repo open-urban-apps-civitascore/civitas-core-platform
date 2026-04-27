@@ -6,8 +6,10 @@ import static org.mockito.Mockito.when;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -119,7 +121,7 @@ class DataSetSagaPublisherTest {
       dataSet.setName("test");
       dataSet.setOpenDataAccess(false);
       dataSet.setProjectId("proj-1");
-      dataSet.setRouteId("route-1");
+      // routeId is now per-named-API on the child entity; no setter on the dataset itself
       dataSet.setServiceId("svc-1");
       dataSet.setPipelineIds(List.of("pipe-1"));
       dataSet.setPipelines(Set.of(existingPipeline, newPipeline));

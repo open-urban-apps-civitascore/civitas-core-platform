@@ -2,6 +2,7 @@ package de.civitascore.portal.messaging.saga;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Typed representation of a saga result Kafka message payload. Used for both {@code SAGA_COMPLETED}
@@ -9,7 +10,8 @@ import java.util.List;
  * details from the top-level message).
  *
  * <p>Field names match the JSON keys produced by the config-adapter orchestrator. Unknown fields
- * are ignored for forward compatibility.
+ * are ignored for forward compatibility. {@code routeIds} is keyed by named-API slug per ADR #1362
+ * so the backend can persist per-route infrastructure state for multi-route datasets.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record SagaResultPayload(
@@ -17,7 +19,7 @@ public record SagaResultPayload(
     // SAGA_COMPLETED infrastructure fields
     String projectId,
     String baseUrl,
-    String routeId,
+    Map<String, String> routeIds,
     String serviceId,
     String publicUrl,
     List<String> pipelineIds,
