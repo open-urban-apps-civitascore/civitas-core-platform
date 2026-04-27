@@ -13,6 +13,7 @@ import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.NamedApiDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
 import de.civitascore.portal.repository.DataSetRepository;
@@ -55,6 +56,7 @@ class DataSetControllerIntegrationTest
   @Autowired private UserRepository userRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private DataSetService dataSetService;
+  @Autowired private de.civitascore.portal.configuration.CivitasProperties civitasProperties;
 
   @Override
   protected String getEndpointPath() {
@@ -302,6 +304,51 @@ class DataSetControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Should round-trip namedApis with server-populated previewUrl (#1315)")
+    void shouldRoundTripNamedApisWithPreviewUrl() {
+      // Per concept #1379: named APIs are dataset-level; per #1315 AC: round-trip works through
+      // POST /datasets and GET /datasets/{id}, with previewUrl built from civitas.api.domain.
+      DataSetInputDTO input = createValidInput();
+      NamedApiDTO traffic = new NamedApiDTO();
+      traffic.setName("Traffic Sensor Readings");
+      traffic.setSlug("traffic");
+      traffic.setStandard("STA");
+      traffic.setVersion("1.1");
+      NamedApiDTO weather = new NamedApiDTO();
+      weather.setName("Weather Sensor Readings");
+      weather.setSlug("weather");
+      weather.setStandard("STA");
+      input.setNamedApis(List.of(traffic, weather));
+
+      ResponseEntity<DataSetOutputDTO> create = performCreate(input);
+      assertThat(create.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      DataSetOutputDTO created = create.getBody();
+      assertThat(created).isNotNull();
+      assertThat(created.getId()).isNotNull();
+
+      String domain = civitasProperties.api().domain();
+      String trafficUrl = "https://" + domain + "/v1/datasets/" + created.getId() + "/traffic";
+      String weatherUrl = "https://" + domain + "/v1/datasets/" + created.getId() + "/weather";
+
+      // POST response: namedApis populated with previewUrl
+      assertThat(created.getNamedApis())
+          .extracting(NamedApiDTO::getSlug, NamedApiDTO::getStandard, NamedApiDTO::getPreviewUrl)
+          .containsExactlyInAnyOrder(
+              org.assertj.core.api.Assertions.tuple("traffic", "STA", trafficUrl),
+              org.assertj.core.api.Assertions.tuple("weather", "STA", weatherUrl));
+
+      // GET round-trip returns the same shape
+      ResponseEntity<DataSetOutputDTO> get = performGetById(created.getId());
+      assertThat(get.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(get.getBody()).isNotNull();
+      assertThat(get.getBody().getNamedApis())
+          .extracting(NamedApiDTO::getSlug, NamedApiDTO::getPreviewUrl)
+          .containsExactlyInAnyOrder(
+              org.assertj.core.api.Assertions.tuple("traffic", trafficUrl),
+              org.assertj.core.api.Assertions.tuple("weather", weatherUrl));
     }
 
     @Test
