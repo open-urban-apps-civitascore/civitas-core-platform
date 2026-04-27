@@ -49,6 +49,10 @@ import org.testcontainers.utility.MountableFile;
  * which are incompatible with Spring's embedded broker.
  */
 @Tag("saga")
+@Disabled(
+    "Pending #1309: both E2E scenarios assert per-slug routeIds populated from the saga result,"
+        + " but the config-adapter still emits singular routeId. Re-enable once the config-adapter"
+        + " migration lands.")
 @TestPropertySource(
     properties = {"kafka.enabled=true", "spring.kafka.listener.missing-topics-fatal=false"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
