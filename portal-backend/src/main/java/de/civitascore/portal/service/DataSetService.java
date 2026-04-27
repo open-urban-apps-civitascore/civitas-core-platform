@@ -453,10 +453,21 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           .getNamedApis()
           .forEach(
               api -> {
-                String routeId = result.routeIds().get(api.getSlug());
-                if (routeId != null) {
-                  api.setRouteId(routeId);
+                String incomingRouteId = result.routeIds().get(api.getSlug());
+                if (incomingRouteId == null) {
+                  return;
                 }
+                String currentRouteId = api.getRouteId();
+                if (currentRouteId != null && !currentRouteId.equals(incomingRouteId)) {
+                  log.warn(
+                      "Saga result for dataset {} replaces routeId on slug {}: {} -> {}. The"
+                          + " previous APISIX route may be leaked.",
+                      Encode.forJava(dataSet.getId().toString()),
+                      Encode.forJava(api.getSlug()),
+                      Encode.forJava(currentRouteId),
+                      Encode.forJava(incomingRouteId));
+                }
+                api.setRouteId(incomingRouteId);
               });
     }
     if (result.serviceId() != null) {

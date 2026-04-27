@@ -207,6 +207,13 @@ public class DataSet extends BaseDataEntity {
    * @param newNamedApis the new named APIs, or {@code null} to clear
    */
   public void setNamedApis(Collection<NamedApi> newNamedApis) {
+    // Guard against self-reference: setNamedApis(getNamedApis()) would otherwise clear() the
+    // very collection we are about to copy from, wiping the entity. Re-link parent FKs and
+    // return.
+    if (newNamedApis == this.namedApis) {
+      this.namedApis.forEach(api -> api.setDataSet(this));
+      return;
+    }
     this.namedApis.clear();
     if (newNamedApis != null) {
       newNamedApis.forEach(api -> api.setDataSet(this));
