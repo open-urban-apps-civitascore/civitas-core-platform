@@ -1,0 +1,53 @@
+meta {
+  name: 02 Create PostGIS DataStore
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/datastores
+  body: json
+  auth: basic
+}
+
+auth:basic {
+  username: {{geoserver_admin_user}}
+  password: {{geoserver_admin_password}}
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "dataStore": {
+      "name": "{{datastore_name}}",
+      "description": "PostGIS connection for dataset {{workspace_name}}",
+      "connectionParameters": {
+        "entry": [
+          { "@key": "dbtype",              "$": "postgis" },
+          { "@key": "host",                "$": "{{postgis_host}}" },
+          { "@key": "port",                "$": "{{postgis_port}}" },
+          { "@key": "database",            "$": "{{postgis_db}}" },
+          { "@key": "user",                "$": "{{postgis_user}}" },
+          { "@key": "passwd",              "$": "{{postgis_password}}" },
+          { "@key": "schema",              "$": "{{postgis_schema}}" },
+          { "@key": "Expose primary keys", "$": "true" },
+          { "@key": "validate connections","$": "true" },
+          { "@key": "fetch size",          "$": "1000" },
+          { "@key": "max connections",     "$": "10" },
+          { "@key": "min connections",     "$": "1" },
+          { "@key": "Connection timeout",  "$": "20" }
+        ]
+      }
+    }
+  }
+}
+
+tests {
+  test("DataStore created", function() {
+    expect(res.status).to.equal(201);
+  });
+}

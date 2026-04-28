@@ -1,0 +1,35 @@
+meta {
+  name: 01 Create Workspace
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{geoserver_url}}/rest/workspaces
+  body: json
+  auth: basic
+}
+
+auth:basic {
+  username: {{geoserver_admin_user}}
+  password: {{geoserver_admin_password}}
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "workspace": {
+      "name": "{{workspace_name}}"
+    }
+  }
+}
+
+tests {
+  test("Workspace created (201) or already exists (409 = idempotent)", function() {
+    expect([201, 409]).to.include(res.status);
+  });
+}

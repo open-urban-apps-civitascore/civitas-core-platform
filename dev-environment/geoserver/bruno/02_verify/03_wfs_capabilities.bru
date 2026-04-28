@@ -1,0 +1,23 @@
+meta {
+  name: 03 WFS GetCapabilities
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{geoserver_url}}/{{workspace_name}}/wfs?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetCapabilities
+  body: none
+  auth: none
+}
+
+tests {
+  test("WFS endpoint responds", function() {
+    expect(res.status).to.equal(200);
+  });
+  test("Response is XML", function() {
+    expect(res.headers["content-type"]).to.include("xml");
+  });
+  test("Layer is listed in capabilities", function() {
+    expect(res.body).to.include(bru.getEnvVar("featuretype_point"));
+  });
+}
