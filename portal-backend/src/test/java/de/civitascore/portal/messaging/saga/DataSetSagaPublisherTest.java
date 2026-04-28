@@ -1,6 +1,7 @@
 package de.civitascore.portal.messaging.saga;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.model.embedded.ConnectorType;
@@ -274,6 +275,57 @@ class DataSetSagaPublisherTest {
       assertThat(routeIds.size()).isEqualTo(2);
       assertThat(routeIds.get("traffic").asString()).isEqualTo("route-1");
       assertThat(routeIds.get("weather").asString()).isEqualTo("route-2");
+    }
+
+    @Test
+    @DisplayName("DELETE trigger routeIds map omits entries with null routeId (partial release)")
+    void deleteTriggerOmitsEntriesWithoutRouteId() throws Exception {
+      // Half-released dataset: traffic was provisioned, weather was not. The DELETE saga must
+      // still tell the orchestrator about both named APIs (so it knows to clean up downstream
+      // state for weather), but routeIds carries only the entries with a real APISIX route.
+      DataSet dataSet = datasetWithNamedApis("route-1", null);
+      dataSet.setProjectId("proj-1");
+      dataSet.setServiceId("svc-1");
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishDeleteRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var routeIds = payload.get("routeIds");
+      assertThat(routeIds).isNotNull();
+      assertThat(routeIds.size()).isEqualTo(1);
+      assertThat(routeIds.has("traffic")).isTrue();
+      assertThat(routeIds.has("weather"))
+          .as("entries without a routeId should not appear in the DELETE map either")
+          .isFalse();
+      // namedApis must still carry both — the orchestrator needs to know weather exists.
+      assertNamedApisInPayload(jsonCaptor.getValue());
+    }
+
+    @Test
+    @DisplayName("Duplicate slug in collection throws with datasetId + slug context")
+    void duplicateSlugThrowsWithContext() {
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setProjectId("proj-1");
+      dataSet.setServiceId("svc-1");
+      dataSet.setPipelines(Set.of());
+      dataSet.setNamedApis(
+          new java.util.HashSet<>(
+              Set.of(
+                  api("Traffic A", "traffic", "route-1"), api("Traffic B", "traffic", "route-2"))));
+
+      // DB UNIQUE(dataset_id, slug) prevents this in production, but if a transactional bug or
+      // migration ever produced duplicates, the publisher must fail with diagnostic context
+      // (datasetId + colliding routeIds) — not a bare IllegalStateException from Collectors.
+      // UPDATE/DELETE triggers project routeIds; CREATE does not, so use UPDATE here.
+      assertThatThrownBy(() -> publisher.publishUpdateRequested(dataSet, Set.of()))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining(dataSet.getId().toString())
+          .hasMessageContaining("route-1")
+          .hasMessageContaining("route-2");
     }
 
     @Test

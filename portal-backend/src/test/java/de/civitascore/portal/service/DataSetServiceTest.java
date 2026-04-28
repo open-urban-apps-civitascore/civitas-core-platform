@@ -550,7 +550,7 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("CREATE: orphan slug in saga result is silently skipped (logged as warning)")
+    @DisplayName("CREATE: orphan slug in saga result is logged as drift but does not throw")
     void createOrphanSlugSilentlySkipped() {
       UUID id = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
