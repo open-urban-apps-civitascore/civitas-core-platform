@@ -171,7 +171,7 @@ public class DataSetSagaPublisher {
    * {@code @JsonInclude(NON_NULL)}) when the dataset has no named APIs.
    */
   private List<NamedApi> buildNamedApis(DataSet dataset) {
-    if (dataset.getNamedApis() == null || dataset.getNamedApis().isEmpty()) {
+    if (dataset.getNamedApis().isEmpty()) {
       return null;
     }
     return dataset.getNamedApis().stream()
@@ -184,15 +184,32 @@ public class DataSetSagaPublisher {
    * the saga payload. Skips entries whose {@code routeId} is null (not yet provisioned). Returns
    * {@code null} if no entry has a populated {@code routeId}, so the field is omitted from the JSON
    * via {@code @JsonInclude(NON_NULL)}.
+   *
+   * <p>Throws {@link IllegalStateException} with dataset/slug/routeId context if duplicate slugs
+   * are present (defense-in-depth: the DB {@code UNIQUE(dataset_id, slug)} constraint should
+   * prevent this in production).
    */
   private Map<String, String> buildRouteIds(DataSet dataset) {
-    if (dataset.getNamedApis() == null || dataset.getNamedApis().isEmpty()) {
+    if (dataset.getNamedApis().isEmpty()) {
       return null;
     }
     Map<String, String> routeIds =
         dataset.getNamedApis().stream()
             .filter(api -> api.getRouteId() != null)
-            .collect(Collectors.toMap(api -> api.getSlug(), api -> api.getRouteId()));
+            .collect(
+                Collectors.toMap(
+                    api -> api.getSlug(),
+                    api -> api.getRouteId(),
+                    (existing, duplicate) -> {
+                      throw new IllegalStateException(
+                          "Duplicate slug in dataset "
+                              + dataset.getId()
+                              + " named APIs (DB UNIQUE(dataset_id, slug) should prevent this);"
+                              + " collision on routeId values "
+                              + existing
+                              + " and "
+                              + duplicate);
+                    }));
     return routeIds.isEmpty() ? null : routeIds;
   }
 
