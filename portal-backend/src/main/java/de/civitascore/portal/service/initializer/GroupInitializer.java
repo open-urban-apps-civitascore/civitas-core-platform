@@ -2,7 +2,6 @@ package de.civitascore.portal.service.initializer;
 
 import de.civitascore.configadapter.model.ConfigResultEvent;
 import de.civitascore.configadapter.model.idm.GroupConfig;
-import de.civitascore.portal.configuration.InitProperties;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
