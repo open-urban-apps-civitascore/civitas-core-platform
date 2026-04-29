@@ -45,7 +45,7 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 public class Group extends AssignableEntity {
 
-  @Column(name = "external_id")
+  @Column(name = "external_id", length = 255)
   private String externalId;
 
   @ManyToMany(fetch = FetchType.LAZY)

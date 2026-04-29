@@ -78,13 +78,11 @@ class GroupSyncIntegrationTest extends BaseEventPublishingIntegrationTest {
   @Test
   @DisplayName("Should update user group memberships in Keycloak when replacing groups")
   void shouldSyncUserGroupMembershipsToKeycloak() {
-    // Create a group
     GroupInputDTO groupInput = new GroupInputDTO();
     groupInput.setName("syncgrp" + System.currentTimeMillis());
     Group group = groupService.create(groupInput);
     assertThat(group.getExternalId()).as("Group must have externalId after creation").isNotNull();
 
-    // Verify group exists in Keycloak
     await()
         .atMost(Duration.ofSeconds(10))
         .untilAsserted(
@@ -92,12 +90,12 @@ class GroupSyncIntegrationTest extends BaseEventPublishingIntegrationTest {
                 assertThat(findKeycloakGroups())
                     .anyMatch(g -> g.getName().equals(group.getName())));
 
-    // Create a user (triggers sync to Keycloak)
     var userInput = createValidUserInput();
     var user = userService.create(userInput);
     assertThat(user.getExternalId()).as("User must have externalId after creation").isNotNull();
 
-    // Add user to group via replaceGroups (triggers USER_UPDATED event with groups field)
+    // replaceGroups publishes USER_UPDATED with the groups field; config-adapter's
+    // GroupSyncHelper diff-syncs memberships in Keycloak.
     userService.replaceGroups(user.getId(), List.of(group.getId()));
 
     await()
@@ -110,5 +108,34 @@ class GroupSyncIntegrationTest extends BaseEventPublishingIntegrationTest {
                   .hasSize(1)
                   .anyMatch(g -> g.getName().equals(group.getName()));
             });
+  }
+
+  @Test
+  @DisplayName("Should remove user from all Keycloak groups when replacing with an empty list")
+  void shouldRemoveAllUserGroupMembershipsInKeycloak() {
+    GroupInputDTO groupInput = new GroupInputDTO();
+    groupInput.setName("removegrp" + System.currentTimeMillis());
+    Group group = groupService.create(groupInput);
+    assertThat(group.getExternalId()).isNotNull();
+
+    var user = userService.create(createValidUserInput());
+    assertThat(user.getExternalId()).isNotNull();
+
+    userService.replaceGroups(user.getId(), List.of(group.getId()));
+    await()
+        .atMost(Duration.ofSeconds(15))
+        .untilAsserted(() -> assertThat(findKeycloakUserGroups(user.getExternalId())).hasSize(1));
+
+    // Replacing with an empty list publishes USER_UPDATED with groups=[]; GroupSyncHelper
+    // should leave every current Keycloak membership.
+    userService.replaceGroups(user.getId(), List.of());
+
+    await()
+        .atMost(Duration.ofSeconds(15))
+        .untilAsserted(
+            () ->
+                assertThat(findKeycloakUserGroups(user.getExternalId()))
+                    .as("All Keycloak memberships must be removed")
+                    .isEmpty());
   }
 }

@@ -34,8 +34,9 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>Always: syncs all groups without a Keycloak reference ({@code externalId IS NULL})
  * </ul>
  *
- * <p>Must run before {@link UserInitializer} ({@code @Order(10)}) so that groups have Keycloak
- * references when user memberships are synced.
+ * <p>Annotated with {@code @Order(10)} on {@link #initialize()} so it runs before {@link
+ * UserInitializer} (which has no explicit order) and groups have Keycloak references when user
+ * memberships are synced.
  */
 @Component
 @Slf4j
@@ -129,8 +130,9 @@ public class GroupInitializer {
                   role.getName());
             },
             () ->
-                log.warn(
-                    "Role '{}' not found for group '{}' — skipping assignment",
+                log.error(
+                    "Role '{}' not found for group '{}' — skipping assignment. This is a "
+                        + "configuration error, not a transient warning.",
                     roleName,
                     group.getName()));
   }
