@@ -68,7 +68,7 @@ class GroupSyncHelperTest {
   void shouldAddAndRemoveGroups() {
     GroupRepresentation keep = group("keep-id", "keep-group");
     GroupRepresentation stale = group("stale-id", "stale-group");
-    when(userResource.groups()).thenReturn(List.of(keep, stale));
+    when(userResource.groups(0, 100)).thenReturn(List.of(keep, stale));
 
     GroupRepresentation newGroup = group("new-id", "new-group");
     when(groupsResource.groups("new-group", true, 0, 1, true)).thenReturn(List.of(newGroup));
@@ -84,7 +84,7 @@ class GroupSyncHelperTest {
   @DisplayName("does nothing when groups match")
   void shouldDoNothingWhenGroupsMatch() {
     GroupRepresentation existing = group("g-id", "existing-group");
-    when(userResource.groups()).thenReturn(List.of(existing));
+    when(userResource.groups(0, 100)).thenReturn(List.of(existing));
 
     helper.syncUserGroups(List.of("existing-group"), USER_ID, realmResource);
 
@@ -99,7 +99,7 @@ class GroupSyncHelperTest {
   void shouldRemoveAllWhenDesiredIsNull() {
     GroupRepresentation g1 = group("a", "alpha");
     GroupRepresentation g2 = group("b", "beta");
-    when(userResource.groups()).thenReturn(List.of(g1, g2));
+    when(userResource.groups(0, 100)).thenReturn(List.of(g1, g2));
 
     helper.syncUserGroups(null, USER_ID, realmResource);
 
@@ -112,7 +112,7 @@ class GroupSyncHelperTest {
   @DisplayName("empty desired list removes all current memberships")
   void shouldRemoveAllWhenDesiredIsEmpty() {
     GroupRepresentation g = group("g-id", "some-group");
-    when(userResource.groups()).thenReturn(List.of(g));
+    when(userResource.groups(0, 100)).thenReturn(List.of(g));
 
     helper.syncUserGroups(Collections.emptyList(), USER_ID, realmResource);
 
@@ -122,7 +122,7 @@ class GroupSyncHelperTest {
   @Test
   @DisplayName("nonexistent group is logged and skipped, does not throw")
   void shouldSkipNonexistentGroup() {
-    when(userResource.groups()).thenReturn(Collections.emptyList());
+    when(userResource.groups(0, 100)).thenReturn(Collections.emptyList());
     when(groupsResource.groups("ghost", true, 0, 1, true)).thenReturn(Collections.emptyList());
 
     helper.syncUserGroups(List.of("ghost"), USER_ID, realmResource);
@@ -133,7 +133,7 @@ class GroupSyncHelperTest {
   @Test
   @DisplayName("uses exact-match lookup so 'prod' does not match 'production'")
   void shouldUseExactMatchLookup() {
-    when(userResource.groups()).thenReturn(Collections.emptyList());
+    when(userResource.groups(0, 100)).thenReturn(Collections.emptyList());
     when(groupsResource.groups("prod", true, 0, 1, true)).thenReturn(Collections.emptyList());
 
     helper.syncUserGroups(List.of("prod"), USER_ID, realmResource);
@@ -146,7 +146,7 @@ class GroupSyncHelperTest {
   void shouldContinueWhenLeaveGroupRaces() {
     GroupRepresentation gone = group("gone-id", "gone-group");
     GroupRepresentation other = group("other-id", "other-group");
-    when(userResource.groups()).thenReturn(List.of(gone, other));
+    when(userResource.groups(0, 100)).thenReturn(List.of(gone, other));
 
     doThrow(new NotFoundException()).when(userResource).leaveGroup("gone-id");
 
@@ -160,7 +160,7 @@ class GroupSyncHelperTest {
   @DisplayName("WebApplicationException on leaveGroup propagates so the event is DLQ'd")
   void shouldPropagate5xxOnLeaveGroup() {
     GroupRepresentation g = group("g-id", "g");
-    when(userResource.groups()).thenReturn(List.of(g));
+    when(userResource.groups(0, 100)).thenReturn(List.of(g));
     doThrow(new WebApplicationException(Response.serverError().build()))
         .when(userResource)
         .leaveGroup("g-id");
@@ -173,7 +173,7 @@ class GroupSyncHelperTest {
   @Test
   @DisplayName("NotFoundException on joinGroup is logged and does not abort the loop")
   void shouldContinueWhenJoinGroupRaces() {
-    when(userResource.groups()).thenReturn(Collections.emptyList());
+    when(userResource.groups(0, 100)).thenReturn(Collections.emptyList());
 
     GroupRepresentation racedAway = group("raced-id", "raced");
     GroupRepresentation present = group("present-id", "present");
@@ -191,7 +191,7 @@ class GroupSyncHelperTest {
   @Test
   @DisplayName("WebApplicationException on joinGroup propagates so the event is DLQ'd")
   void shouldPropagate5xxOnJoinGroup() {
-    when(userResource.groups()).thenReturn(Collections.emptyList());
+    when(userResource.groups(0, 100)).thenReturn(Collections.emptyList());
     GroupRepresentation g = group("g-id", "g");
     when(groupsResource.groups("g", true, 0, 1, true)).thenReturn(List.of(g));
     doThrow(new WebApplicationException(Response.serverError().build()))
@@ -201,5 +201,29 @@ class GroupSyncHelperTest {
     assertThrows(
         WebApplicationException.class,
         () -> helper.syncUserGroups(List.of("g"), USER_ID, realmResource));
+  }
+
+  @Test
+  @DisplayName("paginates current memberships so users with >100 groups don't lose the overflow")
+  void shouldPaginateCurrentMemberships() {
+    List<GroupRepresentation> firstPage = new java.util.ArrayList<>();
+    for (int i = 0; i < 100; i++) {
+      firstPage.add(group("id-" + i, "group-" + i));
+    }
+    GroupRepresentation overflow = group("id-100", "group-100");
+    when(userResource.groups(0, 100)).thenReturn(firstPage);
+    when(userResource.groups(100, 100)).thenReturn(List.of(overflow));
+    when(userResource.groups(200, 100)).thenReturn(Collections.emptyList());
+
+    // desired keeps page 1 entirely; overflow group "group-100" is not desired and must be removed
+    List<String> desired = new java.util.ArrayList<>();
+    for (int i = 0; i < 100; i++) {
+      desired.add("group-" + i);
+    }
+
+    helper.syncUserGroups(desired, USER_ID, realmResource);
+
+    verify(userResource).leaveGroup("id-100");
+    verify(userResource, never()).leaveGroup("id-0");
   }
 }

@@ -184,14 +184,14 @@ public class GroupInitializer {
         log.info(
             "Synced group '{}' to Keycloak, externalId={}", group.getName(), result.resourceId());
       } else if (result != null) {
-        log.warn(
+        log.error(
             "Keycloak sync for group '{}' failed: status={}, message={}, errorCode={}",
             group.getName(),
             result.status(),
             result.message(),
             result.errorCode());
       } else {
-        log.warn("Keycloak sync for group '{}' returned null result", group.getName());
+        log.error("Keycloak sync for group '{}' returned null result", group.getName());
       }
     } catch (TimeoutException e) {
       log.error("Timeout waiting for Keycloak sync for group '{}'", group.getName());

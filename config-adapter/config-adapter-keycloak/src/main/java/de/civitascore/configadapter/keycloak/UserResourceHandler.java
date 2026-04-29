@@ -188,7 +188,11 @@ class UserResourceHandler implements KeycloakResourceHandler {
     } catch (FatalAdapterException | RetryableAdapterException e) {
       throw e;
     } catch (Exception e) {
-      logger.error("Failed to process user in realm: {}", Encode.forJava(realm), e);
+      logger.error(
+          "Failed to process user in realm: {} ({})",
+          Encode.forJava(realm),
+          e.getClass().getSimpleName(),
+          e);
       throw new FatalAdapterException(errorCode, e, maskPII(e.getMessage()));
     }
   }

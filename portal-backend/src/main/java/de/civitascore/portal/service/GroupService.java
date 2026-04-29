@@ -100,8 +100,20 @@ public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
 
   /**
    * Builds a {@link GroupConfig} from a Group entity. Used by both CRUD events and catch-up sync.
+   *
+   * @throws IllegalStateException if {@code entity.getName()} is null or blank — name is enforced
+   *     non-blank at API ingress, so a null here means a corrupt DB row, and we fail loudly rather
+   *     than silently NPE-ing into a permanent unsynced state.
    */
   public static GroupConfig buildGroupConfig(Group entity) {
+    if (entity.getName() == null || entity.getName().isBlank()) {
+      throw new IllegalStateException(
+          "Cannot build GroupConfig for group id="
+              + entity.getId()
+              + ": name is null or blank. This indicates a corrupt DB row; "
+              + "the API enforces non-blank names on create/update.");
+    }
+
     GroupConfig groupConfig = new GroupConfig();
 
     if (entity.getExternalId() != null && !entity.getExternalId().isBlank()) {

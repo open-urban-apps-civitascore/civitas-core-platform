@@ -11,12 +11,14 @@ package de.civitascore.configadapter.keycloak;
 
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.keycloak.admin.client.resource.RealmResource;
+import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.representations.idm.GroupRepresentation;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
@@ -26,6 +28,12 @@ import org.slf4j.LoggerFactory;
 class GroupSyncHelper {
 
   private static final Logger logger = LoggerFactory.getLogger(GroupSyncHelper.class);
+
+  /**
+   * Page size for paginating a user's group memberships. Keycloak's default cap when pagination is
+   * not requested is around 100; users with more memberships would silently lose the overflow.
+   */
+  private static final int GROUPS_PAGE_SIZE = 100;
 
   /**
    * Reconciles a user's group memberships with the desired set: removes memberships not in the
@@ -38,7 +46,7 @@ class GroupSyncHelper {
   void syncUserGroups(List<String> desiredGroupNames, String userId, RealmResource realmResource) {
     Set<String> desired =
         desiredGroupNames != null ? new HashSet<>(desiredGroupNames) : Collections.emptySet();
-    List<GroupRepresentation> currentGroups = realmResource.users().get(userId).groups();
+    List<GroupRepresentation> currentGroups = fetchAllGroups(realmResource.users().get(userId));
     Set<String> currentGroupNames =
         currentGroups.stream().map(GroupRepresentation::getName).collect(Collectors.toSet());
 
@@ -97,5 +105,22 @@ class GroupSyncHelper {
         }
       }
     }
+  }
+
+  private List<GroupRepresentation> fetchAllGroups(UserResource userResource) {
+    List<GroupRepresentation> all = new ArrayList<>();
+    int first = 0;
+    while (true) {
+      List<GroupRepresentation> page = userResource.groups(first, GROUPS_PAGE_SIZE);
+      if (page == null || page.isEmpty()) {
+        break;
+      }
+      all.addAll(page);
+      if (page.size() < GROUPS_PAGE_SIZE) {
+        break;
+      }
+      first += GROUPS_PAGE_SIZE;
+    }
+    return all;
   }
 }
