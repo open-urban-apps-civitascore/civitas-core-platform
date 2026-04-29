@@ -37,7 +37,7 @@ tests {
 docs {
   **Saga step 8b of 18** — Verify metadata update is blocked during in-flight saga.
 
-  Immediately after releasing (step 8), the CREATE saga is running asynchronously. This step attempts to update the dataset's published metadata, which should be rejected with **409 Conflict** because `pendingSagaType` is non-null.
+  Immediately after releasing (step 8), the CREATE saga is running asynchronously. This step attempts to update the dataset's released metadata, which should be rejected with **409 Conflict** because `pendingSagaType` is non-null.
 
   If the saga completed very quickly (possible in fast environments), a 200 is also accepted since the guard would not fire.
 

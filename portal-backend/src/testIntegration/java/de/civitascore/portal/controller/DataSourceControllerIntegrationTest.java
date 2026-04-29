@@ -649,21 +649,21 @@ class DataSourceControllerIntegrationTest
 
     @Test
     @DisplayName("PATCH then release should work")
-    void patchThenPublishShouldWork() {
+    void patchThenReleaseShouldWork() {
       UUID id = createReleasableSqlTestEntity();
 
-      Map<String, Object> patch = Map.of("description", "Published via patch");
+      Map<String, Object> patch = Map.of("description", "Released via patch");
       ResponseEntity<DataSourceOutputDTO> patchResponse = performPatch(id, patch);
 
       assertThat(patchResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(patchResponse.getBody().getDescription()).isEqualTo("Published via patch");
+      assertThat(patchResponse.getBody().getDescription()).isEqualTo("Released via patch");
 
-      ResponseEntity<DataSourceOutputDTO> publishResponse = performRelease(id);
+      ResponseEntity<DataSourceOutputDTO> releaseResponse = performRelease(id);
 
-      assertThat(publishResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(publishResponse.getBody().getDataSourceStatus())
+      assertThat(releaseResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(releaseResponse.getBody().getDataSourceStatus())
           .isEqualTo(DataSourceStatus.AVAILABLE);
-      assertThat(publishResponse.getBody().getDescription()).isEqualTo("Published via patch");
+      assertThat(releaseResponse.getBody().getDescription()).isEqualTo("Released via patch");
     }
   }
 

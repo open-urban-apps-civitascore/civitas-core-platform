@@ -15,20 +15,20 @@ import lombok.Data;
 public class SqlConnectorConfiguration implements ConnectorConfiguration {
 
   @Schema(description = "Database driver type.", example = "postgres")
-  @NotBlank(groups = OnPublish.class, message = "'driver' is required and must not be blank") private String driver;
+  @NotBlank(groups = OnRelease.class, message = "'driver' is required and must not be blank") private String driver;
 
   @Schema(
       description =
           "Connection URL. Embedded credentials are stripped — use user/password instead.",
       example = "postgres://localhost:5432/mydb")
-  @NotBlank(groups = OnPublish.class, message = "'dsn' is required and must not be blank") private String dsn;
+  @NotBlank(groups = OnRelease.class, message = "'dsn' is required and must not be blank") private String dsn;
 
   @Schema(description = "Target table name.", example = "sensor_readings")
-  @NotBlank(groups = OnPublish.class, message = "'table' is required and must not be blank") private String table;
+  @NotBlank(groups = OnRelease.class, message = "'table' is required and must not be blank") private String table;
 
   @Schema(description = "Column names to select.", example = "[\"id\", \"value\", \"timestamp\"]")
   @NotEmpty(
-      groups = OnPublish.class,
+      groups = OnRelease.class,
       message = "'columns' is required and must be a non-empty list")
   private List<String> columns;
 

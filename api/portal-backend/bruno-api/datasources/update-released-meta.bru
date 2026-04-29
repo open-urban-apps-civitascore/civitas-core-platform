@@ -17,29 +17,29 @@ params:path {
 body:json {
   {
     "name": "Updated Source Name",
-    "description": "Updated description for published data source",
+    "description": "Updated description for released data source",
     "assignments": []
   }
 }
 
 tests {
-  test("Updated or not published", function() {
+  test("Updated or not released", function() {
     const status = res.getStatus();
-    // 200=updated, 400=datasource not in published state
+    // 200=updated, 400=datasource not in released state
     expect(status === 200 || status === 400).to.be.true;
   });
 }
 
 docs {
-  **Precondition:** `dataSourceId` is set and in published state.
+  **Precondition:** `dataSourceId` is set and in released state.
 
-  **Expected Response:** 200 OK, published name and description are updated.
+  **Expected Response:** 200 OK, released name and description are updated.
 
   **System Impact:**
 
   | Layer | Effect |
   |---|---|
-  | Backend | Published DataSource name/description updated |
+  | Backend | Released DataSource name/description updated |
   | Config Adapter | Consumes `de.civitascore.api.backend.updated` Kafka event; updates route metadata in APISIX |
   | APISIX | Route metadata updated |
 }

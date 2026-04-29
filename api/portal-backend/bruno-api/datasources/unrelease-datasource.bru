@@ -15,15 +15,15 @@ params:path {
 }
 
 tests {
-  test("Unpublish accepted or not published", function() {
+  test("Unrelease accepted or not released", function() {
     const status = res.getStatus();
-    // 200=unpublished, 400=not in published state
+    // 200=unreleased, 400=not in released state
     expect(status === 200 || status === 400).to.be.true;
   });
 }
 
 docs {
-  **Precondition:** `dataSourceId` is set and in published state.
+  **Precondition:** `dataSourceId` is set and in released state.
 
   **Expected Response:** 200 OK, body reflects data source returned to draft state.
 

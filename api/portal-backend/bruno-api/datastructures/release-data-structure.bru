@@ -15,9 +15,9 @@ params:path {
 }
 
 tests {
-  test("Publish accepted or precondition not met", function() {
+  test("Release accepted or precondition not met", function() {
     const status = res.getStatus();
-    // 200=published, 400=not in DRAFT state
+    // 200=released, 400=not in DRAFT state
     expect(status === 200 || status === 400).to.be.true;
   });
 }
@@ -25,13 +25,13 @@ tests {
 docs {
   **Precondition:** `dataStructureId` is set and in draft state.
 
-  **Expected Response:** 200 OK, body reflects data structure in published state.
+  **Expected Response:** 200 OK, body reflects data structure in released state.
 
   **System Impact:**
 
   | Layer | Impact | Status |
   |---|---|---|
-  | Backend | DataStructure status updated to published | --- |
+  | Backend | DataStructure status updated to released | --- |
   | Config Adapter | --- | --- |
   | Model Atlas | DataStructure schema becomes available in Model Atlas (`http://localhost:8086`) | --- |
 }

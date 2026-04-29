@@ -66,8 +66,8 @@ Test case documentation is embedded in each `.bru` file's `docs` block (visible 
 | Roles | `roles/` | CRUD |
 | Permissions | `permissions/` | Read-only |
 | Assignments | `assignments/` | Create / Create Scoped / Read / Delete |
-| DataSources | `datasources/` | CRUD + Publish / Unpublish + Published Meta + Assignments |
-| DataSets | `datasets/` | CRUD + Publish / Unpublish + Release / Unrelease + Published Meta + Assignments |
+| DataSources | `datasources/` | CRUD + Release / Unrelease + Released Meta + Assignments |
+| DataSets | `datasets/` | CRUD + Stage / Unstage + Release / Unrelease + Released Meta + Assignments |
 | Pipelines | `pipelines/` | CRUD (nested under DataSet) |
-| DataStructures | `datastructures/` | CRUD + Publish / Unpublish + Published Meta + Assignments |
-| DataStructure Versions | `datastructures/versions/` | CRUD + Publish / Unpublish + Published Meta |
+| DataStructures | `datastructures/` | CRUD + Release / Unrelease + Released Meta + Assignments |
+| DataStructure Versions | `datastructures/versions/` | CRUD + Release / Unrelease + Released Meta |

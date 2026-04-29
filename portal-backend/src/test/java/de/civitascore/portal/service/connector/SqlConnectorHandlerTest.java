@@ -6,7 +6,7 @@ import de.civitascore.configadapter.crypto.CredentialDecryptor;
 import de.civitascore.configadapter.crypto.CredentialEncryptor;
 import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import de.civitascore.portal.configuration.EncryptionConfig;
-import de.civitascore.portal.model.connector.OnPublish;
+import de.civitascore.portal.model.connector.OnRelease;
 import jakarta.validation.groups.Default;
 import java.security.GeneralSecurityException;
 import java.util.HashMap;
@@ -73,7 +73,7 @@ class SqlConnectorHandlerTest {
       config.put("table", "users");
       config.put("columns", List.of("id", "name"));
 
-      assertThat(handler.validate(config, Default.class, OnPublish.class)).isEmpty();
+      assertThat(handler.validate(config, Default.class, OnRelease.class)).isEmpty();
     }
 
     @Test
@@ -85,11 +85,11 @@ class SqlConnectorHandlerTest {
     }
 
     @Test
-    @DisplayName("Should fail on publish when required fields are missing")
+    @DisplayName("Should fail on release when required fields are missing")
     void shouldFailWhenFieldsMissing() {
       Map<String, Object> config = new HashMap<>();
 
-      List<String> errors = handler.validate(config, Default.class, OnPublish.class);
+      List<String> errors = handler.validate(config, Default.class, OnRelease.class);
       assertThat(errors).hasSize(4);
     }
 
@@ -102,7 +102,7 @@ class SqlConnectorHandlerTest {
       config.put("table", "users");
       config.put("columns", "id,name");
 
-      List<String> errors = handler.validate(config, Default.class, OnPublish.class);
+      List<String> errors = handler.validate(config, Default.class, OnRelease.class);
       assertThat(errors).hasSize(1);
       assertThat(errors.get(0)).contains("Invalid configuration format");
     }

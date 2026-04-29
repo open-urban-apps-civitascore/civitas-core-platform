@@ -86,10 +86,10 @@ class DataSetControllerIntegrationTest
     portalData.cleanAll();
   }
 
-  /** Seeds the minimum publish requirement: one datasource linked to the first pipeline. */
-  private void seedPublishRequirements(Pipeline... pipelines) {
+  /** Seeds the minimum stage requirement: one datasource linked to the first pipeline. */
+  private void seedStageRequirements(Pipeline... pipelines) {
     DataSource dataSource = new DataSource();
-    dataSource.setName("publish-datasource-" + System.nanoTime());
+    dataSource.setName("stage-datasource-" + System.nanoTime());
     dataSource = dataSourceRepository.save(dataSource);
     pipelines[0].getDataSources().add(dataSource);
     pipelineRepository.save(pipelines[0]);
@@ -512,7 +512,7 @@ class DataSetControllerIntegrationTest
         mode = EnumSource.Mode.EXCLUDE,
         names = {"DRAFT"})
     @DisplayName("Should update released dataset metadata via /released/meta endpoint")
-    void shouldUpdatePublishedDataSetMetaViaPublishedEndpoint(DataSetStatus status) {
+    void shouldUpdateReleasedDataSetMetaViaReleasedEndpoint(DataSetStatus status) {
       DataSet dataSet = createDataSetWithRelationships();
       dataSet.setDataSetStatus(status);
       dataSet = dataSetRepository.save(dataSet);
@@ -522,8 +522,8 @@ class DataSetControllerIntegrationTest
           dataSet.getPipelines().stream().map(Pipeline::getId).toList();
 
       DataSetInputDTO updateInput = new DataSetInputDTO();
-      updateInput.setName("Updated Published Dataset");
-      updateInput.setDescription("Updated description for published dataset");
+      updateInput.setName("Updated Released Dataset");
+      updateInput.setDescription("Updated description for released dataset");
       updateInput.setOpenDataAccess(false);
 
       ResponseEntity<DataSetOutputDTO> response =
@@ -544,10 +544,10 @@ class DataSetControllerIntegrationTest
       assertThat(output.getId()).isEqualTo(dataSetId);
       assertThat(output.getName())
           .as("Name should be updated")
-          .isEqualTo("Updated Published Dataset");
+          .isEqualTo("Updated Released Dataset");
       assertThat(output.getDescription())
           .as("Description should be updated")
-          .isEqualTo("Updated description for published dataset");
+          .isEqualTo("Updated description for released dataset");
       assertThat(output.getPipelines())
           .as("Pipelines should remain unchanged")
           .hasSize(2)
@@ -558,7 +558,7 @@ class DataSetControllerIntegrationTest
 
     @Test
     @DisplayName("Should fail to update DRAFT dataset via /released/meta endpoint")
-    void shouldFailToUpdateDraftDataSetViaPublishedEndpoint() {
+    void shouldFailToUpdateDraftDataSetViaReleasedEndpoint() {
       UUID dataSetId = createTestEntity();
 
       DataSetInputDTO updateInput = new DataSetInputDTO();
@@ -693,9 +693,9 @@ class DataSetControllerIntegrationTest
           .isEqualTo(secondResponse.getBody().getDescription());
     }
 
-    // Tests for preventing updates of published datasets via regular endpoint
-    // are in shouldFailToUpdatePublishedDataSetViaRegularEndpoint and
-    // shouldUpdatePublishedDataSetMetaViaPublishedEndpoint above
+    // Tests for preventing updates of non-DRAFT datasets via the regular endpoint are in
+    // shouldFailToUpdateNonDraftDataSetViaRegularEndpoint and
+    // shouldUpdateReleasedDataSetMetaViaReleasedEndpoint above
 
     @Test
     @DisplayName("Should fail to update non-existent dataset")
@@ -892,13 +892,13 @@ class DataSetControllerIntegrationTest
     @DisplayName("Should stage dataset with pipelines successfully")
     void shouldStageDataSetWithPipelinesSuccessfully() {
       DataSet dataSet = new DataSet();
-      dataSet.setName("test_dataset_publish_" + System.currentTimeMillis());
+      dataSet.setName("test_dataset_stage_" + System.currentTimeMillis());
       dataSet.setDescription("Test dataset with pipelines");
       dataSet.setDataSetStatus(DataSetStatus.DRAFT);
       dataSet.setPersistenceId(12345L);
-      dataSet.setIdentifier("test-identifier-publish");
+      dataSet.setIdentifier("test-identifier-stage");
       dataSet.setVersion("1.0.0");
-      dataSet.setExternalId("ext-dataset-publish-" + System.currentTimeMillis());
+      dataSet.setExternalId("ext-dataset-stage-" + System.currentTimeMillis());
       dataSet.setFormat("JSON");
       dataSet.setOpenDataAccess(false);
       dataSet = dataSetRepository.save(dataSet);
@@ -923,7 +923,7 @@ class DataSetControllerIntegrationTest
       pipeline2.setPersistences(Collections.singletonList(12345L));
       pipelineRepository.save(pipeline2);
 
-      seedPublishRequirements(pipeline1, pipeline2);
+      seedStageRequirements(pipeline1, pipeline2);
 
       UUID dataSetId = dataSet.getId();
 
@@ -1096,7 +1096,7 @@ class DataSetControllerIntegrationTest
       pipeline2.setPersistences(Collections.singletonList(12345L));
       pipelineRepository.save(pipeline2);
 
-      seedPublishRequirements(pipeline1, pipeline2);
+      seedStageRequirements(pipeline1, pipeline2);
 
       UUID dataSetId = dataSet.getId();
 
@@ -1126,8 +1126,8 @@ class DataSetControllerIntegrationTest
   class SagaCompletionTests {
 
     /**
-     * Creates a published (READY) dataset with a pipeline containing the given API paths. Reuses
-     * the existing publish HTTP endpoint which does not require Kafka.
+     * Creates a staged (READY) dataset with a pipeline containing the given API paths. Reuses the
+     * existing stage HTTP endpoint which does not require Kafka.
      */
     private DataSet createReadyDataSetWithApis(List<String> apiPaths) {
       DataSet dataSet = new DataSet();

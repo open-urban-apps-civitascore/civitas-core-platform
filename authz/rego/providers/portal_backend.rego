@@ -71,7 +71,7 @@ resource_name := path_parts[1] if {
 }
 
 # Extract resource ID from path (third segment: /v1/resource/{id})
-# Covers both direct resources (/v1/users/{id}) and sub-resources (/v1/datasets/{id}/publish)
+# Covers both direct resources (/v1/users/{id}) and sub-resources (/v1/datasets/{id}/release)
 # Only defined for resource endpoints, not collection endpoints
 resource_id := path_parts[2] if {
 	count(path_parts) >= 3

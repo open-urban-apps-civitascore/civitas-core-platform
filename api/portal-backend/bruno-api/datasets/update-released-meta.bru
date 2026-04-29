@@ -17,30 +17,30 @@ params:path {
 body:json {
   {
     "name": "Updated Dataset Name",
-    "description": "Updated description for published dataset",
+    "description": "Updated description for released dataset",
     "openDataAccess": false,
     "assignments": []
   }
 }
 
 tests {
-  test("Updated or not published", function() {
+  test("Updated or not released", function() {
     const status = res.getStatus();
-    // 200=updated, 400=dataset not in published state, 409=saga in-flight
+    // 200=updated, 400=dataset not in released state, 409=saga in-flight
     expect(status === 200 || status === 400 || status === 409).to.be.true;
   });
 }
 
 docs {
-  **Precondition:** `dataSetId` is set and in published state.
+  **Precondition:** `dataSetId` is set and in released state.
 
-  **Expected Response:** 200 OK, published metadata is updated.
+  **Expected Response:** 200 OK, released metadata is updated.
 
   **System Impact:**
 
   | Layer | Effect |
   |---|---|
-  | Backend | Published DataSet name/description updated |
+  | Backend | Released DataSet name/description updated |
   | Config Adapter | — |
   | External System | — |
 }

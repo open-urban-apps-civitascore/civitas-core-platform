@@ -15,9 +15,9 @@ params:path {
 }
 
 tests {
-  test("Unpublished or already draft", function() {
+  test("Unreleased or already draft", function() {
     const status = res.getStatus();
-    // 200=unpublished, 400=not in AVAILABLE state (already draft), 409=still in use
+    // 200=unreleased, 400=not in AVAILABLE state (already draft), 409=still in use
     expect(status === 200 || status === 400 || status === 409).to.be.true;
   });
 }
@@ -25,7 +25,7 @@ tests {
 docs {
   **Saga step 15b of 20** — Prerequisites: Pipeline deleted (step 15).
 
-  Unpublishes the datasource, reverting it from AVAILABLE to DRAFT status. This must happen after the pipeline is deleted (step 15) because a datasource referenced by a pipeline cannot be unpublished. The datasource must be in DRAFT status before it can be deleted (step 16).
+  Unreleasees the datasource, reverting it from AVAILABLE to DRAFT status. This must happen after the pipeline is deleted (step 15) because a datasource referenced by a pipeline cannot be unreleased. The datasource must be in DRAFT status before it can be deleted (step 16).
 
   **Expected Response:** 200 OK. 400 if already in DRAFT state. 409 if still referenced by a pipeline.
 

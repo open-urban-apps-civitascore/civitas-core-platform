@@ -1,7 +1,7 @@
 package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.DataSourceMapper;
-import de.civitascore.portal.model.connector.OnPublish;
+import de.civitascore.portal.model.connector.OnRelease;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
@@ -424,7 +424,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
 
     ConnectorHandler handler =
         connectorHandlerRegistry.getHandlerOrThrow(entity.getConnectorType());
-    List<String> errors = handler.validate(config, Default.class, OnPublish.class);
+    List<String> errors = handler.validate(config, Default.class, OnRelease.class);
 
     if (!errors.isEmpty()) {
       throw new InvalidInputException(
