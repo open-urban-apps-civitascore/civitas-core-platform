@@ -30,14 +30,15 @@ import lombok.experimental.SuperBuilder;
 @Entity
 @Table(
     name = "groups",
-    uniqueConstraints =
-        @UniqueConstraint(
-            name = "uk_group_name",
-            columnNames = {"name"}),
-    indexes = {
-      @Index(name = "idx_group_contact", columnList = "contact_user_id"),
-      @Index(name = "idx_group_external_id", columnList = "external_id")
-    })
+    uniqueConstraints = {
+      @UniqueConstraint(
+          name = "uk_group_name",
+          columnNames = {"name"}),
+      @UniqueConstraint(
+          name = "idx_group_external_id",
+          columnNames = {"external_id"})
+    },
+    indexes = {@Index(name = "idx_group_contact", columnList = "contact_user_id")})
 @Getter
 @Setter
 @SuperBuilder

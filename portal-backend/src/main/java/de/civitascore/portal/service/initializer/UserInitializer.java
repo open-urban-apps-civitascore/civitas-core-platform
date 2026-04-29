@@ -64,10 +64,6 @@ public class UserInitializer {
   }
 
   /**
-   * Initializes groups and users from configuration after the application context is fully ready.
-   * Groups are created first so that users can reference them during setup.
-   */
-  /**
    * Initializes users from configuration after the application context is fully ready. Groups are
    * already created and synced to Keycloak by {@link GroupInitializer} which runs earlier
    * ({@code @Order(10)}).

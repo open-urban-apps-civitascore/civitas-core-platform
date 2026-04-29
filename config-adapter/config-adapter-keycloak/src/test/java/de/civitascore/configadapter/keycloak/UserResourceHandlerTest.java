@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.keycloak;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -39,6 +40,7 @@ import org.keycloak.admin.client.resource.RoleScopeResource;
 import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.admin.client.resource.UsersResource;
 import org.keycloak.representations.idm.UserRepresentation;
+import org.mockito.ArgumentCaptor;
 
 class UserResourceHandlerTest {
 
@@ -101,6 +103,52 @@ class UserResourceHandlerTest {
       verify(userResource).update(any(UserRepresentation.class));
       verify(roleSyncHelper).syncRealmRoles(any(), any(), any());
       verify(resultPublisher).publish(event, SuccessCode.USER_UPDATE_SUCCESS, "user-id");
+    }
+
+    @Test
+    @DisplayName(
+        "strips realmRoles and groups from UserRepresentation before update so Keycloak does not"
+            + " auto-attach them, bypassing the explicit diff sync")
+    void shouldStripAssignmentsBeforeUpdate() throws Exception {
+      RealmResource realmResource = mock(RealmResource.class);
+      UsersResource usersResource = mock(UsersResource.class);
+      UserResource userResource = mock(UserResource.class);
+      RoleMappingResource roleMapping = mock(RoleMappingResource.class);
+      RoleScopeResource roleScopeResource = mock(RoleScopeResource.class);
+
+      when(keycloakClient.realm("test-realm")).thenReturn(realmResource);
+      when(realmResource.users()).thenReturn(usersResource);
+      when(usersResource.get("user-id")).thenReturn(userResource);
+      when(userResource.roles()).thenReturn(roleMapping);
+      when(roleMapping.realmLevel()).thenReturn(roleScopeResource);
+      when(roleScopeResource.listAll()).thenReturn(List.of());
+
+      UserConfig userConfig = new UserConfig();
+      userConfig.setUsername("testuser");
+      userConfig.setRealmRoles(List.of("admin"));
+      userConfig.setGroups(List.of("Engineers"));
+      ConfigEvent event =
+          new ConfigEvent(
+              new Metadata(null, null, null, null, null, null),
+              new Payload("USER", "test-realm", Operation.UPDATE, new Config(null, userConfig)));
+
+      handler.update("test-realm", "user-id", event);
+
+      ArgumentCaptor<UserRepresentation> repCaptor =
+          ArgumentCaptor.forClass(UserRepresentation.class);
+      verify(userResource).update(repCaptor.capture());
+      UserRepresentation sentToKeycloak = repCaptor.getValue();
+      assertNull(
+          sentToKeycloak.getRealmRoles(),
+          "realmRoles must be null so Keycloak's update() does not attach them directly");
+      assertNull(
+          sentToKeycloak.getClientRoles(),
+          "clientRoles must be null so Keycloak's update() does not attach them directly");
+      assertNull(
+          sentToKeycloak.getGroups(),
+          "groups must be null so GroupSyncHelper owns the membership diff");
+
+      verify(groupSyncHelper).syncUserGroups(List.of("Engineers"), "user-id", realmResource);
     }
   }
 

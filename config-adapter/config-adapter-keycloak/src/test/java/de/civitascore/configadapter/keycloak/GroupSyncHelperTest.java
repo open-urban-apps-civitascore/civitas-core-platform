@@ -9,14 +9,19 @@
  */
 package de.civitascore.configadapter.keycloak;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -134,5 +139,67 @@ class GroupSyncHelperTest {
     helper.syncUserGroups(List.of("prod"), USER_ID, realmResource);
 
     verify(groupsResource).groups("prod", true, 0, 1, true);
+  }
+
+  @Test
+  @DisplayName("NotFoundException on leaveGroup is logged and does not abort the loop")
+  void shouldContinueWhenLeaveGroupRaces() {
+    GroupRepresentation gone = group("gone-id", "gone-group");
+    GroupRepresentation other = group("other-id", "other-group");
+    when(userResource.groups()).thenReturn(List.of(gone, other));
+
+    doThrow(new NotFoundException()).when(userResource).leaveGroup("gone-id");
+
+    helper.syncUserGroups(List.of(), USER_ID, realmResource);
+
+    verify(userResource).leaveGroup("gone-id");
+    verify(userResource).leaveGroup("other-id");
+  }
+
+  @Test
+  @DisplayName("WebApplicationException on leaveGroup propagates so the event is DLQ'd")
+  void shouldPropagate5xxOnLeaveGroup() {
+    GroupRepresentation g = group("g-id", "g");
+    when(userResource.groups()).thenReturn(List.of(g));
+    doThrow(new WebApplicationException(Response.serverError().build()))
+        .when(userResource)
+        .leaveGroup("g-id");
+
+    assertThrows(
+        WebApplicationException.class,
+        () -> helper.syncUserGroups(List.of(), USER_ID, realmResource));
+  }
+
+  @Test
+  @DisplayName("NotFoundException on joinGroup is logged and does not abort the loop")
+  void shouldContinueWhenJoinGroupRaces() {
+    when(userResource.groups()).thenReturn(Collections.emptyList());
+
+    GroupRepresentation racedAway = group("raced-id", "raced");
+    GroupRepresentation present = group("present-id", "present");
+    when(groupsResource.groups("raced", true, 0, 1, true)).thenReturn(List.of(racedAway));
+    when(groupsResource.groups("present", true, 0, 1, true)).thenReturn(List.of(present));
+
+    doThrow(new NotFoundException()).when(userResource).joinGroup("raced-id");
+
+    helper.syncUserGroups(List.of("raced", "present"), USER_ID, realmResource);
+
+    verify(userResource).joinGroup("raced-id");
+    verify(userResource).joinGroup("present-id");
+  }
+
+  @Test
+  @DisplayName("WebApplicationException on joinGroup propagates so the event is DLQ'd")
+  void shouldPropagate5xxOnJoinGroup() {
+    when(userResource.groups()).thenReturn(Collections.emptyList());
+    GroupRepresentation g = group("g-id", "g");
+    when(groupsResource.groups("g", true, 0, 1, true)).thenReturn(List.of(g));
+    doThrow(new WebApplicationException(Response.serverError().build()))
+        .when(userResource)
+        .joinGroup("g-id");
+
+    assertThrows(
+        WebApplicationException.class,
+        () -> helper.syncUserGroups(List.of("g"), USER_ID, realmResource));
   }
 }

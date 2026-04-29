@@ -9,6 +9,8 @@
  */
 package de.civitascore.configadapter.keycloak;
 
+import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.WebApplicationException;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -28,8 +30,10 @@ class GroupSyncHelper {
   /**
    * Reconciles a user's group memberships with the desired set: removes memberships not in the
    * desired set, joins memberships that are missing. A {@code null} desired list is treated as an
-   * empty set (remove all memberships). Group names that don't exist in Keycloak are logged and
-   * skipped.
+   * empty set (remove all memberships). Group lookup uses exact-name matching. Groups that don't
+   * exist in Keycloak are logged and skipped (warning), as are race-condition NotFoundExceptions on
+   * leaveGroup/joinGroup. Other Keycloak failures (5xx, network) propagate so the event is DLQ'd
+   * rather than silently leaving the user partially synced.
    */
   void syncUserGroups(List<String> desiredGroupNames, String userId, RealmResource realmResource) {
     Set<String> desired =
@@ -40,11 +44,26 @@ class GroupSyncHelper {
 
     for (GroupRepresentation group : currentGroups) {
       if (!desired.contains(group.getName())) {
-        realmResource.users().get(userId).leaveGroup(group.getId());
-        logger.info(
-            "Removed user {} from group '{}'",
-            Encode.forJava(KeycloakErrorHandler.maskId(userId)),
-            Encode.forJava(group.getName()));
+        try {
+          realmResource.users().get(userId).leaveGroup(group.getId());
+          logger.info(
+              "Removed user {} from group '{}'",
+              Encode.forJava(KeycloakErrorHandler.maskId(userId)),
+              Encode.forJava(group.getName()));
+        } catch (NotFoundException e) {
+          logger.warn(
+              "Group '{}' (id={}) already gone for user {} during leave — skipping.",
+              Encode.forJava(group.getName()),
+              Encode.forJava(KeycloakErrorHandler.maskId(group.getId())),
+              Encode.forJava(KeycloakErrorHandler.maskId(userId)));
+        } catch (WebApplicationException e) {
+          logger.error(
+              "Failed to remove user {} from group '{}': {}",
+              Encode.forJava(KeycloakErrorHandler.maskId(userId)),
+              Encode.forJava(group.getName()),
+              e.getResponse().getStatus());
+          throw e;
+        }
       }
     }
 
@@ -57,11 +76,25 @@ class GroupSyncHelper {
               "Group '{}' not found in Keycloak, skipping assignment.", Encode.forJava(groupName));
           continue;
         }
-        realmResource.users().get(userId).joinGroup(found.getFirst().getId());
-        logger.info(
-            "Added user {} to group '{}'",
-            Encode.forJava(KeycloakErrorHandler.maskId(userId)),
-            Encode.forJava(groupName));
+        try {
+          realmResource.users().get(userId).joinGroup(found.getFirst().getId());
+          logger.info(
+              "Added user {} to group '{}'",
+              Encode.forJava(KeycloakErrorHandler.maskId(userId)),
+              Encode.forJava(groupName));
+        } catch (NotFoundException e) {
+          logger.warn(
+              "Group '{}' disappeared between lookup and join for user {} — skipping.",
+              Encode.forJava(groupName),
+              Encode.forJava(KeycloakErrorHandler.maskId(userId)));
+        } catch (WebApplicationException e) {
+          logger.error(
+              "Failed to add user {} to group '{}': {}",
+              Encode.forJava(KeycloakErrorHandler.maskId(userId)),
+              Encode.forJava(groupName),
+              e.getResponse().getStatus());
+          throw e;
+        }
       }
     }
   }
