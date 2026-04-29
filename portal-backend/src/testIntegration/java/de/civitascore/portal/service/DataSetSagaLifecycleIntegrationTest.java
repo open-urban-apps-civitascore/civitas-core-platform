@@ -38,9 +38,6 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.Network;
-import org.testcontainers.kafka.KafkaContainer;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -68,34 +65,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Slf4j
 class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
 
-  static final Network sagaNetwork = Network.newNetwork();
-
-  static final GenericContainer<?> postgis = createPostgis(sagaNetwork);
-  static final GenericContainer<?> frost = createFrost(sagaNetwork, postgis);
-  static final KafkaContainer kafka = createKafka();
-  static final GenericContainer<?> redpandaConnect = createRedpandaConnect(sagaNetwork);
-  static final GenericContainer<?> mosquitto = createMosquitto(sagaNetwork);
-
   private static SagaOrchestratorTestHelper sagaHelper;
-  private static String frostExternalUrl;
-  private static String redpandaExternalUrl;
-
-  static {
-    postgis.start();
-    frost.start();
-    kafka.start();
-    mosquitto.start();
-    redpandaConnect.start();
-
-    frostExternalUrl =
-        "http://" + frost.getHost() + ":" + frost.getMappedPort(8080) + "/FROST-Server/v1.1";
-    redpandaExternalUrl =
-        "http://" + redpandaConnect.getHost() + ":" + redpandaConnect.getMappedPort(4195);
-
-    log.info("Lifecycle tests: FROST at {}", frostExternalUrl);
-    log.info("Lifecycle tests: Kafka at {}", kafka.getBootstrapServers());
-    log.info("Lifecycle tests: Redpanda Connect at {}", redpandaExternalUrl);
-  }
 
   @Autowired private DataSetService dataSetService;
   @Autowired private DataSetRepository dataSetRepository;
@@ -134,12 +104,6 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
     if (sagaHelper != null) {
       sagaHelper.close();
     }
-    redpandaConnect.stop();
-    mosquitto.stop();
-    kafka.stop();
-    frost.stop();
-    postgis.stop();
-    sagaNetwork.close();
   }
 
   @Test
