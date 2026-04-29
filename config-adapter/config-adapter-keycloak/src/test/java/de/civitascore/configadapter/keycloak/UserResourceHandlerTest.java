@@ -45,6 +45,7 @@ class UserResourceHandlerTest {
   private Keycloak keycloakClient;
   private ResultPublisher resultPublisher;
   private RoleSyncHelper roleSyncHelper;
+  private GroupSyncHelper groupSyncHelper;
   private UserResourceHandler handler;
 
   @BeforeEach
@@ -52,11 +53,18 @@ class UserResourceHandlerTest {
     keycloakClient = mock(Keycloak.class);
     resultPublisher = mock(ResultPublisher.class);
     roleSyncHelper = mock(RoleSyncHelper.class);
+    groupSyncHelper = mock(GroupSyncHelper.class);
     ObjectMapper objectMapper = new ObjectMapper();
     objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     handler =
         new UserResourceHandler(
-            keycloakClient, objectMapper, resultPublisher, roleSyncHelper, null, null);
+            keycloakClient,
+            objectMapper,
+            resultPublisher,
+            roleSyncHelper,
+            groupSyncHelper,
+            null,
+            null);
   }
 
   private ConfigEvent userEvent(String username) {
