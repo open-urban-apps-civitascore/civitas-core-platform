@@ -1,6 +1,6 @@
 package de.civitascore.portal.service;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.Operation;
@@ -29,50 +29,56 @@ class ConfigEventPublisherServiceTest {
   void publishUserCreated_shouldNotThrowException() {
     UserConfig userConfig = createTestUserConfig();
 
-    assertDoesNotThrow(() -> configEventPublisher.publishUserCreated("civitas-core", userConfig));
+    assertThatNoException()
+        .isThrownBy(() -> configEventPublisher.publishUserCreated("civitas-core", userConfig));
   }
 
   @Test
   void publishUserUpdated_shouldNotThrowException() {
     UserConfig userConfig = createTestUserConfig();
 
-    assertDoesNotThrow(() -> configEventPublisher.publishUserUpdated("civitas-core", userConfig));
+    assertThatNoException()
+        .isThrownBy(() -> configEventPublisher.publishUserUpdated("civitas-core", userConfig));
   }
 
   @Test
   void publishUserDeleted_shouldNotThrowException() {
     UserConfig userConfig = createTestUserConfig();
 
-    assertDoesNotThrow(() -> configEventPublisher.publishUserDeleted("civitas-core", userConfig));
+    assertThatNoException()
+        .isThrownBy(() -> configEventPublisher.publishUserDeleted("civitas-core", userConfig));
   }
 
   @Test
   void publishConfigEvent_shouldHandleNullResultTopic() {
     UserConfig userConfig = createTestUserConfig();
 
-    assertDoesNotThrow(
-        () ->
-            configEventPublisher.publishConfigEvent(
-                Topics.USER_CREATED,
-                "keycloak",
-                "civitas-core",
-                Operation.CREATE,
-                "/users",
-                userConfig));
+    assertThatNoException()
+        .isThrownBy(
+            () ->
+                configEventPublisher.publishConfigEvent(
+                    Topics.USER_CREATED,
+                    "keycloak",
+                    "civitas-core",
+                    Operation.CREATE,
+                    "/users",
+                    userConfig));
   }
 
   @Test
   void publishGroupCreated_shouldNotThrowException() {
     UserConfig userConfig = createTestUserConfig();
 
-    assertDoesNotThrow(() -> configEventPublisher.publishGroupCreated("civitas-core", userConfig));
+    assertThatNoException()
+        .isThrownBy(() -> configEventPublisher.publishGroupCreated("civitas-core", userConfig));
   }
 
   @Test
   void publishRoleCreated_shouldNotThrowException() {
     UserConfig userConfig = createTestUserConfig();
 
-    assertDoesNotThrow(() -> configEventPublisher.publishRoleCreated("civitas-core", userConfig));
+    assertThatNoException()
+        .isThrownBy(() -> configEventPublisher.publishRoleCreated("civitas-core", userConfig));
   }
 
   private UserConfig createTestUserConfig() {
