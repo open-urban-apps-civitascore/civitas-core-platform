@@ -175,7 +175,7 @@ public class DataSetSagaPublisher {
       return null;
     }
     return dataset.getNamedApis().stream()
-        .map(api -> new NamedApi(api.getName(), api.getSlug(), api.getStandard(), api.getVersion()))
+        .map(api -> new NamedApi(api.getSlug(), api.getStandard(), api.getVersion()))
         .toList();
   }
 

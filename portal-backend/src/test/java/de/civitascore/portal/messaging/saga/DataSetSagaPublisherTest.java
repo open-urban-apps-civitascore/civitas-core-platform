@@ -219,9 +219,14 @@ class DataSetSagaPublisherTest {
       java.util.Map<String, tools.jackson.databind.JsonNode> bySlug = new java.util.HashMap<>();
       namedApis.forEach(node -> bySlug.put(node.get("slug").asString(), node));
       assertThat(bySlug).containsKeys("traffic", "weather");
-      assertThat(bySlug.get("traffic").get("name").asString()).isEqualTo("Traffic Sensor Readings");
       assertThat(bySlug.get("traffic").get("standard").asString()).isEqualTo("STA");
       assertThat(bySlug.get("traffic").get("version").asString()).isEqualTo("1.1");
+      // Saga contract carries only slug/standard/version: human-readable name and description
+      // stay portal-backend-private.
+      assertThat(bySlug.get("traffic").get("name")).as("name must not leak across saga").isNull();
+      assertThat(bySlug.get("traffic").get("description"))
+          .as("description must not leak across saga")
+          .isNull();
     }
 
     @Test
