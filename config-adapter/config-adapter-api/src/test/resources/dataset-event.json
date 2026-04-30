@@ -168,8 +168,8 @@
       }
     ],
     "namedApis": [
-      { "name": "Traffic Sensor Readings", "slug": "traffic", "standard": "STA", "version": "1.1" },
-      { "name": "Weather Sensor Readings", "slug": "weather", "standard": "STA", "version": "1.1" }
+      { "slug": "traffic", "standard": "STA", "version": "1.1" },
+      { "slug": "weather", "standard": "STA", "version": "1.1" }
     ]
   }
 }
