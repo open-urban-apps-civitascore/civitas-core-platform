@@ -35,6 +35,11 @@ public class NamedApiOutputDTO {
   private String version;
 
   @Schema(
+      description = "Optional free-form description of the named API. Max 150 characters.",
+      example = "Live traffic counter readings from city sensors.")
+  private String description;
+
+  @Schema(
       description =
           "Predicted public URL once the dataset reaches AVAILABLE: "
               + "https://{civitas.api.domain}/v1/datasets/{datasetId}/{slug}. Server-populated;"

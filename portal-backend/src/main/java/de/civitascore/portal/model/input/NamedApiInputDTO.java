@@ -2,6 +2,7 @@ package de.civitascore.portal.model.input;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
@@ -42,4 +43,11 @@ public class NamedApiInputDTO {
       description = "Optional standard version (e.g. \"1.1\" for STA). Free-form string.",
       example = "1.1")
   private String version;
+
+  @Size(max = 150, message = "Description must be at most 150 characters") @Schema(
+      description =
+          "Optional free-form description of the named API surfaced in the dataset form and"
+              + " discovery responses. Max 150 characters.",
+      example = "Live traffic counter readings from city sensors.")
+  private String description;
 }

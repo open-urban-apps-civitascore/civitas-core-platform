@@ -514,6 +514,46 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should round-trip optional description alongside a null description")
+    void shouldRoundTripDescription() {
+      DataSetInputDTO input = createValidInput();
+      NamedApiInputDTO traffic = namedApi("Traffic", "traffic", "STA", "1.1");
+      traffic.setDescription("Live traffic counter readings from city sensors.");
+      NamedApiInputDTO weather = namedApi("Weather", "weather", "STA", "1.1");
+      // weather.description intentionally null — must round-trip as null
+
+      input.setNamedApis(List.of(traffic, weather));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+      assertThat(created.getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getDescription)
+          .containsExactlyInAnyOrder(
+              tuple("traffic", "Live traffic counter readings from city sensors."),
+              tuple("weather", null));
+
+      DataSetOutputDTO refetched = performGetById(created.getId()).getBody();
+      assertThat(refetched).isNotNull();
+      assertThat(refetched.getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getDescription)
+          .containsExactlyInAnyOrder(
+              tuple("traffic", "Live traffic counter readings from city sensors."),
+              tuple("weather", null));
+    }
+
+    @Test
+    @DisplayName("Should reject namedApis entry with description over 150 characters")
+    void shouldRejectOverlongDescription() {
+      DataSetInputDTO input = createValidInput();
+      NamedApiInputDTO bad = namedApi("Traffic", "traffic", "STA", null);
+      bad.setDescription("x".repeat(151));
+      input.setNamedApis(List.of(bad));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     @DisplayName("Should preserve NamedApi rows (id + routeId) when PATCH body omits namedApis")
     void shouldLeaveNamedApisUntouchedWhenPatchOmitsField() {
       DataSetInputDTO input = createValidInput();
