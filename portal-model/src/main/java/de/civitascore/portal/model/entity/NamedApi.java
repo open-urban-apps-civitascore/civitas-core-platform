@@ -9,6 +9,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -76,6 +77,14 @@ public class NamedApi extends BaseEntity {
   /** Optional standard version (e.g. {@code "1.1"} for STA). */
   @Column(name = "version", length = 32)
   private String version;
+
+  /**
+   * Optional free-form description shown in the dataset form (Basisinformationen, max 150 chars per
+   * concept #1383 wireframe) and surfaced in discovery responses. Portal-backend-private; not part
+   * of the saga contract.
+   */
+  @Size(max = 150) @Column(name = "description", length = 150)
+  private String description;
 
   /**
    * APISIX route ID populated by the dataset saga result handler after release. Null before release

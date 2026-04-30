@@ -19,6 +19,7 @@ CREATE TABLE named_apis
     slug        VARCHAR(32)                 NOT NULL,
     standard    VARCHAR(16)                 NOT NULL,
     version     VARCHAR(32),
+    description VARCHAR(150),
     route_id    VARCHAR(255),
     CONSTRAINT pk_named_apis PRIMARY KEY (id),
     CONSTRAINT uk_named_api_dataset_slug UNIQUE (dataset_id, slug),
