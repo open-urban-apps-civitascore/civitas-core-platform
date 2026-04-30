@@ -6491,6 +6491,13 @@ components:
             Optional standard version (e.g. `"1.1"` for STA). Free-form
             string.
           example: "1.1"
+        description:
+          type: string
+          maxLength: 150
+          description: |
+            Optional free-form description of the named API surfaced in the
+            dataset form and discovery responses. Max 150 characters.
+          example: Live traffic counter readings from city sensors.
         previewUrl:
           type: string
           format: uri
