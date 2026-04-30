@@ -1,7 +1,7 @@
 CREATE EXTENSION IF NOT EXISTS postgis;
 
 -- Test schema that simulates what the CIVITAS portal backend provisions
--- when a dataset with GEO_PERSISTENCE DataSink is published.
+-- when a dataset with GEO_PERSISTENCE DataSink is released (DRAFT → AVAILABLE).
 -- Schema name mirrors the convention: dataset_{uuid}
 
 CREATE SCHEMA IF NOT EXISTS dataset_test_uuid_001;
