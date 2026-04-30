@@ -1,60 +1,213 @@
 name: geoserver
 
-services:
-  geoserver:
-    image: docker.osgeo.org/geoserver:2.26.2
-    container_name: civitas-geoserver
-    hostname: civitas-geoserver
-    environment:
-      - GEOSERVER_ADMIN_USER=${GEOSERVER_ADMIN_USER:-admin}
-      - GEOSERVER_ADMIN_PASSWORD=${GEOSERVER_ADMIN_PASSWORD}
-      - SKIP_DEMO_DATA=true
-      - INSTALL_EXTENSIONS=false
-    volumes:
-      - geoserver_data:/opt/geoserver_data
-    ports:
-      - "8082:8080"
-    depends_on:
-      postgis:
-        condition: service_healthy
-    networks:
-      - geoserver-network
-      - civitas-network
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/geoserver/web/ || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
+x-variables:
+  environment: &common_env
+    SPRING_PROFILES_ACTIVE: "pgconfig,acl"
+    GEOWEBCACHE_CACHE_DIR: /data/geowebcache
 
-  postgis:
-    image: postgis/postgis:17-3.5-alpine
-    container_name: civitas-geoserver-db
-    hostname: civitas-geoserver-db
-    environment:
-      - POSTGRES_DB=geoserver
-      - POSTGRES_USER=geoserver
-      - POSTGRES_PASSWORD=${POSTGIS_PASSWORD}
-    volumes:
-      - postgis_data:/var/lib/postgresql/data
-      - ./init:/docker-entrypoint-initdb.d
-    expose:
-      - "5432"
-    ports:
-      - "5434:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d geoserver -U geoserver"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      - geoserver-network
+x-config-server-overrides:
+  environment: &config-server-overrides
+    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_ACL_URL: http://acl:8080/acl/api
+    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_ACL_USERNAME: admin
+    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_ACL_PASSWORD: s3cr3t
+    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_HOST: geoserverdb
+    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_PORT: 5432
+    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_DATABASE: geoserver
+    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_USERNAME: geoserver
+    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_PASSWORD: ${GEOSERVER_DB_PASSWORD:-geoserver}
+    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_SCHEMA: pgconfig
+    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_INITIALIZE: true
+
+x-gs-dependencies: &gs-dependencies
+  rabbitmq:
+    condition: service_healthy
+  discovery:
+    condition: service_healthy
+  geoserverdb:
+    condition: service_started
+  config:
+    condition: service_healthy
+  acl:
+    condition: service_healthy
 
 volumes:
-  geoserver_data:
-  postgis_data:
+  geowebcache_data:
+  geoserverdb_data:
+
+services:
+  geoserverdb:
+    image: imresamu/postgis:17-3.5
+    container_name: civitas-geoserver-db
+    hostname: civitas-geoserver-db
+    shm_size: 2g
+    environment:
+      POSTGRES_DB: geoserver
+      POSTGRES_USER: geoserver
+      POSTGRES_PASSWORD: ${GEOSERVER_DB_PASSWORD:-geoserver}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U geoserver"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - geoserverdb_data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d
+    ports:
+      - "5434:5432"
+    networks:
+      - geoserver-internal
+
+  rabbitmq:
+    image: rabbitmq:3.13.3-alpine
+    user: "1000:1000"
+    restart: unless-stopped
+    tmpfs:
+      - /var/lib/rabbitmq:size=512m,mode=1777
+    healthcheck:
+      test: rabbitmq-diagnostics is_running
+      start_period: 10s
+      interval: 15s
+      timeout: 30s
+      retries: 3
+    networks:
+      - geoserver-internal
+
+  acl:
+    image: geoservercloud/geoserver-acl:2.4.0
+    user: "1000:1000"
+    depends_on:
+      geoserverdb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      PG_HOST: geoserverdb
+      PG_PORT: 5432
+      PG_DB: geoserver
+      PG_USERNAME: geoserver
+      PG_PASSWORD: ${GEOSERVER_DB_PASSWORD:-geoserver}
+      PG_SCHEMA: acl
+      'ACL_USERS_ADMIN_PASSWORD': '{noop}s3cr3t'
+      'ACL_USERS_GEOSERVER_PASSWORD': '{noop}s3cr3t'
+      GEOSERVER_BUS_ENABLED: true
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+    networks:
+      - geoserver-internal
+
+  config:
+    image: geoservercloud/geoserver-cloud-config:2.28.3.0
+    user: "1000:1000"
+    environment:
+      <<: *config-server-overrides
+      SPRING_PROFILES_ACTIVE: native
+      SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL: v2.28.3.0
+    networks:
+      - geoserver-internal
+
+  discovery:
+    image: geoservercloud/geoserver-cloud-discovery:2.28.3.0
+    user: "1000:1000"
+    depends_on:
+      - config
+    ports:
+      - "8500:8500"
+    networks:
+      - geoserver-internal
+
+  # Single entry point routing to all GeoServer microservices.
+  # Named civitas-geoserver so APISIX can reach it via Docker network
+  # at civitas-geoserver:8080 (see setup-apisix-route.sh).
+  gateway:
+    image: geoservercloud/geoserver-cloud-gateway:2.28.3.0
+    user: "1000:1000"
+    container_name: civitas-geoserver
+    hostname: civitas-geoserver
+    depends_on:
+      discovery:
+        condition: service_healthy
+    environment:
+      GEOSERVER_BASE_PATH: /geoserver
+    ports:
+      - "8082:8080"
+    networks:
+      - geoserver-internal
+      - civitas-network
+
+  # Base template for all GeoServer microservices (replicas: 0 = not started directly)
+  geoserver_template:
+    image: geoservercloud/geoserver-cloud-webui:2.28.3.0
+    user: "1000:1000"
+    environment:
+      <<: *common_env
+    volumes:
+      - geowebcache_data:/data/geowebcache
+    deploy:
+      mode: replicated
+      replicas: 0
+    networks:
+      - geoserver-internal
+
+  wfs:
+    image: geoservercloud/geoserver-cloud-wfs:2.28.3.0
+    extends:
+      service: geoserver_template
+    depends_on: *gs-dependencies
+    deploy:
+      replicas: 1
+
+  wms:
+    image: geoservercloud/geoserver-cloud-wms:2.28.3.0
+    extends:
+      service: geoserver_template
+    depends_on: *gs-dependencies
+    deploy:
+      replicas: 1
+
+  wcs:
+    image: geoservercloud/geoserver-cloud-wcs:2.28.3.0
+    extends:
+      service: geoserver_template
+    depends_on: *gs-dependencies
+    deploy:
+      replicas: 1
+
+  wps:
+    image: geoservercloud/geoserver-cloud-wps:2.28.3.0
+    extends:
+      service: geoserver_template
+    depends_on: *gs-dependencies
+    deploy:
+      replicas: 1
+
+  restconfig:
+    image: geoservercloud/geoserver-cloud-rest:2.28.3.0
+    extends:
+      service: geoserver_template
+    depends_on: *gs-dependencies
+    deploy:
+      replicas: 1
+
+  webui:
+    image: geoservercloud/geoserver-cloud-webui:2.28.3.0
+    extends:
+      service: geoserver_template
+    depends_on: *gs-dependencies
+    deploy:
+      replicas: 1
+
+  gwc:
+    image: geoservercloud/geoserver-cloud-gwc:2.28.3.0
+    extends:
+      service: geoserver_template
+    depends_on: *gs-dependencies
+    deploy:
+      replicas: 1
 
 networks:
-  geoserver-network:
+  geoserver-internal:
     driver: bridge
   civitas-network:
     name: civitas-network

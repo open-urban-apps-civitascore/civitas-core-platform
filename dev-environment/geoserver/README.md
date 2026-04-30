@@ -1,6 +1,37 @@
-# GeoServer Development Setup
+# GeoServer Cloud Development Setup
 
-GeoServer with a dedicated PostGIS database for local development of GeoServer integration.
+GeoServer Cloud — a microservices-based GeoServer distribution — with a shared
+PostgreSQL backend (pgconfig catalog + ACL) for local development.
+
+---
+
+## Architecture
+
+GeoServer Cloud splits GeoServer into independent microservices that communicate
+via RabbitMQ and register with a Consul discovery service. All OGC service
+requests enter through the gateway.
+
+```
+Host                Docker (geoserver-internal network)
+────                ──────────────────────────────────
+localhost:8082 ──►  gateway (civitas-geoserver)
+                      ├─► webui
+                      ├─► wfs
+                      ├─► wms
+                      ├─► wcs
+                      ├─► wps
+                      ├─► restconfig
+                      └─► gwc
+                    acl  ◄──► geoserverdb (PostgreSQL/PostGIS)
+                    config (Spring Cloud Config)
+                    discovery (Consul)
+                    rabbitmq (message bus)
+localhost:5434 ──►  geoserverdb (direct DB access)
+localhost:8500 ──►  discovery (Consul UI)
+```
+
+The gateway is also connected to `civitas-network` so APISIX can route
+`/geoserver/*` requests to it by Docker hostname (`civitas-geoserver:8080`).
 
 ---
 
@@ -8,13 +39,11 @@ GeoServer with a dedicated PostGIS database for local development of GeoServer i
 
 | Container | Role | Local Port |
 |-----------|------|------------|
-| `civitas-geoserver` | GeoServer OGC server | `8082` |
-| `civitas-geoserver-db` | PostGIS database | `5434` |
-
-The PostGIS database is only reachable from within the `geoserver-network`
-by the GeoServer container, and directly from the host on port `5434`.
-It is intentionally **not** connected to `civitas-network` — spatial data is
-separate from the portal backend database.
+| `civitas-geoserver` | Gateway — single entry point | `8082` |
+| `civitas-geoserver-db` | PostgreSQL/PostGIS (pgconfig + ACL) | `5434` |
+| *(internal)* | Consul discovery UI | `8500` |
+| *(internal)* | WFS, WMS, WCS, WPS, REST, WebUI, GWC | — |
+| *(internal)* | RabbitMQ, ACL, Config server | — |
 
 ---
 
@@ -22,7 +51,7 @@ separate from the portal backend database.
 
 ```bash
 cd dev-environment/geoserver
-cp .env.example .env          # set passwords
+cp .env.example .env          # review GEOSERVER_DB_PASSWORD
 docker compose up -d
 ```
 
@@ -32,6 +61,9 @@ Or start everything via the root script:
 cd dev-environment
 ./start-portal-dev.sh
 ```
+
+GeoServer Cloud takes ~60–90 seconds to fully start (all microservices must
+register with Consul before the gateway begins routing).
 
 ---
 
@@ -45,14 +77,14 @@ cd dev-environment
 | Port | `5434` |
 | Database | `geoserver` |
 | User | `geoserver` |
-| Password | see `geoserver/.env` → `POSTGIS_PASSWORD` |
+| Password | see `geoserver/.env` → `GEOSERVER_DB_PASSWORD` |
 | SSL | disabled (local dev) |
 
 ```bash
 psql -h localhost -p 5434 -U geoserver -d geoserver
 ```
 
-### PostGIS — From GeoServer Container (Docker network)
+### PostGIS — From GeoServer Containers (Docker network)
 
 GeoServer datastores must use the internal Docker hostname:
 
@@ -62,20 +94,20 @@ GeoServer datastores must use the internal Docker hostname:
 | Port | `5432` |
 | Database | `geoserver` |
 | User | `geoserver` |
-| Password | see `geoserver/.env` → `POSTGIS_PASSWORD` |
+| Password | see `geoserver/.env` → `GEOSERVER_DB_PASSWORD` |
 
 ### GeoServer REST API (config-adapter / curl)
 
 | Property | Value |
 |----------|-------|
 | Base URL | `http://localhost:8082/geoserver` |
-| Admin User | `admin` (or `GEOSERVER_ADMIN_USER` from `.env`) |
-| Admin Password | see `geoserver/.env` → `GEOSERVER_ADMIN_PASSWORD` |
+| Admin User | `admin` |
+| Admin Password | `geoserver` (GeoServer Cloud default) |
 | Auth scheme | HTTP Basic |
 
 ```bash
 # Test REST API connectivity
-curl -u admin:<password> http://localhost:8082/geoserver/rest/workspaces.json
+curl -u admin:geoserver http://localhost:8082/geoserver/rest/workspaces.json
 ```
 
 ### GeoServer OGC Services (via APISIX gateway)
@@ -92,26 +124,32 @@ curl -u admin:<password> http://localhost:8082/geoserver/rest/workspaces.json
 ```
 http://localhost:8082/geoserver/web
 User:     admin
-Password: see geoserver/.env → GEOSERVER_ADMIN_PASSWORD
+Password: geoserver
+```
+
+### Consul Service Discovery UI
+
+```
+http://localhost:8500
 ```
 
 ---
 
 ## Configuring a GeoServer Datastore via REST API
 
-The config-adapter will create datastores via the GeoServer REST API.
+The config-adapter creates datastores via the GeoServer REST API.
 Equivalent manual steps for development/debugging:
 
 **1. Create workspace**
 ```bash
-curl -u admin:<pw> -X POST http://localhost:8082/geoserver/rest/workspaces \
+curl -u admin:geoserver -X POST http://localhost:8082/geoserver/rest/workspaces \
   -H "Content-Type: application/json" \
   -d '{"workspace": {"name": "my-dataset"}}'
 ```
 
 **2. Create PostGIS datastore**
 ```bash
-curl -u admin:<pw> -X POST \
+curl -u admin:geoserver -X POST \
   http://localhost:8082/geoserver/rest/workspaces/my-dataset/datastores \
   -H "Content-Type: application/json" \
   -d '{
@@ -123,7 +161,7 @@ curl -u admin:<pw> -X POST \
           {"@key": "port",     "content": "5432"},
           {"@key": "database", "content": "geoserver"},
           {"@key": "user",     "content": "geoserver"},
-          {"@key": "passwd",   "content": "<POSTGIS_PASSWORD>"},
+          {"@key": "passwd",   "content": "<GEOSERVER_DB_PASSWORD>"},
           {"@key": "dbtype",   "content": "postgis"},
           {"@key": "schema",   "content": "public"}
         ]
@@ -134,7 +172,7 @@ curl -u admin:<pw> -X POST \
 
 **3. Publish a feature type (implicitly creates the Layer)**
 ```bash
-curl -u admin:<pw> -X POST \
+curl -u admin:geoserver -X POST \
   http://localhost:8082/geoserver/rest/workspaces/my-dataset/datastores/my-dataset-db/featuretypes \
   -H "Content-Type: application/json" \
   -d '{
@@ -154,7 +192,7 @@ curl -u admin:<pw> -X POST \
 
 **4. Delete workspace (including all child resources)**
 ```bash
-curl -u admin:<pw> -X DELETE \
+curl -u admin:geoserver -X DELETE \
   "http://localhost:8082/geoserver/rest/workspaces/my-dataset?recurse=true"
 ```
 
@@ -162,9 +200,14 @@ curl -u admin:<pw> -X DELETE \
 
 ## Notes
 
-- The PostGIS container exposes port `5434` on the host to avoid conflict with
-  the portal backend postgres on `5432`.
-- GeoServer configuration (workspaces, stores, layers) is persisted in the
-  `geoserver_data` Docker volume — it survives container restarts.
+- GeoServer Cloud persists catalog data (workspaces, stores, layers) in the
+  `geoserverdb` PostgreSQL database (`pgconfig` schema), not in a file-based
+  data directory. The `geoserverdb_data` volume survives container restarts.
+- GeoWebCache tiles are stored in the `geowebcache_data` volume.
+- The PostGIS container exposes port `5434` to avoid conflict with the portal
+  backend PostgreSQL on `5432`.
 - Spatial tables must exist in the PostGIS database before they can be
-  published as feature types.
+  published as feature types. The `init/` directory seeds a test schema on
+  first startup.
+- The ACL service manages access control for GeoServer resources. Default
+  admin credentials for the ACL API are `admin` / `s3cr3t` (dev only).
