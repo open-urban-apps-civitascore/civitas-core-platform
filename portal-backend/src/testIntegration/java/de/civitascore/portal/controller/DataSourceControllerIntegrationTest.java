@@ -126,12 +126,12 @@ class DataSourceControllerIntegrationTest
     return exchange(url, HttpMethod.POST, createAuthHeaders(), null, getOutputTypeReference());
   }
 
-  private ResponseEntity<DataSourceOutputDTO> performUnpublish(UUID id) {
+  private ResponseEntity<DataSourceOutputDTO> performUnrelease(UUID id) {
     String url = DATASOURCES_ENDPOINT + "/" + id + "/unrelease";
     return exchange(url, HttpMethod.POST, createAuthHeaders(), null, getOutputTypeReference());
   }
 
-  private ResponseEntity<String> performUnpublishExpectingError(UUID id) {
+  private ResponseEntity<String> performUnreleaseExpectingError(UUID id) {
     String url = DATASOURCES_ENDPOINT + "/" + id + "/unrelease";
     return restTemplate.exchange(
         url, HttpMethod.POST, new HttpEntity<>(createAuthHeaders()), String.class);
@@ -987,7 +987,7 @@ class DataSourceControllerIntegrationTest
 
   @Nested
   @DisplayName("Released Meta Update Tests")
-  class PublishedMetaTests {
+  class ReleasedMetaTests {
 
     @Test
     @DisplayName("Should update name and description of AVAILABLE data source")
@@ -1209,7 +1209,7 @@ class DataSourceControllerIntegrationTest
 
   @Nested
   @DisplayName("Unrelease DataSource Tests")
-  class UnpublishTests {
+  class UnreleaseTests {
 
     @Test
     @DisplayName("Should unrelease DataSource when not in use")
@@ -1217,7 +1217,7 @@ class DataSourceControllerIntegrationTest
       UUID id = createReleasableTestEntity();
       performRelease(id);
 
-      ResponseEntity<DataSourceOutputDTO> response = performUnpublish(id);
+      ResponseEntity<DataSourceOutputDTO> response = performUnrelease(id);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody().getDataSourceStatus()).isEqualTo(DataSourceStatus.DRAFT);
@@ -1229,7 +1229,7 @@ class DataSourceControllerIntegrationTest
       DataSource dataSource = createAvailableDataSource();
       linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.READY);
 
-      ResponseEntity<String> response = performUnpublishExpectingError(dataSource.getId());
+      ResponseEntity<String> response = performUnreleaseExpectingError(dataSource.getId());
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
@@ -1240,19 +1240,19 @@ class DataSourceControllerIntegrationTest
       DataSource dataSource = createAvailableDataSource();
       linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.AVAILABLE);
 
-      ResponseEntity<String> response = performUnpublishExpectingError(dataSource.getId());
+      ResponseEntity<String> response = performUnreleaseExpectingError(dataSource.getId());
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test
     @DisplayName(
-        "Should return 409 when unpublishing a DataSource referenced by a Pipeline in a DRAFT DataSet")
+        "Should return 409 when unreleasing a DataSource referenced by a Pipeline in a DRAFT DataSet")
     void shouldReturn409WhenInUseByDraftDataSet() {
       DataSource dataSource = createAvailableDataSource();
       linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.DRAFT);
 
-      ResponseEntity<String> response = performUnpublishExpectingError(dataSource.getId());
+      ResponseEntity<String> response = performUnreleaseExpectingError(dataSource.getId());
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }

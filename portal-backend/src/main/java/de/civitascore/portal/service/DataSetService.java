@@ -25,9 +25,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for managing {@link DataSet} entities through their full lifecycle: DRAFT, READY, and
- * AVAILABLE. Orchestrates publishing (generating distributions from pipeline APIs), releasing
- * (triggering infrastructure provisioning via sagas), and the corresponding reverse operations.
- * Handles saga completion and failure callbacks to reconcile dataset state.
+ * AVAILABLE. Orchestrates staging (DRAFT → READY: generating distributions from pipeline APIs),
+ * releasing (READY → AVAILABLE: triggering infrastructure provisioning via sagas), and the
+ * corresponding reverse operations (unstage, unrelease). Handles saga completion and failure
+ * callbacks to reconcile dataset state.
  */
 @Slf4j
 @Service
