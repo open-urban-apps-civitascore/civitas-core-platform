@@ -145,10 +145,37 @@ class DatasetSerializationTest {
     assertEquals("STA", traffic.standard());
     assertEquals("1.1", traffic.version());
 
-    NamedApi weather = dataset.namedApis().get(1);
-    assertEquals("weather", weather.slug());
-    assertEquals("STA", weather.standard());
-    assertEquals("1.1", weather.version());
+    // Second fixture entry exercises a non-STA standard and an absent (null) version.
+    NamedApi boundaries = dataset.namedApis().get(1);
+    assertEquals("boundaries", boundaries.slug());
+    assertEquals("WFS", boundaries.standard());
+    assertNull(boundaries.version());
+  }
+
+  /**
+   * Pins the forward-compat property documented on {@link NamedApi}: the record uses
+   * {@code @JsonIgnoreProperties(ignoreUnknown = true)} so portal-backend can add fields (e.g. the
+   * portal-backend-private {@code name} and {@code description}) without breaking config-adapter
+   * deserialization.
+   */
+  @Test
+  void shouldDeserializeNamedApiIgnoringUnknownFields() throws Exception {
+    String json =
+        """
+        {
+          "slug": "traffic",
+          "standard": "STA",
+          "version": "1.1",
+          "name": "Traffic Sensor Readings",
+          "description": "Live traffic counter readings from city sensors."
+        }
+        """;
+
+    NamedApi api = objectMapper.readValue(json, NamedApi.class);
+
+    assertEquals("traffic", api.slug());
+    assertEquals("STA", api.standard());
+    assertEquals("1.1", api.version());
   }
 
   @Test
