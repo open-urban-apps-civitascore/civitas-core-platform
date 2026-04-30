@@ -1,11 +1,11 @@
 meta {
-  name: Publish Data Structure Version
+  name: Release Data Structure Version
   type: http
   seq: 12
 }
 
 post {
-  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/publish
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/release
   body: none
   auth: inherit
 }
@@ -24,13 +24,13 @@ tests {
 docs {
   **Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in draft state.
 
-  **Expected Response:** 200 OK, body reflects version in published state.
+  **Expected Response:** 200 OK, body reflects version in released state.
 
   **System Impact:**
 
   | Layer | Effect |
   |---|---|
-  | Backend | Version status updated to published |
+  | Backend | Version status updated to released |
   | Config Adapter | -- |
-  | Model Atlas / Apicurio Registry | Version schema published at `modelAtlasUri`; verify in Apicurio Registry UI (`http://localhost:8888`) |
+  | Model Atlas / Apicurio Registry | Version schema released at `modelAtlasUri`; verify in Apicurio Registry UI (`http://localhost:8888`) |
 }

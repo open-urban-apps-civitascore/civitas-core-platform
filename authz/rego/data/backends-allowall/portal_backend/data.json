@@ -37,6 +37,9 @@
       "PATCH": null,
       "DELETE": null
     },
+    "/v1/groups/{id}/assignments": {
+      "PUT": null
+    },
     "/v1/permissions": {
       "GET": null
     },
@@ -63,10 +66,10 @@
       "PATCH": null,
       "DELETE": null
     },
-    "/v1/datasets/{id}/publish": {
+    "/v1/datasets/{id}/stage": {
       "POST": null
     },
-    "/v1/datasets/{id}/unpublish": {
+    "/v1/datasets/{id}/unstage": {
       "POST": null
     },
     "/v1/datasets/{id}/release": {
@@ -75,7 +78,7 @@
     "/v1/datasets/{id}/unrelease": {
       "POST": null
     },
-    "/v1/datasets/{id}/published/meta": {
+    "/v1/datasets/{id}/released/meta": {
       "PUT": null
     },
     "/v1/datasets/{id}/assignments": {
@@ -101,13 +104,13 @@
       "PATCH": null,
       "DELETE": null
     },
-    "/v1/datasources/{id}/publish": {
+    "/v1/datasources/{id}/release": {
       "POST": null
     },
-    "/v1/datasources/{id}/unpublish": {
+    "/v1/datasources/{id}/unrelease": {
       "POST": null
     },
-    "/v1/datasources/{id}/published/meta": {
+    "/v1/datasources/{id}/released/meta": {
       "PUT": null
     },
     "/v1/datasources/{id}/assignments": {
@@ -123,13 +126,13 @@
       "PATCH": null,
       "DELETE": null
     },
-    "/v1/datastructures/{id}/publish": {
+    "/v1/datastructures/{id}/release": {
       "POST": null
     },
-    "/v1/datastructures/{id}/unpublish": {
+    "/v1/datastructures/{id}/unrelease": {
       "POST": null
     },
-    "/v1/datastructures/{id}/published/meta": {
+    "/v1/datastructures/{id}/released/meta": {
       "PUT": null
     },
     "/v1/datastructures/{id}/assignments": {
@@ -145,13 +148,13 @@
       "PATCH": null,
       "DELETE": null
     },
-    "/v1/datastructures/{id}/versions/{id}/publish": {
+    "/v1/datastructures/{id}/versions/{id}/release": {
       "POST": null
     },
-    "/v1/datastructures/{id}/versions/{id}/unpublish": {
+    "/v1/datastructures/{id}/versions/{id}/unrelease": {
       "POST": null
     },
-    "/v1/datastructures/{id}/versions/{id}/published/meta": {
+    "/v1/datastructures/{id}/versions/{id}/released/meta": {
       "PUT": null
     }
   }

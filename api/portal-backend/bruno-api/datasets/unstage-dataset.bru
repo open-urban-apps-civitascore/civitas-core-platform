@@ -1,11 +1,11 @@
 meta {
-  name: Unpublish Dataset
+  name: Unstage Dataset
   type: http
   seq: 12
 }
 
 post {
-  url: {{baseUrl}}/datasets/:id/unpublish
+  url: {{baseUrl}}/datasets/:id/unstage
   body: none
   auth: inherit
 }
@@ -15,9 +15,9 @@ params:path {
 }
 
 tests {
-  test("Unpublished or precondition not met", function() {
+  test("Unstaged or precondition not met", function() {
     const status = res.getStatus();
-    // 200=unpublished, 400=pending saga or already DRAFT
+    // 200=unstaged, 400=pending saga or already DRAFT
     expect(status === 200 || status === 400).to.be.true;
   });
 }

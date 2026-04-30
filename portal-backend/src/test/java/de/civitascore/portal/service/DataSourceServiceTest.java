@@ -87,12 +87,12 @@ class DataSourceServiceTest {
   }
 
   @Nested
-  @DisplayName("Publish DataSource")
-  class PublishTests {
+  @DisplayName("Release DataSource")
+  class ReleaseTests {
 
     @Test
-    @DisplayName("Should publish valid MQTT data source")
-    void shouldPublishValidMqttDataSource() {
+    @DisplayName("Should release valid MQTT data source")
+    void shouldReleaseValidMqttDataSource() {
       UUID id = UUID.randomUUID();
       DataSource entity = createMqttDataSource(id);
 
@@ -101,14 +101,14 @@ class DataSourceServiceTest {
       when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.MQTT)).thenReturn(mqttHandler);
       when(mqttHandler.validate(any(), any(Class[].class))).thenReturn(Collections.emptyList());
 
-      DataSource result = dataSourceService.publish(id);
+      DataSource result = dataSourceService.release(id);
 
       assertThat(result.getDataSourceStatus()).isEqualTo(DataSourceStatus.AVAILABLE);
     }
 
     @Test
-    @DisplayName("Should publish valid SQL data source")
-    void shouldPublishValidSqlDataSource() {
+    @DisplayName("Should release valid SQL data source")
+    void shouldReleaseValidSqlDataSource() {
       UUID id = UUID.randomUUID();
       DataSource entity = createSqlDataSource(id);
 
@@ -117,14 +117,14 @@ class DataSourceServiceTest {
       when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.SQL)).thenReturn(sqlHandler);
       when(sqlHandler.validate(any(), any(Class[].class))).thenReturn(Collections.emptyList());
 
-      DataSource result = dataSourceService.publish(id);
+      DataSource result = dataSourceService.release(id);
 
       assertThat(result.getDataSourceStatus()).isEqualTo(DataSourceStatus.AVAILABLE);
     }
 
     @Test
-    @DisplayName("Should fail to publish already AVAILABLE data source")
-    void shouldFailToPublishAvailableDataSource() {
+    @DisplayName("Should fail to release already AVAILABLE data source")
+    void shouldFailToReleaseAvailableDataSource() {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
@@ -132,14 +132,14 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
 
-      assertThatThrownBy(() -> dataSourceService.publish(id))
+      assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("DRAFT");
     }
 
     @Test
-    @DisplayName("Should fail to publish without connector type")
-    void shouldFailToPublishWithoutConnectorType() {
+    @DisplayName("Should fail to release without connector type")
+    void shouldFailToReleaseWithoutConnectorType() {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
@@ -148,14 +148,14 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
 
-      assertThatThrownBy(() -> dataSourceService.publish(id))
+      assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("Connector type");
     }
 
     @Test
-    @DisplayName("Should fail to publish without data structure version")
-    void shouldFailToPublishWithoutDataStructureVersion() {
+    @DisplayName("Should fail to release without data structure version")
+    void shouldFailToReleaseWithoutDataStructureVersion() {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
@@ -165,14 +165,14 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
 
-      assertThatThrownBy(() -> dataSourceService.publish(id))
+      assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("Data structure version");
     }
 
     @Test
-    @DisplayName("Should fail to publish MQTT source without urls")
-    void shouldFailToPublishMqttWithoutUrls() {
+    @DisplayName("Should fail to release MQTT source without urls")
+    void shouldFailToReleaseMqttWithoutUrls() {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
@@ -185,14 +185,14 @@ class DataSourceServiceTest {
       when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.MQTT)).thenReturn(mqttHandler);
       when(mqttHandler.validate(any(), any(Class[].class))).thenReturn(List.of("urls is required"));
 
-      assertThatThrownBy(() -> dataSourceService.publish(id))
+      assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("urls");
     }
 
     @Test
-    @DisplayName("Should fail to publish MQTT source with invalid qos")
-    void shouldFailToPublishMqttWithInvalidQos() {
+    @DisplayName("Should fail to release MQTT source with invalid qos")
+    void shouldFailToReleaseMqttWithInvalidQos() {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
@@ -207,14 +207,14 @@ class DataSourceServiceTest {
       when(mqttHandler.validate(any(), any(Class[].class)))
           .thenReturn(List.of("qos must be 0, 1, or 2"));
 
-      assertThatThrownBy(() -> dataSourceService.publish(id))
+      assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("qos");
     }
 
     @Test
-    @DisplayName("Should fail to publish SQL source without driver")
-    void shouldFailToPublishSqlWithoutDriver() {
+    @DisplayName("Should fail to release SQL source without driver")
+    void shouldFailToReleaseSqlWithoutDriver() {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
@@ -229,14 +229,14 @@ class DataSourceServiceTest {
       when(sqlHandler.validate(any(), any(Class[].class)))
           .thenReturn(List.of("driver is required"));
 
-      assertThatThrownBy(() -> dataSourceService.publish(id))
+      assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("driver");
     }
 
     @Test
-    @DisplayName("Should fail to publish with empty configuration")
-    void shouldFailToPublishWithEmptyConfiguration() {
+    @DisplayName("Should fail to release with empty configuration")
+    void shouldFailToReleaseWithEmptyConfiguration() {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
@@ -247,29 +247,29 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
 
-      assertThatThrownBy(() -> dataSourceService.publish(id))
+      assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("Configuration is required");
     }
 
     @Test
-    @DisplayName("Should fail to publish non-existent data source")
-    void shouldFailToPublishNonExistentDataSource() {
+    @DisplayName("Should fail to release non-existent data source")
+    void shouldFailToReleaseNonExistentDataSource() {
       UUID id = UUID.randomUUID();
       when(dataSourceRepository.findById(id)).thenReturn(Optional.empty());
 
-      assertThatThrownBy(() -> dataSourceService.publish(id))
+      assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(ResourceNotFoundException.class);
     }
   }
 
   @Nested
-  @DisplayName("Unpublish DataSource")
-  class UnpublishTests {
+  @DisplayName("Unrelease DataSource")
+  class UnreleaseTests {
 
     @Test
-    @DisplayName("Should unpublish AVAILABLE data source")
-    void shouldUnpublishAvailableDataSource() {
+    @DisplayName("Should unrelease AVAILABLE data source")
+    void shouldUnreleaseAvailableDataSource() {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
@@ -279,15 +279,15 @@ class DataSourceServiceTest {
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
       when(pipelineRepository.existsByDataSourcesId(any())).thenReturn(false);
 
-      DataSource result = dataSourceService.unpublish(id);
+      DataSource result = dataSourceService.unrelease(id);
 
       assertThat(result.getDataSourceStatus()).isEqualTo(DataSourceStatus.DRAFT);
     }
 
     @Test
     @DisplayName(
-        "Should block unpublish when DataSource is referenced by a READY or AVAILABLE DataSet")
-    void shouldBlockUnpublishWhenInUse() {
+        "Should block unrelease when DataSource is referenced by a READY or AVAILABLE DataSet")
+    void shouldBlockUnreleaseWhenInUse() {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
@@ -296,13 +296,13 @@ class DataSourceServiceTest {
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       when(pipelineRepository.existsByDataSourcesId(any())).thenReturn(true);
 
-      assertThatThrownBy(() -> dataSourceService.unpublish(id))
+      assertThatThrownBy(() -> dataSourceService.unrelease(id))
           .isInstanceOf(ResourceInUseException.class);
     }
 
     @Test
-    @DisplayName("Should fail to unpublish DRAFT data source")
-    void shouldFailToUnpublishDraftDataSource() {
+    @DisplayName("Should fail to unrelease DRAFT data source")
+    void shouldFailToUnreleaseDraftDataSource() {
       UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
@@ -310,15 +310,15 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
 
-      assertThatThrownBy(() -> dataSourceService.unpublish(id))
+      assertThatThrownBy(() -> dataSourceService.unrelease(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("AVAILABLE");
     }
   }
 
   @Nested
-  @DisplayName("Update Published Metadata")
-  class UpdatePublishedMetaTests {
+  @DisplayName("Update Released Metadata")
+  class UpdateReleasedMetaTests {
 
     private void stubNotInUse(UUID id) {
       when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(false);
@@ -346,7 +346,7 @@ class DataSourceServiceTest {
       stubNotInUse(id);
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getName()).isEqualTo("new-name");
       assertThat(result.getDescription()).isEqualTo("new-desc");
@@ -365,7 +365,7 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
 
-      assertThatThrownBy(() -> dataSourceService.updatePublishedMeta(id, input))
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("AVAILABLE");
     }
@@ -387,7 +387,7 @@ class DataSourceServiceTest {
       stubNotInUse(id);
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getName()).isEqualTo("updated-name");
       assertThat(result.getDescription()).isEqualTo("original-desc");
@@ -422,7 +422,7 @@ class DataSourceServiceTest {
       when(mqttHandler.getSensitiveFields()).thenReturn(Set.of());
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getConfiguration()).containsEntry("topics", List.of("new/topic"));
     }
@@ -470,7 +470,7 @@ class DataSourceServiceTest {
       when(sqlHandler.getSensitiveFields()).thenReturn(Set.of("password"));
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getConfiguration()).containsEntry("password", "enc_secret");
       assertThat(result.getConfiguration()).containsEntry("dsn", "postgres://new-host/db");
@@ -496,7 +496,7 @@ class DataSourceServiceTest {
       stubNotInUse(id);
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getConfiguration()).isEqualTo(originalConfig);
     }
@@ -519,7 +519,7 @@ class DataSourceServiceTest {
       stubInUse(id);
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getName()).isEqualTo("new-name");
       assertThat(result.getDescription()).isEqualTo("new-desc");
@@ -542,7 +542,7 @@ class DataSourceServiceTest {
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       stubInUse(id);
 
-      assertThatThrownBy(() -> dataSourceService.updatePublishedMeta(id, input))
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("configuration")
           .hasMessageContaining("in use");
@@ -565,7 +565,7 @@ class DataSourceServiceTest {
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       stubInUse(id);
 
-      assertThatThrownBy(() -> dataSourceService.updatePublishedMeta(id, input))
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("connector type")
           .hasMessageContaining("in use");
@@ -592,7 +592,7 @@ class DataSourceServiceTest {
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       stubInUse(id);
 
-      assertThatThrownBy(() -> dataSourceService.updatePublishedMeta(id, input))
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("data structure version")
           .hasMessageContaining("in use");
@@ -616,7 +616,7 @@ class DataSourceServiceTest {
       stubInUse(id);
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getName()).isEqualTo("new-name");
     }
@@ -638,7 +638,7 @@ class DataSourceServiceTest {
       stubInUse(id);
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getAssignments()).isEmpty();
     }
@@ -661,7 +661,7 @@ class DataSourceServiceTest {
 
       assertThatThrownBy(() -> dataSourceService.deleteById(id))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("AVAILABLE");
+          .hasMessageContaining("released");
     }
 
     @Test

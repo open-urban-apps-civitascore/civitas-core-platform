@@ -92,7 +92,7 @@ test_required_permissions_patch_role if {
 
 # Test: AND-permission array → multi-element set
 test_required_permissions_and_array if {
-	result := permission_eval.required_permissions with input as portal_request_no_auth("PUT", "/v1/datasets/abc/published/meta")
+	result := permission_eval.required_permissions with input as portal_request_no_auth("PUT", "/v1/datasets/abc/released/meta")
 	result == {"DATASET_UPDATE", "DATASET_RELEASE"}
 }
 
@@ -142,7 +142,7 @@ test_is_known_endpoint_unknown if {
 
 # Test: AND-permission endpoint is known
 test_is_known_endpoint_and_permission if {
-	result := permission_eval.is_known_endpoint with input as portal_request_no_auth("PUT", "/v1/datasets/abc/published/meta")
+	result := permission_eval.is_known_endpoint with input as portal_request_no_auth("PUT", "/v1/datasets/abc/released/meta")
 	result == true
 }
 
@@ -202,7 +202,7 @@ test_has_permission_no_groups if {
 test_has_permission_and_both_present if {
 	result := permission_eval.has_permission with http.send as mock_send_and_both
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/dataset-1/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/dataset-1/released/meta")
 	result == true
 }
 
@@ -210,7 +210,7 @@ test_has_permission_and_both_present if {
 test_has_permission_and_missing_one if {
 	result := permission_eval.has_permission with http.send as mock_send_and_missing_one
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/dataset-1/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/dataset-1/released/meta")
 	result == false
 }
 

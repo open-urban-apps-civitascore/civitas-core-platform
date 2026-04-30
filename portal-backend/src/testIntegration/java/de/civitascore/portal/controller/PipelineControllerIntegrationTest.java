@@ -1159,7 +1159,7 @@ class PipelineControllerIntegrationTest
     @Test
     @DisplayName(
         "Should allow updating pipeline fields without re-validating unchanged datasource associations")
-    void shouldAllowPatchWhenLinkedDataSourceBecomesUnpublished() {
+    void shouldAllowPatchWhenLinkedDataSourceBecomesUnreleased() {
       // Create pipeline with an AVAILABLE datasource
       DataSource dataSource = createTestDataSource();
       dataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
@@ -1171,25 +1171,25 @@ class PipelineControllerIntegrationTest
       assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       UUID pipelineId = createResponse.getBody().getId();
 
-      // Unpublish the datasource (revert to DRAFT)
+      // Unrelease the datasource (revert to DRAFT)
       dataSource.setDataSourceStatus(DataSourceStatus.DRAFT);
       dataSourceRepository.save(dataSource);
 
       // PATCH a non-datasource field — should succeed because dataSourceIds is not in the patch
       Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("description", "Updated after datasource unpublished");
+      patchMap.put("description", "Updated after datasource unreleased");
 
       ResponseEntity<PipelineOutputDTO> patchResponse = performPatch(pipelineId, patchMap);
 
       assertThat(patchResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(patchResponse.getBody().getDescription())
-          .isEqualTo("Updated after datasource unpublished");
+          .isEqualTo("Updated after datasource unreleased");
     }
 
     @Test
     @DisplayName(
         "Should reject updating datasource associations when a linked datasource is no longer AVAILABLE")
-    void shouldRejectUpdateWhenReSubmittingUnpublishedDataSource() {
+    void shouldRejectUpdateWhenReSubmittingUnreleasedDataSource() {
       // Create pipeline with an AVAILABLE datasource
       DataSource dataSource = createTestDataSource();
       dataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
@@ -1201,7 +1201,7 @@ class PipelineControllerIntegrationTest
       assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       UUID pipelineId = createResponse.getBody().getId();
 
-      // Unpublish the datasource (revert to DRAFT)
+      // Unrelease the datasource (revert to DRAFT)
       dataSource.setDataSourceStatus(DataSourceStatus.DRAFT);
       dataSourceRepository.save(dataSource);
 

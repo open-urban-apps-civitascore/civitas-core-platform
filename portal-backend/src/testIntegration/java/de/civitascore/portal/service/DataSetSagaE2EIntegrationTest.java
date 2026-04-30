@@ -123,11 +123,11 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
     UUID dataSetId = dataSet.getId();
     UUID pipelineId = sqlPipeline.getId();
 
-    // Publish: DRAFT → READY (generates distributions from pipeline APIs)
-    DataSet published = dataSetService.publish(dataSetId);
-    assertThat(published.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
-    assertThat(published.getDistributions())
-        .as("Publish should create auto-generated distributions from pipeline APIs")
+    // Stage: DRAFT → READY (generates distributions from pipeline APIs)
+    DataSet staged = dataSetService.stage(dataSetId);
+    assertThat(staged.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+    assertThat(staged.getDistributions())
+        .as("Stage should create auto-generated distributions from pipeline APIs")
         .isNotEmpty();
 
     // Release: READY → AVAILABLE (triggers CREATE saga)
@@ -189,10 +189,10 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
     UUID dataSetId = dataSet.getId();
     UUID pipelineId = mqttPipeline.getId();
 
-    // Publish: DRAFT → READY
-    DataSet published = dataSetService.publish(dataSetId);
-    assertThat(published.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
-    assertThat(published.getDistributions()).isNotEmpty();
+    // Stage: DRAFT → READY
+    DataSet staged = dataSetService.stage(dataSetId);
+    assertThat(staged.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+    assertThat(staged.getDistributions()).isNotEmpty();
 
     // Release: READY → AVAILABLE (triggers CREATE saga)
     DataSet released = dataSetService.release(dataSetId);

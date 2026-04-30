@@ -10,11 +10,11 @@ import { toast } from 'sonner'
 
 import {
   usePatchDataset,
-  usePublishDataset,
   useReleaseDataset,
-  useUnpublishDataset,
+  useStageDataset,
   useUnreleaseDataset,
-  useUpdatePublishedDatasetMeta,
+  useUnstageDataset,
+  useUpdateReleasedDatasetMeta,
 } from '@/app/services/api/datasets/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { FooterElement } from '@/components/form/FooterElement'
@@ -83,17 +83,17 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
   const updateDataset = usePatchDataset()
-  const updatePublishedMeta = useUpdatePublishedDatasetMeta()
-  const publishDataset = usePublishDataset()
-  const unpublishDataset = useUnpublishDataset()
+  const updateReleasedMeta = useUpdateReleasedDatasetMeta()
+  const stageDataset = useStageDataset()
+  const unstageDataset = useUnstageDataset()
   const releaseDataset = useReleaseDataset()
   const unreleaseDataset = useUnreleaseDataset()
 
   const isLoading =
     updateDataset.isPending ||
-    updatePublishedMeta.isPending ||
-    publishDataset.isPending ||
-    unpublishDataset.isPending ||
+    updateReleasedMeta.isPending ||
+    stageDataset.isPending ||
+    unstageDataset.isPending ||
     releaseDataset.isPending ||
     unreleaseDataset.isPending
 
@@ -155,12 +155,12 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     if (oldStatus === newStatus) return []
 
     const transitions: Record<string, ((id: string) => Promise<unknown>)[]> = {
-      'DRAFT->READY': [publishDataset.mutateAsync],
-      'READY->DRAFT': [unpublishDataset.mutateAsync],
+      'DRAFT->READY': [stageDataset.mutateAsync],
+      'READY->DRAFT': [unstageDataset.mutateAsync],
       'READY->AVAILABLE': [releaseDataset.mutateAsync],
       'AVAILABLE->READY': [unreleaseDataset.mutateAsync],
-      'DRAFT->AVAILABLE': [publishDataset.mutateAsync, releaseDataset.mutateAsync],
-      'AVAILABLE->DRAFT': [unreleaseDataset.mutateAsync, unpublishDataset.mutateAsync],
+      'DRAFT->AVAILABLE': [stageDataset.mutateAsync, releaseDataset.mutateAsync],
+      'AVAILABLE->DRAFT': [unreleaseDataset.mutateAsync, unstageDataset.mutateAsync],
     }
 
     return transitions[`${oldStatus}->${newStatus}`] ?? []
@@ -194,7 +194,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
         if (serverStatus === DATASET_STATUS_TYPES.DRAFT) {
           await updateDataset.mutateAsync(updateData)
         } else {
-          await updatePublishedMeta.mutateAsync({ ...parsed.data, id: dataset.id })
+          await updateReleasedMeta.mutateAsync({ ...parsed.data, id: dataset.id })
         }
       }
 
@@ -207,12 +207,12 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       // Success message
       if (steps.length > 0) {
         const messageMap: Record<string, string> = {
-          'DRAFT->READY': t('messages.publishSuccess'),
-          'READY->DRAFT': t('messages.unpublishSuccess'),
+          'DRAFT->READY': t('messages.stageSuccess'),
+          'READY->DRAFT': t('messages.unstageSuccess'),
           'READY->AVAILABLE': t('messages.releaseSuccess'),
           'AVAILABLE->READY': t('messages.unreleaseSuccess'),
           'DRAFT->AVAILABLE': t('messages.releaseSuccess'),
-          'AVAILABLE->DRAFT': t('messages.unpublishSuccess'),
+          'AVAILABLE->DRAFT': t('messages.unstageSuccess'),
         }
         toast.success(messageMap[`${serverStatus}->${dataSetStatus}`] ?? t('messages.updateSuccess'))
       } else {

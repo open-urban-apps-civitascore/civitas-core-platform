@@ -86,10 +86,10 @@ class DataSetControllerIntegrationTest
     portalData.cleanAll();
   }
 
-  /** Seeds the minimum publish requirement: one datasource linked to the first pipeline. */
-  private void seedPublishRequirements(Pipeline... pipelines) {
+  /** Seeds the minimum stage requirement: one datasource linked to the first pipeline. */
+  private void seedStageRequirements(Pipeline... pipelines) {
     DataSource dataSource = new DataSource();
-    dataSource.setName("publish-datasource-" + System.nanoTime());
+    dataSource.setName("stage-datasource-" + System.nanoTime());
     dataSource = dataSourceRepository.save(dataSource);
     pipelines[0].getDataSources().add(dataSource);
     pipelineRepository.save(pipelines[0]);
@@ -476,8 +476,8 @@ class DataSetControllerIntegrationTest
         value = DataSetStatus.class,
         mode = EnumSource.Mode.EXCLUDE,
         names = {"DRAFT"})
-    @DisplayName("Should fail to update published dataset via regular PUT endpoint")
-    void shouldFailToUpdatePublishedDataSetViaRegularEndpoint(DataSetStatus status) {
+    @DisplayName("Should fail to update non-DRAFT dataset via regular PUT endpoint")
+    void shouldFailToUpdateNonDraftDataSetViaRegularEndpoint(DataSetStatus status) {
       DataSet dataSet = createDataSetWithRelationships();
       dataSet.setDataSetStatus(status);
       dataSet = dataSetRepository.save(dataSet);
@@ -511,8 +511,8 @@ class DataSetControllerIntegrationTest
         value = DataSetStatus.class,
         mode = EnumSource.Mode.EXCLUDE,
         names = {"DRAFT"})
-    @DisplayName("Should update published dataset metadata via /published/meta endpoint")
-    void shouldUpdatePublishedDataSetMetaViaPublishedEndpoint(DataSetStatus status) {
+    @DisplayName("Should update released dataset metadata via /released/meta endpoint")
+    void shouldUpdateReleasedDataSetMetaViaReleasedEndpoint(DataSetStatus status) {
       DataSet dataSet = createDataSetWithRelationships();
       dataSet.setDataSetStatus(status);
       dataSet = dataSetRepository.save(dataSet);
@@ -522,13 +522,13 @@ class DataSetControllerIntegrationTest
           dataSet.getPipelines().stream().map(Pipeline::getId).toList();
 
       DataSetInputDTO updateInput = new DataSetInputDTO();
-      updateInput.setName("Updated Published Dataset");
-      updateInput.setDescription("Updated description for published dataset");
+      updateInput.setName("Updated Released Dataset");
+      updateInput.setDescription("Updated description for released dataset");
       updateInput.setOpenDataAccess(false);
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSetId + "/published/meta",
+              getEndpointPath() + "/" + dataSetId + "/released/meta",
               org.springframework.http.HttpMethod.PUT,
               createAuthHeaders(),
               updateInput,
@@ -544,10 +544,10 @@ class DataSetControllerIntegrationTest
       assertThat(output.getId()).isEqualTo(dataSetId);
       assertThat(output.getName())
           .as("Name should be updated")
-          .isEqualTo("Updated Published Dataset");
+          .isEqualTo("Updated Released Dataset");
       assertThat(output.getDescription())
           .as("Description should be updated")
-          .isEqualTo("Updated description for published dataset");
+          .isEqualTo("Updated description for released dataset");
       assertThat(output.getPipelines())
           .as("Pipelines should remain unchanged")
           .hasSize(2)
@@ -557,8 +557,8 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should fail to update DRAFT dataset via /published/meta endpoint")
-    void shouldFailToUpdateDraftDataSetViaPublishedEndpoint() {
+    @DisplayName("Should fail to update DRAFT dataset via /released/meta endpoint")
+    void shouldFailToUpdateDraftDataSetViaReleasedEndpoint() {
       UUID dataSetId = createTestEntity();
 
       DataSetInputDTO updateInput = new DataSetInputDTO();
@@ -568,7 +568,7 @@ class DataSetControllerIntegrationTest
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSetId + "/published/meta",
+              getEndpointPath() + "/" + dataSetId + "/released/meta",
               org.springframework.http.HttpMethod.PUT,
               createAuthHeaders(),
               updateInput,
@@ -693,9 +693,9 @@ class DataSetControllerIntegrationTest
           .isEqualTo(secondResponse.getBody().getDescription());
     }
 
-    // Tests for preventing updates of published datasets via regular endpoint
-    // are in shouldFailToUpdatePublishedDataSetViaRegularEndpoint and
-    // shouldUpdatePublishedDataSetMetaViaPublishedEndpoint above
+    // Tests for preventing updates of non-DRAFT datasets via the regular endpoint are in
+    // shouldFailToUpdateNonDraftDataSetViaRegularEndpoint and
+    // shouldUpdateReleasedDataSetMetaViaReleasedEndpoint above
 
     @Test
     @DisplayName("Should fail to update non-existent dataset")
@@ -885,20 +885,20 @@ class DataSetControllerIntegrationTest
   }
 
   @Nested
-  @DisplayName("Publish DataSet Tests")
-  class PublishDataSetTests {
+  @DisplayName("Stage DataSet Tests")
+  class StageDataSetTests {
 
     @Test
-    @DisplayName("Should publish dataset with pipelines successfully")
-    void shouldPublishDataSetWithPipelinesSuccessfully() {
+    @DisplayName("Should stage dataset with pipelines successfully")
+    void shouldStageDataSetWithPipelinesSuccessfully() {
       DataSet dataSet = new DataSet();
-      dataSet.setName("test_dataset_publish_" + System.currentTimeMillis());
+      dataSet.setName("test_dataset_stage_" + System.currentTimeMillis());
       dataSet.setDescription("Test dataset with pipelines");
       dataSet.setDataSetStatus(DataSetStatus.DRAFT);
       dataSet.setPersistenceId(12345L);
-      dataSet.setIdentifier("test-identifier-publish");
+      dataSet.setIdentifier("test-identifier-stage");
       dataSet.setVersion("1.0.0");
-      dataSet.setExternalId("ext-dataset-publish-" + System.currentTimeMillis());
+      dataSet.setExternalId("ext-dataset-stage-" + System.currentTimeMillis());
       dataSet.setFormat("JSON");
       dataSet.setOpenDataAccess(false);
       dataSet = dataSetRepository.save(dataSet);
@@ -923,13 +923,13 @@ class DataSetControllerIntegrationTest
       pipeline2.setPersistences(Collections.singletonList(12345L));
       pipelineRepository.save(pipeline2);
 
-      seedPublishRequirements(pipeline1, pipeline2);
+      seedStageRequirements(pipeline1, pipeline2);
 
       UUID dataSetId = dataSet.getId();
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSetId + "/publish",
+              getEndpointPath() + "/" + dataSetId + "/stage",
               org.springframework.http.HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -938,7 +938,7 @@ class DataSetControllerIntegrationTest
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDataSetStatus())
-          .as("DataSet status should be READY after publishing")
+          .as("DataSet status should be READY after staging")
           .isEqualTo(DataSetStatus.READY);
 
       long distributionCount =
@@ -970,8 +970,8 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should publish dataset with provide pipeline (APIs only, no datasources)")
-    void shouldPublishDataSetWithApisOnly() {
+    @DisplayName("Should stage dataset with provide pipeline (APIs only, no datasources)")
+    void shouldStageDataSetWithApisOnly() {
       DataSet dataSet = new DataSet();
       dataSet.setName("test_dataset_provide_" + System.currentTimeMillis());
       dataSet.setDescription("Test dataset with provide pipeline");
@@ -992,7 +992,7 @@ class DataSetControllerIntegrationTest
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSetId + "/publish",
+              getEndpointPath() + "/" + dataSetId + "/stage",
               org.springframework.http.HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -1001,7 +1001,7 @@ class DataSetControllerIntegrationTest
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDataSetStatus())
-          .as("DataSet status should be READY after publishing")
+          .as("DataSet status should be READY after staging")
           .isEqualTo(DataSetStatus.READY);
 
       long distributionCount =
@@ -1015,8 +1015,8 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should fail to publish dataset without pipelines")
-    void shouldFailToPublishDataSetWithoutPipelines() {
+    @DisplayName("Should fail to stage dataset without pipelines")
+    void shouldFailToStageDataSetWithoutPipelines() {
       DataSet dataSet = new DataSet();
       dataSet.setName("test_dataset_no_pipelines_" + System.currentTimeMillis());
       dataSet.setDescription("Test dataset without pipelines");
@@ -1029,7 +1029,7 @@ class DataSetControllerIntegrationTest
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSetId + "/publish",
+              getEndpointPath() + "/" + dataSetId + "/stage",
               org.springframework.http.HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -1042,18 +1042,18 @@ class DataSetControllerIntegrationTest
       DataSet unchangedDataSet = dataSetRepository.findById(dataSetId).orElse(null);
       assertThat(unchangedDataSet).isNotNull();
       assertThat(unchangedDataSet.getDataSetStatus())
-          .as("DataSet status should remain DRAFT after failed publish")
+          .as("DataSet status should remain DRAFT after failed stage")
           .isEqualTo(DataSetStatus.DRAFT);
     }
 
     @Test
-    @DisplayName("Should fail to publish non-existent dataset")
-    void shouldFailToPublishNonExistentDataSet() {
+    @DisplayName("Should fail to stage non-existent dataset")
+    void shouldFailToStageNonExistentDataSet() {
       UUID nonExistentId = UUID.randomUUID();
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + nonExistentId + "/publish",
+              getEndpointPath() + "/" + nonExistentId + "/stage",
               org.springframework.http.HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -1096,13 +1096,13 @@ class DataSetControllerIntegrationTest
       pipeline2.setPersistences(Collections.singletonList(12345L));
       pipelineRepository.save(pipeline2);
 
-      seedPublishRequirements(pipeline1, pipeline2);
+      seedStageRequirements(pipeline1, pipeline2);
 
       UUID dataSetId = dataSet.getId();
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
-              getEndpointPath() + "/" + dataSetId + "/publish",
+              getEndpointPath() + "/" + dataSetId + "/stage",
               org.springframework.http.HttpMethod.POST,
               createAuthHeaders(),
               null,
@@ -1126,8 +1126,8 @@ class DataSetControllerIntegrationTest
   class SagaCompletionTests {
 
     /**
-     * Creates a published (READY) dataset with a pipeline containing the given API paths. Reuses
-     * the existing publish HTTP endpoint which does not require Kafka.
+     * Creates a staged (READY) dataset with a pipeline containing the given API paths. Reuses the
+     * existing stage HTTP endpoint which does not require Kafka.
      */
     private DataSet createReadyDataSetWithApis(List<String> apiPaths) {
       DataSet dataSet = new DataSet();
@@ -1145,7 +1145,7 @@ class DataSetControllerIntegrationTest
 
       UUID dataSetId = dataSet.getId();
       exchange(
-          getEndpointPath() + "/" + dataSetId + "/publish",
+          getEndpointPath() + "/" + dataSetId + "/stage",
           HttpMethod.POST,
           createAuthHeaders(),
           null,

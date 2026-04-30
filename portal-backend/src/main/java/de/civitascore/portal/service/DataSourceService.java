@@ -1,11 +1,12 @@
 package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.DataSourceMapper;
-import de.civitascore.portal.model.connector.OnPublish;
+import de.civitascore.portal.model.connector.OnRelease;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
@@ -32,7 +33,7 @@ import tools.jackson.databind.JsonNode;
 /**
  * Service for managing {@link DataSource} entities through their full lifecycle (DRAFT to
  * AVAILABLE). Handles connector configuration normalization, encryption of sensitive fields, data
- * structure version linking, and publish/unpublish status transitions.
+ * structure version linking, and release/unrelease status transitions.
  */
 @Service
 @RequiredArgsConstructor
@@ -64,6 +65,26 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   @Override
   protected AssignmentFactory getAssignmentFactory() {
     return assignmentFactory;
+  }
+
+  @Override
+  protected ReleasableStatus getEntityStatus(DataSource entity) {
+    return entity.getDataSourceStatus();
+  }
+
+  @Override
+  protected void setEntityStatus(DataSource entity, ReleasableStatus status) {
+    entity.setDataSourceStatus((DataSourceStatus) status);
+  }
+
+  @Override
+  protected ReleasableStatus getDraftStatus() {
+    return DataSourceStatus.DRAFT;
+  }
+
+  @Override
+  protected ReleasableStatus getAvailableStatus() {
+    return DataSourceStatus.AVAILABLE;
   }
 
   /**
@@ -238,62 +259,24 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     return entity;
   }
 
-  /**
-   * Publishes a data source by transitioning it from DRAFT to AVAILABLE status. Validates that a
-   * connector type, data structure version, and valid configuration are present.
-   *
-   * @param id the data source ID
-   * @return the published data source
-   * @throws InvalidInputException if the data source is not in DRAFT status or is missing required
-   *     fields
-   */
-  @Transactional
-  public DataSource publish(UUID id) {
-    DataSource entity = findByIdOrThrow(id);
-
-    if (entity.getDataSourceStatus() != DataSourceStatus.DRAFT) {
-      throw new InvalidInputException(
-          getEntityName(), id, "Only data sources in DRAFT status can be published");
-    }
-
+  @Override
+  protected void validateRelease(DataSource entity) {
     if (entity.getConnectorType() == null) {
       throw new InvalidInputException(
-          getEntityName(), id, "Connector type must be set before publishing");
+          getEntityName(), entity.getId(), "Connector type must be set before releasing");
     }
 
     if (entity.getDataStructureVersion() == null) {
       throw new InvalidInputException(
-          getEntityName(), id, "Data structure version must be set before publishing");
+          getEntityName(), entity.getId(), "Data structure version must be set before releasing");
     }
 
     validateConfiguration(entity);
-
-    entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
-    return save(entity);
   }
 
-  /**
-   * Unpublishes a data source by reverting it from AVAILABLE to DRAFT status. Validates that the
-   * data source is not referenced by any READY or AVAILABLE datasets.
-   *
-   * @param id the data source ID
-   * @return the unpublished data source
-   * @throws InvalidInputException if the data source is not in AVAILABLE status
-   * @throws ResourceInUseException if the data source is referenced by an active dataset
-   */
-  @Transactional
-  public DataSource unpublish(UUID id) {
-    DataSource entity = findByIdOrThrow(id);
-
-    if (entity.getDataSourceStatus() != DataSourceStatus.AVAILABLE) {
-      throw new InvalidInputException(
-          getEntityName(), id, "Only data sources in AVAILABLE status can be unpublished");
-    }
-
-    validateNotInUse(id);
-
-    entity.setDataSourceStatus(DataSourceStatus.DRAFT);
-    return save(entity);
+  @Override
+  protected void validateUnrelease(DataSource entity) {
+    validateNotInUse(entity.getId());
   }
 
   private void validateNotInUse(UUID id) {
@@ -301,7 +284,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       throw new ResourceInUseException(
           getEntityName(),
           id,
-          "Cannot unpublish DataSource because it is referenced by a Pipeline.");
+          "Cannot unrelease DataSource because it is referenced by a Pipeline.");
     }
   }
 
@@ -316,8 +299,9 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
    * @throws InvalidInputException if the data source is not AVAILABLE or violates in-use
    *     constraints
    */
+  @Override
   @Transactional
-  public DataSource updatePublishedMeta(UUID id, DataSourceInputDTO input) {
+  public DataSource updateReleasedMeta(UUID id, DataSourceInputDTO input) {
     DataSource entity = findByIdOrThrow(id);
 
     if (entity.getDataSourceStatus() != DataSourceStatus.AVAILABLE) {
@@ -407,7 +391,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   }
 
   /**
-   * Prevents deletion of data sources in AVAILABLE status. The data source must be unpublished
+   * Prevents deletion of data sources in AVAILABLE status. The data source must be unreleased
    * first.
    *
    * @param id the data source ID
@@ -420,7 +404,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
 
     if (entity.getDataSourceStatus() == DataSourceStatus.AVAILABLE) {
       throw new InvalidInputException(
-          getEntityName(), id, "Cannot delete a data source in AVAILABLE status");
+          getEntityName(), id, "Cannot delete a released data source. Unrelease it first.");
     }
 
     return entity;
@@ -435,12 +419,12 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     Map<String, Object> config = entity.getConfiguration();
     if (config == null || config.isEmpty()) {
       throw new InvalidInputException(
-          getEntityName(), entity.getId(), "Configuration is required for publishing");
+          getEntityName(), entity.getId(), "Configuration is required for releasing");
     }
 
     ConnectorHandler handler =
         connectorHandlerRegistry.getHandlerOrThrow(entity.getConnectorType());
-    List<String> errors = handler.validate(config, Default.class, OnPublish.class);
+    List<String> errors = handler.validate(config, Default.class, OnRelease.class);
 
     if (!errors.isEmpty()) {
       throw new InvalidInputException(

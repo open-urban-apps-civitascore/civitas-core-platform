@@ -58,9 +58,9 @@ tests {
 }
 
 docs {
-  **Saga step 5 of 20** — Prerequisites: DataSource published (step 4b), DataSet created (step 4).
+  **Saga step 5 of 20** — Prerequisites: DataSource released (step 4b), DataSet created (step 4).
 
-  Creates a Redpanda Connect pipeline ("Saga Test Pipeline") attached to the dataset. The pipeline consumes from the MQTT datasource (`sagaDataSourceId`) and posts to FROST. The datasource must be in AVAILABLE status (published in step 4b) before it can be linked. When the dataset is released, the saga deploys this pipeline to Redpanda Connect.
+  Creates a Redpanda Connect pipeline ("Saga Test Pipeline") attached to the dataset. The pipeline consumes from the MQTT datasource (`sagaDataSourceId`) and posts to FROST. The datasource must be in AVAILABLE status (released in step 4b) before it can be linked. When the dataset is released, the saga deploys this pipeline to Redpanda Connect.
 
   **Expected Response:** 201 Created, body contains `id`. 409 if the pipeline already existed (idempotent).
 

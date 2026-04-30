@@ -195,7 +195,7 @@ public class DataSet extends BaseDataEntity {
 
   /**
    * Resets all infrastructure-related fields (projectId, frostBaseUrl, routeId, serviceId,
-   * publicUrl, pipelineIds) to {@code null}, typically called during unpublish.
+   * publicUrl, pipelineIds) to {@code null}, typically called during unrelease.
    */
   public void clearInfrastructureFields() {
     this.projectId = null;

@@ -1,11 +1,11 @@
 meta {
-  name: 12. Unpublish DataSet
+  name: 12. Unstage DataSet
   type: http
   seq: 28
 }
 
 post {
-  url: {{baseUrl}}/datasets/:id/unpublish
+  url: {{baseUrl}}/datasets/:id/unstage
   body: none
   auth: inherit
 }
@@ -15,15 +15,15 @@ params:path {
 }
 
 tests {
-  test("Unpublished or already draft", function() {
+  test("Unstaged or already draft", function() {
     const status = res.getStatus();
-    // 200=unpublished, 400=pending saga or already DRAFT
+    // 200=unstaged, 400=pending saga or already DRAFT
     expect(status === 200 || status === 400).to.be.true;
   });
 }
 
 docs {
-  **Saga step 12 of 18** — Unpublish the dataset before deleting it.
+  **Saga step 12 of 18** — Unstage the dataset before deleting it.
 
   Transitions the dataset from `READY` back to `DRAFT`. This must be called after the DATASET_DELETE saga from step 11 has completed. A 400 is returned if a saga is still pending or the dataset is already in `DRAFT`.
 

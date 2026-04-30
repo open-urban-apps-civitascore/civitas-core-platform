@@ -1,11 +1,11 @@
 meta {
-  name: Unpublish Data Structure Version
+  name: Unrelease Data Structure Version
   type: http
   seq: 13
 }
 
 post {
-  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/unpublish
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/unrelease
   body: none
   auth: inherit
 }
@@ -22,7 +22,7 @@ tests {
 }
 
 docs {
-  **Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in published state.
+  **Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in released state.
 
   **Expected Response:** 200 OK, body reflects version returned to draft state.
 
@@ -32,5 +32,5 @@ docs {
   |---|---|
   | Backend | Version status reverted to draft |
   | Config Adapter | -- |
-  | Model Atlas / Apicurio Registry | Version schema unpublished/removed from registry |
+  | Model Atlas / Apicurio Registry | Version schema unreleased/removed from registry |
 }

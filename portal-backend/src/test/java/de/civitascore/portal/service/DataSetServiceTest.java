@@ -79,12 +79,12 @@ class DataSetServiceTest {
   }
 
   @Nested
-  @DisplayName("publish()")
-  class PublishTests {
+  @DisplayName("stage()")
+  class StageTests {
 
     @Test
-    @DisplayName("publishes dataset with feed-in pipeline (has datasources)")
-    void publishesWithDatasources() {
+    @DisplayName("stages dataset with feed-in pipeline (has datasources)")
+    void stagesWithDatasources() {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
       Pipeline p = new Pipeline();
@@ -94,13 +94,13 @@ class DataSetServiceTest {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      DataSet result = createService().publish(id);
+      DataSet result = createService().stage(id);
       assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
     }
 
     @Test
-    @DisplayName("publishes dataset with provide pipeline (has APIs, no datasources)")
-    void publishesWithApisOnly() {
+    @DisplayName("stages dataset with provide pipeline (has APIs, no datasources)")
+    void stagesWithApisOnly() {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
       Pipeline p = new Pipeline();
@@ -112,7 +112,7 @@ class DataSetServiceTest {
       when(distributionService.createFromApiUrlAndDataSet(any(), any()))
           .thenReturn(new Distribution());
 
-      DataSet result = createService().publish(id);
+      DataSet result = createService().stage(id);
       assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
     }
 
@@ -125,7 +125,7 @@ class DataSetServiceTest {
 
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
-      assertThatThrownBy(() -> createService().publish(id))
+      assertThatThrownBy(() -> createService().stage(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("DataSources or APIs");
     }
@@ -138,7 +138,7 @@ class DataSetServiceTest {
 
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
-      assertThatThrownBy(() -> createService().publish(id))
+      assertThatThrownBy(() -> createService().stage(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("Pipeline");
     }
@@ -233,8 +233,8 @@ class DataSetServiceTest {
   }
 
   @Nested
-  @DisplayName("updatePublishedMeta()")
-  class UpdatePublishedMetaTests {
+  @DisplayName("updateReleasedMeta()")
+  class UpdateReleasedMetaTests {
 
     @Test
     @DisplayName("throws ResourceInUseException when CREATE saga is in-flight")
@@ -247,7 +247,7 @@ class DataSetServiceTest {
       DataSetInputDTO input = new DataSetInputDTO();
       input.setName("updated name");
 
-      assertThatThrownBy(() -> createService().updatePublishedMeta(id, input))
+      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
           .isInstanceOf(ResourceInUseException.class)
           .hasMessageContaining("saga is in-flight")
           .hasMessageContaining("CREATE");
@@ -264,7 +264,7 @@ class DataSetServiceTest {
       DataSetInputDTO input = new DataSetInputDTO();
       input.setName("updated name");
 
-      assertThatThrownBy(() -> createService().updatePublishedMeta(id, input))
+      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
           .isInstanceOf(ResourceInUseException.class)
           .hasMessageContaining("saga is in-flight")
           .hasMessageContaining("UPDATE");
@@ -281,7 +281,7 @@ class DataSetServiceTest {
       DataSetInputDTO input = new DataSetInputDTO();
       input.setName("updated name");
 
-      assertThatThrownBy(() -> createService().updatePublishedMeta(id, input))
+      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
           .isInstanceOf(ResourceInUseException.class)
           .hasMessageContaining("saga is in-flight")
           .hasMessageContaining("DELETE");
@@ -298,7 +298,7 @@ class DataSetServiceTest {
       DataSetInputDTO input = new DataSetInputDTO();
       input.setName("updated name");
 
-      DataSet result = createService().updatePublishedMeta(id, input);
+      DataSet result = createService().updateReleasedMeta(id, input);
       assertThat(result).isNotNull();
       verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
     }

@@ -29,9 +29,9 @@ tests {
 }
 
 docs {
-  **Saga step 4a of 20** — Prerequisites: DataSource created (step 1), DataStructure version published (step 3d).
+  **Saga step 4a of 20** — Prerequisites: DataSource created (step 1), DataStructure version released (step 3d).
 
-  Patches the datasource to set the `dataStructureVersionId`, which is required before the datasource can be published. The datasource was created in step 1 with `dataStructureVersionId: null` because the DataStructure version did not yet exist.
+  Patches the datasource to set the `dataStructureVersionId`, which is required before the datasource can be released. The datasource was created in step 1 with `dataStructureVersionId: null` because the DataStructure version did not yet exist.
 
   **Expected Response:** 200 OK. 400 if the datasource is in an invalid state.
 

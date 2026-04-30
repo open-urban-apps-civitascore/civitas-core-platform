@@ -1,11 +1,11 @@
 meta {
-  name: Publish Dataset
+  name: Stage Dataset
   type: http
   seq: 6
 }
 
 post {
-  url: {{baseUrl}}/datasets/:id/publish
+  url: {{baseUrl}}/datasets/:id/stage
   body: none
   auth: inherit
 }
@@ -15,9 +15,9 @@ params:path {
 }
 
 tests {
-  test("Publish accepted or precondition not met", function() {
+  test("Staged or precondition not met", function() {
     const status = res.getStatus();
-    // 200=published, 400=not in DRAFT state (already published or no pipeline)
+    // 200=staged, 400=not in DRAFT state (already staged or no pipeline)
     expect(status === 200 || status === 400).to.be.true;
   });
 }

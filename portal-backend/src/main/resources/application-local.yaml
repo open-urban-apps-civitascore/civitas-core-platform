@@ -95,7 +95,7 @@ init:
     - name: 'Local Data Consumers'
       roleName: 'Data Consumer'
       scopeType: TENANT
-      description: 'Local dev group — read access to published data'
+      description: 'Local dev group — read access to released data'
   users:
     - firstName: Developer
       lastName: User

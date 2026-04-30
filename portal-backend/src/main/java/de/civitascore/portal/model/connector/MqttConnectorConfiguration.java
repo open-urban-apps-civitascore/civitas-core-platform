@@ -20,10 +20,10 @@ public class MqttConnectorConfiguration implements ConnectorConfiguration {
   @Schema(
       description = "Broker URLs. Embedded credentials are stripped — use user/password instead.",
       example = "[\"tcp://broker:1883\"]")
-  @NotEmpty(groups = OnPublish.class, message = "'urls' is required and must be a non-empty list") private List<String> urls;
+  @NotEmpty(groups = OnRelease.class, message = "'urls' is required and must be a non-empty list") private List<String> urls;
 
   @Schema(description = "MQTT topic filters.", example = "[\"sensor/#\"]")
-  @NotEmpty(groups = OnPublish.class, message = "'topics' is required and must be a non-empty list") private List<String> topics;
+  @NotEmpty(groups = OnRelease.class, message = "'topics' is required and must be a non-empty list") private List<String> topics;
 
   @JsonProperty("client_id")
   @Schema(description = "MQTT client identifier.", example = "civitas-client-1")
@@ -32,7 +32,7 @@ public class MqttConnectorConfiguration implements ConnectorConfiguration {
   @Schema(
       description = "QoS level: 0 = at most once, 1 = at least once, 2 = exactly once.",
       example = "1")
-  @NotNull(groups = OnPublish.class, message = "'qos' is required") @Min(value = 0, message = "'qos' must be 0, 1, or 2") @Max(value = 2, message = "'qos' must be 0, 1, or 2") private Integer qos;
+  @NotNull(groups = OnRelease.class, message = "'qos' is required") @Min(value = 0, message = "'qos' must be 0, 1, or 2") @Max(value = 2, message = "'qos' must be 0, 1, or 2") private Integer qos;
 
   @JsonProperty("connect_timeout")
   @Schema(description = "Connection timeout duration.", example = "5s")

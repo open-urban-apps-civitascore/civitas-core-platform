@@ -35,7 +35,7 @@ tests {
 docs {
   **Saga step 4 of 18** — Prerequisites: create supporting resources before triggering the saga.
 
-  Creates the dataset ("Saga Test DataSet") that will be published, released (triggering the DATASET_CREATE saga), and later unreleased (triggering the DATASET_DELETE saga).
+  Creates the dataset ("Saga Test DataSet") that will be staged, released (triggering the DATASET_CREATE saga), and later unreleased (triggering the DATASET_DELETE saga).
 
   **Expected Response:** 201 Created, body contains `id`. 409 if the dataset already existed (idempotent).
 

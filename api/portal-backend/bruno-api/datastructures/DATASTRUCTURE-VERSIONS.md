@@ -140,7 +140,7 @@ Content-Type: application/json
 
 ## TC-DSTV-06 – Delete DataStructure Version
 
-**Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is not in published state.
+**Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is not in released state.
 
 **Request**
 ```
@@ -162,36 +162,36 @@ DELETE {{baseUrl}}/datastructures/:dataStructureId/versions/:id
 
 ---
 
-## TC-DSTV-07 – Publish DataStructure Version
+## TC-DSTV-07 – Release DataStructure Version
 
 **Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in draft state.
 
 **Request**
 ```
-POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/publish
+POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/release
 ```
 
 **Expected Response**
 - Status: `200 OK`
-- Body reflects the version in published state
+- Body reflects the version in released state
 
 **System Impact**
 
 | System | Expected Change | Verified |
 |---|---|---|
-| Backend | Version status updated to published in `portal_backend` DB | ☐ |
+| Backend | Version status updated to released in `portal_backend` DB | ☐ |
 | Config Adapter | — | ☐ |
-| Model Atlas / Apicurio Registry | Version schema published at `modelAtlasUri`; verify in Apicurio Registry UI (`http://localhost:8888`) | ☐ |
+| Model Atlas / Apicurio Registry | Version schema released at `modelAtlasUri`; verify in Apicurio Registry UI (`http://localhost:8888`) | ☐ |
 
 ---
 
-## TC-DSTV-08 – Unpublish DataStructure Version
+## TC-DSTV-08 – Unrelease DataStructure Version
 
-**Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in published state.
+**Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in released state.
 
 **Request**
 ```
-POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/unpublish
+POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/unrelease
 ```
 
 **Expected Response**
@@ -204,17 +204,17 @@ POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/unpublish
 |---|---|---|
 | Backend | Version status reverted to draft in `portal_backend` DB | ☐ |
 | Config Adapter | — | ☐ |
-| Model Atlas / Apicurio Registry | Version schema unpublished/removed from registry | ☐ |
+| Model Atlas / Apicurio Registry | Version schema unreleased/removed from registry | ☐ |
 
 ---
 
-## TC-DSTV-09 – Update Published Version Meta
+## TC-DSTV-09 – Update Released Version Meta
 
-**Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in published state.
+**Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in released state.
 
 **Request**
 ```
-PUT {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/published/meta
+PUT {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/released/meta
 
 Content-Type: application/json
 
@@ -228,12 +228,12 @@ Content-Type: application/json
 
 **Expected Response**
 - Status: `200 OK`
-- Published version metadata is updated
+- Released version metadata is updated
 
 **System Impact**
 
 | System | Expected Change | Verified |
 |---|---|---|
-| Backend | Published version metadata updated in `portal_backend` DB | ☐ |
+| Backend | Released version metadata updated in `portal_backend` DB | ☐ |
 | Config Adapter | — | ☐ |
 | Model Atlas / Apicurio Registry | Version metadata updated in registry | ☐ |
