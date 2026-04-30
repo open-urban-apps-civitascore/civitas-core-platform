@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 /**
  * Service for managing {@link Distribution} entities, which represent access endpoints for a
  * dataset. Supports both manual creation via input DTOs and automatic generation from pipeline API
- * paths during dataset publishing.
+ * paths during dataset staging (DRAFT → READY).
  */
 @Service
 @RequiredArgsConstructor
