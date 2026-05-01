@@ -209,5 +209,7 @@ curl -u admin:geoserver -X DELETE \
 - Spatial tables must exist in the PostGIS database before they can be
   published as feature types. The `init/` directory seeds a test schema on
   first startup.
-- The ACL service manages access control for GeoServer resources. Default
-  admin credentials for the ACL API are `admin` / `s3cr3t` (dev only).
+- The ACL authorization layer is **not enabled** (`acl` Spring profile omitted).
+  OGC services (WFS, WMS, WCS) are publicly accessible without authentication,
+  matching the default behaviour of monolithic GeoServer. The REST API and Web
+  UI still require admin credentials.

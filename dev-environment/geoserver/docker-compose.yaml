@@ -2,14 +2,26 @@ name: geoserver
 
 x-variables:
   environment: &common_env
-    SPRING_PROFILES_ACTIVE: "pgconfig,acl"
+    SPRING_PROFILES_ACTIVE: "pgconfig"
     GEOWEBCACHE_CACHE_DIR: /data/geowebcache
+    # pgconfig catalog backend — set directly so services don't depend on
+    # config-server bootstrap succeeding before they can share catalog state
+    PGCONFIG_HOST: geoserverdb
+    PGCONFIG_PORT: 5432
+    PGCONFIG_DATABASE: geoserver
+    PGCONFIG_USERNAME: geoserver
+    PGCONFIG_PASSWORD: ${GEOSERVER_DB_PASSWORD:-geoserver}
+    PGCONFIG_SCHEMA: pgconfig
+    PGCONFIG_INITIALIZE: true
+    # RabbitMQ — Spring Cloud Bus for catalog-change event propagation between
+    # microservices (restconfig → wfs/wms/etc. cache invalidation)
+    SPRING_RABBITMQ_HOST: rabbitmq
+    SPRING_RABBITMQ_PORT: 5672
+    SPRING_RABBITMQ_USERNAME: guest
+    SPRING_RABBITMQ_PASSWORD: guest
 
 x-config-server-overrides:
   environment: &config-server-overrides
-    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_ACL_URL: http://acl:8080/acl/api
-    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_ACL_USERNAME: admin
-    SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_ACL_PASSWORD: s3cr3t
     SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_HOST: geoserverdb
     SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_PORT: 5432
     SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_DATABASE: geoserver
@@ -26,8 +38,6 @@ x-gs-dependencies: &gs-dependencies
   geoserverdb:
     condition: service_started
   config:
-    condition: service_healthy
-  acl:
     condition: service_healthy
 
 volumes:
@@ -69,31 +79,6 @@ services:
       interval: 15s
       timeout: 30s
       retries: 3
-    networks:
-      - geoserver-internal
-
-  acl:
-    image: geoservercloud/geoserver-acl:2.4.0
-    user: "1000:1000"
-    depends_on:
-      geoserverdb:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    environment:
-      PG_HOST: geoserverdb
-      PG_PORT: 5432
-      PG_DB: geoserver
-      PG_USERNAME: geoserver
-      PG_PASSWORD: ${GEOSERVER_DB_PASSWORD:-geoserver}
-      PG_SCHEMA: acl
-      'ACL_USERS_ADMIN_PASSWORD': '{noop}s3cr3t'
-      'ACL_USERS_GEOSERVER_PASSWORD': '{noop}s3cr3t'
-      GEOSERVER_BUS_ENABLED: true
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: guest
-      RABBITMQ_PASSWORD: guest
     networks:
       - geoserver-internal
 
