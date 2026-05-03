@@ -20,7 +20,7 @@
   <properties>
     <revision>1.0.0</revision>
     <java.version>25</java.version>
-    <spotless.version>2.46.1</spotless.version>
+    <spotless.version>3.4.0</spotless.version>
   </properties>
 
   <dependencies>
@@ -103,9 +103,7 @@
               <include>src/main/java/**/*.java</include>
               <include>src/test/java/**/*.java</include>
             </includes>
-            <googleJavaFormat>
-              <version>1.28.0</version>
-            </googleJavaFormat>
+            <googleJavaFormat/>
             <removeUnusedImports/>
             <importOrder/>
             <formatAnnotations/>

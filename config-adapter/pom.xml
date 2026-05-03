@@ -52,7 +52,7 @@
 		<testcontainers.version>2.0.2</testcontainers.version>
 		<awaitility.version>4.2.2</awaitility.version>
 		<jacoco.version>0.8.14</jacoco.version>
-		<spotless.version>2.46.1</spotless.version>
+		<spotless.version>3.4.0</spotless.version>
 		<commons.beanutils.version>1.11.0</commons.beanutils.version>
 		<commons.io.version>2.21.0</commons.io.version>
 		<commons.lang.version>3.20.0</commons.lang.version>
@@ -298,9 +298,7 @@
 							<include>src/main/java/**/*.java</include>
 							<include>src/test/java/**/*.java</include>
 						</includes>
-                        <googleJavaFormat>
-                            <version>1.28.0</version>
-                        </googleJavaFormat>
+                        <googleJavaFormat/>
 						<licenseHeader>
 							<content>/**
  * &lt;p&gt;This work and the accompanying materials are made available under the terms of the European Union Public License (EU-PL) 1.2 which is available at https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
