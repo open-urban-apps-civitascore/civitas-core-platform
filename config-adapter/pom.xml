@@ -35,8 +35,8 @@
 
 	<properties>
 		<revision>1.0.2</revision>
-		<maven.compiler.source>21</maven.compiler.source>
-		<maven.compiler.target>21</maven.compiler.target>
+		<maven.compiler.source>25</maven.compiler.source>
+		<maven.compiler.target>25</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
 		<kafka.version>4.1.1</kafka.version>
