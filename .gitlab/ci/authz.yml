@@ -116,7 +116,7 @@ bundle-authz-rego:
 # This must always run (needs: []) to ensure dependency scanning has the graph
 # even when the build job is skipped due to no changes
 generate-graph-authz:
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   rules:
     # Always run on tags
@@ -147,7 +147,7 @@ generate-graph-authz:
 
 lint-authz:
   extends: .only-authz-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
@@ -165,7 +165,7 @@ lint-authz:
 
 dependency-prune-authz:
   extends: .only-authz-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
@@ -185,7 +185,7 @@ dependency-prune-authz:
 
 test-authz:
   extends: .only-authz-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: test
   needs:
     - job: build-authz
@@ -226,7 +226,7 @@ test-authz:
 
 build-authz:
   extends: .only-authz-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: build
   needs:
     - job: setup-version

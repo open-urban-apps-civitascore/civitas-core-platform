@@ -20,7 +20,7 @@
 # This must always run (needs: []) to ensure dependency scanning has the graph
 # even when the build job is skipped due to no changes
 generate-graph-backend:
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   needs: []
   rules:
@@ -52,7 +52,7 @@ generate-graph-backend:
 
 lint-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   needs: []
   variables:
@@ -70,7 +70,7 @@ lint-backend:
 
 dependency-prune-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   needs: []
   variables:
@@ -91,7 +91,7 @@ dependency-prune-backend:
 
 test-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: test
   needs:
     - job: build-backend
@@ -131,7 +131,7 @@ test-backend:
 
 integration-test-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21
+  image: maven:3.9-eclipse-temurin-25
   stage: test
   needs:
     - job: build-backend
@@ -178,7 +178,7 @@ integration-test-backend:
 # (portal-backend + config-adapter orchestrator in-process, with real FROST, Kafka, Redpanda Connect).
 # Auto-runs on main/develop, manual trigger on MRs (heavy: ~2 min, 6+ containers).
 saga-e2e-test-backend:
-  image: maven:3.9-eclipse-temurin-21
+  image: maven:3.9-eclipse-temurin-25
   stage: test
   needs:
     - job: build-backend
@@ -333,7 +333,7 @@ api-test-backend:
 
 report-test-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21
+  image: maven:3.9-eclipse-temurin-25
   stage: test
   dependencies:
     - build-backend
@@ -358,7 +358,7 @@ report-test-backend:
 
 build-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: build
   needs:
     - job: setup-version
