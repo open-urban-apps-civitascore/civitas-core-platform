@@ -99,12 +99,12 @@ echo "Checking prerequisites..."
 
 # Java
 if ! command -v java >/dev/null 2>&1; then
-    echo "ERROR: Java is not installed. Please install Java 21+."
+    echo "ERROR: Java is not installed. Please install Java 25+."
     exit 1
 fi
 
 # Auto-detect JDK if JAVA_HOME not set or invalid.
-# Supports Temurin, OpenJDK, Oracle, GraalVM, SDKMAN-installed JDKs (21+).
+# Supports Temurin, OpenJDK, Oracle, GraalVM, SDKMAN-installed JDKs (25+).
 if [ -z "$JAVA_HOME" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
     JAVA_HOME=""
     if [ "$OS_TYPE" = "Darwin" ]; then
@@ -113,7 +113,7 @@ if [ -z "$JAVA_HOME" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
             JAVA_HOME=$(/usr/libexec/java_home 2>/dev/null || true)
         fi
     else
-        # Linux / WSL: search common JDK locations, pick newest >= 21
+        # Linux / WSL: search common JDK locations, pick newest >= 25
         best_ver=0
         for jdk_dir in /usr/lib/jvm/temurin-*-jdk-* \
                         /usr/lib/jvm/java-*-openjdk-* \
@@ -122,7 +122,7 @@ if [ -z "$JAVA_HOME" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
                         "$HOME/.sdkman/candidates/java"/*/; do
             if [ -x "$jdk_dir/bin/java" ]; then
                 ver=$("$jdk_dir/bin/java" -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
-                if [ "$ver" -ge 21 ] 2>/dev/null && [ "$ver" -gt "$best_ver" ]; then
+                if [ "$ver" -ge 25 ] 2>/dev/null && [ "$ver" -gt "$best_ver" ]; then
                     best_ver=$ver
                     JAVA_HOME="$jdk_dir"
                 fi
@@ -138,9 +138,9 @@ else
     export PATH="$JAVA_HOME/bin:$PATH"
 fi
 JAVA_VERSION=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
-if [ "$JAVA_VERSION" -lt 21 ] 2>/dev/null; then
-    echo "ERROR: Java 21 or higher is required. Found Java $JAVA_VERSION."
-    echo "       Install any JDK >= 21 (Temurin, OpenJDK, Oracle, GraalVM) or set JAVA_HOME."
+if [ "$JAVA_VERSION" -lt 25 ] 2>/dev/null; then
+    echo "ERROR: Java 25 or higher is required. Found Java $JAVA_VERSION."
+    echo "       Install any JDK >= 25 (Temurin, OpenJDK, Oracle, GraalVM) or set JAVA_HOME."
     exit 1
 fi
 echo "  Java $JAVA_VERSION found (JAVA_HOME=${JAVA_HOME:-system default})"
