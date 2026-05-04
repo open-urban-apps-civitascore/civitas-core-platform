@@ -320,7 +320,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       renderComponent()
 
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
-      expect(screen.getAllByTestId('confirmButton').length).toBeGreaterThan(0)
+      expect(screen.getByTestId('confirmButton')).toBeInTheDocument()
     })
 
     it('switches to edit mode when edit button is clicked', async () => {
@@ -332,7 +332,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
       await waitFor(() => {
         expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
-        expect(screen.getAllByTestId('confirmButton').length).toBeGreaterThan(0)
+        expect(screen.getByTestId('confirmButton')).toBeInTheDocument()
       })
     })
 
