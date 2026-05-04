@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.civitascore.configadapter.model.dataset.NamedApiRouteIds;
+import de.civitascore.configadapter.model.dataset.NamedApiHelper;
 import de.civitascore.configadapter.model.saga.SagaContext;
 import de.civitascore.configadapter.model.saga.SagaStatus;
 import de.civitascore.configadapter.model.saga.SagaStep;
@@ -713,8 +713,8 @@ class DatasetCommandBuilderTest {
       Map<String, String> routeIds = (Map<String, String>) result.get("routeIds");
       assertNotNull(routeIds);
       assertEquals(2, routeIds.size());
-      assertEquals(NamedApiRouteIds.derive(DATASET_ID, "traffic"), routeIds.get("traffic"));
-      assertEquals(NamedApiRouteIds.derive(DATASET_ID, "weather"), routeIds.get("weather"));
+      assertEquals(NamedApiHelper.derive(DATASET_ID, "traffic"), routeIds.get("traffic"));
+      assertEquals(NamedApiHelper.derive(DATASET_ID, "weather"), routeIds.get("weather"));
     }
 
     @Test
@@ -738,7 +738,7 @@ class DatasetCommandBuilderTest {
       @SuppressWarnings("unchecked")
       Map<String, String> routeIds = (Map<String, String>) result.get("routeIds");
       assertEquals(existingTrafficId, routeIds.get("traffic"));
-      assertEquals(NamedApiRouteIds.derive(DATASET_ID, "weather"), routeIds.get("weather"));
+      assertEquals(NamedApiHelper.derive(DATASET_ID, "weather"), routeIds.get("weather"));
     }
 
     @Test

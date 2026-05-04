@@ -10,7 +10,7 @@
 package de.civitascore.configadapter.orchestrator.engine;
 
 import de.civitascore.configadapter.model.dataset.Dataset;
-import de.civitascore.configadapter.model.dataset.NamedApiRouteIds;
+import de.civitascore.configadapter.model.dataset.NamedApiHelper;
 import de.civitascore.configadapter.model.saga.SagaContext;
 import de.civitascore.configadapter.model.saga.SagaStep;
 import de.civitascore.configadapter.model.saga.SagaStepStatus;
@@ -86,7 +86,7 @@ public final class DatasetCommandBuilder {
    * <ul>
    *   <li>For each entry in the trigger's {@code namedApis[]}, reuse an existing route ID under the
    *       trigger's {@code routeIds[slug]} (UPDATE/DELETE flows).
-   *   <li>Otherwise, derive a deterministic UUID via {@link NamedApiRouteIds#derive}.
+   *   <li>Otherwise, derive a deterministic UUID via {@link NamedApiHelper#derive}.
    * </ul>
    */
   private static Map<String, String> resolveRouteIds(SagaContext context) {
@@ -109,7 +109,7 @@ public final class DatasetCommandBuilder {
       }
       String routeId = existing.get(slug);
       if (routeId == null || routeId.isBlank()) {
-        routeId = NamedApiRouteIds.derive(datasetId, slug);
+        routeId = NamedApiHelper.derive(datasetId, slug);
       }
       resolved.put(slug, routeId);
     }

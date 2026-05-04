@@ -21,9 +21,9 @@ import java.util.UUID;
  * the underlying provisioning implementation. Both the orchestrator's result-aggregation path and
  * the APISIX adapter's route-creation path must agree on the same UUID for the same input.
  */
-public final class NamedApiRouteIds {
+public final class NamedApiHelper {
 
-  private NamedApiRouteIds() {}
+  private NamedApiHelper() {}
 
   /**
    * Derive the deterministic UUID route ID for a named API on a given dataset. {@link
