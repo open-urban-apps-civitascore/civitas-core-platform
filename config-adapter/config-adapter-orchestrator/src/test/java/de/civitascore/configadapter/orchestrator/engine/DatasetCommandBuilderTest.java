@@ -19,6 +19,7 @@ import de.civitascore.configadapter.model.saga.SagaStatus;
 import de.civitascore.configadapter.model.saga.SagaStep;
 import de.civitascore.configadapter.model.saga.SagaType;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -680,6 +681,177 @@ class DatasetCommandBuilderTest {
       @SuppressWarnings("unchecked")
       List<Map<String, Object>> properties = (List<Map<String, Object>>) result.get("properties");
       assertTrue(properties.isEmpty());
+    }
+  }
+
+  // ─── Named API route synthesis (stub) ───────────────────────────────────────
+
+  @Nested
+  @DisplayName("Named API route ID synthesis")
+  class NamedApiRouteSynthesis {
+
+    @Test
+    @DisplayName("CREATE: derives a deterministic UUID per slug when no incoming routeIds")
+    void aggregateSagaResult_createWithNamedApis_shouldSynthesizeRouteIds() {
+      Map<String, Object> trigger =
+          Map.of(
+              "id",
+              DATASET_ID,
+              "name",
+              "Test",
+              "namedApis",
+              List.of(
+                  Map.of("slug", "traffic", "standard", "STA", "version", "1.1"),
+                  Map.of("slug", "weather", "standard", "STA", "version", "1.1")));
+
+      SagaContext context = createContextWithSteps(SagaType.DATASET_CREATE, trigger, List.of());
+
+      Map<String, Object> result = DatasetCommandBuilder.aggregateSagaResult(context);
+
+      @SuppressWarnings("unchecked")
+      Map<String, String> routeIds = (Map<String, String>) result.get("routeIds");
+      assertNotNull(routeIds);
+      assertEquals(2, routeIds.size());
+      assertEquals(
+          DatasetCommandBuilder.deriveRouteId(DATASET_ID, "traffic"), routeIds.get("traffic"));
+      assertEquals(
+          DatasetCommandBuilder.deriveRouteId(DATASET_ID, "weather"), routeIds.get("weather"));
+    }
+
+    @Test
+    @DisplayName("Synthesized route IDs are valid UUIDs and stable across calls")
+    void deriveRouteId_isDeterministicUuid() {
+      String first = DatasetCommandBuilder.deriveRouteId(DATASET_ID, "traffic");
+      String second = DatasetCommandBuilder.deriveRouteId(DATASET_ID, "traffic");
+      assertEquals(first, second);
+      // Throws if not a valid UUID string.
+      java.util.UUID.fromString(first);
+    }
+
+    @Test
+    @DisplayName("Different slugs produce different route IDs for the same dataset")
+    void deriveRouteId_differentSlugs_shouldDifferentiate() {
+      String trafficId = DatasetCommandBuilder.deriveRouteId(DATASET_ID, "traffic");
+      String weatherId = DatasetCommandBuilder.deriveRouteId(DATASET_ID, "weather");
+      assertTrue(!trafficId.equals(weatherId));
+    }
+
+    @Test
+    @DisplayName("Same slug produces different route IDs across datasets")
+    void deriveRouteId_differentDatasets_shouldDifferentiate() {
+      String first = DatasetCommandBuilder.deriveRouteId("ds-1", "traffic");
+      String second = DatasetCommandBuilder.deriveRouteId("ds-2", "traffic");
+      assertTrue(!first.equals(second));
+    }
+
+    @Test
+    @DisplayName("UPDATE: preserves existing routeIds for known slugs and synthesizes for new ones")
+    void aggregateSagaResult_updateMixedSlugs_shouldPreserveExistingAndSynthesizeNew() {
+      String existingTrafficId = "existing-route-traffic";
+      Map<String, Object> trigger = new HashMap<>();
+      trigger.put("id", DATASET_ID);
+      trigger.put("name", "Test");
+      trigger.put(
+          "namedApis",
+          List.of(
+              Map.of("slug", "traffic", "standard", "STA", "version", "1.1"),
+              Map.of("slug", "weather", "standard", "STA", "version", "1.1")));
+      trigger.put("routeIds", Map.of("traffic", existingTrafficId));
+
+      SagaContext context = createContextWithSteps(SagaType.DATASET_UPDATE, trigger, List.of());
+
+      Map<String, Object> result = DatasetCommandBuilder.aggregateSagaResult(context);
+
+      @SuppressWarnings("unchecked")
+      Map<String, String> routeIds = (Map<String, String>) result.get("routeIds");
+      assertEquals(existingTrafficId, routeIds.get("traffic"));
+      assertEquals(
+          DatasetCommandBuilder.deriveRouteId(DATASET_ID, "weather"), routeIds.get("weather"));
+    }
+
+    @Test
+    @DisplayName("UPDATE: drops slugs that are no longer in namedApis")
+    void aggregateSagaResult_updateRemovedSlug_shouldDropFromMap() {
+      Map<String, Object> trigger = new HashMap<>();
+      trigger.put("id", DATASET_ID);
+      trigger.put("name", "Test");
+      trigger.put("namedApis", List.of(Map.of("slug", "traffic", "standard", "STA")));
+      trigger.put("routeIds", Map.of("traffic", "route-1", "weather", "route-2-removed"));
+
+      SagaContext context = createContextWithSteps(SagaType.DATASET_UPDATE, trigger, List.of());
+
+      Map<String, Object> result = DatasetCommandBuilder.aggregateSagaResult(context);
+
+      @SuppressWarnings("unchecked")
+      Map<String, String> routeIds = (Map<String, String>) result.get("routeIds");
+      assertEquals(1, routeIds.size());
+      assertEquals("route-1", routeIds.get("traffic"));
+      assertNull(routeIds.get("weather"));
+    }
+
+    @Test
+    @DisplayName("Empty or absent namedApis omits routeIds from the result")
+    void aggregateSagaResult_noNamedApis_shouldOmitRouteIds() {
+      SagaContext withoutKey =
+          createContextWithSteps(
+              SagaType.DATASET_CREATE, Map.of("id", DATASET_ID, "name", "Test"), List.of());
+      assertNull(DatasetCommandBuilder.aggregateSagaResult(withoutKey).get("routeIds"));
+
+      SagaContext withEmptyList =
+          createContextWithSteps(
+              SagaType.DATASET_CREATE,
+              Map.of("id", DATASET_ID, "name", "Test", "namedApis", List.of()),
+              List.of());
+      assertNull(DatasetCommandBuilder.aggregateSagaResult(withEmptyList).get("routeIds"));
+    }
+
+    @Test
+    @DisplayName("Entries without a slug are skipped silently")
+    void aggregateSagaResult_namedApiWithoutSlug_shouldSkip() {
+      Map<String, Object> trigger =
+          Map.of(
+              "id",
+              DATASET_ID,
+              "name",
+              "Test",
+              "namedApis",
+              List.of(
+                  Map.of("standard", "STA"),
+                  Map.of("slug", "", "standard", "STA"),
+                  Map.of("slug", "traffic", "standard", "STA")));
+
+      SagaContext context = createContextWithSteps(SagaType.DATASET_CREATE, trigger, List.of());
+
+      Map<String, Object> result = DatasetCommandBuilder.aggregateSagaResult(context);
+
+      @SuppressWarnings("unchecked")
+      Map<String, String> routeIds = (Map<String, String>) result.get("routeIds");
+      assertEquals(1, routeIds.size());
+      assertNotNull(routeIds.get("traffic"));
+    }
+
+    @Test
+    @DisplayName("Properties array carries the routeIds map for backend persistence")
+    void aggregateSagaResult_namedApis_shouldEmitRouteIdsInProperties() {
+      Map<String, Object> trigger =
+          Map.of(
+              "id",
+              DATASET_ID,
+              "name",
+              "Test",
+              "namedApis",
+              List.of(Map.of("slug", "traffic", "standard", "STA")));
+
+      SagaContext context = createContextWithSteps(SagaType.DATASET_CREATE, trigger, List.of());
+
+      Map<String, Object> result = DatasetCommandBuilder.aggregateSagaResult(context);
+
+      @SuppressWarnings("unchecked")
+      List<Map<String, Object>> properties = (List<Map<String, Object>>) result.get("properties");
+      assertNotNull(properties);
+      assertTrue(
+          properties.stream().anyMatch(p -> p.containsKey("routeIds")),
+          "properties should contain a routeIds entry");
     }
   }
 

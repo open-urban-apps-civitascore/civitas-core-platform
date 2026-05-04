@@ -13,10 +13,13 @@ import de.civitascore.configadapter.model.dataset.Dataset;
 import de.civitascore.configadapter.model.saga.SagaContext;
 import de.civitascore.configadapter.model.saga.SagaStep;
 import de.civitascore.configadapter.model.saga.SagaStepStatus;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Builds adapter-specific command payloads from the trigger event and previous step results.
@@ -67,9 +70,74 @@ public final class DatasetCommandBuilder {
       }
     }
 
+    Map<String, String> routeIds = resolveRouteIds(context);
+    if (!routeIds.isEmpty()) {
+      result.put("routeIds", routeIds);
+    }
+
     // Build properties array for backend persistence
     result.put("properties", buildProperties(context));
     return Map.copyOf(result);
+  }
+
+  /**
+   * Resolve the slug-keyed route ID map for the saga. Stub implementation pending the real APISIX
+   * named-API handler (per concept #1379, ADR #1362):
+   *
+   * <ul>
+   *   <li>For each entry in the trigger's {@code namedApis[]}, look up an existing route ID under
+   *       the trigger's {@code routeIds[slug]} (UPDATE/DELETE flows) and reuse it.
+   *   <li>Otherwise, derive a deterministic UUID from {@code datasetId + "/" + slug} as a stable
+   *       placeholder (CREATE flow, or new slug introduced on UPDATE).
+   * </ul>
+   *
+   * <p>The deterministic-UUID derivation is part of the contract: when the real APISIX handler
+   * lands, it MUST use the same derivation so route IDs persisted on portal-backend entities during
+   * the stub window remain valid. See {@link #deriveRouteId(String, String)}.
+   */
+  private static Map<String, String> resolveRouteIds(SagaContext context) {
+    var trigger = context.triggerPayload();
+    Object namedApisRaw = trigger.get("namedApis");
+    if (!(namedApisRaw instanceof List<?> namedApisList) || namedApisList.isEmpty()) {
+      return Map.of();
+    }
+
+    Map<String, String> existing = readStringMap(trigger.get("routeIds"));
+    var resolved = new LinkedHashMap<String, String>();
+    String datasetId = context.datasetId();
+    for (Object entry : namedApisList) {
+      if (!(entry instanceof Map<?, ?> map)) {
+        continue;
+      }
+      Object slugValue = map.get("slug");
+      if (!(slugValue instanceof String slug) || slug.isBlank()) {
+        continue;
+      }
+      String routeId = existing.get(slug);
+      if (routeId == null || routeId.isBlank()) {
+        routeId = deriveRouteId(datasetId, slug);
+      }
+      resolved.put(slug, routeId);
+    }
+    return Map.copyOf(resolved);
+  }
+
+  /**
+   * Derive a deterministic UUID route ID from {@code datasetId} and {@code slug}. Uses {@link
+   * UUID#nameUUIDFromBytes(byte[])} so the same input always produces the same UUID and never
+   * collides across datasets or slugs.
+   */
+  static String deriveRouteId(String datasetId, String slug) {
+    String input = datasetId + "/" + slug;
+    return UUID.nameUUIDFromBytes(input.getBytes(StandardCharsets.UTF_8)).toString();
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, String> readStringMap(Object value) {
+    if (value instanceof Map<?, ?> map) {
+      return (Map<String, String>) map;
+    }
+    return Map.of();
   }
 
   // ─── FROST Adapter ──────────────────────────────────────────────────────────
@@ -297,6 +365,10 @@ public final class DatasetCommandBuilder {
       if (result.containsKey("pipelineIds")) {
         props.add(Map.of("pipelineIds", result.get("pipelineIds")));
       }
+    }
+    Map<String, String> routeIds = resolveRouteIds(context);
+    if (!routeIds.isEmpty()) {
+      props.add(Map.of("routeIds", routeIds));
     }
     return List.copyOf(props);
   }
