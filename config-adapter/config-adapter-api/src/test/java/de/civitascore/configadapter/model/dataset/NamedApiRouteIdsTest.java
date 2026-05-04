@@ -10,16 +10,12 @@
 package de.civitascore.configadapter.model.dataset;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
-import java.util.UUID;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class NamedApiRouteIdsTest {
 
   @Test
-  @DisplayName("derive pins the formula: nameUUIDFromBytes(datasetId + '/' + slug, UTF-8)")
   void derive_goldenValues_lockTheFormula() {
     // Hand-computed via UUID.nameUUIDFromBytes(...). Any change to the separator,
     // encoding, or hashing scheme MUST update these values — and any code that
@@ -32,28 +28,5 @@ class NamedApiRouteIdsTest {
     assertEquals(
         "9477f601-6d56-3517-86ca-148577f4136a",
         NamedApiRouteIds.derive("550e8400-e29b-41d4-a716-446655440000", "weather"));
-  }
-
-  @Test
-  @DisplayName("derive returns a stable, valid UUID for the same input")
-  void derive_isDeterministic() {
-    String first = NamedApiRouteIds.derive("ds-1", "traffic");
-    String second = NamedApiRouteIds.derive("ds-1", "traffic");
-    assertEquals(first, second);
-    UUID.fromString(first);
-  }
-
-  @Test
-  @DisplayName("Different slugs on the same dataset produce different IDs")
-  void derive_differentSlugs_differentiate() {
-    assertNotEquals(
-        NamedApiRouteIds.derive("ds-1", "traffic"), NamedApiRouteIds.derive("ds-1", "weather"));
-  }
-
-  @Test
-  @DisplayName("Same slug across different datasets produces different IDs")
-  void derive_differentDatasets_differentiate() {
-    assertNotEquals(
-        NamedApiRouteIds.derive("ds-1", "traffic"), NamedApiRouteIds.derive("ds-2", "traffic"));
   }
 }

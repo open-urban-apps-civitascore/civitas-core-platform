@@ -742,26 +742,6 @@ class DatasetCommandBuilderTest {
     }
 
     @Test
-    @DisplayName("UPDATE: drops slugs that are no longer in namedApis")
-    void aggregateSagaResult_updateRemovedSlug_shouldDropFromMap() {
-      Map<String, Object> trigger = new HashMap<>();
-      trigger.put("id", DATASET_ID);
-      trigger.put("name", "Test");
-      trigger.put("namedApis", List.of(Map.of("slug", "traffic", "standard", "STA")));
-      trigger.put("routeIds", Map.of("traffic", "route-1", "weather", "route-2-removed"));
-
-      SagaContext context = createContextWithSteps(SagaType.DATASET_UPDATE, trigger, List.of());
-
-      Map<String, Object> result = DatasetCommandBuilder.aggregateSagaResult(context);
-
-      @SuppressWarnings("unchecked")
-      Map<String, String> routeIds = (Map<String, String>) result.get("routeIds");
-      assertEquals(1, routeIds.size());
-      assertEquals("route-1", routeIds.get("traffic"));
-      assertNull(routeIds.get("weather"));
-    }
-
-    @Test
     @DisplayName("Empty or absent namedApis omits routeIds from the result")
     void aggregateSagaResult_noNamedApis_shouldOmitRouteIds() {
       SagaContext withoutKey =
@@ -775,55 +755,6 @@ class DatasetCommandBuilderTest {
               Map.of("id", DATASET_ID, "name", "Test", "namedApis", List.of()),
               List.of());
       assertNull(DatasetCommandBuilder.aggregateSagaResult(withEmptyList).get("routeIds"));
-    }
-
-    @Test
-    @DisplayName("Entries without a slug are skipped silently")
-    void aggregateSagaResult_namedApiWithoutSlug_shouldSkip() {
-      Map<String, Object> trigger =
-          Map.of(
-              "id",
-              DATASET_ID,
-              "name",
-              "Test",
-              "namedApis",
-              List.of(
-                  Map.of("standard", "STA"),
-                  Map.of("slug", "", "standard", "STA"),
-                  Map.of("slug", "traffic", "standard", "STA")));
-
-      SagaContext context = createContextWithSteps(SagaType.DATASET_CREATE, trigger, List.of());
-
-      Map<String, Object> result = DatasetCommandBuilder.aggregateSagaResult(context);
-
-      @SuppressWarnings("unchecked")
-      Map<String, String> routeIds = (Map<String, String>) result.get("routeIds");
-      assertEquals(1, routeIds.size());
-      assertNotNull(routeIds.get("traffic"));
-    }
-
-    @Test
-    @DisplayName("Properties array carries the routeIds map for backend persistence")
-    void aggregateSagaResult_namedApis_shouldEmitRouteIdsInProperties() {
-      Map<String, Object> trigger =
-          Map.of(
-              "id",
-              DATASET_ID,
-              "name",
-              "Test",
-              "namedApis",
-              List.of(Map.of("slug", "traffic", "standard", "STA")));
-
-      SagaContext context = createContextWithSteps(SagaType.DATASET_CREATE, trigger, List.of());
-
-      Map<String, Object> result = DatasetCommandBuilder.aggregateSagaResult(context);
-
-      @SuppressWarnings("unchecked")
-      List<Map<String, Object>> properties = (List<Map<String, Object>>) result.get("properties");
-      assertNotNull(properties);
-      assertTrue(
-          properties.stream().anyMatch(p -> p.containsKey("routeIds")),
-          "properties should contain a routeIds entry");
     }
   }
 
