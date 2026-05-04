@@ -10,16 +10,15 @@
 package de.civitascore.configadapter.orchestrator.engine;
 
 import de.civitascore.configadapter.model.dataset.Dataset;
+import de.civitascore.configadapter.model.dataset.NamedApiRouteIds;
 import de.civitascore.configadapter.model.saga.SagaContext;
 import de.civitascore.configadapter.model.saga.SagaStep;
 import de.civitascore.configadapter.model.saga.SagaStepStatus;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Builds adapter-specific command payloads from the trigger event and previous step results.
@@ -82,18 +81,13 @@ public final class DatasetCommandBuilder {
 
   /**
    * Resolve the slug-keyed route ID map for the saga. Stub implementation pending the real APISIX
-   * named-API handler (per concept #1379, ADR #1362):
+   * named-API handler:
    *
    * <ul>
-   *   <li>For each entry in the trigger's {@code namedApis[]}, look up an existing route ID under
-   *       the trigger's {@code routeIds[slug]} (UPDATE/DELETE flows) and reuse it.
-   *   <li>Otherwise, derive a deterministic UUID from {@code datasetId + "/" + slug} as a stable
-   *       placeholder (CREATE flow, or new slug introduced on UPDATE).
+   *   <li>For each entry in the trigger's {@code namedApis[]}, reuse an existing route ID under the
+   *       trigger's {@code routeIds[slug]} (UPDATE/DELETE flows).
+   *   <li>Otherwise, derive a deterministic UUID via {@link NamedApiRouteIds#derive}.
    * </ul>
-   *
-   * <p>The deterministic-UUID derivation is part of the contract: when the real APISIX handler
-   * lands, it MUST use the same derivation so route IDs persisted on portal-backend entities during
-   * the stub window remain valid. See {@link #deriveRouteId(String, String)}.
    */
   private static Map<String, String> resolveRouteIds(SagaContext context) {
     var trigger = context.triggerPayload();
@@ -115,21 +109,11 @@ public final class DatasetCommandBuilder {
       }
       String routeId = existing.get(slug);
       if (routeId == null || routeId.isBlank()) {
-        routeId = deriveRouteId(datasetId, slug);
+        routeId = NamedApiRouteIds.derive(datasetId, slug);
       }
       resolved.put(slug, routeId);
     }
     return Map.copyOf(resolved);
-  }
-
-  /**
-   * Derive a deterministic UUID route ID from {@code datasetId} and {@code slug}. Uses {@link
-   * UUID#nameUUIDFromBytes(byte[])} so the same input always produces the same UUID and never
-   * collides across datasets or slugs.
-   */
-  static String deriveRouteId(String datasetId, String slug) {
-    String input = datasetId + "/" + slug;
-    return UUID.nameUUIDFromBytes(input.getBytes(StandardCharsets.UTF_8)).toString();
   }
 
   @SuppressWarnings("unchecked")

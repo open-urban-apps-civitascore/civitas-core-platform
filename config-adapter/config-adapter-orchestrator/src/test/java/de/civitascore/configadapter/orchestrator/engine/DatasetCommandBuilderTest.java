@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.civitascore.configadapter.model.dataset.NamedApiRouteIds;
 import de.civitascore.configadapter.model.saga.SagaContext;
 import de.civitascore.configadapter.model.saga.SagaStatus;
 import de.civitascore.configadapter.model.saga.SagaStep;
@@ -712,36 +713,8 @@ class DatasetCommandBuilderTest {
       Map<String, String> routeIds = (Map<String, String>) result.get("routeIds");
       assertNotNull(routeIds);
       assertEquals(2, routeIds.size());
-      assertEquals(
-          DatasetCommandBuilder.deriveRouteId(DATASET_ID, "traffic"), routeIds.get("traffic"));
-      assertEquals(
-          DatasetCommandBuilder.deriveRouteId(DATASET_ID, "weather"), routeIds.get("weather"));
-    }
-
-    @Test
-    @DisplayName("Synthesized route IDs are valid UUIDs and stable across calls")
-    void deriveRouteId_isDeterministicUuid() {
-      String first = DatasetCommandBuilder.deriveRouteId(DATASET_ID, "traffic");
-      String second = DatasetCommandBuilder.deriveRouteId(DATASET_ID, "traffic");
-      assertEquals(first, second);
-      // Throws if not a valid UUID string.
-      java.util.UUID.fromString(first);
-    }
-
-    @Test
-    @DisplayName("Different slugs produce different route IDs for the same dataset")
-    void deriveRouteId_differentSlugs_shouldDifferentiate() {
-      String trafficId = DatasetCommandBuilder.deriveRouteId(DATASET_ID, "traffic");
-      String weatherId = DatasetCommandBuilder.deriveRouteId(DATASET_ID, "weather");
-      assertTrue(!trafficId.equals(weatherId));
-    }
-
-    @Test
-    @DisplayName("Same slug produces different route IDs across datasets")
-    void deriveRouteId_differentDatasets_shouldDifferentiate() {
-      String first = DatasetCommandBuilder.deriveRouteId("ds-1", "traffic");
-      String second = DatasetCommandBuilder.deriveRouteId("ds-2", "traffic");
-      assertTrue(!first.equals(second));
+      assertEquals(NamedApiRouteIds.derive(DATASET_ID, "traffic"), routeIds.get("traffic"));
+      assertEquals(NamedApiRouteIds.derive(DATASET_ID, "weather"), routeIds.get("weather"));
     }
 
     @Test
@@ -765,8 +738,7 @@ class DatasetCommandBuilderTest {
       @SuppressWarnings("unchecked")
       Map<String, String> routeIds = (Map<String, String>) result.get("routeIds");
       assertEquals(existingTrafficId, routeIds.get("traffic"));
-      assertEquals(
-          DatasetCommandBuilder.deriveRouteId(DATASET_ID, "weather"), routeIds.get("weather"));
+      assertEquals(NamedApiRouteIds.derive(DATASET_ID, "weather"), routeIds.get("weather"));
     }
 
     @Test
