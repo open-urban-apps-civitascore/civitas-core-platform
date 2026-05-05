@@ -10,13 +10,11 @@
 package de.civitascore.configadapter.orchestrator.engine;
 
 import de.civitascore.configadapter.model.dataset.Dataset;
-import de.civitascore.configadapter.model.dataset.NamedApiHelper;
 import de.civitascore.configadapter.model.saga.SagaContext;
 import de.civitascore.configadapter.model.saga.SagaStep;
 import de.civitascore.configadapter.model.saga.SagaStepStatus;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -69,59 +67,9 @@ public final class DatasetCommandBuilder {
       }
     }
 
-    Map<String, String> routeIds = resolveRouteIds(context);
-    if (!routeIds.isEmpty()) {
-      result.put("routeIds", routeIds);
-    }
-
     // Build properties array for backend persistence
     result.put("properties", buildProperties(context));
     return Map.copyOf(result);
-  }
-
-  /**
-   * Resolve the slug-keyed route ID map for the saga. Stub implementation pending the real APISIX
-   * named-API handler:
-   *
-   * <ul>
-   *   <li>For each entry in the trigger's {@code namedApis[]}, reuse an existing route ID under the
-   *       trigger's {@code routeIds[slug]} (UPDATE/DELETE flows).
-   *   <li>Otherwise, derive a deterministic UUID via {@link NamedApiHelper#derive}.
-   * </ul>
-   */
-  private static Map<String, String> resolveRouteIds(SagaContext context) {
-    var trigger = context.triggerPayload();
-    Object namedApisRaw = trigger.get("namedApis");
-    if (!(namedApisRaw instanceof List<?> namedApisList) || namedApisList.isEmpty()) {
-      return Map.of();
-    }
-
-    Map<String, String> existing = readStringMap(trigger.get("routeIds"));
-    var resolved = new LinkedHashMap<String, String>();
-    String datasetId = context.datasetId();
-    for (Object entry : namedApisList) {
-      if (!(entry instanceof Map<?, ?> map)) {
-        continue;
-      }
-      Object slugValue = map.get("slug");
-      if (!(slugValue instanceof String slug) || slug.isBlank()) {
-        continue;
-      }
-      String routeId = existing.get(slug);
-      if (routeId == null || routeId.isBlank()) {
-        routeId = NamedApiHelper.derive(datasetId, slug);
-      }
-      resolved.put(slug, routeId);
-    }
-    return Map.copyOf(resolved);
-  }
-
-  @SuppressWarnings("unchecked")
-  private static Map<String, String> readStringMap(Object value) {
-    if (value instanceof Map<?, ?> map) {
-      return (Map<String, String>) map;
-    }
-    return Map.of();
   }
 
   // ─── FROST Adapter ──────────────────────────────────────────────────────────
@@ -349,10 +297,6 @@ public final class DatasetCommandBuilder {
       if (result.containsKey("pipelineIds")) {
         props.add(Map.of("pipelineIds", result.get("pipelineIds")));
       }
-    }
-    Map<String, String> routeIds = resolveRouteIds(context);
-    if (!routeIds.isEmpty()) {
-      props.add(Map.of("routeIds", routeIds));
     }
     return List.copyOf(props);
   }

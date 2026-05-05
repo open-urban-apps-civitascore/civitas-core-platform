@@ -14,13 +14,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.civitascore.configadapter.model.dataset.NamedApiHelper;
 import de.civitascore.configadapter.model.saga.SagaContext;
 import de.civitascore.configadapter.model.saga.SagaStatus;
 import de.civitascore.configadapter.model.saga.SagaStep;
 import de.civitascore.configadapter.model.saga.SagaType;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -682,79 +680,6 @@ class DatasetCommandBuilderTest {
       @SuppressWarnings("unchecked")
       List<Map<String, Object>> properties = (List<Map<String, Object>>) result.get("properties");
       assertTrue(properties.isEmpty());
-    }
-  }
-
-  // ─── Named API route synthesis (stub) ───────────────────────────────────────
-
-  @Nested
-  @DisplayName("Named API route ID synthesis")
-  class NamedApiRouteSynthesis {
-
-    @Test
-    @DisplayName("CREATE: derives a deterministic UUID per slug when no incoming routeIds")
-    void aggregateSagaResult_createWithNamedApis_shouldSynthesizeRouteIds() {
-      Map<String, Object> trigger =
-          Map.of(
-              "id",
-              DATASET_ID,
-              "name",
-              "Test",
-              "namedApis",
-              List.of(
-                  Map.of("slug", "traffic", "standard", "STA", "version", "1.1"),
-                  Map.of("slug", "weather", "standard", "STA", "version", "1.1")));
-
-      SagaContext context = createContextWithSteps(SagaType.DATASET_CREATE, trigger, List.of());
-
-      Map<String, Object> result = DatasetCommandBuilder.aggregateSagaResult(context);
-
-      @SuppressWarnings("unchecked")
-      Map<String, String> routeIds = (Map<String, String>) result.get("routeIds");
-      assertNotNull(routeIds);
-      assertEquals(2, routeIds.size());
-      assertEquals(NamedApiHelper.derive(DATASET_ID, "traffic"), routeIds.get("traffic"));
-      assertEquals(NamedApiHelper.derive(DATASET_ID, "weather"), routeIds.get("weather"));
-    }
-
-    @Test
-    @DisplayName("UPDATE: preserves existing routeIds for known slugs and synthesizes for new ones")
-    void aggregateSagaResult_updateMixedSlugs_shouldPreserveExistingAndSynthesizeNew() {
-      String existingTrafficId = "existing-route-traffic";
-      Map<String, Object> trigger = new HashMap<>();
-      trigger.put("id", DATASET_ID);
-      trigger.put("name", "Test");
-      trigger.put(
-          "namedApis",
-          List.of(
-              Map.of("slug", "traffic", "standard", "STA", "version", "1.1"),
-              Map.of("slug", "weather", "standard", "STA", "version", "1.1")));
-      trigger.put("routeIds", Map.of("traffic", existingTrafficId));
-
-      SagaContext context = createContextWithSteps(SagaType.DATASET_UPDATE, trigger, List.of());
-
-      Map<String, Object> result = DatasetCommandBuilder.aggregateSagaResult(context);
-
-      @SuppressWarnings("unchecked")
-      Map<String, String> routeIds = (Map<String, String>) result.get("routeIds");
-      assertEquals(existingTrafficId, routeIds.get("traffic"));
-      assertEquals(NamedApiHelper.derive(DATASET_ID, "weather"), routeIds.get("weather"));
-    }
-
-    @Test
-    @DisplayName("Empty or absent namedApis omits routeIds from the result")
-    void aggregateSagaResult_noNamedApis_shouldOmitRouteIds() {
-      SagaContext withoutKey =
-          createContextWithSteps(
-              SagaType.DATASET_CREATE, Map.of("id", DATASET_ID, "name", "Test"), List.of());
-      assertNull(DatasetCommandBuilder.aggregateSagaResult(withoutKey).get("routeIds"));
-
-      SagaContext withEmptyList =
-          createContextWithSteps(
-              SagaType.DATASET_CREATE,
-              Map.of("id", DATASET_ID, "name", "Test", "namedApis", List.of()),
-              List.of());
-      assertNull(DatasetCommandBuilder.aggregateSagaResult(withEmptyList).get("routeIds"));
     }
   }
 
