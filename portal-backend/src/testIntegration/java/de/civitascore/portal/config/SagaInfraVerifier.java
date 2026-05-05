@@ -150,12 +150,14 @@ public class SagaInfraVerifier {
         .as("APISIX mock should have received %s requests", expectedMethod)
         .isNotEmpty();
 
-    String routeSuffix = "/apisix/admin/routes/" + dataSetId;
+    // Route ID is no longer the dataset ID — it's a per-slug derived UUID once named APIs land
+    // (see NamedApiHelper). Match any route admin call, not a specific routeId path.
+    String routesPrefix = "/apisix/admin/routes/";
     assertThat(sagaHelper.getApisixRequests())
         .as(
             "APISIX mock should have received %s route request for dataset %s",
             expectedMethod, dataSetId)
-        .anyMatch(r -> expectedMethod.equals(r.method()) && r.path().contains(routeSuffix));
+        .anyMatch(r -> expectedMethod.equals(r.method()) && r.path().contains(routesPrefix));
 
     if ("PUT".equals(expectedMethod)) {
       String upstreamSuffix = "/apisix/admin/upstreams/" + dataSetId;
