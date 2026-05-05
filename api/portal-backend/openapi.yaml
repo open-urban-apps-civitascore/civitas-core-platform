@@ -6504,10 +6504,10 @@ components:
           readOnly: true
           description: |
             Predicted public URL once the dataset reaches AVAILABLE:
-            `https://api.{domain}/v1/datasets/{datasetId}/{slug}`. Built
-            server-side from the configured data-plane domain (per concept
-            #1380 and ADR #1387). Absent before the dataset has been
-            persisted.
+            `https://{civitas.api.domain}/v1/datasets/{datasetId}/{slug}`.
+            Built server-side from the configured data-plane domain (per
+            ADR 040). Absent before the dataset has been persisted.
+          example: https://api.core.civitasconnect.digital/v1/datasets/b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a/traffic
       required:
       - name
       - slug
