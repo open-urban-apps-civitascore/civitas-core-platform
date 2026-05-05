@@ -4,7 +4,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import java.util.ArrayList;
 import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -21,10 +20,16 @@ public class DataSetInputDTO extends BaseDataEntityInputDTO {
   @Schema(description = "Whether this dataset is publicly accessible, defaults to false")
   private Boolean openDataAccess = false;
 
+  /**
+   * Defaults to {@code null} so {@link de.civitascore.portal.mapper.DataSetMapper#linkNamedApis
+   * linkNamedApis} treats "field not provided" as "leave the entity's collection untouched". An
+   * explicit empty list still clears the collection. See {@code linkNamedApis} for full PATCH
+   * semantics.
+   */
   @Valid @Schema(
       description =
           "Named API endpoints exposed by this dataset (per concepts #1379 and #1383). Each entry"
               + " produces one published distribution and one APISIX route after release. Slug"
               + " uniqueness within the dataset is enforced at publish time (#1312).")
-  private List<NamedApiInputDTO> namedApis = new ArrayList<>();
+  private List<NamedApiInputDTO> namedApis = null;
 }
