@@ -2,6 +2,7 @@ package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.configadapter.model.dataset.NamedApiHelper;
 import de.civitascore.portal.config.InfraTestDataFactory;
 import de.civitascore.portal.config.SagaInfraVerifier;
 import de.civitascore.portal.config.SagaOrchestratorTestHelper;
@@ -144,7 +145,10 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
         .contains("Projects(" + completed.getProjectId() + ")");
     assertThat(completed.getNamedApis())
         .as("named API entries should carry the deterministic per-slug routeId from APISIX step")
-        .anyMatch(api -> dataSetId.toString().equals(api.getRouteId()));
+        .anyMatch(
+            api ->
+                NamedApiHelper.derive(dataSetId.toString(), api.getSlug())
+                    .equals(api.getRouteId()));
     assertThat(completed.getServiceId())
         .as("serviceId from APISIX step (deterministic = datasetId)")
         .isEqualTo(dataSetId.toString());
@@ -206,7 +210,10 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
         .isNotNull()
         .contains("Projects(" + completed.getProjectId() + ")");
     assertThat(completed.getNamedApis())
-        .anyMatch(api -> dataSetId.toString().equals(api.getRouteId()));
+        .anyMatch(
+            api ->
+                NamedApiHelper.derive(dataSetId.toString(), api.getSlug())
+                    .equals(api.getRouteId()));
     assertThat(completed.getServiceId()).isEqualTo(dataSetId.toString());
     assertThat(completed.getPublicUrl()).isNotNull().contains("/datasets/" + dataSetId);
     assertThat(completed.getPipelineIds()).isNotNull().containsExactly(pipelineId.toString());
