@@ -141,10 +141,9 @@ public class DataSet extends BaseDataEntity {
   private List<String> pipelineIds;
 
   /**
-   * Named API endpoints exposed by this dataset (per concept #1379 and #1383). Each entry produces
-   * one published distribution and one APISIX route after release. Modelled as a child entity to
-   * mirror the {@link Pipeline} / {@link Distribution} pattern; slug uniqueness within the dataset
-   * is enforced by a DB unique constraint.
+   * Named API endpoints exposed by this dataset. Each entry produces one published distribution and
+   * one APISIX route after release. Slug uniqueness within the dataset is enforced by a DB unique
+   * constraint.
    */
   @OneToMany(
       mappedBy = "dataSet",
@@ -207,13 +206,6 @@ public class DataSet extends BaseDataEntity {
    * @param newNamedApis the new named APIs, or {@code null} to clear
    */
   public void setNamedApis(Collection<NamedApi> newNamedApis) {
-    // Guard against self-reference: setNamedApis(getNamedApis()) would otherwise clear() the
-    // very collection we are about to copy from, wiping the entity. Re-link parent FKs and
-    // return.
-    if (newNamedApis == this.namedApis) {
-      this.namedApis.forEach(api -> api.setDataSet(this));
-      return;
-    }
     this.namedApis.clear();
     if (newNamedApis != null) {
       newNamedApis.forEach(api -> api.setDataSet(this));
@@ -226,9 +218,9 @@ public class DataSet extends BaseDataEntity {
    * pipelineIds) and clears the per-named-API {@code routeId} on each entry. The named-API entries
    * themselves are preserved (they are user-authored). Typically called during unrelease.
    *
-   * <p><b>Transactional precondition:</b> {@link #namedApis} is lazily fetched. Call this method
-   * within an active Hibernate session (e.g. inside {@code @Transactional}); calling it on a
-   * detached entity throws {@code LazyInitializationException}.
+   * <p>Iterates {@code namedApis}; safe with the entity loaded via {@code
+   * DataSetRepository.findById} (which fetches the collection eagerly). Detached entities or custom
+   * queries without the entity graph need to fetch first.
    */
   public void clearInfrastructureFields() {
     this.projectId = null;
