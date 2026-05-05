@@ -150,8 +150,8 @@ public class SagaInfraVerifier {
         .as("APISIX mock should have received %s requests", expectedMethod)
         .isNotEmpty();
 
-    // Route ID is no longer the dataset ID — it's a per-slug derived UUID once named APIs land
-    // (see NamedApiHelper). Match any route admin call, not a specific routeId path.
+    // Route ID is a per-slug derived UUID (see NamedApiHelper), not the dataset ID. Match any
+    // route admin call, not a specific routeId path.
     String routesPrefix = "/apisix/admin/routes/";
     assertThat(sagaHelper.getApisixRequests())
         .as(

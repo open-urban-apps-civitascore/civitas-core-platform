@@ -1,9 +1,7 @@
--- Payload API (#1311): replace single route_id column on datasets with a per-row named_apis child
--- table. Per concept #1379 + #1383, named APIs are dataset-level artifacts; per ADR #1362, each
--- carries {name, slug, standard, version}. The route_id is populated per-entry by the saga result
--- handler. Slug uniqueness within a dataset is enforced by uk_named_api_dataset_slug. Existing
--- route_id values are dropped because the prior single APISIX route was non-functional (concept
--- #1293).
+-- Payload API: replace the single route_id column on datasets with a named_apis child table. Each
+-- row carries {name, slug, standard, version} (ADR 039); route_id is populated per-entry by the
+-- saga result handler. Existing route_id values on datasets are dropped — the prior single APISIX
+-- route was non-functional and there is no production data to migrate.
 
 ALTER TABLE datasets DROP COLUMN route_id;
 

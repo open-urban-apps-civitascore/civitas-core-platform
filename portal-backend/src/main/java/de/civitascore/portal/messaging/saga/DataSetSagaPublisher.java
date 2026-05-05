@@ -165,11 +165,7 @@ public class DataSetSagaPublisher {
     return result;
   }
 
-  /**
-   * Maps the dataset's named APIs from the portal-model entity collection to the config-adapter-api
-   * record list consumed by the orchestrator. Returns {@code null} (omitted from the JSON via
-   * {@code @JsonInclude(NON_NULL)}) when the dataset has no named APIs.
-   */
+  /** Returns {@code null} when the dataset has no named APIs, so the JSON field is omitted. */
   private List<NamedApi> buildNamedApis(DataSet dataset) {
     if (dataset.getNamedApis().isEmpty()) {
       return null;

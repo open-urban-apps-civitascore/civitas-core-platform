@@ -59,8 +59,7 @@ public class InfraTestDataFactory {
   /**
    * Creates a saga-test dataset with a single seeded {@link NamedApi} (slug {@code traffic},
    * standard {@code STA}). Required so saga publisher / result handler logic touching the per-slug
-   * {@code routeIds} map (#1311) has at least one entry to project. Seeded via {@link
-   * DataSet#setNamedApis(java.util.Collection)} so the FK back-reference is wired.
+   * {@code routeIds} map has at least one entry to project.
    */
   public DataSet createDataSet(String name) {
     DataSet dataSet =

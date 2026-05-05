@@ -412,8 +412,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
         "Cannot delete an AVAILABLE dataset. Unrelease it first (POST /datasets/{id}/unrelease) to tear down infrastructure");
   }
 
-  // Structured log tags for drift events emitted by applyInfrastructureResult. Stable identifiers
-  // for ops queries (`grep drift= portal-backend.log`); see method javadoc for policy.
+  // Stable identifiers for drift events emitted by applyInfrastructureResult.
   private static final String DRIFT_ORPHAN_SLUGS = "orphan-slugs";
   private static final String DRIFT_UNPROVISIONED_SLUGS = "unprovisioned-slugs";
   private static final String DRIFT_REPLACED_ROUTEID = "replaced-routeid";
@@ -428,7 +427,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * unprovisioned slugs, replaced routeIds) is logged as drift events but does not fail the saga.
    * Throwing here would not undo the upstream APISIX/FROST mutations and would cause Kafka
    * redelivery to retry indefinitely without the orchestrator being able to compensate. Real
-   * compensation (fail-saga + cleanup) is tracked in #1314.
+   * compensation (fail-saga + cleanup) is not yet implemented.
    */
   private void applyInfrastructureResult(DataSet dataSet, SagaResultPayload result) {
     if (result.projectId() != null) {
@@ -447,9 +446,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       if (!orphanSlugs.isEmpty()) {
         log.error(
             "drift={} dataset={} slugs={} — saga returned routeIds for slugs not on the entity;"
-                + " APISIX routes are likely leaked. Compensation deferred to #1314.",
+                + " APISIX routes are likely leaked.",
             DRIFT_ORPHAN_SLUGS,
-            Encode.forJava(dataSet.getId().toString()),
+            dataSet.getId(),
             Encode.forJava(orphanSlugs.toString()));
       }
 
@@ -458,9 +457,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       if (!unprovisionedSlugs.isEmpty()) {
         log.error(
             "drift={} dataset={} slugs={} — saga did not return routeIds for these entity slugs;"
-                + " user-facing endpoints will 404. Compensation deferred to #1314.",
+                + " user-facing endpoints will 404.",
             DRIFT_UNPROVISIONED_SLUGS,
-            Encode.forJava(dataSet.getId().toString()),
+            dataSet.getId(),
             Encode.forJava(unprovisionedSlugs.toString()));
       }
 
@@ -479,9 +478,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
                 if (currentRouteId != null && !currentRouteId.equals(incomingRouteId)) {
                   log.error(
                       "drift={} dataset={} slug={} previous={} incoming={} — prior APISIX route"
-                          + " is likely leaked. Compensation deferred to #1314.",
+                          + " is likely leaked.",
                       DRIFT_REPLACED_ROUTEID,
-                      Encode.forJava(dataSet.getId().toString()),
+                      dataSet.getId(),
                       Encode.forJava(api.getSlug()),
                       Encode.forJava(currentRouteId),
                       Encode.forJava(incomingRouteId));

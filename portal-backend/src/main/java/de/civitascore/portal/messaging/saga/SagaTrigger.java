@@ -46,18 +46,7 @@ public sealed interface SagaTrigger
       List<NamedApi> namedApis)
       implements SagaTrigger {
 
-    /**
-     * Factory method that creates a {@link DatasetCreate} trigger with the correct saga type.
-     *
-     * @param datasetId the dataset UUID
-     * @param datasetName the dataset name
-     * @param description the dataset description
-     * @param openDataAccess whether the dataset has open data access
-     * @param datasources the data sources referenced by pipelines
-     * @param dataPipelines the pipelines to provision
-     * @param namedApis the named API endpoints to expose (one APISIX route per entry)
-     * @return a new create trigger
-     */
+    /** Constructs a {@link DatasetCreate} trigger with {@link SagaType#DATASET_CREATE}. */
     public static DatasetCreate of(
         String datasetId,
         String datasetName,
@@ -99,22 +88,7 @@ public sealed interface SagaTrigger
       List<NamedApi> namedApis)
       implements SagaTrigger {
 
-    /**
-     * Factory method that creates a {@link DatasetUpdate} trigger with the correct saga type.
-     *
-     * @param datasetId the dataset UUID
-     * @param datasetName the dataset name
-     * @param description the dataset description
-     * @param openDataAccess whether the dataset has open data access
-     * @param projectId the existing FROST project ID
-     * @param routeIds existing APISIX route IDs keyed by named-API slug
-     * @param serviceId the existing APISIX service ID (shared upstream)
-     * @param pipelineIds the existing Redpanda pipeline IDs
-     * @param datasources the data sources referenced by pipelines
-     * @param dataPipelines the pipeline diff (ADD, UPDATE, DELETE actions)
-     * @param namedApis the named API endpoints in the desired state
-     * @return a new update trigger
-     */
+    /** Constructs a {@link DatasetUpdate} trigger with {@link SagaType#DATASET_UPDATE}. */
     public static DatasetUpdate of(
         String datasetId,
         String datasetName,
@@ -160,18 +134,7 @@ public sealed interface SagaTrigger
       List<NamedApi> namedApis)
       implements SagaTrigger {
 
-    /**
-     * Factory method that creates a {@link DatasetDelete} trigger with the correct saga type.
-     *
-     * @param datasetId the dataset UUID
-     * @param projectId the FROST project ID to tear down
-     * @param frostBaseUrl the FROST base URL
-     * @param routeIds APISIX route IDs to remove, keyed by named-API slug
-     * @param serviceId the APISIX service ID to remove
-     * @param pipelineIds the Redpanda pipeline IDs to remove
-     * @param namedApis the named API endpoints whose routes are being torn down
-     * @return a new delete trigger
-     */
+    /** Constructs a {@link DatasetDelete} trigger with {@link SagaType#DATASET_DELETE}. */
     public static DatasetDelete of(
         String datasetId,
         String projectId,
