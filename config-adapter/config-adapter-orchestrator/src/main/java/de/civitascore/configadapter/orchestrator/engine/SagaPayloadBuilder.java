@@ -56,6 +56,19 @@ final class SagaPayloadBuilder {
         if (payload.containsKey("baseUrl") && !payload.containsKey("upstreamUrl")) {
           payload.put("upstreamUrl", payload.get("baseUrl"));
         }
+        // Legacy APISIX handler still requires a single "routeId" string on UPDATE/DELETE. When the
+        // trigger carries the new slug-keyed "routeIds" map (named-API world) but no flat
+        // "routeId", fall back to the first value of the map so the handler has something to
+        // operate on. Removed once the real named-API APISIX handler reads the map directly.
+        if (!payload.containsKey("routeId")) {
+          Object routeIdsRaw = payload.get("routeIds");
+          if (routeIdsRaw instanceof Map<?, ?> routeIds && !routeIds.isEmpty()) {
+            Object first = routeIds.values().iterator().next();
+            if (first != null) {
+              payload.put("routeId", first);
+            }
+          }
+        }
       }
       case "redpanda" -> {
         // Redpanda handler expects "targetUrl", FROST result provides "baseUrl"
