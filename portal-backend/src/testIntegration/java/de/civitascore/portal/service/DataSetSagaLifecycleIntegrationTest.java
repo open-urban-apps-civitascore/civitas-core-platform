@@ -33,7 +33,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -113,10 +112,6 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
   }
 
   @Test
-  @Disabled(
-      "Pending config-adapter multi-route: assertion 'named APIs should carry the deterministic"
-          + " routeId' fails with empty list because the orchestrator's DatasetCommandBuilder"
-          + " strips per-slug routeIds from SAGA_COMPLETED.")
   @DisplayName("Full lifecycle: create → unrelease (DELETE saga) → re-release (new CREATE saga)")
   void fullRoundTrip_createThenDeleteThenReCreate() throws Exception {
     DataSource dataSource = data.createMqttDataSource();
@@ -189,13 +184,6 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
   }
 
   @Test
-  @Disabled(
-      "Pending config-adapter multi-route DELETE: orchestrator's DatasetCommandBuilder still"
-          + " aggregates singular routeId from step results, so per-slug routeIds never round-trip"
-          + " through SAGA_COMPLETED — the dataset stays AVAILABLE because the saga never reaches"
-          + " a state where DataSetService can transition it back to READY. Re-enable once"
-          + " ApisixSagaHandler returns Map<String, String> routeIds and the orchestrator"
-          + " forwards them.")
   @DisplayName("Unrelease DELETE saga tears down FROST project, APISIX route, and pipeline")
   void unrelease_deleteSagaCleansInfrastructure() throws Exception {
     DataSource dataSource = data.createMqttDataSource();
@@ -442,10 +430,6 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
   }
 
   @Test
-  @Disabled(
-      "Pending config-adapter multi-route: assertion 'APISIX route(s) should carry the"
-          + " deterministic routeId' fails with empty list because per-slug routeIds are stripped"
-          + " by the orchestrator before SAGA_COMPLETED.")
   @DisplayName(
       "CREATE saga with provide pipeline (APIs only, no datasources) skips Redpanda deployment")
   void createSaga_provideOnlyPipeline_skipsRedpanda() throws Exception {
@@ -637,10 +621,6 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
     }
 
     @Test
-    @Disabled(
-        "Pending config-adapter multi-route DELETE: same root cause as"
-            + " unrelease_deleteSagaCleansInfrastructure — the DELETE leg of the cycle hangs in"
-            + " AVAILABLE because routeIds never round-trip through SAGA_COMPLETED.")
     @DisplayName(
         "Full cycle: CREATE → UPDATE (metadata change) → DELETE preserves correct transitions")
     void createThenUpdateThenDelete_fullCycle() throws Exception {
@@ -687,9 +667,6 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
      * infrastructure fields on the DataSet.
      */
     @Test
-    @Disabled(
-        "Pending config-adapter multi-route: SAGA_COMPLETED routeIds map arrives empty because the"
-            + " orchestrator strips per-slug values before publishing to the result topic.")
     @DisplayName("SAGA_COMPLETED message persists infrastructure fields on DataSet")
     void completedMessage_persistsInfrastructureFields() throws Exception {
       DataSource dataSource = data.createMqttDataSource();

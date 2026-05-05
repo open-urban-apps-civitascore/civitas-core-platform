@@ -19,7 +19,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -116,11 +115,6 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
   }
 
   @Test
-  @Disabled(
-      "Pending config-adapter multi-route: orchestrator's DatasetCommandBuilder still aggregates"
-          + " singular routeId from step results, so the per-slug routeIds map round-tripped to"
-          + " portal-backend is empty. Re-enable once ApisixSagaHandler returns Map<String, String>"
-          + " routeIds and the orchestrator forwards them through SAGA_COMPLETED.")
   void createSaga_withSqlPipeline_resultPersistedAndDataFlowsToFrost() throws Exception {
     DataSource sqlDataSource = data.createSqlDataSource();
     DataSet dataSet = data.createDataSet("SQL E2E Dataset");
@@ -190,9 +184,6 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
   }
 
   @Test
-  @Disabled(
-      "Pending config-adapter multi-route: same root cause as the SQL variant — empty routeIds"
-          + " map round-tripped because the orchestrator strips per-slug values.")
   void createSaga_withMqttPipeline_resultPersistedAndDataFlowsToFrost() throws Exception {
     DataSource mqttDataSource = data.createMqttDataSource();
     DataSet dataSet = data.createDataSet("MQTT E2E Dataset");
