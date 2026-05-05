@@ -3,6 +3,7 @@ package de.civitascore.portal.service;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.awaitility.Awaitility.await;
 
 import de.civitascore.configadapter.model.dataset.NamedApiHelper;
@@ -14,6 +15,7 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Distribution;
+import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
@@ -710,7 +712,8 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       assertThat(persisted.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
       assertThat(persisted.getFrostBaseUrl()).contains(projectId);
       assertThat(persisted.getNamedApis())
-          .anyMatch(api -> dataSetId.toString().equals(api.getRouteId()));
+          .extracting(NamedApi::getSlug, NamedApi::getRouteId)
+          .containsExactly(tuple("traffic", dataSetId.toString()));
       assertThat(persisted.getServiceId()).isEqualTo(dataSetId.toString());
       assertThat(persisted.getPublicUrl()).contains("/datasets/" + dataSetId);
       assertThat(persisted.getPipelineIds()).containsExactly("pipe-1");
