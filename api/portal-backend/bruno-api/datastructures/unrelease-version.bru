@@ -1,0 +1,36 @@
+meta {
+  name: Unrelease Data Structure Version
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/unrelease
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+  versionId: {{dataStructureVersionId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in released state.
+
+  **Expected Response:** 200 OK, body reflects version returned to draft state.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Version status reverted to draft |
+  | Config Adapter | -- |
+  | Model Atlas / Apicurio Registry | Version schema unreleased/removed from registry |
+}

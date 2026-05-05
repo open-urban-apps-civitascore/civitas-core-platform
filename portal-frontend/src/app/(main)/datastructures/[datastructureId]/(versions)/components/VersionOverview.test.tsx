@@ -50,7 +50,7 @@ vi.mock('@/components/uml-modeler/hooks/use-multi-session-manager', () => ({
 }))
 
 const mockUpdateMutateAsync = vi.fn()
-const mockUpdatePublishedMutateAsync = vi.fn()
+const mockUpdateReleasedMutateAsync = vi.fn()
 const mockCreateMutateAsync = vi.fn()
 const mockStatusUpdateMutateAsync = vi.fn()
 
@@ -63,8 +63,8 @@ vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
     mutateAsync: mockUpdateMutateAsync,
     isPending: false,
   }),
-  useUpdateDatastructureVersionPublished: () => ({
-    mutateAsync: mockUpdatePublishedMutateAsync,
+  useUpdateDatastructureVersionReleased: () => ({
+    mutateAsync: mockUpdateReleasedMutateAsync,
     isPending: false,
   }),
   useStatusUpdateDatastructureVersion: () => ({
@@ -181,7 +181,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     mockPush.mockReset()
     mockRefresh.mockReset()
     mockUpdateMutateAsync.mockResolvedValue({ data: mockVersion })
-    mockUpdatePublishedMutateAsync.mockResolvedValue({ data: mockVersion })
+    mockUpdateReleasedMutateAsync.mockResolvedValue({ data: mockVersion })
     mockCreateMutateAsync.mockResolvedValue({ data: mockVersion })
     mockStatusUpdateMutateAsync.mockResolvedValue({ data: mockVersion })
     mockSearchParams = new URLSearchParams('mode=edit')
@@ -526,9 +526,9 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       await user.click(confirmButtons[0])
 
       await waitFor(() => {
-        expect(mockUpdatePublishedMutateAsync).toHaveBeenCalledWith(
+        expect(mockUpdateReleasedMutateAsync).toHaveBeenCalledWith(
           expect.objectContaining({
-            endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}/published/meta`,
+            endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}/released/meta`,
           }),
         )
       })
@@ -569,7 +569,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       await waitFor(() => {
         expect(mockStatusUpdateMutateAsync).toHaveBeenCalledWith(
           expect.objectContaining({
-            endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}/publish`,
+            endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}/release`,
           }),
         )
       })
@@ -593,7 +593,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       await waitFor(() => {
         expect(mockStatusUpdateMutateAsync).toHaveBeenCalledWith(
           expect.objectContaining({
-            endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}/unpublish`,
+            endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}/unrelease`,
           }),
         )
       })

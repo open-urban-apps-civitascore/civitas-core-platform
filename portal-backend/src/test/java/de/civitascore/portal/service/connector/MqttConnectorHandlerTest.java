@@ -6,7 +6,7 @@ import de.civitascore.configadapter.crypto.CredentialDecryptor;
 import de.civitascore.configadapter.crypto.CredentialEncryptor;
 import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import de.civitascore.portal.configuration.EncryptionConfig;
-import de.civitascore.portal.model.connector.OnPublish;
+import de.civitascore.portal.model.connector.OnRelease;
 import jakarta.validation.groups.Default;
 import java.security.GeneralSecurityException;
 import java.util.HashMap;
@@ -72,7 +72,7 @@ class MqttConnectorHandlerTest {
       config.put("topics", List.of("sensor/#"));
       config.put("qos", 1);
 
-      assertThat(handler.validate(config, Default.class, OnPublish.class)).isEmpty();
+      assertThat(handler.validate(config, Default.class, OnRelease.class)).isEmpty();
     }
 
     @Test
@@ -84,13 +84,13 @@ class MqttConnectorHandlerTest {
     }
 
     @Test
-    @DisplayName("Should fail on publish when urls is missing")
+    @DisplayName("Should fail on release when urls is missing")
     void shouldFailWhenUrlsMissing() {
       Map<String, Object> config = new HashMap<>();
       config.put("topics", List.of("sensor/#"));
       config.put("qos", 1);
 
-      List<String> errors = handler.validate(config, Default.class, OnPublish.class);
+      List<String> errors = handler.validate(config, Default.class, OnRelease.class);
       assertThat(errors).hasSize(1);
       assertThat(errors.get(0)).contains("urls");
     }
@@ -109,11 +109,11 @@ class MqttConnectorHandlerTest {
     }
 
     @Test
-    @DisplayName("Should report all publish validation errors at once")
+    @DisplayName("Should report all release validation errors at once")
     void shouldReportAllErrors() {
       Map<String, Object> config = new HashMap<>();
 
-      List<String> errors = handler.validate(config, Default.class, OnPublish.class);
+      List<String> errors = handler.validate(config, Default.class, OnRelease.class);
       assertThat(errors).hasSize(3);
       assertThat(errors).anyMatch(e -> e.contains("urls"));
       assertThat(errors).anyMatch(e -> e.contains("topics"));

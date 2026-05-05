@@ -1,0 +1,38 @@
+meta {
+  name: 06 Assign Default Style to Layer
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/layers/{{featuretype_point}}
+  body: json
+  auth: basic
+}
+
+auth:basic {
+  username: {{geoserver_admin_user}}
+  password: {{geoserver_admin_password}}
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "layer": {
+      "defaultStyle": {
+        "name": "{{workspace_name}}:{{style_point}}",
+        "workspace": "{{workspace_name}}"
+      }
+    }
+  }
+}
+
+tests {
+  test("Default style assigned", function() {
+    expect(res.status).to.equal(200);
+  });
+}

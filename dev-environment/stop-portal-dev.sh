@@ -57,6 +57,9 @@ $COMPOSE_DOWN 2>/dev/null && echo "  Model Atlas stopped" || true
 cd "$SCRIPT_DIR/redpanda-connect"
 $COMPOSE_DOWN 2>/dev/null && echo "  Redpanda Connect stopped" || true
 
+cd "$SCRIPT_DIR/geoserver"
+$COMPOSE_DOWN 2>/dev/null && echo "  GeoServer stopped" || true
+
 cd "$SCRIPT_DIR/frost"
 $COMPOSE_DOWN 2>/dev/null && echo "  FROST Server stopped" || true
 

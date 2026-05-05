@@ -40,29 +40,29 @@ export const useUpdateDatasource = () =>
     errorMessage: 'An error occurred while updating datasource',
   })
 
-export const useUpdateDatasourcePublished = () =>
+export const useUpdateDatasourceReleased = () =>
   useUpdateMutation<Datasource, DatasourcePutData>({
     method: 'PUT',
     key,
-    endpoint: ({ id }) => `/datasources/${id}/published/meta`,
+    endpoint: ({ id }) => `/datasources/${id}/released/meta`,
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while updating datasource',
   })
 
-export const usePublishDatasource = () =>
+export const useReleaseDatasource = () =>
   useCreateMutation<Datasource, WithId>({
     key,
-    endpoint: ({ id }) => `/datasources/${id}/publish`,
+    endpoint: ({ id }) => `/datasources/${id}/release`,
     headers: { 'x-api-request': 'true' },
-    errorMessage: 'An error occurred while publishing datasource',
+    errorMessage: 'An error occurred while releasing datasource',
   })
 
-export const useUnpublishDatasource = () =>
+export const useUnreleaseDatasource = () =>
   useCreateMutation<Datasource, WithId>({
     key,
-    endpoint: ({ id }) => `/datasources/${id}/unpublish`,
+    endpoint: ({ id }) => `/datasources/${id}/unrelease`,
     headers: { 'x-api-request': 'true' },
-    errorMessage: 'An error occurred while unpublishing datasource',
+    errorMessage: 'An error occurred while unreleasing datasource',
   })
 
 export const useDeleteDatasource = () =>

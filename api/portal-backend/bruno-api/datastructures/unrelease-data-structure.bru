@@ -1,0 +1,37 @@
+meta {
+  name: Unrelease Data Structure
+  type: http
+  seq: 17
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/unrelease
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+}
+
+tests {
+  test("Unrelease accepted or not released", function() {
+    const status = res.getStatus();
+    // 200=unreleased, 400=not in released state
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` is set and in released state.
+
+  **Expected Response:** 200 OK, body reflects data structure returned to draft state.
+
+  **System Impact:**
+
+  | Layer | Impact | Status |
+  |---|---|---|
+  | Backend | DataStructure status reverted to draft | --- |
+  | Config Adapter | --- | --- |
+  | Model Atlas | DataStructure schema no longer publicly available | --- |
+}

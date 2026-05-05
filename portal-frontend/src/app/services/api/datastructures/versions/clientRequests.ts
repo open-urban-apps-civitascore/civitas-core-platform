@@ -70,7 +70,7 @@ export const useUpdateDatastructureVersion = () =>
     errorMessage: 'An error occurred while updating datastructure version',
   })
 
-export const useUpdateDatastructureVersionPublished = () =>
+export const useUpdateDatastructureVersionReleased = () =>
   useDatastructureVersionMutation<DatastructureVersion, DatastructureVersionPutData>({
     method: 'PUT',
     errorMessage: 'An error occurred while updating datastructure version',
@@ -82,16 +82,16 @@ export const useStatusUpdateDatastructureVersion = () =>
     errorMessage: 'An error occurred while changing the status of the datastructure version',
   })
 
-export const usePublishDatastructureVersion = (datastructureId: string) =>
+export const useReleaseDatastructureVersion = (datastructureId: string) =>
   useCreateMutation<DatastructureVersion, WithId>({
     key: `datastructures/${datastructureId}/versions`,
-    endpoint: (data: WithId) => `/datastructures/${datastructureId}/versions/${data.id}/publish`,
+    endpoint: (data: WithId) => `/datastructures/${datastructureId}/versions/${data.id}/release`,
     headers: { 'x-api-request': 'true' },
-    errorMessage: 'An error occurred while publishing datastructure version',
+    errorMessage: 'An error occurred while releasing datastructure version',
   })
 
-export const useUnpublishDatastructureVersion = () =>
+export const useUnreleaseDatastructureVersion = () =>
   useDatastructureVersionMutation<DatastructureVersion, WithId>({
     method: 'POST',
-    errorMessage: 'An error occurred while publishing datastructure version',
+    errorMessage: 'An error occurred while unreleasing datastructure version',
   })

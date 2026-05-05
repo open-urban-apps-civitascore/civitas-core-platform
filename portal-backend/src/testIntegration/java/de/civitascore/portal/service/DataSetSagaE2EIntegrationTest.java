@@ -27,8 +27,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.Network;
-import org.testcontainers.kafka.KafkaContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.MountableFile;
 
 /**
@@ -56,14 +55,7 @@ import org.testcontainers.utility.MountableFile;
 @Import(InfraTestDataFactory.class)
 class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
 
-  static final Network sagaNetwork = Network.newNetwork();
-
-  static final GenericContainer<?> postgis = createPostgis(sagaNetwork);
-  static final GenericContainer<?> frost = createFrost(sagaNetwork, postgis);
-  static final KafkaContainer kafka = createKafka();
-  static final GenericContainer<?> redpandaConnect = createRedpandaConnect(sagaNetwork);
-  static final GenericContainer<?> mosquitto = createMosquitto(sagaNetwork);
-
+  /** Extra datasource PostgreSQL container — only needed for SQL E2E tests. */
   @SuppressWarnings("resource")
   static final GenericContainer<?> datasourcePg =
       new GenericContainer<>("postgres:15-alpine")
@@ -75,32 +67,13 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
           .withCopyToContainer(
               MountableFile.forClasspathResource("datasource-db/init.sql"),
               "/docker-entrypoint-initdb.d/init.sql")
-          .waitingFor(
-              org.testcontainers.containers.wait.strategy.Wait.forLogMessage(
-                  ".*database system is ready to accept connections.*", 2));
+          .waitingFor(Wait.forLogMessage(".*database system is ready to accept connections.*", 2));
 
   private static SagaOrchestratorTestHelper sagaHelper;
-  private static String frostExternalUrl;
-  private static String redpandaExternalUrl;
 
   static {
-    postgis.start();
-    frost.start();
-    kafka.start();
     datasourcePg.start();
-    mosquitto.start();
-    redpandaConnect.start();
-
-    frostExternalUrl =
-        "http://" + frost.getHost() + ":" + frost.getMappedPort(8080) + "/FROST-Server/v1.1";
-    redpandaExternalUrl =
-        "http://" + redpandaConnect.getHost() + ":" + redpandaConnect.getMappedPort(4195);
-
-    log.info("FROST available at {}", frostExternalUrl);
-    log.info("Kafka available at {}", kafka.getBootstrapServers());
-    log.info("Redpanda Connect available at {}", redpandaExternalUrl);
     log.info("Datasource PG available at datasource-db:5432 (internal)");
-    log.info("Mosquitto available at mqtt-broker:1883 (internal)");
   }
 
   @Autowired private DataSetService dataSetService;
@@ -137,13 +110,7 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
     if (sagaHelper != null) {
       sagaHelper.close();
     }
-    redpandaConnect.stop();
-    mosquitto.stop();
     datasourcePg.stop();
-    kafka.stop();
-    frost.stop();
-    postgis.stop();
-    sagaNetwork.close();
   }
 
   @Test
@@ -156,11 +123,11 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
     UUID dataSetId = dataSet.getId();
     UUID pipelineId = sqlPipeline.getId();
 
-    // Publish: DRAFT → READY (generates distributions from pipeline APIs)
-    DataSet published = dataSetService.publish(dataSetId);
-    assertThat(published.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
-    assertThat(published.getDistributions())
-        .as("Publish should create auto-generated distributions from pipeline APIs")
+    // Stage: DRAFT → READY (generates distributions from pipeline APIs)
+    DataSet staged = dataSetService.stage(dataSetId);
+    assertThat(staged.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+    assertThat(staged.getDistributions())
+        .as("Stage should create auto-generated distributions from pipeline APIs")
         .isNotEmpty();
 
     // Release: READY → AVAILABLE (triggers CREATE saga)
@@ -222,10 +189,10 @@ class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
     UUID dataSetId = dataSet.getId();
     UUID pipelineId = mqttPipeline.getId();
 
-    // Publish: DRAFT → READY
-    DataSet published = dataSetService.publish(dataSetId);
-    assertThat(published.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
-    assertThat(published.getDistributions()).isNotEmpty();
+    // Stage: DRAFT → READY
+    DataSet staged = dataSetService.stage(dataSetId);
+    assertThat(staged.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+    assertThat(staged.getDistributions()).isNotEmpty();
 
     // Release: READY → AVAILABLE (triggers CREATE saga)
     DataSet released = dataSetService.release(dataSetId);

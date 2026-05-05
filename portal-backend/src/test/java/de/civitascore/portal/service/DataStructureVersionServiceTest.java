@@ -53,12 +53,12 @@ class DataStructureVersionServiceTest {
   @InjectMocks private DataStructureVersionService dataStructureVersionService;
 
   @Nested
-  @DisplayName("Unpublish inUse guard")
-  class UnpublishInUseTests {
+  @DisplayName("Unrelease inUse guard")
+  class UnreleaseInUseTests {
 
     @Test
-    @DisplayName("Should block unpublish when version is in use by a DataSource")
-    void shouldBlockUnpublishWhenInUse() {
+    @DisplayName("Should block unrelease when version is in use by a DataSource")
+    void shouldBlockUnreleaseWhenInUse() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
       ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
@@ -71,13 +71,13 @@ class DataStructureVersionServiceTest {
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
 
-      assertThatThrownBy(() -> dataStructureVersionService.unpublish(versionId))
+      assertThatThrownBy(() -> dataStructureVersionService.unrelease(versionId))
           .isInstanceOf(ResourceInUseException.class);
     }
 
     @Test
-    @DisplayName("Should allow unpublish when version is not in use")
-    void shouldAllowUnpublishWhenNotInUse() {
+    @DisplayName("Should allow unrelease when version is not in use")
+    void shouldAllowUnreleaseWhenNotInUse() {
       UUID versionId = UUID.randomUUID();
       UUID otherVersionId = UUID.randomUUID();
 
@@ -100,7 +100,7 @@ class DataStructureVersionServiceTest {
       when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
       when(dataStructureVersionRepository.save(version)).thenReturn(version);
 
-      dataStructureVersionService.unpublish(versionId);
+      dataStructureVersionService.unrelease(versionId);
 
       verify(dataStructureVersionRepository).save(version);
     }
@@ -153,11 +153,11 @@ class DataStructureVersionServiceTest {
   }
 
   @Nested
-  @DisplayName("UpdatePublishedMeta inUse guard")
-  class UpdatePublishedMetaInUseTests {
+  @DisplayName("UpdateReleasedMeta inUse guard")
+  class UpdateReleasedMetaInUseTests {
 
     @Test
-    @DisplayName("Should allow full update via updatePublishedMeta when version is not in use")
+    @DisplayName("Should allow full update via updateReleasedMeta when version is not in use")
     void shouldAllowFullUpdateWhenNotInUse() {
       UUID versionId = UUID.randomUUID();
       UUID dataStructureId = UUID.randomUUID();
@@ -192,12 +192,12 @@ class DataStructureVersionServiceTest {
       when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
 
       assertThatNoException()
-          .isThrownBy(() -> dataStructureVersionService.updatePublishedMeta(versionId, input));
+          .isThrownBy(() -> dataStructureVersionService.updateReleasedMeta(versionId, input));
     }
 
     @Test
     @DisplayName(
-        "Should block model and structural changes via updatePublishedMeta when version is in use")
+        "Should block model and structural changes via updateReleasedMeta when version is in use")
     void shouldBlockStructuralChangesWhenInUse() {
       UUID versionId = UUID.randomUUID();
       UUID dataStructureId = UUID.randomUUID();
@@ -231,7 +231,7 @@ class DataStructureVersionServiceTest {
       when(dataStructureVersionRepository.save(any())).thenReturn(version);
       when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
 
-      dataStructureVersionService.updatePublishedMeta(versionId, input);
+      dataStructureVersionService.updateReleasedMeta(versionId, input);
 
       // After preProcessUpdateInput, in-use fields should be reverted
       assertThat(input.getModelAtlasUri())
@@ -243,8 +243,8 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
-    @DisplayName("Should reject updatePublishedMeta for DRAFT version")
-    void shouldRejectUpdatePublishedMetaForDraftVersion() {
+    @DisplayName("Should reject updateReleasedMeta for DRAFT version")
+    void shouldRejectUpdateReleasedMetaForDraftVersion() {
       UUID versionId = UUID.randomUUID();
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -255,20 +255,20 @@ class DataStructureVersionServiceTest {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("1.0.0");
 
-      assertThatThrownBy(() -> dataStructureVersionService.updatePublishedMeta(versionId, input))
+      assertThatThrownBy(() -> dataStructureVersionService.updateReleasedMeta(versionId, input))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("DRAFT");
     }
   }
 
   @Nested
-  @DisplayName("Publish model existence guard")
-  class PublishModelExistenceTests {
+  @DisplayName("Release model existence guard")
+  class ReleaseModelExistenceTests {
 
     @Test
     @DisplayName(
-        "Should block publish when modelAtlasUri is set but no model exists in Model Atlas")
-    void shouldBlockPublishWhenModelNotFoundInAtlas() {
+        "Should block release when modelAtlasUri is set but no model exists in Model Atlas")
+    void shouldBlockReleaseWhenModelNotFoundInAtlas() {
       UUID versionId = UUID.randomUUID();
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -279,14 +279,14 @@ class DataStructureVersionServiceTest {
       when(modelService.downloadModel("http://example.com/model/missing", "application/xml"))
           .thenThrow(new RuntimeException("Not found"));
 
-      assertThatThrownBy(() -> dataStructureVersionService.publish(versionId))
+      assertThatThrownBy(() -> dataStructureVersionService.release(versionId))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("no model found in Model Atlas");
     }
 
     @Test
-    @DisplayName("Should block publish when Model Atlas returns null content")
-    void shouldBlockPublishWhenModelContentIsNull() {
+    @DisplayName("Should block release when Model Atlas returns null content")
+    void shouldBlockReleaseWhenModelContentIsNull() {
       UUID versionId = UUID.randomUUID();
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -297,14 +297,14 @@ class DataStructureVersionServiceTest {
       when(modelService.downloadModel("http://example.com/model/empty", "application/xml"))
           .thenReturn(null);
 
-      assertThatThrownBy(() -> dataStructureVersionService.publish(versionId))
+      assertThatThrownBy(() -> dataStructureVersionService.release(versionId))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("no model found in Model Atlas");
     }
 
     @Test
-    @DisplayName("Should allow publish when model exists in Model Atlas")
-    void shouldAllowPublishWhenModelExists() {
+    @DisplayName("Should allow release when model exists in Model Atlas")
+    void shouldAllowReleaseWhenModelExists() {
       UUID versionId = UUID.randomUUID();
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -316,7 +316,7 @@ class DataStructureVersionServiceTest {
           .thenReturn("<xml>model content</xml>");
       when(dataStructureVersionRepository.save(version)).thenReturn(version);
 
-      DataStructureVersion result = dataStructureVersionService.publish(versionId);
+      DataStructureVersion result = dataStructureVersionService.release(versionId);
 
       assertThat(result.getDataStructureVersionStatus())
           .isEqualTo(DataStructureVersionStatus.AVAILABLE);
@@ -324,8 +324,8 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
-    @DisplayName("Should block publish when modelAtlasUri is blank")
-    void shouldBlockPublishWhenModelAtlasUriIsBlank() {
+    @DisplayName("Should block release when modelAtlasUri is blank")
+    void shouldBlockReleaseWhenModelAtlasUriIsBlank() {
       UUID versionId = UUID.randomUUID();
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -334,14 +334,14 @@ class DataStructureVersionServiceTest {
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
 
-      assertThatThrownBy(() -> dataStructureVersionService.publish(versionId))
+      assertThatThrownBy(() -> dataStructureVersionService.release(versionId))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("modelAtlasUri");
     }
 
     @Test
-    @DisplayName("Should block publish when version is already published")
-    void shouldBlockPublishWhenAlreadyPublished() {
+    @DisplayName("Should block release when version is already released")
+    void shouldBlockReleaseWhenAlreadyReleased() {
       UUID versionId = UUID.randomUUID();
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -349,9 +349,9 @@ class DataStructureVersionServiceTest {
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
 
-      assertThatThrownBy(() -> dataStructureVersionService.publish(versionId))
+      assertThatThrownBy(() -> dataStructureVersionService.release(versionId))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("already published");
+          .hasMessageContaining("already released");
     }
   }
 

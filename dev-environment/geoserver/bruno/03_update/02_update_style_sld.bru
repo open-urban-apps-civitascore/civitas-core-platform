@@ -1,0 +1,59 @@
+meta {
+  name: 02 Update Style SLD (Data Steward uploads custom SLD)
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{geoserver_url}}/rest/workspaces/{{workspace_name}}/styles/{{style_point}}
+  body: text
+  auth: basic
+}
+
+auth:basic {
+  username: {{geoserver_admin_user}}
+  password: {{geoserver_admin_password}}
+}
+
+headers {
+  Content-Type: application/vnd.ogc.sld+xml
+}
+
+body:text {
+  <?xml version="1.0" encoding="UTF-8"?>
+  <StyledLayerDescriptor xmlns="http://www.opengis.net/sld"
+                         xmlns:ogc="http://www.opengis.net/ogc"
+                         version="1.0.0">
+    <NamedLayer>
+      <Name>civitas_default_point</Name>
+      <UserStyle>
+        <Title>CIVITAS Custom Point (red — updated)</Title>
+        <FeatureTypeStyle>
+          <Rule>
+            <PointSymbolizer>
+              <Graphic>
+                <Mark>
+                  <WellKnownName>circle</WellKnownName>
+                  <Fill>
+                    <CssParameter name="fill">#ef4444</CssParameter>
+                  </Fill>
+                  <Stroke>
+                    <CssParameter name="stroke">#ffffff</CssParameter>
+                    <CssParameter name="stroke-width">2</CssParameter>
+                  </Stroke>
+                </Mark>
+                <Size>10</Size>
+              </Graphic>
+            </PointSymbolizer>
+          </Rule>
+        </FeatureTypeStyle>
+      </UserStyle>
+    </NamedLayer>
+  </StyledLayerDescriptor>
+}
+
+tests {
+  test("Style updated", function() {
+    expect(res.status).to.equal(200);
+  });
+}

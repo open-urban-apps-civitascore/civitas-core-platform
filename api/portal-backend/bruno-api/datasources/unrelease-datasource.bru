@@ -1,0 +1,37 @@
+meta {
+  name: Unrelease Data Source
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/datasources/:id/unrelease
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSourceId}}
+}
+
+tests {
+  test("Unrelease accepted or not released", function() {
+    const status = res.getStatus();
+    // 200=unreleased, 400=not in released state
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Precondition:** `dataSourceId` is set and in released state.
+
+  **Expected Response:** 200 OK, body reflects data source returned to draft state.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource status reverted to draft |
+  | Config Adapter | Consumes `de.civitascore.api.backend.deleted` Kafka event; removes the backend from APISIX |
+  | APISIX | Upstream/route removed |
+}

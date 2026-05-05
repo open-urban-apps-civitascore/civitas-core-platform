@@ -38,12 +38,12 @@ class DataStructureServiceTest {
   @InjectMocks private DataStructureService dataStructureService;
 
   @Nested
-  @DisplayName("Unpublish inUse guard")
-  class UnpublishInUseTests {
+  @DisplayName("Unrelease inUse guard")
+  class UnreleaseInUseTests {
 
     @Test
-    @DisplayName("Should block unpublish when any version is in use")
-    void shouldBlockUnpublishWhenVersionInUse() {
+    @DisplayName("Should block unrelease when any version is in use")
+    void shouldBlockUnreleaseWhenVersionInUse() {
       UUID dsId = UUID.randomUUID();
       UUID versionId = UUID.randomUUID();
 
@@ -60,13 +60,13 @@ class DataStructureServiceTest {
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
           .thenReturn(true);
 
-      assertThatThrownBy(() -> dataStructureService.unpublish(dsId))
+      assertThatThrownBy(() -> dataStructureService.unrelease(dsId))
           .isInstanceOf(ResourceInUseException.class);
     }
 
     @Test
-    @DisplayName("Should allow unpublish when no version is in use")
-    void shouldAllowUnpublishWhenNoVersionInUse() {
+    @DisplayName("Should allow unrelease when no version is in use")
+    void shouldAllowUnreleaseWhenNoVersionInUse() {
       UUID dsId = UUID.randomUUID();
       UUID versionId = UUID.randomUUID();
 
@@ -84,7 +84,7 @@ class DataStructureServiceTest {
           .thenReturn(false);
       when(dataStructureRepository.save(ds)).thenReturn(ds);
 
-      dataStructureService.unpublish(dsId);
+      dataStructureService.unrelease(dsId);
 
       verify(dataStructureRepository).save(ds);
     }

@@ -1,0 +1,33 @@
+meta {
+  name: 3e. Release DataStructure
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{sagaDataStructureId}}
+}
+
+tests {
+  test("Released or already released", function() {
+    const status = res.getStatus();
+    // 200=released, 400=not in DRAFT state (already released)
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Saga step 3e of 18** — Prerequisites: DataStructure version released (step 3d).
+
+  Releases the DataStructure itself, making it available for use in datasets. All versions must be released before the parent DataStructure can be released.
+
+  **Expected Response:** 200 OK. 400 if not in DRAFT state (already released — idempotent).
+
+  **Post-condition:** DataStructure status transitions from `DRAFT` to `PUBLISHED`.
+}

@@ -309,8 +309,8 @@ public class DataStructureVersionService
   }
 
   /**
-   * Override update to ensure it can only be called for DRAFT versions. For published versions, use
-   * updatePublishedMeta instead.
+   * Override update to ensure it can only be called for DRAFT versions. For released versions, use
+   * updateReleasedMeta instead.
    *
    * @param id the version ID
    * @param input the update input
@@ -331,7 +331,7 @@ public class DataStructureVersionService
   }
 
   /**
-   * Updates a published data structure version. If the version is not in use by any DataSource, all
+   * Updates a released data structure version. If the version is not in use by any DataSource, all
    * fields (model, modelAtlasUri, version, styles, modelName, description) can be updated. If the
    * version is in use, only description and modelName can be changed.
    *
@@ -342,13 +342,13 @@ public class DataStructureVersionService
    * @throws ResourceInUseException if trying to update restricted fields on an in-use version
    */
   @Transactional
-  public DataStructureVersion updatePublishedMeta(UUID id, DataStructureVersionInputDTO input) {
+  public DataStructureVersion updateReleasedMeta(UUID id, DataStructureVersionInputDTO input) {
     DataStructureVersion existingEntity = findByIdOrThrow(id);
     if (existingEntity.getDataStructureVersionStatus() == DataStructureVersionStatus.DRAFT) {
       throw new InvalidInputException(
           "dataStructureVersionStatus",
           id,
-          "Cannot use updatePublishedMeta for DRAFT DataStructureVersion.");
+          "Cannot update released metadata for a DRAFT DataStructureVersion.");
     }
 
     String oldModelAtlasUri = existingEntity.getModelAtlasUri();
@@ -358,21 +358,21 @@ public class DataStructureVersionService
   }
 
   /**
-   * Publishes a data structure version by validating it has a modelAtlasUri and setting status to
+   * Releases a data structure version by validating it has a modelAtlasUri and setting status to
    * AVAILABLE.
    *
    * @param id the version ID
-   * @return the published version
-   * @throws InvalidInputException if version has no modelAtlasUri or is already published
+   * @return the released version
+   * @throws InvalidInputException if version has no modelAtlasUri or is already released
    */
   @Transactional
-  public DataStructureVersion publish(UUID id) {
+  public DataStructureVersion release(UUID id) {
     DataStructureVersion version = findByIdOrThrow(id);
 
     // Validate that version is currently in DRAFT status
     if (version.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT) {
       throw new InvalidInputException(
-          "dataStructureVersionStatus", id, "DataStructureVersion is already published");
+          "dataStructureVersionStatus", id, "DataStructureVersion is already released");
     }
 
     // Validate that version has a modelAtlasUri
@@ -380,7 +380,7 @@ public class DataStructureVersionService
       throw new InvalidInputException(
           "modelAtlasUri",
           id,
-          "DataStructureVersion must contain a modelAtlasUri before publishing");
+          "DataStructureVersion must contain a modelAtlasUri before releasing");
     }
 
     // Validate that the model is actually retrievable from Model Atlas
@@ -388,7 +388,7 @@ public class DataStructureVersionService
       throw new InvalidInputException(
           "modelAtlasUri",
           id,
-          "Cannot publish: no model found in Model Atlas for modelAtlasUri "
+          "Cannot release: no model found in Model Atlas for modelAtlasUri "
               + version.getModelAtlasUri());
     }
 
@@ -397,28 +397,28 @@ public class DataStructureVersionService
   }
 
   /**
-   * Unpublishes a data structure version by setting status back to DRAFT. Validates that
-   * unpublishing won't leave a published DataStructure without any published versions.
+   * Unreleases a data structure version by setting status back to DRAFT. Validates that unreleasing
+   * won't leave a released DataStructure without any released versions.
    *
    * @param id the version ID
-   * @return the unpublished version
-   * @throws InvalidInputException if version is already DRAFT or if unpublishing would leave a
-   *     published DataStructure without published versions
+   * @return the unreleased version
+   * @throws InvalidInputException if version is already DRAFT or if unreleasing would leave a
+   *     released DataStructure without released versions
    */
   @Transactional
-  public DataStructureVersion unpublish(UUID id) {
+  public DataStructureVersion unrelease(UUID id) {
     DataStructureVersion version = findByIdOrThrow(id);
 
-    // Validate that version is currently published
+    // Validate that version is currently released
     if (version.getDataStructureVersionStatus() == DataStructureVersionStatus.DRAFT) {
       throw new InvalidInputException(
           "dataStructureVersionStatus", id, "DataStructureVersion is already in DRAFT status");
     }
 
     validateNotInUse(id);
-    validateExistenceOfOtherPublishedVersion(
+    validateExistenceOfOtherReleasedVersion(
         version,
-        "Cannot unpublish this DataStructureVersion because it is the only published version of a published DataStructure. Please unpublish the DataStructure first.");
+        "Cannot unrelease this DataStructureVersion because it is the only released version of a released DataStructure. Please unrelease the DataStructure first.");
 
     version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
     return dataStructureVersionRepository.save(version);
@@ -426,21 +426,21 @@ public class DataStructureVersionService
 
   /**
    * Validates that the version is not in use by any data source and that deleting it would not
-   * leave a published data structure without any published versions.
+   * leave a released data structure without any released versions.
    *
    * @param id the version ID to delete
    * @return the version entity to be deleted
    * @throws ResourceInUseException if the version is referenced by a data source
-   * @throws InvalidInputException if the version is the only published version of a published data
+   * @throws InvalidInputException if the version is the only released version of a released data
    *     structure
    */
   @Override
   protected DataStructureVersion preProcessDelete(UUID id) {
     DataStructureVersion version = findByIdOrThrow(id);
     validateNotInUse(id);
-    validateExistenceOfOtherPublishedVersion(
+    validateExistenceOfOtherReleasedVersion(
         version,
-        "Cannot delete this DataStructureVersion because it is the only published version of a published DataStructure. Please unpublish the DataStructure first.");
+        "Cannot delete this DataStructureVersion because it is the only released version of a released DataStructure. Please unrelease the DataStructure first.");
 
     return version;
   }
@@ -454,19 +454,19 @@ public class DataStructureVersionService
     }
   }
 
-  private void validateExistenceOfOtherPublishedVersion(
+  private void validateExistenceOfOtherReleasedVersion(
       DataStructureVersion version, String errorMessage) {
     DataStructure dataStructure = version.getDataStructure();
     if (dataStructure.getDataStructureStatus() == DataStructureStatus.DRAFT) {
       return;
     }
 
-    boolean hasOtherPublishedVersions =
+    boolean hasOtherReleasedVersions =
         dataStructure.getDataStructureVersions().stream()
             .filter(v -> !v.getId().equals(version.getId()))
             .anyMatch(v -> v.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT);
 
-    if (!hasOtherPublishedVersions) {
+    if (!hasOtherReleasedVersions) {
       throw new InvalidInputException("dataStructureVersionStatus", version.getId(), errorMessage);
     }
   }

@@ -5,6 +5,7 @@ import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -24,9 +25,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for managing {@link DataSet} entities through their full lifecycle: DRAFT, READY, and
- * AVAILABLE. Orchestrates publishing (generating distributions from pipeline APIs), releasing
- * (triggering infrastructure provisioning via sagas), and the corresponding reverse operations.
- * Handles saga completion and failure callbacks to reconcile dataset state.
+ * AVAILABLE. Orchestrates staging (DRAFT → READY: generating distributions from pipeline APIs),
+ * releasing (READY → AVAILABLE: triggering infrastructure provisioning via sagas), and the
+ * corresponding reverse operations (unstage, unrelease). Handles saga completion and failure
+ * callbacks to reconcile dataset state.
  */
 @Slf4j
 @Service
@@ -73,9 +75,29 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     return assignmentFactory;
   }
 
+  @Override
+  protected ReleasableStatus getEntityStatus(DataSet entity) {
+    return entity.getDataSetStatus();
+  }
+
+  @Override
+  protected void setEntityStatus(DataSet entity, ReleasableStatus status) {
+    entity.setDataSetStatus((DataSetStatus) status);
+  }
+
+  @Override
+  protected ReleasableStatus getDraftStatus() {
+    return DataSetStatus.DRAFT;
+  }
+
+  @Override
+  protected ReleasableStatus getAvailableStatus() {
+    return DataSetStatus.AVAILABLE;
+  }
+
   /**
-   * Override update to ensure it can only be called for DRAFT datasets. For published datasets, use
-   * updatePublishedMeta instead.
+   * Override update to ensure it can only be called for DRAFT datasets. For released datasets, use
+   * updateReleasedMeta instead.
    *
    * @param id the dataset ID
    * @param input the update input
@@ -96,7 +118,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Updates only the metadata (name, description) of a published dataset. Cannot modify
+   * Updates only the metadata (name, description) of a released dataset. Cannot modify
    * persistenceId or pipelines. For AVAILABLE datasets with existing infrastructure, triggers a
    * saga UPDATE if no saga is currently in-flight.
    *
@@ -106,14 +128,15 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * @throws InvalidInputException if trying to update a DRAFT dataset
    * @throws ResourceInUseException if a saga is in-flight for this dataset
    */
+  @Override
   @Transactional
-  public DataSet updatePublishedMeta(UUID id, DataSetInputDTO input) {
+  public DataSet updateReleasedMeta(UUID id, DataSetInputDTO input) {
     DataSet existingEntity = findByIdOrThrow(id);
     if (existingEntity.getDataSetStatus() == DataSetStatus.DRAFT) {
       throw new InvalidInputException(
           "dataSetStatus",
           id,
-          "This endpoint requires a published dataset (READY or AVAILABLE), current status: DRAFT");
+          "This endpoint requires a released dataset (READY or AVAILABLE), current status: DRAFT");
     }
 
     if (existingEntity.getPendingSagaType() != null) {
@@ -139,20 +162,20 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Publishes a dataset by validating it has at least one pipeline, generating distributions from
+   * Stages a dataset by validating it has at least one pipeline, generating distributions from
    * pipeline APIs, and setting status to READY.
    *
    * @param id the dataset ID
-   * @return the published dataset
-   * @throws InvalidInputException if dataset has no pipelines or is already published
+   * @return the staged dataset
+   * @throws InvalidInputException if dataset has no pipelines or is not in DRAFT status
    */
   @Transactional
-  public DataSet publish(UUID id) {
+  public DataSet stage(UUID id) {
     DataSet dataSet = findByIdOrThrow(id);
 
     // Validate status is DRAFT
     if (dataSet.getDataSetStatus() != DataSetStatus.DRAFT) {
-      throw new InvalidInputException("dataSetStatus", id, "DataSet is already published");
+      throw new InvalidInputException("dataSetStatus", id, "Only DRAFT datasets can be staged");
     }
 
     // Validate name not blank
@@ -168,7 +191,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     // Validate that dataset has at least one pipeline
     if (dataSet.getPipelines() == null || dataSet.getPipelines().isEmpty()) {
       throw new InvalidInputException(
-          "pipelines", id, "DataSet must contain at least one Pipeline before publishing");
+          "pipelines", id, "DataSet must contain at least one Pipeline before staging");
     }
 
     // Each pipeline must have either datasources (feed-in) or APIs (provide)
@@ -190,19 +213,19 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Unpublishes a dataset, reverting it from READY to DRAFT. Removes auto-generated distributions.
+   * Unstages a dataset, reverting it from READY to DRAFT. Removes auto-generated distributions.
    *
    * @param id the dataset ID
-   * @return the unpublished dataset
+   * @return the unstaged dataset
    * @throws InvalidInputException if dataset is not in READY status
    */
   @Transactional
-  public DataSet unpublish(UUID id) {
+  public DataSet unstage(UUID id) {
     DataSet dataSet = findByIdOrThrow(id);
 
     if (dataSet.getDataSetStatus() != DataSetStatus.READY) {
       throw new InvalidInputException(
-          "dataSetStatus", id, "DataSet can only be unpublished from READY status");
+          "dataSetStatus", id, "DataSet can only be unstaged from READY status");
     }
 
     dataSet.getDistributions().removeIf(Distribution::getAutoGenerated);
@@ -220,6 +243,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * @return the released dataset
    * @throws InvalidInputException if dataset is not in READY status
    */
+  @Override
   @Transactional
   public DataSet release(UUID id) {
     DataSet dataSet =
@@ -250,6 +274,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * @throws InvalidInputException if dataset is not AVAILABLE
    * @throws ResourceInUseException if a saga is already in-flight
    */
+  @Override
   @Transactional
   public DataSet unrelease(UUID id) {
     DataSet dataSet = findByIdOrThrow(id);
@@ -357,9 +382,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Deletes a DRAFT dataset immediately. READY datasets cannot be deleted — unpublish first. For
-   * AVAILABLE datasets the controller routes through {@link #triggerDeleteSaga} instead, returning
-   * 202 Accepted for the asynchronous teardown.
+   * Deletes a DRAFT dataset immediately. READY datasets cannot be deleted — mark as draft first.
+   * For AVAILABLE datasets the controller routes through {@link #triggerDeleteSaga} instead,
+   * returning 202 Accepted for the asynchronous teardown.
    */
   @Override
   @Transactional
@@ -375,7 +400,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       throw new InvalidInputException(
           "dataSetStatus",
           id,
-          "Cannot delete a READY dataset. Unpublish it first to return to DRAFT");
+          "Cannot delete a READY dataset. Unstage it first (POST /datasets/{id}/unstage)");
     }
 
     throw new InvalidInputException(

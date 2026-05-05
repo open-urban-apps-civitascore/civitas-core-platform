@@ -6,10 +6,10 @@ import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import {
-  usePublishDatasource,
-  useUnpublishDatasource,
+  useReleaseDatasource,
+  useUnreleaseDatasource,
   useUpdateDatasource,
-  useUpdateDatasourcePublished,
+  useUpdateDatasourceReleased,
 } from '@/app/services/api/datasources/clientRequests'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { useError } from '@/hooks/use-error'
@@ -56,14 +56,14 @@ export const useDatasourceForm = (
   )
 
   const updateDatasource = useUpdateDatasource()
-  const updatePublishedDatasource = useUpdateDatasourcePublished()
-  const publishDatasource = usePublishDatasource()
-  const unpublishDatasource = useUnpublishDatasource()
+  const updateReleasedDatasource = useUpdateDatasourceReleased()
+  const releaseDatasource = useReleaseDatasource()
+  const unreleaseDatasource = useUnreleaseDatasource()
   const isLoading =
     updateDatasource.isPending ||
-    updatePublishedDatasource.isPending ||
-    publishDatasource.isPending ||
-    unpublishDatasource.isPending
+    updateReleasedDatasource.isPending ||
+    releaseDatasource.isPending ||
+    unreleaseDatasource.isPending
 
   const form = useForm<DatasourceFormDraft>({
     resolver: zodResolver(DatasourceFormDraftSchema),
@@ -177,7 +177,7 @@ export const useDatasourceForm = (
     try {
       const response =
         datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
-          ? await updatePublishedDatasource.mutateAsync({ ...values, name: nameWatch })
+          ? await updateReleasedDatasource.mutateAsync({ ...values, name: nameWatch })
           : await updateDatasource.mutateAsync(values)
 
       toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.datasource') }))
@@ -223,17 +223,17 @@ export const useDatasourceForm = (
     } as DatasourcePatchData
 
     const shouldUpdateValues = Object.keys(dirtyValues).some(key => key !== 'dataSourceStatus') || areAssignmentsDirty
-    const shouldPublish = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
-    const shouldUnpublish = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
+    const shouldRelease = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
+    const shouldUnrelease = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
 
     try {
       let datasourceResponse: Datasource | null = shouldUpdateValues ? await handleUpdateValues(apiPayload) : null
 
-      if (shouldPublish) {
-        datasourceResponse = await handleStatusUpdate(publishDatasource.mutateAsync)
+      if (shouldRelease) {
+        datasourceResponse = await handleStatusUpdate(releaseDatasource.mutateAsync)
       }
-      if (shouldUnpublish) {
-        datasourceResponse = await handleStatusUpdate(unpublishDatasource.mutateAsync)
+      if (shouldUnrelease) {
+        datasourceResponse = await handleStatusUpdate(unreleaseDatasource.mutateAsync)
       }
 
       if (datasourceResponse) {

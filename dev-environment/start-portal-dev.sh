@@ -470,6 +470,18 @@ else
     echo "           Portal development works fine without it."
 fi
 
+cd "$SCRIPT_DIR/geoserver"
+if [ ! -f .env ] && [ -f .env.example ]; then
+    cp .env.example .env
+    echo "  Created geoserver/.env from .env.example (set GEOSERVER_ADMIN_PASSWORD to change the password)"
+fi
+if $DOCKER_COMPOSE up -d 2>&1; then
+    echo "  GeoServer started"
+else
+    echo "  WARNING: GeoServer failed to start"
+    echo "           Portal development works fine without it."
+fi
+
 cd "$SCRIPT_DIR/redpanda-connect"
 if $DOCKER_COMPOSE up -d 2>&1; then
     echo "  Redpanda Connect started"
@@ -640,6 +652,14 @@ export FROST_API_KEY_HEADER=X-API-Key
 export FROST_TOPICS=de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
 export REDPANDA_URL=http://localhost:4195
 export REDPANDA_TOPICS=de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
+export GEOSERVER_URL=http://localhost:8082/geoserver
+export GEOSERVER_ADMIN_USER=admin
+export GEOSERVER_ADMIN_PASSWORD=changeme-generate-a-strong-password
+export GEOSERVER_POSTGIS_HOST=localhost
+export GEOSERVER_POSTGIS_PORT=5434
+export GEOSERVER_POSTGIS_DB=geoserver
+export GEOSERVER_POSTGIS_USER=geoserver
+export GEOSERVER_POSTGIS_PASSWORD=changeme-generate-a-strong-password
 
 java -jar "$CONFIG_ADAPTER_JAR"
 exec bash
@@ -681,6 +701,14 @@ else
     echo "  FROST_PUBLIC_URL=http://civitas-frost:8080/FROST-Server/v1.1"
     echo "  FROST_API_KEY=dev-frost-api-key"
     echo "  REDPANDA_URL=http://localhost:4195"
+    echo "  GEOSERVER_URL=http://localhost:8082/geoserver"
+    echo "  GEOSERVER_ADMIN_USER=admin"
+    echo "  GEOSERVER_ADMIN_PASSWORD=changeme-generate-a-strong-password"
+    echo "  GEOSERVER_POSTGIS_HOST=localhost"
+    echo "  GEOSERVER_POSTGIS_PORT=5434"
+    echo "  GEOSERVER_POSTGIS_DB=geoserver"
+    echo "  GEOSERVER_POSTGIS_USER=geoserver"
+    echo "  GEOSERVER_POSTGIS_PASSWORD=changeme-generate-a-strong-password"
     echo
 fi
 
@@ -905,6 +933,9 @@ echo "  Keycloak Admin:   http://localhost:8080 (admin/admin)"
 echo "  Kafka UI:         http://localhost:8090"
 echo "  FROST Server:     http://localhost:8085/FROST-Server/v1.1 (HTTP)"
 echo "  FROST MQTT:       mqtt://localhost:1883"
+echo "  GeoServer Admin:  http://localhost:8082/geoserver/web (admin / see geoserver/.env)"
+echo "  GeoServer WFS:    http://localhost:9080/geoserver/{workspace}/wfs (via APISIX)"
+echo "  GeoServer PostGIS: localhost:5434  db=geoserver  user=geoserver  (see geoserver/.env)"
 echo "  APISIX Gateway:   http://localhost:9080"
 echo "  APISIX Admin API: http://localhost:9180"
 echo "  Redpanda Connect: http://localhost:4195"
@@ -943,6 +974,7 @@ echo "  cd dev-environment/kafka && docker compose down"
 echo "  cd dev-environment/keycloak && docker compose down"
 echo "  cd dev-environment/apisix && docker compose down"
 echo "  cd dev-environment/frost && docker compose down"
+echo "  cd dev-environment/geoserver && docker compose down"
 echo "  cd dev-environment/redpanda-connect && docker compose down"
 echo "  cd dev-environment/modelatlas && docker compose down"
 echo

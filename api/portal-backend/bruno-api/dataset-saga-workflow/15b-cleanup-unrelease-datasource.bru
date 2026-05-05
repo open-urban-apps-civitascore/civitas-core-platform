@@ -1,0 +1,39 @@
+meta {
+  name: 15b. Cleanup - Unrelease DataSource
+  type: http
+  seq: 32
+}
+
+post {
+  url: {{baseUrl}}/datasources/:id/unrelease
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSourceId}}
+}
+
+tests {
+  test("Unreleased or already draft", function() {
+    const status = res.getStatus();
+    // 200=unreleased, 400=not in AVAILABLE state (already draft), 409=still in use
+    expect(status === 200 || status === 400 || status === 409).to.be.true;
+  });
+}
+
+docs {
+  **Saga step 15b of 20** — Prerequisites: Pipeline deleted (step 15).
+
+  Unreleasees the datasource, reverting it from AVAILABLE to DRAFT status. This must happen after the pipeline is deleted (step 15) because a datasource referenced by a pipeline cannot be unreleased. The datasource must be in DRAFT status before it can be deleted (step 16).
+
+  **Expected Response:** 200 OK. 400 if already in DRAFT state. 409 if still referenced by a pipeline.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource status reverted to `DRAFT` in `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

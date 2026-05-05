@@ -1,0 +1,44 @@
+meta {
+  name: Update Released Data Structure Meta
+  type: http
+  seq: 18
+}
+
+put {
+  url: {{baseUrl}}/datastructures/:dataStructureId/released/meta
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+}
+
+body:json {
+  {
+    "name": "Updated Name",
+    "description": "Updated description for released data structure"
+  }
+}
+
+tests {
+  test("Updated or not released", function() {
+    const status = res.getStatus();
+    // 200=updated, 400=data structure not in released state
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` is set and in released state.
+
+  **Expected Response:** 200 OK, released name and description are updated.
+
+  **System Impact:**
+
+  | Layer | Impact | Status |
+  |---|---|---|
+  | Backend | Released DataStructure name/description updated | --- |
+  | Config Adapter | --- | --- |
+  | Model Atlas | Metadata updated in Model Atlas | --- |
+}

@@ -53,7 +53,7 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
                 data-testid={`${name}TextField`}
                 data-test-element="formField"
                 className="disabled:opacity-100 disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
-                placeholder={placeholder}
+                placeholder={disabled ? undefined : placeholder}
                 {...field}
                 disabled={disabled}
                 aria-invalid={!!manualError || !!form.formState.errors[name]}

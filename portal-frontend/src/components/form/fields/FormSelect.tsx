@@ -78,7 +78,7 @@ export const FormSelect = <T extends FieldValues>(props: AccessibleSelectProps<T
                 )}
                 disabled={disabled}
               >
-                <SelectValue placeholder={placeholder} />
+                <SelectValue placeholder={disabled ? undefined : placeholder} />
               </SelectTrigger>
               <SelectContent data-testid={`${name}SelectContent`}>
                 {placeholder && (
