@@ -1,16 +1,15 @@
 package de.civitascore.portal.model.input;
 
+import de.civitascore.configadapter.model.dataset.ApiStandards;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
- * Input DTO for a named API endpoint exposed by a dataset (per concepts #1379 / #1383 / #1384, ADR
- * #1362). Used in {@link DataSetInputDTO#getNamedApis()} for POST/PUT/PATCH bodies.
- *
- * <p>Format/length validation of {@code slug} and the controlled {@code standard} vocabulary land
- * in #1312; this issue (#1315) only enforces non-blank guards.
+ * Input DTO for a named API endpoint exposed by a dataset. Used in {@link
+ * DataSetInputDTO#getNamedApis()} for POST/PUT/PATCH bodies.
  *
  * <p>Note: {@code previewUrl} is intentionally absent on the input side — it is server-built and
  * lives only on {@link de.civitascore.portal.model.output.NamedApiOutputDTO}.
@@ -23,7 +22,11 @@ public class NamedApiInputDTO {
       example = "Traffic Sensor Readings")
   private String name;
 
-  @NotBlank(message = "Slug is required") @Schema(
+  @NotBlank(message = "Slug is required") @Pattern(
+      regexp = "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+      message =
+          "Slug must be lowercase alphanumeric with internal hyphens (e.g. 'traffic-counter')")
+  @Size(max = 32, message = "Slug must be at most 32 characters") @Schema(
       description =
           "URL slug used as the path segment in the public route"
               + " /v1/datasets/{datasetId}/{slug}. Lowercase alphanumeric with internal hyphens,"
@@ -31,10 +34,10 @@ public class NamedApiInputDTO {
       example = "traffic")
   private String slug;
 
-  @NotBlank(message = "Standard is required") @Schema(
+  @NotBlank(message = "Standard is required") @Pattern(regexp = ApiStandards.PATTERN, message = "Standard must be one of WFS, WMS, STA, CUSTOM") @Schema(
       description =
-          "API standard per ADR #1362. CUSTOM allows free-form, non-standard APIs. Immutable"
-              + " once the dataset reaches AVAILABLE.",
+          "API standard. CUSTOM allows free-form, non-standard APIs. Immutable once the dataset"
+              + " reaches AVAILABLE.",
       allowableValues = {"WFS", "WMS", "STA", "CUSTOM"},
       example = "STA")
   private String standard;

@@ -470,6 +470,36 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should reject namedApis entry with malformed slug (uppercase)")
+    void shouldRejectMalformedNamedApiSlug() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(List.of(namedApi("Traffic", "Traffic-Counter", "STA", null)));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject namedApis entry with slug over 32 characters")
+    void shouldRejectOverlongNamedApiSlug() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(List.of(namedApi("Traffic", "a".repeat(33), "STA", null)));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject namedApis entry with unknown standard value")
+    void shouldRejectUnknownNamedApiStandard() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(List.of(namedApi("Traffic", "traffic", "OGCAPI", null)));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     @DisplayName("Should reject when an invalid entry follows a valid entry (cascade visits all)")
     void shouldRejectWhenSecondNamedApiEntryIsInvalid() {
       DataSetInputDTO input = createValidInput();
