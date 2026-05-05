@@ -409,6 +409,45 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should replace namedApis with same slugs (no unique-constraint violation)")
+    void shouldReplaceNamedApisWithSameSlugs() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(
+          List.of(
+              namedApi("Traffic", "traffic", "STA", null),
+              namedApi("Weather", "weather", "STA", null)));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+
+      // PATCH with the same slugs but different display name + description.
+      // Orphan removal of old rows + insert of new rows must not collide on
+      // uk_named_api_dataset_slug.
+      Map<String, Object> patchBody =
+          Map.of(
+              "namedApis",
+              List.of(
+                  Map.of(
+                      "name", "Traffic Sensor Readings",
+                      "slug", "traffic",
+                      "standard", "STA",
+                      "description", "Live traffic counter readings."),
+                  Map.of(
+                      "name", "Weather Sensor Readings",
+                      "slug", "weather",
+                      "standard", "STA")));
+
+      ResponseEntity<DataSetOutputDTO> patch = performPatch(created.getId(), patchBody);
+      assertThat(patch.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patch.getBody()).isNotNull();
+      assertThat(patch.getBody().getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getName)
+          .containsExactlyInAnyOrder(
+              tuple("traffic", "Traffic Sensor Readings"),
+              tuple("weather", "Weather Sensor Readings"));
+    }
+
+    @Test
     @DisplayName("Should clear namedApis on PATCH with empty array")
     void shouldClearNamedApisOnPatchWithEmptyArray() {
       DataSetInputDTO input = createValidInput();

@@ -7,8 +7,10 @@ import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.summary.DataSetSummaryDTO;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.BeanMapping;
@@ -104,13 +106,21 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   void updateEntity(@MappingTarget DataSet entity, DataSetInputDTO input);
 
   /**
-   * Wires {@code namedApis} through {@link DataSet#setNamedApis(java.util.Collection)} so the FK
-   * back-reference is set on each entry. Used by both {@link #toEntity(DataSetInputDTO)} (POST) and
-   * {@link #updateEntity(DataSet, DataSetInputDTO)} (PUT/PATCH).
+   * Wires {@code namedApis} into the entity, merging by slug to avoid the orphan-removal +
+   * unique-constraint flush-order foot-gun: replacing an entry whose slug is unchanged would
+   * otherwise DELETE then INSERT a row with the same {@code (dataset_id, slug)} pair in the same
+   * flush, violating {@code uk_named_api_dataset_slug}. Strategy:
    *
-   * <p>A {@code null} {@code namedApis} on the input is treated as "no namedApis field in the patch
-   * body" — leave the entity's existing collection untouched. An empty list clears the collection
-   * (orphan removal triggers).
+   * <ul>
+   *   <li>Existing entries whose slug appears in the incoming list have their non-key fields
+   *       updated in place; their {@code routeId} is preserved.
+   *   <li>Existing entries whose slug is absent from the incoming list are removed (orphan
+   *       removal).
+   *   <li>Slugs in the incoming list that don't exist on the entity are added as new entries.
+   * </ul>
+   *
+   * <p>A {@code null} {@code namedApis} on the input means "no namedApis field in the patch body" —
+   * leave the entity's existing collection untouched. An empty list clears the collection.
    */
   @AfterMapping
   default void linkNamedApis(DataSetInputDTO input, @MappingTarget DataSet entity) {
@@ -118,11 +128,26 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
     if (incoming == null) {
       return;
     }
-    Set<NamedApi> mapped = new HashSet<>();
-    for (NamedApiInputDTO dto : incoming) {
-      mapped.add(toNamedApiEntity(dto));
+    Map<String, NamedApi> existingBySlug = new HashMap<>();
+    for (NamedApi api : entity.getNamedApis()) {
+      existingBySlug.put(api.getSlug(), api);
     }
-    entity.setNamedApis(mapped);
+    Set<String> incomingSlugs = new HashSet<>();
+    for (NamedApiInputDTO dto : incoming) {
+      incomingSlugs.add(dto.getSlug());
+      NamedApi existing = existingBySlug.get(dto.getSlug());
+      if (existing != null) {
+        existing.setName(dto.getName());
+        existing.setStandard(dto.getStandard());
+        existing.setVersion(dto.getVersion());
+        existing.setDescription(dto.getDescription());
+      } else {
+        NamedApi created = toNamedApiEntity(dto);
+        created.setDataSet(entity);
+        entity.getNamedApis().add(created);
+      }
+    }
+    entity.getNamedApis().removeIf(api -> !incomingSlugs.contains(api.getSlug()));
   }
 
   /**
