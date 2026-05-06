@@ -30,7 +30,10 @@ public record CivitasProperties(@NotBlank String masterKey, @Valid Api api) {
    */
   public record Api(
       @NotBlank @Pattern(
-              regexp = "^[a-zA-Z0-9.-]+(:[0-9]+)?$",
+              regexp =
+                  "^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?"
+                      + "(\\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*"
+                      + "(:[0-9]+)?$",
               message =
                   "Domain must be a bare host with optional port (no scheme, no trailing slash)")
           String domain) {}
