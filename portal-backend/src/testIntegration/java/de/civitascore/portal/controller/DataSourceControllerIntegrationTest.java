@@ -668,12 +668,16 @@ class DataSourceControllerIntegrationTest
   }
 
   @Nested
-  @DisplayName("Unique Name Constraint Tests")
-  class UniqueNameTests {
+  @DisplayName("Duplicate Name Tests")
+  class DuplicateNameTests {
+
+    // Name uniqueness on DataSource was removed (#1453) to close a create-oracle: read access
+    // is scope-restricted but create access is global, so a uniqueness violation leaked the
+    // existence of records the caller had no permission to read. Duplicate names must succeed.
 
     @Test
-    @DisplayName("Should reject create with duplicate name")
-    void shouldRejectCreateWithDuplicateName() {
+    @DisplayName("Should allow create with duplicate name")
+    void shouldAllowCreateWithDuplicateName() {
       DataSourceInputDTO input = createValidInput();
       String name = input.getName();
       performCreate(input);
@@ -681,19 +685,15 @@ class DataSourceControllerIntegrationTest
       DataSourceInputDTO duplicate = createValidInput();
       duplicate.setName(name);
 
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath(),
-              HttpMethod.POST,
-              new HttpEntity<>(duplicate, createAuthHeaders()),
-              String.class);
+      ResponseEntity<DataSourceOutputDTO> response = performCreate(duplicate);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody().getName()).isEqualTo(name);
     }
 
     @Test
-    @DisplayName("Should reject update with duplicate name")
-    void shouldRejectUpdateWithDuplicateName() {
+    @DisplayName("Should allow update with duplicate name")
+    void shouldAllowUpdateWithDuplicateName() {
       DataSourceInputDTO first = createValidInput();
       String existingName = first.getName();
       performCreate(first);
@@ -705,19 +705,15 @@ class DataSourceControllerIntegrationTest
       DataSourceInputDTO update = createUpdateInput();
       update.setName(existingName);
 
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath() + "/" + secondId,
-              HttpMethod.PUT,
-              new HttpEntity<>(update, createAuthHeaders()),
-              String.class);
+      ResponseEntity<DataSourceOutputDTO> response = performUpdate(secondId, update);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getName()).isEqualTo(existingName);
     }
 
     @Test
-    @DisplayName("Should reject patch with duplicate name")
-    void shouldRejectPatchWithDuplicateName() {
+    @DisplayName("Should allow patch with duplicate name")
+    void shouldAllowPatchWithDuplicateName() {
       DataSourceInputDTO first = createValidInput();
       String existingName = first.getName();
       performCreate(first);
@@ -726,19 +722,20 @@ class DataSourceControllerIntegrationTest
 
       Map<String, Object> patch = Map.of("name", existingName);
 
-      ResponseEntity<String> response =
+      ResponseEntity<DataSourceOutputDTO> response =
           restTemplate.exchange(
               getEndpointPath() + "/" + secondId,
               HttpMethod.PATCH,
               new HttpEntity<>(patch, createAuthHeaders()),
-              String.class);
+              DataSourceOutputDTO.class);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getName()).isEqualTo(existingName);
     }
 
     @Test
-    @DisplayName("Should reject released meta update with duplicate name")
-    void shouldRejectPublishedMetaUpdateWithDuplicateName() {
+    @DisplayName("Should allow released meta update with duplicate name")
+    void shouldAllowPublishedMetaUpdateWithDuplicateName() {
       DataSourceInputDTO first = createValidInput();
       String existingName = first.getName();
       performCreate(first);
@@ -748,14 +745,15 @@ class DataSourceControllerIntegrationTest
 
       Map<String, Object> metaUpdate = Map.of("name", existingName);
 
-      ResponseEntity<String> response =
+      ResponseEntity<DataSourceOutputDTO> response =
           restTemplate.exchange(
               getEndpointPath() + "/" + secondId + "/released/meta",
               HttpMethod.PUT,
               new HttpEntity<>(metaUpdate, createAuthHeaders()),
-              String.class);
+              DataSourceOutputDTO.class);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getName()).isEqualTo(existingName);
     }
 
     @Test
