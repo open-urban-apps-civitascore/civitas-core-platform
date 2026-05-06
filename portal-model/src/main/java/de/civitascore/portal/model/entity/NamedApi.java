@@ -1,6 +1,6 @@
 package de.civitascore.portal.model.entity;
 
-import de.civitascore.portal.model.entity.base.BaseEntity;
+import de.civitascore.portal.model.entity.base.NamedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -9,7 +9,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -37,14 +36,11 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public class NamedApi extends BaseEntity {
+public class NamedApi extends NamedEntity {
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "dataset_id", nullable = false)
   private DataSet dataSet;
-
-  @Column(name = "name", nullable = false)
-  private String name;
 
   @Column(name = "slug", nullable = false, length = 32)
   private String slug;
@@ -58,10 +54,6 @@ public class NamedApi extends BaseEntity {
 
   @Column(name = "version", length = 32)
   private String version;
-
-  /** Portal-backend-private; not part of the saga contract. */
-  @Size(max = 150) @Column(name = "description", length = 150)
-  private String description;
 
   /**
    * Populated by the saga result handler after release; null before release and after unrelease.

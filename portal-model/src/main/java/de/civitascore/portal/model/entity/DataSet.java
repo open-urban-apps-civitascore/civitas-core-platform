@@ -214,13 +214,9 @@ public class DataSet extends BaseDataEntity {
   }
 
   /**
-   * Resets all infrastructure-related fields (projectId, frostBaseUrl, serviceId, publicUrl,
-   * pipelineIds) and clears the per-named-API {@code routeId} on each entry. The named-API entries
-   * themselves are preserved (they are user-authored). Typically called during unrelease.
-   *
-   * <p>Iterates {@code namedApis}; safe with the entity loaded via {@code
-   * DataSetRepository.findById} (which fetches the collection eagerly). Detached entities or custom
-   * queries without the entity graph need to fetch first.
+   * Resets all infrastructure-related fields and clears the per-named-API {@code routeId} on each
+   * entry. The named-API entries themselves are preserved (they are user-authored). The {@code
+   * namedApis} collection must be initialized before this is called.
    */
   public void clearInfrastructureFields() {
     this.projectId = null;
