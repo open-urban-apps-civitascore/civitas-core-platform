@@ -14,7 +14,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -37,10 +36,6 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(
     name = "data_sources",
-    uniqueConstraints =
-        @UniqueConstraint(
-            name = "uk_data_sources_name",
-            columnNames = {"name"}),
     indexes = {
       @Index(name = "idx_data_sources_status", columnList = "data_source_status"),
       @Index(name = "idx_data_sources_connector_type", columnList = "connector_type"),

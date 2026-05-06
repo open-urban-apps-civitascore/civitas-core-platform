@@ -343,6 +343,28 @@ class DataSetControllerIntegrationTest
           .as("createdBy should be null when no matching User exists")
           .isNull();
     }
+
+    @Test
+    @DisplayName("Should allow creating datasets with the same name")
+    void shouldAllowDuplicateDataSetName() {
+      // Name uniqueness was removed (#1453) to close a create-oracle: read access on
+      // DataSets is scope-restricted but create access is global, so a uniqueness
+      // violation leaked the existence of records the caller had no permission to read.
+      DataSetInputDTO input = createValidInput();
+      String name = input.getName();
+      ResponseEntity<DataSetOutputDTO> firstResponse = performCreate(input);
+      assertThat(firstResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+      DataSetInputDTO duplicate = createValidInput();
+      duplicate.setName(name);
+      ResponseEntity<DataSetOutputDTO> secondResponse = performCreate(duplicate);
+
+      assertThat(secondResponse.getStatusCode())
+          .as("Duplicate name must be accepted to avoid create-oracle leak")
+          .isEqualTo(HttpStatus.CREATED);
+      assertThat(secondResponse.getBody().getId()).isNotEqualTo(firstResponse.getBody().getId());
+      assertThat(secondResponse.getBody().getName()).isEqualTo(name);
+    }
   }
 
   @Nested
