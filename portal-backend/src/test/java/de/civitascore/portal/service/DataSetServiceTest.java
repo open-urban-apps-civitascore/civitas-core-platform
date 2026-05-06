@@ -2,11 +2,16 @@ package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
@@ -34,6 +39,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DataSetService Tests")
@@ -538,15 +544,29 @@ class DataSetServiceTest {
               null,
               null);
 
-      createService().handleSagaCompleted(id, result);
+      Logger serviceLogger = (Logger) LoggerFactory.getLogger(DataSetService.class);
+      ListAppender<ILoggingEvent> appender = new ListAppender<>();
+      appender.start();
+      serviceLogger.addAppender(appender);
+      try {
+        createService().handleSagaCompleted(id, result);
+      } finally {
+        serviceLogger.detachAppender(appender);
+      }
 
       ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
       verify(dataSetRepository).save(saved.capture());
-      // Incoming routeId wins; the warn-log makes the leak visible (asserted by code review,
-      // not the test — adding a log appender for one assertion would be heavier than the value).
       assertThat(saved.getValue().getNamedApis())
           .extracting(NamedApi::getSlug, NamedApi::getRouteId)
-          .containsExactly(org.assertj.core.api.Assertions.tuple("traffic", "route-NEW"));
+          .containsExactly(tuple("traffic", "route-NEW"));
+      assertThat(appender.list)
+          .anyMatch(
+              event ->
+                  event.getLevel() == Level.ERROR
+                      && event.getFormattedMessage().contains("drift=replaced-routeid")
+                      && event.getFormattedMessage().contains("traffic")
+                      && event.getFormattedMessage().contains("route-old")
+                      && event.getFormattedMessage().contains("route-NEW"));
     }
 
     @Test

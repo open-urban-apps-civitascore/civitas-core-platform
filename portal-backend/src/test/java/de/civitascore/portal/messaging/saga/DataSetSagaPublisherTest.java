@@ -317,10 +317,12 @@ class DataSetSagaPublisherTest {
       dataSet.setProjectId("proj-1");
       dataSet.setServiceId("svc-1");
       dataSet.setPipelines(Set.of());
-      dataSet.setNamedApis(
-          new java.util.HashSet<>(
-              Set.of(
-                  api("Traffic A", "traffic", "route-1"), api("Traffic B", "traffic", "route-2"))));
+      // Build the set via add() rather than Set.of(...), so the test still constructs two
+      // duplicate-slug entries even if NamedApi later gains @EqualsAndHashCode on slug.
+      java.util.Set<NamedApi> apis = new java.util.LinkedHashSet<>();
+      apis.add(api("Traffic A", "traffic", "route-1"));
+      apis.add(api("Traffic B", "traffic", "route-2"));
+      dataSet.setNamedApis(apis);
 
       // DB UNIQUE(dataset_id, slug) prevents this in production, but if a transactional bug or
       // migration ever produced duplicates, the publisher must fail with diagnostic context
