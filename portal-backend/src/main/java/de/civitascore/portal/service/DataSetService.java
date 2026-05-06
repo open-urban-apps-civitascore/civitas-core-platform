@@ -436,10 +436,11 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     if (result.baseUrl() != null) {
       dataSet.setFrostBaseUrl(result.baseUrl());
     }
-    if (result.routeIds() != null && !result.routeIds().isEmpty()) {
+    if (!dataSet.getNamedApis().isEmpty()) {
+      boolean resultHasRouteIds = result.routeIds() != null && !result.routeIds().isEmpty();
       Set<String> entitySlugs =
           dataSet.getNamedApis().stream().map(NamedApi::getSlug).collect(Collectors.toSet());
-      Set<String> resultSlugs = result.routeIds().keySet();
+      Set<String> resultSlugs = resultHasRouteIds ? result.routeIds().keySet() : Set.of();
 
       List<String> orphanSlugs =
           resultSlugs.stream().filter(slug -> !entitySlugs.contains(slug)).toList();
@@ -463,30 +464,30 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
             Encode.forJava(unprovisionedSlugs.toString()));
       }
 
-      dataSet
-          .getNamedApis()
-          .forEach(
-              api -> {
-                String incomingRouteId = result.routeIds().get(api.getSlug());
-                if (incomingRouteId == null) {
-                  // Either the slug is absent from the result map (already logged as
-                  // unprovisioned above) or the orchestrator sent an explicit null. In both
-                  // cases, preserve the current routeId on the entity.
-                  return;
-                }
-                String currentRouteId = api.getRouteId();
-                if (currentRouteId != null && !currentRouteId.equals(incomingRouteId)) {
-                  log.error(
-                      "drift={} dataset={} slug={} previous={} incoming={} — prior APISIX route"
-                          + " is likely leaked.",
-                      DRIFT_REPLACED_ROUTEID,
-                      dataSet.getId(),
-                      Encode.forJava(api.getSlug()),
-                      Encode.forJava(currentRouteId),
-                      Encode.forJava(incomingRouteId));
-                }
-                api.setRouteId(incomingRouteId);
-              });
+      if (resultHasRouteIds) {
+        dataSet
+            .getNamedApis()
+            .forEach(
+                api -> {
+                  String incomingRouteId = result.routeIds().get(api.getSlug());
+                  if (incomingRouteId == null) {
+                    // Already logged as unprovisioned above; preserve current routeId.
+                    return;
+                  }
+                  String currentRouteId = api.getRouteId();
+                  if (currentRouteId != null && !currentRouteId.equals(incomingRouteId)) {
+                    log.error(
+                        "drift={} dataset={} slug={} previous={} incoming={} — prior APISIX route"
+                            + " is likely leaked.",
+                        DRIFT_REPLACED_ROUTEID,
+                        dataSet.getId(),
+                        Encode.forJava(api.getSlug()),
+                        Encode.forJava(currentRouteId),
+                        Encode.forJava(incomingRouteId));
+                  }
+                  api.setRouteId(incomingRouteId);
+                });
+      }
     }
     if (result.serviceId() != null) {
       dataSet.setServiceId(result.serviceId());

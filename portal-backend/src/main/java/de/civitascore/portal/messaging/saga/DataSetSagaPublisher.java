@@ -49,12 +49,7 @@ public class DataSetSagaPublisher {
     this.objectMapper = objectMapper;
   }
 
-  /**
-   * Publish a dataset creation saga trigger. Provisions FROST project, APISIX route, and Redpanda
-   * pipelines.
-   *
-   * @param dataset the dataset to create infrastructure for
-   */
+  /** Publishes a {@code DATASET_CREATE} saga trigger. See {@link SagaTrigger} for the contract. */
   public void publishCreateRequested(DataSet dataset) {
     var trigger =
         SagaTrigger.DatasetCreate.of(
@@ -69,11 +64,8 @@ public class DataSetSagaPublisher {
   }
 
   /**
-   * Publish a dataset update saga trigger. Computes pipeline diffs and sends targeted update
-   * commands with existing infrastructure IDs.
-   *
-   * @param dataset the updated dataset
-   * @param previousPipelines the pipelines before the update, used for diff computation
+   * Publishes a {@code DATASET_UPDATE} saga trigger with a pipeline diff against {@code
+   * previousPipelines}.
    */
   public void publishUpdateRequested(DataSet dataset, Set<Pipeline> previousPipelines) {
     var trigger =
@@ -92,12 +84,7 @@ public class DataSetSagaPublisher {
     sendTrigger(trigger);
   }
 
-  /**
-   * Publish a dataset deletion saga trigger. Tears down Redpanda pipelines, APISIX route, and FROST
-   * project in reverse order.
-   *
-   * @param dataset the dataset whose infrastructure should be removed
-   */
+  /** Publishes a {@code DATASET_DELETE} saga trigger. */
   public void publishDeleteRequested(DataSet dataset) {
     var trigger =
         SagaTrigger.DatasetDelete.of(
@@ -176,14 +163,9 @@ public class DataSetSagaPublisher {
   }
 
   /**
-   * Projects the dataset's named-API entries into the slug-keyed {@code routeIds} map expected by
-   * the saga payload. Skips entries whose {@code routeId} is null (not yet provisioned). Returns
-   * {@code null} if no entry has a populated {@code routeId}, so the field is omitted from the JSON
-   * via {@code @JsonInclude(NON_NULL)}.
-   *
-   * <p>Throws {@link IllegalStateException} with dataset/slug/routeId context if duplicate slugs
-   * are present (defense-in-depth: the DB {@code UNIQUE(dataset_id, slug)} constraint should
-   * prevent this in production).
+   * Returns null when no entry has a populated {@code routeId} so {@code @JsonInclude(NON_NULL)}
+   * drops the field. Defense-in-depth against the DB {@code NOT NULL} / {@code UNIQUE(dataset_id,
+   * slug)} constraints.
    */
   private Map<String, String> buildRouteIds(DataSet dataset) {
     if (dataset.getNamedApis().isEmpty()) {
@@ -192,21 +174,28 @@ public class DataSetSagaPublisher {
     Map<String, String> routeIds =
         dataset.getNamedApis().stream()
             .filter(api -> api.getRouteId() != null)
+            .peek(
+                api -> {
+                  if (api.getSlug() == null) {
+                    throw invariant(
+                        "NamedApi %s on dataset %s has null slug", api.getId(), dataset.getId());
+                  }
+                })
             .collect(
                 Collectors.toMap(
                     api -> api.getSlug(),
                     api -> api.getRouteId(),
                     (existing, duplicate) -> {
-                      throw new IllegalStateException(
-                          "Duplicate slug in dataset "
-                              + dataset.getId()
-                              + " named APIs (DB UNIQUE(dataset_id, slug) should prevent this);"
-                              + " collision on routeId values "
-                              + existing
-                              + " and "
-                              + duplicate);
+                      throw invariant(
+                          "Dataset %s has duplicate slug; routeIds %s and %s",
+                          dataset.getId(), existing, duplicate);
                     }));
     return routeIds.isEmpty() ? null : routeIds;
+  }
+
+  private static IllegalStateException invariant(String fmt, Object... args) {
+    return new IllegalStateException(
+        String.format(fmt, args) + " (DB constraint should prevent this)");
   }
 
   private DataPipeline toPipelineEntry(Pipeline pipeline, PipelineAction action) {
