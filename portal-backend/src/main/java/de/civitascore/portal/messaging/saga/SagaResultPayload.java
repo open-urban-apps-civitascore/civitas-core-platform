@@ -10,8 +10,8 @@ import java.util.Map;
  * details from the top-level message).
  *
  * <p>Field names match the JSON keys produced by the config-adapter orchestrator. Unknown fields
- * are ignored for forward compatibility. {@code routeIds} is keyed by named-API slug per ADR #1362
- * so the backend can persist per-route infrastructure state for multi-route datasets.
+ * are ignored for forward compatibility. {@code routeIds} is keyed by named-API slug so per-route
+ * infrastructure state is addressable independently.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record SagaResultPayload(

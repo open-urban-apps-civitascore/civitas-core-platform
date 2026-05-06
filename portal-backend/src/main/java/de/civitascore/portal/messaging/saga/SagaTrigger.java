@@ -7,18 +7,26 @@ import de.civitascore.configadapter.model.dataset.NamedApi;
 import de.civitascore.configadapter.model.saga.SagaType;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Typed saga trigger payloads sent to the orchestrator topic. Each record carries {@code sagaType}
  * as an explicit field so Jackson serializes it into the flat JSON that the orchestrator's {@code
  * SagaTriggerConsumer} expects ({@code SagaType.valueOf(sagaTypeStr)}).
  *
- * <p>The three permitted subtypes map 1:1 to {@link SagaType} variants and are constructed via
- * their static factory methods, which fix the correct {@code sagaType} value automatically.
+ * <p>The three permitted subtypes map 1:1 to {@link SagaType} variants. Construct via the static
+ * {@code of(...)} factories; the canonical constructors enforce that the supplied {@code sagaType}
+ * matches the variant and that {@code datasetId} is non-null.
+ *
+ * <p>The orchestrator provisions FROST project → APISIX routes (one per named API) → Redpanda
+ * pipelines on CREATE, runs targeted updates on UPDATE, and tears down in reverse order on DELETE.
+ *
+ * <p>{@code routeIds} is keyed by named-API slug so per-route infrastructure state is addressable
+ * independently.
  *
  * <p>{@code NON_NULL} is required because the orchestrator's {@code SagaPayloadBuilder}
  * deserializes the JSON into {@code Map<String, Object>} and calls {@code Map.copyOf()}, which
- * rejects null values. Omitting null fields from the JSON prevents null map entries.
+ * rejects null values.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public sealed interface SagaTrigger
@@ -30,10 +38,6 @@ public sealed interface SagaTrigger
   /** The saga type serialized into the JSON payload for the orchestrator. */
   SagaType sagaType();
 
-  /**
-   * Trigger for {@link SagaType#DATASET_CREATE}: provisions FROST project → APISIX route → Redpanda
-   * pipeline (conditional).
-   */
   @JsonInclude(JsonInclude.Include.NON_NULL)
   record DatasetCreate(
       SagaType sagaType,
@@ -46,7 +50,14 @@ public sealed interface SagaTrigger
       List<NamedApi> namedApis)
       implements SagaTrigger {
 
-    /** Constructs a {@link DatasetCreate} trigger with {@link SagaType#DATASET_CREATE}. */
+    public DatasetCreate {
+      if (sagaType != SagaType.DATASET_CREATE) {
+        throw new IllegalArgumentException(
+            "DatasetCreate requires sagaType=DATASET_CREATE, got " + sagaType);
+      }
+      Objects.requireNonNull(datasetId, "datasetId");
+    }
+
     public static DatasetCreate of(
         String datasetId,
         String datasetName,
@@ -67,11 +78,6 @@ public sealed interface SagaTrigger
     }
   }
 
-  /**
-   * Trigger for {@link SagaType#DATASET_UPDATE}: updates FROST project → APISIX route → Redpanda
-   * pipeline diff (conditional). Carries existing infrastructure IDs so the orchestrator can issue
-   * targeted update commands without re-querying.
-   */
   @JsonInclude(JsonInclude.Include.NON_NULL)
   record DatasetUpdate(
       SagaType sagaType,
@@ -88,7 +94,14 @@ public sealed interface SagaTrigger
       List<NamedApi> namedApis)
       implements SagaTrigger {
 
-    /** Constructs a {@link DatasetUpdate} trigger with {@link SagaType#DATASET_UPDATE}. */
+    public DatasetUpdate {
+      if (sagaType != SagaType.DATASET_UPDATE) {
+        throw new IllegalArgumentException(
+            "DatasetUpdate requires sagaType=DATASET_UPDATE, got " + sagaType);
+      }
+      Objects.requireNonNull(datasetId, "datasetId");
+    }
+
     public static DatasetUpdate of(
         String datasetId,
         String datasetName,
@@ -117,11 +130,6 @@ public sealed interface SagaTrigger
     }
   }
 
-  /**
-   * Trigger for {@link SagaType#DATASET_DELETE}: tears down Redpanda pipeline → APISIX routes →
-   * FROST project (reverse order, best-effort). Only infrastructure IDs are needed — no dataset
-   * content.
-   */
   @JsonInclude(JsonInclude.Include.NON_NULL)
   record DatasetDelete(
       SagaType sagaType,
@@ -134,7 +142,14 @@ public sealed interface SagaTrigger
       List<NamedApi> namedApis)
       implements SagaTrigger {
 
-    /** Constructs a {@link DatasetDelete} trigger with {@link SagaType#DATASET_DELETE}. */
+    public DatasetDelete {
+      if (sagaType != SagaType.DATASET_DELETE) {
+        throw new IllegalArgumentException(
+            "DatasetDelete requires sagaType=DATASET_DELETE, got " + sagaType);
+      }
+      Objects.requireNonNull(datasetId, "datasetId");
+    }
+
     public static DatasetDelete of(
         String datasetId,
         String projectId,

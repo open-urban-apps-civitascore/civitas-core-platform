@@ -15,13 +15,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> {
 
-  /**
-   * Find a dataset by ID with related entities eagerly fetched. This prevents N+1 query problems
-   * when loading datasets with their relationships.
-   *
-   * @param id the dataset ID
-   * @return the dataset with eagerly fetched owner, pipelines, distributions, and namedApis
-   */
   @EntityGraph(attributePaths = {"owner", "pipelines", "distributions", "namedApis"})
   @Override
   @NonNull Optional<DataSet> findById(@NonNull UUID id);
@@ -37,14 +30,7 @@ public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> 
   boolean existsByPipelinesDataSourcesIdAndDataSetStatusIn(
       UUID dataSourceId, Collection<DataSetStatus> statuses);
 
-  /**
-   * Find a dataset by ID with pipelines and their data sources eagerly fetched. Used for saga
-   * trigger publishing where the full pipeline-datasource graph is needed.
-   *
-   * @param id the dataset ID
-   * @return the dataset with eagerly fetched owner, pipelines, pipeline data sources, and
-   *     distributions
-   */
+  /** Variant for saga trigger publishing: also fetches {@code pipelines.dataSources}. */
   @EntityGraph(
       attributePaths = {
         "owner",
