@@ -40,6 +40,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
@@ -508,14 +509,33 @@ class DataSetControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
-    @Test
-    @DisplayName("Should reject namedApis entry with malformed slug (uppercase)")
-    void shouldRejectMalformedNamedApiSlug() {
+    @ParameterizedTest(name = "[{index}] slug={0}")
+    @ValueSource(
+        strings = {
+          "Traffic-Counter", // uppercase
+          "-traffic", // leading hyphen
+          "traffic-", // trailing hyphen
+          "traffic_counter", // underscore
+          "traffic.counter", // dot
+          "traffic counter", // space
+        })
+    @DisplayName("Should reject namedApis entry with malformed slug")
+    void shouldRejectMalformedNamedApiSlug(String slug) {
       DataSetInputDTO input = createValidInput();
-      input.setNamedApis(List.of(namedApi("Traffic", "Traffic-Counter", "STA", null)));
+      input.setNamedApis(List.of(namedApi("Traffic", slug, "STA", null)));
 
       ResponseEntity<DataSetOutputDTO> response = performCreate(input);
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should accept single-character slug (regex boundary case)")
+    void shouldAcceptSingleCharSlug() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(List.of(namedApi("Traffic", "a", "STA", null)));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
 
     @Test
@@ -667,6 +687,99 @@ class DataSetControllerIntegrationTest
                 assertThat(api.getId()).isEqualTo(originalEntryId);
                 assertThat(api.getRouteId()).isEqualTo("route-saga-1");
               });
+    }
+
+    @Test
+    @DisplayName(
+        "Should partially overlap namedApis on PATCH (preserve overlap, drop missing, add new)")
+    void shouldPartiallyOverlapNamedApisOnPatch() {
+      // Pins the partial-overlap merge path distinct from the all-overlap
+      // (shouldReplaceNamedApisWithSameSlugs) and no-overlap (shouldReplaceNamedApisOnPatch) cases:
+      // overlapping slugs must keep their id + saga-populated routeId.
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(
+          List.of(
+              namedApi("Traffic", "traffic", "STA", null),
+              namedApi("Weather", "weather", "STA", null)));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+      UUID dataSetId = created.getId();
+
+      UUID trafficOriginalId =
+          txTemplate.execute(
+              status -> {
+                DataSet ds = dataSetRepository.findById(dataSetId).orElseThrow();
+                NamedApi traffic =
+                    ds.getNamedApis().stream()
+                        .filter(api -> "traffic".equals(api.getSlug()))
+                        .findFirst()
+                        .orElseThrow();
+                traffic.setRouteId("route-saga-traffic");
+                return traffic.getId();
+              });
+
+      Map<String, Object> patchBody =
+          Map.of(
+              "namedApis",
+              List.of(
+                  Map.of("name", "Traffic v2", "slug", "traffic", "standard", "STA"),
+                  Map.of("name", "Air Quality", "slug", "air", "standard", "STA")));
+
+      ResponseEntity<DataSetOutputDTO> patch = performPatch(dataSetId, patchBody);
+      assertThat(patch.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patch.getBody()).isNotNull();
+      assertThat(patch.getBody().getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getName)
+          .containsExactlyInAnyOrder(tuple("traffic", "Traffic v2"), tuple("air", "Air Quality"));
+
+      DataSet afterPatch = dataSetRepository.findById(dataSetId).orElseThrow();
+      assertThat(afterPatch.getNamedApis())
+          .anySatisfy(
+              api -> {
+                assertThat(api.getSlug()).isEqualTo("traffic");
+                assertThat(api.getId()).isEqualTo(trafficOriginalId);
+                assertThat(api.getRouteId()).isEqualTo("route-saga-traffic");
+              })
+          .anySatisfy(
+              api -> {
+                assertThat(api.getSlug()).isEqualTo("air");
+                assertThat(api.getRouteId()).isNull();
+              })
+          .extracting(NamedApi::getSlug)
+          .doesNotContain("weather");
+    }
+
+    @Test
+    @DisplayName("Should replace namedApis on PUT with the supplied list")
+    void shouldReplaceNamedApisOnPut() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(
+          List.of(
+              namedApi("Traffic", "traffic", "STA", null),
+              namedApi("Weather", "weather", "STA", null)));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+      UUID dataSetId = created.getId();
+
+      DataSetInputDTO putBody = createValidInput();
+      putBody.setName(created.getName());
+      putBody.setNamedApis(
+          List.of(
+              namedApi("Traffic v2", "traffic", "STA", "1.1"),
+              namedApi("Air Quality", "air", "STA", null)));
+
+      ResponseEntity<DataSetOutputDTO> put = performUpdate(dataSetId, putBody);
+      assertThat(put.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(put.getBody()).isNotNull();
+      assertThat(put.getBody().getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getName)
+          .containsExactlyInAnyOrder(tuple("traffic", "Traffic v2"), tuple("air", "Air Quality"));
+
+      assertThat(performGetById(dataSetId).getBody().getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug)
+          .containsExactlyInAnyOrder("traffic", "air");
     }
 
     @Test

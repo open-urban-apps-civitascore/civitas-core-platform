@@ -15,6 +15,15 @@ class DataSetMapperTest {
   private final DataSetMapper mapper = new DataSetMapperImpl();
 
   @Test
+  @DisplayName("DataSetInputDTO.namedApis default must be null (load-bearing PATCH contract)")
+  void namedApisDefaultMustBeNull() {
+    // linkNamedApis treats null as "field omitted, leave entity untouched" and empty list as
+    // "clear collection". Defaulting to an empty list would silently wipe saga-populated routeIds
+    // on every PATCH that omits namedApis.
+    assertThat(new DataSetInputDTO().getNamedApis()).isNull();
+  }
+
+  @Test
   @DisplayName("updateEntity does not wipe namedApis when input has no namedApis field")
   void updateEntityPreservesNamedApis() {
     DataSet entity = new DataSet();
