@@ -117,6 +117,23 @@ export interface FrostNodeData extends BasePipelineNodeData {
   version: string
 }
 
+/**
+ * Data specific to Geo Persistence storage nodes.
+ * Configured with a table name and a data structure version.
+ *
+ */
+export interface GeoPersistenceNodeData extends BasePipelineNodeData {
+  entityType: typeof ENTITY_TYPES.Persistence
+  /** Table name for geo data storage */
+  tableName: string
+  /** ID of the selected data structure version */
+  dataStructureVersionId?: string
+  /** Display name of the selected data structure */
+  dataStructureName?: string
+  /** Version number of the selected data structure version */
+  versionNumber?: string
+}
+
 // ============================================================================
 // Trigger Node Data (CRON)
 // ============================================================================
@@ -160,6 +177,7 @@ export type PipelineNodeData =
   | DataSourceNodeData
   | ApiNodeData
   | FrostNodeData
+  | GeoPersistenceNodeData
   | CronNodeData
   | MappingNodeData
 
@@ -200,6 +218,13 @@ export const isApiNodeData = (data: PipelineNodeData): data is ApiNodeData => {
  */
 export const isFrostNodeData = (data: PipelineNodeData): data is FrostNodeData => {
   return 'entityType' in data && (data as EntityNodeData).entityType === ENTITY_TYPES.Frost
+}
+
+/**
+ * Type guard to check if node data is for a Geo Persistence node.
+ */
+export const isGeoPersistenceNodeData = (data: PipelineNodeData): data is GeoPersistenceNodeData => {
+  return 'entityType' in data && (data as EntityNodeData).entityType === ENTITY_TYPES.Persistence
 }
 
 /**
@@ -271,6 +296,13 @@ export const createDefaultNodeData = (nodeType: PipelineNodeType, datasetId?: st
         serverName: 'Frost Server',
         serverUrl: '',
         version: '1.1',
+      }
+    case PIPELINE_NODE_TYPES.GeoPersistence:
+      return {
+        label: 'Geo Persistence',
+        configured: false, // Needs table name and data structure version
+        entityType: ENTITY_TYPES.Persistence,
+        tableName: '',
       }
     case PIPELINE_NODE_TYPES.Cron:
       return {

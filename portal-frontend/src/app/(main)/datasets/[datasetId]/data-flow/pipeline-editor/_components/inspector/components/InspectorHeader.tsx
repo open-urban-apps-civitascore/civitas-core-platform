@@ -8,7 +8,7 @@
  *
  */
 
-import { Clock, Database, Globe, Play, Reply, Snowflake, Square, Workflow } from 'lucide-react'
+import { Clock, Database, Globe, Radio, Play, Reply, Square, Workflow } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
@@ -31,11 +31,12 @@ interface InspectorHeaderProps {
 const NODE_TYPE_ICONS: Record<PipelineNodeType, ReactNode> = {
   start: <Play className="h-4 w-4" />,
   end: <Square className="h-4 w-4" />,
-  dataSource: <Database className="h-4 w-4" />,
+  dataSource: <Radio className="h-4 w-4" />,
   apiRequest: <Globe className="h-4 w-4" />,
   apiResponse: <Reply className="h-4 w-4" />,
   cron: <Clock className="h-4 w-4" />,
-  frost: <Snowflake className="h-4 w-4" />,
+  frost: <Database className="h-4 w-4" />,
+  geoPersistence: <Database className="h-4 w-4" />,
   mapping: <Workflow className="h-4 w-4" />,
 }
 
@@ -48,6 +49,7 @@ const NODE_TYPE_TO_TRANSLATION_KEY: Record<PipelineNodeType, string> = {
   apiResponse: 'apiResponse',
   cron: 'cronTrigger',
   frost: 'frostStorage',
+  geoPersistence: 'geoPersistence',
   mapping: 'mapping',
 }
 
