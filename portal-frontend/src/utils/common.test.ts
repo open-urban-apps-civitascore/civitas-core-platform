@@ -1,5 +1,6 @@
-import { enumFromConst, getRequestEndpoint, isFn } from './common'
 import z from 'zod'
+
+import { enumFromConst, getRequestEndpoint, isFn } from './common'
 
 describe('isFn', () => {
   it('returns true for a function', () => {
