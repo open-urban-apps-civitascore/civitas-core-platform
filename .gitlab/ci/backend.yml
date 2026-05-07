@@ -414,11 +414,6 @@ build-backend-image:
     DOCKER_BUILDKIT: 1
   before_script:
     - docker info
-    # Register a current QEMU build so cross-arch builds (linux/arm64 on amd64 runner)
-    # can execute Alpine 3.22+ musl 1.2.5 (time64 ABI). The QEMU bundled in docker:27
-    # predates that ABI and fails with "Invalid ELF image for this architecture" the
-    # moment the Dockerfile spawns a shell (e.g. via `apk add`).
-    - docker run --privileged --rm tonistiigi/binfmt:latest --install all
     - |
       cat > /tmp/buildkitd.toml <<'EOF'
       [registry."docker.io"]
