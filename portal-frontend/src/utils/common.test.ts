@@ -1,4 +1,5 @@
 import { enumFromConst, getRequestEndpoint, isFn } from './common'
+import z from 'zod'
 
 describe('isFn', () => {
   it('returns true for a function', () => {
@@ -37,20 +38,9 @@ describe('enumFromConst', () => {
   it('produces a Zod enum that validates known values and rejects unknown ones', () => {
     const StatusEnum = enumFromConst(STATUS)
 
+    expect(StatusEnum).toBeInstanceOf(z.ZodEnum)
     expect(StatusEnum.parse('active')).toBe('active')
     expect(StatusEnum.parse('inactive')).toBe('inactive')
-    expect(() => StatusEnum.parse('pending')).toThrow()
-    expect(() => StatusEnum.parse('')).toThrow()
-  })
-
-  it('accepts known values', () => {
-    const StatusEnum = enumFromConst(STATUS)
-    expect(StatusEnum.parse('active')).toBe('active')
-    expect(StatusEnum.parse('inactive')).toBe('inactive')
-  })
-
-  it('rejects unknown values', () => {
-    const StatusEnum = enumFromConst(STATUS)
     expect(() => StatusEnum.parse('pending')).toThrow()
     expect(() => StatusEnum.parse('')).toThrow()
   })
