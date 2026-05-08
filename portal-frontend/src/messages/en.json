@@ -258,6 +258,13 @@
           "pipelines": "Pipeline",
           "sensorThingsAPI": "SensorThings API",
           "noDataFlow": "No data flow available yet."
+        },
+        "apis": {
+          "title": "APIs",
+          "noApis": "No APIs available yet.",
+          "addApi": "Add API",
+          "sensorThings": "SensorThings API",
+          "wfsWms": "WFS/WMS API"
         }
       }
     },

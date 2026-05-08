@@ -72,4 +72,23 @@ describe('CompletionStep', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
     expect(screen.queryByRole('button')).toHaveTextContent('Test Button')
   })
+
+  it('renders actionElement instead of buttons when provided', async () => {
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <CompletionStep
+          datasetId="1"
+          step={{
+            title: 'Test Title',
+            buttons: [{ text: 'Should Not Render', routeParam: 'access-management' }],
+            isCompleted: false,
+            actionElement: <div data-testid="custom-action">Custom Action</div>,
+          }}
+        />
+      </NextIntlClientProvider>,
+    )
+    expect(screen.getByTestId('custom-action')).toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    expect(screen.queryByText('Should Not Render')).not.toBeInTheDocument()
+  })
 })

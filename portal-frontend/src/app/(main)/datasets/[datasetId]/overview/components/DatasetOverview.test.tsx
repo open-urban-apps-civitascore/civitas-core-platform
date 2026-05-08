@@ -553,6 +553,11 @@ describe('DatasetOverview', () => {
       expect(screen.getByTestId('completionStep-overview.completion.dataFlow.title')).toBeInTheDocument()
     })
 
+    it('renders apis completion card', () => {
+      renderComponent()
+      expect(screen.getByTestId('completionStep-overview.completion.apis.title')).toBeInTheDocument()
+    })
+
     it('renders access management completion card', () => {
       renderComponent()
       expect(screen.getByTestId('completionStep-overview.completion.accessManagement.title')).toBeInTheDocument()

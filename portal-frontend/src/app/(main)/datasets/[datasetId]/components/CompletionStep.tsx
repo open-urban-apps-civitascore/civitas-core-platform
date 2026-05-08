@@ -64,14 +64,16 @@ export const CompletionStep = (props: CompletionStepProps) => {
           </div>
         </div>
         <div className="flex gap-10">
-          {step.buttons.map(button => (
-            <ButtonLink
-              key={button.text}
-              buttonText={button.text}
-              routeParam={button.routeParam}
-              queryParam={button.queryParam}
-            />
-          ))}
+          {step.actionElement
+            ? step.actionElement
+            : step.buttons.map(button => (
+                <ButtonLink
+                  key={button.text}
+                  buttonText={button.text}
+                  routeParam={button.routeParam}
+                  queryParam={button.queryParam}
+                />
+              ))}
         </div>
       </div>
       {step.content && (
