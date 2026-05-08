@@ -1,5 +1,5 @@
 import { CheckedState } from '@radix-ui/react-checkbox'
-import { JSX } from 'react'
+import { JSX, ReactNode } from 'react'
 import { z } from 'zod'
 
 import { AssignmentScopedInputSchema } from './assignments'
@@ -134,7 +134,7 @@ export type DatasetTableData = {
   dataSetStatus: DatasetStatusTypes
 }
 
-export type CompletionStepParam = 'access-management' | 'data-flow'
+export type CompletionStepParam = 'access-management' | 'data-flow' | 'apis'
 
 export type CompletionStepData = {
   title: string
@@ -145,4 +145,5 @@ export type CompletionStepData = {
     queryParam?: string
   }[]
   content?: JSX.Element
+  actionElement?: ReactNode
 }
