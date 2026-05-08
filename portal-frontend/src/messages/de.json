@@ -257,6 +257,13 @@
           "pipelines": "Pipeline",
           "distributionAccessURLs": "SensorThings API",
           "noDataFlow": "Es sind noch keine Daten vorhanden."
+        },
+        "apis": {
+          "title": "APIs",
+          "noApis": "Noch keine APIs vorhanden.",
+          "addApi": "API hinzufügen",
+          "sensorThings": "SensorThings API",
+          "wfsWms": "WFS/WMS API"
         }
       }
     },

@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AxiosError } from 'axios'
+import { ChevronDown } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
@@ -18,6 +19,7 @@ import {
 } from '@/app/services/api/datasets/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { FooterElement } from '@/components/form/FooterElement'
+import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -25,7 +27,9 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import PageEditControls from '@/components/page-edit-controls/PageEditControls'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { BasicTooltip } from '@/components/tooltip/Tooltip'
+import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form'
 import { useError } from '@/hooks/use-error'
 import { usePermissions } from '@/hooks/use-permissions'
@@ -327,6 +331,34 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
         ) : (
           <div>{t('overview.completion.dataFlow.noDataFlow')}</div>
         ),
+    },
+    {
+      title: t('overview.completion.apis.title'),
+      isCompleted: false,
+      buttons: [],
+      content: <div>{t('overview.completion.apis.noApis')}</div>,
+      actionElement: (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              {t('overview.completion.apis.addApi')}
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <GuardedLink href={`/datasets/${dataset.id}/apis?type=sensorthings`}>
+                {t('overview.completion.apis.sensorThings')}
+              </GuardedLink>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <GuardedLink href={`/datasets/${dataset.id}/apis?type=wfs-wms`}>
+                {t('overview.completion.apis.wfsWms')}
+              </GuardedLink>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
     },
     {
       title: t('overview.completion.accessManagement.title'),
