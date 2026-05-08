@@ -604,6 +604,50 @@ class DataSetServiceTest {
     }
 
     @Test
+    @DisplayName(
+        "CREATE: routeIds returned for entity without namedApis is logged as drift but does not"
+            + " throw")
+    void createUnexpectedRouteIdsLoggedAsDrift() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      ds.setNamedApis(new HashSet<>());
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              "proj-1",
+              "https://frost.example.com",
+              Map.of("ghost", "route-orphan"),
+              "svc-1",
+              "https://public.example.com",
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      Logger serviceLogger = (Logger) LoggerFactory.getLogger(DataSetService.class);
+      ListAppender<ILoggingEvent> appender = new ListAppender<>();
+      appender.start();
+      serviceLogger.addAppender(appender);
+      try {
+        createService().handleSagaCompleted(id, result);
+      } finally {
+        serviceLogger.detachAppender(appender);
+      }
+
+      assertThat(appender.list)
+          .anyMatch(
+              event ->
+                  event.getLevel() == Level.ERROR
+                      && event.getFormattedMessage().contains("drift=unexpected-routeids")
+                      && event.getFormattedMessage().contains("ghost"));
+    }
+
+    @Test
     @DisplayName("DELETE: clears infrastructure fields and reverts to READY")
     void deleteClearsAndReverts() {
       UUID id = UUID.randomUUID();

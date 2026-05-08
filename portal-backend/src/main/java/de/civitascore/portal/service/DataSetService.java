@@ -37,6 +37,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputDTO> {
 
+  // Stable identifiers for drift events emitted by applyInfrastructureResult.
+  private static final String DRIFT_ORPHAN_SLUGS = "orphan-slugs";
+  private static final String DRIFT_UNPROVISIONED_SLUGS = "unprovisioned-slugs";
+  private static final String DRIFT_REPLACED_ROUTEID = "replaced-routeid";
+  private static final String DRIFT_UNEXPECTED_ROUTEIDS = "unexpected-routeids";
+
   private final DataSetRepository dataSetRepository;
   private final DataSetMapper dataSetMapper;
 
@@ -412,11 +418,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
         "Cannot delete an AVAILABLE dataset. Unrelease it first (POST /datasets/{id}/unrelease) to tear down infrastructure");
   }
 
-  // Stable identifiers for drift events emitted by applyInfrastructureResult.
-  private static final String DRIFT_ORPHAN_SLUGS = "orphan-slugs";
-  private static final String DRIFT_UNPROVISIONED_SLUGS = "unprovisioned-slugs";
-  private static final String DRIFT_REPLACED_ROUTEID = "replaced-routeid";
-
   /**
    * Applies infrastructure fields from the saga result payload to the dataset entity. Uses
    * PATCH-style semantics: only non-null fields in the result are applied. This is intentional
@@ -488,6 +489,13 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
                   api.setRouteId(incomingRouteId);
                 });
       }
+    } else if (result.routeIds() != null && !result.routeIds().isEmpty()) {
+      log.error(
+          "drift={} dataset={} slugs={} — saga returned routeIds but entity has no namedApis;"
+              + " APISIX routes are likely leaked.",
+          DRIFT_UNEXPECTED_ROUTEIDS,
+          dataSet.getId(),
+          Encode.forJava(result.routeIds().keySet().toString()));
     }
     if (result.serviceId() != null) {
       dataSet.setServiceId(result.serviceId());

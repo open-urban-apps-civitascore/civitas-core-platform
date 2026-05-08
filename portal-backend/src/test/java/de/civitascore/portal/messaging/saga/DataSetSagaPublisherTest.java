@@ -2,6 +2,7 @@ package de.civitascore.portal.messaging.saga;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.model.embedded.ConnectorType;
@@ -81,10 +82,7 @@ class DataSetSagaPublisherTest {
       dataSet.setPipelines(Set.of(p1, p2));
 
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
-      when(kafkaTemplate.send(
-              org.mockito.ArgumentMatchers.anyString(),
-              org.mockito.ArgumentMatchers.anyString(),
-              jsonCaptor.capture()))
+      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
           .thenReturn(
               CompletableFuture.completedFuture(
                   new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
@@ -130,10 +128,7 @@ class DataSetSagaPublisherTest {
       Set<Pipeline> previousPipelines = Set.of(existingPipeline, removedPipeline);
 
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
-      when(kafkaTemplate.send(
-              org.mockito.ArgumentMatchers.anyString(),
-              org.mockito.ArgumentMatchers.anyString(),
-              jsonCaptor.capture()))
+      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
           .thenReturn(
               CompletableFuture.completedFuture(
                   new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
@@ -200,10 +195,7 @@ class DataSetSagaPublisherTest {
 
     private ArgumentCaptor<String> stubKafkaSend() {
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
-      when(kafkaTemplate.send(
-              org.mockito.ArgumentMatchers.anyString(),
-              org.mockito.ArgumentMatchers.anyString(),
-              jsonCaptor.capture()))
+      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
           .thenReturn(
               CompletableFuture.completedFuture(
                   new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));

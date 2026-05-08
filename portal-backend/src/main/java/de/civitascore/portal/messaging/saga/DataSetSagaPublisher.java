@@ -174,16 +174,16 @@ public class DataSetSagaPublisher {
     Map<String, String> routeIds =
         dataset.getNamedApis().stream()
             .filter(api -> api.getRouteId() != null)
-            .peek(
-                api -> {
-                  if (api.getSlug() == null) {
-                    throw invariant(
-                        "NamedApi %s on dataset %s has null slug", api.getId(), dataset.getId());
-                  }
-                })
             .collect(
                 Collectors.toMap(
-                    api -> api.getSlug(),
+                    api -> {
+                      if (api.getSlug() == null) {
+                        throw invariant(
+                            "NamedApi %s on dataset %s has null slug",
+                            api.getId(), dataset.getId());
+                      }
+                      return api.getSlug();
+                    },
                     api -> api.getRouteId(),
                     (existing, duplicate) -> {
                       throw invariant(
