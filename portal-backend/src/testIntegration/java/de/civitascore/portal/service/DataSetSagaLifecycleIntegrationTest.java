@@ -25,7 +25,9 @@ import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -501,8 +503,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       Map<String, String> originalRouteIds =
           created.getNamedApis().stream()
               .filter(api -> api.getRouteId() != null)
-              .collect(
-                  java.util.stream.Collectors.toMap(api -> api.getSlug(), api -> api.getRouteId()));
+              .collect(Collectors.toMap(NamedApi::getSlug, NamedApi::getRouteId));
 
       assertThat(originalProjectId).isNotNull();
       assertThat(originalRouteIds).as("CREATE should populate per-slug routeIds").isNotEmpty();
@@ -528,8 +529,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       Map<String, String> completedRouteIds =
           completed.getNamedApis().stream()
               .filter(api -> api.getRouteId() != null)
-              .collect(
-                  java.util.stream.Collectors.toMap(api -> api.getSlug(), api -> api.getRouteId()));
+              .collect(Collectors.toMap(NamedApi::getSlug, NamedApi::getRouteId));
       assertThat(completedRouteIds)
           .as("per-slug routeIds should be preserved after UPDATE")
           .isEqualTo(originalRouteIds);
@@ -783,13 +783,12 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       // Simulate an AVAILABLE dataset with infra, pending DELETE
       dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
       dataSet.setProjectId("proj-existing");
-      de.civitascore.portal.model.entity.NamedApi api =
-          new de.civitascore.portal.model.entity.NamedApi();
+      NamedApi api = new NamedApi();
       api.setName("Existing API");
       api.setSlug("existing");
       api.setStandard("STA");
       api.setRouteId("route-existing");
-      dataSet.setNamedApis(java.util.Set.of(api));
+      dataSet.setNamedApis(Set.of(api));
       dataSet.setPendingSagaType(PendingSagaType.DELETE);
       dataSetRepository.save(dataSet);
 

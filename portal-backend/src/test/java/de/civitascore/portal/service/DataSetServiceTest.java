@@ -354,7 +354,7 @@ class DataSetServiceTest {
       assertThat(persisted.getFrostBaseUrl()).isEqualTo("https://frost.example.com");
       assertThat(persisted.getNamedApis())
           .extracting(NamedApi::getSlug, NamedApi::getRouteId)
-          .containsExactly(org.assertj.core.api.Assertions.tuple("traffic", "route-1"));
+          .containsExactly(tuple("traffic", "route-1"));
       assertThat(persisted.getServiceId()).isEqualTo("svc-1");
       assertThat(persisted.getPublicUrl()).isEqualTo("https://public.example.com");
       assertThat(persisted.getPipelineIds()).containsExactly("pipe-1");
@@ -403,9 +403,7 @@ class DataSetServiceTest {
       verify(dataSetRepository).save(saved.capture());
       assertThat(saved.getValue().getNamedApis())
           .extracting(NamedApi::getSlug, NamedApi::getRouteId)
-          .containsExactlyInAnyOrder(
-              org.assertj.core.api.Assertions.tuple("traffic", "route-1"),
-              org.assertj.core.api.Assertions.tuple("weather", "route-2"));
+          .containsExactlyInAnyOrder(tuple("traffic", "route-1"), tuple("weather", "route-2"));
     }
 
     @Test
@@ -451,9 +449,7 @@ class DataSetServiceTest {
       verify(dataSetRepository).save(saved.capture());
       assertThat(saved.getValue().getNamedApis())
           .extracting(NamedApi::getSlug, NamedApi::getRouteId)
-          .containsExactlyInAnyOrder(
-              org.assertj.core.api.Assertions.tuple("traffic", "route-1"),
-              org.assertj.core.api.Assertions.tuple("weather", null));
+          .containsExactlyInAnyOrder(tuple("traffic", "route-1"), tuple("weather", null));
     }
 
     @Test
@@ -600,7 +596,7 @@ class DataSetServiceTest {
       // The matching slug still gets its routeId; orphan is ignored without throwing.
       assertThat(saved.getValue().getNamedApis())
           .extracting(NamedApi::getSlug, NamedApi::getRouteId)
-          .containsExactly(org.assertj.core.api.Assertions.tuple("traffic", "route-1"));
+          .containsExactly(tuple("traffic", "route-1"));
     }
 
     @Test

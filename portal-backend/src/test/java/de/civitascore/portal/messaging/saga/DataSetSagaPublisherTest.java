@@ -10,6 +10,8 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.test.util.ReflectionTestUtils;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -208,7 +211,7 @@ class DataSetSagaPublisherTest {
       assertThat(namedApis).as("namedApis must be present in trigger payload").isNotNull();
       assertThat(namedApis.size()).isEqualTo(2);
       // Order is not guaranteed (Set), assert by slug
-      java.util.Map<String, tools.jackson.databind.JsonNode> bySlug = new java.util.HashMap<>();
+      Map<String, JsonNode> bySlug = new HashMap<>();
       namedApis.forEach(node -> bySlug.put(node.get("slug").asString(), node));
       assertThat(bySlug).containsKeys("traffic", "weather");
       assertThat(bySlug.get("traffic").get("standard").asString()).isEqualTo("STA");
@@ -311,7 +314,7 @@ class DataSetSagaPublisherTest {
       dataSet.setPipelines(Set.of());
       // Build the set via add() rather than Set.of(...), so the test still constructs two
       // duplicate-slug entries even if NamedApi later gains @EqualsAndHashCode on slug.
-      java.util.Set<NamedApi> apis = new java.util.LinkedHashSet<>();
+      Set<NamedApi> apis = new LinkedHashSet<>();
       apis.add(api("Traffic A", "traffic", "route-1"));
       apis.add(api("Traffic B", "traffic", "route-2"));
       dataSet.setNamedApis(apis);
