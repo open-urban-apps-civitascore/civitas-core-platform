@@ -7,6 +7,7 @@
 
 import type { UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
 import type {
+  AttributeMeta,
   UMLAbstractClass,
   UMLAttribute,
   UMLClass,
@@ -53,6 +54,16 @@ const PRIMITIVE_TYPE_HREF: Record<string, string> = {
   Date: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
   void: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
 }
+// Geometry type mapping to XMI href
+const GEOMETRY_TYPE_HREF: Record<string, string> = {
+  Point: 'http://models.civitasconnect.org/models/myspecialModel/1.0#//Point',
+  LineString: 'http://models.civitasconnect.org/models/myspecialModel/1.0#//LineString',
+  Polygon: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Boolean',
+  MultiPoint: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
+  MultiLineString: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
+  MultiPolygon: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
+  GeometryCollection: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
+}
 
 /**
  * Generates a unique ID (UUID v4 format)
@@ -81,14 +92,17 @@ const escapeXml = (text: string): string => {
  * Converts a UML type to XMI type reference
  */
 const typeToXmi = (type: UMLType, indent: string): string => {
-  if (typeof type === 'string') {
-    // Primitive type
-    const href = PRIMITIVE_TYPE_HREF[type] || PRIMITIVE_TYPE_HREF['String']
-    return `${indent}<type xmi:type="uml:PrimitiveType" href="${href}"/>`
-  } else {
-    // Type reference to another element in the model
+  if (typeof type !== 'string') {
     return `${indent}<type xmi:type="uml:Class" xmi:idref="${type.id}"/>`
   }
+
+  const primitiveHref = PRIMITIVE_TYPE_HREF[type]
+  if (primitiveHref) return `${indent}<type xmi:type="uml:PrimitiveType" href="${primitiveHref}"/>`
+
+  const geometryHref = GEOMETRY_TYPE_HREF[type]
+  if (geometryHref) return `${indent}<type xmi:type="uml:GeometryType" href="${geometryHref}"/>`
+
+  return `${indent}<type xmi:type="uml:PrimitiveType" href="${PRIMITIVE_TYPE_HREF.String}"/>`
 }
 
 /**
@@ -135,10 +149,31 @@ const parameterToXmi = (param: UMLParameter, indent: string): string => {
   return lines.join('\n')
 }
 
+const metaToXmi = (meta: AttributeMeta, indent: string) => {
+  const lines: string[] = []
+  const childIndent = `${indent}  `
+  const metaInfoKey = Object.keys(meta) as (keyof AttributeMeta)[]
+
+  for (const infoKey of metaInfoKey) {
+    const infoValue = meta[infoKey]
+    if (!infoValue) continue
+    const detailsKey = Object.keys(infoValue) as (keyof typeof infoValue)[]
+    lines.push(`${indent}<eAnnotations xmi:id="_-1wPgEhkEfGtCKigp6Bpmw" source="${infoKey}">`)
+    for (const detail of detailsKey) {
+      lines.push(
+        `${childIndent}<details xmi:id="_CVj-QEhlEfGtCKigp6Bpmw" key="${detail}" value="${infoValue[detail]}"/>`,
+      )
+    }
+    lines.push('</eAnnotations>')
+  }
+  return lines.join('\n')
+}
+
 /**
  * Converts a UML attribute to XMI
  */
 const attributeToXmi = (attr: UMLAttribute, indent: string): string => {
+  console.log('META: ', attr.meta)
   const lines: string[] = []
   const visibility = VISIBILITY_XMI_MAP[attr.visibility]
   const childIndent = `${indent}  `
@@ -153,6 +188,9 @@ const attributeToXmi = (attr: UMLAttribute, indent: string): string => {
   }
 
   lines.push(`${indent}<ownedAttribute ${propertyAttrs}>`)
+  if (attr.meta) {
+    lines.push(metaToXmi(attr.meta, childIndent))
+  }
   lines.push(typeToXmi(attr.type, childIndent))
 
   if (attr.multiplicity) {

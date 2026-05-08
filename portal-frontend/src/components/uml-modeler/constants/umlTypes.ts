@@ -1,4 +1,4 @@
-import type { UMLPrimitiveType, UMLTypeReference } from '../types/uml'
+import type { UMLGeometryType, UMLPrimitiveType, UMLTypeReference } from '../types/uml'
 
 // UML 2.5 Primitive Types with their official URIs
 export const UML_PRIMITIVE_TYPES: Record<UMLPrimitiveType, { name: string; uri: string }> = {
@@ -45,6 +45,36 @@ export const UML_PRIMITIVE_TYPES: Record<UMLPrimitiveType, { name: string; uri: 
   void: {
     name: 'void',
     uri: 'http://www.eclipse.org/uml2/5.0.0/Types#void',
+  },
+}
+export const UML_GEOMETRY_TYPES: Record<UMLGeometryType, { name: string; uri: string }> = {
+  Point: {
+    name: 'Point',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//Point',
+  },
+  LineString: {
+    name: 'LineString',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//LineString',
+  },
+  Polygon: {
+    name: 'Polygon',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//Polygon',
+  },
+  MultiPoint: {
+    name: 'MultiPoint',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//Point',
+  },
+  MultiLineString: {
+    name: 'MultiLineString',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//MultiLineString',
+  },
+  MultiPolygon: {
+    name: 'MultiPolygon',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//MultiPolygon',
+  },
+  GeometryCollection: {
+    name: 'GeometryCollection',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//GeometryCollection',
   },
 }
 

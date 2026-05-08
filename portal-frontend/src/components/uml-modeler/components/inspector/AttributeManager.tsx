@@ -3,10 +3,15 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { useCallback } from 'react'
 
-import { UML_PRIMITIVE_TYPES } from '../../constants/umlTypes'
+import { BasicSelect } from '@/components/basicSelect/BasicSelect'
+import { GroupedOption, GroupedSelect } from '@/components/select/grouped-select/GroupedSelect'
+import { cn } from '@/lib/utils'
+import { SelectOption } from '@/types/common'
+
+import { UML_GEOMETRY_TYPES, UML_PRIMITIVE_TYPES } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
-import type { UMLAttribute, UMLElement, UMLPrimitiveType, Visibility } from '../../types/uml'
+import type { UMLAttribute, UMLElement, UMLGeometryType, UMLPrimitiveType, Visibility } from '../../types/uml'
 
 interface AttributeManagerProps {
   nodeId: string
@@ -26,6 +31,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
         name: 'neuesAttribut',
         type: 'String',
         visibility: 'private',
+        isId: false,
       }
       updateNode(nodeId, {
         attributes: [...element.attributes, newAttribute],
@@ -59,8 +65,42 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
     return null
   }
 
-  const visibilityOptions: Visibility[] = ['public', 'private', 'protected', 'package']
-  const typeOptions = Object.keys(UML_PRIMITIVE_TYPES) as UMLPrimitiveType[]
+  const visibilityOptions: SelectOption<Visibility>[] = [
+    { value: 'public', label: '+' },
+    { value: 'private', label: '-' },
+    { value: 'protected', label: '#' },
+    { value: 'package', label: '~' },
+  ]
+  const primitiveTypeOptions = Object.keys(UML_PRIMITIVE_TYPES) as UMLPrimitiveType[]
+  const geometryTypeOptions = Object.keys(UML_GEOMETRY_TYPES) as UMLGeometryType[]
+
+  const typeOptions: GroupedOption[] = [
+    { label: 'Primitive Types', options: primitiveTypeOptions.map(type => ({ label: type, value: type })) },
+    { label: 'Geometry Types', options: geometryTypeOptions.map(type => ({ label: type, value: type })) },
+  ]
+
+  const crsOptions = [
+    {
+      label: 'EPSG:4326  – WGS84 (Standard)',
+      value: 'EPSG:4326',
+    },
+    {
+      label: 'EPSG:3857  – Web Mercator',
+      value: 'EPSG:3857',
+    },
+    {
+      label: 'EPSG:25832 – UTM Zone 32N',
+      value: 'EPSG:25832',
+    },
+    {
+      label: 'EPSG:25833 – UTM Zone 33N',
+      value: 'EPSG:25833',
+    },
+    {
+      label: 'EPSG:4258  – ETRS89',
+      value: 'EPSG:4258',
+    },
+  ]
 
   return (
     <div className="space-y-3">
@@ -109,43 +149,56 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
             {/* Type */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
-              <select
-                value={typeof attribute.type === 'string' ? attribute.type : attribute.type.name}
-                onChange={e => updateAttribute(attribute.id, { type: e.target.value as UMLPrimitiveType })}
-                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              <GroupedSelect
+                groupedOptions={typeOptions}
+                onValueChange={e =>
+                  updateAttribute(attribute.id, {
+                    type: e as UMLPrimitiveType | UMLGeometryType,
+                    ...(UML_GEOMETRY_TYPES[e as UMLGeometryType]
+                      ? {}
+                      : { meta: { ...attribute.meta, gisInfo: undefined } }),
+                  })
+                }
                 disabled={isReadOnly}
-              >
-                {typeOptions.map(type => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
+                defaultValue={typeof attribute.type === 'string' ? attribute.type : attribute.type.name}
+                size="sm"
+                triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* meta info */}
+            <div className={cn(!Object.keys(UML_GEOMETRY_TYPES).includes(attribute.type as string) && 'hidden')}>
+              <label className="block text-xs font-medium text-gray-600 mb-1">CRS</label>
+              <BasicSelect
+                options={crsOptions}
+                onValueChange={e =>
+                  updateAttribute(attribute.id, {
+                    meta: {
+                      ...attribute.meta,
+                      gisInfo: { ...attribute.meta?.gisInfo, crs: e },
+                    },
+                  })
+                }
+                defaultValue={
+                  crsOptions.find(option => option.value === attribute.meta?.gisInfo?.crs)?.value ?? crsOptions[0].value
+                }
+                disabled={!Object.keys(UML_GEOMETRY_TYPES).includes(attribute.type as string)}
+                size="sm"
+                triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
             </div>
 
             {/* Visibility */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Visibility</label>
-              <select
-                value={attribute.visibility}
-                onChange={e => updateAttribute(attribute.id, { visibility: e.target.value as Visibility })}
-                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              <BasicSelect
+                options={visibilityOptions}
+                onValueChange={e => updateAttribute(attribute.id, { visibility: e as Visibility })}
+                defaultValue={attribute.visibility}
+                triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                size="sm"
                 disabled={isReadOnly}
-              >
-                {visibilityOptions.map(visibility => (
-                  <option key={visibility} value={visibility}>
-                    {visibility} (
-                    {visibility === 'public'
-                      ? '+'
-                      : visibility === 'private'
-                        ? '-'
-                        : visibility === 'protected'
-                          ? '#'
-                          : '~'}
-                    )
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             {/* Default Value */}
@@ -173,6 +226,21 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
               />
               <label htmlFor={`static-${attribute.id}`} className="text-xs text-gray-600">
                 Static (underlined)
+              </label>
+            </div>
+
+            {/* Primary key checkbox */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id={`static-${attribute.id}`}
+                checked={attribute.isId}
+                onChange={e => updateAttribute(attribute.id, { isId: e.target.checked })}
+                className="mr-2"
+                disabled={isReadOnly}
+              />
+              <label htmlFor={`static-${attribute.id}`} className="text-xs text-gray-600">
+                {`Primary Key {PK}`}
               </label>
             </div>
           </div>

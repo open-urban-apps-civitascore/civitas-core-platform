@@ -20,6 +20,15 @@ export type UMLPrimitiveType =
   | 'Date'
   | 'void'
 
+export type UMLGeometryType =
+  | 'Point'
+  | 'LineString'
+  | 'Polygon'
+  | 'MultiPoint'
+  | 'MultiLineString'
+  | 'MultiPolygon'
+  | 'GeometryCollection'
+
 export interface UMLTypeReference {
   id: string
   name: string
@@ -27,7 +36,7 @@ export interface UMLTypeReference {
   href?: string // For XMI external references
 }
 
-export type UMLType = UMLPrimitiveType | UMLTypeReference
+export type UMLType = UMLPrimitiveType | UMLGeometryType | UMLTypeReference
 
 export interface UMLParameter {
   id: string
@@ -37,15 +46,22 @@ export interface UMLParameter {
   multiplicity?: string // e.g., "0..1", "1..*", "*"
 }
 
+export type AttributeMeta = {
+  gisInfo?: {
+    crs: string
+  }
+}
 export interface UMLAttribute {
   id: string
   name: string
   type: UMLType
   visibility: Visibility
   isStatic?: boolean
+  isId?: boolean
   isReadonly?: boolean
   multiplicity?: string
   defaultValue?: string
+  meta?: AttributeMeta
 }
 
 export interface UMLOperation {
