@@ -31,6 +31,8 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -138,8 +140,8 @@ class DataSetAssemblerTest {
         .isNull();
   }
 
-  @org.junit.jupiter.params.ParameterizedTest(name = "[{index}] domain={0}")
-  @org.junit.jupiter.params.provider.CsvSource({
+  @ParameterizedTest(name = "[{index}] domain={0}")
+  @CsvSource({
     "api.example.com,                  https://api.example.com",
     "api.example.com:8443,             https://api.example.com:8443",
     "api.test.example.com,             https://api.test.example.com",
