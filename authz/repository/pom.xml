@@ -17,7 +17,7 @@
     <description>Authorization context repository for OPA policy evaluation</description>
 
     <properties>
-        <java.version>21</java.version>
+        <java.version>25</java.version>
         <testcontainers.version>2.0.4</testcontainers.version>
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <portal-model.version>1.0.0</portal-model.version>
@@ -162,13 +162,10 @@
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
-                <version>2.43.0</version>
+                <version>3.4.0</version>
                 <configuration>
                     <java>
-                        <googleJavaFormat>
-                            <version>1.22.0</version>
-                            <style>GOOGLE</style>
-                        </googleJavaFormat>
+                        <googleJavaFormat/>
                         <removeUnusedImports/>
                     </java>
                 </configuration>
