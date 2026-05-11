@@ -1,5 +1,6 @@
 package de.civitascore.portal.messaging.saga;
 
+import de.civitascore.configadapter.model.dataset.ApiStandard;
 import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.model.dataset.NamedApi;
@@ -158,7 +159,10 @@ public class DataSetSagaPublisher {
       return null;
     }
     return dataset.getNamedApis().stream()
-        .map(api -> new NamedApi(api.getSlug(), api.getStandard(), api.getVersion()))
+        .map(
+            api ->
+                new NamedApi(
+                    api.getSlug(), ApiStandard.valueOf(api.getStandard()), api.getVersion()))
         .toList();
   }
 
