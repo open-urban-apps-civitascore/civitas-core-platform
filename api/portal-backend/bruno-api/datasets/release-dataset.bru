@@ -29,10 +29,10 @@ docs {
   The saga orchestrator provisions infrastructure asynchronously:
 
   1. **FROST Server** — creates a Project
-  2. **APISIX Gateway** — creates upstream + route for the dataset
+  2. **APISIX Gateway** — creates upstream + one route per named API
   3. **Redpanda Connect** — deploys data pipelines (if any)
 
-  On success, infrastructure references (projectId, routeId, serviceId, publicUrl, pipelineIds) are stored.
+  On success, infrastructure references (projectId, per-namedApi routeId, serviceId, publicUrl, pipelineIds) are stored.
   On failure, compensation runs in reverse order and the dataset reverts to READY.
 
   **Expected Response**
