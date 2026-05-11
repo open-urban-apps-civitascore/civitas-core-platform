@@ -19,10 +19,12 @@ import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
@@ -156,6 +158,33 @@ class DataSetServiceTest {
       assertThatThrownBy(() -> createService().stage(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("Pipeline");
+    }
+
+    @Test
+    @DisplayName("stages dataset with valid named APIs")
+    void stagesWithValidNamedApis() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = draftDataSetWithPipeline(id);
+      NamedApi api = new NamedApi();
+      api.setName("Traffic");
+      api.setSlug("traffic");
+      api.setStandard(ApiStandard.STA);
+      ds.setNamedApis(new HashSet<>(Set.of(api)));
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSet result = createService().stage(id);
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+    }
+
+    /** Draft dataset with one feed-in pipeline, so the publish gate only fails on namedApis. */
+    private DataSet draftDataSetWithPipeline(UUID id) {
+      DataSet ds = draftDataSet(id);
+      Pipeline p = new Pipeline();
+      p.setDataSources(new HashSet<>(List.of(new DataSource())));
+      ds.getPipelines().add(p);
+      return ds;
     }
   }
 
@@ -316,6 +345,70 @@ class DataSetServiceTest {
       DataSet result = createService().updateReleasedMeta(id, input);
       assertThat(result).isNotNull();
       verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
+    }
+
+    @Test
+    @DisplayName(
+        "rejects any non-null namedApis on /released/meta (concept #1379/#1384 immutability)")
+    void rejectsAnyNamedApisOnReleased() {
+      // The contract is that namedApis cannot appear at all on this endpoint — even a no-op
+      // round-trip of the existing list is rejected, not just diffs.
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+      NamedApiInputDTO roundTripped = new NamedApiInputDTO();
+      roundTripped.setName("Traffic Sensor Readings");
+      roundTripped.setSlug("traffic");
+      roundTripped.setStandard(ApiStandard.STA);
+      input.setNamedApis(List.of(roundTripped));
+
+      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("cannot be changed")
+          .hasMessageContaining("AVAILABLE");
+
+      // Pins the ordering contract: the namedApis guard fires BEFORE the saga trigger. Without
+      // this, a regression that placed the check after publishUpdateRequested would leak an
+      // UPDATE event for invalid input.
+      verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
+    }
+
+    @Test
+    @DisplayName("rejects an empty namedApis list too (the field is forbidden, not just changes)")
+    void rejectsEmptyNamedApisListOnReleased() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+      input.setNamedApis(List.of());
+
+      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("cannot be changed")
+          .hasMessageContaining("READY");
+
+      verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
+    }
+
+    @Test
+    @DisplayName("allows updateReleasedMeta with namedApis omitted (PATCH semantics)")
+    void allowsOmittedNamedApis() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+      // input.getNamedApis() stays null
+
+      DataSet result = createService().updateReleasedMeta(id, input);
+      assertThat(result).isNotNull();
     }
   }
 

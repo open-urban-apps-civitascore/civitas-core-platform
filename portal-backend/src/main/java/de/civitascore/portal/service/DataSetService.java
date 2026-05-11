@@ -127,14 +127,16 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Updates only the metadata (name, description) of a released dataset. Cannot modify
-   * persistenceId or pipelines. For AVAILABLE datasets with existing infrastructure, triggers a
-   * saga UPDATE if no saga is currently in-flight.
+   * Updates the editable metadata of a released dataset: {@code name}, {@code description}, {@code
+   * openDataAccess}, and {@code assignments}. The {@code namedApis} set is immutable while the
+   * dataset is in READY / AVAILABLE — per concept #1379 + #1384 the only path to change it is
+   * unrelease → edit in DRAFT → release. For AVAILABLE datasets with existing infrastructure,
+   * triggers a saga UPDATE if no saga is currently in-flight.
    *
    * @param id the dataset ID
    * @param input the update input
    * @return the updated dataset
-   * @throws InvalidInputException if trying to update a DRAFT dataset
+   * @throws InvalidInputException if the dataset is DRAFT or the input carries {@code namedApis}
    * @throws ResourceInUseException if a saga is in-flight for this dataset
    */
   @Override
@@ -154,6 +156,15 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           id,
           "Cannot update metadata while a saga is in-flight: "
               + existingEntity.getPendingSagaType());
+    }
+
+    if (input.getNamedApis() != null) {
+      throw new InvalidInputException(
+          "namedApis",
+          id,
+          "Named APIs cannot be changed while the dataset is "
+              + existingEntity.getDataSetStatus()
+              + ". Unrelease the dataset and edit it in DRAFT.");
     }
 
     Set<Pipeline> previousPipelines = new HashSet<>(existingEntity.getPipelines());
