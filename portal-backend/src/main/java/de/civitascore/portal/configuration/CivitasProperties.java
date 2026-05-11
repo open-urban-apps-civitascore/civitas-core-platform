@@ -2,6 +2,7 @@ package de.civitascore.portal.configuration;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
@@ -18,7 +19,7 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "civitas")
 public record CivitasProperties(
-    @NotBlank String masterKey, @NestedConfigurationProperty @Valid Api api) {
+    @NotBlank String masterKey, @NotNull @NestedConfigurationProperty @Valid Api api) {
 
   /**
    * Data-plane API configuration.
