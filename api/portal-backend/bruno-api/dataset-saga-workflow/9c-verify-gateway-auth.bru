@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{apisixGatewayUrl}}/v1/datasets/{{sagaDataSetId}}/traffic
+  url: {{apisixGatewayUrl}}/datasets/{{sagaDataSetId}}
   body: none
   auth: none
 }
@@ -19,7 +19,7 @@ tests {
 docs {
   **Saga step 9c of 18** — Verify APISIX gateway enforces authentication.
 
-  Sends an unauthenticated GET request through the APISIX gateway to the dataset's named-API route (slug `traffic`, see step 4). The OpenID-Connect plugin applied by the saga must reject the request with 401.
+  Sends an unauthenticated GET request through the APISIX gateway to the dataset route. The OpenID-Connect plugin applied by the saga must reject the request with 401.
 
   **Precondition:** `sagaDataSetId` is set; APISIX gateway reachable at `apisixGatewayUrl`; saga has completed and the route exists.
 

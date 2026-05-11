@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{apisixGatewayUrl}}/v1/datasets/{{sagaDataSetId}}/traffic
+  url: {{apisixGatewayUrl}}/datasets/{{sagaDataSetId}}
   body: none
   auth: inherit
 }
@@ -27,9 +27,9 @@ tests {
 docs {
   **Saga step 9d of 18** — Verify end-to-end data access through the gateway.
 
-  Sends an authenticated request through the APISIX gateway to the FROST server for the dataset's named-API route (slug `traffic`, see step 4). This confirms the full data path is working: Keycloak token → APISIX (auth validation) → FROST (data response).
+  Sends an authenticated request through the APISIX gateway to the FROST server for the dataset route. This confirms the full data path is working: Keycloak token → APISIX (auth validation) → FROST (data response).
 
-  **Precondition:** `sagaDataSetId` is set; bearer token is valid; APISIX gateway reachable at `apisixGatewayUrl`; saga completed and route + upstream exist for the `traffic` slug.
+  **Precondition:** `sagaDataSetId` is set; bearer token is valid; APISIX gateway reachable at `apisixGatewayUrl`; saga completed and route + upstream exist.
 
   **Expected Response:** 200 OK, body is a valid JSON object from the FROST SensorThings API.
 }

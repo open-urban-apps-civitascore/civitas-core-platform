@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{apisixAdminUrl}}/apisix/admin/routes/{{sagaTrafficRouteId}}
+  url: {{apisixAdminUrl}}/apisix/admin/routes/{{sagaDataSetId}}
   body: none
   auth: none
 }
@@ -15,32 +15,16 @@ headers {
 }
 
 script:pre-request {
-  // Routes are now keyed by a deterministic per-named-API UUID
-  // (NamedApiHelper.derive = UUID.nameUUIDFromBytes("{datasetId}/{slug}".getBytes(UTF_8))).
-  // Replicate the derivation here so the test does not rely on portal-backend exposing routeId
-  // on the output DTO. The saga workflow's step 4 creates a single named API with slug 'traffic'.
-  const crypto = require('crypto');
-  function deriveRouteId(datasetId, slug) {
-    const md5 = crypto.createHash('md5').update(`${datasetId}/${slug}`, 'utf8').digest();
-    md5[6] = (md5[6] & 0x0f) | 0x30;  // UUID version 3
-    md5[8] = (md5[8] & 0x3f) | 0x80;  // RFC 4122 variant
-    const hex = md5.toString('hex');
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-  }
-
-  const datasetId = bru.getVar('sagaDataSetId');
-  const routeId = deriveRouteId(datasetId, 'traffic');
-  bru.setVar('sagaTrafficRouteId', routeId);
-
-  // Wait for async saga to create the APISIX route (max 30 s, poll every 2 s).
+  // Wait for async saga to create APISIX route (max 30s, poll every 2s)
   const axios = require('axios');
   const adminUrl = bru.getEnvVar('apisixAdminUrl');
   const adminKey = bru.getEnvVar('apisixAdminKey');
+  const datasetId = bru.getVar('sagaDataSetId');
 
   for (let i = 0; i < 15; i++) {
     try {
       const resp = await axios.get(
-        `${adminUrl}/apisix/admin/routes/${routeId}`,
+        `${adminUrl}/apisix/admin/routes/${datasetId}`,
         { headers: { 'X-API-KEY': adminKey }, validateStatus: () => true }
       );
       if (resp.status === 200) break;
@@ -54,12 +38,12 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
 
-  test("Route URI contains datasetId and slug", function() {
+  test("Route has correct URI pattern", function() {
     const route = res.body.value || res.body;
     const uris = route.uris || [route.uri];
     const datasetId = bru.getVar('sagaDataSetId');
-    const hasNamedApiUri = uris.some(u => u.includes(datasetId) && u.includes('traffic'));
-    expect(hasNamedApiUri).to.be.true;
+    const hasDatasetUri = uris.some(u => u.includes(datasetId));
+    expect(hasDatasetUri).to.be.true;
   });
 
   test("Route references upstream", function() {
@@ -74,16 +58,16 @@ tests {
 }
 
 docs {
-  **Saga step 9b of 18** — Verify the APISIX route provisioned by the saga for the dataset's named API.
+  **Saga step 9b of 18** — Verify APISIX route provisioned by the saga.
 
-  Since #1311/#1315 each named API gets its own APISIX route with a deterministic ID derived from `UUID.nameUUIDFromBytes("{datasetId}/{slug}")` (see `NamedApiHelper` in config-adapter). The pre-request script replicates that derivation and polls for up to 30 seconds (15 × 2 s intervals) to accommodate async saga completion.
+  Queries the APISIX Admin API directly to confirm the saga created a route for the dataset. The pre-request script polls for up to 30 seconds (15 × 2 s intervals) to accommodate async saga completion.
 
   The route must:
-  - include the `sagaDataSetId` and slug in its URI pattern (e.g. `/v1/datasets/{id}/traffic`)
+  - include the `sagaDataSetId` in its URI pattern
   - reference an upstream (pointing to the FROST server)
   - have `plugin_config_id=1` confirming the OpenID-Connect auth plugin is applied
 
-  **Precondition:** `sagaDataSetId` is set; APISIX Admin API reachable at `apisixAdminUrl`; the dataset created in step 4 has at least one named API with slug `traffic`.
+  **Precondition:** `sagaDataSetId` is set; APISIX Admin API reachable at `apisixAdminUrl`.
 
   **Expected Response:** 200 OK from APISIX Admin API with the route object.
 }
