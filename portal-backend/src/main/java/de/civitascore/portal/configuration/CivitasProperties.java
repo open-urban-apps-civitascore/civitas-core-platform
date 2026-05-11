@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.NestedConfigurationProperty;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -16,7 +17,8 @@ import org.springframework.validation.annotation.Validated;
  */
 @Validated
 @ConfigurationProperties(prefix = "civitas")
-public record CivitasProperties(@NotBlank String masterKey, @Valid Api api) {
+public record CivitasProperties(
+    @NotBlank String masterKey, @NestedConfigurationProperty @Valid Api api) {
 
   /**
    * Data-plane API configuration.
