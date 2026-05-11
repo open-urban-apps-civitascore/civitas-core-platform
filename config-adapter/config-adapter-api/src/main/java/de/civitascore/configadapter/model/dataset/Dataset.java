@@ -14,13 +14,15 @@ import java.util.List;
 
 /**
  * Typed representation of a dataset CloudEvent payload. Contains the dataset metadata, its
- * datasource connections, and data pipeline definitions.
+ * datasource connections, data pipeline definitions, and named API endpoints.
  *
  * @param id unique dataset identifier (UUID)
  * @param name human-readable dataset name
  * @param openDataAccess whether the dataset is publicly accessible
  * @param datasources external data source connections
  * @param datapipelines Redpanda Connect pipeline definitions
+ * @param namedApis named API endpoints exposed by this dataset (per concepts #1379 and #1383); one
+ *     APISIX route per entry
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record Dataset(
@@ -28,4 +30,5 @@ public record Dataset(
     String name,
     boolean openDataAccess,
     List<Datasource> datasources,
-    List<DataPipeline> datapipelines) {}
+    List<DataPipeline> datapipelines,
+    List<NamedApi> namedApis) {}

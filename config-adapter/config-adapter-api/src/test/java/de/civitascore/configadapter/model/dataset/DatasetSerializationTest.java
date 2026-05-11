@@ -136,6 +136,49 @@ class DatasetSerializationTest {
   }
 
   @Test
+  void shouldDeserializeNamedApis() {
+    assertNotNull(dataset.namedApis());
+    assertEquals(2, dataset.namedApis().size());
+
+    NamedApi traffic = dataset.namedApis().get(0);
+    assertEquals("traffic", traffic.slug());
+    assertEquals(ApiStandard.STA, traffic.standard());
+    assertEquals("1.1", traffic.version());
+
+    // Second fixture entry exercises a non-STA standard and an absent (null) version.
+    NamedApi boundaries = dataset.namedApis().get(1);
+    assertEquals("boundaries", boundaries.slug());
+    assertEquals(ApiStandard.WFS, boundaries.standard());
+    assertNull(boundaries.version());
+  }
+
+  /**
+   * Pins the forward-compat property documented on {@link NamedApi}: the record uses
+   * {@code @JsonIgnoreProperties(ignoreUnknown = true)} so portal-backend can add fields (e.g. the
+   * portal-backend-private {@code name} and {@code description}) without breaking config-adapter
+   * deserialization.
+   */
+  @Test
+  void shouldDeserializeNamedApiIgnoringUnknownFields() throws Exception {
+    String json =
+        """
+        {
+          "slug": "traffic",
+          "standard": "STA",
+          "version": "1.1",
+          "name": "Traffic Sensor Readings",
+          "description": "Live traffic counter readings from city sensors."
+        }
+        """;
+
+    NamedApi api = objectMapper.readValue(json, NamedApi.class);
+
+    assertEquals("traffic", api.slug());
+    assertEquals(ApiStandard.STA, api.standard());
+    assertEquals("1.1", api.version());
+  }
+
+  @Test
   void shouldRoundTripSerializeDataset() throws Exception {
     String json = objectMapper.writeValueAsString(dataset);
     Dataset roundTripped = objectMapper.readValue(json, Dataset.class);
@@ -146,5 +189,8 @@ class DatasetSerializationTest {
     assertEquals(dataset.datapipelines().size(), roundTripped.datapipelines().size());
     assertEquals(dataset.datasources().get(0), roundTripped.datasources().get(0));
     assertEquals(dataset.datasources().get(1), roundTripped.datasources().get(1));
+    assertEquals(dataset.namedApis().size(), roundTripped.namedApis().size());
+    assertEquals(dataset.namedApis().get(0), roundTripped.namedApis().get(0));
+    assertEquals(dataset.namedApis().get(1), roundTripped.namedApis().get(1));
   }
 }
