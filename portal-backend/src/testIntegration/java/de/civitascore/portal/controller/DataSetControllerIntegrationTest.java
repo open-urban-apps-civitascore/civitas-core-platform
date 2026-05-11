@@ -18,6 +18,7 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
+import de.civitascore.portal.model.input.validation.NamedApiAllowedSlugValidator;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
@@ -36,11 +37,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
@@ -524,6 +527,21 @@ class DataSetControllerIntegrationTest
         })
     @DisplayName("Should reject namedApis entry with malformed slug")
     void shouldRejectMalformedNamedApiSlug(String slug) {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(List.of(namedApi("Traffic", slug, ApiStandard.STA, null)));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    static Stream<String> reservedSlugs() {
+      return NamedApiAllowedSlugValidator.RESERVED.stream();
+    }
+
+    @ParameterizedTest(name = "[{index}] slug={0}")
+    @MethodSource("reservedSlugs")
+    @DisplayName("Should reject namedApis entry with reserved slug (collides with platform path)")
+    void shouldRejectReservedNamedApiSlug(String slug) {
       DataSetInputDTO input = createValidInput();
       input.setNamedApis(List.of(namedApi("Traffic", slug, ApiStandard.STA, null)));
 
