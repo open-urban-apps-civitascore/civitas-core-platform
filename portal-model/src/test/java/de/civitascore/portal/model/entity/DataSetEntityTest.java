@@ -2,6 +2,7 @@ package de.civitascore.portal.model.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.model.embedded.ApiStandard;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -49,12 +50,12 @@ class DataSetEntityTest {
       NamedApi traffic = new NamedApi();
       traffic.setName("Traffic Sensor Readings");
       traffic.setSlug("traffic");
-      traffic.setStandard("STA");
+      traffic.setStandard(ApiStandard.STA);
       traffic.setRouteId("route-1");
       NamedApi weather = new NamedApi();
       weather.setName("Weather Sensor Readings");
       weather.setSlug("weather");
-      weather.setStandard("STA");
+      weather.setStandard(ApiStandard.STA);
       weather.setRouteId("route-2");
       dataSet.setNamedApis(Set.of(traffic, weather));
 
@@ -147,7 +148,7 @@ class DataSetEntityTest {
       NamedApi api = new NamedApi();
       api.setName("API " + slug);
       api.setSlug(slug);
-      api.setStandard("STA");
+      api.setStandard(ApiStandard.STA);
       return api;
     }
 
