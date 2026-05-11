@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.configuration.CivitasProperties;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -70,7 +71,8 @@ class DataSetControllerIntegrationTest
   }
 
   /** Helper to construct a {@link NamedApiInputDTO} with the four explicit fields. */
-  private NamedApiInputDTO namedApi(String name, String slug, String standard, String version) {
+  private NamedApiInputDTO namedApi(
+      String name, String slug, ApiStandard standard, String version) {
     NamedApiInputDTO dto = new NamedApiInputDTO();
     dto.setName(name);
     dto.setSlug(slug);
@@ -330,8 +332,8 @@ class DataSetControllerIntegrationTest
       DataSetInputDTO input = createValidInput();
       input.setNamedApis(
           List.of(
-              namedApi("Traffic Sensor Readings", "traffic", "STA", "1.1"),
-              namedApi("Weather Sensor Readings", "weather", "STA", null)));
+              namedApi("Traffic Sensor Readings", "traffic", ApiStandard.STA, "1.1"),
+              namedApi("Weather Sensor Readings", "weather", ApiStandard.STA, null)));
 
       ResponseEntity<DataSetOutputDTO> create = performCreate(input);
       assertThat(create.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -350,7 +352,8 @@ class DataSetControllerIntegrationTest
               NamedApiOutputDTO::getStandard,
               NamedApiOutputDTO::getPreviewUrl)
           .containsExactlyInAnyOrder(
-              tuple("traffic", "STA", trafficUrl), tuple("weather", "STA", weatherUrl));
+              tuple("traffic", ApiStandard.STA, trafficUrl),
+              tuple("weather", ApiStandard.STA, weatherUrl));
 
       // GET round-trip returns the same shape
       ResponseEntity<DataSetOutputDTO> get = performGetById(created.getId());
@@ -382,8 +385,8 @@ class DataSetControllerIntegrationTest
       DataSetInputDTO input = createValidInput();
       input.setNamedApis(
           List.of(
-              namedApi("Traffic", "traffic", "STA", null),
-              namedApi("Weather", "weather", "STA", null)));
+              namedApi("Traffic", "traffic", ApiStandard.STA, null),
+              namedApi("Weather", "weather", ApiStandard.STA, null)));
 
       DataSetOutputDTO created = performCreate(input).getBody();
       assertThat(created).isNotNull();
@@ -415,8 +418,8 @@ class DataSetControllerIntegrationTest
       DataSetInputDTO input = createValidInput();
       input.setNamedApis(
           List.of(
-              namedApi("Traffic", "traffic", "STA", null),
-              namedApi("Weather", "weather", "STA", null)));
+              namedApi("Traffic", "traffic", ApiStandard.STA, null),
+              namedApi("Weather", "weather", ApiStandard.STA, null)));
 
       DataSetOutputDTO created = performCreate(input).getBody();
       assertThat(created).isNotNull();
@@ -452,7 +455,7 @@ class DataSetControllerIntegrationTest
     @DisplayName("Should clear namedApis on PATCH with empty array")
     void shouldClearNamedApisOnPatchWithEmptyArray() {
       DataSetInputDTO input = createValidInput();
-      input.setNamedApis(List.of(namedApi("Traffic", "traffic", "STA", null)));
+      input.setNamedApis(List.of(namedApi("Traffic", "traffic", ApiStandard.STA, null)));
 
       DataSetOutputDTO created = performCreate(input).getBody();
       assertThat(created).isNotNull();
@@ -472,7 +475,7 @@ class DataSetControllerIntegrationTest
       NamedApiInputDTO bad = new NamedApiInputDTO();
       bad.setName("   "); // whitespace, exercises @NotBlank (vs @NotNull)
       bad.setSlug("traffic");
-      bad.setStandard("STA");
+      bad.setStandard(ApiStandard.STA);
       input.setNamedApis(List.of(bad));
 
       ResponseEntity<DataSetOutputDTO> response = performCreate(input);
@@ -488,7 +491,7 @@ class DataSetControllerIntegrationTest
       NamedApiInputDTO bad = new NamedApiInputDTO();
       bad.setName("Traffic");
       bad.setSlug("");
-      bad.setStandard("STA");
+      bad.setStandard(ApiStandard.STA);
       input.setNamedApis(List.of(bad));
 
       ResponseEntity<DataSetOutputDTO> response = performCreate(input);
@@ -522,7 +525,7 @@ class DataSetControllerIntegrationTest
     @DisplayName("Should reject namedApis entry with malformed slug")
     void shouldRejectMalformedNamedApiSlug(String slug) {
       DataSetInputDTO input = createValidInput();
-      input.setNamedApis(List.of(namedApi("Traffic", slug, "STA", null)));
+      input.setNamedApis(List.of(namedApi("Traffic", slug, ApiStandard.STA, null)));
 
       ResponseEntity<DataSetOutputDTO> response = performCreate(input);
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -532,7 +535,7 @@ class DataSetControllerIntegrationTest
     @DisplayName("Should accept single-character slug (regex boundary case)")
     void shouldAcceptSingleCharSlug() {
       DataSetInputDTO input = createValidInput();
-      input.setNamedApis(List.of(namedApi("Traffic", "a", "STA", null)));
+      input.setNamedApis(List.of(namedApi("Traffic", "a", ApiStandard.STA, null)));
 
       ResponseEntity<DataSetOutputDTO> response = performCreate(input);
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -542,7 +545,7 @@ class DataSetControllerIntegrationTest
     @DisplayName("Should reject namedApis entry with slug over 32 characters")
     void shouldRejectOverlongNamedApiSlug() {
       DataSetInputDTO input = createValidInput();
-      input.setNamedApis(List.of(namedApi("Traffic", "a".repeat(33), "STA", null)));
+      input.setNamedApis(List.of(namedApi("Traffic", "a".repeat(33), ApiStandard.STA, null)));
 
       ResponseEntity<DataSetOutputDTO> response = performCreate(input);
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -551,10 +554,26 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should reject namedApis entry with unknown standard value")
     void shouldRejectUnknownNamedApiStandard() {
-      DataSetInputDTO input = createValidInput();
-      input.setNamedApis(List.of(namedApi("Traffic", "traffic", "OGCAPI", null)));
+      // Raw-map body so we can post a value outside the ApiStandard enum and exercise the
+      // Jackson-level rejection that returns 400 before bean validation.
+      Map<String, Object> body =
+          Map.of(
+              "name",
+              "DataSet with bad standard",
+              "namedApis",
+              List.of(
+                  Map.of(
+                      "name", "Traffic",
+                      "slug", "traffic",
+                      "standard", "OGCAPI")));
 
-      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath(),
+              HttpMethod.POST,
+              createAuthHeaders(),
+              body,
+              getOutputTypeReference());
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
@@ -565,11 +584,11 @@ class DataSetControllerIntegrationTest
       NamedApiInputDTO good = new NamedApiInputDTO();
       good.setName("Traffic");
       good.setSlug("traffic");
-      good.setStandard("STA");
+      good.setStandard(ApiStandard.STA);
       NamedApiInputDTO bad = new NamedApiInputDTO();
       bad.setName("");
       bad.setSlug("weather");
-      bad.setStandard("STA");
+      bad.setStandard(ApiStandard.STA);
       input.setNamedApis(List.of(good, bad));
 
       // Pins that @Valid cascade visits every element, not just the first. A future regression
@@ -586,8 +605,8 @@ class DataSetControllerIntegrationTest
       // version on weather is intentionally null — must round-trip as null, not empty string
       input.setNamedApis(
           List.of(
-              namedApi("Traffic", "traffic", "STA", "1.1"),
-              namedApi("Weather", "weather", "STA", null)));
+              namedApi("Traffic", "traffic", ApiStandard.STA, "1.1"),
+              namedApi("Weather", "weather", ApiStandard.STA, null)));
 
       DataSetOutputDTO created = performCreate(input).getBody();
       assertThat(created).isNotNull();
@@ -606,9 +625,9 @@ class DataSetControllerIntegrationTest
     @DisplayName("Should round-trip optional description alongside a null description")
     void shouldRoundTripDescription() {
       DataSetInputDTO input = createValidInput();
-      NamedApiInputDTO traffic = namedApi("Traffic", "traffic", "STA", "1.1");
+      NamedApiInputDTO traffic = namedApi("Traffic", "traffic", ApiStandard.STA, "1.1");
       traffic.setDescription("Live traffic counter readings from city sensors.");
-      NamedApiInputDTO weather = namedApi("Weather", "weather", "STA", "1.1");
+      NamedApiInputDTO weather = namedApi("Weather", "weather", ApiStandard.STA, "1.1");
       // weather.description intentionally null — must round-trip as null
 
       input.setNamedApis(List.of(traffic, weather));
@@ -634,7 +653,7 @@ class DataSetControllerIntegrationTest
     @DisplayName("Should reject namedApis entry with description over 150 characters")
     void shouldRejectOverlongDescription() {
       DataSetInputDTO input = createValidInput();
-      NamedApiInputDTO bad = namedApi("Traffic", "traffic", "STA", null);
+      NamedApiInputDTO bad = namedApi("Traffic", "traffic", ApiStandard.STA, null);
       bad.setDescription("x".repeat(151));
       input.setNamedApis(List.of(bad));
 
@@ -646,7 +665,7 @@ class DataSetControllerIntegrationTest
     @DisplayName("Should preserve NamedApi rows (id + routeId) when PATCH body omits namedApis")
     void shouldLeaveNamedApisUntouchedWhenPatchOmitsField() {
       DataSetInputDTO input = createValidInput();
-      input.setNamedApis(List.of(namedApi("Traffic", "traffic", "STA", null)));
+      input.setNamedApis(List.of(namedApi("Traffic", "traffic", ApiStandard.STA, null)));
 
       DataSetOutputDTO created = performCreate(input).getBody();
       assertThat(created).isNotNull();
@@ -699,8 +718,8 @@ class DataSetControllerIntegrationTest
       DataSetInputDTO input = createValidInput();
       input.setNamedApis(
           List.of(
-              namedApi("Traffic", "traffic", "STA", null),
-              namedApi("Weather", "weather", "STA", null)));
+              namedApi("Traffic", "traffic", ApiStandard.STA, null),
+              namedApi("Weather", "weather", ApiStandard.STA, null)));
 
       DataSetOutputDTO created = performCreate(input).getBody();
       assertThat(created).isNotNull();
@@ -756,8 +775,8 @@ class DataSetControllerIntegrationTest
       DataSetInputDTO input = createValidInput();
       input.setNamedApis(
           List.of(
-              namedApi("Traffic", "traffic", "STA", null),
-              namedApi("Weather", "weather", "STA", null)));
+              namedApi("Traffic", "traffic", ApiStandard.STA, null),
+              namedApi("Weather", "weather", ApiStandard.STA, null)));
 
       DataSetOutputDTO created = performCreate(input).getBody();
       assertThat(created).isNotNull();
@@ -767,8 +786,8 @@ class DataSetControllerIntegrationTest
       putBody.setName(created.getName());
       putBody.setNamedApis(
           List.of(
-              namedApi("Traffic v2", "traffic", "STA", "1.1"),
-              namedApi("Air Quality", "air", "STA", null)));
+              namedApi("Traffic v2", "traffic", ApiStandard.STA, "1.1"),
+              namedApi("Air Quality", "air", ApiStandard.STA, null)));
 
       ResponseEntity<DataSetOutputDTO> put = performUpdate(dataSetId, putBody);
       assertThat(put.getStatusCode()).isEqualTo(HttpStatus.OK);

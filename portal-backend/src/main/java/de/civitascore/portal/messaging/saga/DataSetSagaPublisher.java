@@ -162,14 +162,26 @@ public class DataSetSagaPublisher {
         .map(
             api ->
                 new NamedApi(
-                    api.getSlug(), ApiStandard.valueOf(api.getStandard()), api.getVersion()))
+                    api.getSlug(), ApiStandard.valueOf(api.getStandard().name()), api.getVersion()))
         .toList();
   }
 
   /**
-   * Returns null when no entry has a populated {@code routeId} so {@code @JsonInclude(NON_NULL)}
-   * drops the field. Defense-in-depth against the DB {@code NOT NULL} / {@code UNIQUE(dataset_id,
-   * slug)} constraints.
+   * Builds the {@code slug -> routeId} map describing APISIX routes the orchestrator currently owns
+   * for this dataset. Returns null when no entry has a populated {@code routeId} so
+   * {@code @JsonInclude(NON_NULL)} drops the field; defense-in-depth against the DB {@code NOT
+   * NULL} / {@code UNIQUE(dataset_id, slug)} constraints.
+   *
+   * <p><b>Contract with the orchestrator:</b>
+   *
+   * <ul>
+   *   <li>{@code null} / field omitted — no existing routes; orchestrator provisions all namedApis
+   *       from scratch.
+   *   <li>Non-empty map — keyed by slug for each route the orchestrator already owns; slugs absent
+   *       from the map (but present in {@code namedApis}) are treated as new and provisioned. Slugs
+   *       present here but absent from {@code namedApis} are torn down on DELETE / left alone on
+   *       UPDATE.
+   * </ul>
    */
   private Map<String, String> buildRouteIds(DataSet dataset) {
     if (dataset.getNamedApis().isEmpty()) {

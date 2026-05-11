@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
@@ -177,7 +178,7 @@ class DataSetSagaPublisherTest {
       NamedApi api = new NamedApi();
       api.setName(name);
       api.setSlug(slug);
-      api.setStandard("STA");
+      api.setStandard(ApiStandard.STA);
       api.setVersion("1.1");
       api.setRouteId(routeId);
       return api;

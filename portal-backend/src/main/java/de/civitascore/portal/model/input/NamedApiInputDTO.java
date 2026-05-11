@@ -1,7 +1,9 @@
 package de.civitascore.portal.model.input;
 
+import de.civitascore.portal.model.embedded.ApiStandard;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -33,16 +35,12 @@ public class NamedApiInputDTO {
       example = "traffic")
   private String slug;
 
-  @NotBlank(message = "Standard is required") @Pattern(
-      regexp = "^(WFS|WMS|STA|CUSTOM)$",
-      message = "Standard must be one of WFS, WMS, STA, CUSTOM")
-  @Schema(
+  @NotNull(message = "Standard is required") @Schema(
       description =
           "API standard. CUSTOM allows free-form, non-standard APIs. Immutable once the dataset"
               + " reaches AVAILABLE.",
-      allowableValues = {"WFS", "WMS", "STA", "CUSTOM"},
       example = "STA")
-  private String standard;
+  private ApiStandard standard;
 
   @Schema(
       description = "Optional standard version (e.g. \"1.1\" for STA). Free-form string.",

@@ -1,5 +1,6 @@
 package de.civitascore.portal.model.output;
 
+import de.civitascore.portal.model.embedded.ApiStandard;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -25,11 +26,8 @@ public class NamedApiOutputDTO {
       example = "traffic")
   private String slug;
 
-  @Schema(
-      description = "API standard per ADR #1362.",
-      allowableValues = {"WFS", "WMS", "STA", "CUSTOM"},
-      example = "STA")
-  private String standard;
+  @Schema(description = "API standard per ADR #1362.", example = "STA")
+  private ApiStandard standard;
 
   @Schema(description = "Optional standard version (e.g. \"1.1\" for STA).", example = "1.1")
   private String version;

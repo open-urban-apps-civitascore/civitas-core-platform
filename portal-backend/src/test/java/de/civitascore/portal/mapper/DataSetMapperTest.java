@@ -2,6 +2,7 @@ package de.civitascore.portal.mapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.input.DataSetInputDTO;
@@ -32,11 +33,11 @@ class DataSetMapperTest {
     NamedApi traffic = new NamedApi();
     traffic.setName("Traffic");
     traffic.setSlug("traffic");
-    traffic.setStandard("STA");
+    traffic.setStandard(ApiStandard.STA);
     NamedApi weather = new NamedApi();
     weather.setName("Weather");
     weather.setSlug("weather");
-    weather.setStandard("WFS");
+    weather.setStandard(ApiStandard.WFS);
     entity.setNamedApis(Set.of(traffic, weather));
 
     DataSetInputDTO input = new DataSetInputDTO();

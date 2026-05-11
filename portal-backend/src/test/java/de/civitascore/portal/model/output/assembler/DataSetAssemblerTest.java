@@ -20,6 +20,7 @@ import static org.mockito.Mockito.when;
 import de.civitascore.portal.configuration.CivitasProperties;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.mapper.UserMapper;
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
@@ -54,7 +55,7 @@ class DataSetAssemblerTest {
     NamedApiOutputDTO dto = new NamedApiOutputDTO();
     dto.setName("API " + slug);
     dto.setSlug(slug);
-    dto.setStandard("STA");
+    dto.setStandard(ApiStandard.STA);
     return dto;
   }
 
