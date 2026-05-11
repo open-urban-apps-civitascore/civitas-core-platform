@@ -1197,7 +1197,7 @@ class DataSetControllerIntegrationTest
               dataSetId.toString(),
               "proj-test",
               "https://frost.example.com",
-              "route-test",
+              Map.of("traffic", "route-test"),
               "svc-test",
               "https://public.example.com/datasets/" + dataSetId,
               List.of("pipe-test"),

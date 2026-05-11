@@ -1,13 +1,19 @@
 package de.civitascore.portal.messaging.saga;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -23,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.test.util.ReflectionTestUtils;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -78,10 +85,7 @@ class DataSetSagaPublisherTest {
       dataSet.setPipelines(Set.of(p1, p2));
 
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
-      when(kafkaTemplate.send(
-              org.mockito.ArgumentMatchers.anyString(),
-              org.mockito.ArgumentMatchers.anyString(),
-              jsonCaptor.capture()))
+      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
           .thenReturn(
               CompletableFuture.completedFuture(
                   new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
@@ -119,7 +123,7 @@ class DataSetSagaPublisherTest {
       dataSet.setName("test");
       dataSet.setOpenDataAccess(false);
       dataSet.setProjectId("proj-1");
-      dataSet.setRouteId("route-1");
+      // routeId is now per-named-API on the child entity; no setter on the dataset itself
       dataSet.setServiceId("svc-1");
       dataSet.setPipelineIds(List.of("pipe-1"));
       dataSet.setPipelines(Set.of(existingPipeline, newPipeline));
@@ -127,10 +131,7 @@ class DataSetSagaPublisherTest {
       Set<Pipeline> previousPipelines = Set.of(existingPipeline, removedPipeline);
 
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
-      when(kafkaTemplate.send(
-              org.mockito.ArgumentMatchers.anyString(),
-              org.mockito.ArgumentMatchers.anyString(),
-              jsonCaptor.capture()))
+      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
           .thenReturn(
               CompletableFuture.completedFuture(
                   new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
@@ -165,6 +166,296 @@ class DataSetSagaPublisherTest {
       assertThat(hasAdd).as("new pipeline should be ADD").isTrue();
       assertThat(hasUpdate).as("existing pipeline should be UPDATE").isTrue();
       assertThat(hasDelete).as("removed pipeline should be DELETE").isTrue();
+    }
+  }
+
+  @Nested
+  @DisplayName("namedApis serialization in saga triggers (#1311)")
+  class NamedApisSerializationTests {
+
+    private NamedApi api(String name, String slug, String routeId) {
+      NamedApi api = new NamedApi();
+      api.setName(name);
+      api.setSlug(slug);
+      api.setStandard("STA");
+      api.setVersion("1.1");
+      api.setRouteId(routeId);
+      return api;
+    }
+
+    private DataSet datasetWithNamedApis(String trafficRouteId, String weatherRouteId) {
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setNamedApis(
+          new java.util.HashSet<>(
+              Set.of(
+                  api("Traffic Sensor Readings", "traffic", trafficRouteId),
+                  api("Weather Sensor Readings", "weather", weatherRouteId))));
+      return dataSet;
+    }
+
+    private ArgumentCaptor<String> stubKafkaSend() {
+      ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
+      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
+          .thenReturn(
+              CompletableFuture.completedFuture(
+                  new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
+      return jsonCaptor;
+    }
+
+    private void assertNamedApisInPayload(String json) throws Exception {
+      var payload = new JsonMapper().readTree(json);
+      var namedApis = payload.get("namedApis");
+      assertThat(namedApis).as("namedApis must be present in trigger payload").isNotNull();
+      assertThat(namedApis.size()).isEqualTo(2);
+      // Order is not guaranteed (Set), assert by slug
+      Map<String, JsonNode> bySlug = new HashMap<>();
+      namedApis.forEach(node -> bySlug.put(node.get("slug").asString(), node));
+      assertThat(bySlug).containsKeys("traffic", "weather");
+      assertThat(bySlug.get("traffic").get("standard").asString()).isEqualTo("STA");
+      assertThat(bySlug.get("traffic").get("version").asString()).isEqualTo("1.1");
+      // Saga contract carries only slug/standard/version: human-readable name and description
+      // stay portal-backend-private.
+      assertThat(bySlug.get("traffic").get("name")).as("name must not leak across saga").isNull();
+      assertThat(bySlug.get("traffic").get("description"))
+          .as("description must not leak across saga")
+          .isNull();
+    }
+
+    @Test
+    @DisplayName("DatasetCreate trigger carries namedApis but omits routeIds")
+    void createTriggerCarriesNamedApis() throws Exception {
+      DataSet dataSet = datasetWithNamedApis(null, null); // no routeIds yet on CREATE
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      assertNamedApisInPayload(jsonCaptor.getValue());
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.has("routeIds"))
+          .as("CREATE trigger has no routeIds: routes are provisioned by this saga")
+          .isFalse();
+    }
+
+    @Test
+    @DisplayName("DatasetUpdate trigger carries namedApis and slug-keyed routeIds")
+    void updateTriggerCarriesNamedApisAndRouteIds() throws Exception {
+      DataSet dataSet = datasetWithNamedApis("route-1", "route-2");
+      dataSet.setProjectId("proj-1");
+      dataSet.setServiceId("svc-1");
+      dataSet.setPipelines(Set.of());
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishUpdateRequested(dataSet, Set.of());
+
+      assertNamedApisInPayload(jsonCaptor.getValue());
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var routeIds = payload.get("routeIds");
+      assertThat(routeIds).isNotNull();
+      assertThat(routeIds.get("traffic").asString()).isEqualTo("route-1");
+      assertThat(routeIds.get("weather").asString()).isEqualTo("route-2");
+    }
+
+    @Test
+    @DisplayName("DatasetDelete trigger carries namedApis and slug-keyed routeIds")
+    void deleteTriggerCarriesNamedApisAndRouteIds() throws Exception {
+      DataSet dataSet = datasetWithNamedApis("route-1", "route-2");
+      dataSet.setProjectId("proj-1");
+      dataSet.setServiceId("svc-1");
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishDeleteRequested(dataSet);
+
+      assertNamedApisInPayload(jsonCaptor.getValue());
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var routeIds = payload.get("routeIds");
+      assertThat(routeIds).isNotNull();
+      assertThat(routeIds.size()).isEqualTo(2);
+      assertThat(routeIds.get("traffic").asString()).isEqualTo("route-1");
+      assertThat(routeIds.get("weather").asString()).isEqualTo("route-2");
+    }
+
+    @Test
+    @DisplayName("DELETE trigger routeIds map omits entries with null routeId (partial release)")
+    void deleteTriggerOmitsEntriesWithoutRouteId() throws Exception {
+      // Half-released dataset: traffic was provisioned, weather was not. The DELETE saga must
+      // still tell the orchestrator about both named APIs (so it knows to clean up downstream
+      // state for weather), but routeIds carries only the entries with a real APISIX route.
+      DataSet dataSet = datasetWithNamedApis("route-1", null);
+      dataSet.setProjectId("proj-1");
+      dataSet.setServiceId("svc-1");
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishDeleteRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var routeIds = payload.get("routeIds");
+      assertThat(routeIds).isNotNull();
+      assertThat(routeIds.size()).isEqualTo(1);
+      assertThat(routeIds.has("traffic")).isTrue();
+      assertThat(routeIds.has("weather"))
+          .as("entries without a routeId should not appear in the DELETE map either")
+          .isFalse();
+      // namedApis must still carry both — the orchestrator needs to know weather exists.
+      assertNamedApisInPayload(jsonCaptor.getValue());
+    }
+
+    @Test
+    @DisplayName("Duplicate slug in collection throws with datasetId + slug context")
+    void duplicateSlugThrowsWithContext() {
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setProjectId("proj-1");
+      dataSet.setServiceId("svc-1");
+      dataSet.setPipelines(Set.of());
+      // Build the set via add() rather than Set.of(...), so the test still constructs two
+      // duplicate-slug entries even if NamedApi later gains @EqualsAndHashCode on slug.
+      Set<NamedApi> apis = new LinkedHashSet<>();
+      apis.add(api("Traffic A", "traffic", "route-1"));
+      apis.add(api("Traffic B", "traffic", "route-2"));
+      dataSet.setNamedApis(apis);
+
+      // DB UNIQUE(dataset_id, slug) prevents this in production, but if a transactional bug or
+      // migration ever produced duplicates, the publisher must fail with diagnostic context
+      // (datasetId + colliding routeIds) — not a bare IllegalStateException from Collectors.
+      // UPDATE/DELETE triggers project routeIds; CREATE does not, so use UPDATE here.
+      assertThatThrownBy(() -> publisher.publishUpdateRequested(dataSet, Set.of()))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining(dataSet.getId().toString())
+          .hasMessageContaining("route-1")
+          .hasMessageContaining("route-2");
+    }
+
+    @Test
+    @DisplayName("UPDATE trigger routeIds map omits entries with null routeId (mid-saga state)")
+    void updateTriggerOmitsEntriesWithoutRouteId() throws Exception {
+      // One entry has a routeId (already provisioned), the other doesn't yet.
+      DataSet dataSet = datasetWithNamedApis("route-1", null);
+      dataSet.setProjectId("proj-1");
+      dataSet.setServiceId("svc-1");
+      dataSet.setPipelines(Set.of());
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishUpdateRequested(dataSet, Set.of());
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var routeIds = payload.get("routeIds");
+      assertThat(routeIds).isNotNull();
+      assertThat(routeIds.size()).isEqualTo(1);
+      assertThat(routeIds.has("traffic")).isTrue();
+      assertThat(routeIds.has("weather"))
+          .as("entries without a routeId should not appear in the map")
+          .isFalse();
+    }
+
+    @Test
+    @DisplayName("Empty namedApis is omitted from the trigger JSON (NON_NULL)")
+    void emptyNamedApisOmitted() throws Exception {
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setPipelines(Set.of());
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.has("namedApis"))
+          .as("empty namedApis should be omitted from the JSON via @JsonInclude(NON_NULL)")
+          .isFalse();
+    }
+
+    @Test
+    @DisplayName("routeIds map is omitted when no entry has a populated routeId")
+    void routeIdsOmittedWhenNoneSet() throws Exception {
+      DataSet dataSet = datasetWithNamedApis(null, null);
+      dataSet.setProjectId("proj-1");
+      dataSet.setServiceId("svc-1");
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishDeleteRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.has("routeIds"))
+          .as("routeIds should be omitted when no entry has a populated routeId")
+          .isFalse();
+    }
+  }
+
+  @Nested
+  @DisplayName("Saga result handling for slug-keyed routeIds (#1311)")
+  class RouteIdsResultTests {
+
+    @Test
+    @DisplayName("SagaResultPayload round-trips the routeIds map through Jackson")
+    void payloadRoundTripsRouteIds() throws Exception {
+      SagaResultPayload result =
+          new SagaResultPayload(
+              UUID.randomUUID().toString(),
+              "proj-1",
+              "http://frost",
+              Map.of("traffic", "route-1", "weather", "route-2"),
+              "svc-1",
+              "http://public",
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      ObjectMapper mapper = new JsonMapper();
+      String json = mapper.writeValueAsString(result);
+      SagaResultPayload roundTripped = mapper.readValue(json, SagaResultPayload.class);
+
+      assertThat(roundTripped.routeIds()).containsEntry("traffic", "route-1");
+      assertThat(roundTripped.routeIds()).containsEntry("weather", "route-2");
+    }
+
+    @Test
+    @DisplayName("Legacy singular 'routeId' key is silently ignored (pre-#1311 wire shape)")
+    void legacyRouteIdKeyIsIgnored() throws Exception {
+      // Document behavior: a stale producer or DLQ replay carrying the pre-#1311 singular
+      // routeId key deserializes cleanly via @JsonIgnoreProperties(ignoreUnknown=true), and
+      // routeIds is null on the parsed payload. If we ever want bridge compatibility this test
+      // forces an explicit decision rather than a silent drop.
+      String legacyJson =
+          "{\"datasetId\":\""
+              + UUID.randomUUID()
+              + "\",\"projectId\":\"proj-1\",\"routeId\":\"legacy-route\"}";
+
+      SagaResultPayload parsed = new JsonMapper().readValue(legacyJson, SagaResultPayload.class);
+
+      assertThat(parsed.projectId()).isEqualTo("proj-1");
+      assertThat(parsed.routeIds())
+          .as("singular legacy 'routeId' is dropped — no bridge from pre-#1311 wire shape")
+          .isNull();
+    }
+
+    @Test
+    @DisplayName("Null routeIds round-trips as null (distinct from empty map)")
+    void nullRouteIdsRoundTrip() throws Exception {
+      SagaResultPayload result =
+          new SagaResultPayload(
+              UUID.randomUUID().toString(),
+              "proj-1",
+              "http://frost",
+              null,
+              "svc-1",
+              "http://public",
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
+
+      ObjectMapper mapper = new JsonMapper();
+      String json = mapper.writeValueAsString(result);
+      SagaResultPayload roundTripped = mapper.readValue(json, SagaResultPayload.class);
+
+      assertThat(roundTripped.routeIds()).isNull();
     }
   }
 }
