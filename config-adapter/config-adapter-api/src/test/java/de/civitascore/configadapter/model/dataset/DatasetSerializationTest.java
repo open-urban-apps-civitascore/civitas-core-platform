@@ -142,13 +142,13 @@ class DatasetSerializationTest {
 
     NamedApi traffic = dataset.namedApis().get(0);
     assertEquals("traffic", traffic.slug());
-    assertEquals("STA", traffic.standard());
+    assertEquals(ApiStandard.STA, traffic.standard());
     assertEquals("1.1", traffic.version());
 
     // Second fixture entry exercises a non-STA standard and an absent (null) version.
     NamedApi boundaries = dataset.namedApis().get(1);
     assertEquals("boundaries", boundaries.slug());
-    assertEquals("WFS", boundaries.standard());
+    assertEquals(ApiStandard.WFS, boundaries.standard());
     assertNull(boundaries.version());
   }
 
@@ -174,7 +174,7 @@ class DatasetSerializationTest {
     NamedApi api = objectMapper.readValue(json, NamedApi.class);
 
     assertEquals("traffic", api.slug());
-    assertEquals("STA", api.standard());
+    assertEquals(ApiStandard.STA, api.standard());
     assertEquals("1.1", api.version());
   }
 

@@ -20,10 +20,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * never displays named APIs to end users.
  *
  * <p>{@code slug} is the URL segment in the public route {@code /v1/datasets/{datasetId}/{slug}}.
- * {@code standard} carries the API standard (WFS / WMS / STA / CUSTOM) per ADR #1362. It is stored
- * as a string rather than a Java enum so the vocabulary can grow and {@code CUSTOM} can stay
- * free-form; the record itself accepts any string and portal-backend validates against the known
- * set.
+ * {@code standard} carries the API standard per ADR #1362 (see {@link ApiStandard}).
  *
  * <p>Validation constraints (enforced by portal-backend, not this record):
  *
@@ -31,12 +28,11 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  *   <li>{@code slug} matches {@code ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$}, max 32 characters
  *   <li>{@code slug} unique within a dataset
  *   <li>{@code slug} and {@code standard} immutable once the dataset reaches AVAILABLE
- *   <li>{@code standard} must be one of {@code WFS}, {@code WMS}, {@code STA}, {@code CUSTOM}
  * </ul>
  *
  * @param slug URL slug used in the public route (e.g. "traffic")
- * @param standard API standard: "WFS", "WMS", "STA", or "CUSTOM"
+ * @param standard API standard (see {@link ApiStandard})
  * @param version optional standard version (e.g. "1.1" for STA); nullable
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record NamedApi(String slug, String standard, String version) {}
+public record NamedApi(String slug, ApiStandard standard, String version) {}
