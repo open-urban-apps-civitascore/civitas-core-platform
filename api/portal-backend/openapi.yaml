@@ -2492,9 +2492,9 @@ paths:
       - DataSets
       summary: Delete a dataset
       description: "Deletes a DRAFT dataset immediately (204 No Content). READY datasets\
-        \ cannot be deleted — unstage first (POST /{id}/unstage). AVAILABLE\
-        \ datasets cannot be deleted directly — unrelease first (POST /{id}/unrelease)\
-        \ to tear down infrastructure, then delete."
+        \ cannot be deleted — unstage first (POST /{id}/unstage). AVAILABLE datasets\
+        \ cannot be deleted directly — unrelease first (POST /{id}/unrelease) to tear\
+        \ down infrastructure, then delete."
       operationId: deleteDataSet
       parameters:
       - name: id
@@ -4709,6 +4709,34 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  /datasets/{id}/unstage:
+    post:
+      tags:
+      - DataSets
+      summary: Unstage a dataset
+      description: Removes auto-generated distributions and reverts the dataset from
+        READY to DRAFT.
+      operationId: unstageDataSet
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataSetOutputDTO"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   /datasets/{id}/unrelease:
     post:
       tags:
@@ -4761,33 +4789,6 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /datasets/{id}/release:
-    post:
-      tags:
-      - DataSets
-      summary: Release
-      description: Transitions the entity from DRAFT to AVAILABLE status.
-      operationId: releaseDataSet
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DataSetOutputDTO"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
   /datasets/{id}/stage:
     post:
       tags:
@@ -4816,14 +4817,13 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /datasets/{id}/unstage:
+  /datasets/{id}/release:
     post:
       tags:
       - DataSets
-      summary: Unstage a dataset
-      description: Removes auto-generated distributions and reverts the dataset from
-        READY to DRAFT.
-      operationId: unstageDataSet
+      summary: Release
+      description: Transitions the entity from DRAFT to AVAILABLE status.
+      operationId: releaseDataSet
       parameters:
       - name: id
         in: path
@@ -6455,64 +6455,6 @@ components:
           type: boolean
           description: Whether this data source is currently referenced by a pipeline
           readOnly: true
-    NamedApiDTO:
-      type: object
-      description: |
-        A named, URL-slug-addressable API endpoint exposed by a dataset. Each
-        named API declares an explicit API standard per ADR #1362. Authored at
-        dataset level (not per pipeline) per concept #1379 and #1383.
-      properties:
-        name:
-          type: string
-          description: |
-            Human-readable display label for this named API. Free-form text;
-            not used in the URL. Required.
-          example: Traffic Sensor Readings
-        slug:
-          type: string
-          pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
-          maxLength: 32
-          description: |
-            URL slug used as the path segment in the public route:
-            `/v1/datasets/{datasetId}/{slug}`. Lowercase alphanumeric with
-            internal hyphens, max 32 characters, unique within the dataset.
-            Immutable once the dataset reaches AVAILABLE.
-          example: traffic
-        standard:
-          type: string
-          enum: [WFS, WMS, STA, CUSTOM]
-          description: |
-            API standard per ADR #1362. `CUSTOM` allows free-form,
-            non-standard APIs. Immutable once the dataset reaches AVAILABLE.
-          example: STA
-        version:
-          type: string
-          description: |
-            Optional standard version (e.g. `"1.1"` for STA). Free-form
-            string.
-          example: "1.1"
-        description:
-          type: string
-          maxLength: 150
-          description: |
-            Optional free-form description of the named API surfaced in the
-            dataset form and discovery responses. Max 150 characters.
-          example: Live traffic counter readings from city sensors.
-        previewUrl:
-          type: string
-          format: uri
-          readOnly: true
-          description: |
-            Predicted public URL once the dataset reaches AVAILABLE:
-            `{civitas.api.base-url}/v1/datasets/{datasetId}/{slug}`.
-            Built server-side from the configured data-plane base URL (per
-            concept #1380 + ADR #1387). Absent before the dataset has been
-            persisted.
-          example: https://api.core.civitasconnect.digital/v1/datasets/b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a/traffic
-      required:
-      - name
-      - slug
-      - standard
     DataSetInputDTO:
       type: object
       properties:
@@ -6532,15 +6474,56 @@ components:
           description: "Whether this dataset is publicly accessible, defaults to false"
         namedApis:
           type: array
+          description: "Named API endpoints exposed by this dataset (per concepts\
+            \ #1379 and #1383). Each entry produces one published distribution and\
+            \ one APISIX route after release. Slug uniqueness within the dataset is\
+            \ enforced at publish time (#1312)."
           items:
-            $ref: "#/components/schemas/NamedApiDTO"
-          description: |
-            Named API endpoints exposed by this dataset (per concepts #1379
-            and #1383). Each entry produces one published distribution and
-            one APISIX route after release. Slug uniqueness within the
-            dataset is enforced at publish time (#1312).
+            $ref: "#/components/schemas/NamedApiInputDTO"
       required:
       - name
+    NamedApiInputDTO:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Human-readable display label for this named API.
+          example: Traffic Sensor Readings
+          minLength: 1
+        slug:
+          type: string
+          description: "URL slug used as the path segment in the public route /v1/datasets/{datasetId}/{slug}.\
+            \ Lowercase alphanumeric with internal hyphens, max 32 characters, unique\
+            \ within a dataset, immutable while AVAILABLE."
+          example: traffic
+          maxLength: 32
+          minLength: 0
+          pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+        standard:
+          type: string
+          description: "API standard. CUSTOM allows free-form, non-standard APIs.\
+            \ Immutable once the dataset reaches AVAILABLE."
+          enum:
+          - WFS
+          - WMS
+          - STA
+          - CUSTOM
+          example: STA
+        version:
+          type: string
+          description: Optional standard version (e.g. "1.1" for STA). Free-form string.
+          example: "1.1"
+        description:
+          type: string
+          description: Optional free-form description of the named API surfaced in
+            the dataset form and discovery responses. Max 150 characters.
+          example: Live traffic counter readings from city sensors.
+          maxLength: 150
+          minLength: 0
+      required:
+      - name
+      - slug
+      - standard
     DataSetOutputDTO:
       type: object
       properties:
@@ -6591,12 +6574,11 @@ components:
             $ref: "#/components/schemas/DistributionSummaryDTO"
         namedApis:
           type: array
+          description: "Named API endpoints exposed by this dataset (per concepts\
+            \ #1379 and #1383). Each entry's previewUrl is server-populated from the\
+            \ configured data-plane domain."
           items:
-            $ref: "#/components/schemas/NamedApiDTO"
-          description: |
-            Named API endpoints exposed by this dataset (per concepts #1379
-            and #1383). Each entry includes a server-populated `previewUrl`
-            built from the configured data-plane domain.
+            $ref: "#/components/schemas/NamedApiOutputDTO"
         openDataAccess:
           type: boolean
           description: Whether this dataset is publicly accessible
@@ -6625,6 +6607,40 @@ components:
           format: uuid
         accessUrl:
           type: string
+    NamedApiOutputDTO:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Human-readable display label for this named API.
+          example: Traffic Sensor Readings
+        slug:
+          type: string
+          description: "URL slug used as the path segment in the public route /v1/datasets/{datasetId}/{slug}."
+          example: traffic
+        standard:
+          type: string
+          description: "API standard per ADR #1362."
+          enum:
+          - WFS
+          - WMS
+          - STA
+          - CUSTOM
+          example: STA
+        version:
+          type: string
+          description: Optional standard version (e.g. "1.1" for STA).
+          example: "1.1"
+        description:
+          type: string
+          description: Optional free-form description of the named API. Max 150 characters.
+          example: Live traffic counter readings from city sensors.
+        previewUrl:
+          type: string
+          description: "Predicted public URL once the dataset reaches AVAILABLE: {civitas.api.base-url}/v1/datasets/{datasetId}/{slug}.\
+            \ Server-populated; absent before the dataset is persisted."
+          example: https://api.core.civitasconnect.digital/v1/datasets/b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a/traffic
+          readOnly: true
     PipelineSummaryDTO:
       type: object
       properties:
@@ -6740,8 +6756,6 @@ components:
         totalPages:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         size:
           type: integer
           format: int32
@@ -6752,20 +6766,25 @@ components:
         number:
           type: integer
           format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageableObject:
       type: object
       properties:
+        offset:
+          type: integer
+          format: int64
         paged:
           type: boolean
         pageNumber:
@@ -6774,9 +6793,6 @@ components:
         pageSize:
           type: integer
           format: int32
-        offset:
-          type: integer
-          format: int64
         sort:
           $ref: "#/components/schemas/SortObject"
         unpaged:
@@ -6784,9 +6800,9 @@ components:
     SortObject:
       type: object
       properties:
-        sorted:
-          type: boolean
         empty:
+          type: boolean
+        sorted:
           type: boolean
         unsorted:
           type: boolean
@@ -6860,8 +6876,6 @@ components:
         totalPages:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         size:
           type: integer
           format: int32
@@ -6872,15 +6886,17 @@ components:
         number:
           type: integer
           format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     Sort:
@@ -6940,8 +6956,6 @@ components:
         totalPages:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         size:
           type: integer
           format: int32
@@ -6952,15 +6966,17 @@ components:
         number:
           type: integer
           format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageDataStructureOutputDTO:
@@ -6972,8 +6988,6 @@ components:
         totalPages:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         size:
           type: integer
           format: int32
@@ -6984,15 +6998,17 @@ components:
         number:
           type: integer
           format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageDataSourceOutputDTO:
@@ -7004,8 +7020,6 @@ components:
         totalPages:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         size:
           type: integer
           format: int32
@@ -7016,15 +7030,17 @@ components:
         number:
           type: integer
           format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageDataSetOutputDTO:
@@ -7036,8 +7052,6 @@ components:
         totalPages:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         size:
           type: integer
           format: int32
@@ -7048,15 +7062,17 @@ components:
         number:
           type: integer
           format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PagePipelineOutputDTO:
@@ -7068,8 +7084,6 @@ components:
         totalPages:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         size:
           type: integer
           format: int32
@@ -7080,15 +7094,17 @@ components:
         number:
           type: integer
           format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageAssignmentOutputDTO:
@@ -7100,8 +7116,6 @@ components:
         totalPages:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         size:
           type: integer
           format: int32
@@ -7112,15 +7126,17 @@ components:
         number:
           type: integer
           format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PatchUserInputDTO:
@@ -7296,12 +7312,12 @@ components:
           description: "Whether this dataset is publicly accessible, defaults to false"
         namedApis:
           type: array
+          description: "Named API endpoints exposed by this dataset (per concepts\
+            \ #1379 and #1383). Each entry produces one published distribution and\
+            \ one APISIX route after release. Slug uniqueness within the dataset is\
+            \ enforced at publish time (#1312)."
           items:
-            $ref: "#/components/schemas/NamedApiDTO"
-          description: |
-            Replaces the dataset's named API list when provided (per concepts
-            #1379 and #1383). Omit the field to leave the existing list
-            unchanged.
+            $ref: "#/components/schemas/NamedApiInputDTO"
     PatchPipelineInputDTO:
       description: Partial update — only provided fields are modified.
       properties:
