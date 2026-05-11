@@ -40,7 +40,7 @@ public class NamedApiOutputDTO {
   @Schema(
       description =
           "Predicted public URL once the dataset reaches AVAILABLE: "
-              + "https://{civitas.api.domain}/v1/datasets/{datasetId}/{slug}. Server-populated;"
+              + "{civitas.api.base-url}/v1/datasets/{datasetId}/{slug}. Server-populated;"
               + " absent before the dataset is persisted.",
       accessMode = Schema.AccessMode.READ_ONLY,
       example =

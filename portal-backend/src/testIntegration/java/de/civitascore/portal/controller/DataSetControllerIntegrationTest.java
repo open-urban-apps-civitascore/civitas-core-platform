@@ -328,7 +328,7 @@ class DataSetControllerIntegrationTest
     @DisplayName("Should round-trip namedApis with server-populated previewUrl")
     void shouldRoundTripNamedApisWithPreviewUrl() {
       // Per concept #1379: named APIs are dataset-level; per #1315 AC: round-trip works through
-      // POST /datasets and GET /datasets/{id}, with previewUrl built from civitas.api.domain.
+      // POST /datasets and GET /datasets/{id}, with previewUrl built from civitas.api.base-url.
       DataSetInputDTO input = createValidInput();
       input.setNamedApis(
           List.of(
@@ -341,9 +341,9 @@ class DataSetControllerIntegrationTest
       assertThat(created).isNotNull();
       assertThat(created.getId()).isNotNull();
 
-      String domain = civitasProperties.api().domain();
-      String trafficUrl = "https://" + domain + "/v1/datasets/" + created.getId() + "/traffic";
-      String weatherUrl = "https://" + domain + "/v1/datasets/" + created.getId() + "/weather";
+      String baseUrl = civitasProperties.api().baseUrl();
+      String trafficUrl = baseUrl + "/v1/datasets/" + created.getId() + "/traffic";
+      String weatherUrl = baseUrl + "/v1/datasets/" + created.getId() + "/weather";
 
       // POST response: namedApis populated with previewUrl
       assertThat(created.getNamedApis())

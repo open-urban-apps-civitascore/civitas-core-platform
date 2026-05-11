@@ -45,7 +45,7 @@ class DataSetAssemblerTest {
   @Mock private UserMapper userMapper;
 
   private final CivitasProperties civitasProperties =
-      new CivitasProperties("test-key", new CivitasProperties.Api("api.example.com"));
+      new CivitasProperties("test-key", new CivitasProperties.Api("https://api.example.com"));
 
   private DataSetAssembler assembler() {
     return new DataSetAssembler(dataSetMapper, userRepository, userMapper, civitasProperties);
@@ -141,19 +141,18 @@ class DataSetAssemblerTest {
         .isNull();
   }
 
-  @ParameterizedTest(name = "[{index}] domain={0}")
+  @ParameterizedTest(name = "[{index}] baseUrl={0}")
   @CsvSource({
-    "api.example.com,                  https://api.example.com",
-    "api.example.com:8443,             https://api.example.com:8443",
-    "api.test.example.com,             https://api.test.example.com",
-    "localhost:8089,                   https://localhost:8089",
+    "https://api.example.com,          https://api.example.com",
+    "https://api.example.com:8443,     https://api.example.com:8443",
+    "https://api.test.example.com,     https://api.test.example.com",
+    "https://localhost:8089,           https://localhost:8089",
   })
-  void buildsPreviewUrlAcrossSupportedDomainShapes(String domain, String expectedPrefix) {
-    // Locks the contract: civitas.api.domain MUST be a bare host (with optional port), no scheme,
-    // no trailing slash. The assembler concatenates "https://" in front, so any other shape would
-    // produce malformed URLs in production. If we add domain normalization later, update this
-    // test to reflect the new contract.
-    CivitasProperties props = new CivitasProperties("test-key", new CivitasProperties.Api(domain));
+  void buildsPreviewUrlAcrossSupportedBaseUrls(String baseUrl, String expectedPrefix) {
+    // Locks the contract: civitas.api.base-url MUST be a fully-qualified HTTPS URL with no path
+    // and no trailing slash. The assembler appends "/v1/datasets/..." to it directly; any other
+    // shape would produce malformed URLs in production.
+    CivitasProperties props = new CivitasProperties("test-key", new CivitasProperties.Api(baseUrl));
     DataSetAssembler customAssembler =
         new DataSetAssembler(dataSetMapper, userRepository, userMapper, props);
 

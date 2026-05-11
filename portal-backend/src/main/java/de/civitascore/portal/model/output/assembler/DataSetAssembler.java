@@ -31,9 +31,9 @@ public class DataSetAssembler implements BaseAssembler<DataSet, DataSetOutputDTO
 
   /**
    * {@inheritDoc} Enriches the output with: (a) the creating user's summary resolved from the audit
-   * trail; (b) per-named-API {@code previewUrl} built from the configured data-plane domain (per
+   * trail; (b) per-named-API {@code previewUrl} built from the configured data-plane base URL (per
    * concept #1380 + ADR #1387), in the form {@code
-   * https://{civitas.api.domain}/v1/datasets/{datasetId}/{slug}}. Preview URLs are absent when the
+   * {civitas.api.base-url}/v1/datasets/{datasetId}/{slug}}. Preview URLs are absent when the
    * dataset has not yet been persisted (no id).
    */
   @Override
@@ -44,9 +44,8 @@ public class DataSetAssembler implements BaseAssembler<DataSet, DataSetOutputDTO
           .ifPresent(user -> dto.setCreatedBy(userMapper.toSummary(user)));
     }
     if (entity.getId() != null) {
-      String baseUrl =
-          "https://" + civitasProperties.api().domain() + "/v1/datasets/" + entity.getId();
-      dto.getNamedApis().forEach(api -> api.setPreviewUrl(baseUrl + "/" + api.getSlug()));
+      String datasetUrl = civitasProperties.api().baseUrl() + "/v1/datasets/" + entity.getId();
+      dto.getNamedApis().forEach(api -> api.setPreviewUrl(datasetUrl + "/" + api.getSlug()));
     }
     return dto;
   }
