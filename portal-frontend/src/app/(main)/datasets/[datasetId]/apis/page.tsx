@@ -1,7 +1,9 @@
-import { getTranslations } from 'next-intl/server'
+import { redirect } from 'next/navigation'
 
-import { PageContainer } from '@/components/page-container/PageContainer'
-import { PageHeader } from '@/components/page-header/PageHeader'
+import { getDataset } from '@/app/services/api/datasets/serverRequests'
+import { isApiTypeQuery } from '@/types/namedApis'
+
+import { ApiConfigPage } from './components/ApiConfigPage'
 
 interface ApisPageProps {
   params: Promise<{ datasetId: string }>
@@ -9,15 +11,16 @@ interface ApisPageProps {
 }
 
 const ApisPage = async (props: ApisPageProps) => {
-  const t = await getTranslations('datasets')
+  const { datasetId } = await props.params
   const { type } = await props.searchParams
 
-  return (
-    <PageContainer headerType="onlyTitle">
-      <PageHeader title={t('overview.completion.apis.title')} />
-      <div className="p-6">API setup placeholder — type: {type ?? 'none'}</div>
-    </PageContainer>
-  )
+  if (!isApiTypeQuery(type)) {
+    redirect(`/datasets/${datasetId}`)
+  }
+
+  const { data: dataset } = await getDataset(datasetId)
+
+  return <ApiConfigPage testId="apiConfigPage" dataset={dataset} apiType={type} />
 }
 
 export default ApisPage
