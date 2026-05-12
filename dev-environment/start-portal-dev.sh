@@ -654,12 +654,12 @@ export REDPANDA_URL=http://localhost:4195
 export REDPANDA_TOPICS=de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
 export GEOSERVER_URL=http://localhost:8082/geoserver
 export GEOSERVER_ADMIN_USER=admin
-export GEOSERVER_ADMIN_PASSWORD=changeme-generate-a-strong-password
+export GEOSERVER_ADMIN_PASSWORD=geoserver
 export GEOSERVER_POSTGIS_HOST=localhost
 export GEOSERVER_POSTGIS_PORT=5434
 export GEOSERVER_POSTGIS_DB=geoserver
 export GEOSERVER_POSTGIS_USER=geoserver
-export GEOSERVER_POSTGIS_PASSWORD=changeme-generate-a-strong-password
+export GEOSERVER_POSTGIS_PASSWORD=geoserver
 
 java -jar "$CONFIG_ADAPTER_JAR"
 exec bash
@@ -703,12 +703,12 @@ else
     echo "  REDPANDA_URL=http://localhost:4195"
     echo "  GEOSERVER_URL=http://localhost:8082/geoserver"
     echo "  GEOSERVER_ADMIN_USER=admin"
-    echo "  GEOSERVER_ADMIN_PASSWORD=changeme-generate-a-strong-password"
+    echo "  GEOSERVER_ADMIN_PASSWORD=geoserver"
     echo "  GEOSERVER_POSTGIS_HOST=localhost"
     echo "  GEOSERVER_POSTGIS_PORT=5434"
     echo "  GEOSERVER_POSTGIS_DB=geoserver"
     echo "  GEOSERVER_POSTGIS_USER=geoserver"
-    echo "  GEOSERVER_POSTGIS_PASSWORD=changeme-generate-a-strong-password"
+    echo "  GEOSERVER_POSTGIS_PASSWORD=geoserver"
     echo
 fi
 
@@ -933,9 +933,10 @@ echo "  Keycloak Admin:   http://localhost:8080 (admin/admin)"
 echo "  Kafka UI:         http://localhost:8090"
 echo "  FROST Server:     http://localhost:8085/FROST-Server/v1.1 (HTTP)"
 echo "  FROST MQTT:       mqtt://localhost:1883"
-echo "  GeoServer Admin:  http://localhost:8082/geoserver/web (admin / see geoserver/.env)"
+echo "  GeoServer Admin:  http://localhost:8082/geoserver/web (admin / geoserver)"
 echo "  GeoServer WFS:    http://localhost:9080/geoserver/{workspace}/wfs (via APISIX)"
 echo "  GeoServer PostGIS: localhost:5434  db=geoserver  user=geoserver  (see geoserver/.env)"
+echo "  GeoServer Consul: http://localhost:8500"
 echo "  APISIX Gateway:   http://localhost:9080"
 echo "  APISIX Admin API: http://localhost:9180"
 echo "  Redpanda Connect: http://localhost:4195"
