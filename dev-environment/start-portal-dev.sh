@@ -653,6 +653,14 @@ echo
 # Kill any leftover processes from a previous run to avoid port conflicts.
 # Without this, the health check may hit an old backend and falsely report success.
 echo "Checking for leftover application processes..."
+
+# Stop any leftover Docker app containers from previous run
+docker rm -f civitas-config-adapter 2>/dev/null || true
+docker rm -f civitas-portal-backend 2>/dev/null || true
+docker rm -f civitas-portal-frontend 2>/dev/null || true
+sleep 1
+
+# Now kill any remaining non-Docker processes on these ports
 for port in 8088 8089 3000; do
     if [ "$OS_TYPE" = "Darwin" ]; then
         pid=$(lsof -ti :"$port" 2>/dev/null | head -1)
@@ -667,9 +675,6 @@ for port in 8088 8089 3000; do
         kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null
     fi
 done
-# Also stop any leftover Docker app containers from a previous run
-docker rm -f civitas-config-adapter 2>/dev/null || true
-docker rm -f civitas-portal-backend 2>/dev/null || true
 echo
 
 # ---- Build & Start (Docker mode) ------------------------------------
