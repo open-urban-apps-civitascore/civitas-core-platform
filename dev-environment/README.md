@@ -16,6 +16,7 @@ dev-environment/
 ├── apisix/     # API Gateway + Authorization (OPA, AuthZ Repository)
 ├── frost/      # FROST IoT Server
 ├── geoserver/  # GeoServer OGC Services (WFS/WMS)
+├── nifi/       # Apache NiFi (data integration / pipeline engine)
 └── modelatlas/ # Model Atlas
 ```
 
@@ -197,6 +198,7 @@ cd apisix    && docker compose up -d
 | FROST Server | http://localhost:8085/FROST-Server/v1.1 | |
 | GeoServer Admin | http://localhost:8082/geoserver/web | admin / see geoserver/.env |
 | GeoServer WFS | http://localhost:9080/geoserver/{workspace}/wfs | via APISIX |
+| Apache NiFi | https://localhost:8443/nifi | admin / ctsBtRBKHRAx69EqUghvvgEvjnaLjFEB |
 
 ---
 

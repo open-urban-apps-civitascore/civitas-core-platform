@@ -375,7 +375,7 @@ echo "  - Keycloak"
 echo "  - APISIX + etcd"
 echo "  - OPA + AuthZ Repository"
 echo "  - FROST Server"
-echo "  - Redpanda Connect"
+echo "  - Apache NiFi"
 echo "  - Model Atlas + Apicurio Registry"
 echo
 
@@ -482,12 +482,19 @@ else
     echo "           Portal development works fine without it."
 fi
 
-cd "$SCRIPT_DIR/redpanda-connect"
+cd "$SCRIPT_DIR/nifi"
+# Download PostgreSQL JDBC driver if not present (needed by NiFi for DB connections)
+if [ ! -f "$SCRIPT_DIR/nifi/drivers/postgresql.jar" ]; then
+    echo "  Downloading PostgreSQL JDBC driver for NiFi..."
+    curl -sL -o "$SCRIPT_DIR/nifi/drivers/postgresql.jar" \
+        https://jdbc.postgresql.org/download/postgresql-42.7.4.jar
+    echo "  PostgreSQL JDBC driver downloaded"
+fi
 if $DOCKER_COMPOSE up -d 2>&1; then
-    echo "  Redpanda Connect started"
+    echo "  Apache NiFi started"
 else
-    echo "  WARNING: Redpanda Connect failed to start"
-    echo "           Dataset saga pipeline deployment will not work."
+    echo "  WARNING: Apache NiFi failed to start"
+    echo "           Dataset pipeline deployment will not work."
 fi
 
 cd "$SCRIPT_DIR/modelatlas"
@@ -624,7 +631,7 @@ if [ "$config_adapter_option" = "1" ]; then
 #!/bin/bash
 # Config Adapter environment variables (from application.properties)
 export HEALTHCHECK_PORT=8088
-export ADAPTERS=keycloak,apisix,frost,redpanda
+export ADAPTERS=keycloak,apisix,frost,nifi
 export EVENTHANDLER_NAME=kafka
 export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 export KAFKA_GROUP_ID=config-adapter-group
@@ -650,8 +657,8 @@ export FROST_PUBLIC_URL=http://civitas-frost:8080/FROST-Server/v1.1
 export FROST_API_KEY=dev-frost-api-key
 export FROST_API_KEY_HEADER=X-API-Key
 export FROST_TOPICS=de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
-export REDPANDA_URL=http://localhost:4195
-export REDPANDA_TOPICS=de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
+export NIFI_URL=https://localhost:8443
+export NIFI_TOPICS=de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
 export GEOSERVER_URL=http://localhost:8082/geoserver
 export GEOSERVER_ADMIN_USER=admin
 export GEOSERVER_ADMIN_PASSWORD=changeme-generate-a-strong-password
@@ -700,7 +707,7 @@ else
     echo "  FROST_URL=http://localhost:8085/FROST-Server/v1.1"
     echo "  FROST_PUBLIC_URL=http://civitas-frost:8080/FROST-Server/v1.1"
     echo "  FROST_API_KEY=dev-frost-api-key"
-    echo "  REDPANDA_URL=http://localhost:4195"
+    echo "  NIFI_URL=https://localhost:8443"
     echo "  GEOSERVER_URL=http://localhost:8082/geoserver"
     echo "  GEOSERVER_ADMIN_USER=admin"
     echo "  GEOSERVER_ADMIN_PASSWORD=changeme-generate-a-strong-password"
@@ -938,7 +945,7 @@ echo "  GeoServer WFS:    http://localhost:9080/geoserver/{workspace}/wfs (via A
 echo "  GeoServer PostGIS: localhost:5434  db=geoserver  user=geoserver  (see geoserver/.env)"
 echo "  APISIX Gateway:   http://localhost:9080"
 echo "  APISIX Admin API: http://localhost:9180"
-echo "  Redpanda Connect: http://localhost:4195"
+echo "  Apache NiFi:      https://localhost:8443/nifi (admin / ctsBtRBKHRAx69EqUghvvgEvjnaLjFEB)"
 echo "  OPA:              http://localhost:8181"
 echo "  AuthZ Repository: http://localhost:8091"
 echo "  Model Atlas:      http://localhost:8086"
@@ -975,6 +982,6 @@ echo "  cd dev-environment/keycloak && docker compose down"
 echo "  cd dev-environment/apisix && docker compose down"
 echo "  cd dev-environment/frost && docker compose down"
 echo "  cd dev-environment/geoserver && docker compose down"
-echo "  cd dev-environment/redpanda-connect && docker compose down"
+echo "  cd dev-environment/nifi && docker compose down"
 echo "  cd dev-environment/modelatlas && docker compose down"
 echo

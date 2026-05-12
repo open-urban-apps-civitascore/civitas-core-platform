@@ -111,7 +111,13 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     healthcheck:
-      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      test:
+        [
+          "CMD",
+          "kafka-broker-api-versions",
+          "--bootstrap-server",
+          "localhost:9092",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -144,7 +150,11 @@ services:
       etcd:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9180/apisix/admin/routes -H 'X-API-KEY: edd1c9f034335f136f87ad84b625c8f1' > /dev/null"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf http://localhost:9180/apisix/admin/routes -H 'X-API-KEY: edd1c9f034335f136f87ad84b625c8f1' > /dev/null",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -165,7 +175,15 @@ services:
       postgres-portal:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8091/actuator/health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8091/actuator/health",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -257,7 +275,13 @@ services:
       APICURIO_REST_DELETION_ARTIFACT-VERSION_ENABLED: "true"
       APICURIO_REST_MUTABILITY_ARTIFACT_VERSION_CONTENT_ENABLED: "true"
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8080/apis/registry/v3/system/info"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-sf",
+          "http://localhost:8080/apis/registry/v3/system/info",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -274,17 +298,25 @@ services:
 
   # ── Data Pipelines ──────────────────────────────────────
 
-  redpanda-connect:
-    image: redpandadata/connect:4
-    command: ["streams"]
+  nifi:
+    image: apache/nifi:2.9.0
     environment:
-      FROST_BASE: http://civitas-frost:8080/FROST-Server/v1.1
+      SINGLE_USER_CREDENTIALS_USERNAME: admin
+      SINGLE_USER_CREDENTIALS_PASSWORD: ctsBtRBKHRAx69EqUghvvgEvjnaLjFEB
+      NIFI_WEB_HTTPS_PORT: "8443"
+      NIFI_WEB_PROXY_HOST: "nifi:8443"
+      NIFI_JVM_HEAP_INIT: "512m"
+      NIFI_JVM_HEAP_MAX: "1g"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost:4195/ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      test:
+        [
+          "CMD-SHELL",
+          "curl -kf https://localhost:8443/nifi-api/system-diagnostics || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
 
   # ── Email (SMTP sink for Keycloak verification emails) ──
 
@@ -342,7 +374,7 @@ services:
     image: ${CI_REGISTRY_IMAGE}/config-adapter:${IMAGE_TAG:-develop}
     environment:
       HEALTHCHECK_PORT: 8088
-      ADAPTERS: keycloak,apisix,frost,redpanda
+      ADAPTERS: keycloak,apisix,frost,nifi
       EVENTHANDLER_NAME: kafka
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_GROUP_ID: config-adapter-group
@@ -366,8 +398,8 @@ services:
       FROST_API_KEY: dev-frost-api-key
       FROST_API_KEY_HEADER: X-API-Key
       FROST_TOPICS: de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
-      REDPANDA_URL: http://redpanda-connect:4195
-      REDPANDA_TOPICS: de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
+      NIFI_URL: https://nifi:8443
+      NIFI_TOPICS: de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
     depends_on:
       kafka:
         condition: service_healthy
