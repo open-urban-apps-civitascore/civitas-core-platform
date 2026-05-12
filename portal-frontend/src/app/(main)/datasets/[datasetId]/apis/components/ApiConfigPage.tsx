@@ -7,7 +7,7 @@ import { FocusEvent, FormEvent, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
-import { usePatchDataset } from '@/app/services/api/datasets/clientRequests'
+import { useCreateNamedApi, usePatchDataset } from '@/app/services/api/datasets/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -57,12 +57,13 @@ export const ApiConfigPage = (props: ApiConfigPageProps) => {
 
   const defaults = DEFAULTS_BY_TYPE[apiType]
   const { handleFormValidationError } = useError()
+  const createNamedApi = useCreateNamedApi()
   const updateDataset = usePatchDataset()
-  const isLoading = updateDataset.isPending
+  const isLoading = createNamedApi.isPending || updateDataset.isPending
 
   const otherNamedApis = useMemo(
-    () => (dataset.namedApis ?? []).filter(a => a.id !== existingApi?.id),
-    [dataset.namedApis, existingApi?.id],
+    () => (dataset.namedApis ?? []).filter(a => a.slug !== existingApi?.slug),
+    [dataset.namedApis, existingApi?.slug],
   )
   const existingSlugs = useMemo(() => otherNamedApis.map(a => a.slug), [otherNamedApis])
 
@@ -130,23 +131,27 @@ export const ApiConfigPage = (props: ApiConfigPageProps) => {
       async data => {
         try {
           const newApi = buildNamedApiPayload(data)
-          const otherInputs: NamedApiInput[] = otherNamedApis.map(a => ({
-            name: a.name,
-            slug: a.slug,
-            standard: a.standard,
-            version: a.version,
-            description: a.description,
-          }))
-
-          await updateDataset.mutateAsync({
-            id: dataset.id,
-            namedApis: [...otherInputs, newApi],
-          })
 
           if (isCreate) {
+            await createNamedApi.mutateAsync({
+              datasetId: dataset.id,
+              api: newApi,
+              existingApis: otherNamedApis,
+            })
             toast.success(t('messages.createSuccess'))
             router.push(`/datasets/${dataset.id}/apis/${newApi.slug}?mode=edit`)
           } else {
+            const otherInputs: NamedApiInput[] = otherNamedApis.map(a => ({
+              name: a.name,
+              slug: a.slug,
+              standard: a.standard,
+              version: a.version,
+              description: a.description,
+            }))
+            await updateDataset.mutateAsync({
+              id: dataset.id,
+              namedApis: [...otherInputs, newApi],
+            })
             toast.success(t('messages.updateSuccess'))
             router.refresh()
             setIsReadOnly(true)
