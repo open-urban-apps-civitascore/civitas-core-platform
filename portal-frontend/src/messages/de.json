@@ -263,7 +263,57 @@
           "noApis": "Noch keine APIs vorhanden.",
           "addApi": "API hinzufügen",
           "sensorThings": "SensorThings API",
-          "wfsWms": "WFS/WMS API"
+          "wfsWms": "WFS/WMS API",
+          "config": {
+            "title": {
+              "sensorthings": "SensorThings API",
+              "wfs-wms": "WFS/WMS API"
+            },
+            "protectedBadge": "Geschützt",
+            "tabs": {
+              "basicInfo": "Basisinformationen",
+              "layer": "Layer",
+              "styles": "Stile",
+              "placeholder": "Inhalte folgen in einem späteren Schritt."
+            },
+            "form": {
+              "sectionTitle": "Basisinformationen",
+              "type": "Typ",
+              "persistence": "Persistenz",
+              "persistenceHint": "aus Pipeline",
+              "persistencePlaceholder": "Persistenz auswählen",
+              "slug": "Slug",
+              "urlPreview": "URL-Vorschau",
+              "name": "Bezeichnung",
+              "nameHint": "Beschreibt, welche Daten diese API bereitstellt.",
+              "description": "Beschreibung",
+              "descriptionHint": "max. 150 Zeichen, optional",
+              "descriptionPlaceholder": ""
+            },
+            "messages": {
+              "createSuccess": "API wurde erfolgreich angelegt.",
+              "updateSuccess": "API wurde erfolgreich aktualisiert.",
+              "saveError": "Beim Speichern der API ist ein Fehler aufgetreten. Bitte versuche es erneut."
+            },
+            "errors": {
+              "name": {
+                "required": "Bezeichnung ist erforderlich"
+              },
+              "slug": {
+                "required": "Slug ist erforderlich",
+                "tooLong": "Slug darf maximal 32 Zeichen lang sein",
+                "invalidFormat": "Slug darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten und nicht mit einem Bindestrich beginnen oder enden",
+                "reserved": "Dieser Slug ist reserviert und kann nicht verwendet werden",
+                "notUnique": "Dieser Slug existiert bereits in diesem Datensatz"
+              },
+              "description": {
+                "tooLong": "Beschreibung darf maximal 150 Zeichen lang sein"
+              },
+              "persistence": {
+                "required": "Persistenz ist erforderlich"
+              }
+            }
+          }
         }
       }
     },

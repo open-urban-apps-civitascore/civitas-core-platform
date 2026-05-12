@@ -264,7 +264,57 @@
           "noApis": "No APIs available yet.",
           "addApi": "Add API",
           "sensorThings": "SensorThings API",
-          "wfsWms": "WFS/WMS API"
+          "wfsWms": "WFS/WMS API",
+          "config": {
+            "title": {
+              "sensorthings": "SensorThings API",
+              "wfs-wms": "WFS/WMS API"
+            },
+            "protectedBadge": "Protected",
+            "tabs": {
+              "basicInfo": "Basic Information",
+              "layer": "Layer",
+              "styles": "Styles",
+              "placeholder": "Content will follow in a later step."
+            },
+            "form": {
+              "sectionTitle": "Basic Information",
+              "type": "Type",
+              "persistence": "Persistence",
+              "persistenceHint": "from pipeline",
+              "persistencePlaceholder": "Select persistence",
+              "slug": "Slug",
+              "urlPreview": "URL Preview",
+              "name": "Name",
+              "nameHint": "Describes what data this API provides.",
+              "description": "Description",
+              "descriptionHint": "max. 150 characters, optional",
+              "descriptionPlaceholder": ""
+            },
+            "messages": {
+              "createSuccess": "API has been successfully created.",
+              "updateSuccess": "API has been successfully updated.",
+              "saveError": "An error occurred while saving the API. Please try again."
+            },
+            "errors": {
+              "name": {
+                "required": "Name is required"
+              },
+              "slug": {
+                "required": "Slug is required",
+                "tooLong": "Slug must be at most 32 characters",
+                "invalidFormat": "Slug may only contain lowercase letters, digits and hyphens, and must not start or end with a hyphen",
+                "reserved": "This slug is reserved and cannot be used",
+                "notUnique": "This slug already exists in this dataset"
+              },
+              "description": {
+                "tooLong": "Description must be at most 150 characters"
+              },
+              "persistence": {
+                "required": "Persistence is required"
+              }
+            }
+          }
         }
       }
     },
