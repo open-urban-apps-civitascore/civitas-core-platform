@@ -11,7 +11,7 @@ interface ApiDetailPageProps {
 
 const inferApiType = (standard: string): ApiTypeQuery | undefined => {
   if (standard === API_STANDARDS.STA) return API_TYPE_QUERY.SENSORTHINGS
-  if (standard === API_STANDARDS.WFS_WMS) return API_TYPE_QUERY.WFS_WMS
+  if (standard === API_STANDARDS.WFS || standard === API_STANDARDS.WMS) return API_TYPE_QUERY.WFS_WMS
   return undefined
 }
 

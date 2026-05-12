@@ -11,8 +11,10 @@ export const SLUG_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/
 export const RESERVED_SLUGS = ['apis'] as const
 
 export const API_STANDARDS = {
+  WFS: 'WFS',
+  WMS: 'WMS',
   STA: 'STA',
-  WFS_WMS: 'WFS_WMS',
+  CUSTOM: 'CUSTOM',
 } as const
 
 export type ApiStandard = (typeof API_STANDARDS)[keyof typeof API_STANDARDS]
@@ -49,7 +51,7 @@ export const DEFAULTS_BY_TYPE: Record<
     persistenceLabel: PERSISTENCE_OPTIONS.FROST.label,
   },
   [API_TYPE_QUERY.WFS_WMS]: {
-    standard: API_STANDARDS.WFS_WMS,
+    standard: API_STANDARDS.WFS,
     defaultSlug: 'wfswms',
     persistenceValue: PERSISTENCE_OPTIONS.POSTGIS.value,
     persistenceLabel: PERSISTENCE_OPTIONS.POSTGIS.label,
@@ -60,7 +62,7 @@ export const NamedApiSchema = z.object({
   id: z.string().optional(),
   name: z.string(),
   slug: z.string(),
-  standard: z.enum([API_STANDARDS.STA, API_STANDARDS.WFS_WMS]),
+  standard: z.enum([API_STANDARDS.WFS, API_STANDARDS.WMS, API_STANDARDS.STA, API_STANDARDS.CUSTOM]),
   version: z.string().optional(),
   description: z.string().optional(),
   previewUrl: z.string().optional(),
@@ -71,7 +73,7 @@ export type NamedApi = z.infer<typeof NamedApiSchema>
 export const NamedApiInputSchema = z.object({
   name: z.string(),
   slug: z.string(),
-  standard: z.enum([API_STANDARDS.STA, API_STANDARDS.WFS_WMS]),
+  standard: z.enum([API_STANDARDS.WFS, API_STANDARDS.WMS, API_STANDARDS.STA, API_STANDARDS.CUSTOM]),
   version: z.string().optional(),
   description: z.string().optional(),
 })
