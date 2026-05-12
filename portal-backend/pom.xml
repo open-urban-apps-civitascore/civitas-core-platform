@@ -321,6 +321,8 @@
                         <!-- Transitively pulled compile-scope by oauth2-resource-server;
                              only direct use is JWTParser in UserMeIntegrationTest -->
                         <ignoredNonTestScopedDependency>com.nimbusds:nimbus-jose-jwt</ignoredNonTestScopedDependency>
+                        <!-- Transitively pulled test-only -->
+                        <ignoredUsedUndeclaredDependency>ch.qos.logback:*</ignoredUsedUndeclaredDependency>
                     </ignoredNonTestScopedDependencies>
                     <ignoredUsedUndeclaredDependencies>
                         <ignoredUsedUndeclaredDependency>org.springframework.boot:*</ignoredUsedUndeclaredDependency>
@@ -354,6 +356,9 @@
                              managed by upstream BOMs (testcontainers, oauth2-resource-server) -->
                         <ignoredUsedUndeclaredDependency>com.github.docker-java:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>com.nimbusds:*</ignoredUsedUndeclaredDependency>
+                        <!-- Transitively pulled, used directly only in tests; versions
+                             managed by upstream BOMs (springframework) -->
+                        <ignoredUsedUndeclaredDependency>ch.qos.logback:*</ignoredUsedUndeclaredDependency>
                     </ignoredUsedUndeclaredDependencies>
                 </configuration>
                 <executions>
