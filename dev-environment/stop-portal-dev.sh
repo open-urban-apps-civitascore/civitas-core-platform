@@ -23,10 +23,16 @@ else
 fi
 echo
 
-# Stop application processes (started by start-portal-dev.sh in background)
+# Stop application Docker containers (started by start-portal-dev.sh in Docker mode)
+echo "Stopping application services (Docker)..."
+cd "$SCRIPT_DIR/apps"
+$COMPOSE_DOWN 2>/dev/null && echo "  Application services stopped (Docker)" || true
+
+# Stop application processes (started by IDE mode or frontend in background)
 # Kill by port — this is reliable regardless of how the process was started
 # (Maven forks child JVMs that don't match pkill patterns)
-echo "Stopping application processes..."
+echo "Stopping application processes (local)..."
+docker rm -f civitas-portal-frontend 2>/dev/null || true
 for port_info in "8088:Config Adapter" "8089:Portal Backend" "3000:Portal Frontend"; do
     port="${port_info%%:*}"
     name="${port_info##*:}"

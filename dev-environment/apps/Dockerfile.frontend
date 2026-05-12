@@ -1,0 +1,43 @@
+# Production build Dockerfile for portal-frontend (dev-environment)
+# Multi-stage: installs deps, builds Next.js, runs production server.
+# Used by dev-environment/apps/docker-compose.yml for the "auto" frontend mode.
+# Note: this is a separate Dockerfile from portal-frontend/Dockerfile, because portal-frontend/Dockerfile needs an existing build output. We want to decouple this, for the dev env.
+
+FROM node:22-alpine AS deps
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+FROM node:22-alpine AS builder
+WORKDIR /app
+RUN corepack enable
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+# Build Next.js production bundle
+RUN pnpm build
+
+FROM node:22-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
+
+RUN corepack enable
+
+# Copy only what's needed for production
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/node_modules ./node_modules
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nextjs -u 1001 && \
+    mkdir -p .next/cache/images && \
+    chown -R nextjs:nodejs /app
+USER nextjs
+
+EXPOSE 3000
+
+CMD ["pnpm", "start"]
