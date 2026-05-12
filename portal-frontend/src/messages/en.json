@@ -251,20 +251,20 @@
         },
         "dataFlow": {
           "title": "Data flow",
-          "button": {
-            "readOnly": "View Data flow",
-            "editable": "Edit Data flow"
+          "pipelines": {
+            "title": "Pipeline(s)",
+            "empty": "No pipeline available yet",
+            "addButton": "Add pipeline"
           },
-          "pipelines": "Pipeline",
-          "sensorThingsAPI": "SensorThings API",
-          "noDataFlow": "No data flow available yet."
+          "apis": {
+            "title": "APIs",
+            "empty": "No API available yet",
+            "addButton": "Add API",
+            "sensorThings": "SensorThings API",
+            "wfsWms": "WFS/WMS API"
+          }
         },
         "apis": {
-          "title": "APIs",
-          "noApis": "No APIs available yet.",
-          "addApi": "Add API",
-          "sensorThings": "SensorThings API",
-          "wfsWms": "WFS/WMS API",
           "config": {
             "title": {
               "sensorthings": "SensorThings API",
