@@ -250,20 +250,20 @@
         },
         "dataFlow": {
           "title": "Datenfluss",
-          "button": {
-            "readOnly": "Daten laden und bereitstellen",
-            "editable": "Datenfluss bearbeiten"
+          "pipelines": {
+            "title": "Pipeline(s)",
+            "empty": "Noch keine Pipeline vorhanden",
+            "addButton": "Pipeline hinzufügen"
           },
-          "pipelines": "Pipeline",
-          "distributionAccessURLs": "SensorThings API",
-          "noDataFlow": "Es sind noch keine Daten vorhanden."
+          "apis": {
+            "title": "APIs",
+            "empty": "Noch keine API vorhanden",
+            "addButton": "API hinzufügen",
+            "sensorThings": "SensorThings API",
+            "wfsWms": "WFS/WMS API"
+          }
         },
         "apis": {
-          "title": "APIs",
-          "noApis": "Noch keine APIs vorhanden.",
-          "addApi": "API hinzufügen",
-          "sensorThings": "SensorThings API",
-          "wfsWms": "WFS/WMS API",
           "config": {
             "title": {
               "sensorthings": "SensorThings API",

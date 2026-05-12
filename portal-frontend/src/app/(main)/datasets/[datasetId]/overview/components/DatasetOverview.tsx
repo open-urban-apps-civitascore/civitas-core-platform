@@ -5,7 +5,7 @@ import { AxiosError } from 'axios'
 import { ChevronDown } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -73,9 +73,9 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
 
-  const { pipelines, distributions } = dataset
+  const { pipelines, namedApis } = dataset
   const pipelineNames = pipelines?.map(pipeline => pipeline.name) || []
-  const distributionAccessURL = distributions?.map(distribution => distribution.accessUrl) || []
+  const namedApiNames = namedApis?.map(api => api.name) || []
 
   const router = useRouter()
   const { handleFormValidationError, handleNameError } = useError()
@@ -123,10 +123,10 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const formValues = useWatch({ control: form.control })
 
   const canSetAvailable = useMemo(() => {
-    const hasDistribution = !!dataset.pipelines?.length || !!dataset.distributions?.length
+    const hasDistribution = !!dataset.pipelines?.length || !!dataset.namedApis?.length
     const hasAssignments = groupCount > 0 && roleCount > 0
     return DatasetFormAvailableSchema.safeParse(formValues).success && hasDistribution && hasAssignments
-  }, [formValues, dataset.pipelines, dataset.distributions, groupCount, roleCount])
+  }, [formValues, dataset.pipelines, dataset.namedApis, groupCount, roleCount])
 
   // Auto-revert status to draft when required fields become invalid
   const revalidateDraftMode = () => {
@@ -306,58 +306,73 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     </div>
   )
 
+  const renderDataFlowRow = (params: { label: string; items: string[]; emptyText: string; action: ReactNode }) => (
+    <div className="flex items-center justify-between gap-4 py-3">
+      <h4 className="font-semibold w-40 shrink-0">{params.label}</h4>
+      <div className="flex-1 text-sm font-normal">
+        {params.items.length > 0 ? (
+          <ul className="list-none">
+            {params.items.map(name => (
+              <li key={name}>{name}</li>
+            ))}
+          </ul>
+        ) : (
+          params.emptyText
+        )}
+      </div>
+      {params.action}
+    </div>
+  )
+
   const completionSteps: CompletionStepData[] = [
     {
       title: t('overview.completion.dataFlow.title'),
-      isCompleted: pipelineNames?.length > 0 || distributionAccessURL?.length > 0,
-      buttons:
-        canUpdate && canReadDatasources
-          ? [
-              {
-                text: isReadOnly
-                  ? t('overview.completion.dataFlow.button.readOnly')
-                  : t('overview.completion.dataFlow.button.editable'),
-                routeParam: 'data-flow',
-              },
-            ]
-          : [],
-      content:
-        pipelineNames?.length > 0 || distributionAccessURL?.length > 0 ? (
-          <>
-            {pipelineNames?.length > 0 && getList(t('overview.completion.dataFlow.pipelines'), pipelineNames)}
-            {distributionAccessURL?.length > 0 &&
-              getList(t('overview.completion.dataFlow.distributionAccessURLs'), distributionAccessURL)}
-          </>
-        ) : (
-          <div>{t('overview.completion.dataFlow.noDataFlow')}</div>
-        ),
-    },
-    {
-      title: t('overview.completion.apis.title'),
-      isCompleted: false,
+      isCompleted: pipelineNames.length > 0 || namedApiNames.length > 0,
       buttons: [],
-      content: <div>{t('overview.completion.apis.noApis')}</div>,
-      actionElement: (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline">
-              {t('overview.completion.apis.addApi')}
-              <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <GuardedLink href={`/datasets/${dataset.id}/apis?type=sensorthings`}>
-                {t('overview.completion.apis.sensorThings')}
-              </GuardedLink>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <GuardedLink href={`/datasets/${dataset.id}/apis?type=wfs-wms`}>
-                {t('overview.completion.apis.wfsWms')}
-              </GuardedLink>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      content: (
+        <>
+          {renderDataFlowRow({
+            label: t('overview.completion.dataFlow.pipelines.title'),
+            items: pipelineNames,
+            emptyText: t('overview.completion.dataFlow.pipelines.empty'),
+            action:
+              canUpdate && canReadDatasources ? (
+                <Button asChild variant="outline">
+                  <GuardedLink href={`/datasets/${dataset.id}/data-flow/pipeline-editor`}>
+                    {t('overview.completion.dataFlow.pipelines.addButton')}
+                  </GuardedLink>
+                </Button>
+              ) : null,
+          })}
+          <div className="border-t" />
+          {renderDataFlowRow({
+            label: t('overview.completion.dataFlow.apis.title'),
+            items: namedApiNames,
+            emptyText: t('overview.completion.dataFlow.apis.empty'),
+            action: (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    {t('overview.completion.dataFlow.apis.addButton')}
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <GuardedLink href={`/datasets/${dataset.id}/apis?type=sensorthings`}>
+                      {t('overview.completion.dataFlow.apis.sensorThings')}
+                    </GuardedLink>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <GuardedLink href={`/datasets/${dataset.id}/apis?type=wfs-wms`}>
+                      {t('overview.completion.dataFlow.apis.wfsWms')}
+                    </GuardedLink>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ),
+          })}
+        </>
       ),
     },
     {
