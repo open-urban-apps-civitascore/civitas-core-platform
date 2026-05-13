@@ -881,8 +881,6 @@
       "start": "Start",
       "end": "Ende",
       "dataSource": "Datenquelle",
-      "apiRequest": "API-Request",
-      "apiResponse": "API-Response",
       "cronTrigger": "CRON-Trigger",
       "frostStorage": "FROST-Server",
       "geoPersistence": "Geo-Persistenz",
@@ -905,10 +903,6 @@
       "flowEndDesc": "Pipeline-Endpunkt. Ausführung endet hier.",
       "dataSource": "Datenquelle",
       "dataSourceDesc": "Datenquelle auswählen",
-      "apiRequest": "API-Request",
-      "apiRequestDesc": "REST-API Request. Erstellt Endpunkt, der Daten bereitstellt.",
-      "apiResponse": "API-Response",
-      "apiResponseDesc": "REST-API Response.",
       "cron": "CRON",
       "cronDesc": "Geplanter Trigger. Führt Pipeline nach Zeitplan aus.",
       "frostServer": "FROST Server",
@@ -946,11 +940,6 @@
       "tags": "Tags",
       "showDataStructure": "Datenstruktur anzeigen",
       "noPermission": "Keine Berechtigung zum Lesen von Datenquellen"
-    },
-    "apiPanel": {
-      "requestDetails": "API-Request-Details",
-      "responseDetails": "API-Response-Details",
-      "apiPath": "API-Pfad"
     },
     "frostPanel": {
       "details": "FROST Server Details",
@@ -995,7 +984,6 @@
       "messages": {
         "startNodeRequired": "Pipeline muss mindestens einen Start-Knoten haben",
         "endNodeRequired": "Pipeline muss mindestens einen End-Knoten haben",
-        "apiPairing": "API-Request-Knoten benötigt einen API-Response-Knoten in der Pipeline",
         "nodeNotConfigured": "{label} ist nicht konfiguriert",
         "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein.",
         "orphanNode": "{label} ist mit keinem anderen Knoten verbunden",

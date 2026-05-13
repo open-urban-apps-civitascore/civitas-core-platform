@@ -15,8 +15,6 @@ import { DataSourceNode } from './source/DataSourceNode'
 import { FrostNode } from './storage/FrostNode'
 import { GeoPersistenceNode } from './storage/GeoPersistenceNode'
 import { MappingNode } from './transform/MappingNode'
-import { ApiRequestNode } from './trigger/ApiRequestNode'
-import { ApiResponseNode } from './trigger/ApiResponseNode'
 import { CronNode } from './trigger/CronNode'
 
 // ============================================================================
@@ -34,8 +32,6 @@ export const pipelineNodeTypes: NodeTypes = {
   [PIPELINE_NODE_TYPES.End]: EndNode,
 
   // Trigger nodes
-  [PIPELINE_NODE_TYPES.ApiRequest]: ApiRequestNode,
-  [PIPELINE_NODE_TYPES.ApiResponse]: ApiResponseNode,
   [PIPELINE_NODE_TYPES.Cron]: CronNode,
 
   // Source nodes
@@ -60,6 +56,4 @@ export { DataSourceNode } from './source/DataSourceNode'
 export { FrostNode } from './storage/FrostNode'
 export { GeoPersistenceNode } from './storage/GeoPersistenceNode'
 export { MappingNode } from './transform/MappingNode'
-export { ApiRequestNode } from './trigger/ApiRequestNode'
-export { ApiResponseNode } from './trigger/ApiResponseNode'
 export { CronNode } from './trigger/CronNode'
