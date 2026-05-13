@@ -60,8 +60,7 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
     return (I) dataSinkMapper.toInput(entity);
   }
 
-  private DataSinkConfiguration buildConfiguration(
-      DataSinkType type, Map<String, Object> raw) {
+  private DataSinkConfiguration buildConfiguration(DataSinkType type, Map<String, Object> raw) {
     return switch (type) {
       case FROST -> new FrostConfiguration();
       case POSTGIS -> buildPostgisConfiguration(raw);
@@ -81,7 +80,7 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
     if (dsvIdRaw != null) {
       UUID dsvId = UUID.fromString(dsvIdRaw.toString());
       dataStructureVersionRepository
-          .findByIdWithRelations(dsvId)
+          .findById(dsvId)
           .ifPresent(
               dsv -> output.setDataStructureVersion(dataStructureVersionMapper.toSummary(dsv)));
     }
