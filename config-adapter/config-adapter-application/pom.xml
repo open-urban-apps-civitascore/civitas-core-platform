@@ -225,12 +225,6 @@
                     <version>${project.version}</version>
                     <scope>runtime</scope>
                 </dependency>
-                <dependency>
-                    <groupId>de.civitas-core</groupId>
-                    <artifactId>config-adapter-flowable</artifactId>
-                    <version>${project.version}</version>
-                    <scope>runtime</scope>
-                </dependency>
             </dependencies>
         </profile>
     </profiles>
