@@ -96,6 +96,8 @@ public class Application {
                 pair.triggerConsumer().start();
               });
 
+      sagaComponents.flowableOrchestrator().ifPresent(flowable -> flowable.start());
+
       sagaComponents.commandConsumer().ifPresent(KafkaSagaCommandConsumer::start);
 
       healthCheckServer.markReady();
@@ -128,6 +130,17 @@ public class Application {
                   pair.orchestrator().stop();
                 } catch (Exception e) {
                   logger.error("Error stopping saga orchestrator", e);
+                }
+              });
+
+      sagaComponents
+          .flowableOrchestrator()
+          .ifPresent(
+              flowable -> {
+                try {
+                  flowable.close();
+                } catch (Exception e) {
+                  logger.error("Error stopping Flowable orchestrator", e);
                 }
               });
 

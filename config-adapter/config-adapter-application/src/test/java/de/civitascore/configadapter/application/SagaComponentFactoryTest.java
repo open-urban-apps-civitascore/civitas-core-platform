@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.application;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.civitascore.configadapter.configuration.AppConfig;
@@ -72,6 +73,21 @@ class SagaComponentFactoryTest {
       assertNotNull(components);
       assertNotNull(components.commandConsumer());
       assertNotNull(components.orchestrator());
+    }
+
+    @Test
+    @DisplayName("Should fail-fast when orchestrator.engine=flowable but JDBC config is missing")
+    void flowableWithoutJdbcConfig_failsFast() {
+      AppConfig config =
+          configWith(
+              Map.of(
+                  "orchestrator.engine", "flowable",
+                  "kafka.bootstrap.servers", "localhost:9092"));
+
+      assertThrows(
+          IllegalStateException.class,
+          () -> factory.create(config),
+          "Flowable mode without JDBC config must fail-fast, not silently degrade");
     }
   }
 }

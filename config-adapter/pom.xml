@@ -31,6 +31,7 @@
 		<module>config-adapter-frost</module>
 		<module>config-adapter-orchestrator</module>
 		<module>config-adapter-redpanda</module>
+		<module>config-adapter-flowable</module>
 	</modules>
 
 	<properties>
@@ -60,6 +61,10 @@
 		<lz4.version>1.8.1</lz4.version>
 		<at.yawk.lz4.version>1.10.1</at.yawk.lz4.version>
 		<owasp.encoder.version>1.4.0</owasp.encoder.version>
+		<flowable.version>7.1.0</flowable.version>
+		<hikaricp.version>6.2.1</hikaricp.version>
+		<postgresql.version>42.7.4</postgresql.version>
+		<h2.version>2.3.232</h2.version>
 		<cyclonedx-maven-plugin.version>2.9.0</cyclonedx-maven-plugin.version>
 	</properties>
 
@@ -191,6 +196,30 @@
 				<groupId>org.owasp.encoder</groupId>
 				<artifactId>encoder</artifactId>
 				<version>${owasp.encoder.version}</version>
+			</dependency>
+
+			<!-- Flowable -->
+			<dependency>
+				<groupId>org.flowable</groupId>
+				<artifactId>flowable-engine</artifactId>
+				<version>${flowable.version}</version>
+			</dependency>
+
+			<!-- Database -->
+			<dependency>
+				<groupId>com.zaxxer</groupId>
+				<artifactId>HikariCP</artifactId>
+				<version>${hikaricp.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.postgresql</groupId>
+				<artifactId>postgresql</artifactId>
+				<version>${postgresql.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.h2database</groupId>
+				<artifactId>h2</artifactId>
+				<version>${h2.version}</version>
 			</dependency>
 
 			<!-- Testing -->

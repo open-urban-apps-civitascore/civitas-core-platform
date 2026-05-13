@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             targetNamespace="http://civitas.de/saga">
+
+  <error id="stepFailedError" errorCode="STEP_FAILED"/>
+
+  <process id="dataset-create" name="Dataset Create Saga" isExecutable="true">
+
+    <startEvent id="start"/>
+
+    <!--
+      Step 1: FROST - Create Project
+      On success: proceed to step 2.
+      On error: no compensation needed (first step), go to error end.
+    -->
+    <serviceTask id="create-project" name="Create FROST Project"
+                 flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate">
+      <extensionElements>
+        <flowable:field name="adapterName" stringValue="frost"/>
+        <flowable:field name="operation" stringValue="CREATE_PROJECT"/>
+        <flowable:field name="stepId" stringValue="create-project"/>
+      </extensionElements>
+    </serviceTask>
+    <boundaryEvent id="frost-error" attachedToRef="create-project">
+      <errorEventDefinition errorRef="stepFailedError"/>
+    </boundaryEvent>
+
+    <!--
+      Step 2: APISIX - Create Route
+      On success: proceed to gateway.
+      On error: compensate step 1 (delete FROST project), then error end.
+    -->
+    <serviceTask id="create-route" name="Create APISIX Route"
+                 flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate">
+      <extensionElements>
+        <flowable:field name="adapterName" stringValue="apisix"/>
+        <flowable:field name="operation" stringValue="CREATE_ROUTE"/>
+        <flowable:field name="stepId" stringValue="create-route"/>
+      </extensionElements>
+    </serviceTask>
+    <boundaryEvent id="apisix-error" attachedToRef="create-route">
+      <errorEventDefinition errorRef="stepFailedError"/>
+    </boundaryEvent>
+
+    <!-- Conditional gateway -->
+    <exclusiveGateway id="pipeline-gateway" name="Has Pipelines?"/>
+
+    <!--
+      Step 3: Redpanda - Deploy Pipelines (conditional)
+      On error: compensate step 2 (delete APISIX route), then step 1 (delete FROST project).
+    -->
+    <serviceTask id="deploy-pipelines" name="Deploy Pipelines"
+                 flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate">
+      <extensionElements>
+        <flowable:field name="adapterName" stringValue="redpanda"/>
+        <flowable:field name="operation" stringValue="DEPLOY_PIPELINES"/>
+        <flowable:field name="stepId" stringValue="deploy-pipelines"/>
+      </extensionElements>
+    </serviceTask>
+    <boundaryEvent id="redpanda-error" attachedToRef="deploy-pipelines">
+      <errorEventDefinition errorRef="stepFailedError"/>
+    </boundaryEvent>
+
+    <!-- Compensation tasks (explicit reverse-order chains) -->
+
+    <!-- Compensate after step 2 failure: undo step 1 -->
+    <serviceTask id="compensate-frost-after-apisix" name="Compensate: Delete FROST Project"
+                 flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate">
+      <extensionElements>
+        <flowable:field name="adapterName" stringValue="frost"/>
+        <flowable:field name="operation" stringValue="DELETE_PROJECT"/>
+        <flowable:field name="stepId" stringValue="create-project"/>
+      </extensionElements>
+    </serviceTask>
+
+    <!-- Compensate after step 3 failure: undo step 2, then step 1 -->
+    <serviceTask id="compensate-apisix-after-redpanda" name="Compensate: Delete APISIX Route"
+                 flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate">
+      <extensionElements>
+        <flowable:field name="adapterName" stringValue="apisix"/>
+        <flowable:field name="operation" stringValue="DELETE_ROUTE"/>
+        <flowable:field name="stepId" stringValue="create-route"/>
+      </extensionElements>
+    </serviceTask>
+    <serviceTask id="compensate-frost-after-redpanda" name="Compensate: Delete FROST Project"
+                 flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate">
+      <extensionElements>
+        <flowable:field name="adapterName" stringValue="frost"/>
+        <flowable:field name="operation" stringValue="DELETE_PROJECT"/>
+        <flowable:field name="stepId" stringValue="create-project"/>
+      </extensionElements>
+    </serviceTask>
+
+    <!-- Result publishing tasks -->
+    <serviceTask id="publish-success" flowable:async="true" name="Publish Success Result"
+                 flowable:class="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate">
+      <extensionElements>
+        <flowable:field name="resultType" stringValue="success"/>
+      </extensionElements>
+    </serviceTask>
+    <serviceTask id="publish-failure" flowable:async="true" name="Publish Failure Result"
+                 flowable:class="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate">
+      <extensionElements>
+        <flowable:field name="resultType" stringValue="failure"/>
+      </extensionElements>
+    </serviceTask>
+
+    <endEvent id="end"/>
+    <endEvent id="error-end" name="Saga Failed"/>
+
+    <!-- Happy path -->
+    <sequenceFlow id="flow-start" sourceRef="start" targetRef="create-project"/>
+    <sequenceFlow id="flow-frost-apisix" sourceRef="create-project" targetRef="create-route"/>
+    <sequenceFlow id="flow-apisix-gateway" sourceRef="create-route" targetRef="pipeline-gateway"/>
+    <sequenceFlow id="flow-gateway-redpanda" sourceRef="pipeline-gateway" targetRef="deploy-pipelines">
+      <conditionExpression xsi:type="tFormalExpression">${hasPipelines == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-gateway-skip" sourceRef="pipeline-gateway" targetRef="publish-success">
+      <conditionExpression xsi:type="tFormalExpression">${hasPipelines == false}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-redpanda-success" sourceRef="deploy-pipelines" targetRef="publish-success"/>
+    <sequenceFlow id="flow-publish-success-end" sourceRef="publish-success" targetRef="end"/>
+
+    <!-- Error path: step 1 fails (nothing to compensate) -->
+    <sequenceFlow id="flow-frost-error" sourceRef="frost-error" targetRef="publish-failure"/>
+
+    <!-- Error path: step 2 fails → compensate step 1 -->
+    <sequenceFlow id="flow-apisix-error" sourceRef="apisix-error" targetRef="compensate-frost-after-apisix"/>
+    <sequenceFlow id="flow-comp-frost-after-apisix" sourceRef="compensate-frost-after-apisix" targetRef="publish-failure"/>
+
+    <!-- Error path: step 3 fails → compensate step 2, then step 1 (reverse order) -->
+    <sequenceFlow id="flow-redpanda-error" sourceRef="redpanda-error" targetRef="compensate-apisix-after-redpanda"/>
+    <sequenceFlow id="flow-comp-apisix-after-redpanda" sourceRef="compensate-apisix-after-redpanda" targetRef="compensate-frost-after-redpanda"/>
+    <sequenceFlow id="flow-comp-frost-after-redpanda" sourceRef="compensate-frost-after-redpanda" targetRef="publish-failure"/>
+
+    <sequenceFlow id="flow-publish-failure-end" sourceRef="publish-failure" targetRef="error-end"/>
+
+  </process>
+
+</definitions>

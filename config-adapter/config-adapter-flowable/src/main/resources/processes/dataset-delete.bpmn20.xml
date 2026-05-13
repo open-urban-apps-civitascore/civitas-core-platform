@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             targetNamespace="http://civitas.de/saga">
+
+  <error id="stepFailedError" errorCode="STEP_FAILED"/>
+
+  <process id="dataset-delete" name="Dataset Delete Saga" isExecutable="true">
+
+    <!--
+      Delete saga: reverse order (Redpanda → APISIX → FROST).
+      Best-effort: on step failure, continue to next step (no compensation).
+      Errors are collected but do not stop execution.
+    -->
+
+    <startEvent id="start"/>
+
+    <!-- Conditional: has pipelines to delete? -->
+    <exclusiveGateway id="pipeline-gateway" name="Has Pipelines?"/>
+
+    <!-- Step 1: Redpanda - Delete Pipelines (conditional) -->
+    <serviceTask id="delete-pipelines" name="Delete Pipelines"
+                 flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate">
+      <extensionElements>
+        <flowable:field name="adapterName" stringValue="redpanda"/>
+        <flowable:field name="operation" stringValue="DELETE_PIPELINES"/>
+        <flowable:field name="stepId" stringValue="delete-pipelines"/>
+      </extensionElements>
+    </serviceTask>
+    <boundaryEvent id="redpanda-error" attachedToRef="delete-pipelines">
+      <errorEventDefinition errorRef="stepFailedError"/>
+    </boundaryEvent>
+
+    <!-- Step 2: APISIX - Delete Route -->
+    <serviceTask id="delete-route" name="Delete APISIX Route"
+                 flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate">
+      <extensionElements>
+        <flowable:field name="adapterName" stringValue="apisix"/>
+        <flowable:field name="operation" stringValue="DELETE_ROUTE"/>
+        <flowable:field name="stepId" stringValue="delete-route"/>
+      </extensionElements>
+    </serviceTask>
+    <boundaryEvent id="apisix-error" attachedToRef="delete-route">
+      <errorEventDefinition errorRef="stepFailedError"/>
+    </boundaryEvent>
+
+    <!-- Step 3: FROST - Delete Project -->
+    <serviceTask id="delete-project" name="Delete FROST Project"
+                 flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate">
+      <extensionElements>
+        <flowable:field name="adapterName" stringValue="frost"/>
+        <flowable:field name="operation" stringValue="DELETE_PROJECT"/>
+        <flowable:field name="stepId" stringValue="delete-project"/>
+      </extensionElements>
+    </serviceTask>
+    <boundaryEvent id="frost-error" attachedToRef="delete-project">
+      <errorEventDefinition errorRef="stepFailedError"/>
+    </boundaryEvent>
+
+    <!-- Result publishing -->
+    <serviceTask id="publish-success" flowable:async="true" name="Publish Success"
+                 flowable:class="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate">
+      <extensionElements>
+        <flowable:field name="resultType" stringValue="success"/>
+      </extensionElements>
+    </serviceTask>
+    <serviceTask id="publish-failure" flowable:async="true" name="Publish Failure"
+                 flowable:class="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate">
+      <extensionElements>
+        <flowable:field name="resultType" stringValue="failure"/>
+        <flowable:field name="supportsCompensation" stringValue="false"/>
+      </extensionElements>
+    </serviceTask>
+
+    <!-- Gateway: did any delete step fail? -->
+    <exclusiveGateway id="result-gateway" name="Has Errors?" default="flow-result-success"/>
+
+    <endEvent id="end"/>
+
+    <!-- Happy path: Redpanda → APISIX → FROST → result gateway → publish → end -->
+    <sequenceFlow id="flow-start" sourceRef="start" targetRef="pipeline-gateway"/>
+    <sequenceFlow id="flow-gateway-redpanda" sourceRef="pipeline-gateway" targetRef="delete-pipelines">
+      <conditionExpression xsi:type="tFormalExpression">${hasPipelines == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-gateway-skip" sourceRef="pipeline-gateway" targetRef="delete-route">
+      <conditionExpression xsi:type="tFormalExpression">${hasPipelines == false}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-redpanda-apisix" sourceRef="delete-pipelines" targetRef="delete-route"/>
+    <sequenceFlow id="flow-apisix-frost" sourceRef="delete-route" targetRef="delete-project"/>
+    <sequenceFlow id="flow-frost-result" sourceRef="delete-project" targetRef="result-gateway"/>
+
+    <!-- Result gateway routes based on whether sagaError was set -->
+    <sequenceFlow id="flow-result-failure" sourceRef="result-gateway" targetRef="publish-failure">
+      <conditionExpression xsi:type="tFormalExpression">${execution.getVariable('sagaError') != null}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-result-success" sourceRef="result-gateway" targetRef="publish-success"/>
+
+    <sequenceFlow id="flow-publish-success-end" sourceRef="publish-success" targetRef="end"/>
+    <sequenceFlow id="flow-publish-failure-end" sourceRef="publish-failure" targetRef="end"/>
+
+    <!-- Best-effort error paths: on failure, skip to next step -->
+    <sequenceFlow id="flow-redpanda-error" sourceRef="redpanda-error" targetRef="delete-route"/>
+    <sequenceFlow id="flow-apisix-error" sourceRef="apisix-error" targetRef="delete-project"/>
+    <sequenceFlow id="flow-frost-error" sourceRef="frost-error" targetRef="result-gateway"/>
+
+  </process>
+
+</definitions>
