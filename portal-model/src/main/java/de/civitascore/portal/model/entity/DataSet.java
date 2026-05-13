@@ -131,9 +131,6 @@ public class DataSet extends BaseDataEntity {
   @Column(name = "frost_base_url", length = 500)
   private String frostBaseUrl;
 
-  @Column(name = "route_id")
-  private String routeId;
-
   @Column(name = "service_id")
   private String serviceId;
 
@@ -142,6 +139,19 @@ public class DataSet extends BaseDataEntity {
 
   @Column(name = "pipeline_ids", columnDefinition = "text[]")
   private List<String> pipelineIds;
+
+  /**
+   * Named API endpoints exposed by this dataset. Each entry produces one published distribution and
+   * one APISIX route after release. Slug uniqueness within the dataset is enforced by a DB unique
+   * constraint.
+   */
+  @OneToMany(
+      mappedBy = "dataSet",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Builder.Default
+  private Set<NamedApi> namedApis = new HashSet<>();
 
   @Enumerated(EnumType.STRING)
   @Column(name = "pending_saga_type", length = 30)
@@ -189,15 +199,31 @@ public class DataSet extends BaseDataEntity {
   }
 
   /**
-   * Resets all infrastructure-related fields (projectId, frostBaseUrl, routeId, serviceId,
-   * publicUrl, pipelineIds) to {@code null}, typically called during unrelease.
+   * Replaces the current named APIs with the provided collection, clearing then re-adding to
+   * satisfy Hibernate orphan-removal semantics. Each entry's {@link NamedApi#getDataSet()} is set
+   * to this dataset.
+   *
+   * @param newNamedApis the new named APIs, or {@code null} to clear
+   */
+  public void setNamedApis(Collection<NamedApi> newNamedApis) {
+    this.namedApis.clear();
+    if (newNamedApis != null) {
+      newNamedApis.forEach(api -> api.setDataSet(this));
+      this.namedApis.addAll(newNamedApis);
+    }
+  }
+
+  /**
+   * Resets all infrastructure-related fields and clears the per-named-API {@code routeId} on each
+   * entry. The named-API entries themselves are preserved (they are user-authored). The {@code
+   * namedApis} collection must be initialized before this is called.
    */
   public void clearInfrastructureFields() {
     this.projectId = null;
     this.frostBaseUrl = null;
-    this.routeId = null;
     this.serviceId = null;
     this.publicUrl = null;
     this.pipelineIds = null;
+    this.namedApis.forEach(api -> api.setRouteId(null));
   }
 }

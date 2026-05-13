@@ -166,6 +166,10 @@
         "version": "2",
         "action": "DELETE"
       }
+    ],
+    "namedApis": [
+      { "slug": "traffic", "standard": "STA", "version": "1.1" },
+      { "slug": "boundaries", "standard": "WFS" }
     ]
   }
 }

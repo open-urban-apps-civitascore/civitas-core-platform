@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.civitascore.configadapter.model.dataset.NamedApiHelper;
 import de.civitascore.configadapter.model.saga.SagaContext;
 import de.civitascore.configadapter.model.saga.SagaStatus;
 import de.civitascore.configadapter.model.saga.SagaStep;
@@ -20,6 +21,7 @@ import de.civitascore.configadapter.model.saga.SagaStepStatus;
 import de.civitascore.configadapter.model.saga.SagaType;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -362,6 +364,57 @@ class SagaPayloadBuilderTest {
       assertEquals(2, results.size());
       assertEquals("saga-1", results.get("sagaId"));
       assertEquals("ds-1", results.get("datasetId"));
+    }
+
+    @Test
+    @DisplayName("CREATE: derives a deterministic UUID per slug when no incoming routeIds")
+    void aggregateResults_createWithNamedApis_shouldSynthesizeRouteIds() {
+      SagaContext context =
+          saga(
+              Map.of(
+                  "namedApis",
+                  List.of(
+                      Map.of("slug", "traffic", "standard", "STA"),
+                      Map.of("slug", "weather", "standard", "STA"))));
+
+      Map<String, Object> results = SagaPayloadBuilder.aggregateResults(context);
+
+      @SuppressWarnings("unchecked")
+      Map<String, String> routeIds = (Map<String, String>) results.get("routeIds");
+      assertEquals(2, routeIds.size());
+      assertEquals(NamedApiHelper.derive("ds-1", "traffic"), routeIds.get("traffic"));
+      assertEquals(NamedApiHelper.derive("ds-1", "weather"), routeIds.get("weather"));
+    }
+
+    @Test
+    @DisplayName("UPDATE: preserves existing routeIds for known slugs and synthesizes for new ones")
+    void aggregateResults_updateMixedSlugs_shouldPreserveExistingAndSynthesizeNew() {
+      var trigger = new HashMap<String, Object>();
+      trigger.put(
+          "namedApis",
+          List.of(
+              Map.of("slug", "traffic", "standard", "STA"),
+              Map.of("slug", "weather", "standard", "STA")));
+      trigger.put("routeIds", Map.of("traffic", "existing-route-id"));
+
+      SagaContext context = saga(trigger);
+
+      Map<String, Object> results = SagaPayloadBuilder.aggregateResults(context);
+
+      @SuppressWarnings("unchecked")
+      Map<String, String> routeIds = (Map<String, String>) results.get("routeIds");
+      assertEquals("existing-route-id", routeIds.get("traffic"));
+      assertEquals(NamedApiHelper.derive("ds-1", "weather"), routeIds.get("weather"));
+    }
+
+    @Test
+    @DisplayName("Empty or absent namedApis omits routeIds from the result")
+    void aggregateResults_noNamedApis_shouldOmitRouteIds() {
+      SagaContext withoutKey = saga(Map.of());
+      assertTrue(!SagaPayloadBuilder.aggregateResults(withoutKey).containsKey("routeIds"));
+
+      SagaContext withEmptyList = saga(Map.of("namedApis", List.of()));
+      assertTrue(!SagaPayloadBuilder.aggregateResults(withEmptyList).containsKey("routeIds"));
     }
   }
 

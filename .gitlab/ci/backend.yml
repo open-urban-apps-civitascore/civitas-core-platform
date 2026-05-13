@@ -20,7 +20,7 @@
 # This must always run (needs: []) to ensure dependency scanning has the graph
 # even when the build job is skipped due to no changes
 generate-graph-backend:
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   needs: []
   rules:
@@ -52,7 +52,7 @@ generate-graph-backend:
 
 lint-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   needs: []
   variables:
@@ -70,9 +70,13 @@ lint-backend:
 
 dependency-prune-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
-  stage: lint
-  needs: []
+  image: maven:3.9-eclipse-temurin-25-alpine
+  stage: test
+  needs:
+    - job: setup-version-portal-model
+      artifacts: true
+    - job: publish-portal-model
+      optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -84,14 +88,11 @@ dependency-prune-backend:
       - .m2/repository
   script:
     - cd portal-backend
-    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -DfailOnWarning=true -DignoreNonCompile=false -s ci_settings.xml
-  allow_failure:
-    exit_codes:
-      - 1
+    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Dportal-model.version=$PORTAL_MODEL_VERSION -DfailOnWarning=true -DignoreNonCompile=false -s ci_settings.xml
 
 test-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: test
   needs:
     - job: build-backend
@@ -113,7 +114,7 @@ test-backend:
     paths:
       - .m2/repository
   before_script:
-    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
     - cd portal-backend
   script:
     # Compile test sources, then run unit tests
@@ -131,7 +132,7 @@ test-backend:
 
 integration-test-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21
+  image: maven:3.9-eclipse-temurin-25
   stage: test
   needs:
     - job: build-backend
@@ -159,7 +160,7 @@ integration-test-backend:
     paths:
       - .m2/repository
   before_script:
-    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
     - cd portal-backend
   script:
     # Compile test sources, then run integration tests only. Saga-tagged tests are excluded via pom.xml (run in saga-e2e-test-backend)
@@ -178,7 +179,7 @@ integration-test-backend:
 # (portal-backend + config-adapter orchestrator in-process, with real FROST, Kafka, Redpanda Connect).
 # Auto-runs on main/develop, manual trigger on MRs (heavy: ~2 min, 6+ containers).
 saga-e2e-test-backend:
-  image: maven:3.9-eclipse-temurin-21
+  image: maven:3.9-eclipse-temurin-25
   stage: test
   needs:
     - job: build-backend
@@ -216,7 +217,7 @@ saga-e2e-test-backend:
     paths:
       - .m2/repository
   before_script:
-    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
     - cd portal-backend
   script:
     - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION -Psaga -Dfailsafe.rerunFailingTestsCount=1
@@ -333,7 +334,7 @@ api-test-backend:
 
 report-test-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21
+  image: maven:3.9-eclipse-temurin-25
   stage: test
   dependencies:
     - build-backend
@@ -358,7 +359,7 @@ report-test-backend:
 
 build-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: build
   needs:
     - job: setup-version
@@ -366,7 +367,6 @@ build-backend:
     - job: setup-version-portal-model
       artifacts: true
     - lint-backend
-    - dependency-prune-backend
     - job: publish-config-adapter
       optional: true
     - job: publish-portal-model
@@ -380,7 +380,7 @@ build-backend:
     paths:
       - .m2/repository
   before_script:
-    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
     - cd portal-backend
   script:
     # Use GitLab Maven repository for config-adapter and portal-model dependencies

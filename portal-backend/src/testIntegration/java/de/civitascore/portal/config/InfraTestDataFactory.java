@@ -6,6 +6,7 @@ import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import java.io.IOException;
 import java.io.InputStream;
@@ -55,12 +56,25 @@ public class InfraTestDataFactory {
 
   private final ObjectMapper objectMapper = new JsonMapper();
 
+  /**
+   * Creates a saga-test dataset with a single seeded {@link NamedApi} (slug {@code traffic},
+   * standard {@code STA}). Required so saga publisher / result handler logic touching the per-slug
+   * {@code routeIds} map has at least one entry to project.
+   */
   public DataSet createDataSet(String name) {
-    return portalData.dataSet(
-        b ->
-            b.name(name + " " + System.nanoTime())
-                .description("Integration test dataset")
-                .openDataAccess(true));
+    DataSet dataSet =
+        portalData.dataSet(
+            b ->
+                b.name(name + " " + System.nanoTime())
+                    .description("Integration test dataset")
+                    .openDataAccess(true));
+    NamedApi defaultApi = new NamedApi();
+    defaultApi.setName("Traffic Sensor Readings");
+    defaultApi.setSlug("traffic");
+    defaultApi.setStandard("STA");
+    defaultApi.setVersion("1.1");
+    dataSet.setNamedApis(Set.of(defaultApi));
+    return portalData.saveDataSet(dataSet);
   }
 
   public DataSource createMqttDataSource() {
