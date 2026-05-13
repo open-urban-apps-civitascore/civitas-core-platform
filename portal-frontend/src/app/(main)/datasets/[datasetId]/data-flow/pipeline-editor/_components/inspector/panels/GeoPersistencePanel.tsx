@@ -19,18 +19,10 @@ import { Label } from '@/components/ui/label'
 import type { GeoPersistenceNodeData } from '../../../_types/nodes'
 import { EntityMetadata } from '../components/EntityMetadata'
 
-// ============================================================================
-// Props
-// ============================================================================
-
 interface GeoPersistencePanelProps {
   data: GeoPersistenceNodeData
   onUpdate: (data: Partial<GeoPersistenceNodeData>) => void
 }
-
-// ============================================================================
-// Component
-// ============================================================================
 
 export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, onUpdate }) => {
   const t = useTranslations('pipelineEditor')
