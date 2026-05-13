@@ -5,10 +5,18 @@
  */
 
 import type { LucideIcon } from 'lucide-react'
-import { Circle, CircleDot, Clock, Database, Radio, Workflow } from 'lucide-react'
+import { Circle, Clock, Database, Radio, Workflow } from 'lucide-react'
+import { createElement, forwardRef } from 'react'
 
 import { PIPELINE_NODE_TYPES, type PipelineNodeType } from '../_types/pipeline'
 import { NODE_CATEGORIES, type NodeCategory } from './nodeCategories'
+
+/** Filled circle icon — renders Circle with a solid fill to appear as a full dot. */
+// eslint-disable-next-line react/display-name
+const FilledCircle = forwardRef<SVGSVGElement, React.ComponentPropsWithoutRef<LucideIcon>>((props, ref) =>
+  createElement(Circle, { ...props, ref, fill: 'currentColor' }),
+) as unknown as LucideIcon
+FilledCircle.displayName = 'FilledCircle'
 
 // ============================================================================
 // Palette Item Type
@@ -60,7 +68,7 @@ export const PALETTE_NODE_DEFINITIONS: Record<PipelineNodeType, PaletteItem> = {
   [PIPELINE_NODE_TYPES.Start]: {
     type: PIPELINE_NODE_TYPES.Start,
     label: 'Flow Start',
-    icon: CircleDot,
+    icon: FilledCircle,
     description: 'Pipeline entry point. Execution begins here.',
     singleUse: true,
   },
