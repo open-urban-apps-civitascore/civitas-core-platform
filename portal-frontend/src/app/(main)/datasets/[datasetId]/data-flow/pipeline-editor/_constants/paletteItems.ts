@@ -106,6 +106,12 @@ export const PALETTE_NODE_DEFINITIONS: Record<PipelineNodeType, PaletteItem> = {
     icon: Database,
     description: 'SensorThings API persistence. Store or retrieve data.',
   },
+  [PIPELINE_NODE_TYPES.GeoPersistence]: {
+    type: PIPELINE_NODE_TYPES.GeoPersistence,
+    label: 'Geo Persistence',
+    icon: Database,
+    description: 'Geo data persistence. Store geo data with a data structure.',
+  },
 
   // Transform nodes
   [PIPELINE_NODE_TYPES.Mapping]: {
@@ -151,7 +157,10 @@ export const PIPELINE_PALETTE_CATEGORIES: PaletteCategory[] = [
   {
     id: NODE_CATEGORIES.STORAGE,
     title: 'Storage',
-    items: [PALETTE_NODE_DEFINITIONS[PIPELINE_NODE_TYPES.Frost]],
+    items: [
+      PALETTE_NODE_DEFINITIONS[PIPELINE_NODE_TYPES.Frost],
+      PALETTE_NODE_DEFINITIONS[PIPELINE_NODE_TYPES.GeoPersistence],
+    ],
     defaultCollapsed: false,
   },
   {

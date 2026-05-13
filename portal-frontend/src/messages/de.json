@@ -885,6 +885,7 @@
       "apiResponse": "API-Response",
       "cronTrigger": "CRON-Trigger",
       "frostStorage": "FROST-Server",
+      "geoPersistence": "Geo-Persistenz",
       "mapping": "Mapping"
     },
     "palette": {
@@ -912,6 +913,8 @@
       "cronDesc": "Geplanter Trigger. Führt Pipeline nach Zeitplan aus.",
       "frostServer": "FROST Server",
       "frostServerDesc": "SensorThings API persistence",
+      "geoPersistence": "Geo-Persistenz",
+      "geoPersistenceDesc": "WFS/WMS Geo-Daten-Persistenz.",
       "mapping": "Mapping",
       "mappingDesc": "Bloblang-Datentransformation. Daten zuordnen und transformieren."
     },
@@ -955,6 +958,17 @@
       "serverUrl": "Server-URL",
       "internalServer": "Interner Frost Server",
       "version": "Version"
+    },
+    "geoPersistencePanel": {
+      "title": "Geo-Persistenz",
+      "tableName": "Tabellenname",
+      "tableNamePlaceholder": "Tabellennamen eingeben...",
+      "dataStructureVersion": "Datenstruktur-Version",
+      "importDataStructure": "Datenstruktur importieren",
+      "changeDataStructure": "Datenstruktur ändern",
+      "details": "Datenstruktur-Details",
+      "dataStructureName": "Datenstruktur",
+      "versionNumber": "Version"
     },
     "mappingPanel": {
       "hint": "Definiere deine Datentransformations-Zuordnung im YAML- oder JSON-Format.",
