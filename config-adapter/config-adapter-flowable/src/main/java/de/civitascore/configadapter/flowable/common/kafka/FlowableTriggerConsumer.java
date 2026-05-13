@@ -19,8 +19,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.WakeupException;
+import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
@@ -40,14 +45,13 @@ public class FlowableTriggerConsumer {
   private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
   private final RuntimeService runtimeService;
-  private final org.flowable.engine.HistoryService historyService;
+  private final HistoryService historyService;
   private final ObjectMapper objectMapper;
   private volatile boolean running;
   private Thread consumerThread;
   private KafkaConsumer<String, byte[]> kafkaConsumer;
 
-  public FlowableTriggerConsumer(
-      RuntimeService runtimeService, org.flowable.engine.HistoryService historyService) {
+  public FlowableTriggerConsumer(RuntimeService runtimeService, HistoryService historyService) {
     this.runtimeService = runtimeService;
     this.historyService = historyService;
     this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
@@ -59,6 +63,9 @@ public class FlowableTriggerConsumer {
    * @param kafkaConsumer the Kafka consumer (caller manages creation and config)
    */
   public void start(KafkaConsumer<String, byte[]> kafkaConsumer) {
+    if (running) {
+      throw new IllegalStateException("FlowableTriggerConsumer is already running");
+    }
     this.kafkaConsumer = kafkaConsumer;
     kafkaConsumer.subscribe(List.of(TRIGGER_TOPIC));
     running = true;
@@ -88,36 +95,9 @@ public class FlowableTriggerConsumer {
   private void pollLoop() {
     try {
       while (running) {
-        ConsumerRecords<String, byte[]> records = kafkaConsumer.poll(Duration.ofSeconds(1));
-        for (var record : records) {
-          try {
-            processTriggerRecord(record);
-            // Commit offset after each successfully processed record to prevent re-processing
-            kafkaConsumer.commitSync(
-                Map.of(
-                    new org.apache.kafka.common.TopicPartition(record.topic(), record.partition()),
-                    new org.apache.kafka.clients.consumer.OffsetAndMetadata(record.offset() + 1)));
-          } catch (java.io.IOException e) {
-            // Permanent payload error (malformed JSON, wrong types) — skip and commit
-            LOG.error(
-                "Skipping malformed trigger (permanent error): {}",
-                Encode.forJava(e.getMessage()),
-                e);
-            kafkaConsumer.commitSync(
-                Map.of(
-                    new org.apache.kafka.common.TopicPartition(record.topic(), record.partition()),
-                    new org.apache.kafka.clients.consumer.OffsetAndMetadata(record.offset() + 1)));
-          } catch (Exception e) {
-            // Transient error (Flowable DB, Kafka, etc.) — do NOT commit, retry on next poll
-            LOG.error(
-                "Failed to process trigger (transient error): {}",
-                Encode.forJava(e.getMessage()),
-                e);
-            break;
-          }
-        }
+        processRecordBatch(kafkaConsumer.poll(Duration.ofSeconds(1)));
       }
-    } catch (org.apache.kafka.common.errors.WakeupException e) {
+    } catch (WakeupException e) {
       if (running) {
         throw e;
       }
@@ -125,11 +105,54 @@ public class FlowableTriggerConsumer {
   }
 
   /**
+   * Processes a batch of records from a single poll. Tracks the first unprocessed offset per
+   * partition. On transient error, ALL partitions are seeked back so no records are lost — even
+   * from partitions whose records were never attempted because an earlier partition failed.
+   */
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // Transient errors must be caught broadly
+  private void processRecordBatch(ConsumerRecords<String, byte[]> records) {
+    Map<TopicPartition, Long> recoveryOffsets = new HashMap<>();
+    for (TopicPartition tp : records.partitions()) {
+      var partRecords = records.records(tp);
+      if (!partRecords.isEmpty()) {
+        recoveryOffsets.put(tp, partRecords.get(0).offset());
+      }
+    }
+
+    for (var record : records) {
+      try {
+        processTriggerRecord(record);
+        commitOffset(record);
+        recoveryOffsets.put(
+            new TopicPartition(record.topic(), record.partition()), record.offset() + 1);
+      } catch (IOException e) {
+        // Permanent payload error (malformed JSON, wrong types) — skip and commit
+        LOG.error(
+            "Skipping malformed trigger (permanent error): {}", Encode.forJava(e.getMessage()), e);
+        commitOffset(record);
+        recoveryOffsets.put(
+            new TopicPartition(record.topic(), record.partition()), record.offset() + 1);
+      } catch (Exception e) {
+        // Transient error — seek ALL partitions to their last safe offset
+        LOG.error(
+            "Failed to process trigger (transient error): {}", Encode.forJava(e.getMessage()), e);
+        seekToRecovery(recoveryOffsets);
+        return;
+      }
+    }
+  }
+
+  private void seekToRecovery(Map<TopicPartition, Long> recoveryOffsets) {
+    for (var entry : recoveryOffsets.entrySet()) {
+      kafkaConsumer.seek(entry.getKey(), entry.getValue());
+    }
+  }
+
+  /**
    * Process a single trigger record. Uses Kafka record metadata (topic+partition+offset) as a
    * deterministic, stable business key for durable idempotency.
    */
-  void processTriggerRecord(org.apache.kafka.clients.consumer.ConsumerRecord<String, byte[]> record)
-      throws IOException {
+  void processTriggerRecord(ConsumerRecord<String, byte[]> record) throws IOException {
     Map<String, Object> trigger = objectMapper.readValue(record.value(), MAP_TYPE);
 
     Object rawSagaType = trigger.get("sagaType");
@@ -204,9 +227,14 @@ public class FlowableTriggerConsumer {
    * that don't need real Kafka record metadata.
    */
   void processTrigger(byte[] value) throws IOException {
-    processTriggerRecord(
-        new org.apache.kafka.clients.consumer.ConsumerRecord<>(
-            TRIGGER_TOPIC, 0, System.nanoTime(), null, value));
+    processTriggerRecord(new ConsumerRecord<>(TRIGGER_TOPIC, 0, System.nanoTime(), null, value));
+  }
+
+  private void commitOffset(ConsumerRecord<String, byte[]> record) {
+    kafkaConsumer.commitSync(
+        Map.of(
+            new TopicPartition(record.topic(), record.partition()),
+            new OffsetAndMetadata(record.offset() + 1)));
   }
 
   /**

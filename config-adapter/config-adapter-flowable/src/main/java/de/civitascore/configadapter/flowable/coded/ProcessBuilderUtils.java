@@ -9,9 +9,6 @@
  */
 package de.civitascore.configadapter.flowable.coded;
 
-import de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate;
-import de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate;
-import de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate;
 import java.util.List;
 import org.flowable.bpmn.model.BoundaryEvent;
 import org.flowable.bpmn.model.ErrorEventDefinition;
@@ -22,10 +19,20 @@ import org.flowable.bpmn.model.ServiceTask;
 /** Shared BPMN model building utilities used by all saga process builders. */
 final class ProcessBuilderUtils {
 
-  static final String STEP_DELEGATE = SagaStepDelegate.class.getName();
-  static final String COMP_DELEGATE = SagaCompensationDelegate.class.getName();
-  static final String RESULT_DELEGATE = ResultPublishDelegate.class.getName();
+  static final String STEP_DELEGATE =
+      "de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate";
+  static final String COMP_DELEGATE =
+      "de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate";
+  static final String RESULT_DELEGATE =
+      "de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate";
   static final String ERROR_CODE = "STEP_FAILED";
+
+  static final String PIPELINE_GATEWAY_ID = "pipeline-gateway";
+  static final String PUBLISH_SUCCESS_ID = "publish-success";
+  static final String PUBLISH_FAILURE_ID = "publish-failure";
+  static final String RESULT_GATEWAY_ID = "result-gateway";
+
+  private static final String IMPL_TYPE_CLASS = "class";
 
   private ProcessBuilderUtils() {}
 
@@ -33,7 +40,7 @@ final class ProcessBuilderUtils {
     ServiceTask task = new ServiceTask();
     task.setId(id);
     task.setName(name);
-    task.setImplementationType("class");
+    task.setImplementationType(IMPL_TYPE_CLASS);
     task.setImplementation(STEP_DELEGATE);
     task.setFieldExtensions(
         List.of(field("adapterName", adapter), field("operation", operation), field("stepId", id)));
@@ -44,7 +51,7 @@ final class ProcessBuilderUtils {
     ServiceTask task = new ServiceTask();
     task.setId(id);
     task.setName("Compensate: " + operation);
-    task.setImplementationType("class");
+    task.setImplementationType(IMPL_TYPE_CLASS);
     task.setImplementation(COMP_DELEGATE);
     task.setFieldExtensions(
         List.of(
@@ -83,16 +90,12 @@ final class ProcessBuilderUtils {
     return sf;
   }
 
-  /** Creates an async result publishing service task (success or failure). */
+  /**
+   * Creates an async result publishing service task (success or failure). Defaults to
+   * supportsCompensation=true.
+   */
   static ServiceTask resultPublishTask(String id, String resultType) {
-    ServiceTask task = new ServiceTask();
-    task.setId(id);
-    task.setName("Publish " + resultType + " result");
-    task.setImplementationType("class");
-    task.setImplementation(RESULT_DELEGATE);
-    task.setAsynchronous(true);
-    task.setFieldExtensions(List.of(field("resultType", resultType)));
-    return task;
+    return resultPublishTask(id, resultType, true);
   }
 
   /** Creates an async result publishing service task with explicit compensation support flag. */
@@ -100,7 +103,7 @@ final class ProcessBuilderUtils {
     ServiceTask task = new ServiceTask();
     task.setId(id);
     task.setName("Publish " + resultType + " result");
-    task.setImplementationType("class");
+    task.setImplementationType(IMPL_TYPE_CLASS);
     task.setImplementation(RESULT_DELEGATE);
     task.setAsynchronous(true);
     task.setFieldExtensions(

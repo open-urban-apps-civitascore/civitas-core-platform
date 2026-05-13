@@ -97,7 +97,8 @@ class ResultPublishingTest {
       start("dataset-create", createVars("saga-c2"));
 
       verify(resultPublisher)
-          .publishFailed(eq("saga-c2"), eq("ds-1"), any(), any(), any(Boolean.class));
+          .publishFailed(
+              argThat(f -> "saga-c2".equals(f.sagaId()) && "ds-1".equals(f.datasetId())));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -110,7 +111,7 @@ class ResultPublishingTest {
       start("dataset-create", createVars("saga-c3"));
 
       verify(resultPublisher, never())
-          .publishFailed(any(), any(), any(), any(), any(Boolean.class));
+          .publishFailed(any(de.civitascore.configadapter.flowable.common.SagaFailure.class));
     }
   }
 
@@ -139,7 +140,8 @@ class ResultPublishingTest {
       start("dataset-update", updateVars("saga-u2"));
 
       verify(resultPublisher)
-          .publishFailed(eq("saga-u2"), eq("ds-1"), any(), any(), any(Boolean.class));
+          .publishFailed(
+              argThat(f -> "saga-u2".equals(f.sagaId()) && "ds-1".equals(f.datasetId())));
     }
   }
 
@@ -170,7 +172,13 @@ class ResultPublishingTest {
 
       start("dataset-delete", deleteVars("saga-d2"));
 
-      verify(resultPublisher).publishFailed(eq("saga-d2"), eq("ds-1"), any(), any(), eq(false));
+      verify(resultPublisher)
+          .publishFailed(
+              argThat(
+                  f ->
+                      "saga-d2".equals(f.sagaId())
+                          && "ds-1".equals(f.datasetId())
+                          && f.compensated() == false));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -184,7 +192,13 @@ class ResultPublishingTest {
 
       start("dataset-delete", deleteVars("saga-d3"));
 
-      verify(resultPublisher).publishFailed(eq("saga-d3"), eq("ds-1"), any(), any(), eq(false));
+      verify(resultPublisher)
+          .publishFailed(
+              argThat(
+                  f ->
+                      "saga-d3".equals(f.sagaId())
+                          && "ds-1".equals(f.datasetId())
+                          && f.compensated() == false));
     }
   }
 

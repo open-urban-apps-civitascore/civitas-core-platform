@@ -30,6 +30,9 @@ import org.flowable.bpmn.model.StartEvent;
  */
 public final class DatasetUpdateProcessBuilder {
 
+  private static final String STEP_UPDATE_PROJECT = "update-project";
+  private static final String STEP_UPDATE_ROUTE = "update-route";
+
   private DatasetUpdateProcessBuilder() {}
 
   public static BpmnModel build() {
@@ -46,18 +49,19 @@ public final class DatasetUpdateProcessBuilder {
     process.addFlowElement(start);
 
     ServiceTask frost =
-        sagaStep("update-project", "Update FROST Project", "frost", "UPDATE_PROJECT");
+        sagaStep(STEP_UPDATE_PROJECT, "Update FROST Project", "frost", "UPDATE_PROJECT");
     process.addFlowElement(frost);
     BoundaryEvent frostError = errorBoundary("frost-error", frost);
     process.addFlowElement(frostError);
 
-    ServiceTask apisix = sagaStep("update-route", "Update APISIX Route", "apisix", "UPDATE_ROUTE");
+    ServiceTask apisix =
+        sagaStep(STEP_UPDATE_ROUTE, "Update APISIX Route", "apisix", "UPDATE_ROUTE");
     process.addFlowElement(apisix);
     BoundaryEvent apisixError = errorBoundary("apisix-error", apisix);
     process.addFlowElement(apisixError);
 
     ExclusiveGateway gateway = new ExclusiveGateway();
-    gateway.setId("pipeline-gateway");
+    gateway.setId(ProcessBuilderUtils.PIPELINE_GATEWAY_ID);
     process.addFlowElement(gateway);
 
     ServiceTask redpanda =
@@ -68,16 +72,16 @@ public final class DatasetUpdateProcessBuilder {
 
     process.addFlowElement(
         compensationStep(
-            "compensate-frost-after-apisix", "frost", "RESTORE_PROJECT", "update-project"));
+            "compensate-frost-after-apisix", "frost", "RESTORE_PROJECT", STEP_UPDATE_PROJECT));
     process.addFlowElement(
         compensationStep(
-            "compensate-apisix-after-redpanda", "apisix", "RESTORE_ROUTE", "update-route"));
+            "compensate-apisix-after-redpanda", "apisix", "RESTORE_ROUTE", STEP_UPDATE_ROUTE));
     process.addFlowElement(
         compensationStep(
-            "compensate-frost-after-redpanda", "frost", "RESTORE_PROJECT", "update-project"));
+            "compensate-frost-after-redpanda", "frost", "RESTORE_PROJECT", STEP_UPDATE_PROJECT));
 
-    process.addFlowElement(resultPublishTask("publish-success", "success"));
-    process.addFlowElement(resultPublishTask("publish-failure", "failure"));
+    process.addFlowElement(resultPublishTask(ProcessBuilderUtils.PUBLISH_SUCCESS_ID, "success"));
+    process.addFlowElement(resultPublishTask(ProcessBuilderUtils.PUBLISH_FAILURE_ID, "failure"));
 
     EndEvent end = new EndEvent();
     end.setId("end");
@@ -88,23 +92,36 @@ public final class DatasetUpdateProcessBuilder {
     errorEnd.setName("Saga Failed");
     process.addFlowElement(errorEnd);
 
-    process.addFlowElement(flow("flow-start", "start", "update-project"));
-    process.addFlowElement(flow("flow-frost-apisix", "update-project", "update-route"));
-    process.addFlowElement(flow("flow-apisix-gateway", "update-route", "pipeline-gateway"));
+    process.addFlowElement(flow("flow-start", "start", STEP_UPDATE_PROJECT));
+    process.addFlowElement(flow("flow-frost-apisix", STEP_UPDATE_PROJECT, STEP_UPDATE_ROUTE));
+    process.addFlowElement(
+        flow("flow-apisix-gateway", STEP_UPDATE_ROUTE, ProcessBuilderUtils.PIPELINE_GATEWAY_ID));
     process.addFlowElement(
         conditionalFlow(
-            "flow-gw-redpanda", "pipeline-gateway", "update-pipelines", "${hasPipelines == true}"));
+            "flow-gw-redpanda",
+            ProcessBuilderUtils.PIPELINE_GATEWAY_ID,
+            "update-pipelines",
+            "${hasPipelines == true}"));
     process.addFlowElement(
         conditionalFlow(
-            "flow-gw-skip", "pipeline-gateway", "publish-success", "${hasPipelines == false}"));
-    process.addFlowElement(flow("flow-redpanda-success", "update-pipelines", "publish-success"));
-    process.addFlowElement(flow("flow-publish-success-end", "publish-success", "end"));
+            "flow-gw-skip",
+            ProcessBuilderUtils.PIPELINE_GATEWAY_ID,
+            ProcessBuilderUtils.PUBLISH_SUCCESS_ID,
+            "${hasPipelines == false}"));
+    process.addFlowElement(
+        flow("flow-redpanda-success", "update-pipelines", ProcessBuilderUtils.PUBLISH_SUCCESS_ID));
+    process.addFlowElement(
+        flow("flow-publish-success-end", ProcessBuilderUtils.PUBLISH_SUCCESS_ID, "end"));
 
-    process.addFlowElement(flow("flow-frost-error", "frost-error", "publish-failure"));
+    process.addFlowElement(
+        flow("flow-frost-error", "frost-error", ProcessBuilderUtils.PUBLISH_FAILURE_ID));
     process.addFlowElement(
         flow("flow-apisix-error", "apisix-error", "compensate-frost-after-apisix"));
     process.addFlowElement(
-        flow("flow-comp-frost-after-apisix", "compensate-frost-after-apisix", "publish-failure"));
+        flow(
+            "flow-comp-frost-after-apisix",
+            "compensate-frost-after-apisix",
+            ProcessBuilderUtils.PUBLISH_FAILURE_ID));
     process.addFlowElement(
         flow("flow-redpanda-error", "redpanda-error", "compensate-apisix-after-redpanda"));
     process.addFlowElement(
@@ -113,8 +130,12 @@ public final class DatasetUpdateProcessBuilder {
             "compensate-apisix-after-redpanda",
             "compensate-frost-after-redpanda"));
     process.addFlowElement(
-        flow("flow-comp-frost", "compensate-frost-after-redpanda", "publish-failure"));
-    process.addFlowElement(flow("flow-publish-failure-end", "publish-failure", "error-end"));
+        flow(
+            "flow-comp-frost",
+            "compensate-frost-after-redpanda",
+            ProcessBuilderUtils.PUBLISH_FAILURE_ID));
+    process.addFlowElement(
+        flow("flow-publish-failure-end", ProcessBuilderUtils.PUBLISH_FAILURE_ID, "error-end"));
 
     return model;
   }

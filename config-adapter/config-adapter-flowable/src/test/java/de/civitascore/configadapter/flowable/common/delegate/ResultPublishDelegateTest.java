@@ -9,9 +9,7 @@
  */
 package de.civitascore.configadapter.flowable.common.delegate;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -84,7 +82,13 @@ class ResultPublishDelegateTest {
     processEngine.getRuntimeService().startProcessInstanceByKey("dataset-create", vars);
     FlowableTestSupport.executeAllJobs(processEngine);
 
-    verify(resultPublisher).publishFailed(eq("saga-1"), eq("ds-1"), any(), any(), eq(false));
+    verify(resultPublisher)
+        .publishFailed(
+            argThat(
+                f ->
+                    "saga-1".equals(f.sagaId())
+                        && "ds-1".equals(f.datasetId())
+                        && f.compensated() == false));
   }
 
   @Test
@@ -106,6 +110,12 @@ class ResultPublishDelegateTest {
     processEngine.getRuntimeService().startProcessInstanceByKey("dataset-create", vars);
     FlowableTestSupport.executeAllJobs(processEngine);
 
-    verify(resultPublisher).publishFailed(eq("saga-2"), eq("ds-1"), any(), any(), eq(true));
+    verify(resultPublisher)
+        .publishFailed(
+            argThat(
+                f ->
+                    "saga-2".equals(f.sagaId())
+                        && "ds-1".equals(f.datasetId())
+                        && f.compensated() == true));
   }
 }

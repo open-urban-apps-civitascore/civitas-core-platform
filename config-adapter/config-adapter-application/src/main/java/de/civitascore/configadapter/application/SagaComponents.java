@@ -24,16 +24,11 @@ record SagaComponents(
     Optional<FlowableSagaOrchestrator> flowableOrchestrator) {
 
   SagaComponents(
-      Optional<KafkaSagaCommandConsumer> commandConsumer,
-      Optional<OrchestratorPair> orchestrator) {
+      Optional<KafkaSagaCommandConsumer> commandConsumer, Optional<OrchestratorPair> orchestrator) {
     this(commandConsumer, orchestrator, Optional.empty());
   }
 
   static SagaComponents flowable(FlowableSagaOrchestrator flowable) {
     return new SagaComponents(Optional.empty(), Optional.empty(), Optional.of(flowable));
-  }
-
-  static SagaComponents empty() {
-    return new SagaComponents(Optional.empty(), Optional.empty(), Optional.empty());
   }
 }

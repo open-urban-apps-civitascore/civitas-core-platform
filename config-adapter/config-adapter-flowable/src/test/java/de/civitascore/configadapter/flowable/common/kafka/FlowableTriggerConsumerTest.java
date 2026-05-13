@@ -9,8 +9,10 @@
  */
 package de.civitascore.configadapter.flowable.common.kafka;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -20,7 +22,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Duration;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicPartition;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.runtime.ProcessInstance;
 import org.junit.jupiter.api.BeforeEach;
@@ -148,5 +157,80 @@ class FlowableTriggerConsumerTest {
     consumer.processTrigger(trigger);
 
     verify(runtimeService, never()).startProcessInstanceByKey(anyString(), anyString(), anyMap());
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void shouldSeekBackToFailedRecordOnTransientError() throws Exception {
+    byte[] triggerJson =
+        objectMapper.writeValueAsBytes(Map.of("sagaType", "DATASET_CREATE", "datasetId", "ds-1"));
+
+    TopicPartition tp = new TopicPartition(FlowableTriggerConsumer.TRIGGER_TOPIC, 0);
+    ConsumerRecord<String, byte[]> record =
+        new ConsumerRecord<>(FlowableTriggerConsumer.TRIGGER_TOPIC, 0, 42L, null, triggerJson);
+    ConsumerRecords<String, byte[]> records = new ConsumerRecords<>(Map.of(tp, List.of(record)));
+
+    KafkaConsumer<String, byte[]> mockKafkaConsumer = mock(KafkaConsumer.class);
+    lenient()
+        .when(mockKafkaConsumer.poll(any(Duration.class)))
+        .thenReturn(records)
+        .thenReturn(new ConsumerRecords<>(Map.of()));
+
+    // Transient error on process start
+    lenient()
+        .when(runtimeService.startProcessInstanceByKey(anyString(), anyString(), anyMap()))
+        .thenThrow(new RuntimeException("DB unavailable"));
+
+    consumer.start(mockKafkaConsumer);
+
+    await()
+        .atMost(2, TimeUnit.SECONDS)
+        .untilAsserted(() -> verify(mockKafkaConsumer).seek(tp, 42L));
+
+    consumer.stop();
+
+    verify(mockKafkaConsumer, never()).commitSync(anyMap());
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void shouldSeekAllPartitionsOnTransientBatchError() throws Exception {
+    byte[] triggerJson =
+        objectMapper.writeValueAsBytes(Map.of("sagaType", "DATASET_CREATE", "datasetId", "ds-1"));
+
+    TopicPartition tp0 = new TopicPartition(FlowableTriggerConsumer.TRIGGER_TOPIC, 0);
+    TopicPartition tp1 = new TopicPartition(FlowableTriggerConsumer.TRIGGER_TOPIC, 1);
+    ConsumerRecord<String, byte[]> record0 =
+        new ConsumerRecord<>(FlowableTriggerConsumer.TRIGGER_TOPIC, 0, 42L, null, triggerJson);
+    ConsumerRecord<String, byte[]> record1 =
+        new ConsumerRecord<>(FlowableTriggerConsumer.TRIGGER_TOPIC, 1, 7L, null, triggerJson);
+
+    ConsumerRecords<String, byte[]> records =
+        new ConsumerRecords<>(Map.of(tp0, List.of(record0), tp1, List.of(record1)));
+
+    KafkaConsumer<String, byte[]> mockKafkaConsumer = mock(KafkaConsumer.class);
+    lenient()
+        .when(mockKafkaConsumer.poll(any(Duration.class)))
+        .thenReturn(records)
+        .thenReturn(new ConsumerRecords<>(Map.of()));
+
+    // Transient error on process start — first record fails, second never reached
+    lenient()
+        .when(runtimeService.startProcessInstanceByKey(anyString(), anyString(), anyMap()))
+        .thenThrow(new RuntimeException("DB unavailable"));
+
+    consumer.start(mockKafkaConsumer);
+
+    await()
+        .atMost(2, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              verify(mockKafkaConsumer).seek(tp0, 42L);
+              verify(mockKafkaConsumer).seek(tp1, 7L);
+            });
+
+    consumer.stop();
+
+    verify(mockKafkaConsumer, never()).commitSync(anyMap());
   }
 }

@@ -9,26 +9,24 @@
  */
 package de.civitascore.configadapter.flowable.common.delegate;
 
-import de.civitascore.configadapter.flowable.common.kafka.FlowableResultPublisher;
+import de.civitascore.configadapter.flowable.common.SagaFailure;
+import de.civitascore.configadapter.flowable.common.SagaResultPublisher;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.flowable.common.engine.api.delegate.Expression;
 import org.flowable.engine.delegate.DelegateExecution;
-import org.flowable.engine.delegate.JavaDelegate;
 import org.flowable.engine.impl.context.Context;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Publishes the saga result (completed or failed) to Kafka at the end of a BPMN process. Placed as
  * the final service task in both the success and error paths.
  */
-public class ResultPublishDelegate implements JavaDelegate {
+public class ResultPublishDelegate extends AbstractSagaDelegate {
 
-  private static final Logger LOG = LoggerFactory.getLogger(ResultPublishDelegate.class);
+  private static final String RESULT_TYPE_SUCCESS = "success";
 
-  /** "success" or "failure" — set via Flowable field injection in BPMN. */
   private Expression resultType;
 
   /** "true" if this process supports compensation (create/update), "false" for delete. */
@@ -36,16 +34,16 @@ public class ResultPublishDelegate implements JavaDelegate {
 
   @Override
   public void execute(DelegateExecution execution) {
-    FlowableResultPublisher publisher = resolvePublisher();
+    SagaResultPublisher publisher = resolvePublisher();
     if (publisher == null) {
       throw new IllegalStateException(
-          "No FlowableResultPublisher bean found — saga result cannot be published");
+          "No SagaResultPublisher bean found — saga result cannot be published");
     }
 
     String sagaId = stringVar(execution, "sagaId");
     String type = resolveString(resultType, execution);
 
-    if ("success".equals(type)) {
+    if (RESULT_TYPE_SUCCESS.equals(type)) {
       Map<String, Object> results = collectResults(execution);
       publisher.publishCompleted(sagaId, results);
     } else {
@@ -54,7 +52,7 @@ public class ResultPublishDelegate implements JavaDelegate {
       String error = stringVar(execution, "sagaError");
       boolean hasCompensation = !"false".equals(resolveString(supportsCompensation, execution));
       boolean compensated = hasCompensation && !hasCompensationErrors(execution);
-      publisher.publishFailed(sagaId, datasetId, failedStep, error, compensated);
+      publisher.publishFailed(new SagaFailure(sagaId, datasetId, failedStep, error, compensated));
     }
   }
 
@@ -83,27 +81,19 @@ public class ResultPublishDelegate implements JavaDelegate {
 
   private boolean hasCompensationErrors(DelegateExecution execution) {
     Object errors = execution.getVariable("compensationErrors");
-    return errors instanceof java.util.List<?> list && !list.isEmpty();
+    return errors instanceof List<?> list && !list.isEmpty();
   }
 
-  private FlowableResultPublisher resolvePublisher() {
+  private SagaResultPublisher resolvePublisher() {
     var config = Context.getProcessEngineConfiguration();
     if (config == null || config.getBeans() == null) {
       return null;
     }
-    return (FlowableResultPublisher) config.getBeans().get("resultPublisher");
+    return (SagaResultPublisher) config.getBeans().get("resultPublisher");
   }
 
   private String stringVar(DelegateExecution execution, String name) {
     Object value = execution.getVariable(name);
-    return value != null ? value.toString() : null;
-  }
-
-  private String resolveString(Expression expression, DelegateExecution execution) {
-    if (expression == null) {
-      return null;
-    }
-    Object value = expression.getValue(execution);
     return value != null ? value.toString() : null;
   }
 

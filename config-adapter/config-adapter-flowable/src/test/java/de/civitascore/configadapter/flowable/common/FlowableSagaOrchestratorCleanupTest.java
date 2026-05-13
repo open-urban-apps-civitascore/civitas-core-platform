@@ -125,6 +125,51 @@ class FlowableSagaOrchestratorCleanupTest {
         "Error must specifically mention the missing redpanda handler");
   }
 
+  @Test
+  void constructor_defensivelyCopiesHandlersMap() {
+    SagaCommandHandler frost = mock(SagaCommandHandler.class);
+    when(frost.adapter()).thenReturn("frost");
+    SagaCommandHandler apisix = mock(SagaCommandHandler.class);
+    when(apisix.adapter()).thenReturn("apisix");
+    SagaCommandHandler redpanda = mock(SagaCommandHandler.class);
+    when(redpanda.adapter()).thenReturn("redpanda");
+
+    java.util.Map<String, SagaCommandHandler> mutableMap =
+        new java.util.HashMap<>(Map.of("frost", frost, "apisix", apisix, "redpanda", redpanda));
+
+    FlowableSagaOrchestrator sut = orchestratorWith("jdbc:h2:mem:copy-test", "sa", "", mutableMap);
+
+    // Mutate the original map AFTER construction
+    mutableMap.clear();
+
+    // Must still work — handlers were defensively copied
+    assertDoesNotThrow(sut::initialize);
+    sut.close();
+  }
+
+  private FlowableSagaOrchestrator orchestratorWith(
+      String url, String user, String pass, java.util.Map<String, SagaCommandHandler> handlers) {
+    AdapterConfig config =
+        new AdapterConfig() {
+          @Override
+          public String getProperty(String key) {
+            return switch (key) {
+              case "flowable.jdbc.url" -> url;
+              case "flowable.jdbc.username" -> user;
+              case "flowable.jdbc.password" -> pass;
+              default -> null;
+            };
+          }
+
+          @Override
+          public String getProperty(String key, String defaultValue) {
+            String value = getProperty(key);
+            return value != null ? value : defaultValue;
+          }
+        };
+    return new FlowableSagaOrchestrator(config, handlers);
+  }
+
   private FlowableSagaOrchestrator orchestratorWith(String url, String user, String pass) {
     AdapterConfig config =
         new AdapterConfig() {

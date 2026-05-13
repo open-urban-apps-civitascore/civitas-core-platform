@@ -12,6 +12,8 @@ package de.civitascore.configadapter.flowable.common.kafka;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import de.civitascore.configadapter.flowable.common.SagaFailure;
+import de.civitascore.configadapter.flowable.common.SagaResultPublisher;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +32,7 @@ import org.slf4j.LoggerFactory;
  * {@code KafkaSagaActionDispatcher}. Ensures downstream consumers (portal-backend) see identical
  * messages regardless of which orchestrator is running.
  */
-public class FlowableResultPublisher {
+public class FlowableResultPublisher implements SagaResultPublisher {
 
   private static final Logger LOG = LoggerFactory.getLogger(FlowableResultPublisher.class);
 
@@ -45,10 +47,8 @@ public class FlowableResultPublisher {
     this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
   }
 
-  /**
-   * Publishes a SAGA_COMPLETED result. Format matches {@code
-   * KafkaSagaActionDispatcher.dispatchCompleteSaga()}.
-   */
+  /** {@inheritDoc} */
+  @Override
   public void publishCompleted(String sagaId, Map<String, Object> resultPayload) {
     var message = new HashMap<String, Object>();
     message.put("type", "SAGA_COMPLETED");
@@ -61,27 +61,26 @@ public class FlowableResultPublisher {
     LOG.info("Published SAGA_COMPLETED: sagaId={}", Encode.forJava(sagaId));
   }
 
-  /**
-   * Publishes a SAGA_FAILED result. Format matches {@code
-   * KafkaSagaActionDispatcher.dispatchFailSaga()}.
-   */
-  public void publishFailed(
-      String sagaId, String datasetId, String failedStep, String error, boolean compensated) {
+  /** {@inheritDoc} */
+  @Override
+  public void publishFailed(SagaFailure failure) {
     var message = new HashMap<String, Object>();
     message.put("type", "SAGA_FAILED");
     message.put("messageId", UUID.randomUUID().toString());
-    message.put("sagaId", sagaId);
-    message.put("datasetId", datasetId);
-    message.put("status", compensated ? "COMPENSATED" : "FAILED");
-    message.put("failedStep", failedStep);
-    message.put("error", error);
-    message.put("compensated", compensated);
+    message.put("sagaId", failure.sagaId());
+    message.put("datasetId", failure.datasetId());
+    message.put("status", failure.compensated() ? "COMPENSATED" : "FAILED");
+    message.put("failedStep", failure.failedStep());
+    message.put("error", failure.error());
+    message.put("compensated", failure.compensated());
     message.put("staleResources", List.of());
     message.put("cleanedResources", List.of());
 
-    publish(sagaId, message);
+    publish(failure.sagaId(), message);
     LOG.info(
-        "Published SAGA_FAILED: sagaId={}, compensated={}", Encode.forJava(sagaId), compensated);
+        "Published SAGA_FAILED: sagaId={}, compensated={}",
+        Encode.forJava(failure.sagaId()),
+        failure.compensated());
   }
 
   private void publish(String key, Map<String, Object> message) {
@@ -101,7 +100,8 @@ public class FlowableResultPublisher {
     }
   }
 
-  /** Close the underlying producer. */
+  /** {@inheritDoc} */
+  @Override
   public void close() {
     producer.close();
   }

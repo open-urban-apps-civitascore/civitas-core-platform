@@ -16,7 +16,9 @@ import de.civitascore.configadapter.flowable.bpmn.BpmnProcessDeployer;
 import de.civitascore.configadapter.flowable.coded.CodedProcessDeployer;
 import de.civitascore.configadapter.flowable.common.kafka.FlowableResultPublisher;
 import de.civitascore.configadapter.flowable.common.kafka.FlowableTriggerConsumer;
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.Set;
 import org.flowable.engine.ProcessEngine;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
@@ -37,6 +39,7 @@ public class FlowableSagaOrchestrator implements AutoCloseable {
 
   private static final String PROP_APPROACH = "flowable.approach";
   private static final String APPROACH_CODED = "coded";
+  private static final Set<String> REQUIRED_HANDLERS = Set.of("frost", "apisix", "redpanda");
 
   private final AdapterConfig config;
   private final Map<String, SagaCommandHandler> handlers;
@@ -48,13 +51,11 @@ public class FlowableSagaOrchestrator implements AutoCloseable {
 
   public FlowableSagaOrchestrator(AdapterConfig config, Map<String, SagaCommandHandler> handlers) {
     this.config = config;
-    this.handlers = handlers;
+    this.handlers = Map.copyOf(handlers);
   }
 
-  private static final java.util.Set<String> REQUIRED_HANDLERS =
-      java.util.Set.of("frost", "apisix", "redpanda");
-
   /** Initialize the Flowable engine and deploy processes. Cleans up on failure. */
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // Cleanup must catch everything
   public void initialize() {
     LOG.info("Initializing FlowableSagaOrchestrator...");
 
@@ -103,7 +104,7 @@ public class FlowableSagaOrchestrator implements AutoCloseable {
   }
 
   private void validateRequiredHandlers() {
-    var missing = new java.util.ArrayList<String>();
+    var missing = new ArrayList<String>();
     for (String required : REQUIRED_HANDLERS) {
       if (!handlers.containsKey(required)) {
         missing.add(required);
@@ -125,29 +126,39 @@ public class FlowableSagaOrchestrator implements AutoCloseable {
     closeQuietly(
         "triggerConsumer",
         () -> {
-          if (triggerConsumer != null) triggerConsumer.stop();
+          if (triggerConsumer != null) {
+            triggerConsumer.stop();
+          }
         });
     triggerConsumer = null;
     closeQuietly(
         "resultPublisher",
         () -> {
-          if (resultPublisher != null) resultPublisher.close();
+          if (resultPublisher != null) {
+            resultPublisher.close();
+          }
         });
     resultPublisher = null;
     closeQuietly(
         "processEngine",
         () -> {
-          if (processEngine != null) processEngine.close();
+          if (processEngine != null) {
+            processEngine.close();
+          }
         });
     processEngine = null;
     closeQuietly(
         "dataSource",
         () -> {
-          if (dataSource != null) dataSource.close();
+          if (dataSource != null) {
+            dataSource.close();
+          }
         });
+    dataSource = null;
     LOG.info("FlowableSagaOrchestrator shut down");
   }
 
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // Intentional: best-effort cleanup
   private void closeQuietly(String name, Runnable closeAction) {
     try {
       closeAction.run();

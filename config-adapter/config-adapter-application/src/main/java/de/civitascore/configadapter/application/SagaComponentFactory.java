@@ -45,8 +45,6 @@ class SagaComponentFactory {
   private static final String DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092";
 
   SagaComponents create(AppConfig config) {
-    String bootstrapServers =
-        config.getProperty(KAFKA_BOOTSTRAP_SERVERS, DEFAULT_BOOTSTRAP_SERVERS);
     String engine = config.getProperty("orchestrator.engine", "custom");
 
     if ("flowable".equals(engine)) {
@@ -55,6 +53,8 @@ class SagaComponentFactory {
     }
 
     logger.info("Using custom saga orchestrator (orchestrator.engine=custom)");
+    String bootstrapServers =
+        config.getProperty(KAFKA_BOOTSTRAP_SERVERS, DEFAULT_BOOTSTRAP_SERVERS);
     Optional<KafkaSagaCommandConsumer> commandConsumer =
         Optional.ofNullable(createSagaCommandConsumer(config, bootstrapServers));
     Optional<OrchestratorPair> orchestratorPair = initializeSagaOrchestrator(bootstrapServers);

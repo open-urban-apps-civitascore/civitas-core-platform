@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.civitascore.configadapter.flowable.common.SagaFailure;
 import java.util.Map;
 import org.apache.kafka.clients.producer.MockProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -59,7 +60,7 @@ class FlowableResultPublisherTest {
   @Test
   void shouldPublishFailedResultInCorrectFormat() throws Exception {
     publisher.publishFailed(
-        "saga-123", "ds-456", "create-route", "APISIX connection refused", true);
+        new SagaFailure("saga-123", "ds-456", "create-route", "APISIX connection refused", true));
 
     assertEquals(1, mockProducer.history().size());
     ProducerRecord<String, byte[]> record = mockProducer.history().get(0);
@@ -79,7 +80,8 @@ class FlowableResultPublisherTest {
 
   @Test
   void shouldSetStatusToFailedWhenNotCompensated() throws Exception {
-    publisher.publishFailed("saga-123", "ds-456", "delete-route", "APISIX down", false);
+    publisher.publishFailed(
+        new SagaFailure("saga-123", "ds-456", "delete-route", "APISIX down", false));
 
     ProducerRecord<String, byte[]> record = mockProducer.history().get(0);
     Map<String, Object> message = objectMapper.readValue(record.value(), MAP_TYPE);

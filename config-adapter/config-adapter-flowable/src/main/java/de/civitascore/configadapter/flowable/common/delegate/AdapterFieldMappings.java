@@ -20,6 +20,8 @@ import java.util.Map;
  */
 final class AdapterFieldMappings {
 
+  private static final String BASE_URL = "baseUrl";
+
   private AdapterFieldMappings() {}
 
   /**
@@ -31,13 +33,13 @@ final class AdapterFieldMappings {
   static void apply(Map<String, Object> payload, String adapter) {
     switch (adapter) {
       case "apisix" -> {
-        if (payload.containsKey("baseUrl") && !payload.containsKey("upstreamUrl")) {
-          payload.put("upstreamUrl", payload.get("baseUrl"));
+        if (payload.containsKey(BASE_URL) && !payload.containsKey("upstreamUrl")) {
+          payload.put("upstreamUrl", payload.get(BASE_URL));
         }
       }
       case "redpanda" -> {
-        if (payload.containsKey("baseUrl") && !payload.containsKey("targetUrl")) {
-          payload.put("targetUrl", payload.get("baseUrl"));
+        if (payload.containsKey(BASE_URL) && !payload.containsKey("targetUrl")) {
+          payload.put("targetUrl", payload.get(BASE_URL));
         }
       }
       default -> {}

@@ -14,6 +14,7 @@ import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.flowable.common.SagaHandlerRegistry;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -37,6 +38,7 @@ import org.slf4j.LoggerFactory;
 public class SagaStepDelegate extends AbstractSagaDelegate {
 
   private static final Logger LOG = LoggerFactory.getLogger(SagaStepDelegate.class);
+  private static final String TYPE_STEP_COMPLETED = "STEP_COMPLETED";
 
   private static final Set<String> INTERNAL_VARIABLE_PREFIXES =
       Set.of("compensationData_", "compensationError_");
@@ -49,6 +51,7 @@ public class SagaStepDelegate extends AbstractSagaDelegate {
   private Expression stepId;
 
   @Override
+  @SuppressWarnings("PMD.CloseResource") // Handler lifecycle managed by ServiceLoader, not callers
   public void execute(DelegateExecution execution) {
     String adapter = resolveString(adapterName, execution);
     String op = resolveString(operation, execution);
@@ -77,13 +80,12 @@ public class SagaStepDelegate extends AbstractSagaDelegate {
 
   @SuppressWarnings("unchecked")
   private void handleResult(DelegateExecution execution, SagaCommandResult result, String step) {
-    if ("STEP_COMPLETED".equals(result.type())) {
+    if (TYPE_STEP_COMPLETED.equals(result.type())) {
       if (result.resultData() != null) {
         result.resultData().forEach(execution::setVariable);
-        java.util.Set<String> resultKeys =
-            (java.util.Set<String>) execution.getVariable("_resultKeys");
+        Set<String> resultKeys = (Set<String>) execution.getVariable("_resultKeys");
         if (resultKeys == null) {
-          resultKeys = new java.util.HashSet<>();
+          resultKeys = new HashSet<>();
         }
         resultKeys.addAll(result.resultData().keySet());
         execution.setVariable("_resultKeys", (Object) resultKeys);

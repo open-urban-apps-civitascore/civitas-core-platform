@@ -34,12 +34,14 @@ import org.slf4j.LoggerFactory;
 public class SagaCompensationDelegate extends AbstractSagaDelegate {
 
   private static final Logger LOG = LoggerFactory.getLogger(SagaCompensationDelegate.class);
+  private static final String TYPE_COMPENSATION_COMPLETED = "COMPENSATION_COMPLETED";
 
   private Expression adapterName;
   private Expression operation;
   private Expression stepId;
 
   @Override
+  @SuppressWarnings("PMD.CloseResource") // Handler lifecycle managed by ServiceLoader, not callers
   public void execute(DelegateExecution execution) {
     String adapter = resolveString(adapterName, execution);
     String op = resolveString(operation, execution);
@@ -65,7 +67,7 @@ public class SagaCompensationDelegate extends AbstractSagaDelegate {
 
     SagaCommandResult result = handler.handle(command);
 
-    if ("COMPENSATION_COMPLETED".equals(result.type())) {
+    if (TYPE_COMPENSATION_COMPLETED.equals(result.type())) {
       LOG.info(
           "Compensation completed: sagaId={}, step={}", Encode.forJava(saga), Encode.forJava(step));
     } else {
@@ -92,7 +94,7 @@ public class SagaCompensationDelegate extends AbstractSagaDelegate {
     for (var entry : allVariables.entrySet()) {
       if (!entry.getKey().startsWith("compensationData_")
           && !entry.getKey().startsWith("compensationError_")
-          && !entry.getKey().equals("compensationErrors")) {
+          && !"compensationErrors".equals(entry.getKey())) {
         payload.putIfAbsent(entry.getKey(), entry.getValue());
       }
     }
