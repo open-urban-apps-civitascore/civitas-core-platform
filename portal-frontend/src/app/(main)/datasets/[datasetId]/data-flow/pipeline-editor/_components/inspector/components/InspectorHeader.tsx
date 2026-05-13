@@ -8,7 +8,7 @@
  *
  */
 
-import { Clock, Database, Globe, Radio, Play, Reply, Square, Workflow } from 'lucide-react'
+import { Clock, Database, Globe, Play, Radio, Reply, Square, Workflow } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
