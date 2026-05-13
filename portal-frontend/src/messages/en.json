@@ -877,6 +877,7 @@
   },
   "pipelineEditor": {
     "title": "Pipeline Editor",
+    "subtitle": "Defines how data is ingested, transformed, and persisted",
     "canvas": {
       "noPipeline": "No pipeline available"
     },
@@ -911,12 +912,12 @@
       "transformation": "Transformation"
     },
     "paletteItems": {
-      "flowStart": "Flow Start",
+      "flowStart": "Pipeline Start",
       "flowStartDesc": "Pipeline entry point. Execution starts here.",
-      "flowEnd": "Flow End",
+      "flowEnd": "Pipeline End",
       "flowEndDesc": "Pipeline exit point. Execution ends here.",
       "dataSource": "Data source",
-      "dataSourceDesc": "Data source. Select a configured Data source.",
+      "dataSourceDesc": "Select data source.",
       "apiRequest": "API Request",
       "apiRequestDesc": "REST API request trigger. Creates endpoint that serves data on HTTP request.",
       "apiResponse": "API Response",

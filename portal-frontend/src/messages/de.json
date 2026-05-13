@@ -863,6 +863,7 @@
   },
   "pipelineEditor": {
     "title": "Pipeline-Editor",
+    "subtitle": "Definiert, wie Daten ingestiert, transformiert und persistiert werden",
     "canvas": {
       "noPipeline": "Keine Pipeline verfügbar"
     },
@@ -897,12 +898,12 @@
       "transformation": "Transformation"
     },
     "paletteItems": {
-      "flowStart": "Flow Start",
+      "flowStart": "Pipeline Start",
       "flowStartDesc": "Pipeline-Einstiegspunkt. Ausführung beginnt hier.",
-      "flowEnd": "Flow Ende",
+      "flowEnd": "Pipeline Ende",
       "flowEndDesc": "Pipeline-Endpunkt. Ausführung endet hier.",
       "dataSource": "Datenquelle",
-      "dataSourceDesc": "Datenquelle. Wähle eine konfigurierte Datenquelle aus.",
+      "dataSourceDesc": "Datenquelle auswählen",
       "apiRequest": "API-Request",
       "apiRequestDesc": "REST-API Request. Erstellt Endpunkt, der Daten bereitstellt.",
       "apiResponse": "API-Response",
@@ -910,7 +911,7 @@
       "cron": "CRON",
       "cronDesc": "Geplanter Trigger. Führt Pipeline nach Zeitplan aus.",
       "frostServer": "FROST Server",
-      "frostServerDesc": "SensorThings API Persistenz. Daten speichern oder abrufen.",
+      "frostServerDesc": "SensorThings API persistence",
       "mapping": "Mapping",
       "mappingDesc": "Bloblang-Datentransformation. Daten zuordnen und transformieren."
     },
@@ -1011,7 +1012,7 @@
     "tabs": {
       "closeTab": "Tab schließen",
       "newPipeline": "Neue Pipeline",
-      "untitledPipeline": "Unbenannte Pipeline"
+      "untitledPipeline": "Pipeline ohne Namen"
     },
     "nodeLabels": {
       "notConfigured": "Nicht konfiguriert"

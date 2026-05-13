@@ -265,7 +265,7 @@ export const createDefaultNodeData = (nodeType: PipelineNodeType, datasetId?: st
       }
     case PIPELINE_NODE_TYPES.Frost:
       return {
-        label: 'Storage',
+        label: 'Frost Server',
         configured: true, // Auto-configured with fixed server
         entityType: ENTITY_TYPES.Frost,
         serverName: 'Frost Server',
