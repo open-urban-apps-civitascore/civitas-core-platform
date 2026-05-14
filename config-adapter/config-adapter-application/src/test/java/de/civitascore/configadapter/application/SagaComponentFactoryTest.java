@@ -39,6 +39,7 @@ class SagaComponentFactoryTest {
       AppConfig config =
           configWith(
               Map.of(
+                  "orchestrator.engine", "custom",
                   "kafka.bootstrap.servers", "localhost:9092",
                   "kafka.group.id", "test-group"));
 
@@ -51,7 +52,8 @@ class SagaComponentFactoryTest {
     @Test
     @DisplayName("Should not throw when using default bootstrap servers")
     void defaultBootstrapServers() {
-      AppConfig config = configWith(Map.of("kafka.group.id", "test-group"));
+      AppConfig config =
+          configWith(Map.of("orchestrator.engine", "custom", "kafka.group.id", "test-group"));
 
       SagaComponents components = factory.create(config);
 
@@ -65,6 +67,7 @@ class SagaComponentFactoryTest {
       AppConfig config =
           configWith(
               Map.of(
+                  "orchestrator.engine", "custom",
                   "kafka.bootstrap.servers", "localhost:9092",
                   "kafka.group.id", "test-group"));
 

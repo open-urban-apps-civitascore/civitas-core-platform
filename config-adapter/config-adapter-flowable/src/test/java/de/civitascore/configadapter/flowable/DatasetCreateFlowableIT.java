@@ -21,6 +21,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import de.civitascore.configadapter.apisix.ApisixSagaHandler;
 import de.civitascore.configadapter.flowable.bpmn.BpmnProcessDeployer;
+import de.civitascore.configadapter.flowable.coded.CodedProcessDeployer;
 import de.civitascore.configadapter.flowable.common.FlowableEngineFactory;
 import de.civitascore.configadapter.flowable.common.SagaHandlerRegistry;
 import de.civitascore.configadapter.flowable.common.kafka.FlowableResultPublisher;
@@ -48,7 +49,8 @@ import org.flowable.job.api.Job;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -136,8 +138,6 @@ class DatasetCreateFlowableIT {
     processEngine =
         FlowableEngineFactory.createWithH2(
             Map.of("sagaHandlerRegistry", registry, "resultPublisher", resultPublisher));
-
-    BpmnProcessDeployer.deploy(processEngine.getRepositoryService());
   }
 
   @AfterEach
@@ -153,8 +153,10 @@ class DatasetCreateFlowableIT {
     network.close();
   }
 
-  @Test
-  void datasetCreateSaga_completesWithRealFrostAndMockApisix() {
+  @ParameterizedTest(name = "approach={0}")
+  @ValueSource(strings = {"bpmn", "coded"})
+  void datasetCreateSaga_completesWithRealFrostAndMockApisix(String approach) {
+    deployProcesses(approach);
     String datasetId = "ds-flowable-e2e-" + UUID.randomUUID().toString().substring(0, 8);
 
     Map<String, Object> variables = new HashMap<>();
@@ -228,8 +230,10 @@ class DatasetCreateFlowableIT {
         "Should have created route");
   }
 
-  @Test
-  void datasetCreateSaga_compensatesOnApisixFailure() throws IOException {
+  @ParameterizedTest(name = "approach={0}")
+  @ValueSource(strings = {"bpmn", "coded"})
+  void datasetCreateSaga_compensatesOnApisixFailure(String approach) throws IOException {
+    deployProcesses(approach);
     apisixMock.stop(0);
     apisixMock = HttpServer.create(new InetSocketAddress(0), 0);
     apisixMock.createContext(
@@ -281,6 +285,14 @@ class DatasetCreateFlowableIT {
     assertTrue(
         allTasks.stream().anyMatch(t -> t.startsWith("compensate-")),
         "Should have executed a compensation task");
+  }
+
+  private void deployProcesses(String approach) {
+    if ("coded".equals(approach)) {
+      CodedProcessDeployer.deploy(processEngine.getRepositoryService());
+    } else {
+      BpmnProcessDeployer.deploy(processEngine.getRepositoryService());
+    }
   }
 
   private void executeAllJobs() {

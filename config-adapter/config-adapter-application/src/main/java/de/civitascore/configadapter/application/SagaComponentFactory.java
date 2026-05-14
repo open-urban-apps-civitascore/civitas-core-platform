@@ -45,7 +45,7 @@ class SagaComponentFactory {
   private static final String DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092";
 
   SagaComponents create(AppConfig config) {
-    String engine = config.getProperty("orchestrator.engine", "custom");
+    String engine = config.getProperty("orchestrator.engine", "flowable");
 
     if ("flowable".equals(engine)) {
       logger.info("Using Flowable saga orchestrator (orchestrator.engine=flowable)");
