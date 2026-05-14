@@ -17,17 +17,17 @@ services:
   # ── Databases ──────────────────────────────────────────────
 
   postgres-portal:
-    image: postgres:18.1-alpine
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM postgres:18.1-alpine
+        RUN echo "CREATE DATABASE flowable OWNER admin;" > /docker-entrypoint-initdb.d/20-flowable.sql
     environment:
       POSTGRES_DB: portal_backend
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
       POSTGRES_HOST_AUTH_METHOD: md5
       POSTGRES_INITDB_ARGS: "--auth-host=md5"
-    volumes:
-      - type: bind
-        source: ./init-flowable-db.sql
-        target: /docker-entrypoint-initdb.d/20-flowable.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d portal_backend"]
       interval: 5s
