@@ -5,6 +5,6 @@ services:
       context: ../../config-adapter
       dockerfile: Dockerfile
     environment:
-      FLOWABLE_JDBC_URL: jdbc:postgresql://postgres-portal:5432/portal_backend
+      FLOWABLE_JDBC_URL: jdbc:postgresql://postgres-portal:5432/flowable
       FLOWABLE_JDBC_USERNAME: admin
       FLOWABLE_JDBC_PASSWORD: admin
