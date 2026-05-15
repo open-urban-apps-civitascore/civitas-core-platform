@@ -1,0 +1,54 @@
+meta {
+  name: Contract SQL — DRAFT accepts empty configuration (deferred validation)
+  type: http
+  seq: 16
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+body:json {
+  {
+    "name": "contract_sql_empty",
+    "description": "x",
+    "connectorType": "SQL",
+    "configuration": {},
+    "dataStructureVersionId": null
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('contractSqlEmptyConfigId', res.body.id);
+  }
+}
+
+tests {
+  test("Status is 201 — empty SQL configuration accepted on DRAFT", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
+docs {
+  Pins the deferred-validation contract: a DataSource in DRAFT status may
+  be saved with an incomplete or empty `configuration`. Validation of
+  required fields is deferred to the release transition, enforced via the
+  Bean Validation `OnRelease` group on `SqlConnectorConfiguration`
+  (`driver`, `dsn`, `table`, etc. carry `@NotBlank(groups = OnRelease.class)`).
+
+  The release-time half of this contract is pinned by
+  `sql-release-rejects-empty-configuration-*.bru` — if either half changes
+  during the refactor, both tests need to be revisited together.
+
+  Probing during #1391 phase 1 confirmed the DRAFT-side behaviour:
+  - POST with `configuration: {}` → 201, response config = all defaults
+  - POST with `configuration` omitted → 201, response config = null
+  - POST with only `password` present → 201, password kept and masked
+}

@@ -1,0 +1,50 @@
+meta {
+  name: Contract MQTT — validation: qos out of range
+  type: http
+  seq: 32
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+body:json {
+  {
+    "name": "contract_mqtt_invalid",
+    "description": "x",
+    "connectorType": "MQTT",
+    "configuration": {
+      "urls": ["tcp://broker:1883"],
+      "topics": ["sensor/data"],
+      "qos": 99
+    },
+    "dataStructureVersionId": null
+  }
+}
+
+tests {
+  test("Status is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Error body matches the INVALID_INPUT contract", function() {
+    expect(res.body.type).to.equal("urn:civitas:error:INVALID_INPUT");
+    expect(res.body.title).to.equal("Bad Request");
+    expect(res.body.status).to.equal(400);
+    expect(res.body.detail).to.equal("Invalid configuration: 'qos' must be 0, 1, or 2");
+    expect(res.body.instance).to.equal("/v1/datasources");
+  });
+}
+
+docs {
+  Pins the error response for MQTT with `qos: 99` (must be 0, 1, or 2).
+
+  This is the only configuration field on the MQTT connector that is
+  currently validated — `urls` and `topics` are not validated (see
+  `mqtt-empty-config-accepted-*.bru`).
+}

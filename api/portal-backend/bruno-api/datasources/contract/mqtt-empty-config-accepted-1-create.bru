@@ -1,0 +1,55 @@
+meta {
+  name: Contract MQTT — DRAFT accepts empty configuration (deferred validation)
+  type: http
+  seq: 33
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+body:json {
+  {
+    "name": "contract_mqtt_empty",
+    "description": "x",
+    "connectorType": "MQTT",
+    "configuration": {},
+    "dataStructureVersionId": null
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('contractMqttEmptyConfigId', res.body.id);
+  }
+}
+
+tests {
+  test("Status is 201 — empty MQTT configuration accepted on DRAFT", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
+docs {
+  Pins the deferred-validation contract: a DataSource in DRAFT status may
+  be saved with an incomplete or empty `configuration`. Required fields
+  on the MQTT connector (`urls`, `topics`, `qos`) carry
+  `@NotEmpty(groups = OnRelease.class)` / `@NotNull(groups = OnRelease.class)`
+  and are enforced at the release transition, not at create/update time.
+
+  The `qos` *range* check (must be 0/1/2) belongs to the `Default` group
+  and runs eagerly — pinned by `mqtt-validation-qos-out-of-range.bru`.
+  The release-time half of the deferred contract is pinned by
+  `mqtt-release-rejects-empty-configuration-*.bru`.
+
+  Probing during #1391 phase 1 confirmed the DRAFT-side behaviour:
+  - POST with `configuration: {}` → 201 (all fields null, `tls.enabled = false`)
+  - POST without `urls` → 201 (urls null)
+  - POST without `topics` → 201 (topics null)
+}
