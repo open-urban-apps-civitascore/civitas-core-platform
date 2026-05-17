@@ -33,6 +33,7 @@
 		<module>config-adapter-orchestrator</module>
 		<module>config-adapter-redpanda</module>
 		<module>config-adapter-flowable</module>
+		<module>config-adapter-postgis</module>
 	</modules>
 
 	<properties>
@@ -67,6 +68,8 @@
 		<postgresql.version>42.7.11</postgresql.version>
 		<h2.version>2.3.232</h2.version>
 		<cyclonedx-maven-plugin.version>2.9.0</cyclonedx-maven-plugin.version>
+		<postgresql.version>42.7.4</postgresql.version>
+		<hikaricp.version>6.2.1</hikaricp.version>
 	</properties>
 
 	<dependencyManagement>
@@ -212,6 +215,7 @@
 				<artifactId>HikariCP</artifactId>
 				<version>${hikaricp.version}</version>
 			</dependency>
+			<!-- JDBC / Connection Pool -->
 			<dependency>
 				<groupId>org.postgresql</groupId>
 				<artifactId>postgresql</artifactId>
@@ -221,6 +225,9 @@
 				<groupId>com.h2database</groupId>
 				<artifactId>h2</artifactId>
 				<version>${h2.version}</version>
+				<groupId>com.zaxxer</groupId>
+				<artifactId>HikariCP</artifactId>
+				<version>${hikaricp.version}</version>
 			</dependency>
 
 			<!-- Testing -->
@@ -251,6 +258,12 @@
 			<dependency>
 				<groupId>org.testcontainers</groupId>
 				<artifactId>testcontainers-kafka</artifactId>
+				<version>${testcontainers.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.testcontainers</groupId>
+				<artifactId>testcontainers-postgresql</artifactId>
 				<version>${testcontainers.version}</version>
 				<scope>test</scope>
 			</dependency>

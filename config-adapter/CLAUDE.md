@@ -38,7 +38,7 @@ mvn package -Pdist -pl config-adapter-application
 
 ## Architecture
 
-Java 21 Maven multi-module project. Event-driven config adapter framework consuming CNCF CloudEvents from Kafka, applying changes to backend services (Keycloak, APISIX, RedPanda Connect, FROST, GeoServer), and publishing result events.
+Java 25 Maven multi-module project. Event-driven config adapter framework consuming CNCF CloudEvents from Kafka, applying changes to backend services (Keycloak, APISIX, RedPanda Connect, FROST, GeoServer, PostGIS), and publishing result events.
 
 ### Module Dependency Graph
 
@@ -47,6 +47,7 @@ config-adapter-api          ← Pure interfaces & models, no impl dependencies
     ↑
     ├── config-adapter-configuration  ← AppConfig (Commons Configuration2), env var support
     ├── event-handler-kafka           ← KafkaEventHandler (consumer + publisher), virtual threads
+    ├── config-adapter-orchestrator   ← Saga orchestrator engine + Kafka integration
     ├── config-adapter-keycloak       ← Keycloak Admin Client REST adapter
     ├── config-adapter-apisix         ← APISIX Admin API adapter
     ├── config-adapter-redpanda       ← RedPanda Connect Streams API adapter (JAX-RS/Jersey)
@@ -54,6 +55,7 @@ config-adapter-api          ← Pure interfaces & models, no impl dependencies
     ├── config-adapter-geoserver      ← GeoServer REST API adapter (JAX-RS/Jersey)
     ├── config-adapter-examples       ← DummyLogAdapter (logging reference impl)
     ├── config-adapter-orchestrator   ← Custom saga engine (Kafka-based state machine)
+    ├── config-adapter-postgis        ← PostgreSQL/PostGIS DDL adapter (JDBC + HikariCP)
     └── config-adapter-flowable       ← Flowable BPMN saga engine (embedded, PostgreSQL state)
     ↑
 config-adapter-application  ← Bootstrap, ServiceLoader discovery, health checks, shade JAR
@@ -75,15 +77,16 @@ Key interfaces: `ConfigAdapter`, `EventConsumer`, `EventPublisher`, `AdapterConf
 ### Config Value Hierarchy (Sealed)
 
 ```
-IdmConfigValue (sealed) → UserConfig, ClientConfig, RealmConfig, RoleConfig, GroupConfig
-ApisixConfigValue → RouteConfigValue
-FrostConfigValue (interface with toApiMap())
+IdmConfigValue (sealed)     → UserConfig, ClientConfig, RealmConfig, RoleConfig, GroupConfig
+ApisixConfigValue           → RouteConfigValue
+FrostConfigValue            (class extending AbstractApiModel with toApiMap())
 GeoServerConfigValue (passthrough container; toApiMap() returns additionalProperties as-is)
+PostgisConfigValue (sealed) → TableConfig
 ```
 
 ### Error Codes
 
-`AdapterErrorCode` enum: 1xxx = fatal/validation, 2xxx = retryable/connectivity, 3xxx = adapter-specific, 9xxx = unknown. Each code carries retryable flag, internal log template, and safe external message.
+`AdapterErrorCode` enum: 1xxx = fatal/validation, 2xxx = retryable/connectivity, 3xxx = adapter-specific (30xx Keycloak, 31xx APISIX, 32xx FROST, 33xx RedPanda, 34xx PostGIS), 9xxx = unknown. Each code carries retryable flag, internal log template, and safe external message.
 
 ## Conventions
 

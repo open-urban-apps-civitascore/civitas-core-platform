@@ -64,6 +64,11 @@ public enum AdapterOperation {
   GEOSERVER_RESOURCE_UPDATE("GeoServer resource update"),
   GEOSERVER_RESOURCE_DELETE("GeoServer resource deletion"),
 
+  // PostGIS / SQL operations
+  TABLE_CREATE("table creation"),
+  TABLE_UPDATE("table update"),
+  TABLE_DELETE("table deletion"),
+
   // DummyLog operations
   EVENT_PROCESSING("event processing");
 

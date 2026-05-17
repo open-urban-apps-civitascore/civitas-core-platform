@@ -253,7 +253,43 @@ geoserver.postgis.password=secret
 
 **Documentation:** For detailed documentation including event formats, typed configuration models, error handling, and saga operations, see [GeoServer Adapter Documentation](config-adapter-geoserver/README.md).
 
-### 9. config-adapter-examples
+### 9. config-adapter-postgis
+Adapter for managing PostgreSQL/PostGIS table configuration via DDL.
+
+**Key Components:**
+- `PostgisAdapter` - Applies table DDL (CREATE, DELETE) via JDBC against a Postgres/PostGIS database
+- `PostgisDialect` - Renders DDL and classifies `SQLException`s (duplicate / missing / connectivity)
+- `TableDdlBuilder` - Produces the ordered DDL statement list for a `TableConfig`
+- `ConnectionProvider` - HikariCP-backed `DataSource` wrapper
+
+**Supported Operations:**
+- CREATE - Create schema (if given), table, and indexes (idempotent: SQLState `42P06`/`42P07` → success)
+- DELETE - Drop table (idempotent: SQLState `42P01`/`3F000` → success)
+- UPDATE - Not yet implemented (returns `UNSUPPORTED_OPERATION`)
+
+**Subscribed Topics:**
+- `de.civitascore.data.table.created`
+- `de.civitascore.data.table.updated`
+- `de.civitascore.data.table.deleted`
+
+**Configuration Properties:**
+```properties
+# Topics to subscribe to
+postgis.topics=de.civitascore.data.table.created,de.civitascore.data.table.updated,de.civitascore.data.table.deleted
+
+# JDBC connection settings (required)
+postgis.jdbc.url=jdbc:postgresql://localhost:5432/civitas
+postgis.jdbc.user=civitas
+postgis.jdbc.password=civitas
+
+# Optional pool tuning (defaults shown)
+postgis.jdbc.maxPoolSize=5
+postgis.jdbc.connectionTimeoutMs=5000
+```
+
+**Documentation:** For the design rationale (dialect seam, idempotency policy, why no migration tool), see [PostGIS Adapter Design](docs/postgis-adapter-design.md).
+
+### 10. config-adapter-examples
 Example adapter implementations for reference and testing.
 
 **Key Components:**
@@ -1092,12 +1128,34 @@ Error codes are categorized by type and severity:
 | 3102 | `APISIX_ROUTE_ERROR` | No | APISIX route error: %s | Route operation failed |
 | 3103 | `APISIX_UPSTREAM_ERROR` | No | APISIX upstream error: %s | Upstream operation failed |
 
+**FROST Adapter (3201):**
+
+| Code | Name | Retryable | Internal Log Template | External Message |
+|------|------|-----------|----------------------|------------------|
+| 3201 | `FROST_ENTITY_ERROR` | No | FROST entity error: %s | Entity operation failed |
+
+**RedPanda Adapter (3301-3303):**
+
+| Code | Name | Retryable | Internal Log Template | External Message |
+|------|------|-----------|----------------------|------------------|
+| 3301 | `REDPANDA_ERROR` | Yes | RedPanda Connect error: %s | Pipeline service error |
+| 3302 | `REDPANDA_PIPELINE_ERROR` | No | RedPanda pipeline error: %s | Pipeline operation failed |
+| 3303 | `REDPANDA_DECRYPTION_ERROR` | No | Credential decryption error: %s | Credential processing failed |
+
 **GeoServer Adapter (3401-3402):**
 
 | Code | Name | Retryable | Internal Log Template | External Message |
 |------|------|-----------|----------------------|------------------|
 | 3401 | `GEOSERVER_ERROR` | Yes | GeoServer error: %s | Geo service error |
 | 3402 | `GEOSERVER_RESOURCE_ERROR` | No | GeoServer resource error: %s | Geo resource operation failed |
+
+**PostGIS Adapter (3401-3403):**
+
+| Code | Name | Retryable | Internal Log Template | External Message |
+|------|------|-----------|----------------------|------------------|
+| 3401 | `POSTGIS_ERROR` | No | PostGIS error: %s | Database error |
+| 3402 | `POSTGIS_DDL_ERROR` | No | PostGIS DDL error: %s | Table operation failed |
+| 3403 | `POSTGIS_CONNECTION_ERROR` | Yes | PostGIS connection error: %s | Database temporarily unavailable |
 
 #### 9xxx - Unknown/Unexpected Errors
 
@@ -1190,6 +1248,33 @@ All topics are defined in `de.civitascore.configadapter.Topics` and validated at
 | `GEO_STYLE_UPDATED` | `de.civitascore.geo.style.updated` |
 | `GEO_STYLE_DELETED` | `de.civitascore.geo.style.deleted` |
 
+#### FROST SensorThings Events
+
+| Topic Constant | Topic Value |
+|----------------|-------------|
+| `THING_CREATED` / `_UPDATED` / `_DELETED` | `de.civitascore.data.thing.{created,updated,deleted}` |
+| `LOCATION_CREATED` / `_UPDATED` / `_DELETED` | `de.civitascore.data.location.{created,updated,deleted}` |
+| `SENSOR_CREATED` / `_UPDATED` / `_DELETED` | `de.civitascore.data.sensor.{created,updated,deleted}` |
+| `OBSERVED_PROPERTY_CREATED` / `_UPDATED` / `_DELETED` | `de.civitascore.data.observedproperty.{created,updated,deleted}` |
+| `DATASTREAM_CREATED` / `_UPDATED` / `_DELETED` | `de.civitascore.data.datastream.{created,updated,deleted}` |
+| `FROST_PROJECT_CREATED` / `_UPDATED` / `_DELETED` | `de.civitascore.data.project.{created,updated,deleted}` |
+
+#### Pipeline Events (RedPanda Connect)
+
+| Topic Constant | Topic Value |
+|----------------|-------------|
+| `PIPELINE_CREATED` | `de.civitascore.data.pipeline.created` |
+| `PIPELINE_UPDATED` | `de.civitascore.data.pipeline.updated` |
+| `PIPELINE_DELETED` | `de.civitascore.data.pipeline.deleted` |
+
+#### Table Events (PostGIS)
+
+| Topic Constant | Topic Value |
+|----------------|-------------|
+| `TABLE_CREATED` | `de.civitascore.data.table.created` |
+| `TABLE_UPDATED` | `de.civitascore.data.table.updated` |
+| `TABLE_DELETED` | `de.civitascore.data.table.deleted` |
+
 **Topic Validation:**
 - Topics are validated using `Topics.isValidTopic(String)` method
 - Whitespace is trimmed automatically
@@ -1267,7 +1352,7 @@ This works because the module tests are independent and Testcontainers uses rand
 
 ### Building the Fat JAR
 
-Adapter plugins (APISIX, FROST, RedPanda, Examples) are only included in the fat JAR via the `dist` profile:
+Adapter plugins (APISIX, FROST, RedPanda, PostGIS, Examples) are only included in the fat JAR via the `dist` profile:
 
 ```bash
 mvn package -Pdist
