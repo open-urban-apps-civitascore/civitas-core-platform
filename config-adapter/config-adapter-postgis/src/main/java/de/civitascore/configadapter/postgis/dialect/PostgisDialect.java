@@ -1,0 +1,218 @@
+/**
+ * <p>This work and the accompanying materials are made available under the terms of the European Union Public License (EU-PL) 1.2 which is available at https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
+ *
+ * <p>SPDX-License-Identifier: EUPL-1.2
+ *
+ * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to all the individual contributors:
+ * Copyright (c) 2012-2026 Civitas Connect e. V. and others.
+ *
+ */
+package de.civitascore.configadapter.postgis.dialect;
+
+import de.civitascore.configadapter.model.postgis.ColumnConfig;
+import de.civitascore.configadapter.model.postgis.ColumnType;
+import de.civitascore.configadapter.model.postgis.GeometryColumnConfig;
+import de.civitascore.configadapter.model.postgis.GeometryType;
+import de.civitascore.configadapter.model.postgis.IndexConfig;
+import de.civitascore.configadapter.model.postgis.TableConfig;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * PostgreSQL + PostGIS implementation of {@link SqlDialect}.
+ *
+ * <p>SQLState handling follows the standard PostgreSQL codes:
+ *
+ * <ul>
+ *   <li>{@code 42P07} duplicate_table / duplicate_object (index)
+ *   <li>{@code 42P06} duplicate_schema
+ *   <li>{@code 42P01} undefined_table
+ *   <li>{@code 3F000} invalid_schema_name
+ *   <li>{@code 08*} connection exception (retryable)
+ * </ul>
+ */
+public final class PostgisDialect implements SqlDialect {
+
+  private static final String SQLSTATE_DUPLICATE_TABLE = "42P07";
+  private static final String SQLSTATE_DUPLICATE_SCHEMA = "42P06";
+  private static final String SQLSTATE_UNDEFINED_TABLE = "42P01";
+  private static final String SQLSTATE_INVALID_SCHEMA = "3F000";
+  private static final String SQLSTATE_CLASS_CONNECTION = "08";
+
+  @Override
+  public String quoteIdent(String ident) {
+    if (ident == null) {
+      throw new IllegalArgumentException("identifier must not be null");
+    }
+    return "\"" + ident.replace("\"", "\"\"") + "\"";
+  }
+
+  @Override
+  public String renderColumn(ColumnConfig column) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(quoteIdent(column.name())).append(' ').append(renderType(column));
+    if (!column.isNullable()) {
+      sb.append(" NOT NULL");
+    }
+    if (column.defaultExpr() != null && !column.defaultExpr().isBlank()) {
+      sb.append(" DEFAULT ").append(column.defaultExpr());
+    }
+    return sb.toString();
+  }
+
+  @Override
+  public String renderGeometryColumn(GeometryColumnConfig column) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(quoteIdent(column.name())).append(' ').append(renderGeometryType(column));
+    if (!column.isNullable()) {
+      sb.append(" NOT NULL");
+    }
+    return sb.toString();
+  }
+
+  @Override
+  public String generatedIndexName(TableConfig table, IndexConfig index) {
+    String columnsPart = String.join("_", index.columns());
+    return "idx_" + table.getName() + "_" + columnsPart;
+  }
+
+  @Override
+  public List<String> createTable(TableConfig table) {
+    if (table.getName() == null || table.getName().isBlank()) {
+      throw new IllegalArgumentException("table name must not be blank");
+    }
+
+    List<String> statements = new ArrayList<>();
+    if (table.getSchema() != null && !table.getSchema().isBlank()) {
+      statements.add("CREATE SCHEMA " + quoteIdent(table.getSchema()));
+    }
+    statements.add(buildCreateTableStatement(table));
+    for (IndexConfig index : table.getIndexes()) {
+      statements.add(buildCreateIndexStatement(table, index));
+    }
+    return List.copyOf(statements);
+  }
+
+  @Override
+  public List<String> dropTable(String schema, String name) {
+    if (name == null || name.isBlank()) {
+      throw new IllegalArgumentException("table name must not be blank");
+    }
+    return List.of("DROP TABLE " + qualified(schema, name));
+  }
+
+  @Override
+  public boolean isDuplicate(SQLException e) {
+    String state = e == null ? null : e.getSQLState();
+    return SQLSTATE_DUPLICATE_TABLE.equals(state) || SQLSTATE_DUPLICATE_SCHEMA.equals(state);
+  }
+
+  @Override
+  public boolean isMissing(SQLException e) {
+    String state = e == null ? null : e.getSQLState();
+    return SQLSTATE_UNDEFINED_TABLE.equals(state) || SQLSTATE_INVALID_SCHEMA.equals(state);
+  }
+
+  @Override
+  public boolean isConnectivity(SQLException e) {
+    String state = e == null ? null : e.getSQLState();
+    return state != null && state.startsWith(SQLSTATE_CLASS_CONNECTION);
+  }
+
+  private String buildCreateTableStatement(TableConfig table) {
+    List<String> parts = new ArrayList<>();
+    for (ColumnConfig column : table.getColumns()) {
+      parts.add(renderColumn(column));
+    }
+    for (GeometryColumnConfig column : table.getGeometryColumns()) {
+      parts.add(renderGeometryColumn(column));
+    }
+    if (!table.getPrimaryKey().isEmpty()) {
+      String pkColumns =
+          table.getPrimaryKey().stream().map(this::quoteIdent).collect(Collectors.joining(", "));
+      parts.add("PRIMARY KEY (" + pkColumns + ")");
+    }
+    return "CREATE TABLE "
+        + qualified(table.getSchema(), table.getName())
+        + " ("
+        + String.join(", ", parts)
+        + ")";
+  }
+
+  private String buildCreateIndexStatement(TableConfig table, IndexConfig index) {
+    String indexName =
+        index.name() == null || index.name().isBlank()
+            ? generatedIndexName(table, index)
+            : index.name();
+    String columns =
+        index.columns().stream().map(this::quoteIdent).collect(Collectors.joining(", "));
+    String unique = index.isUnique() ? "UNIQUE " : "";
+    return "CREATE "
+        + unique
+        + "INDEX "
+        + quoteIdent(indexName)
+        + " ON "
+        + qualified(table.getSchema(), table.getName())
+        + " USING "
+        + index.effectiveMethod().name()
+        + " ("
+        + columns
+        + ")";
+  }
+
+  private String qualified(String schema, String name) {
+    if (schema == null || schema.isBlank()) {
+      return quoteIdent(name);
+    }
+    return quoteIdent(schema) + "." + quoteIdent(name);
+  }
+
+  private String renderType(ColumnConfig column) {
+    ColumnType type = column.type();
+    if (type == null) {
+      throw new IllegalArgumentException(
+          "column type must not be null for column " + column.name());
+    }
+    return switch (type) {
+      case SMALLINT -> "SMALLINT";
+      case INTEGER -> "INTEGER";
+      case BIGINT -> "BIGINT";
+      case NUMERIC -> renderNumeric(column);
+      case REAL -> "REAL";
+      case DOUBLE_PRECISION -> "DOUBLE PRECISION";
+      case BOOLEAN -> "BOOLEAN";
+      case VARCHAR -> column.length() == null ? "VARCHAR" : "VARCHAR(" + column.length() + ")";
+      case TEXT -> "TEXT";
+      case UUID -> "UUID";
+      case DATE -> "DATE";
+      case TIME -> "TIME";
+      case TIMESTAMP -> "TIMESTAMP";
+      case TIMESTAMPTZ -> "TIMESTAMPTZ";
+      case JSONB -> "JSONB";
+      case BYTEA -> "BYTEA";
+    };
+  }
+
+  private String renderNumeric(ColumnConfig column) {
+    if (column.precision() == null) {
+      return "NUMERIC";
+    }
+    if (column.scale() == null) {
+      return "NUMERIC(" + column.precision() + ")";
+    }
+    return "NUMERIC(" + column.precision() + ", " + column.scale() + ")";
+  }
+
+  private String renderGeometryType(GeometryColumnConfig column) {
+    GeometryType type =
+        column.geometryType() == null ? GeometryType.GEOMETRY : column.geometryType();
+    String suffix =
+        column.effectiveDimension() == 3 ? "Z" : column.effectiveDimension() == 4 ? "ZM" : "";
+    if (column.srid() == null) {
+      return "GEOMETRY(" + type.name() + suffix + ")";
+    }
+    return "GEOMETRY(" + type.name() + suffix + ", " + column.srid() + ")";
+  }
+}

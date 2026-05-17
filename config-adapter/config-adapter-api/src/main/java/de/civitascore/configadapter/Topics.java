@@ -95,6 +95,11 @@ public enum Topics {
   GEO_LAYER_UPDATED("de.civitascore.geo.layer.updated"),
   GEO_LAYER_DELETED("de.civitascore.geo.layer.deleted");
 
+  // --- PostGIS Table Events ---
+  TABLE_CREATED("de.civitascore.data.table.created"),
+  TABLE_UPDATED("de.civitascore.data.table.updated"),
+  TABLE_DELETED("de.civitascore.data.table.deleted");
+
   private final String value;
 
   Topics(String value) {

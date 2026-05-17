@@ -48,5 +48,6 @@ export FROST_API_KEY=dev-frost-api-key
 export FLOWABLE_JDBC_PASSWORD=flowable
 export GEOSERVER_ADMIN_PASSWORD=geoserver
 export GEOSERVER_POSTGIS_PASSWORD=geo
+export POSTGIS_JDBC_PASSWORD=civitas
 
 java -jar config-adapter-application/target/config-adapter-application-1.1.0.jar

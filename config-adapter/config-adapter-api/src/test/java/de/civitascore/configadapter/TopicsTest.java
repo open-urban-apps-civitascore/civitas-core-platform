@@ -244,13 +244,13 @@ class TopicsTest {
   }
 
   @Test
-  void values_whenCounted_shouldReturn60() {
+  void values_whenCounted_shouldReturn63() {
     // User: 7, Realm: 3, Client: 3, Group: 3, Role: 3, Backend: 3, Route: 3,
     // Thing: 3, Location: 3, Sensor: 3, ObservedProperty: 3, Datastream: 3,
-    // FROST Project: 3, Pipeline: 3 = 46
+    // FROST Project: 3, Pipeline: 3, Table: 3 
     // GeoServer: Workspace: 3, Datastore: 3, FeatureType: 3, Style: 3, Layer: 2 = 14
-    // Total: 60
-    assertEquals(60, Topics.values().length);
+    // Total: 63
+    assertEquals(63, Topics.values().length);
   }
 
   @Test
@@ -270,5 +270,12 @@ class TopicsTest {
     // Layer has no 'created' topic: GeoServer publishes layers implicitly with their feature type.
     assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.layer.updated"));
     assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.layer.deleted"));
+  }
+
+  @Test
+  void allTopics_whenAccessed_shouldContainTableTopics() {
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.table.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.table.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.table.deleted"));
   }
 }
