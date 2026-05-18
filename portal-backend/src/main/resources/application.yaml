@@ -126,10 +126,8 @@ springdoc:
 # CIVITAS platform configuration
 civitas:
   api:
-    # Data-plane base URL used to build public preview URLs for named APIs
-    # (per concept #1380, ADR #1387). MUST point at the data-plane host, not the management host.
-    # Form: https://host[:port] — no path, no trailing slash. No default — fail-fast on missing
-    # configuration; set via the CIVITAS_API_BASE_URL env var or a profile-specific YAML.
+    # Data-plane base URL used to build public preview URLs for named APIs.
+    # Form: https://host[:port] — no path, no trailing slash. No default.
     base-url:
 
 # Security: paths permitted without authentication

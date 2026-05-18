@@ -6620,7 +6620,7 @@ components:
           example: traffic
         standard:
           type: string
-          description: "API standard per ADR #1362."
+          description: "API standard."
           enum:
           - WFS
           - WMS

@@ -10,7 +10,6 @@ app:
 civitas:
   master-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
   api:
-    # Data-plane base URL used to build public preview URLs for named APIs (per concept #1380, ADR #1387).
     base-url: https://api.civitas.local
 
 spring:

@@ -24,9 +24,8 @@ public record CivitasProperties(
   /**
    * Data-plane API configuration.
    *
-   * @param baseUrl the data-plane base URL (per concept #1380 + ADR #1387) used to build public
-   *     preview URLs in the form {@code {baseUrl}/v1/datasets/{datasetId}/{slug}}. Must point at
-   *     the data-plane host, not the management host. Fully-qualified HTTPS URL with no path and no
+   * @param baseUrl the data-plane base URL used to build public preview URLs in the form {@code
+   *     {baseUrl}/v1/datasets/{datasetId}/{slug}}. Fully-qualified HTTPS URL with no path and no
    *     trailing slash — e.g. {@code https://api.example.com} or {@code
    *     https://api.example.com:8443}.
    */

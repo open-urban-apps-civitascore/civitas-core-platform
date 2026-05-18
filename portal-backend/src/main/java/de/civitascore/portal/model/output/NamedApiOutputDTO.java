@@ -26,7 +26,7 @@ public class NamedApiOutputDTO {
       example = "traffic")
   private String slug;
 
-  @Schema(description = "API standard per ADR #1362.", example = "STA")
+  @Schema(description = "API standard.", example = "STA")
   private ApiStandard standard;
 
   @Schema(description = "Optional standard version (e.g. \"1.1\" for STA).", example = "1.1")
