@@ -264,7 +264,9 @@
             "noDescription": "No description provided",
             "addButton": "Add API",
             "sensorThings": "SensorThings API",
+            "sensorThingsSubtitle": "Time Series Data",
             "wfsWms": "WFS/WMS API",
+            "wfsWmsSubtitle": "Geo Data",
             "standardLabels": {
               "STA": "SensorThings API",
               "WFS": "WFS",
