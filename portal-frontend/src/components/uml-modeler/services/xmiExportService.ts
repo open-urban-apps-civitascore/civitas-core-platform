@@ -52,6 +52,7 @@ const PRIMITIVE_TYPE_HREF: Record<string, string> = {
   Byte: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
   Character: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
   Date: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
+  Uuid: 'http://models.civitasconnect.org/Types/1.0#//Uuid',
   void: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
 }
 // Geometry type mapping to XMI href
@@ -179,6 +180,10 @@ const attributeToXmi = (attr: UMLAttribute, indent: string): string => {
   const childIndent = `${indent}  `
 
   let propertyAttrs = `xmi:id="${attr.id}" name="${escapeXml(attr.name)}" visibility="${visibility}"`
+
+  if (attr.isId) {
+    propertyAttrs += ' isID="true"'
+  }
 
   if (attr.isStatic) {
     propertyAttrs += ' isStatic="true"'

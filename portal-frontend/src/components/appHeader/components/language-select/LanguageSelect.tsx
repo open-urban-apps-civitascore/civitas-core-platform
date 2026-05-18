@@ -26,7 +26,7 @@ export const LanguageSelect = () => {
       options={options}
       placeholder={tLang('selectLanguagePlaceholder')}
       triggerClassName="w-[140px]"
-      defaultValue={initialLocale}
+      value={initialLocale}
     />
   )
 }

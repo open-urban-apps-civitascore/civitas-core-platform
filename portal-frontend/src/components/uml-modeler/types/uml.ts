@@ -18,6 +18,7 @@ export type UMLPrimitiveType =
   | 'Byte'
   | 'Character'
   | 'Date'
+  | 'Uuid'
   | 'void'
 
 export type UMLGeometryType =

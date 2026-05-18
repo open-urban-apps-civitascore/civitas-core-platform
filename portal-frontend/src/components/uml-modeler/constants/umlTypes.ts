@@ -42,6 +42,10 @@ export const UML_PRIMITIVE_TYPES: Record<UMLPrimitiveType, { name: string; uri: 
     name: 'Date',
     uri: 'http://www.eclipse.org/uml2/5.0.0/Types#String',
   },
+  Uuid: {
+    name: 'Uuid',
+    uri: 'http://models.civitasconnect.org/Types/1.0#//Uuid',
+  },
   void: {
     name: 'void',
     uri: 'http://www.eclipse.org/uml2/5.0.0/Types#void',
@@ -80,7 +84,7 @@ export const UML_GEOMETRY_TYPES: Record<UMLGeometryType, { name: string; uri: st
 
 // Categorized primitive types for UI dropdowns
 export const PRIMITIVE_TYPE_CATEGORIES = {
-  Text: ['String', 'Character'] as UMLPrimitiveType[],
+  Text: ['String', 'Character', 'Uuid'] as UMLPrimitiveType[],
   Numbers: ['Integer', 'Long', 'Short', 'Byte', 'Float', 'Double'] as UMLPrimitiveType[],
   Other: ['Boolean', 'Date', 'void'] as UMLPrimitiveType[],
 }

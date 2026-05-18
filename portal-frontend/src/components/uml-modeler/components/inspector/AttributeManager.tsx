@@ -11,7 +11,13 @@ import { SelectOption } from '@/types/common'
 import { UML_GEOMETRY_TYPES, UML_PRIMITIVE_TYPES } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
-import type { UMLAttribute, UMLElement, UMLGeometryType, UMLPrimitiveType, Visibility } from '../../types/uml'
+import {
+  type UMLAttribute,
+  type UMLElement,
+  type UMLGeometryType,
+  type UMLPrimitiveType,
+  type Visibility,
+} from '../../types/uml'
 
 interface AttributeManagerProps {
   nodeId: string
@@ -102,6 +108,40 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
     },
   ]
 
+  const isGeometryType = (type: string) => !!UML_GEOMETRY_TYPES[type as UMLGeometryType]
+
+  const allGeomAttributes = element.attributes.filter(attr => isGeometryType(attr.type as string))
+
+  const firstGeomAttr = allGeomAttributes[0]
+
+  const isFirstGeomAttr = (attributeId: string) => firstGeomAttr?.id === attributeId
+
+  const getMetaForTypeChange = (attribute: UMLAttribute, newType: string): UMLAttribute['meta'] => {
+    if (!isGeometryType(newType)) {
+      if (!attribute.meta?.gisInfo) return attribute.meta
+      const { gisInfo: _, ...metaWithoutGisinfo } = attribute.meta
+      return metaWithoutGisinfo
+    }
+    const crs = firstGeomAttr?.meta?.gisInfo?.crs ?? crsOptions[0].value
+    return { ...attribute.meta, gisInfo: { ...attribute.meta?.gisInfo, crs } }
+  }
+
+  const handleTypeChange = (e: string, attribute: UMLAttribute) =>
+    updateAttribute(attribute.id, {
+      type: e as UMLPrimitiveType | UMLGeometryType,
+      meta: getMetaForTypeChange(attribute, e),
+    })
+
+  const handleCrsChange = (e: string, attributeId: string) => {
+    if (!isFirstGeomAttr(attributeId)) return
+    const updatedAttributes = element.attributes.map(attr =>
+      isGeometryType(attr.type as string)
+        ? { ...attr, meta: { ...attr.meta, gisInfo: { ...attr.meta?.gisInfo, crs: e } } }
+        : attr,
+    )
+    updateNode(nodeId, { attributes: updatedAttributes })
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -151,38 +191,22 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
               <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
               <GroupedSelect
                 groupedOptions={typeOptions}
-                onValueChange={e =>
-                  updateAttribute(attribute.id, {
-                    type: e as UMLPrimitiveType | UMLGeometryType,
-                    ...(UML_GEOMETRY_TYPES[e as UMLGeometryType]
-                      ? {}
-                      : { meta: { ...attribute.meta, gisInfo: undefined } }),
-                  })
-                }
+                onValueChange={e => handleTypeChange(e, attribute)}
                 disabled={isReadOnly}
-                defaultValue={typeof attribute.type === 'string' ? attribute.type : attribute.type.name}
+                value={typeof attribute.type === 'string' ? attribute.type : attribute.type.name}
                 size="sm"
                 triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
 
-            {/* meta info */}
-            <div className={cn(!Object.keys(UML_GEOMETRY_TYPES).includes(attribute.type as string) && 'hidden')}>
+            {/* meta info - CRS */}
+            <div className={cn(!isGeometryType(attribute.type as string) && 'hidden')}>
               <label className="block text-xs font-medium text-gray-600 mb-1">CRS</label>
               <BasicSelect
                 options={crsOptions}
-                onValueChange={e =>
-                  updateAttribute(attribute.id, {
-                    meta: {
-                      ...attribute.meta,
-                      gisInfo: { ...attribute.meta?.gisInfo, crs: e },
-                    },
-                  })
-                }
-                defaultValue={
-                  crsOptions.find(option => option.value === attribute.meta?.gisInfo?.crs)?.value ?? crsOptions[0].value
-                }
-                disabled={!Object.keys(UML_GEOMETRY_TYPES).includes(attribute.type as string)}
+                onValueChange={e => handleCrsChange(e, attribute.id)}
+                value={attribute.meta?.gisInfo?.crs}
+                disabled={!isFirstGeomAttr(attribute.id)}
                 size="sm"
                 triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
@@ -194,7 +218,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
               <BasicSelect
                 options={visibilityOptions}
                 onValueChange={e => updateAttribute(attribute.id, { visibility: e as Visibility })}
-                defaultValue={attribute.visibility}
+                value={attribute.visibility}
                 triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                 size="sm"
                 disabled={isReadOnly}
@@ -240,7 +264,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
                 disabled={isReadOnly}
               />
               <label htmlFor={`static-${attribute.id}`} className="text-xs text-gray-600">
-                {`Primary Key {PK}`}
+                {`Primary Key {id}`}
               </label>
             </div>
           </div>

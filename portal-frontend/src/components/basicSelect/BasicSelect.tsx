@@ -8,7 +8,7 @@ interface BasicSelectProps extends HTMLAttributes<HTMLDivElement> {
   onValueChange: (value: string) => void
   options: SelectOption[]
   placeholder?: string
-  defaultValue?: SelectOption['value']
+  value?: SelectOption['value']
   triggerClassName?: string
   contentClassName?: string
   // eslint-disable-next-line react/boolean-prop-naming
@@ -17,19 +17,10 @@ interface BasicSelectProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 export const BasicSelect = (props: BasicSelectProps) => {
-  const {
-    onValueChange,
-    options,
-    placeholder,
-    triggerClassName,
-    contentClassName,
-    defaultValue,
-    disabled = false,
-    size,
-  } = props
+  const { onValueChange, options, placeholder, triggerClassName, contentClassName, value, size, disabled } = props
 
   return (
-    <Select onValueChange={value => onValueChange(value)} defaultValue={defaultValue}>
+    <Select onValueChange={onValueChange} value={value}>
       <SelectTrigger className={`w-[235px] ${triggerClassName}`} disabled={disabled} size={size}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>

@@ -20,7 +20,7 @@ interface GroupedSelectProps extends HTMLAttributes<HTMLDivElement> {
   onValueChange: (value: string) => void
   groupedOptions: GroupedOption[]
   placeholder?: string
-  defaultValue?: SelectOption['value']
+  value?: SelectOption['value']
   triggerClassName?: string
   contentClassName?: string
   // eslint-disable-next-line react/boolean-prop-naming
@@ -29,18 +29,10 @@ interface GroupedSelectProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 export const GroupedSelect = (props: GroupedSelectProps) => {
-  const {
-    groupedOptions,
-    onValueChange,
-    placeholder,
-    defaultValue,
-    triggerClassName,
-    contentClassName,
-    disabled,
-    size,
-  } = props
+  const { groupedOptions, onValueChange, placeholder, value, triggerClassName, contentClassName, disabled, size } =
+    props
   return (
-    <Select onValueChange={onValueChange} disabled={disabled} defaultValue={defaultValue}>
+    <Select onValueChange={onValueChange} disabled={disabled} defaultValue={value}>
       <SelectTrigger className={triggerClassName} size={size}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
