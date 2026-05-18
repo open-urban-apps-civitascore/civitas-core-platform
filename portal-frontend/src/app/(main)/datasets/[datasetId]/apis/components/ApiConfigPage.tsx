@@ -1,9 +1,9 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { FocusEvent, FormEvent, useEffect, useMemo, useState } from 'react'
+import { FocusEvent, FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -47,11 +47,27 @@ export const ApiConfigPage = (props: ApiConfigPageProps) => {
   const tCommon = useTranslations('common')
 
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
 
   const isCreate = !existingApi
   const [isReadOnly, setIsReadOnly] = useState(isCreate ? false : mode !== 'edit')
+
+  const updateMode = useCallback(
+    (isEditing: boolean) => {
+      setIsReadOnly(!isEditing)
+      const params = new URLSearchParams(searchParams.toString())
+      if (isEditing) {
+        params.set('mode', 'edit')
+      } else {
+        params.delete('mode')
+      }
+      const query = params.toString()
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    },
+    [pathname, router, searchParams],
+  )
   const [selectedTab, setSelectedTab] = useState<ApiConfigTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
@@ -74,7 +90,7 @@ export const ApiConfigPage = (props: ApiConfigPageProps) => {
 
   const form = useForm<NamedApiFormData>({
     resolver: zodResolver(formSchema),
-    mode: 'onChange',
+    mode: 'onBlur',
     defaultValues: {
       name: existingApi?.name ?? '',
       slug: initialSlug,
@@ -154,7 +170,7 @@ export const ApiConfigPage = (props: ApiConfigPageProps) => {
             })
             toast.success(t('messages.updateSuccess'))
             router.refresh()
-            setIsReadOnly(true)
+            updateMode(false)
           }
           isSaved = true
         } catch {
@@ -183,7 +199,7 @@ export const ApiConfigPage = (props: ApiConfigPageProps) => {
     if (isCreate) {
       router.push(`/datasets/${dataset.id}`)
     } else {
-      setIsReadOnly(true)
+      updateMode(false)
     }
   }
 
@@ -195,7 +211,7 @@ export const ApiConfigPage = (props: ApiConfigPageProps) => {
     }
     form.reset()
     setUrlPreviewSlug(initialSlug)
-    setIsReadOnly(true)
+    updateMode(false)
   }
 
   const handleSaveAndExit = () => {
@@ -208,14 +224,14 @@ export const ApiConfigPage = (props: ApiConfigPageProps) => {
 
   const buttonGroup = isReadOnly ? (
     <div className="flex items-center gap-2 px-[var(--layout-padding)]">
-      <Button data-testid="editButton" type="button" onClick={() => setIsReadOnly(false)}>
+      <Button data-testid="editButton" type="button" onClick={() => updateMode(true)}>
         {tCommon('actions.edit')}
       </Button>
     </div>
   ) : (
     <div className="flex items-center gap-2 px-[var(--layout-padding)]">
       <Button data-testid="cancelButton" type="button" variant="secondary" onClick={handleExit} disabled={isLoading}>
-        {tCommon('actions.cancel')}
+        {tCommon('actions.exit')}
       </Button>
       <Button
         data-testid="confirmButton"
