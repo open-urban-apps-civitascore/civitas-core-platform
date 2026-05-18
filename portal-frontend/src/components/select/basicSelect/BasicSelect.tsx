@@ -2,7 +2,7 @@ import { HTMLAttributes } from 'react'
 
 import { SelectOption } from '@/types/common'
 
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '../../ui/select'
 
 interface BasicSelectProps extends HTMLAttributes<HTMLDivElement> {
   onValueChange: (value: string) => void

@@ -3,7 +3,7 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { useCallback } from 'react'
 
-import { BasicSelect } from '@/components/basicSelect/BasicSelect'
+import { BasicSelect } from '@/components/select/basicSelect/BasicSelect'
 import { GroupedOption, GroupedSelect } from '@/components/select/grouped-select/GroupedSelect'
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
