@@ -314,7 +314,12 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
         <>
           <PipelineList datasetId={dataset.id} pipelines={pipelineList} canAdd={canUpdate && canReadDatasources} />
           <div className="border-t" />
-          <ApiList datasetId={dataset.id} apis={namedApiList} canEdit={canUpdate} />
+          <ApiList
+            datasetId={dataset.id}
+            apis={namedApiList}
+            canEdit={canUpdate}
+            isOpenDataAccess={dataset.openDataAccess}
+          />
         </>
       ),
     },
