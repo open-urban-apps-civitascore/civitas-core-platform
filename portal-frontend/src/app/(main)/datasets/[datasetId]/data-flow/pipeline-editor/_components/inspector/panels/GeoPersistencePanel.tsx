@@ -30,7 +30,8 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
 
   const handleTableNameChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const tableName = e.target.value
+      // Only allow letters, numbers, and underscores
+      const tableName = e.target.value.replace(/[^a-zA-Z0-9_]/g, '')
       const hasDataStructure = !!data.dataStructureVersionId
       onUpdate({
         tableName,
