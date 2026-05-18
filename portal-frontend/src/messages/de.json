@@ -251,6 +251,7 @@
         },
         "dataFlow": {
           "title": "Datenfluss",
+          "description": "Konfiguriert, wie Daten durch Pipelines verarbeitet und über APIs bereitgestellt werden",
           "pipelines": {
             "title": "Pipeline(s)",
             "empty": "Noch keine Pipeline vorhanden",
