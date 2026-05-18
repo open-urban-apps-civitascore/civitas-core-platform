@@ -2,10 +2,9 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AxiosError } from 'axios'
-import { ChevronDown } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -19,7 +18,6 @@ import {
 } from '@/app/services/api/datasets/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { FooterElement } from '@/components/form/FooterElement'
-import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -27,9 +25,7 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import PageEditControls from '@/components/page-edit-controls/PageEditControls'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { BasicTooltip } from '@/components/tooltip/Tooltip'
-import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form'
 import { useError } from '@/hooks/use-error'
 import { usePermissions } from '@/hooks/use-permissions'
@@ -53,6 +49,8 @@ import { pickDirtyValues } from '@/utils/form'
 import { mapDatasetToFormData } from '../../../utils/mappers'
 import { BaseInfoForm } from '../../components/BaseInfoForm'
 import { CompletionStep } from '../../components/CompletionStep'
+import { ApiList } from './ApiList'
+import { PipelineList } from './PipelineList'
 
 interface DatasetOverviewProps {
   dataset: Dataset
@@ -74,8 +72,8 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const mode = searchParams.get('mode')
 
   const { pipelines, namedApis } = dataset
-  const pipelineNames = pipelines?.map(pipeline => pipeline.name) || []
-  const namedApiNames = namedApis?.map(api => api.name) || []
+  const pipelineList = pipelines ?? []
+  const namedApiList = namedApis ?? []
 
   const router = useRouter()
   const { handleFormValidationError, handleNameError } = useError()
@@ -306,72 +304,16 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     </div>
   )
 
-  const renderDataFlowRow = (params: { label: string; items: string[]; emptyText: string; action: ReactNode }) => (
-    <div className="flex items-center justify-between gap-4 py-3">
-      <h4 className="font-semibold w-40 shrink-0">{params.label}</h4>
-      <div className="flex-1 text-sm font-normal">
-        {params.items.length > 0 ? (
-          <ul className="list-none">
-            {params.items.map(name => (
-              <li key={name}>{name}</li>
-            ))}
-          </ul>
-        ) : (
-          params.emptyText
-        )}
-      </div>
-      {params.action}
-    </div>
-  )
-
   const completionSteps: CompletionStepData[] = [
     {
       title: t('overview.completion.dataFlow.title'),
-      isCompleted: pipelineNames.length > 0 || namedApiNames.length > 0,
+      isCompleted: pipelineList.length > 0 || namedApiList.length > 0,
       buttons: [],
       content: (
         <>
-          {renderDataFlowRow({
-            label: t('overview.completion.dataFlow.pipelines.title'),
-            items: pipelineNames,
-            emptyText: t('overview.completion.dataFlow.pipelines.empty'),
-            action:
-              canUpdate && canReadDatasources ? (
-                <Button asChild variant="outline">
-                  <GuardedLink href={`/datasets/${dataset.id}/data-flow/pipeline-editor`}>
-                    {t('overview.completion.dataFlow.pipelines.addButton')}
-                  </GuardedLink>
-                </Button>
-              ) : null,
-          })}
+          <PipelineList datasetId={dataset.id} pipelines={pipelineList} canAdd={canUpdate && canReadDatasources} />
           <div className="border-t" />
-          {renderDataFlowRow({
-            label: t('overview.completion.dataFlow.apis.title'),
-            items: namedApiNames,
-            emptyText: t('overview.completion.dataFlow.apis.empty'),
-            action: (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    {t('overview.completion.dataFlow.apis.addButton')}
-                    <ChevronDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <GuardedLink href={`/datasets/${dataset.id}/apis?type=sensorthings`}>
-                      {t('overview.completion.dataFlow.apis.sensorThings')}
-                    </GuardedLink>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <GuardedLink href={`/datasets/${dataset.id}/apis?type=wfs-wms`}>
-                      {t('overview.completion.dataFlow.apis.wfsWms')}
-                    </GuardedLink>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ),
-          })}
+          <ApiList datasetId={dataset.id} apis={namedApiList} canEdit={canUpdate} />
         </>
       ),
     },
