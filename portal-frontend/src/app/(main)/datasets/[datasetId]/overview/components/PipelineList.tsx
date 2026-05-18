@@ -75,12 +75,12 @@ export const PipelineList = ({ datasetId, pipelines, canAdd }: PipelineListProps
       </div>
 
       {pipelines.length > 0 ? (
-        <ul className="mt-4 grid grid-cols-[auto_auto] justify-start gap-x-4 gap-y-2">
+        <ul className="mt-4 grid grid-cols-[auto_auto] justify-start gap-x-12 gap-y-2">
           {pipelines.map(pipeline => (
             <li key={pipeline.id} className="contents" data-testid={`pipelineRow-${pipeline.id}`}>
               <GuardedLink
                 href={`/datasets/${datasetId}/data-flow/pipeline-editor?pipeline=${pipeline.id}`}
-                className="text-primary hover:underline text-sm font-medium self-center"
+                className="text-primary hover:underline text-sm font-normal self-center"
               >
                 {pipeline.name}
               </GuardedLink>
