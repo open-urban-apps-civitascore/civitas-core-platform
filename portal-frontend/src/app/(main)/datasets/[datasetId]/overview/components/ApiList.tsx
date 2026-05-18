@@ -33,10 +33,16 @@ export const ApiList = ({ datasetId, apis, canEdit, isOpenDataAccess }: ApiListP
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild>
-              <GuardedLink href={`/datasets/${datasetId}/apis?type=sensorthings`}>{t('sensorThings')}</GuardedLink>
+              <GuardedLink href={`/datasets/${datasetId}/apis?type=sensorthings`} className="flex items-center gap-3">
+                <span>{t('sensorThings')}</span>
+                <span className="text-xs text-muted-foreground">{t('sensorThingsSubtitle')}</span>
+              </GuardedLink>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <GuardedLink href={`/datasets/${datasetId}/apis?type=wfs-wms`}>{t('wfsWms')}</GuardedLink>
+              <GuardedLink href={`/datasets/${datasetId}/apis?type=wfs-wms`} className="flex items-center gap-3">
+                <span>{t('wfsWms')}</span>
+                <span className="text-xs text-muted-foreground">{t('wfsWmsSubtitle')}</span>
+              </GuardedLink>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

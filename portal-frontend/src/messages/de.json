@@ -263,7 +263,9 @@
             "noDescription": "Keine Beschreibung vorhanden",
             "addButton": "API hinzufügen",
             "sensorThings": "SensorThings API",
+            "sensorThingsSubtitle": "Zeitreihendaten",
             "wfsWms": "WFS/WMS API",
+            "wfsWmsSubtitle": "Geodaten",
             "standardLabels": {
               "STA": "SensorThings API",
               "WFS": "WFS",
