@@ -11,9 +11,7 @@ vi.mock('./ApiCard', () => ({
 }))
 
 vi.mock('@/components/guarded-link/GuardedLink', () => ({
-  GuardedLink: ({ href, children }: { href: string; children: React.ReactNode }) => (
-    <a href={href}>{children}</a>
-  ),
+  GuardedLink: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
 }))
 
 vi.mock('next-intl', () => ({
@@ -35,8 +33,7 @@ const defaultProps = {
   isOpenDataAccess: false,
 }
 
-const renderComponent = (props: Partial<typeof defaultProps> = {}) =>
-  render(<ApiList {...defaultProps} {...props} />)
+const renderComponent = (props: Partial<typeof defaultProps> = {}) => render(<ApiList {...defaultProps} {...props} />)
 
 describe('ApiList', () => {
   describe('Empty state', () => {

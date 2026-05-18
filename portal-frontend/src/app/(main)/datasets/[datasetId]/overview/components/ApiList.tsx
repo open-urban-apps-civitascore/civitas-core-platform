@@ -51,7 +51,14 @@ export const ApiList = ({ datasetId, apis, canEdit, isOpenDataAccess }: ApiListP
       {apis.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           {apis.map(api => (
-            <ApiCard key={api.slug} api={api} datasetId={datasetId} existingApis={apis} canEdit={canEdit} isOpenDataAccess={isOpenDataAccess} />
+            <ApiCard
+              key={api.slug}
+              api={api}
+              datasetId={datasetId}
+              existingApis={apis}
+              canEdit={canEdit}
+              isOpenDataAccess={isOpenDataAccess}
+            />
           ))}
         </div>
       ) : (
