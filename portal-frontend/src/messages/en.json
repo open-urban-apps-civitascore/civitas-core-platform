@@ -298,6 +298,8 @@
               "wfs-wms": "WFS/WMS API"
             },
             "protectedBadge": "Protected",
+            "openDataBadge": "Open Data",
+            "protectedBadgeTooltip": "Access to this API is restricted and requires appropriate permissions.",
             "tabs": {
               "basicInfo": "Basic Information",
               "layer": "Layer",

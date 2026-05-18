@@ -11,6 +11,7 @@ import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ApiStandard, NamedApi, NamedApiInput } from '@/types/namedApis'
 
 const STANDARD_ICONS: Record<ApiStandard, ComponentType<{ className?: string }>> = {
@@ -25,9 +26,10 @@ interface ApiCardProps {
   datasetId: string
   existingApis: NamedApi[]
   canEdit: boolean
+  isOpenDataAccess: boolean
 }
 
-export const ApiCard = ({ api, datasetId, existingApis, canEdit }: ApiCardProps) => {
+export const ApiCard = ({ api, datasetId, existingApis, canEdit, isOpenDataAccess }: ApiCardProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.apis.card')
   const tStandard = useTranslations('datasets.overview.completion.dataFlow.apis.standardLabels')
   const tApis = useTranslations('datasets.overview.completion.dataFlow.apis')
@@ -85,9 +87,18 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit }: ApiCardProps)
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             <div className="flex items-center gap-2">
               <span className="text-sm font-normal text-muted-foreground">{typeLabel}</span>
-              <Badge variant="secondary">{tProtected('protectedBadge')}</Badge>
+              {isOpenDataAccess ? (
+                <Badge variant="secondary">{tProtected('openDataBadge')}</Badge>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="secondary">{tProtected('protectedBadge')}</Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>{tProtected('protectedBadgeTooltip')}</TooltipContent>
+                </Tooltip>
+              )}
             </div>
-            <span className="font-normal truncate">{api.name}</span>
+            <span className="font-medium truncate">{api.name}</span>
             {api.description ? (
               <span className="text-sm font-normal text-muted-foreground line-clamp-2">{api.description}</span>
             ) : (
@@ -134,7 +145,7 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit }: ApiCardProps)
 
         <div className="border-t" />
 
-        <div className="px-7 py-6 text-sm break-all">
+        <div className="pl-17 pr-4 py-6 text-sm break-all">
           <span className="text-muted-foreground font-normal">{pathPrefix}</span>
           <strong>{api.slug}</strong>
         </div>
