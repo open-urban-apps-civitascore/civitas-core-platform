@@ -197,7 +197,8 @@
     "data-management": "Daten-Management",
     "datasources": "Datenquellen",
     "datastructures": "Datenstrukturen",
-    "access-management": "Zugriffsmanagement"
+    "access-management": "Zugriffsmanagement",
+    "apis": "APIs"
   },
   "datasets": {
     "title": "Datensätze",
@@ -258,9 +259,34 @@
           "apis": {
             "title": "APIs",
             "empty": "Noch keine API vorhanden",
+            "noDescription": "Keine Beschreibung vorhanden",
             "addButton": "API hinzufügen",
             "sensorThings": "SensorThings API",
-            "wfsWms": "WFS/WMS API"
+            "wfsWms": "WFS/WMS API",
+            "standardLabels": {
+              "STA": "SensorThings API",
+              "WFS": "WFS",
+              "WMS": "WMS",
+              "CUSTOM": "Custom API"
+            },
+            "card": {
+              "actions": {
+                "edit": "Bearbeiten",
+                "view": "Öffnen",
+                "delete": "Löschen",
+                "copyPath": "Pfad kopieren"
+              },
+              "deleteConfirm": {
+                "title": "API löschen",
+                "description": "Möchtest du die API \"{name}\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+                "confirm": "Löschen"
+              },
+              "messages": {
+                "copySuccess": "Pfad wurde in die Zwischenablage kopiert.",
+                "deleteSuccess": "API wurde erfolgreich gelöscht.",
+                "deleteError": "Beim Löschen der API ist ein Fehler aufgetreten. Bitte versuche es erneut."
+              }
+            }
           }
         },
         "apis": {

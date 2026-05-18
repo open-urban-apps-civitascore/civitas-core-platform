@@ -198,7 +198,8 @@
     "data-management": "Data management",
     "datasources": "Data sources",
     "datastructures": "Data structures",
-    "access-management": "Access management"
+    "access-management": "Access management",
+    "apis": "APIs"
   },
   "datasets": {
     "title": "Datasets",
@@ -259,9 +260,34 @@
           "apis": {
             "title": "APIs",
             "empty": "No API available yet",
+            "noDescription": "No description provided",
             "addButton": "Add API",
             "sensorThings": "SensorThings API",
-            "wfsWms": "WFS/WMS API"
+            "wfsWms": "WFS/WMS API",
+            "standardLabels": {
+              "STA": "SensorThings API",
+              "WFS": "WFS",
+              "WMS": "WMS",
+              "CUSTOM": "Custom API"
+            },
+            "card": {
+              "actions": {
+                "edit": "Edit",
+                "view": "Open",
+                "delete": "Delete",
+                "copyPath": "Copy path"
+              },
+              "deleteConfirm": {
+                "title": "Delete API",
+                "description": "Do you really want to delete the API \"{name}\"? This action cannot be undone.",
+                "confirm": "Delete"
+              },
+              "messages": {
+                "copySuccess": "Path copied to clipboard.",
+                "deleteSuccess": "API has been successfully deleted.",
+                "deleteError": "An error occurred while deleting the API. Please try again."
+              }
+            }
           }
         },
         "apis": {

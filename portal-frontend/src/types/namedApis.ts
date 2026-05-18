@@ -87,21 +87,27 @@ interface BuildSchemaArgs {
 export const buildNamedApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) => {
   const normalizedExisting = existingSlugs.map(s => s.toLowerCase())
   return z.object({
-    name: z.string().trim().min(1, 'apis.config.errors.name.required'),
+    name: z.string().trim().min(1, 'datasets.overview.completion.apis.config.errors.name.required'),
     slug: z
       .string()
-      .min(1, 'apis.config.errors.slug.required')
-      .max(SLUG_MAX_LENGTH, 'apis.config.errors.slug.tooLong')
-      .regex(SLUG_PATTERN, 'apis.config.errors.slug.invalidFormat')
-      .refine(s => !RESERVED_SLUGS.includes(s as (typeof RESERVED_SLUGS)[number]), 'apis.config.errors.slug.reserved')
-      .refine(s => !normalizedExisting.includes(s.toLowerCase()), 'apis.config.errors.slug.notUnique'),
+      .min(1, 'datasets.overview.completion.apis.config.errors.slug.required')
+      .max(SLUG_MAX_LENGTH, 'datasets.overview.completion.apis.config.errors.slug.tooLong')
+      .regex(SLUG_PATTERN, 'datasets.overview.completion.apis.config.errors.slug.invalidFormat')
+      .refine(
+        s => !RESERVED_SLUGS.includes(s as (typeof RESERVED_SLUGS)[number]),
+        'datasets.overview.completion.apis.config.errors.slug.reserved',
+      )
+      .refine(
+        s => !normalizedExisting.includes(s.toLowerCase()),
+        'datasets.overview.completion.apis.config.errors.slug.notUnique',
+      ),
     description: z
       .string()
       .trim()
-      .max(NAMED_API_DESCRIPTION_MAX_LENGTH, 'apis.config.errors.description.tooLong')
+      .max(NAMED_API_DESCRIPTION_MAX_LENGTH, 'datasets.overview.completion.apis.config.errors.description.tooLong')
       .optional()
       .or(z.literal('')),
-    persistence: z.string().min(1, 'apis.config.errors.persistence.required'),
+    persistence: z.string().min(1, 'datasets.overview.completion.apis.config.errors.persistence.required'),
   })
 }
 
