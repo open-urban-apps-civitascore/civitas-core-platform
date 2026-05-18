@@ -31,15 +31,18 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
 
   const handleEntityChange = (entity: { id: string; name: string } | undefined) => {
     if (entity) {
+      const fullEntity = getEntityById(entity.id)
       onUpdate({
         entityId: entity.id,
         entityName: entity.name,
         configured: true,
+        entityMetadata: fullEntity?.connectorType ? { connector: fullEntity.connectorType } : undefined,
       })
     } else {
       onUpdate({
         entityId: undefined,
         entityName: undefined,
+        entityMetadata: undefined,
         configured: false,
       })
     }
