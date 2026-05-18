@@ -327,8 +327,6 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should round-trip namedApis with server-populated previewUrl")
     void shouldRoundTripNamedApisWithPreviewUrl() {
-      // Per concept #1379: named APIs are dataset-level; per #1315 AC: round-trip works through
-      // POST /datasets and GET /datasets/{id}, with previewUrl built from civitas.api.base-url.
       DataSetInputDTO input = createValidInput();
       input.setNamedApis(
           List.of(
@@ -449,6 +447,41 @@ class DataSetControllerIntegrationTest
           .containsExactlyInAnyOrder(
               tuple("traffic", "Traffic Sensor Readings"),
               tuple("weather", "Weather Sensor Readings"));
+    }
+
+    @Test
+    @DisplayName("Should replace (not merge) entry fields on PATCH with same slug")
+    void shouldReplaceEntryFieldsOnPatchWithSameSlug() {
+      // PATCH replaces by slug: a non-empty namedApis list is the new source of truth, including
+      // the optional fields of each entry. Omitting version/description on a slug that previously
+      // carried them clears them. To preserve a field, the client must re-send it.
+      DataSetInputDTO input = createValidInput();
+      NamedApiInputDTO traffic = namedApi("Traffic", "traffic", ApiStandard.STA, "1.1");
+      traffic.setDescription("Live traffic counter readings.");
+      input.setNamedApis(List.of(traffic));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+
+      Map<String, Object> patchBody =
+          Map.of(
+              "namedApis",
+              List.of(
+                  Map.of(
+                      "name", "Traffic v2",
+                      "slug", "traffic",
+                      "standard", "STA")));
+
+      ResponseEntity<DataSetOutputDTO> patch = performPatch(created.getId(), patchBody);
+      assertThat(patch.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patch.getBody()).isNotNull();
+      assertThat(patch.getBody().getNamedApis())
+          .extracting(
+              NamedApiOutputDTO::getSlug,
+              NamedApiOutputDTO::getName,
+              NamedApiOutputDTO::getVersion,
+              NamedApiOutputDTO::getDescription)
+          .containsExactly(tuple("traffic", "Traffic v2", null, null));
     }
 
     @Test

@@ -11,12 +11,15 @@ import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -102,6 +105,46 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   @Override
   protected ReleasableStatus getAvailableStatus() {
     return DataSetStatus.AVAILABLE;
+  }
+
+  /**
+   * Reconciles the entity's {@code namedApis} collection with the incoming input. A {@code null}
+   * input list means "field omitted from the patch body" — leave the entity untouched. An empty
+   * list clears the collection. A non-empty list is the new source of truth: entries are matched by
+   * slug; existing rows are updated in place (preserving {@code id} and {@code routeId}, both of
+   * which are server-managed), entries with new slugs are added, and entries whose slug is absent
+   * from the input are removed (orphan removal).
+   *
+   * <p>The in-place update avoids the orphan-removal + unique-constraint flush-order foot-gun: a
+   * DELETE+INSERT of a row with the same {@code (dataset_id, slug)} pair in the same flush would
+   * violate {@code uk_named_api_dataset_slug}.
+   */
+  @Override
+  protected DataSet postConvertToEntity(DataSet entity, DataSetInputDTO input) {
+    List<NamedApiInputDTO> incoming = input.getNamedApis();
+    if (incoming != null) {
+      Map<String, NamedApi> existingBySlug = new HashMap<>();
+      for (NamedApi api : entity.getNamedApis()) {
+        existingBySlug.put(api.getSlug(), api);
+      }
+      Set<String> incomingSlugs = new HashSet<>();
+      for (NamedApiInputDTO dto : incoming) {
+        incomingSlugs.add(dto.getSlug());
+        NamedApi existing = existingBySlug.get(dto.getSlug());
+        if (existing != null) {
+          existing.setName(dto.getName());
+          existing.setStandard(dto.getStandard());
+          existing.setVersion(dto.getVersion());
+          existing.setDescription(dto.getDescription());
+        } else {
+          NamedApi created = dataSetMapper.toNamedApiEntity(dto);
+          created.setDataSet(entity);
+          entity.getNamedApis().add(created);
+        }
+      }
+      entity.getNamedApis().removeIf(api -> !incomingSlugs.contains(api.getSlug()));
+    }
+    return super.postConvertToEntity(entity, input);
   }
 
   /**

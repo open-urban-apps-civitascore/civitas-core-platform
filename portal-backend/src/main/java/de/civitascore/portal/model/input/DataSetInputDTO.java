@@ -21,15 +21,12 @@ public class DataSetInputDTO extends BaseDataEntityInputDTO {
   private Boolean openDataAccess = false;
 
   /**
-   * Defaults to {@code null} so {@link de.civitascore.portal.mapper.DataSetMapper#linkNamedApis
-   * linkNamedApis} treats "field not provided" as "leave the entity's collection untouched". An
-   * explicit empty list still clears the collection. See {@code linkNamedApis} for full PATCH
-   * semantics.
+   * Defaults to {@code null} so the PATCH reconciler distinguishes "field omitted" (leave the
+   * entity collection untouched) from "explicit empty list" (clear the collection).
    */
   @Valid @Schema(
       description =
-          "Named API endpoints exposed by this dataset (per concepts #1379 and #1383). Each entry"
-              + " produces one published distribution and one APISIX route after release. Slug"
-              + " uniqueness within the dataset is enforced at publish time (#1312).")
+          "Named API endpoints exposed by this dataset. Each entry produces one published"
+              + " distribution and one APISIX route after release.")
   private List<NamedApiInputDTO> namedApis = null;
 }
