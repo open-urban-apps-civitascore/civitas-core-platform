@@ -39,7 +39,7 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
   const t = useTranslations('pipelineEditor')
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
-  console.log('GeoPersistencePanel render', { data, pendingKey })
+
   const parsed = useMemo(() => (pendingKey ? parseCompositeKey(pendingKey) : null), [pendingKey])
 
   const { data: versionResponse } = useGetDatastructureVersion({
@@ -73,7 +73,6 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
   )
 
   const handleSelectVersion = useCallback((selection: Record<string, boolean>) => {
-    console.log('Selected version from modal', { selection })
     const selectedKey = Object.keys(selection).find(key => selection[key])
     if (selectedKey && parseCompositeKey(selectedKey)) {
       setPendingKey(selectedKey)
@@ -103,13 +102,28 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
       </div>
 
       {data.dataStructureVersionId && (
-        <EntityMetadata
-          title={t('geoPersistencePanel.details')}
-          items={[
-            { label: t('geoPersistencePanel.dataStructureName'), value: data.dataStructureName },
-            { label: t('geoPersistencePanel.versionNumber'), value: data.versionNumber },
-          ]}
-        />
+        <>
+          <EntityMetadata
+            title={t('geoPersistencePanel.details')}
+            items={[
+              { label: t('geoPersistencePanel.dataStructureName'), value: data.dataStructureName },
+              { label: t('geoPersistencePanel.versionNumber'), value: data.versionNumber },
+            ]}
+          />
+          {parseCompositeKey(data.dataStructureVersionId) && (
+            <button
+              onClick={() =>
+                window.open(
+                  `/datastructures/${parseCompositeKey(data.dataStructureVersionId!)!.datastructureId}`,
+                  '_blank',
+                )
+              }
+              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              {t('dataSourcePanel.showDataStructure')}
+            </button>
+          )}
+        </>
       )}
 
       <DataModelImportModal
