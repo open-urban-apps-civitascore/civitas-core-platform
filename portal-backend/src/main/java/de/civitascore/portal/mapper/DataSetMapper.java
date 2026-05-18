@@ -41,7 +41,7 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Mapping(target = "pipelineIds", ignore = true)
   @Mapping(target = "pendingSagaType", ignore = true)
   @Mapping(target = "assignments", ignore = true)
-  // namedApis is reconciled by DataSetService.postConvertToEntity — see linkNamedApis(...) there.
+  // namedApis is reconciled by DataSetService.postConvertToEntity (slug-keyed replace).
   @Mapping(target = "namedApis", ignore = true)
   @Override
   DataSet toEntity(DataSetInputDTO input);
