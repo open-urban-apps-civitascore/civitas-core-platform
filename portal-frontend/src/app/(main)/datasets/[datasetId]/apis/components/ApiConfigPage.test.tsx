@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { toast } from 'sonner'
 import { UseFormReturn } from 'react-hook-form'
+import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Dataset } from '@/types/datasets'
@@ -243,9 +243,7 @@ describe('ApiConfigPage', () => {
         expect(mockPatchDataset).toHaveBeenCalledWith(
           expect.objectContaining({
             id: 'test-id',
-            namedApis: expect.arrayContaining([
-              expect.objectContaining({ slug: 'existing-slug' }),
-            ]),
+            namedApis: expect.arrayContaining([expect.objectContaining({ slug: 'existing-slug' })]),
           }),
         )
         expect(toast.success).toHaveBeenCalled()
@@ -273,9 +271,7 @@ describe('ApiConfigPage', () => {
       await waitFor(() => {
         expect(mockPatchDataset).toHaveBeenCalledWith(
           expect.objectContaining({
-            namedApis: expect.arrayContaining([
-              expect.objectContaining({ name: 'Trimmed Name' }),
-            ]),
+            namedApis: expect.arrayContaining([expect.objectContaining({ name: 'Trimmed Name' })]),
           }),
         )
       })

@@ -45,8 +45,7 @@ const defaultProps = {
   isOpenDataAccess: false,
 }
 
-const renderComponent = (props: Partial<typeof defaultProps> = {}) =>
-  render(<ApiCard {...defaultProps} {...props} />)
+const renderComponent = (props: Partial<typeof defaultProps> = {}) => render(<ApiCard {...defaultProps} {...props} />)
 
 describe('ApiCard', () => {
   beforeEach(() => {
@@ -156,9 +155,7 @@ describe('ApiCard', () => {
         expect(mockPatchDataset).toHaveBeenCalledWith(
           expect.objectContaining({
             id: 'dataset-123',
-            namedApis: expect.arrayContaining([
-              expect.objectContaining({ slug: 'other-api', name: 'Other API' }),
-            ]),
+            namedApis: expect.arrayContaining([expect.objectContaining({ slug: 'other-api', name: 'Other API' })]),
           }),
         )
       })
