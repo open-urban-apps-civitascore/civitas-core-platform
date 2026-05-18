@@ -307,6 +307,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const completionSteps: CompletionStepData[] = [
     {
       title: t('overview.completion.dataFlow.title'),
+      description: t('overview.completion.dataFlow.description'),
       isCompleted: pipelineList.length > 0 || namedApiList.length > 0,
       buttons: [],
       content: (
