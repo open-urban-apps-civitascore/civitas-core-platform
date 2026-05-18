@@ -95,7 +95,7 @@ export const BreadcrumbNavigation = () => {
   const segments = pathname?.split('/').filter(Boolean) ?? []
 
   // Skip intermediate container route segments that duplicate their child routes
-  const hiddenIntermediateSegments = ['data-flow']
+  const hiddenIntermediateSegments = ['data-flow', 'apis']
 
   const breadcrumbs: Breadcrumb[] = segments.map((segment, index) => ({
     title: segment,
