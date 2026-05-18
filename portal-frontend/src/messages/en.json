@@ -252,6 +252,7 @@
         },
         "dataFlow": {
           "title": "Data flow",
+          "description": "Configures how data is processed through pipelines and exposed via APIs",
           "pipelines": {
             "title": "Pipeline(s)",
             "empty": "No pipeline available yet",

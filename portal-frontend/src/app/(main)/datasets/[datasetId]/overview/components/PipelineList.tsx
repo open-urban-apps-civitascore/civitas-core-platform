@@ -1,16 +1,15 @@
 'use client'
 
-import { useMemo } from 'react'
-
 import { useTranslations } from 'next-intl'
+import { useMemo } from 'react'
 
 import { DataSourceNodeData } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types/nodes'
 import {
   PIPELINE_NODE_TYPES,
   PipelineOutputDTO,
 } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types/pipeline'
-import { useGetPipelines } from '@/app/services/api/pipelines/clientRequests'
 import { useGetDatasources } from '@/app/services/api/datasources/clientRequests'
+import { useGetPipelines } from '@/app/services/api/pipelines/clientRequests'
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -65,7 +64,7 @@ export const PipelineList = ({ datasetId, pipelines, canAdd }: PipelineListProps
   }, [pipelinesData?.data, datasourceConnectors])
 
   return (
-    <div className="py-3">
+    <div className="py-3 mb-6">
       <div className="flex items-center justify-between gap-4">
         <h4 className="font-semibold">{t('title')}</h4>
         {canAdd && (
