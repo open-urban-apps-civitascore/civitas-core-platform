@@ -5,20 +5,24 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Role;
+import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
@@ -28,8 +32,10 @@ import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.GroupRepository;
+import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.RoleRepository;
+import de.civitascore.portal.repository.StyleRepository;
 import de.civitascore.portal.service.DataSpaceService;
 import de.civitascore.portal.service.GroupService;
 import de.civitascore.portal.util.ResourceInUseException;
@@ -64,6 +70,8 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private DataSpaceRepository dataSpaceRepository;
   @Autowired private AssignmentRepository assignmentRepository;
   @Autowired private RoleRepository roleRepository;
+  @Autowired private LayerRepository layerRepository;
+  @Autowired private StyleRepository styleRepository;
   @Autowired private GroupService groupService;
   @Autowired private DataSpaceService dataSpaceService;
 
@@ -74,6 +82,8 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
   @AfterEach
   void cleanup() {
     assignmentRepository.deleteAll();
+    layerRepository.deleteAll();
+    styleRepository.deleteAll();
     dataSinkRepository.deleteAll();
     pipelineRepository.deleteAll();
     distributionRepository.deleteAll();
@@ -147,6 +157,29 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
     return dataSourceRepository.save(ds);
   }
 
+  private DataSink createDataSink(DataSet dataSet, Pipeline pipeline) {
+    DataSink sink = new DataSink();
+    sink.setPipeline(pipeline);
+    sink.setDataSinkType(DataSinkType.FROST);
+    return dataSinkRepository.save(sink);
+  }
+
+  private Layer createLayer(DataSet dataSet, DataSink dataSink) {
+    Layer layer = new Layer();
+    layer.setDataSet(dataSet);
+    layer.setDataSink(dataSink);
+    layer.setLayerName(uniqueName("layer"));
+    return layerRepository.save(layer);
+  }
+
+  private Style createStyle(DataSet dataSet) {
+    Style style = new Style();
+    style.setDataSet(dataSet);
+    style.setName(uniqueName("style"));
+    style.setSldContent("<StyledLayerDescriptor/>");
+    return styleRepository.save(style);
+  }
+
   private DataSpace createDataSpace() {
     DataSpace ds = new DataSpace();
     ds.setName(uniqueName("dataspace"));
@@ -216,6 +249,47 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
       entityManager.flush();
 
       assertThat(distributionRepository.findById(distributionId)).isEmpty();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("Deleting DataSet should cascade-delete its Layers")
+    void deletingDataSet_shouldCascadeDeleteLayers() {
+      DataSet dataSet = createDataSet();
+
+      // DataSink lives under a separate dataset/pipeline so it does not block
+      // cascade deletion of dataSet's own pipelines via fk_data_sinks_on_pipeline
+      DataSet otherDataSet = createDataSet();
+      Pipeline otherPipeline = createPipeline(otherDataSet);
+      DataSink dataSink = createDataSink(otherDataSet, otherPipeline);
+
+      Layer layer = createLayer(dataSet, dataSink);
+      UUID layerId = layer.getId();
+
+      entityManager.flush();
+      entityManager.clear();
+
+      dataSetRepository.deleteById(dataSet.getId());
+      entityManager.flush();
+
+      assertThat(layerRepository.findById(layerId)).isEmpty();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("Deleting DataSet should cascade-delete its Styles")
+    void deletingDataSet_shouldCascadeDeleteStyles() {
+      DataSet dataSet = createDataSet();
+      Style style = createStyle(dataSet);
+      UUID styleId = style.getId();
+
+      entityManager.flush();
+      entityManager.clear();
+
+      dataSetRepository.deleteById(dataSet.getId());
+      entityManager.flush();
+
+      assertThat(styleRepository.findById(styleId)).isEmpty();
     }
 
     @Test

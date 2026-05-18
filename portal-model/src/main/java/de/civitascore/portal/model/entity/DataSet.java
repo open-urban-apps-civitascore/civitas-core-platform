@@ -153,6 +153,22 @@ public class DataSet extends BaseDataEntity {
   @Builder.Default
   private Set<NamedApi> namedApis = new HashSet<>();
 
+  @OneToMany(
+      mappedBy = "dataSet",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Builder.Default
+  private Set<Layer> layers = new HashSet<>();
+
+  @OneToMany(
+      mappedBy = "dataSet",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Builder.Default
+  private Set<Style> styles = new HashSet<>();
+
   @Enumerated(EnumType.STRING)
   @Column(name = "pending_saga_type", length = 30)
   private PendingSagaType pendingSagaType;
