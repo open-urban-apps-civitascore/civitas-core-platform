@@ -61,9 +61,7 @@ export const CompletionStep = (props: CompletionStepProps) => {
           {step.isCompleted ? <CircleCheckBig data-testid="circleCheck" /> : <Circle data-testid="circle" />}
           <div className="flex-1">
             <h3 className="text-2xl font-bold">{step.title}</h3>
-            {step.description && (
-              <p className="text-sm text-muted-foreground mt-1">{step.description}</p>
-            )}
+            {step.description && <p className="text-sm text-muted-foreground mt-1">{step.description}</p>}
           </div>
         </div>
         <div className="flex gap-10">
