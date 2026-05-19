@@ -26,7 +26,10 @@ import java.util.regex.Pattern;
 public class NamedApiAllowedSlugValidator
     implements ConstraintValidator<NamedApiAllowedSlug, String> {
 
-  /** Reserved slug blocklist, ordered by priority. */
+  /**
+   * Reserved slug blocklist. Insertion order is preserved for deterministic error-message
+   * rendering.
+   */
   public static final List<String> RESERVED = List.of("apis", "api", "v1", "admin");
 
   /**

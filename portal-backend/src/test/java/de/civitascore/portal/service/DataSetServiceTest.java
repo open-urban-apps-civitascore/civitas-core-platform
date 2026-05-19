@@ -178,7 +178,7 @@ class DataSetServiceTest {
       assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
     }
 
-    /** Draft dataset with one feed-in pipeline, so the publish gate only fails on namedApis. */
+    /** A DRAFT dataset that passes the pipeline precondition of {@code stage()}. */
     private DataSet draftDataSetWithPipeline(UUID id) {
       DataSet ds = draftDataSet(id);
       Pipeline p = new Pipeline();
@@ -399,6 +399,8 @@ class DataSetServiceTest {
     @DisplayName("allows updateReleasedMeta with namedApis omitted (PATCH semantics)")
     void allowsOmittedNamedApis() {
       UUID id = UUID.randomUUID();
+      // availableDataSet seeds a NamedApi with slug "traffic"; the omit-means-unchanged
+      // contract must leave that collection untouched.
       DataSet ds = availableDataSet(id);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -408,7 +410,7 @@ class DataSetServiceTest {
       // input.getNamedApis() stays null
 
       DataSet result = createService().updateReleasedMeta(id, input);
-      assertThat(result).isNotNull();
+      assertThat(result.getNamedApis()).extracting(NamedApi::getSlug).containsExactly("traffic");
     }
   }
 

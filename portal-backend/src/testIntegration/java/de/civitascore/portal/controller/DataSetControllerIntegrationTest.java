@@ -550,6 +550,22 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should reject reserved slug on PUT update too (constraint wired on every @Valid)")
+    void shouldRejectReservedNamedApiSlugOnUpdate() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(List.of(namedApi("Traffic", "traffic", ApiStandard.STA, null)));
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+
+      DataSetInputDTO updateBody = createValidInput();
+      updateBody.setName(created.getName());
+      updateBody.setNamedApis(List.of(namedApi("Apis", "apis", ApiStandard.STA, null)));
+
+      ResponseEntity<DataSetOutputDTO> response = performUpdate(created.getId(), updateBody);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     @DisplayName("Should accept single-character slug (regex boundary case)")
     void shouldAcceptSingleCharSlug() {
       DataSetInputDTO input = createValidInput();
