@@ -21,6 +21,7 @@ import {
   isCronNodeData,
   isDataSourceNodeData,
   isFrostNodeData,
+  isGeoPersistenceNodeData,
   isMappingNodeData,
 } from '../../_types/nodes'
 import { InspectorHeader } from './components/InspectorHeader'
@@ -29,6 +30,7 @@ import { ControlPanel } from './panels/ControlPanel'
 import { CronPanel } from './panels/CronPanel'
 import { DataSourcePanel } from './panels/DataSourcePanel'
 import { FrostPanel } from './panels/FrostPanel'
+import { GeoPersistencePanel } from './panels/GeoPersistencePanel'
 import { MappingPanel } from './panels/MappingPanel'
 import { ValidationPanel } from './validation'
 
@@ -117,6 +119,9 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
     }
     if (isFrostNodeData(data)) {
       return <FrostPanel data={data} />
+    }
+    if (isGeoPersistenceNodeData(data)) {
+      return <GeoPersistencePanel data={data} onUpdate={handleNodeUpdate} />
     }
     if (isMappingNodeData(data)) {
       return <MappingPanel data={data} onUpdate={handleNodeUpdate} />
