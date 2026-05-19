@@ -862,7 +862,7 @@
     }
   },
   "pipelineEditor": {
-    "title": "Pipeline-Editor",
+    "title": "Pipeline Editor",
     "subtitle": "Definiert, wie Daten ingestiert, transformiert und persistiert werden",
     "canvas": {
       "noPipeline": "Keine Pipeline verfügbar"
