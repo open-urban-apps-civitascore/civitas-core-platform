@@ -15,6 +15,7 @@ import ch.qos.logback.core.read.ListAppender;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -65,7 +66,7 @@ class DataSetServiceTest {
     NamedApi api = new NamedApi();
     api.setName("Traffic Sensor Readings");
     api.setSlug("traffic");
-    api.setStandard("STA");
+    api.setStandard(ApiStandard.STA);
     ds.setNamedApis(new HashSet<>(Set.of(api)));
     return ds;
   }
@@ -374,11 +375,11 @@ class DataSetServiceTest {
       NamedApi traffic = new NamedApi();
       traffic.setName("Traffic");
       traffic.setSlug("traffic");
-      traffic.setStandard("STA");
+      traffic.setStandard(ApiStandard.STA);
       NamedApi weather = new NamedApi();
       weather.setName("Weather");
       weather.setSlug("weather");
-      weather.setStandard("STA");
+      weather.setStandard(ApiStandard.STA);
       ds.setNamedApis(new HashSet<>(Set.of(traffic, weather)));
 
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
@@ -419,11 +420,11 @@ class DataSetServiceTest {
       NamedApi traffic = new NamedApi();
       traffic.setName("Traffic");
       traffic.setSlug("traffic");
-      traffic.setStandard("STA");
+      traffic.setStandard(ApiStandard.STA);
       NamedApi weather = new NamedApi();
       weather.setName("Weather");
       weather.setSlug("weather");
-      weather.setStandard("STA");
+      weather.setStandard(ApiStandard.STA);
       ds.setNamedApis(new HashSet<>(Set.of(traffic, weather)));
 
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));

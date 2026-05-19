@@ -2,6 +2,7 @@ package de.civitascore.portal.config;
 
 import de.civitascore.configadapter.crypto.CredentialEncryptor;
 import de.civitascore.configadapter.crypto.CryptoKeyLoader;
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSet;
@@ -71,7 +72,7 @@ public class InfraTestDataFactory {
     NamedApi defaultApi = new NamedApi();
     defaultApi.setName("Traffic Sensor Readings");
     defaultApi.setSlug("traffic");
-    defaultApi.setStandard("STA");
+    defaultApi.setStandard(ApiStandard.STA);
     defaultApi.setVersion("1.1");
     dataSet.setNamedApis(Set.of(defaultApi));
     return portalData.saveDataSet(dataSet);
