@@ -36,12 +36,17 @@ services:
       - ./drivers:/opt/nifi/drivers:ro
     healthcheck:
       test:
-        [
-          "CMD-SHELL",
-          "curl -kf https://localhost:8443/nifi-api/system-diagnostics || exit 1",
-        ]
+        - "CMD-SHELL"
+        - |
+          TOKEN=$$(curl -k -sf -H 'Host: localhost:8443' -X POST \
+            --data-urlencode "username=$$SINGLE_USER_CREDENTIALS_USERNAME" \
+            --data-urlencode "password=$$SINGLE_USER_CREDENTIALS_PASSWORD" \
+            https://$$HOSTNAME:8443/nifi-api/access/token) \
+          && curl -k -sf -o /dev/null -H 'Host: localhost:8443' \
+            -H "Authorization: Bearer $$TOKEN" \
+            https://$$HOSTNAME:8443/nifi-api/system-diagnostics
       interval: 30s
-      timeout: 10s
+      timeout: 15s
       retries: 10
       start_period: 90s
     networks:
