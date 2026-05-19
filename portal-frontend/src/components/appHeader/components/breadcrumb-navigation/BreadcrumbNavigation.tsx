@@ -56,8 +56,7 @@ const getName = (firstName?: string, lastName?: string) => (firstName && lastNam
 const isDatastructureVersionBreadcrumb = (segments: string[], index: number) =>
   segments[0] === 'datastructures' && index === 2
 
-const isNamedApiSlugBreadcrumb = (segments: string[], index: number) =>
-  segments[index - 1] === 'apis'
+const isNamedApiSlugBreadcrumb = (segments: string[], index: number) => segments[index - 1] === 'apis'
 
 const getBreadcrumbApiHref = (segments: string[], index: number): string | undefined => {
   if (isNamedApiSlugBreadcrumb(segments, index)) return undefined
