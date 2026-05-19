@@ -19,7 +19,7 @@
 # - develop: snapshot version (e.g., 1.0.2-SNAPSHOT)
 # - MR: merge request version (e.g., 1.0.2-MR-123)
 setup-version-config-adapter:
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: .pre
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
@@ -56,7 +56,7 @@ setup-version-config-adapter:
 # This must always run (needs: []) to ensure dependency scanning has the graph
 # even when the build job is skipped due to no changes
 generate-graph-config-adapter:
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   needs:
     - job: setup-version-config-adapter
@@ -89,7 +89,7 @@ generate-graph-config-adapter:
 
 lint-config-adapter:
   extends: .only-config-adapter-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   needs:
     - job: setup-version-config-adapter
@@ -108,7 +108,7 @@ lint-config-adapter:
 
 dependency-prune-config-adapter:
   extends: .only-config-adapter-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: lint
   needs:
     - job: setup-version-config-adapter
@@ -130,7 +130,7 @@ dependency-prune-config-adapter:
 
 test-config-adapter:
   extends: .only-config-adapter-changes
-  image: maven:3.9-eclipse-temurin-21
+  image: maven:3.9-eclipse-temurin-25
   stage: build-package
   needs:
     - job: setup-version-config-adapter
@@ -179,7 +179,7 @@ test-config-adapter:
 
 build-config-adapter:
   extends: .only-config-adapter-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: build-package
   needs:
     - job: setup-version-config-adapter
@@ -210,7 +210,7 @@ build-config-adapter:
 # Runs in QA stage so backend tests can use the published artifacts
 publish-config-adapter:
   extends: .only-config-adapter-changes # overridden by rules: below, kept for documentation
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine
   stage: deploy-package
   rules:
     # Same conditions as .only-config-adapter-changes, but with per-rule needs:

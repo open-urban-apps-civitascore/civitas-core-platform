@@ -137,17 +137,39 @@ public final class DatasetCommandBuilder {
     return switch (stepDef.operation()) {
       case "CREATE_ROUTE" -> Map.copyOf(payload);
       case "UPDATE_ROUTE" -> {
-        payload.put("routeId", getProperty(trigger, "routeId"));
+        payload.put("routeId", resolveLegacyRouteId(trigger));
         payload.put("serviceId", getProperty(trigger, "serviceId"));
         yield Map.copyOf(payload);
       }
       case "DELETE_ROUTE" -> {
-        payload.put("routeId", getProperty(trigger, "routeId"));
+        payload.put("routeId", resolveLegacyRouteId(trigger));
         payload.put("serviceId", getProperty(trigger, "serviceId"));
         yield Map.copyOf(payload);
       }
       default -> Map.copyOf(payload);
     };
+  }
+
+  /**
+   * Resolve the single legacy {@code routeId} field expected by {@code ApisixSagaHandler}. When the
+   * trigger carries the new slug-keyed {@code routeIds} map (named-API world) instead of a flat
+   * {@code routeId}, fall back to the first value in the map so the existing handler still has
+   * something to operate on. Removed once the real named-API APISIX handler lands and consumes the
+   * map directly.
+   */
+  private static Object resolveLegacyRouteId(Map<String, Object> trigger) {
+    Object legacy = getProperty(trigger, "routeId");
+    if (legacy != null) {
+      return legacy;
+    }
+    Object routeIdsRaw = trigger.get("routeIds");
+    if (routeIdsRaw instanceof Map<?, ?> map && !map.isEmpty()) {
+      Object first = map.values().iterator().next();
+      if (first != null) {
+        return first;
+      }
+    }
+    return null;
   }
 
   private static Map<String, Object> buildApisixCompensationPayload(
