@@ -41,16 +41,16 @@ usage() {
     echo "                                   auto = Docker container (recommended)"
     echo "                                   cmd  = command line (mvn spring-boot:run, requires Java 25+)"
     echo "                                   ide  = manual/IDE debugging (requires Java 25+)"
-    echo "  --frontend=auto|cmd|manual|skip  Portal Frontend startup (default: prompt)"
+    echo "  --frontend=auto|cmd|manual       Portal Frontend startup (default: prompt)"
     echo "                                   auto = Docker container (production build)"
     echo "                                   cmd  = command line (pnpm dev, requires Node.js)"
     echo "  --keycloak-secret=SECRET         Keycloak client secret for portal-frontend"
     echo "  -h, --help                       Show this help message"
     echo
     echo "Examples:"
-    echo "  $0 --authz=allowall --config-adapter=auto --backend=auto --frontend=skip"
-    echo "  $0 --config-adapter=cmd --backend=cmd --frontend=skip"
-    echo "  $0 --config-adapter=ide --backend=ide --frontend=skip"
+    echo "  $0 --authz=allowall --config-adapter=auto --backend=auto --frontend=auto"
+    echo "  $0 --config-adapter=cmd --backend=cmd --frontend=manual"
+    echo "  $0 --config-adapter=ide --backend=ide --frontend=manual"
     echo "  $0 --backend=auto --keycloak-secret=abc123"
     exit 0
 }
@@ -86,8 +86,7 @@ while [ $# -gt 0 ]; do
                 auto)   frontend_arg="1" ;;
                 cmd)    frontend_arg="2" ;;
                 manual) frontend_arg="3" ;;
-                skip)   frontend_arg="4" ;;
-                *) echo "ERROR: --frontend must be 'auto', 'cmd', 'manual', or 'skip'"; exit 1 ;;
+                *) echo "ERROR: --frontend must be 'auto', 'cmd', or 'manual'"; exit 1 ;;
             esac ;;
         --keycloak-secret=*)
             keycloak_secret_arg="${1#*=}" ;;
@@ -386,7 +385,6 @@ if [ -n "$frontend_arg" ]; then
         1) echo "Portal Frontend: Docker (--frontend=auto)" ;;
         2) echo "Portal Frontend: Command line (--frontend=cmd)" ;;
         3) echo "Portal Frontend: Manual (--frontend=manual)" ;;
-        4) echo "Portal Frontend: Skip (--frontend=skip)" ;;
     esac
 else
     echo "How would you like to start the Portal Frontend?"
@@ -398,9 +396,8 @@ else
         echo "  2) Command line (pnpm dev — NOT AVAILABLE: Node.js/pnpm missing)"
     fi
     echo "  3) Manual (start later)"
-    echo "  4) Skip (not needed)"
     echo
-    read -p "Select option [1/2/3/4]: " frontend_option
+    read -p "Select option [1/2/3]: " frontend_option
 fi
 
 # Validate cmd mode requires Node/pnpm
@@ -431,7 +428,6 @@ case "$frontend_option" in
     1) echo "  Portal Frontend: Docker" ;;
     2) echo "  Portal Frontend: Command line" ;;
     3) echo "  Portal Frontend: Manual" ;;
-    *) echo "  Portal Frontend: Skip" ;;
 esac
 echo "------------------------------------------------------"
 echo
@@ -1014,8 +1010,6 @@ elif [ "$frontend_option" = "3" ]; then
     echo "  cd portal-frontend"
     echo "  pnpm install    # if not done yet"
     echo "  pnpm dev"
-else
-    echo "  Frontend skipped"
 fi
 
 echo

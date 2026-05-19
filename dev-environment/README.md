@@ -66,7 +66,7 @@ Usage: start-portal-dev.sh [OPTIONS]
 Options:
   --config-adapter=auto|cmd|ide    Config Adapter startup (default: prompt)
   --backend=auto|cmd|ide           Portal Backend startup (default: prompt)
-  --frontend=auto|manual|skip      Portal Frontend startup (default: prompt)
+  --frontend=auto|cmd|manual       Portal Frontend startup (default: prompt)
   --keycloak-secret=SECRET         Keycloak client secret for portal-frontend
   -h, --help                       Show this help message
 
@@ -83,10 +83,10 @@ Startup modes:
 ./start-portal-dev.sh --config-adapter=auto --backend=auto --frontend=auto
 
 # Legacy command-line mode (java -jar in new terminal windows)
-./start-portal-dev.sh --config-adapter=cmd --backend=cmd --frontend=skip
+./start-portal-dev.sh --config-adapter=cmd --backend=cmd --frontend=manual
 
-# Run backend in IDE, skip frontend
-./start-portal-dev.sh --config-adapter=ide --backend=ide --frontend=skip
+# Run backend in IDE, start frontend manually later
+./start-portal-dev.sh --config-adapter=ide --backend=ide --frontend=manual
 
 # Provide the Keycloak client secret directly
 ./start-portal-dev.sh --backend=auto --keycloak-secret=<secret>
@@ -146,7 +146,7 @@ Options:
   --authz=full|allowall            AuthZ mode (default: prompt, default answer: allowall)
   --config-adapter=auto|cmd|ide    Config Adapter startup (default: prompt)
   --backend=auto|cmd|ide           Portal Backend startup (default: prompt)
-  --frontend=auto|manual|skip      Portal Frontend startup (default: prompt)
+  --frontend=auto|cmd|manual       Portal Frontend startup (default: prompt)
   --keycloak-secret=SECRET         Keycloak client secret for portal-frontend
   -h, --help                       Show this help message
 ```
@@ -158,10 +158,10 @@ Options:
 ./start-portal-dev.sh --authz=allowall --config-adapter=auto --backend=auto --frontend=auto
 
 # Legacy command-line mode (java -jar in new terminal windows)
-./start-portal-dev.sh --authz=allowall --config-adapter=cmd --backend=cmd --frontend=skip
+./start-portal-dev.sh --authz=allowall --config-adapter=cmd --backend=cmd --frontend=manual
 
-# Run backend in IDE, skip frontend
-./start-portal-dev.sh --config-adapter=ide --backend=ide --frontend=skip
+# Run backend in IDE, start frontend manually later
+./start-portal-dev.sh --config-adapter=ide --backend=ide --frontend=manual
 
 # Provide the Keycloak client secret directly
 ./start-portal-dev.sh --backend=auto --keycloak-secret=<secret>
