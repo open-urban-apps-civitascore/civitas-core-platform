@@ -5,6 +5,7 @@
  * Designed for easy extension to support import functionality in the future.
  */
 
+import { UML_GEOMETRY_TYPES, UML_PRIMITIVE_TYPES } from '../constants/umlTypes'
 import type { UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
 import type {
   AttributeMeta,
@@ -35,35 +36,6 @@ const VISIBILITY_XMI_MAP: Record<Visibility, string> = {
   private: 'private',
   protected: 'protected',
   package: 'package',
-}
-
-// Primitive type mapping to XMI href (using 20131001 namespace for Eclipse compatibility)
-const PRIMITIVE_TYPE_HREF: Record<string, string> = {
-  String: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
-  Integer: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
-  Boolean: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Boolean',
-  Real: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
-  UnlimitedNatural: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#UnlimitedNatural',
-  // Extended types mapped to closest UML primitive
-  Float: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
-  Double: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
-  Long: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
-  Short: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
-  Byte: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
-  Character: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
-  Date: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
-  Uuid: 'http://models.civitasconnect.org/Types/1.0#//Uuid',
-  void: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
-}
-// Geometry type mapping to XMI href
-const GEOMETRY_TYPE_HREF: Record<string, string> = {
-  Point: 'http://models.civitasconnect.org/models/myspecialModel/1.0#//Point',
-  LineString: 'http://models.civitasconnect.org/models/myspecialModel/1.0#//LineString',
-  Polygon: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Boolean',
-  MultiPoint: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
-  MultiLineString: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
-  MultiPolygon: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
-  GeometryCollection: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
 }
 
 /**
@@ -97,13 +69,13 @@ const typeToXmi = (type: UMLType, indent: string): string => {
     return `${indent}<type xmi:type="uml:Class" xmi:idref="${type.id}"/>`
   }
 
-  const primitiveHref = PRIMITIVE_TYPE_HREF[type]
+  const primitiveHref = UML_PRIMITIVE_TYPES[type as keyof typeof UML_PRIMITIVE_TYPES]?.uri
   if (primitiveHref) return `${indent}<type xmi:type="uml:PrimitiveType" href="${primitiveHref}"/>`
 
-  const geometryHref = GEOMETRY_TYPE_HREF[type]
+  const geometryHref = UML_GEOMETRY_TYPES[type as keyof typeof UML_GEOMETRY_TYPES]?.uri
   if (geometryHref) return `${indent}<type xmi:type="uml:GeometryType" href="${geometryHref}"/>`
 
-  return `${indent}<type xmi:type="uml:PrimitiveType" href="${PRIMITIVE_TYPE_HREF.String}"/>`
+  return `${indent}<type xmi:type="uml:PrimitiveType" href="${UML_PRIMITIVE_TYPES.String.uri}"/>`
 }
 
 /**
@@ -159,13 +131,13 @@ const metaToXmi = (meta: AttributeMeta, indent: string) => {
     const infoValue = meta[infoKey]
     if (!infoValue) continue
     const detailsKey = Object.keys(infoValue) as (keyof typeof infoValue)[]
-    lines.push(`${indent}<eAnnotations xmi:id="_-1wPgEhkEfGtCKigp6Bpmw" source="${infoKey}">`)
+    lines.push(`${indent}<eAnnotations xmi:id="${crypto.randomUUID()}" source="${infoKey}">`)
     for (const detail of detailsKey) {
       lines.push(
-        `${childIndent}<details xmi:id="_CVj-QEhlEfGtCKigp6Bpmw" key="${detail}" value="${infoValue[detail]}"/>`,
+        `${childIndent}<details xmi:id="${crypto.randomUUID()}" key="${detail}" value="${infoValue[detail]}"/>`,
       )
     }
-    lines.push('</eAnnotations>')
+    lines.push(`${indent}</eAnnotations>`)
   }
   return lines.join('\n')
 }
@@ -174,7 +146,6 @@ const metaToXmi = (meta: AttributeMeta, indent: string) => {
  * Converts a UML attribute to XMI
  */
 const attributeToXmi = (attr: UMLAttribute, indent: string): string => {
-  console.log('META: ', attr.meta)
   const lines: string[] = []
   const visibility = VISIBILITY_XMI_MAP[attr.visibility]
   const childIndent = `${indent}  `

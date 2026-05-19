@@ -4,43 +4,43 @@ import type { UMLGeometryType, UMLPrimitiveType, UMLTypeReference } from '../typ
 export const UML_PRIMITIVE_TYPES: Record<UMLPrimitiveType, { name: string; uri: string }> = {
   String: {
     name: 'String',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#String',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
   },
   Integer: {
     name: 'Integer',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Integer',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
   },
   Boolean: {
     name: 'Boolean',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Boolean',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Boolean',
   },
   Float: {
     name: 'Float',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Real',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
   },
   Double: {
     name: 'Double',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Real',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
   },
   Long: {
     name: 'Long',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Integer',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
   },
   Short: {
     name: 'Short',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Integer',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
   },
   Byte: {
     name: 'Byte',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Integer',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
   },
   Character: {
     name: 'Character',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#String',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
   },
   Date: {
     name: 'Date',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#String',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
   },
   Uuid: {
     name: 'Uuid',
@@ -48,7 +48,7 @@ export const UML_PRIMITIVE_TYPES: Record<UMLPrimitiveType, { name: string; uri: 
   },
   void: {
     name: 'void',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#void',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
   },
 }
 export const UML_GEOMETRY_TYPES: Record<UMLGeometryType, { name: string; uri: string }> = {
@@ -66,7 +66,7 @@ export const UML_GEOMETRY_TYPES: Record<UMLGeometryType, { name: string; uri: st
   },
   MultiPoint: {
     name: 'MultiPoint',
-    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//Point',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//MultiPoint',
   },
   MultiLineString: {
     name: 'MultiLineString',
