@@ -307,7 +307,7 @@
               "styles": "Stile",
               "placeholder": "Inhalte folgen in einem späteren Schritt."
             },
-            "form": {
+            "baseInfo": {
               "sectionTitle": "Basisinformationen",
               "type": "Typ",
               "persistence": "Persistenz",
@@ -320,6 +320,45 @@
               "description": "Beschreibung",
               "descriptionHint": "max. 150 Zeichen, optional",
               "descriptionPlaceholder": ""
+            },
+            "layer": {
+              "title": "Layer",
+              "addLayer": "Layer hinzufügen",
+              "deleteLayer": "Layer löschen",
+              "baseInfo": {
+                "sectionTitle": "Basisinformationen",
+                "title": "Bezeichnung",
+                "technicalName": "Technischer Name",
+                "technicalNameHint": "für URL",
+                "description": "Beschreibung"
+              },
+              "dataSelection": {
+                "sectionTitle": "Datenauswahl",
+                "table": "Tabelle",
+                "tablePlaceHolder": "Tabelle auswählen ...",
+                "attributes": "Attribute",
+                "attributesPlaceHolder": "Attribute auswählen ...",
+                "filter": "Filter definieren",
+                "filterHint": "mit CQL, z. B. attribut='wert'"
+              },
+              "geometry": {
+                "sectionTitle": "Geometrie",
+                "geometryField": "Geometriefield",
+                "geometryFieldPlaceHolder": "Geometrie auswählen ...",
+                "nativeCrs": "Natives Koordinatenreferenzsystem (CRS)",
+                "definedCrs": "Angegebenes Koordinatenreferenzsystem (CRS)",
+                "crsPlaceHolder": "CRS auswählen ...",
+                "boundingBox": "Bounding Box",
+                "calculateFromCrs": "Aus nativem CRS berechnen",
+                "calculateFromData": "Aus Daten berechnen"
+              },
+              "style": {
+                "sectionTitle": "Layer-Stil",
+                "standardStyle": "Standardanzeige",
+                "default": "Standard (Geoserver default)",
+                "alternativeStyles": "Alternative Stile",
+                "addAlternativeStyle": "Alternativen Stil hinzufügen"
+              }
             },
             "messages": {
               "createSuccess": "API wurde erfolgreich angelegt.",

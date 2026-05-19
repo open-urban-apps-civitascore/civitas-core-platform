@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { parseStringArray } from './connectors'
+
 export const SLUG_MAX_LENGTH = 32
 export const NAMED_API_DESCRIPTION_MAX_LENGTH = 150
 
@@ -111,4 +113,37 @@ export const buildNamedApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) => {
   })
 }
 
+export const BoundingBoxSchema = z.object({
+  minx: z.number(),
+  miny: z.number(),
+  maxx: z.number(),
+  maxy: z.number(),
+  crs: z.string(),
+})
+
+export const WfsWmsLayerFormSchema = z.object({
+  title: z.string().trim().min(1, 'common.errors.required'),
+  layerName: z.string().trim().min(1, 'common.errors.required'),
+  layerDescription: z
+    .string()
+    .trim()
+    .max(NAMED_API_DESCRIPTION_MAX_LENGTH, 'datasets.overview.completion.apis.config.errors.description.tooLong')
+    .optional()
+    .or(z.literal('')),
+  table: z.string().min(1, 'common.errors.required'),
+  attribute: z.preprocess(parseStringArray, z.array(z.string()).min(1, 'common.errors.required')),
+  cqlFilter: z.string().trim(),
+  geometryColumnRef: z.string().min(1, 'common.errors.required'),
+  crs: z.string().min(1, 'common.errors.required'),
+  bboxAutoCalculate: z.boolean(),
+  nativeBoundingBox: BoundingBoxSchema,
+  latLonBoundingBox: BoundingBoxSchema,
+  defaultStilId: z.string().optional(),
+  alternativeStilIds: z.string().optional(),
+})
+
+export const WfsWmsApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) =>
+  buildNamedApiFormSchema({ existingSlugs }).extend({ layer: WfsWmsLayerFormSchema })
+
 export type NamedApiFormData = z.input<ReturnType<typeof buildNamedApiFormSchema>>
+export type WfsWmsApiFormData = z.input<ReturnType<typeof WfsWmsApiFormSchema>>
