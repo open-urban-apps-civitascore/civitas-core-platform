@@ -499,8 +499,42 @@ Tests cover:
 - All typed model `toApiMap()` outputs (workspace, datastore, feature type, layer, style, bounding box)
 - Saga handler: PROVISION_WORKSPACE, DELETE_WORKSPACE, RESTORE_WORKSPACE, unknown operations
 
+### Integration Tests
+
+`GeoServerAdapterIntegrationTest` runs the adapter against a real **GeoServer Cloud
+2.28.3.0** stack started with Testcontainers. The setup mirrors
+[`dev-environment/geoserver/docker-compose.yaml`](../../dev-environment/geoserver/docker-compose.yaml)
+and exercises the same provisioning flow as the Bruno collection
+(`dev-environment/geoserver/bruno/`).
+
+**Stack started per JVM (singleton container pattern):**
+
+| Container | Image | Purpose |
+|-----------|-------|---------|
+| `geoserverdb` (alias: `geodatabase`) | `imresamu/postgis:17-3.5` | pgconfig catalog + spatial data, seeded with `dataset_test_uuid_001` schema |
+| `rabbitmq` | `rabbitmq:3.13.3-alpine` | Spring Cloud Bus |
+| `discovery` | `geoservercloud/geoserver-cloud-discovery:2.28.3.0` | Service discovery (Consul/Eureka) |
+| `config` | `geoservercloud/geoserver-cloud-config:2.28.3.0` | Spring Cloud Config server (port 8080) |
+| `restconfig` | `geoservercloud/geoserver-cloud-rest:2.28.3.0` | GeoServer REST API under test |
+
+Total stack startup: ~60–120s.
+
+**Scenarios covered:**
+
+- `provisionWorkspaceDatastoreAndFeatureTypesEndToEnd` — workspace → PostGIS datastore →
+  point + polygon feature types → update feature type title (Bruno steps 01–04)
+- `duplicateWorkspaceCreateIsIdempotent409` — HTTP 409 on duplicate CREATE returns SUCCESS
+- `deleteMissingWorkspaceIsIdempotent404` — HTTP 404 on missing DELETE returns SUCCESS
+- `deleteWorkspaceUsesRecurseTrue` — workspace with child datastore deleted recursively
+
+> **Style creation is not exercised end-to-end:** the adapter sends a JSON metadata body,
+> but GeoServer requires an accompanying SLD XML body uploaded as
+> `application/vnd.ogc.sld+xml` (see Bruno step 05). SLD body upload is out of scope for
+> the adapter's current implementation. Unit tests still verify the JSON body shape.
+
 ```bash
-mvn test -pl config-adapter-geoserver
+# Run only the integration test (requires Docker)
+mvn test -pl config-adapter-geoserver -Dtest=GeoServerAdapterIntegrationTest
 ```
 
 ## Troubleshooting
