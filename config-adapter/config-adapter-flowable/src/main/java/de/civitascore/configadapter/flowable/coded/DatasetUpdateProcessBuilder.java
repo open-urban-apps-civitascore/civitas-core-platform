@@ -26,7 +26,7 @@ import org.flowable.bpmn.model.StartEvent;
 
 /**
  * Builds the Dataset Update saga process programmatically. Same structure as Create but with
- * UPDATE/RESTORE operations. Produces identical behavior to {@code dataset-update.bpmn20.xml}.
+ * UPDATE/RESTORE operations. Produces identical behavior to {@code dataset-update.bpmn}.
  */
 public final class DatasetUpdateProcessBuilder {
 

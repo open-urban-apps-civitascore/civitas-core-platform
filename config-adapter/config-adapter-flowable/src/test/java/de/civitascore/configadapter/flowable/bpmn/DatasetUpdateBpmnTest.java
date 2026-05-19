@@ -67,7 +67,7 @@ class DatasetUpdateBpmnTest {
     processEngine
         .getRepositoryService()
         .createDeployment()
-        .addClasspathResource("processes/dataset-update.bpmn20.xml")
+        .addClasspathResource("processes/dataset-update.bpmn")
         .deploy();
   }
 

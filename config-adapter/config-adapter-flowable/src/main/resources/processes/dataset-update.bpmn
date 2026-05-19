@@ -1,34 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- origin at X=0.0 Y=0.0 -->
-<definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:flowable="http://flowable.org/bpmn" xmlns:xs="http://www.w3.org/2001/XMLSchema" id="Definitions_1" exporter="org.eclipse.bpmn2.modeler.core" exporterVersion="1.5.4.RC1-v20220528-0836-B1" targetNamespace="http://civitas.de/saga">
-  <error id="stepFailedError" errorCode="STEP_FAILED"/>
+<definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:flowable="http://flowable.org/bpmn" id="Definitions_1" exporter="org.eclipse.bpmn2.modeler.core" exporterVersion="1.5.4.RC1-v20220528-0836-B1" targetNamespace="http://civitas.de/saga">
+  <error id="stepFailedError" name="Step Failed" errorCode="STEP_FAILED"/>
   <process id="dataset-update" name="Dataset Update Saga" isExecutable="true">
-    <startEvent id="start">
+    <startEvent id="start" name="Start">
       <outgoing>flow-start</outgoing>
     </startEvent>
     <serviceTask id="update-project" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Update FROST Project">
       <extensionElements>
-        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="frost"/>
-        <flowable:field xsi:type="xs:anyType" name="operation" stringValue="UPDATE_PROJECT"/>
-        <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="update-project"/>
+        <flowable:field name="adapterName" stringValue="frost"/>
+        <flowable:field name="operation" stringValue="UPDATE_PROJECT"/>
+        <flowable:field name="stepId" stringValue="update-project"/>
       </extensionElements>
       <incoming>flow-start</incoming>
       <outgoing>flow-frost-apisix</outgoing>
     </serviceTask>
-    <boundaryEvent id="frost-error" attachedToRef="update-project">
+    <boundaryEvent id="frost-error" name="Step Failed" attachedToRef="update-project">
       <outgoing>flow-frost-error</outgoing>
       <errorEventDefinition id="ErrorEventDefinition_1" errorRef="stepFailedError"/>
     </boundaryEvent>
     <serviceTask id="update-route" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Update APISIX Route">
       <extensionElements>
-        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="apisix"/>
-        <flowable:field xsi:type="xs:anyType" name="operation" stringValue="UPDATE_ROUTE"/>
-        <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="update-route"/>
+        <flowable:field name="adapterName" stringValue="apisix"/>
+        <flowable:field name="operation" stringValue="UPDATE_ROUTE"/>
+        <flowable:field name="stepId" stringValue="update-route"/>
       </extensionElements>
       <incoming>flow-frost-apisix</incoming>
       <outgoing>flow-apisix-gateway</outgoing>
     </serviceTask>
-    <boundaryEvent id="apisix-error" attachedToRef="update-route">
+    <boundaryEvent id="apisix-error" name="Step Failed" attachedToRef="update-route">
       <outgoing>flow-apisix-error</outgoing>
       <errorEventDefinition id="ErrorEventDefinition_2" errorRef="stepFailedError"/>
     </boundaryEvent>
@@ -39,22 +39,22 @@
     </exclusiveGateway>
     <serviceTask id="update-pipelines" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Update Pipelines">
       <extensionElements>
-        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="redpanda"/>
-        <flowable:field xsi:type="xs:anyType" name="operation" stringValue="UPDATE_PIPELINES"/>
-        <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="update-pipelines"/>
+        <flowable:field name="adapterName" stringValue="redpanda"/>
+        <flowable:field name="operation" stringValue="UPDATE_PIPELINES"/>
+        <flowable:field name="stepId" stringValue="update-pipelines"/>
       </extensionElements>
       <incoming>flow-gateway-redpanda</incoming>
       <outgoing>flow-redpanda-success</outgoing>
     </serviceTask>
-    <boundaryEvent id="redpanda-error" attachedToRef="update-pipelines">
+    <boundaryEvent id="redpanda-error" name="Step Failed" attachedToRef="update-pipelines">
       <outgoing>flow-redpanda-error</outgoing>
       <errorEventDefinition id="ErrorEventDefinition_3" errorRef="stepFailedError"/>
     </boundaryEvent>
     <serviceTask id="compensate-frost-after-apisix" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate" name="Compensate: Restore FROST Project">
       <extensionElements>
-        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="frost"/>
-        <flowable:field xsi:type="xs:anyType" name="operation" stringValue="RESTORE_PROJECT"/>
-        <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="update-project"/>
+        <flowable:field name="adapterName" stringValue="frost"/>
+        <flowable:field name="operation" stringValue="RESTORE_PROJECT"/>
+        <flowable:field name="stepId" stringValue="update-project"/>
       </extensionElements>
       <incoming>flow-apisix-error</incoming>
       <incoming>flow-comp-apisix</incoming>
@@ -62,16 +62,16 @@
     </serviceTask>
     <serviceTask id="compensate-apisix-after-redpanda" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate" name="Compensate: Restore APISIX Route">
       <extensionElements>
-        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="apisix"/>
-        <flowable:field xsi:type="xs:anyType" name="operation" stringValue="RESTORE_ROUTE"/>
-        <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="update-route"/>
+        <flowable:field name="adapterName" stringValue="apisix"/>
+        <flowable:field name="operation" stringValue="RESTORE_ROUTE"/>
+        <flowable:field name="stepId" stringValue="update-route"/>
       </extensionElements>
       <incoming>flow-redpanda-error</incoming>
       <outgoing>flow-comp-apisix</outgoing>
     </serviceTask>
     <serviceTask id="publish-success" flowable:async="true" flowable:class="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate" name="Publish Success Result">
       <extensionElements>
-        <flowable:field xsi:type="xs:anyType" name="resultType" stringValue="success"/>
+        <flowable:field name="resultType" stringValue="success"/>
       </extensionElements>
       <incoming>flow-gateway-skip</incoming>
       <incoming>flow-redpanda-success</incoming>
@@ -79,13 +79,13 @@
     </serviceTask>
     <serviceTask id="publish-failure" flowable:async="true" flowable:class="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate" name="Publish Failure Result">
       <extensionElements>
-        <flowable:field xsi:type="xs:anyType" name="resultType" stringValue="failure"/>
+        <flowable:field name="resultType" stringValue="failure"/>
       </extensionElements>
       <incoming>flow-frost-error</incoming>
       <incoming>flow-comp-frost-after-apisix</incoming>
       <outgoing>flow-publish-failure-end</outgoing>
     </serviceTask>
-    <endEvent id="end">
+    <endEvent id="end" name="Saga Completed">
       <incoming>flow-publish-success-end</incoming>
     </endEvent>
     <endEvent id="error-end" name="Saga Failed">
@@ -94,10 +94,10 @@
     <sequenceFlow id="flow-start" sourceRef="start" targetRef="update-project"/>
     <sequenceFlow id="flow-frost-apisix" sourceRef="update-project" targetRef="update-route"/>
     <sequenceFlow id="flow-apisix-gateway" sourceRef="update-route" targetRef="pipeline-gateway"/>
-    <sequenceFlow id="flow-gateway-redpanda" sourceRef="pipeline-gateway" targetRef="update-pipelines">
+    <sequenceFlow id="flow-gateway-redpanda" name="yes" sourceRef="pipeline-gateway" targetRef="update-pipelines">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_1">${hasPipelines == true}</conditionExpression>
     </sequenceFlow>
-    <sequenceFlow id="flow-gateway-skip" sourceRef="pipeline-gateway" targetRef="publish-success">
+    <sequenceFlow id="flow-gateway-skip" name="no" sourceRef="pipeline-gateway" targetRef="publish-success">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_2">${hasPipelines == false}</conditionExpression>
     </sequenceFlow>
     <sequenceFlow id="flow-redpanda-success" sourceRef="update-pipelines" targetRef="publish-success"/>
@@ -245,7 +245,7 @@
         <di:waypoint xsi:type="dc:Point" x="246.0" y="285.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_21"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_11" bpmnElement="flow-comp-apisix" sourceElement="BPMNShape_ServiceTask_5">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_11" bpmnElement="flow-comp-apisix" sourceElement="BPMNShape_ServiceTask_5" targetElement="BPMNShape_ServiceTask_4">
         <di:waypoint xsi:type="dc:Point" x="555.0" y="285.0"/>
         <di:waypoint xsi:type="dc:Point" x="407.0" y="285.0"/>
         <di:waypoint xsi:type="dc:Point" x="397.0" y="285.0"/>

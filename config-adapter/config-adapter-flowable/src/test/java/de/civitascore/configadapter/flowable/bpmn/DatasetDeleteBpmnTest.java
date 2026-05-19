@@ -62,7 +62,7 @@ class DatasetDeleteBpmnTest {
     processEngine
         .getRepositoryService()
         .createDeployment()
-        .addClasspathResource("processes/dataset-delete.bpmn20.xml")
+        .addClasspathResource("processes/dataset-delete.bpmn")
         .deploy();
   }
 

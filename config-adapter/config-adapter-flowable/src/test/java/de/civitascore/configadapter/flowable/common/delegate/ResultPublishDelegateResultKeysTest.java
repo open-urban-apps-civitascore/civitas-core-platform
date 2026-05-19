@@ -56,7 +56,7 @@ class ResultPublishDelegateResultKeysTest {
     processEngine
         .getRepositoryService()
         .createDeployment()
-        .addClasspathResource("processes/dataset-create.bpmn20.xml")
+        .addClasspathResource("processes/dataset-create.bpmn")
         .deploy();
   }
 

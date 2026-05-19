@@ -26,7 +26,7 @@ import org.flowable.bpmn.model.StartEvent;
 /**
  * Builds the Dataset Delete saga process programmatically. Reverse order (Redpanda → APISIX →
  * FROST), best-effort: on failure, continue to next step. No compensation. Produces identical
- * behavior to {@code dataset-delete.bpmn20.xml}.
+ * behavior to {@code dataset-delete.bpmn}.
  */
 public final class DatasetDeleteProcessBuilder {
 

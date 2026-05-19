@@ -69,7 +69,7 @@ class DatasetCreateBpmnTest {
     RepositoryService repositoryService = processEngine.getRepositoryService();
     repositoryService
         .createDeployment()
-        .addClasspathResource("processes/dataset-create.bpmn20.xml")
+        .addClasspathResource("processes/dataset-create.bpmn")
         .deploy();
   }
 

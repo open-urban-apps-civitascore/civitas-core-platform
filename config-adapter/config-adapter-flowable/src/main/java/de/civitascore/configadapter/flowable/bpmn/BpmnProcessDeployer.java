@@ -25,9 +25,9 @@ public final class BpmnProcessDeployer {
 
   private static final List<String> PROCESS_RESOURCES =
       List.of(
-          "processes/dataset-create.bpmn20.xml",
-          "processes/dataset-update.bpmn20.xml",
-          "processes/dataset-delete.bpmn20.xml");
+          "processes/dataset-create.bpmn",
+          "processes/dataset-update.bpmn",
+          "processes/dataset-delete.bpmn");
 
   private BpmnProcessDeployer() {}
 

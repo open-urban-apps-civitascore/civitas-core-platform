@@ -26,7 +26,7 @@ import org.flowable.bpmn.model.StartEvent;
 
 /**
  * Builds the Dataset Create saga process programmatically using Flowable's BpmnModel API. Produces
- * an identical process to {@code processes/dataset-create.bpmn20.xml} (Approach A).
+ * an identical process to {@code processes/dataset-create.bpmn} (Approach A).
  *
  * <p>Flow: FROST → APISIX → Redpanda (conditional). On failure: explicit reverse-order compensation
  * chain.
