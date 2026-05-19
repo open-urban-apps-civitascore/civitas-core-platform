@@ -195,7 +195,7 @@ const validateNodeConfiguration: ValidationRule = {
   validate: (pipeline: Pipeline) => {
     const errors: PipelineValidationError[] = []
 
-    const entityNodeTypes = ['dataSource', 'frost', 'cron', 'mapping']
+    const entityNodeTypes = ['dataSource', 'frost', 'cron', 'mapping', 'geoPersistence']
 
     pipeline.nodes.forEach(node => {
       if (entityNodeTypes.includes(node.type) && !node.data.configured) {
