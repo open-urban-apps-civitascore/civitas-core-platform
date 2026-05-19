@@ -10,6 +10,7 @@ import de.civitascore.configadapter.model.dataset.NamedApiHelper;
 import de.civitascore.portal.config.InfraTestDataFactory;
 import de.civitascore.portal.config.SagaInfraVerifier;
 import de.civitascore.portal.config.SagaOrchestratorTestHelper;
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -786,7 +787,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       NamedApi api = new NamedApi();
       api.setName("Existing API");
       api.setSlug("existing");
-      api.setStandard("STA");
+      api.setStandard(ApiStandard.STA);
       api.setRouteId("route-existing");
       dataSet.setNamedApis(Set.of(api));
       dataSet.setPendingSagaType(PendingSagaType.DELETE);

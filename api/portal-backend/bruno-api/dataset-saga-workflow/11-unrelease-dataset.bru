@@ -28,7 +28,7 @@ docs {
   Transitions the dataset from `AVAILABLE` back to `READY` and triggers the **DATASET_DELETE** saga asynchronously. The saga de-provisions infrastructure in reverse order:
 
   1. **Redpanda Connect** — removes deployed pipelines
-  2. **APISIX Gateway** — removes route + upstream
+  2. **APISIX Gateway** — removes all named-API routes + the dataset's upstream
   3. **FROST Server** — removes the Project
 
   On completion, the dataset reverts to `READY` state and `pendingSagaType` becomes `null`.

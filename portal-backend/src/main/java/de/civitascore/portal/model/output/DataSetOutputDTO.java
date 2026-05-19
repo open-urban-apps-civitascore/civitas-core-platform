@@ -35,6 +35,12 @@ public class DataSetOutputDTO extends BaseOutputDTO {
 
   private List<DistributionSummaryDTO> distributions = new ArrayList<>();
 
+  @Schema(
+      description =
+          "Named API endpoints exposed by this dataset (per concepts #1379 and #1383). Each"
+              + " entry's previewUrl is server-populated from the configured data-plane domain.")
+  private List<NamedApiOutputDTO> namedApis = new ArrayList<>();
+
   @Schema(description = "Whether this dataset is publicly accessible")
   private Boolean openDataAccess;
 
