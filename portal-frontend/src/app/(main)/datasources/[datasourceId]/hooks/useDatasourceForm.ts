@@ -27,7 +27,6 @@ import {
 } from '@/types/datasources'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
 import { getConnectorDefaults } from '@/utils/connectors'
-import { isNameConflictError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 export const useDatasourceForm = (
@@ -37,7 +36,7 @@ export const useDatasourceForm = (
 ) => {
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
-  const { handleNameError, handleFormValidationError } = useError()
+  const { handleFormValidationError } = useError()
 
   const mapDatasourceToFormValues = (source: Datasource) => {
     const parsedDatasource = DatasourceApiToFormSchema.parse(source)
@@ -186,9 +185,7 @@ export const useDatasourceForm = (
       }
       return response.data
     } catch (error) {
-      if (isNameConflictError(error as AxiosError)) {
-        handleNameError(form, values.name)
-      } else toast.error(t('errors.updateError'))
+      toast.error(t('errors.updateError'))
       throw error
     }
   }
