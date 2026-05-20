@@ -1,18 +1,26 @@
+import { useQueries } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import React from 'react'
 import { UseFormReturn } from 'react-hook-form'
 
+import { useGetDatasinks } from '@/app/services/api/datasinks/clientRequests'
+import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
+import { FormComboboxMulti } from '@/components/form/fields/FormComboboxMulti'
+import { FormSelect } from '@/components/form/fields/FormSelect'
 import { TextField } from '@/components/form/fields/TextField'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
-import { useIsMobile } from '@/hooks/use-mobile'
-import { cn } from '@/lib/utils'
-import { WfsWmsApiFormData } from '@/types/namedApis'
 import { FormItem, FormLabel } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { FormSelect } from '@/components/form/fields/FormSelect'
+import { UMLAttribute, UMLClass } from '@/components/uml-modeler/types/uml'
 import { crsOptions } from '@/const/crs'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { cn } from '@/lib/utils'
+import { DATASINK_TYPES } from '@/types/datasinks'
+import { DatastructureVersion } from '@/types/datastructures'
+import { WfsWmsApiFormData } from '@/types/namedApis'
+
 import { BoundingBoxConfig } from './BoundingBoxConfig'
 
 interface LayerConfigProps {
@@ -23,6 +31,44 @@ export const LayerConfig = (props: LayerConfigProps) => {
   const { form } = props
   const t = useTranslations('datasets.overview.completion.apis.config.layer')
   const isMobile = useIsMobile()
+
+  const tableWatch = form.watch('layer.table')
+
+  const { data: datasinksData } = useGetDatasinks()
+
+  const postgisDatasinks =
+    datasinksData?.data.filter(datasink => datasink.dataSinkType === DATASINK_TYPES.POSTGIS) || []
+  const datastructuresToFetch = postgisDatasinks?.map(datasink => ({
+    datastructureId: datasink.configuration.dataStructureVersion.dataStructureId,
+    versionId: datasink.configuration.dataStructureVersion.id,
+  }))
+
+  const datastructuresResponse = useQueries({
+    queries: datastructuresToFetch.map(({ datastructureId, versionId }) => ({
+      queryKey: [`datastructures/${datastructureId}/versions`, versionId],
+      queryFn: () =>
+        apiRequest<DatastructureVersion>({
+          endpoint: `/datastructures/${datastructureId}/versions/${versionId}`,
+          method: 'GET',
+          headers: { 'x-api-request': 'true' },
+          errorMessage: 'An error occurred while fetching datastructure versions.',
+        }),
+    })),
+  })
+
+  const tableOptions = postgisDatasinks?.map(datasink => ({
+    value: datasink.id,
+    label: datasink.configuration.tableName,
+  }))
+
+  const currentDatastructureVersion = postgisDatasinks?.find(datasink => datasink.id === tableWatch)?.configuration
+    .dataStructureVersion
+
+  const attributeOptions =
+    (
+      datastructuresResponse.find(datastructure => datastructure.data?.data.id === currentDatastructureVersion)?.data
+        ?.data.styles?.nodes[0].data.element as UMLClass
+    )?.attributes?.map((attr: UMLAttribute) => ({ value: attr.name, label: attr.name })) || []
 
   return (
     <div className="flex flex-col">
@@ -45,10 +91,23 @@ export const LayerConfig = (props: LayerConfigProps) => {
         <SubHeader title={t('dataSelection.sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
       </DetailsFieldContainer>
       <DetailsFieldContainer className="border-b-0 py-2 pt-6">
-        <TextField form={form} label={t('dataSelection.table')} name="layer.table" placeholder="" required />
+        <FormSelect
+          form={form}
+          id="tableSelect"
+          label={t('dataSelection.table')}
+          name="layer.table"
+          options={tableOptions}
+        />
       </DetailsFieldContainer>
       <DetailsFieldContainer className="border-b-0 py-2">
-        <TextField form={form} label={t('dataSelection.attributes')} name="layer.attribute" placeholder="" required />
+        <FormComboboxMulti
+          form={form}
+          id="layerAttribute"
+          items={attributeOptions.map(o => o.value)}
+          label={t('dataSelection.attributes')}
+          name="layer.attribute"
+          required
+        />
       </DetailsFieldContainer>
       <DetailsFieldContainer className="border-b-0 py-2 pb-6">
         <TextField form={form} label={t('dataSelection.filter')} name="layer.cqlFilter" placeholder="" />
@@ -90,7 +149,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
         />
       </DetailsFieldContainer>
       <DetailsFieldContainer className="border-b-0 py-2 pb-6">
-        <BoundingBoxConfig form={form}/>
+        <BoundingBoxConfig form={form} />
       </DetailsFieldContainer>
 
       {/* Style section */}

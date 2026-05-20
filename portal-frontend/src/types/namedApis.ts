@@ -1,7 +1,5 @@
 import { z } from 'zod'
 
-import { parseStringArray } from './connectors'
-
 export const SLUG_MAX_LENGTH = 32
 export const NAMED_API_DESCRIPTION_MAX_LENGTH = 150
 
@@ -113,11 +111,24 @@ export const buildNamedApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) => {
   })
 }
 
+const boundingBoxCoord = z.string().transform((v, ctx) => {
+  if (v === '') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'common.errors.required' })
+    return z.NEVER
+  }
+  const n = Number(v)
+  if (!Number.isFinite(n)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'common.errors.invalidNumber' })
+    return z.NEVER
+  }
+  return n
+})
+
 export const BoundingBoxSchema = z.object({
-  minX: z.coerce.number({ message: 'common.errors.required' }),
-  minY: z.coerce.number({ message: 'common.errors.required' }),
-  maxX: z.coerce.number({ message: 'common.errors.required' }),
-  maxY: z.coerce.number({ message: 'common.errors.required' }),
+  minX: boundingBoxCoord,
+  minY: boundingBoxCoord,
+  maxX: boundingBoxCoord,
+  maxY: boundingBoxCoord,
   crs: z.string(),
 })
 
@@ -131,7 +142,7 @@ export const WfsWmsLayerFormSchema = z.object({
     .optional()
     .or(z.literal('')),
   table: z.string().min(1, 'common.errors.required'),
-  attribute: z.preprocess(v => parseStringArray(v) ?? [], z.array(z.string()).min(1, 'common.errors.required')),
+  attribute: z.array(z.string()).min(1, 'common.errors.required'),
   cqlFilter: z.string().trim(),
   geometryColumnRef: z.string().min(1, 'common.errors.required'),
   crs: z.string().min(1, 'common.errors.required'),
