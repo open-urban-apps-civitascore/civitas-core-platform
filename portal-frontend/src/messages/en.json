@@ -198,7 +198,8 @@
     "data-management": "Data management",
     "datasources": "Data sources",
     "datastructures": "Data structures",
-    "access-management": "Access management"
+    "access-management": "Access management",
+    "apis": "APIs"
   },
   "datasets": {
     "title": "Datasets",
@@ -251,13 +252,100 @@
         },
         "dataFlow": {
           "title": "Data flow",
-          "button": {
-            "readOnly": "View Data flow",
-            "editable": "Edit Data flow"
+          "description": "Configures how data is processed through pipelines and exposed via APIs",
+          "pipelines": {
+            "title": "Pipeline(s)",
+            "empty": "No pipeline available yet",
+            "addButton": "Add pipeline"
           },
-          "pipelines": "Pipeline",
-          "sensorThingsAPI": "SensorThings API",
-          "noDataFlow": "No data flow available yet."
+          "apis": {
+            "title": "APIs",
+            "empty": "No API available yet",
+            "noDescription": "No description provided",
+            "addButton": "Add API",
+            "sensorThings": "SensorThings API",
+            "sensorThingsSubtitle": "Time Series Data",
+            "wfsWms": "WFS/WMS API",
+            "wfsWmsSubtitle": "Geo Data",
+            "standardLabels": {
+              "STA": "SensorThings API",
+              "WFS": "WFS",
+              "WMS": "WMS",
+              "CUSTOM": "Custom API"
+            },
+            "card": {
+              "actions": {
+                "edit": "Edit",
+                "view": "Open",
+                "delete": "Delete",
+                "copyPath": "Copy path"
+              },
+              "deleteConfirm": {
+                "title": "Delete API",
+                "description": "Do you really want to delete the API \"{name}\"? This action cannot be undone.",
+                "confirm": "Delete"
+              },
+              "messages": {
+                "copySuccess": "Path copied to clipboard.",
+                "deleteSuccess": "API has been successfully deleted.",
+                "deleteError": "An error occurred while deleting the API. Please try again."
+              }
+            }
+          }
+        },
+        "apis": {
+          "config": {
+            "title": {
+              "sensorthings": "SensorThings API",
+              "wfs-wms": "WFS/WMS API"
+            },
+            "protectedBadge": "Protected",
+            "openDataBadge": "Open Data",
+            "protectedBadgeTooltip": "Access to this API is restricted and requires appropriate permissions.",
+            "tabs": {
+              "basicInfo": "Basic Information",
+              "layer": "Layer",
+              "styles": "Styles",
+              "placeholder": "Content will follow in a later step."
+            },
+            "form": {
+              "sectionTitle": "Basic Information",
+              "type": "Type",
+              "persistence": "Persistence",
+              "persistenceHint": "from pipeline",
+              "persistencePlaceholder": "Select persistence",
+              "slug": "Slug",
+              "urlPreview": "URL Preview",
+              "name": "Name",
+              "nameHint": "Describes what data this API provides.",
+              "description": "Description",
+              "descriptionHint": "max. 150 characters, optional",
+              "descriptionPlaceholder": ""
+            },
+            "messages": {
+              "createSuccess": "API has been successfully created.",
+              "updateSuccess": "API has been successfully updated.",
+              "saveError": "An error occurred while saving the API. Please try again."
+            },
+            "errors": {
+              "name": {
+                "required": "Name is required"
+              },
+              "slug": {
+                "required": "Slug is required",
+                "tooLong": "Slug must be at most 32 characters",
+                "invalidFormat": "Slug may only contain lowercase letters, digits and hyphens, and must not start or end with a hyphen",
+                "reserved": "This slug is reserved and cannot be used",
+                "notUnique": "This slug already exists in this dataset"
+              },
+              "description": {
+                "tooLong": "Description must be at most 150 characters"
+              },
+              "persistence": {
+                "required": "Persistence is required"
+              }
+            }
+          }
         }
       }
     },
