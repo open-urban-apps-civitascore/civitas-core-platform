@@ -6,12 +6,9 @@ meta {
 
 get {
   url: {{nifiBaseUrl}}/nifi-api/process-groups/{{demoPgId}}
-  auth: none
+  auth: inherit
 }
 
-headers {
-  Authorization: Bearer {{nifiToken}}
-}
 
 script:post-response {
   if (res.status === 200) {

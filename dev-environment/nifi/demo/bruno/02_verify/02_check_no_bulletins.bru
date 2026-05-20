@@ -6,12 +6,9 @@ meta {
 
 get {
   url: {{nifiBaseUrl}}/nifi-api/flow/bulletin-board?groupId={{demoPgId}}
-  auth: none
+  auth: inherit
 }
 
-headers {
-  Authorization: Bearer {{nifiToken}}
-}
 
 tests {
   test("Status 200", function() {

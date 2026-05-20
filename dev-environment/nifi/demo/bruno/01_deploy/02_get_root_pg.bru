@@ -6,11 +6,7 @@ meta {
 
 get {
   url: {{nifiBaseUrl}}/nifi-api/process-groups/root
-  auth: none
-}
-
-headers {
-  Authorization: Bearer {{nifiToken}}
+  auth: inherit
 }
 
 script:post-response {
