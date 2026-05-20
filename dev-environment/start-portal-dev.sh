@@ -239,10 +239,6 @@ mvn_in_container() {
     host_uid=$(id -u)
     host_gid=$(id -g)
 
-    # Runs as root first to fix Maven cache volume ownership (Docker volumes
-    # are created with root ownership by default), then drops to the host
-    # user via setpriv so that project files are written with correct ownership.
-    # This avoids permission issues on both macOS and Linux.
     docker run --rm \
         -v "$PROJECT_ROOT:/project" \
         -v "$MVN_CACHE_VOLUME:/var/maven/.m2" \
