@@ -30,7 +30,8 @@ public class NamedApiInputDTO {
               + " /v1/datasets/{datasetId}/{slug}. Lowercase alphanumeric with internal hyphens,"
               + " max 32 characters, unique within a dataset, not one of the reserved platform"
               + " names (apis, api, v1, admin), immutable while AVAILABLE.",
-      example = "traffic")
+      example = "traffic",
+      pattern = "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
   private String slug;
 
   @NotNull(message = "Standard is required") @Schema(
