@@ -101,11 +101,6 @@ class LayerControllerIntegrationTest
   }
 
   @Override
-  protected boolean supportsUpdateAndPatch() {
-    return true;
-  }
-
-  @Override
   @Test
   @DisplayName("PATCH is not supported — always returns 405")
   void shouldRejectPatchThatResultsInInvalidEntity() {
@@ -180,6 +175,66 @@ class LayerControllerIntegrationTest
 
       var saved = layerRepository.findById(id).orElseThrow();
       assertThat(saved.getLayerName()).isEqualTo(update.getLayerName());
+    }
+  }
+
+  @Nested
+  @DisplayName("Uniqueness Tests")
+  class UniquenessTests {
+
+    @Test
+    @DisplayName(
+        "Should return 409 when creating a Layer with a layerName that already exists in the dataSink")
+    void shouldReturn409OnDuplicateLayerName() {
+      LayerInputDTO first = createValidInput();
+      performCreate(first);
+
+      LayerInputDTO duplicate = createValidInput();
+      duplicate.setLayerName(first.getLayerName());
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), duplicate);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+  }
+
+  @Nested
+  @DisplayName("Style Ownership Tests")
+  class StyleOwnershipTests {
+
+    @Test
+    @DisplayName("Should return 400 when defaultStyleId belongs to a different dataset")
+    void shouldReturn400WhenDefaultStyleFromWrongDataset() {
+      DataSet otherDataSet = portalData.dataSet();
+      Style foreignStyle = portalData.style(otherDataSet);
+
+      LayerInputDTO input = createValidInput();
+      input.setDefaultStyleId(foreignStyle.getId());
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Nested
+  @DisplayName("Bbox Validation Tests")
+  class BboxValidationTests {
+
+    @Test
+    @DisplayName("Should return 400 when nativeBoundingBox is set but bboxAutoCalculate is true")
+    void shouldReturn400WhenBboxSetWithAutoCalculateTrue() {
+      LayerInputDTO input = createValidInput();
+      input.setBboxAutoCalculate(true);
+      input.setNativeBoundingBox(
+          java.util.Map.of("minx", -180, "miny", -90, "maxx", 180, "maxy", 90));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
   }
 

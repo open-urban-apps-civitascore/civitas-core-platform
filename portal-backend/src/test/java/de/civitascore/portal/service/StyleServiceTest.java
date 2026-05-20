@@ -15,6 +15,7 @@ import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.StyleRepository;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -93,8 +94,11 @@ class StyleServiceTest {
       input.setSldContent("<sld/>");
 
       Style entity = new Style();
+      entity.setName("sld-name");
       when(styleMapper.toEntity(any())).thenReturn(entity);
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
+      when(styleRepository.findByDataSetIdAndName(dataSetId, "sld-name"))
+          .thenReturn(Optional.empty());
       when(styleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       Style result = styleService.create(input);
@@ -142,6 +146,67 @@ class StyleServiceTest {
 
       assertThatThrownBy(() -> styleService.preProcessUpdateInput(input, existing))
           .isInstanceOf(ResourceNotFoundException.class);
+    }
+  }
+
+  @Nested
+  @DisplayName("preSave() — uniqueness")
+  class PreSave {
+
+    @Test
+    @DisplayName(
+        "Should throw UniqueConstraintViolationException when name already exists in dataset")
+    void shouldThrowOnDuplicateName() {
+      UUID dataSetId = UUID.randomUUID();
+      DataSet ds = dataSet(dataSetId);
+
+      StyleInputDTO input = new StyleInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setName("my-style");
+      input.setSldContent("<sld/>");
+
+      Style entity = new Style();
+      entity.setDataSet(ds);
+      entity.setName("my-style");
+
+      Style existing = new Style();
+      existing.setId(UUID.randomUUID());
+      existing.setDataSet(ds);
+      existing.setName("my-style");
+
+      when(styleMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
+      when(styleRepository.findByDataSetIdAndName(dataSetId, "my-style"))
+          .thenReturn(Optional.of(existing));
+
+      assertThatThrownBy(() -> styleService.create(input))
+          .isInstanceOf(UniqueConstraintViolationException.class);
+    }
+
+    @Test
+    @DisplayName("Should not throw when updating a Style with its own existing name")
+    void shouldAllowUpdateWithSameName() {
+      UUID styleId = UUID.randomUUID();
+      UUID dataSetId = UUID.randomUUID();
+      DataSet ds = dataSet(dataSetId);
+
+      Style existing = new Style();
+      existing.setId(styleId);
+      existing.setDataSet(ds);
+      existing.setName("my-style");
+
+      StyleInputDTO input = new StyleInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setName("my-style");
+      input.setSldContent("<sld/>");
+
+      when(styleRepository.findById(styleId)).thenReturn(Optional.of(existing));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
+      when(styleRepository.findByDataSetIdAndName(dataSetId, "my-style"))
+          .thenReturn(Optional.of(existing));
+      when(styleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      assertThatCode(() -> styleService.update(styleId, input)).doesNotThrowAnyException();
     }
   }
 

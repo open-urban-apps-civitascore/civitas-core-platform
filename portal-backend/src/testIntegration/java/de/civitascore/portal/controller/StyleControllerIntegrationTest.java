@@ -91,11 +91,6 @@ class StyleControllerIntegrationTest
   }
 
   @Override
-  protected boolean supportsUpdateAndPatch() {
-    return true;
-  }
-
-  @Override
   @Test
   @DisplayName("PATCH is not supported — always returns 405")
   void shouldRejectPatchThatResultsInInvalidEntity() {
@@ -186,6 +181,27 @@ class StyleControllerIntegrationTest
               null);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+  }
+
+  @Nested
+  @DisplayName("Uniqueness Tests")
+  class UniquenessTests {
+
+    @Test
+    @DisplayName(
+        "Should return 409 when creating a Style with a name that already exists in the dataset")
+    void shouldReturn409OnDuplicateName() {
+      StyleInputDTO first = createValidInput();
+      performCreate(first);
+
+      StyleInputDTO duplicate = createValidInput();
+      duplicate.setName(first.getName());
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), duplicate);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
   }
 

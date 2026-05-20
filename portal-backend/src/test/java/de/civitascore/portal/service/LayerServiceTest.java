@@ -1,6 +1,7 @@
 package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -15,7 +16,9 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.StyleRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -105,10 +108,13 @@ class LayerServiceTest {
 
       LayerInputDTO input = baseInput(dataSetId, dataSinkId);
       Layer entity = new Layer();
+      entity.setLayerName("test-layer");
 
       when(layerMapper.toEntity(any())).thenReturn(entity);
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
       when(dataSinkRepository.findById(dataSinkId)).thenReturn(Optional.of(dataSink));
+      when(layerRepository.findByDataSinkIdAndLayerName(dataSinkId, "test-layer"))
+          .thenReturn(Optional.empty());
       when(layerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       Layer result = layerService.create(input);
@@ -200,6 +206,196 @@ class LayerServiceTest {
 
       assertThatThrownBy(() -> layerService.preProcessUpdateInput(input, existing))
           .isInstanceOf(ResourceNotFoundException.class);
+    }
+  }
+
+  @Nested
+  @DisplayName("preSave() — uniqueness")
+  class PreSave {
+
+    @Test
+    @DisplayName(
+        "Should throw UniqueConstraintViolationException when layerName already exists in dataSink")
+    void shouldThrowOnDuplicateLayerName() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dataSinkId = UUID.randomUUID();
+      DataSet ds = dataSet(dataSetId);
+
+      DataSink dataSink = new DataSink();
+      dataSink.setId(dataSinkId);
+      dataSink.setDataSet(ds);
+
+      LayerInputDTO input = baseInput(dataSetId, dataSinkId);
+      Layer entity = new Layer();
+      entity.setDataSet(ds);
+      entity.setDataSink(dataSink);
+      entity.setLayerName("test-layer");
+
+      Layer existing = new Layer();
+      existing.setId(UUID.randomUUID());
+
+      when(layerMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.findById(dataSinkId)).thenReturn(Optional.of(dataSink));
+      when(layerRepository.findByDataSinkIdAndLayerName(dataSinkId, "test-layer"))
+          .thenReturn(Optional.of(existing));
+
+      assertThatThrownBy(() -> layerService.create(input))
+          .isInstanceOf(UniqueConstraintViolationException.class);
+    }
+
+    @Test
+    @DisplayName("Should not throw when updating a Layer with its own existing layerName")
+    void shouldAllowUpdateWithSameLayerName() {
+      UUID layerId = UUID.randomUUID();
+      UUID dataSetId = UUID.randomUUID();
+      UUID dataSinkId = UUID.randomUUID();
+      DataSet ds = dataSet(dataSetId);
+
+      DataSink dataSink = new DataSink();
+      dataSink.setId(dataSinkId);
+      dataSink.setDataSet(ds);
+
+      Layer existingLayer = new Layer();
+      existingLayer.setId(layerId);
+      existingLayer.setDataSet(ds);
+      existingLayer.setDataSink(dataSink);
+      existingLayer.setLayerName("test-layer");
+
+      LayerInputDTO input = baseInput(dataSetId, dataSinkId);
+
+      when(layerRepository.findById(layerId)).thenReturn(Optional.of(existingLayer));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.findById(dataSinkId)).thenReturn(Optional.of(dataSink));
+      when(layerRepository.findByDataSinkIdAndLayerName(dataSinkId, "test-layer"))
+          .thenReturn(Optional.of(existingLayer));
+      when(layerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      assertThatCode(() -> layerService.update(layerId, input)).doesNotThrowAnyException();
+    }
+  }
+
+  @Nested
+  @DisplayName("validateStyleOwnership()")
+  class ValidateStyleOwnership {
+
+    private DataSet otherDataSet() {
+      DataSet ds = new DataSet();
+      ds.setId(UUID.randomUUID());
+      ds.setName("other-ds");
+      return ds;
+    }
+
+    @Test
+    @DisplayName(
+        "Should throw InvalidInputException when defaultStyle belongs to a different dataset")
+    void shouldThrowWhenDefaultStyleFromWrongDataset() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dataSinkId = UUID.randomUUID();
+      UUID styleId = UUID.randomUUID();
+      DataSet ds = dataSet(dataSetId);
+
+      DataSink dataSink = new DataSink();
+      dataSink.setId(dataSinkId);
+      dataSink.setDataSet(ds);
+
+      Style style = new Style();
+      style.setId(styleId);
+      style.setDataSet(otherDataSet());
+
+      LayerInputDTO input = baseInput(dataSetId, dataSinkId);
+      input.setDefaultStyleId(styleId);
+
+      Layer entity = new Layer();
+      when(layerMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.findById(dataSinkId)).thenReturn(Optional.of(dataSink));
+      when(styleRepository.findById(styleId)).thenReturn(Optional.of(style));
+
+      assertThatThrownBy(() -> layerService.create(input))
+          .isInstanceOf(InvalidInputException.class)
+          .extracting("resourceInfo")
+          .isEqualTo("defaultStyleId");
+    }
+
+    @Test
+    @DisplayName(
+        "Should throw InvalidInputException when an alternativeStyle belongs to a different dataset")
+    void shouldThrowWhenAlternativeStyleFromWrongDataset() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dataSinkId = UUID.randomUUID();
+      UUID styleId = UUID.randomUUID();
+      DataSet ds = dataSet(dataSetId);
+
+      DataSink dataSink = new DataSink();
+      dataSink.setId(dataSinkId);
+      dataSink.setDataSet(ds);
+
+      Style style = new Style();
+      style.setId(styleId);
+      style.setDataSet(otherDataSet());
+
+      LayerInputDTO input = baseInput(dataSetId, dataSinkId);
+      input.setAlternativeStyleIds(List.of(styleId));
+
+      Layer entity = new Layer();
+      when(layerMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.findById(dataSinkId)).thenReturn(Optional.of(dataSink));
+      when(styleRepository.findAllById(List.of(styleId))).thenReturn(List.of(style));
+
+      assertThatThrownBy(() -> layerService.create(input))
+          .isInstanceOf(InvalidInputException.class)
+          .extracting("resourceInfo")
+          .isEqualTo("alternativeStyleIds");
+    }
+  }
+
+  @Nested
+  @DisplayName("validateBboxConsistency()")
+  class ValidateBboxConsistency {
+
+    @Test
+    @DisplayName(
+        "Should throw InvalidInputException when bboxAutoCalculate is true but nativeBoundingBox is set")
+    void shouldThrowWhenBboxSetWithAutoCalculateTrue() {
+      LayerInputDTO input = new LayerInputDTO();
+      input.setBboxAutoCalculate(true);
+      input.setNativeBoundingBox(java.util.Map.of("minx", -180));
+      input.setDataSinkId(UUID.randomUUID());
+      input.setLayerName("layer");
+
+      assertThatThrownBy(() -> layerService.preProcessCreateInput(input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("bboxAutoCalculate");
+    }
+
+    @Test
+    @DisplayName(
+        "Should throw InvalidInputException when bboxAutoCalculate is true but latLonBoundingBox is set")
+    void shouldThrowWhenLatLonBboxSetWithAutoCalculateTrue() {
+      LayerInputDTO input = new LayerInputDTO();
+      input.setBboxAutoCalculate(true);
+      input.setLatLonBoundingBox(java.util.Map.of("minx", -180));
+      input.setDataSinkId(UUID.randomUUID());
+      input.setLayerName("layer");
+
+      assertThatThrownBy(() -> layerService.preProcessCreateInput(input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("bboxAutoCalculate");
+    }
+
+    @Test
+    @DisplayName("Should allow nativeBoundingBox when bboxAutoCalculate is false")
+    void shouldAllowBboxWhenAutoCalculateFalse() {
+      LayerInputDTO input = new LayerInputDTO();
+      input.setBboxAutoCalculate(false);
+      input.setNativeBoundingBox(java.util.Map.of("minx", -180));
+      input.setLatLonBoundingBox(java.util.Map.of("minx", -180));
+      input.setDataSinkId(UUID.randomUUID());
+      input.setLayerName("layer");
+
+      assertThatCode(() -> layerService.preProcessCreateInput(input)).doesNotThrowAnyException();
     }
   }
 }

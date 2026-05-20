@@ -9,6 +9,7 @@ import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.StyleRepository;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -64,6 +65,29 @@ public class StyleService extends BaseService<Style, StyleInputDTO> {
       throw new ResourceNotFoundException(getEntityName(), id);
     }
     return style;
+  }
+
+  /**
+   * Rejects saves that would create a duplicate name within the same dataset.
+   *
+   * @throws UniqueConstraintViolationException (409) if another Style with the same name exists in
+   *     the dataset
+   */
+  @Override
+  protected Style preSave(Style entity) {
+    styleRepository
+        .findByDataSetIdAndName(entity.getDataSet().getId(), entity.getName())
+        .filter(existing -> !existing.getId().equals(entity.getId()))
+        .ifPresent(
+            _ -> {
+              throw new UniqueConstraintViolationException(
+                  Style.class.getSimpleName(),
+                  "name",
+                  entity.getName(),
+                  "datasetId",
+                  entity.getDataSet().getId().toString());
+            });
+    return super.preSave(entity);
   }
 
   /** Validates that an update does not attempt to move a Style to a different dataset. */

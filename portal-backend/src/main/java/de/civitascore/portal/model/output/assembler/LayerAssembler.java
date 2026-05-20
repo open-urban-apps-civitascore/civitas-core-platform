@@ -2,6 +2,7 @@ package de.civitascore.portal.model.output.assembler;
 
 import de.civitascore.portal.mapper.LayerMapper;
 import de.civitascore.portal.model.entity.Layer;
+import de.civitascore.portal.model.entity.base.BaseEntity;
 import de.civitascore.portal.model.output.LayerOutputDTO;
 import java.util.List;
 import java.util.UUID;
@@ -21,7 +22,7 @@ public class LayerAssembler implements BaseAssembler<Layer, LayerOutputDTO, UUID
 
   @Override
   public LayerOutputDTO enrichDto(LayerOutputDTO dto, Layer entity) {
-    List<UUID> altIds = entity.getAlternativeStyles().stream().map(style -> style.getId()).toList();
+    List<UUID> altIds = entity.getAlternativeStyles().stream().map(BaseEntity::getId).toList();
     dto.setAlternativeStyleIds(altIds);
     return dto;
   }
