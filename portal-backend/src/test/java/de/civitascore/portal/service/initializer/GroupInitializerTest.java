@@ -200,5 +200,107 @@ class GroupInitializerTest {
       assertThat(ok.getExternalId()).isEqualTo("kc-ok-id");
       assertThat(broken.getExternalId()).isNull();
     }
+
+    @Test
+    @DisplayName("publishes a layer in parallel before awaiting any result")
+    void shouldPublishLayerInParallel() {
+      Group a = group("A");
+      Group b = group("B");
+      Group c = group("C");
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of(a, b, c));
+
+      // Force a single InOrder verification: all three publishGroupCreated calls must happen
+      // before any save (which only happens after .get() returns). If the implementation were
+      // sequential publish->wait->save, we'd see publish/save/publish/save/... instead.
+      when(configEventPublisher.publishGroupCreated(eq("test-realm"), any(GroupConfig.class)))
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-a")))
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-b")))
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-c")));
+
+      initializer.initialize();
+
+      org.mockito.InOrder order =
+          org.mockito.Mockito.inOrder(configEventPublisher, groupRepository);
+      order
+          .verify(configEventPublisher, times(3))
+          .publishGroupCreated(eq("test-realm"), any(GroupConfig.class));
+      order.verify(groupRepository, times(3)).save(any(Group.class));
+    }
+
+    @Test
+    @DisplayName("cancels the underlying future when the wait times out")
+    void shouldCancelFutureOnTimeout() {
+      Group g = group("Slow");
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of(g));
+
+      CompletableFuture<ConfigResultEvent> hanging = new CompletableFuture<>();
+      when(configEventPublisher.publishGroupCreated(eq("test-realm"), any(GroupConfig.class)))
+          .thenReturn(hanging);
+
+      initializer.initialize();
+
+      assertThat(hanging.isCancelled())
+          .as("Timed-out future must be cancelled to free the publisher's correlation entry")
+          .isTrue();
+    }
+
+    @Test
+    @DisplayName("syncs parents before children across separate depth layers")
+    void shouldSyncParentBeforeChild() {
+      Group parent = group("Parent");
+      Group child = group("Child");
+      child.setParentGroup(parent);
+
+      // Order in the repository result is intentionally child-first to verify the initializer
+      // does NOT rely on the input order.
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of(child, parent));
+      when(configEventPublisher.publishGroupCreated(eq("test-realm"), any(GroupConfig.class)))
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-parent")))
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-child")));
+
+      initializer.initialize();
+
+      ArgumentCaptor<GroupConfig> captor = ArgumentCaptor.forClass(GroupConfig.class);
+      verify(configEventPublisher, times(2))
+          .publishGroupCreated(eq("test-realm"), captor.capture());
+      assertThat(captor.getAllValues().get(0).getName())
+          .as("Parent must be published first so its externalId exists for the child layer")
+          .isEqualTo("Parent");
+      assertThat(captor.getAllValues().get(1).getName()).isEqualTo("Child");
+    }
+
+    @Test
+    @DisplayName("depth() returns a finite value even when the parent chain has a cycle")
+    void shouldGuardAgainstCyclicParentChain() {
+      // Synthetic cycle: a → b → a. FK constraints prevent this in production, but the guard
+      // means a corrupt DB row cannot wedge initialize() in an infinite loop.
+      Group a = group("a");
+      Group b = group("b");
+      a.setParentGroup(b);
+      b.setParentGroup(a);
+
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of(a));
+      when(configEventPublisher.publishGroupCreated(eq("test-realm"), any(GroupConfig.class)))
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-a")));
+
+      // If the cycle guard is missing, this call hangs in depth() and the test times out.
+      org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
+          java.time.Duration.ofSeconds(2), () -> initializer.initialize());
+    }
+  }
+
+  @Nested
+  @DisplayName("listener order")
+  class ListenerOrder {
+
+    @Test
+    @DisplayName("ORDER constant is strictly lower than Spring's LOWEST_PRECEDENCE default")
+    void orderMustBeLowerThanUserInitializer() {
+      // UserInitializer has no @Order — Spring defaults event listeners to LOWEST_PRECEDENCE.
+      // GroupInitializer.ORDER must compare lower (run earlier) so user memberships can rely on
+      // groups already having an externalId.
+      assertThat(GroupInitializer.ORDER)
+          .isLessThan(org.springframework.core.Ordered.LOWEST_PRECEDENCE);
+    }
   }
 }

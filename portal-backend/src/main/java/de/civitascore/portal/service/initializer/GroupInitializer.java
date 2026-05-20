@@ -10,12 +10,19 @@ import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.service.ConfigEventPublisherService;
 import de.civitascore.portal.service.GroupService;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,16 +38,28 @@ import org.springframework.transaction.annotation.Transactional;
  * <ul>
  *   <li>With {@code init} profile: creates groups from configuration properties and their
  *       assignments
- *   <li>Always: syncs all groups without a Keycloak reference ({@code externalId IS NULL})
+ *   <li>Always: syncs all groups without a Keycloak reference ({@code externalId IS NULL}) in
+ *       parallel per parent-depth layer, so a degraded Keycloak path cannot wedge startup linearly
  * </ul>
  *
- * <p>Annotated with {@code @Order(10)} on {@link #initialize()} so it runs before {@link
- * UserInitializer} (which has no explicit order) and groups have Keycloak references when user
- * memberships are synced.
+ * <p>Listener order: {@link #initialize()} uses {@link #ORDER} which must compare lower than the
+ * listener order of {@code UserInitializer.initialize()}. {@code UserInitializer} has no explicit
+ * {@code @Order}, so Spring defaults it to {@link
+ * org.springframework.core.Ordered#LOWEST_PRECEDENCE} — any low integer wins. This ordering is
+ * required so that user memberships can be assigned to groups that already have a Keycloak {@code
+ * externalId}.
  */
 @Component
 @Slf4j
 public class GroupInitializer {
+
+  /**
+   * Listener order for {@link #initialize()}. Must be strictly lower than {@code UserInitializer}'s
+   * listener order (currently the Spring default {@link
+   * org.springframework.core.Ordered#LOWEST_PRECEDENCE}) so groups are synced to Keycloak before
+   * user memberships are pushed.
+   */
+  public static final int ORDER = 10;
 
   private final GroupRepository groupRepository;
   private final RoleRepository roleRepository;
@@ -68,7 +87,7 @@ public class GroupInitializer {
   }
 
   @EventListener(ApplicationReadyEvent.class)
-  @Order(10)
+  @Order(ORDER)
   @Transactional
   public void initialize() {
     initProperties.ifPresent(this::createGroupsFromConfig);
@@ -145,38 +164,46 @@ public class GroupInitializer {
       return;
     }
 
-    // Sort: root groups first (null parent), then by depth.
-    // This ensures parent externalIds are available when syncing children.
-    List<Group> sorted =
-        unsyncedGroups.stream().sorted(Comparator.comparingInt(this::depth)).toList();
+    // Group by parent-depth so each layer's events can be fired in parallel while preserving the
+    // parent-before-child ordering needed for nested groups (parent externalId must already exist
+    // before a child can reference it).
+    Map<Integer, List<Group>> byDepth =
+        unsyncedGroups.stream()
+            .sorted(Comparator.comparingInt(this::depth))
+            .collect(Collectors.groupingBy(this::depth));
 
-    log.info("Syncing {} unsynced groups to Keycloak", sorted.size());
+    log.info(
+        "Syncing {} unsynced groups to Keycloak across {} depth layer(s)",
+        unsyncedGroups.size(),
+        byDepth.size());
 
-    for (Group group : sorted) {
-      publishGroupCreated(group);
+    for (Map.Entry<Integer, List<Group>> layer : new java.util.TreeMap<>(byDepth).entrySet()) {
+      syncLayerInParallel(layer.getKey(), layer.getValue());
     }
 
     log.info("Group catch-up sync completed");
   }
 
-  private int depth(Group group) {
-    int d = 0;
-    Group current = group.getParentGroup();
-    while (current != null) {
-      d++;
-      current = current.getParentGroup();
+  private void syncLayerInParallel(int depth, List<Group> groupsAtDepth) {
+    List<PendingSync> pending = new ArrayList<>(groupsAtDepth.size());
+    for (Group group : groupsAtDepth) {
+      GroupConfig groupConfig = GroupService.buildGroupConfig(group);
+      CompletableFuture<ConfigResultEvent> future =
+          configEventPublisher.publishGroupCreated(targetRealm, groupConfig);
+      pending.add(new PendingSync(group, future));
     }
-    return d;
+
+    log.info("Publishing {} group(s) at depth {} in parallel", pending.size(), depth);
+
+    for (PendingSync entry : pending) {
+      handleResult(entry);
+    }
   }
 
-  private void publishGroupCreated(Group group) {
-    GroupConfig groupConfig = GroupService.buildGroupConfig(group);
-
+  private void handleResult(PendingSync entry) {
+    Group group = entry.group();
     try {
-      ConfigResultEvent result =
-          configEventPublisher
-              .publishGroupCreated(targetRealm, groupConfig)
-              .get(configAdapterTimeoutSeconds, TimeUnit.SECONDS);
+      ConfigResultEvent result = entry.future().get(configAdapterTimeoutSeconds, TimeUnit.SECONDS);
 
       if (result != null
           && result.status() == ConfigResultEvent.Status.SUCCESS
@@ -196,12 +223,35 @@ public class GroupInitializer {
         log.error("Keycloak sync for group '{}' returned null result", group.getName());
       }
     } catch (TimeoutException e) {
+      // Cancel the future so the publisher's correlation map cleans up rather than holding the
+      // pending entry indefinitely. A late Keycloak response is then silently dropped; the group
+      // is re-picked up on the next startup via the externalId IS NULL predicate.
+      entry.future().cancel(true);
       log.error("Timeout waiting for Keycloak sync for group '{}'", group.getName());
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+      entry.future().cancel(true);
       log.error("Interrupted while waiting for Keycloak sync for group '{}'", group.getName());
     } catch (ExecutionException e) {
       log.error("Failed to sync group '{}' to Keycloak", group.getName(), e);
     }
   }
+
+  /**
+   * Returns the number of ancestors above this group. Includes a cycle guard: FK constraints make
+   * cycles structurally impossible today, but a corrupt DB row would otherwise spin the loop
+   * forever.
+   */
+  private int depth(Group group) {
+    int d = 0;
+    Set<UUID> visited = new HashSet<>();
+    Group current = group.getParentGroup();
+    while (current != null && visited.add(current.getId())) {
+      d++;
+      current = current.getParentGroup();
+    }
+    return d;
+  }
+
+  private record PendingSync(Group group, CompletableFuture<ConfigResultEvent> future) {}
 }
