@@ -27,11 +27,13 @@ dev-environment/
 
 **Required:**
 * Docker + Docker Compose v2
-* Java JDK (any version — needed for Maven builds; Dockerfiles use a JRE base image)
+
+**Additionally required for cmd/IDE mode (running services locally without Docker):**
+* Java 25+ JDK (Temurin, OpenJDK, Oracle, GraalVM)
 * Maven 3.6+
 
-**Additionally for IDE/debugging mode:**
-* Java 25+ JDK (Temurin, OpenJDK, Oracle, GraalVM)
+> The default Docker (`auto`) mode builds JARs inside a containerized Maven + JDK 25
+> image, so no local Java or Maven installation is needed for the Quick Start path.
 
 **Optional:**
 * jq (for dev-mode scripts)
@@ -213,7 +215,7 @@ cd apisix    && docker compose up -d
 | FROST Server | http://localhost:8085/FROST-Server/v1.1 | |
 | GeoServer Admin | http://localhost:8082/geoserver/web | admin / see geoserver/.env |
 | GeoServer WFS | http://localhost:9080/geoserver/{workspace}/wfs | via APISIX |
-| Apache NiFi | https://localhost:8443/nifi | admin / ctsBtRBKHRAx69EqUghvvgEvjnaLjFEB |
+| Apache NiFi | https://localhost:8443/nifi | admin / see nifi/.env |
 
 ---
 

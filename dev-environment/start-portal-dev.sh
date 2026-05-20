@@ -181,7 +181,7 @@ if command -v mvn >/dev/null 2>&1; then
     MVN_VERSION=$(mvn -version 2>&1 | head -1 | awk '{print $3}')
     MVN_MAJOR=$(echo "$MVN_VERSION" | cut -d'.' -f1)
     MVN_MINOR=$(echo "$MVN_VERSION" | cut -d'.' -f2)
-    if [ "$MVN_MAJOR" -ge 3 ] && [ "$MVN_MINOR" -ge 6 ]; then
+    if [ "$MVN_MAJOR" -gt 3 ] || { [ "$MVN_MAJOR" -eq 3 ] && [ "$MVN_MINOR" -ge 6 ]; }; then
         MVN_AVAILABLE=true
         echo "  Maven $MVN_VERSION found"
     else
@@ -226,14 +226,34 @@ mvn_in_container() {
     local work_dir="$1"
     shift
     local rel_path
-    rel_path=$(python3 -c "import os.path; print(os.path.relpath('$work_dir', '$PROJECT_ROOT'))" 2>/dev/null \
-        || echo "${work_dir#$PROJECT_ROOT/}")
+    case "$work_dir" in
+        "$PROJECT_ROOT"/*) rel_path="${work_dir#$PROJECT_ROOT/}" ;;
+        "$PROJECT_ROOT")   rel_path="." ;;
+        *)
+            echo "ERROR: mvn_in_container work dir '$work_dir' is not under PROJECT_ROOT '$PROJECT_ROOT'" >&2
+            exit 1
+            ;;
+    esac
+
+    local host_uid host_gid
+    host_uid=$(id -u)
+    host_gid=$(id -g)
+
+    # Runs as root first to fix Maven cache volume ownership (Docker volumes
+    # are created with root ownership by default), then drops to the host
+    # user via setpriv so that project files are written with correct ownership.
+    # This avoids permission issues on both macOS and Linux.
     docker run --rm \
         -v "$PROJECT_ROOT:/project" \
-        -v "$MVN_CACHE_VOLUME:/root/.m2" \
+        -v "$MVN_CACHE_VOLUME:/var/maven/.m2" \
+        -e MAVEN_CONFIG=/var/maven/.m2 \
         -w "/project/$rel_path" \
         maven:3.9-eclipse-temurin-25 \
-        mvn "$@"
+        sh -c "
+            chown -R $host_uid:$host_gid /var/maven/.m2 && \
+            exec setpriv --reuid=$host_uid --regid=$host_gid --clear-groups \
+                mvn -Duser.home=/var/maven \"\$@\"
+        " -- "$@"
 }
 
 # ---- Terminal Helper -----------------------------------------------
@@ -556,13 +576,33 @@ else
 fi
 
 cd "$SCRIPT_DIR/nifi"
-# Download PostgreSQL JDBC driver if not present (needed by NiFi for DB connections)
-if [ ! -f "$SCRIPT_DIR/nifi/drivers/postgresql.jar" ]; then
-    echo "  Downloading PostgreSQL JDBC driver for NiFi..."
-    curl -sL -o "$SCRIPT_DIR/nifi/drivers/postgresql.jar" \
-        https://jdbc.postgresql.org/download/postgresql-42.7.4.jar
-    echo "  PostgreSQL JDBC driver downloaded"
+# Seed the NiFi credentials file from the checked-in example
+if [ ! -f .env ] && [ -f .env.example ]; then
+    cp .env.example .env
+    echo "  Created nifi/.env from .env.example (edit to change credentials)"
 fi
+
+if [ -f .env ]; then
+    # shellcheck disable=SC1091
+    set -a; . ./.env; set +a
+fi
+
+# Download PostgreSQL JDBC driver if not present (needed by NiFi for DB connections).
+POSTGRES_JDBC_VERSION=42.7.4
+if [ ! -f "$SCRIPT_DIR/nifi/drivers/postgresql.jar" ]; then
+    echo "  Downloading PostgreSQL JDBC driver $POSTGRES_JDBC_VERSION for NiFi..."
+    mkdir -p "$SCRIPT_DIR/nifi/drivers"
+    if curl -fsSL --retry 3 -o "$SCRIPT_DIR/nifi/drivers/postgresql.jar.tmp" \
+        "https://jdbc.postgresql.org/download/postgresql-${POSTGRES_JDBC_VERSION}.jar"; then
+        mv "$SCRIPT_DIR/nifi/drivers/postgresql.jar.tmp" "$SCRIPT_DIR/nifi/drivers/postgresql.jar"
+        echo "  PostgreSQL JDBC driver downloaded"
+    else
+        rm -f "$SCRIPT_DIR/nifi/drivers/postgresql.jar.tmp"
+        echo "ERROR: Failed to download PostgreSQL JDBC driver" >&2
+        exit 1
+    fi
+fi
+
 if $DOCKER_COMPOSE up -d 2>&1; then
     echo "  Apache NiFi started"
 else
@@ -975,6 +1015,10 @@ fi
 
 if [ "$frontend_option" = "1" ]; then
     # Docker mode: build & run production container
+    if [ ! -f "$FRONTEND_DIR/.env.local" ]; then
+        echo "ERROR: portal-frontend/.env.local is missing." >&2
+        exit 1
+    fi
     echo "Starting Portal Frontend (Docker)..."
     docker rm -f civitas-portal-frontend 2>/dev/null || true
     cd "$SCRIPT_DIR/apps"
@@ -1109,7 +1153,7 @@ echo "  GeoServer PostGIS: localhost:5434  db=geoserver  user=geoserver  (see ge
 echo "  GeoServer Consul: http://localhost:8500"
 echo "  APISIX Gateway:   http://localhost:9080"
 echo "  APISIX Admin API: http://localhost:9180"
-echo "  Apache NiFi:      https://localhost:8443/nifi (admin / ctsBtRBKHRAx69EqUghvvgEvjnaLjFEB)"
+echo "  Apache NiFi:      https://localhost:8443/nifi (${SINGLE_USER_CREDENTIALS_USERNAME:-admin} / ${SINGLE_USER_CREDENTIALS_PASSWORD:-see nifi/.env})"
 echo "  OPA:              http://localhost:8181"
 echo "  AuthZ Repository: http://localhost:8091"
 echo "  Model Atlas:      http://localhost:8086"

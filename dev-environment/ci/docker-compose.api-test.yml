@@ -276,9 +276,9 @@ services:
 
   nifi:
     image: apache/nifi:2.9.0
+    env_file:
+     - ../nifi/.env.example
     environment:
-      SINGLE_USER_CREDENTIALS_USERNAME: admin
-      SINGLE_USER_CREDENTIALS_PASSWORD: ctsBtRBKHRAx69EqUghvvgEvjnaLjFEB
       NIFI_WEB_HTTPS_PORT: "8443"
       NIFI_WEB_PROXY_HOST: "nifi:8443"
       NIFI_JVM_HEAP_INIT: "512m"

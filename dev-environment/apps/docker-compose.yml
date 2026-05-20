@@ -110,7 +110,8 @@ services:
       HOSTNAME: "0.0.0.0"
       PORT: "3000"
     env_file:
-      - ../../portal-frontend/.env.local
+      - path: ../../portal-frontend/.env.local
+        required: false
     networks:
       - civitas-network
     healthcheck:

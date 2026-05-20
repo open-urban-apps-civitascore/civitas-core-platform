@@ -4,7 +4,7 @@
 # Used for dataset pipeline deployment (replaces Redpanda Connect).
 #
 # UI: https://localhost:8443/nifi (self-signed cert, accept browser warning)
-# Credentials: admin / ctsBtRBKHRAx69EqUghvvgEvjnaLjFEB
+# Credentials: configured via dev-environment/nifi/.env (see .env.example).
 
 services:
   nifi:
@@ -15,10 +15,12 @@ services:
       - "8443:8443" # HTTPS UI / REST API
       - "10000:10000" # Site-to-Site
       - "8000:8000" # JVM debug
+    env_file:
+      - path: .env
+        required: false
+      - path: .env.example
+        required: false
     environment:
-      # Single-user auth (password MUST be >= 12 chars)
-      SINGLE_USER_CREDENTIALS_USERNAME: admin
-      SINGLE_USER_CREDENTIALS_PASSWORD: ctsBtRBKHRAx69EqUghvvgEvjnaLjFEB
       NIFI_WEB_HTTPS_PORT: "8443"
       NIFI_WEB_PROXY_HOST: "localhost:8443"
       NIFI_JVM_HEAP_INIT: "1g"
