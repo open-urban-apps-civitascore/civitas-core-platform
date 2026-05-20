@@ -359,6 +359,7 @@ class UserServiceTest {
       UserService service = createService();
       UUID userId = UUID.randomUUID();
       User user = userWithId(userId);
+      user.setExternalId("keycloak-uuid-123");
       when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
       List<UUID> groupIds = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
@@ -367,6 +368,34 @@ class UserServiceTest {
       assertThatThrownBy(() -> service.replaceGroups(userId, groupIds))
           .isInstanceOf(InvalidInputException.class)
           .hasMessage("One or more groups do not exist.");
+    }
+
+    @Test
+    @DisplayName("Should reject when user has not been synced to Keycloak yet")
+    void shouldRejectWhenExternalIdMissing() {
+      UserService service = createService();
+      UUID userId = UUID.randomUUID();
+      User user = userWithId(userId);
+      user.setExternalId(null);
+      when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+      assertThatThrownBy(() -> service.replaceGroups(userId, List.of(UUID.randomUUID())))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("not been synced to Keycloak");
+    }
+
+    @Test
+    @DisplayName("Should reject when externalId is blank")
+    void shouldRejectWhenExternalIdBlank() {
+      UserService service = createService();
+      UUID userId = UUID.randomUUID();
+      User user = userWithId(userId);
+      user.setExternalId("   ");
+      when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+      assertThatThrownBy(() -> service.replaceGroups(userId, List.of(UUID.randomUUID())))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("not been synced to Keycloak");
     }
   }
 

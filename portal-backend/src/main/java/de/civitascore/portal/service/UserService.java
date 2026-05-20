@@ -84,6 +84,11 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   public User replaceGroups(UUID userId, List<UUID> groupIds) {
     User user = findByIdOrThrow(userId);
 
+    if (user.getExternalId() == null || user.getExternalId().isBlank()) {
+      throw new InvalidInputException(
+          "user", "not synced", "User has not been synced to Keycloak yet; retry shortly.");
+    }
+
     if (groupIds.isEmpty()) {
       user.setGroups(new HashSet<>());
     } else {
