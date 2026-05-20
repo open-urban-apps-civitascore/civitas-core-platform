@@ -3,23 +3,28 @@ package de.civitascore.portal.model.output.assembler;
 import de.civitascore.portal.mapper.StyleMapper;
 import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.output.StyleOutputDTO;
+import de.civitascore.portal.repository.LayerRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/**
- * Assembler for converting {@link Style} entities to {@link StyleOutputDTO}. The {@code inUse} flag
- * is populated in the enrichDto hook (wired in the enrichment layer).
- */
 @Component
 @RequiredArgsConstructor
 public class StyleAssembler implements BaseAssembler<Style, StyleOutputDTO, UUID> {
 
   private final StyleMapper styleMapper;
+  private final LayerRepository layerRepository;
 
   @Override
   public StyleOutputDTO mapToBaseDto(Style entity) {
     return styleMapper.toOutput(entity);
+  }
+
+  @Override
+  public StyleOutputDTO enrichDto(StyleOutputDTO dto, Style entity) {
+    UUID styleId = entity.getId();
+    dto.setInUse(layerRepository.existsByDefaultStyleIdOrAlternativeStylesId(styleId, styleId));
+    return dto;
   }
 
   @Override

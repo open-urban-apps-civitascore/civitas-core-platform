@@ -3,14 +3,11 @@ package de.civitascore.portal.model.output.assembler;
 import de.civitascore.portal.mapper.LayerMapper;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.output.LayerOutputDTO;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/**
- * Assembler for converting {@link Layer} entities to {@link LayerOutputDTO}. The {@code
- * alternativeStyleIds} field is populated in the enrichDto hook (wired in the enrichment layer).
- */
 @Component
 @RequiredArgsConstructor
 public class LayerAssembler implements BaseAssembler<Layer, LayerOutputDTO, UUID> {
@@ -20,6 +17,13 @@ public class LayerAssembler implements BaseAssembler<Layer, LayerOutputDTO, UUID
   @Override
   public LayerOutputDTO mapToBaseDto(Layer entity) {
     return layerMapper.toOutput(entity);
+  }
+
+  @Override
+  public LayerOutputDTO enrichDto(LayerOutputDTO dto, Layer entity) {
+    List<UUID> altIds = entity.getAlternativeStyles().stream().map(style -> style.getId()).toList();
+    dto.setAlternativeStyleIds(altIds);
+    return dto;
   }
 
   @Override
