@@ -44,7 +44,7 @@ describe('BasicSelect', () => {
 
   it('renders with defaultValue', () => {
     const onValueChange = vi.fn()
-    render(<BasicSelect onValueChange={onValueChange} options={mockOptions} defaultValue="option2" />)
+    render(<BasicSelect onValueChange={onValueChange} options={mockOptions} value="option2" />)
 
     expect(screen.getByText('Option 2')).toBeInTheDocument()
   })
