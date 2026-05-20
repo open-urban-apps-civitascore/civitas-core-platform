@@ -308,6 +308,31 @@
               "styles": "Stile",
               "placeholder": "Inhalte folgen in einem späteren Schritt."
             },
+            "styles": {
+              "title": "Stile",
+              "addStyle": "Stil hinzufügen",
+              "name": "Name",
+              "sldFile": "SLD-Datei",
+              "sldFilePlaceholder": "SLD auswählen...",
+              "styleEditor": "Stil-Editor",
+              "deleteStyle": "Stil löschen",
+              "noStyles": {
+                "title": "Keine Stile vorhanden",
+                "subtitle": "Stile können erstellt und anschließend den Layern dieser API zugeordnet werden"
+              },
+              "deleteModal": {
+                "title": "Stil wirklich löschen?",
+                "description": "Diese Änderung hat folgende Auswirkungen:\n• Der Stil steht nicht mehr zur Verfügung\n• Layer, die diesen Stil verwenden, verlieren ihre aktuelle Darstellung\n• Die Darstellung kann sich in verbundenen Diensten (z. B. WMS) ändern"
+              },
+              "messages": {
+                "deleteSuccess": "Stil wurde erfolgreich gelöscht.",
+                "deleteError": "Beim Löschen des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+                "createSuccess": "Stil wurde erfolgreich erstellt.",
+                "updateSuccess": "Stil wurde erfolgreich aktualisiert.",
+                "saveError": "Beim Speichern des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+                "saveSuccess": "Stile wurden erfolgreich gespeichert."
+              }
+            },
             "baseInfo": {
               "sectionTitle": "Basisinformationen",
               "type": "Typ",

@@ -2,7 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useForm, UseFormReturn } from 'react-hook-form'
 
 import { Form } from '@/components/ui/form'
@@ -20,6 +20,7 @@ import { useApiConfig } from '../../hooks/useApiConfig'
 import { ApiConfigTab, ApiConfigWrapper } from '../ApiConfigWrapper'
 import { BaseInfoForm } from '../base-info/BaseInfoForm'
 import { LayerConfig } from './LayerConfig'
+import { StylesConfig, StylesConfigHandle } from './StylesConfig'
 
 interface WfsWmsApiConfigPageProps {
   dataset: Dataset
@@ -68,6 +69,8 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     defaultValues: wfsWmsDefaults,
   })
 
+  const stylesRef = useRef<StylesConfigHandle>(null)
+
   useEffect(() => {
     form.reset(wfsWmsDefaults)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,7 +87,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     handleExit,
     handleDiscardAndExit,
     handleSaveAndExit,
-    handleSubmit,
+    handleSave,
   } = useApiConfig({
     form,
     dataset,
@@ -98,6 +101,15 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
       description: data.description?.trim() || undefined,
     }),
   })
+
+  const handleSubmitWithStyles = (e: FormEvent) => {
+    e.preventDefault()
+    void handleSave().then(async apiSaved => {
+      if (apiSaved && stylesRef.current) {
+        await stylesRef.current.saveAllStyles()
+      }
+    })
+  }
 
   const [selectedTab, setSelectedTab] = useState<ApiConfigTab>('basicInfo')
   const typeLabel = t(`title.${apiType}`)
@@ -126,7 +138,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
       onExit={handleExit}
       onDiscard={handleDiscardAndExit}
       onSaveAndExit={handleSaveAndExit}
-      onSubmit={handleSubmit}
+      onSubmit={handleSubmitWithStyles}
     >
       <Form {...form}>
         {selectedTab === 'basicInfo' && (
@@ -140,12 +152,8 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
             onSlugBlur={handleSlugBlur}
           />
         )}
-        {selectedTab === 'layer' && <LayerConfig form={form} />}
-        {selectedTab === 'styles' && (
-          <div data-testid={`tabPlaceholder-${selectedTab}`} className="py-12 text-center text-muted-foreground">
-            {t('tabs.placeholder')}
-          </div>
-        )}
+        {selectedTab === 'layer' && <LayerConfig form={form} datasetId={dataset.id} />}
+        {selectedTab === 'styles' && <StylesConfig ref={stylesRef} datasetId={dataset.id} />}
       </Form>
     </ApiConfigWrapper>
   )
