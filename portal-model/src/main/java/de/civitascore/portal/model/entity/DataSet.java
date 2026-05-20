@@ -141,9 +141,8 @@ public class DataSet extends BaseDataEntity {
   private List<String> pipelineIds;
 
   /**
-   * Named API endpoints exposed by this dataset. Each entry produces one published distribution and
-   * one APISIX route after release. Slug uniqueness within the dataset is enforced by a DB unique
-   * constraint.
+   * Named API endpoints exposed by this dataset. Each entry produces one APISIX route after
+   * release. Slug uniqueness within the dataset is enforced by a DB unique constraint.
    */
   @OneToMany(
       mappedBy = "dataSet",
