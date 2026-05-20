@@ -114,10 +114,10 @@ export const buildNamedApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) => {
 }
 
 export const BoundingBoxSchema = z.object({
-  minx: z.number(),
-  miny: z.number(),
-  maxx: z.number(),
-  maxy: z.number(),
+  minX: z.coerce.number({ message: 'common.errors.required' }),
+  minY: z.coerce.number({ message: 'common.errors.required' }),
+  maxX: z.coerce.number({ message: 'common.errors.required' }),
+  maxY: z.coerce.number({ message: 'common.errors.required' }),
   crs: z.string(),
 })
 
@@ -131,7 +131,7 @@ export const WfsWmsLayerFormSchema = z.object({
     .optional()
     .or(z.literal('')),
   table: z.string().min(1, 'common.errors.required'),
-  attribute: z.preprocess(parseStringArray, z.array(z.string()).min(1, 'common.errors.required')),
+  attribute: z.preprocess(v => parseStringArray(v) ?? [], z.array(z.string()).min(1, 'common.errors.required')),
   cqlFilter: z.string().trim(),
   geometryColumnRef: z.string().min(1, 'common.errors.required'),
   crs: z.string().min(1, 'common.errors.required'),

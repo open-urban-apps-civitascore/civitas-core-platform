@@ -9,6 +9,11 @@ import { Button } from '@/components/ui/button'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import { WfsWmsApiFormData } from '@/types/namedApis'
+import { FormItem, FormLabel } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import { FormSelect } from '@/components/form/fields/FormSelect'
+import { crsOptions } from '@/const/crs'
+import { BoundingBoxConfig } from './BoundingBoxConfig'
 
 interface LayerConfigProps {
   form: UseFormReturn<WfsWmsApiFormData>
@@ -40,13 +45,13 @@ export const LayerConfig = (props: LayerConfigProps) => {
         <SubHeader title={t('dataSelection.sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
       </DetailsFieldContainer>
       <DetailsFieldContainer className="border-b-0 py-2 pt-6">
-        <TextField form={form} label={t('dataSelection.table')} name="layer.title" placeholder="" required />
+        <TextField form={form} label={t('dataSelection.table')} name="layer.table" placeholder="" required />
       </DetailsFieldContainer>
       <DetailsFieldContainer className="border-b-0 py-2">
-        <TextField form={form} label={t('dataSelection.attributes')} name="layer.layerName" placeholder="" required />
+        <TextField form={form} label={t('dataSelection.attributes')} name="layer.attribute" placeholder="" required />
       </DetailsFieldContainer>
       <DetailsFieldContainer className="border-b-0 py-2 pb-6">
-        <TextField form={form} label={t('dataSelection.filter')} name="layer.layerDescription" placeholder="" />
+        <TextField form={form} label={t('dataSelection.filter')} name="layer.cqlFilter" placeholder="" />
       </DetailsFieldContainer>
 
       {/* Geometry section */}
@@ -54,16 +59,38 @@ export const LayerConfig = (props: LayerConfigProps) => {
         <SubHeader title={t('geometry.sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
       </DetailsFieldContainer>
       <DetailsFieldContainer className="border-b-0 py-2 pt-6">
-        <TextField form={form} label={t('geometry.geometryField')} name="layer.title" placeholder="" required />
+        <TextField
+          form={form}
+          label={t('geometry.geometryField')}
+          name="layer.geometryColumnRef"
+          placeholder=""
+          required
+        />
       </DetailsFieldContainer>
+      {/* The native CRS is a read-only field and not part of the form. It only represents the crs information from the datastructure */}
       <DetailsFieldContainer className="border-b-0 py-2">
-        <TextField form={form} label={t('geometry.nativeCrs')} name="layer.layerName" placeholder="" required />
+        <FormItem className={cn(isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]')}>
+          <FormLabel>{t('geometry.nativeCrs')}</FormLabel>
+          <Input
+            data-testid="nativeCrsTextField"
+            data-test-element="formField"
+            className="disabled:opacity-100 disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
+            value="Test CRS"
+            disabled={true}
+          />
+        </FormItem>
       </DetailsFieldContainer>
       <DetailsFieldContainer className="border-b-0 py-2 pb-6">
-        <TextField form={form} label={t('geometry.definedCrs')} name="layer.layerDescription" placeholder="" />
+        <FormSelect
+          form={form}
+          label={t('geometry.definedCrs')}
+          name="layer.crs"
+          id="wfsWmsLayerCrs"
+          options={crsOptions}
+        />
       </DetailsFieldContainer>
       <DetailsFieldContainer className="border-b-0 py-2 pb-6">
-        <TextField form={form} label={t('geometry.boundingBox')} name="layer.layerDescription" placeholder="" />
+        <BoundingBoxConfig form={form}/>
       </DetailsFieldContainer>
 
       {/* Style section */}

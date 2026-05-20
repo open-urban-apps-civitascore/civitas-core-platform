@@ -40,21 +40,26 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
   const formSchema = useMemo(() => WfsWmsApiFormSchema({ existingSlugs }), [existingSlugs])
   const initialSlug = existingApi?.slug ?? defaults.defaultSlug
 
-  const wfsWmsDefaults = {
+  const wfsWmsDefaults: WfsWmsApiFormData = {
     name: existingApi?.name ?? '',
     slug: initialSlug,
     description: existingApi?.description ?? '',
     persistence: defaults.persistenceValue,
-    layerName: '',
-    technicalLayerName: '',
-    layerDescription: '' as string | undefined,
-    table: '',
-    attributes: [] as string[],
-    filter: '',
-    geometryField: '',
-    crs: '',
-    bbox: '',
-    style: '',
+    layer: {
+      title: '',
+      layerName: '',
+      layerDescription: '' as string | undefined,
+      table: '',
+      attribute: [] as string[],
+      cqlFilter: '',
+      geometryColumnRef: '',
+      crs: '',
+      bboxAutoCalculate: false,
+      nativeBoundingBox: { minX: '', minY: '', maxX: '', maxY: '', crs: '' },
+      latLonBoundingBox: { minX: '', minY: '', maxX: '', maxY: '', crs: '' },
+      defaultStilId: '',
+      alternativeStilIds: undefined,
+    },
   }
 
   const form = useForm<WfsWmsApiFormData>({

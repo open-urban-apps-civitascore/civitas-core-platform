@@ -1,4 +1,4 @@
-const crsOptions = [
+export const crsOptions = [
   {
     label: 'EPSG:4326  – WGS84 (Standard)',
     value: 'EPSG:4326',

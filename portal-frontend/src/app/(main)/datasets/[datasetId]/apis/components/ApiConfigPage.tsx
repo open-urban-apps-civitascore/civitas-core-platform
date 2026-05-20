@@ -1,5 +1,6 @@
 'use client'
 
+import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { Dataset } from '@/types/datasets'
 import { API_TYPE_QUERY, ApiTypeQuery, NamedApi } from '@/types/namedApis'
 
@@ -14,8 +15,12 @@ interface ApiConfigPageProps {
 }
 
 export const ApiConfigPage = ({ apiType, ...props }: ApiConfigPageProps) => {
-  if (apiType === API_TYPE_QUERY.WFS_WMS) {
-    return <WfsWmsApiConfigPage {...props} />
+  switch (apiType) {
+    case API_TYPE_QUERY.WFS_WMS:
+      return <WfsWmsApiConfigPage {...props} />
+    case API_TYPE_QUERY.SENSORTHINGS:
+      return <StaApiConfigPage {...props} />
+    default:
+      return <NoDataPage title="Unknown API Type" />
   }
-  return <StaApiConfigPage {...props} />
 }
