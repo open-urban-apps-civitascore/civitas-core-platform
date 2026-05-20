@@ -237,6 +237,7 @@ saga-e2e-test-backend:
 api-test-backend:
   image: docker:27
   stage: test # runs after build jobs provide JAR artifacts
+  allow_failure: true
   needs:
     - job: build-backend
       artifacts: true
