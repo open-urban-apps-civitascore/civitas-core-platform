@@ -90,7 +90,7 @@ export const ApiConfigPage = (props: ApiConfigPageProps) => {
 
   const form = useForm<NamedApiFormData>({
     resolver: zodResolver(formSchema),
-    mode: 'onBlur',
+    mode: 'onChange',
     defaultValues: {
       name: existingApi?.name ?? '',
       slug: initialSlug,
@@ -169,6 +169,7 @@ export const ApiConfigPage = (props: ApiConfigPageProps) => {
               namedApis: [...otherInputs, newApi],
             })
             toast.success(t('messages.updateSuccess'))
+            form.reset(data)
             router.refresh()
             updateMode(false)
           }

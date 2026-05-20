@@ -91,7 +91,7 @@ export const ApiConfigForm = (props: ApiConfigFormProps) => {
         <FormField
           control={form.control}
           name="slug"
-          render={({ field }) => (
+          render={({ field, fieldState }) => (
             <FormItem className={cn(gridClass)}>
               <FormLabel htmlFor="apiSlug">
                 {t('form.slug')}
@@ -111,10 +111,10 @@ export const ApiConfigForm = (props: ApiConfigFormProps) => {
                     }}
                     maxLength={SLUG_MAX_LENGTH}
                     disabled={isReadOnly}
-                    aria-invalid={!!form.formState.errors.slug}
+                    aria-invalid={fieldState.isTouched && !!form.formState.errors.slug}
                   />
                 </FormControl>
-                <FormMessage data-testid="slugFormMessage" className="mt-2" />
+                {fieldState.isTouched && <FormMessage data-testid="slugFormMessage" className="mt-2" />}
               </div>
             </FormItem>
           )}
