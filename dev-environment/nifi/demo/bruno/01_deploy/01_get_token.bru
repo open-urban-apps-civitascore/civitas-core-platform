@@ -17,7 +17,9 @@ body:form-urlencoded {
 
 script:post-response {
   if (res.status === 200 || res.status === 201) {
-    bru.setVar('nifiToken', res.body);
+    // Use setEnvVar (not setVar): Bruno's `auth:bearer { token: {{var}} }`
+    // block only resolves env-scope vars at request-send time.
+    bru.setEnvVar('nifiToken', res.body);
   }
 }
 
@@ -26,7 +28,7 @@ tests {
     expect([200, 201]).to.include(res.status);
   });
   test("Token captured", function() {
-    expect(bru.getVar('nifiToken')).to.be.a('string');
+    expect(bru.getEnvVar('nifiToken')).to.be.a('string');
   });
 }
 

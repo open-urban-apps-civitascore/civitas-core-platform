@@ -1,0 +1,28 @@
+meta {
+  name: 00b Find Demo PG by Name
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{nifiBaseUrl}}/nifi-api/process-groups/{{rootPgId}}/process-groups
+  auth: inherit
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const groupName = bru.getEnvVar('groupName');
+    const pg = (res.body.processGroups || []).find(
+      g => g.component && g.component.name === groupName
+    );
+    if (pg) {
+      bru.setVar('demoPgId', pg.id);
+    }
+  }
+}
+
+tests {
+  test("Demo PG found", function() {
+    expect(bru.getVar('demoPgId')).to.be.a('string');
+  });
+}
