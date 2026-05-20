@@ -1,0 +1,40 @@
+meta {
+  name: 01 Get NiFi Access Token
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{nifiBaseUrl}}/nifi-api/access/token
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  username: {{nifiUser}}
+  password: {{nifiPassword}}
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar('nifiToken', res.body);
+  }
+}
+
+tests {
+  test("Status 200/201", function() {
+    expect([200, 201]).to.include(res.status);
+  });
+  test("Token captured", function() {
+    expect(bru.getVar('nifiToken')).to.be.a('string');
+  });
+}
+
+docs {
+  Authenticates against NiFi's single-user provider and stashes the JWT in
+  the `nifiToken` collection variable. All subsequent requests use
+  `Authorization: Bearer {{nifiToken}}`.
+
+  NiFi uses a self-signed cert in dev; enable "Disable SSL Verification" in
+  Bruno settings (or per-collection) before running.
+}

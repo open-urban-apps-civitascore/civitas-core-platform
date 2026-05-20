@@ -1,0 +1,26 @@
+meta {
+  name: 04 Delete Process Group
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{nifiBaseUrl}}/nifi-api/process-groups/{{demoPgId}}?version={{demoPgRevision}}&clientId=bruno-demo&disconnectedNodeAcknowledged=false
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{nifiToken}}
+}
+
+tests {
+  test("Status 200", function() {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  Deletes the demo PG. NiFi requires the current `version` for optimistic
+  locking and a `clientId` for identifying the modifier.
+}

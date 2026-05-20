@@ -1,0 +1,33 @@
+meta {
+  name: 02 Get Root Process Group
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{nifiBaseUrl}}/nifi-api/process-groups/root
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{nifiToken}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setVar('rootPgId', res.body.id);
+  }
+}
+
+tests {
+  test("Status 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  test("rootPgId saved", function() {
+    expect(bru.getVar('rootPgId')).to.be.a('string');
+  });
+}
+
+docs {
+  Fetches the root Process Group's id — needed as the upload parent in step 03.
+}

@@ -1,0 +1,29 @@
+meta {
+  name: 01 Stop Process Group
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{nifiBaseUrl}}/nifi-api/flow/process-groups/{{demoPgId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{nifiToken}}
+}
+
+body:json {
+  {
+    "id": "{{demoPgId}}",
+    "state": "STOPPED",
+    "disconnectedNodeAcknowledged": false
+  }
+}
+
+tests {
+  test("Status 200", function() {
+    expect(res.status).to.equal(200);
+  });
+}

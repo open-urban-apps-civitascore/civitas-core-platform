@@ -1,0 +1,34 @@
+meta {
+  name: 02 Disable All Controller Services
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{nifiBaseUrl}}/nifi-api/flow/process-groups/{{demoPgId}}/controller-services
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{nifiToken}}
+}
+
+body:json {
+  {
+    "id": "{{demoPgId}}",
+    "state": "DISABLED",
+    "disconnectedNodeAcknowledged": false
+  }
+}
+
+tests {
+  test("Status 200", function() {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  Controller services must be DISABLED before the parent PG can be deleted.
+  NiFi disables them asynchronously — give it ~3s before step 04.
+}
