@@ -111,6 +111,46 @@ class GroupSyncIntegrationTest extends BaseEventPublishingIntegrationTest {
   }
 
   @Test
+  @DisplayName("Should preserve user memberships when group is renamed (sync keyed on externalId)")
+  void shouldPreserveMembershipsAcrossGroupRename() {
+    // Regression guard for the rename-race issue: membership sync now keys on the stable
+    // Keycloak externalId, not on the group name. A portal-side rename must NOT cause the user
+    // to lose their existing membership in Keycloak — the externalId stays the same.
+    GroupInputDTO groupInput = new GroupInputDTO();
+    String originalName = "renamegrp" + System.currentTimeMillis();
+    groupInput.setName(originalName);
+    Group group = groupService.create(groupInput);
+    String externalId = group.getExternalId();
+    assertThat(externalId).isNotNull();
+
+    var user = userService.create(createValidUserInput());
+    userService.replaceGroups(user.getId(), List.of(group.getId()));
+    await()
+        .atMost(Duration.ofSeconds(15))
+        .untilAsserted(() -> assertThat(findKeycloakUserGroups(user.getExternalId())).hasSize(1));
+
+    // Rename the group: externalId stays the same, only the display name changes.
+    GroupInputDTO renameInput = new GroupInputDTO();
+    String newName = originalName + "-renamed";
+    renameInput.setName(newName);
+    groupService.update(group.getId(), renameInput);
+
+    // A subsequent user update must not drop the membership — sync keys on externalId.
+    userService.replaceGroups(user.getId(), List.of(group.getId()));
+
+    await()
+        .atMost(Duration.ofSeconds(15))
+        .untilAsserted(
+            () -> {
+              var userGroups = findKeycloakUserGroups(user.getExternalId());
+              assertThat(userGroups)
+                  .as("User must still be a member after portal-side rename")
+                  .hasSize(1)
+                  .anyMatch(g -> g.getName().equals(newName));
+            });
+  }
+
+  @Test
   @DisplayName("Should remove user from all Keycloak groups when replacing with an empty list")
   void shouldRemoveAllUserGroupMembershipsInKeycloak() {
     GroupInputDTO groupInput = new GroupInputDTO();

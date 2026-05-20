@@ -121,7 +121,6 @@ public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
     }
 
     groupConfig.setName(entity.getName());
-    groupConfig.setPath("/" + entity.getName().toLowerCase().replaceAll("\\s+", "-"));
 
     if (entity.getParentGroup() != null && entity.getParentGroup().getExternalId() != null) {
       groupConfig.setParentId(entity.getParentGroup().getExternalId());

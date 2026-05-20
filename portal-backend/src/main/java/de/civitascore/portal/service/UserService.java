@@ -150,7 +150,17 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     userConfig.setFirstName(entity.getFirstName());
     userConfig.setLastName(entity.getLastName());
     userConfig.setEnabled(true);
-    userConfig.setGroups(entity.getGroups().stream().map(Group::getName).sorted().toList());
+    // Use externalId (Keycloak group UUID) — stable across portal-side group renames.
+    // Groups not yet synced to Keycloak (externalId == null) are excluded; the adapter cannot
+    // assign a membership to a group that does not yet exist on the Keycloak side. The missing
+    // memberships are re-attempted on the next user update after the catch-up sync runs.
+    userConfig.setGroups(
+        entity.getGroups().stream()
+            .map(Group::getExternalId)
+            .filter(Objects::nonNull)
+            .filter(id -> !id.isBlank())
+            .sorted()
+            .toList());
 
     return userConfig;
   }

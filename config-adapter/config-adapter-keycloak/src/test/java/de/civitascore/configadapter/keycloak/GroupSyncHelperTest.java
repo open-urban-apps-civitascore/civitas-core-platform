@@ -10,8 +10,6 @@
 package de.civitascore.configadapter.keycloak;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -27,7 +25,6 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.keycloak.admin.client.resource.GroupsResource;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.admin.client.resource.UsersResource;
@@ -39,7 +36,6 @@ class GroupSyncHelperTest {
   private RealmResource realmResource;
   private UsersResource usersResource;
   private UserResource userResource;
-  private GroupsResource groupsResource;
 
   private static final String USER_ID = "user-1";
 
@@ -49,11 +45,9 @@ class GroupSyncHelperTest {
     realmResource = mock(RealmResource.class);
     usersResource = mock(UsersResource.class);
     userResource = mock(UserResource.class);
-    groupsResource = mock(GroupsResource.class);
 
     when(realmResource.users()).thenReturn(usersResource);
     when(usersResource.get(USER_ID)).thenReturn(userResource);
-    when(realmResource.groups()).thenReturn(groupsResource);
   }
 
   private GroupRepresentation group(String id, String name) {
@@ -64,16 +58,13 @@ class GroupSyncHelperTest {
   }
 
   @Test
-  @DisplayName("adds missing groups and removes stale groups")
+  @DisplayName("adds missing groups and removes stale groups (keyed on externalId)")
   void shouldAddAndRemoveGroups() {
     GroupRepresentation keep = group("keep-id", "keep-group");
     GroupRepresentation stale = group("stale-id", "stale-group");
     when(userResource.groups(0, 100)).thenReturn(List.of(keep, stale));
 
-    GroupRepresentation newGroup = group("new-id", "new-group");
-    when(groupsResource.groups("new-group", true, 0, 1, true)).thenReturn(List.of(newGroup));
-
-    helper.syncUserGroups(List.of("keep-group", "new-group"), USER_ID, realmResource);
+    helper.syncUserGroups(List.of("keep-id", "new-id"), USER_ID, realmResource);
 
     verify(userResource).leaveGroup("stale-id");
     verify(userResource).joinGroup("new-id");
@@ -81,17 +72,15 @@ class GroupSyncHelperTest {
   }
 
   @Test
-  @DisplayName("does nothing when groups match")
+  @DisplayName("does nothing when group ids match")
   void shouldDoNothingWhenGroupsMatch() {
     GroupRepresentation existing = group("g-id", "existing-group");
     when(userResource.groups(0, 100)).thenReturn(List.of(existing));
 
-    helper.syncUserGroups(List.of("existing-group"), USER_ID, realmResource);
+    helper.syncUserGroups(List.of("g-id"), USER_ID, realmResource);
 
     verify(userResource, never()).leaveGroup(anyString());
     verify(userResource, never()).joinGroup(anyString());
-    verify(groupsResource, never())
-        .groups(anyString(), anyBoolean(), anyInt(), anyInt(), anyBoolean());
   }
 
   @Test
@@ -120,25 +109,29 @@ class GroupSyncHelperTest {
   }
 
   @Test
-  @DisplayName("nonexistent group is logged and skipped, does not throw")
-  void shouldSkipNonexistentGroup() {
-    when(userResource.groups(0, 100)).thenReturn(Collections.emptyList());
-    when(groupsResource.groups("ghost", true, 0, 1, true)).thenReturn(Collections.emptyList());
+  @DisplayName("rename: same externalId in current and desired set ⇒ no membership churn")
+  void shouldBeStableAcrossPortalRename() {
+    // Portal renames "Editors" -> "Writers"; Keycloak side already reflects the new name
+    // because GROUP_UPDATED was applied before this USER_UPDATED event. The user's desired
+    // membership list still references the same externalId, so no leave/join is issued.
+    GroupRepresentation renamed = group("kc-uuid-1", "Writers");
+    when(userResource.groups(0, 100)).thenReturn(List.of(renamed));
 
-    helper.syncUserGroups(List.of("ghost"), USER_ID, realmResource);
+    helper.syncUserGroups(List.of("kc-uuid-1"), USER_ID, realmResource);
 
+    verify(userResource, never()).leaveGroup(anyString());
     verify(userResource, never()).joinGroup(anyString());
   }
 
   @Test
-  @DisplayName("uses exact-match lookup so 'prod' does not match 'production'")
-  void shouldUseExactMatchLookup() {
+  @DisplayName("nonexistent group id is logged and skipped, does not throw")
+  void shouldSkipNonexistentGroupId() {
     when(userResource.groups(0, 100)).thenReturn(Collections.emptyList());
-    when(groupsResource.groups("prod", true, 0, 1, true)).thenReturn(Collections.emptyList());
+    doThrow(new NotFoundException()).when(userResource).joinGroup("ghost-id");
 
-    helper.syncUserGroups(List.of("prod"), USER_ID, realmResource);
+    helper.syncUserGroups(List.of("ghost-id"), USER_ID, realmResource);
 
-    verify(groupsResource).groups("prod", true, 0, 1, true);
+    verify(userResource).joinGroup("ghost-id");
   }
 
   @Test
@@ -174,15 +167,9 @@ class GroupSyncHelperTest {
   @DisplayName("NotFoundException on joinGroup is logged and does not abort the loop")
   void shouldContinueWhenJoinGroupRaces() {
     when(userResource.groups(0, 100)).thenReturn(Collections.emptyList());
-
-    GroupRepresentation racedAway = group("raced-id", "raced");
-    GroupRepresentation present = group("present-id", "present");
-    when(groupsResource.groups("raced", true, 0, 1, true)).thenReturn(List.of(racedAway));
-    when(groupsResource.groups("present", true, 0, 1, true)).thenReturn(List.of(present));
-
     doThrow(new NotFoundException()).when(userResource).joinGroup("raced-id");
 
-    helper.syncUserGroups(List.of("raced", "present"), USER_ID, realmResource);
+    helper.syncUserGroups(List.of("raced-id", "present-id"), USER_ID, realmResource);
 
     verify(userResource).joinGroup("raced-id");
     verify(userResource).joinGroup("present-id");
@@ -192,15 +179,13 @@ class GroupSyncHelperTest {
   @DisplayName("WebApplicationException on joinGroup propagates so the event is DLQ'd")
   void shouldPropagate5xxOnJoinGroup() {
     when(userResource.groups(0, 100)).thenReturn(Collections.emptyList());
-    GroupRepresentation g = group("g-id", "g");
-    when(groupsResource.groups("g", true, 0, 1, true)).thenReturn(List.of(g));
     doThrow(new WebApplicationException(Response.serverError().build()))
         .when(userResource)
         .joinGroup("g-id");
 
     assertThrows(
         WebApplicationException.class,
-        () -> helper.syncUserGroups(List.of("g"), USER_ID, realmResource));
+        () -> helper.syncUserGroups(List.of("g-id"), USER_ID, realmResource));
   }
 
   @Test
@@ -215,10 +200,10 @@ class GroupSyncHelperTest {
     when(userResource.groups(100, 100)).thenReturn(List.of(overflow));
     when(userResource.groups(200, 100)).thenReturn(Collections.emptyList());
 
-    // desired keeps page 1 entirely; overflow group "group-100" is not desired and must be removed
+    // desired keeps page 1 entirely; overflow id-100 is not desired and must be removed
     List<String> desired = new java.util.ArrayList<>();
     for (int i = 0; i < 100; i++) {
-      desired.add("group-" + i);
+      desired.add("id-" + i);
     }
 
     helper.syncUserGroups(desired, USER_ID, realmResource);

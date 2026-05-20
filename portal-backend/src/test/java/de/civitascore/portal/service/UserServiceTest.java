@@ -252,22 +252,50 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("Should populate groups with group names from user memberships")
-    void shouldPopulateGroupNames() {
+    @DisplayName("Should populate groups with Keycloak externalIds (not names)")
+    void shouldPopulateGroupExternalIds() {
       UserService service = createService();
       User user = userWithId(UUID.randomUUID());
 
       Group group1 = new Group();
       group1.setName("Editors");
+      group1.setExternalId("kc-uuid-editors");
       Group group2 = new Group();
       group2.setName("Viewers");
+      group2.setExternalId("kc-uuid-viewers");
       user.addGroup(group1);
       user.addGroup(group2);
 
       UserConfig config =
           (UserConfig) service.toConfigValuePostSave(user, new UserInputDTO(), null);
 
-      assertThat(config.getGroups()).containsExactlyInAnyOrder("Editors", "Viewers");
+      assertThat(config.getGroups())
+          .containsExactlyInAnyOrder("kc-uuid-editors", "kc-uuid-viewers");
+    }
+
+    @Test
+    @DisplayName("Should skip groups without externalId (not yet synced to Keycloak)")
+    void shouldSkipGroupsWithoutExternalId() {
+      UserService service = createService();
+      User user = userWithId(UUID.randomUUID());
+
+      Group synced = new Group();
+      synced.setName("Synced");
+      synced.setExternalId("kc-uuid-synced");
+      Group unsynced = new Group();
+      unsynced.setName("Unsynced");
+      unsynced.setExternalId(null);
+      Group blank = new Group();
+      blank.setName("Blank");
+      blank.setExternalId("   ");
+      user.addGroup(synced);
+      user.addGroup(unsynced);
+      user.addGroup(blank);
+
+      UserConfig config =
+          (UserConfig) service.toConfigValuePostSave(user, new UserInputDTO(), null);
+
+      assertThat(config.getGroups()).containsExactly("kc-uuid-synced");
     }
 
     @Test

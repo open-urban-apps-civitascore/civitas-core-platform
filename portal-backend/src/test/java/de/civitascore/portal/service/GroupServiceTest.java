@@ -206,8 +206,8 @@ class GroupServiceTest {
   class ToConfigValuePostSaveTests {
 
     @Test
-    @DisplayName("Should build GroupConfig with name and path")
-    void shouldBuildGroupConfigWithNameAndPath() {
+    @DisplayName("Should build GroupConfig with name (path is left to Keycloak)")
+    void shouldBuildGroupConfigWithName() {
       GroupService service = createService();
       Group group = new Group();
       group.setId(UUID.randomUUID());
@@ -217,7 +217,7 @@ class GroupServiceTest {
           (GroupConfig) service.toConfigValuePostSave(group, new GroupInputDTO(), null);
 
       assertThat(config.getName()).isEqualTo("Editors");
-      assertThat(config.getPath()).isEqualTo("/editors");
+      assertThat(config.getPath()).isNull();
     }
 
     @Test
