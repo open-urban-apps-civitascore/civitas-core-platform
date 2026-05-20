@@ -25,7 +25,7 @@ tests {
   test("Status 200", function() {
     expect(res.status).to.equal(200);
   });
-  test("Demo PG found (run scripts/upload-snapshot.sh first if this fails)", function() {
+  test("Demo PG found", function() {
     expect(bru.getVar('demoPgId')).to.be.a('string');
   });
 }
