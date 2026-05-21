@@ -103,6 +103,11 @@ public class DataSet extends BaseDataEntity {
   @Builder.Default
   private Set<Agent> agents = new HashSet<>();
 
+  /**
+   * Distribution rows linked to this dataset. Currently has no production writer — the entity is
+   * reserved for the deferred DCAT distribution work. Existing rows are preserved by cascade
+   * delete; the dormancy is documented on {@link Distribution} itself.
+   */
   @OneToMany(
       mappedBy = "dataSet",
       fetch = FetchType.LAZY,
