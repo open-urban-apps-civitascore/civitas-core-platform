@@ -9,38 +9,45 @@ with a real `geometry(Point, 4326)` value.
 
 ## How it works
 
-```
- MQTT publisher          Mosquitto         NiFi Process Group              PostGIS
- ───────────────         ─────────         ─────────────────────           ───────
- mosquitto_pub  ──pub──►  broker  ──sub──► ConsumeMQTT                      
-                                            │                               
-                                            ▼                               
-                                           ConvertRecord                    
-                                            │                               
-                                            ▼                               
-                                           UpdateRecord ("mapping")         
-                                            │  /geom = concat('POINT(', /lon, ' ', /lat, ')')
-                                            │  /measurement_time = toDate(/ts, "...")
-                                            ▼                               
-                                           PutDatabaseRecord  ──INSERT──►   sensor_observations
+```mermaid
+flowchart LR
+  pub[mosquitto_pub] -->|JSON| broker[(Mosquitto<br/>:1883)]
+
+  subgraph nifi[NiFi Process Group · civitas-mqtt-postgis-demo]
+    direction LR
+    consume[ConsumeMQTT] -->|raw bytes| convert[ConvertRecord]
+    convert -->|typed record| mapping["UpdateRecord<br/>aka <b>mapping</b>"]
+    mapping -->|transformed record| put[PutDatabaseRecord]
+  end
+
+  broker -->|subscribe<br/>sensors/+/temp| consume
+  put -->|INSERT| db[(PostGIS<br/>sensor_observations)]
 ```
 
-Inside the NiFi Process Group, four processors are wired together:
+The four processors inside the Process Group:
 
 1. **ConsumeMQTT** subscribes to `sensors/+/temp` on the local Mosquitto broker.
 2. **ConvertRecord** parses the JSON body into a typed record.
 3. **UpdateRecord** (named `mapping`) rewrites the record using
    **RecordPath** — a small expression language NiFi understands natively.
-   Each target field gets its own expression: a `concat(...)` produces the
-   WKT geometry string, `toDate(...)` parses the ISO timestamp, the rest
-   pass through.
+   One expression per target field:
+
+   ```jsonc
+   {
+     "/geom":             "concat('POINT(', /lon, ' ', /lat, ')')",
+     "/measurement_time": "toDate(/ts, \"yyyy-MM-dd'T'HH:mm:ss'Z'\")",
+     "/temperature":      "/temperature",
+     "/station_id":       "/station_id"
+   }
+   ```
+
 4. **PutDatabaseRecord** inserts the transformed record into the PostGIS
    `sensor_observations` table.
 
-The whole flow is stored as a single JSON file (`MQTT_TO_POSTGIS_demo.snapshot.json`)
-that NiFi can import in one upload. The demo's job is to upload that file,
-finish setup (the DB password is not part of the file by design), and start
-the flow.
+The whole flow is stored as a single JSON file
+(`MQTT_TO_POSTGIS_demo.snapshot.json`) that NiFi can import in one upload.
+The demo's job is to upload that file, finish setup (the DB password isn't
+part of the file by design), and start the processors.
 
 ---
 
