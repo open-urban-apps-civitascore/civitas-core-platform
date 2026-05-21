@@ -9,6 +9,10 @@ get {
   auth: inherit
 }
 
+script:pre-request {
+  bru.setVar('demoPgId', null);
+}
+
 script:post-response {
   if (res.status === 200) {
     const groupName = bru.getEnvVar('groupName');
@@ -17,12 +21,15 @@ script:post-response {
     );
     if (pg) {
       bru.setVar('demoPgId', pg.id);
+    } else {
+      console.log(`No PG named "${groupName}" — nothing to clean up. Stopping chain.`);
+      bru.setNextRequest(null);
     }
   }
 }
 
 tests {
-  test("Demo PG found", function() {
-    expect(bru.getVar('demoPgId')).to.be.a('string');
+  test("Lookup completed (cleanup is idempotent)", function() {
+    expect(res.status).to.equal(200);
   });
 }

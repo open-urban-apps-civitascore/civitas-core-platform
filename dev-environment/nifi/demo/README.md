@@ -125,15 +125,15 @@ cd dev-environment/nifi/demo
 
 cd bruno
 BRU="npx --yes @usebruno/cli@3.3.0 run"
-$BRU 01_deploy --env local --insecure --disable-cookies   # token, set pw, enable, start
+$BRU 01_deploy --env local --insecure   # token, set pw, enable, start
 
 sleep 10
 docker exec civitas-nifi-demo-mosquitto mosquitto_pub -h localhost \
   -t "sensors/sensor-001/temp" \
   -m '{"lat":50.110,"lon":8.660,"temperature":21.3,"ts":"2026-05-20T18:30:00Z","station_id":"sensor-001"}'
 
-$BRU 02_verify --env local --insecure --disable-cookies   # processors RUNNING, bulletins clear
-$BRU 03_cleanup --env local --insecure --disable-cookies  # stop, disable, delete
+$BRU 02_verify --env local --insecure   # processors RUNNING, bulletins clear
+$BRU 03_cleanup --env local --insecure  # stop, disable, delete
 ```
 
 Das `--disable-cookies` ist Pflicht — Erklärung in
@@ -143,9 +143,10 @@ Das `--disable-cookies` ist Pflicht — Erklärung in
 
 ## Bekannte Fallstricke
 
-- **`--disable-cookies` immer.** NiFi setzt einen Bearer-Cookie auf
-  `/access/token`; Bruno's Cookie-Jar schickt ihn auf jede Folgeanfrage, und
-  NiFis CSRF-Schutz weist PUT/POST/DELETE mit Cookie ohne CSRF-Token ab.
+- **Folder-runs, keine Einzelrequests.** Jeder Folder enthält die nötige
+  Token+Lookup-Prelude. Wer in Bruno Desktop nur einzelne `.bru` triggert,
+  läuft in stale-env-Probleme (alte `nifiToken`, alte `dbcpServiceId`).
+  Siehe [bruno/README-bruno-quirks.md](bruno/README-bruno-quirks.md).
 - **10 Sekunden Wartezeit zwischen Start und Publish.** ConsumeMQTT
   abonniert das Topic erst nach der Processor-Initialisierung. Sleep zu
   knapp → Messages werden vor dem Subscribe vom Broker mit QoS 0 verworfen.

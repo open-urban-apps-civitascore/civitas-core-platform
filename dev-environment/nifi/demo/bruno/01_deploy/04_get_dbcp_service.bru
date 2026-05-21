@@ -10,6 +10,12 @@ get {
 }
 
 
+script:pre-request {
+  // Reset before lookup — never leak a stale id from a previous run.
+  bru.setVar('dbcpServiceId', null);
+  bru.setVar('dbcpRevision', null);
+}
+
 script:post-response {
   if (res.status === 200) {
     const dbcp = res.body.controllerServices.find(
@@ -18,6 +24,9 @@ script:post-response {
     if (dbcp) {
       bru.setVar('dbcpServiceId', dbcp.id);
       bru.setVar('dbcpRevision', dbcp.revision.version);
+    } else {
+      console.log('No DBCPConnectionPool in this PG. Aborting chain.');
+      bru.setNextRequest(null);
     }
   }
 }

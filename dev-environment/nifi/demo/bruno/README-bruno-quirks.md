@@ -1,15 +1,6 @@
 # Bruno CLI quirks for the NiFi demo
 
-## Always pass `--disable-cookies`
-
-```bash
-npx --yes @usebruno/cli@3.3.0 run 01_deploy --env local --insecure --disable-cookies
-```
-
-Without `--disable-cookies`, every PUT/POST/DELETE after `01_get_token` returns
-HTTP 403 and NiFi logs the caller as anonymous (`-`) instead of `admin`.
-
-### Why
+## Cookie/CSRF gotcha (handled automatically)
 
 `POST /nifi-api/access/token` responds with both the JWT body **and** a
 `Set-Cookie: __Secure-Authorization-Bearer=<JWT>; HttpOnly; Secure; SameSite=Strict`
@@ -21,12 +12,16 @@ NiFi treats the bearer cookie as an authentication source separate from the
 header. When the cookie is present on a state-changing request (PUT/POST/DELETE)
 without a matching CSRF token, NiFi rejects the request as anonymous — even
 though a valid `Authorization` header is also present. GETs are unaffected
-because NiFi does not enforce CSRF on safe methods, which is why
-`02_get_root_pg`, `03_find_demo_pg`, and `04_get_dbcp_service` succeed while
-`05`/`06`/`07` fail.
+because NiFi does not enforce CSRF on safe methods.
 
-Verified against `nifi-request.log`: with the cookie, PUTs log as `- - [...]`;
-with `--disable-cookies`, the same PUTs log as `- admin [...]` and return 200.
+The collection-level `script:pre-request` in `collection.bru` calls
+`bru.cookies.jar().clear()` before every request, which neutralises this. No
+CLI flag needed; works in both Bruno CLI and Bruno Desktop. Verified against
+`nifi-request.log`: PUTs log as `- admin [...]` with 200 instead of `- - [...]`
+with 403.
+
+(Equivalent CLI-only fix exists as `--disable-cookies` if you ever strip the
+pre-request script.)
 
 ## `bru.setVar` vs `bru.setEnvVar` for auth tokens
 
@@ -35,3 +30,35 @@ variables from the **environment** scope at request-send time, not the
 collection-runtime scope set by `bru.setVar`. In `01_get_token.bru` use
 `bru.setEnvVar('nifiToken', res.body)`, not `bru.setVar`, or the bearer
 header will be empty on all subsequent requests.
+
+## Run folders, not single requests
+
+Each folder (`01_deploy`, `02_verify`, `03_cleanup`) starts with its own
+token-fetch + PG-lookup prelude that refreshes the runtime env vars
+(`nifiToken`, `rootPgId`, `demoPgId`, `dbcpServiceId`, `dbcpRevision`). If you
+trigger a single request from inside Bruno Desktop without running the
+prelude, you'll hit stale env vars from the previous session — symptoms range
+from `"Signed JWT rejected"` (stale token) to `404 Unable to locate controller
+service with id 'abc...'` (stale `dbcpServiceId` pointing at a CS that was
+deleted with a previous PG).
+
+Always run the folder, not the individual `.bru` file. In Bruno Desktop:
+right-click the folder → Run. In CLI: `bru run 01_deploy --env local --insecure`.
+
+## Stale-token symptom: "Signed JWT rejected"
+
+If a request fails with
+
+```
+Unauthorized error="invalid_token",
+error_description="Signed JWT rejected: Another algorithm expected,
+or no matching key(s) found"
+```
+
+NiFi has been (re)started with a fresh signing keypair (Ed25519, generated on
+first boot, stored in the `nifi_nifi_state` / `nifi_nifi_conf` volumes). The
+`nifiToken` cached in Bruno's runtime env was issued by the previous keypair
+and no longer validates. Re-run `01_get_token.bru` (or the `00_get_token.bru`
+in whichever folder you're driving) to mint a fresh JWT. With `bru run
+01_deploy/02_verify/03_cleanup` this happens automatically; only single-file
+runs need a manual token refresh first.
