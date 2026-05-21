@@ -1,6 +1,6 @@
 # Bruno CLI quirks for the NiFi demo
 
-## Cookie/CSRF gotcha (handled automatically)
+## Cookie/CSRF gotcha (handled automatically — incl. multipart upload)
 
 `POST /nifi-api/access/token` responds with both the JWT body **and** a
 `Set-Cookie: __Secure-Authorization-Bearer=<JWT>; HttpOnly; Secure; SameSite=Strict`
@@ -22,6 +22,12 @@ with 403.
 
 (Equivalent CLI-only fix exists as `--disable-cookies` if you ever strip the
 pre-request script.)
+
+The collection's multipart upload (`01_deploy/03_upload_snapshot.bru`) hits the
+same root cause as PUTs — earlier debugging traced it incorrectly to a separate
+"Bruno strips Authorization on multipart-form" bug; in reality there is only
+one bug (cookie + CSRF), and the pre-request `clear()` handles it for both
+multipart POSTs and JSON PUTs equally.
 
 ## `bru.setVar` vs `bru.setEnvVar` for auth tokens
 

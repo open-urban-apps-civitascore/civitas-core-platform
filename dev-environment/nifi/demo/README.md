@@ -83,70 +83,63 @@ demo/
 
 ## Demo durchspielen
 
-### Option A: nur Shell
+### Bruno (Standard)
+
+Bruno deckt den kompletten Lifecycle ab — Upload, Aktivierung, Verify,
+Cleanup. Keine Shell-Vorbereitung nötig.
 
 ```bash
-cd dev-environment/nifi/demo
-./scripts/cleanup.sh                  # alte Demo-PG abräumen
-./scripts/upload-snapshot.sh          # Snapshot hochladen, liefert PG-UUID
-./scripts/deploy.sh                   # patch password + enable CSs + start PG
-
-sleep 10                              # ConsumeMQTT braucht ~10s zum Subscribe
-
-docker exec civitas-nifi-demo-mosquitto mosquitto_pub -h localhost \
-  -t "sensors/sensor-001/temp" \
-  -m '{"lat":50.110,"lon":8.660,"temperature":21.3,"ts":"2026-05-20T18:30:00Z","station_id":"sensor-001"}'
-
-docker exec -e PGPASSWORD=nifi-demo-password civitas-nifi-demo-postgis \
-  psql -U nifi -d nifi_demo -c \
-  "SELECT station_id, temperature, measurement_time, ST_AsText(geom), ST_SRID(geom) FROM sensor_observations;"
-
-./scripts/cleanup.sh
-```
-
-Erwartete Zeile:
-```
- station_id | temperature |    measurement_time    |    st_astext    | st_srid
-------------+-------------+------------------------+-----------------+---------
- sensor-001 |        21.3 | 2026-05-20 18:30:00+00 | POINT(8.66 50.11)| 4326
-```
-
-### Option B: Bruno + Shell-Upload
-
-`@usebruno/cli@3.3.0` kann das Multipart-Upload nicht authentifizieren
-(siehe [`bruno/README-bruno-quirks.md`](bruno/README-bruno-quirks.md)), daher
-bleibt der Upload-Schritt als Shell. Alles Übrige läuft in Bruno.
-
-```bash
-cd dev-environment/nifi/demo
-
-./scripts/cleanup.sh
-./scripts/upload-snapshot.sh                          # Upload
-
-cd bruno
+cd dev-environment/nifi/demo/bruno
 BRU="npx --yes @usebruno/cli@3.3.0 run"
-$BRU 01_deploy --env local --insecure   # token, set pw, enable, start
 
-sleep 10
+$BRU 01_deploy --env local --insecure   # upload + set pw + enable + start (7 Requests)
+
+sleep 10                                # ConsumeMQTT braucht ~10s zum Subscribe
+
 docker exec civitas-nifi-demo-mosquitto mosquitto_pub -h localhost \
   -t "sensors/sensor-001/temp" \
-  -m '{"lat":50.110,"lon":8.660,"temperature":21.3,"ts":"2026-05-20T18:30:00Z","station_id":"sensor-001"}'
+  -m '{"lat":50.110,"lon":8.660,"temperature":21.3,"ts":"2026-05-21T08:00:00Z","station_id":"sensor-001"}'
 
 $BRU 02_verify --env local --insecure   # processors RUNNING, bulletins clear
 $BRU 03_cleanup --env local --insecure  # stop, disable, delete
 ```
 
-Das `--disable-cookies` ist Pflicht — Erklärung in
-[`bruno/README-bruno-quirks.md`](bruno/README-bruno-quirks.md).
+Erwartete Zeile (`psql` gegen `civitas-nifi-demo-postgis`):
+
+```
+ station_id | temperature |    measurement_time    |    st_astext     | st_srid
+------------+-------------+------------------------+------------------+---------
+ sensor-001 |        21.3 | 2026-05-21 08:00:00+00 | POINT(8.66 50.11)| 4326
+```
+
+In Bruno Desktop: Folder rechtsklicken → Run. Keine zusätzlichen Flags nötig
+(`collection.bru` kümmert sich um die NiFi-Cookie/CSRF-Falltüre, siehe
+[`bruno/README-bruno-quirks.md`](bruno/README-bruno-quirks.md)).
+
+### Alternative: nur Shell
+
+Für Shell-only Setups gibt es `scripts/deploy.sh` / `scripts/cleanup.sh` mit
+gleicher Funktionalität:
+
+```bash
+cd dev-environment/nifi/demo
+./scripts/cleanup.sh
+./scripts/deploy.sh                     # upload + activate + start
+# publish + select wie oben
+./scripts/cleanup.sh
+```
 
 ---
 
 ## Bekannte Fallstricke
 
 - **Folder-runs, keine Einzelrequests.** Jeder Folder enthält die nötige
-  Token+Lookup-Prelude. Wer in Bruno Desktop nur einzelne `.bru` triggert,
-  läuft in stale-env-Probleme (alte `nifiToken`, alte `dbcpServiceId`).
-  Siehe [bruno/README-bruno-quirks.md](bruno/README-bruno-quirks.md).
+  Token+Lookup-Prelude. Die `find_demo_pg`-Schritte setzen ihre Ziel-Var
+  vor dem Lookup explizit auf `null` und brechen die Kette per
+  `bru.setNextRequest(null)` ab, wenn keine PG existiert — so können keine
+  stalen IDs ins Folge-Request leaken. Wer in Bruno Desktop trotzdem nur
+  einzelne `.bru` triggert, umgeht die Prelude und kann auf stale-env-Daten
+  treffen. Siehe [bruno/README-bruno-quirks.md](bruno/README-bruno-quirks.md).
 - **10 Sekunden Wartezeit zwischen Start und Publish.** ConsumeMQTT
   abonniert das Topic erst nach der Processor-Initialisierung. Sleep zu
   knapp → Messages werden vor dem Subscribe vom Broker mit QoS 0 verworfen.
