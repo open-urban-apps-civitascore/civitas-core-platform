@@ -145,10 +145,10 @@ GUI-Alternative: MQTT Explorer / MQTTX gegen `localhost:1883` (anonym).
 
 ```bash
 # Quickest — keine Host-Installation nötig:
-docker exec -e PGPASSWORD=nifi-demo-password civitas-nifi-demo-postgis \
+`docker exec -e PGPASSWORD=nifi-demo-password civitas-nifi-demo-postgis \
   psql -U nifi -d nifi_demo -c \
   "SELECT station_id, temperature, measurement_time, ST_AsText(geom), ST_SRID(geom)
-     FROM sensor_observations ORDER BY measurement_time DESC LIMIT 10;"
+     FROM sensor_observations ORDER BY measurement_time DESC LIMIT 100;"`
 
 # Vom Host (psql installiert):
 PGPASSWORD=nifi-demo-password psql -h localhost -p 5435 -U nifi -d nifi_demo
@@ -189,6 +189,11 @@ tauchen die Zeilen mit ~1s Verzögerung auf.
 - **10 Sekunden Wartezeit zwischen Start und Publish.** ConsumeMQTT
   abonniert das Topic erst nach der Processor-Initialisierung. Sleep zu
   knapp → Messages werden vor dem Subscribe vom Broker mit QoS 0 verworfen.
+- **Doppel-Deploy ohne Cleanup führt zu duplikatem PG.** Beide PGs
+  abonnieren `sensors/+/temp` — Messages landen unvorhersagbar. Wenn der
+  Bruno-Cleanup mit `HTTP 409 Queue not empty` scheitert, ist `./scripts/cleanup.sh`
+  die robuste Recovery (Drop-FlowFiles + Poll-bis-DISABLED + DELETE über alle
+  Duplikate).
 - **Sensitive Properties.** Beim Snapshot-Download strippt NiFi die
   `Password`-Property. `01_deploy/05_set_dbcp_password.bru` (bzw. der
   entsprechende Schritt in `deploy.sh`) muss vor dem Enable laufen.

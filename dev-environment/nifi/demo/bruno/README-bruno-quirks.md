@@ -51,6 +51,31 @@ deleted with a previous PG).
 Always run the folder, not the individual `.bru` file. In Bruno Desktop:
 right-click the folder → Run. In CLI: `bru run 01_deploy --env local --insecure`.
 
+## Recovering from a stuck state
+
+If a deploy was interrupted, or `01_deploy` ran twice without cleanup in between,
+you can end up with:
+
+- **Duplicate PGs** with the same name (`civitas-mqtt-postgis-demo`) competing
+  for the same MQTT topic — data may or may not reach PostGIS depending on which
+  PG "wins" the subscription.
+- **Queue not empty** errors on PG delete (`HTTP 409 "Queue not empty for ..."`),
+  because NiFi refuses to delete a PG that still has queued FlowFiles.
+- **Controller-services still ENABLING/DISABLING** when delete fires — `409`
+  again, because the PG state isn't yet stable.
+
+The Bruno `03_cleanup` folder only handles the happy path (one PG, empty
+queues, fast disable). For the messy case, run the shell helper:
+
+```bash
+cd dev-environment/nifi/demo
+./scripts/cleanup.sh
+```
+
+It loops over **all** matching PGs, drops FlowFiles from every connection,
+polls until controller services reach `DISABLED`, then deletes. Idempotent —
+re-running on an already-clean root prints `"nothing to clean up"` and exits 0.
+
 ## Stale-token symptom: "Signed JWT rejected"
 
 If a request fails with
