@@ -131,6 +131,52 @@ cd dev-environment/nifi/demo
 
 ---
 
+## Daten beobachten
+
+### MQTT live mitlesen
+
+```bash
+docker exec -it civitas-nifi-demo-mosquitto mosquitto_sub -h localhost -t 'sensors/#' -v
+```
+
+GUI-Alternative: MQTT Explorer / MQTTX gegen `localhost:1883` (anonym).
+
+### PostGIS abfragen
+
+```bash
+# Quickest — keine Host-Installation nötig:
+docker exec -e PGPASSWORD=nifi-demo-password civitas-nifi-demo-postgis \
+  psql -U nifi -d nifi_demo -c \
+  "SELECT station_id, temperature, measurement_time, ST_AsText(geom), ST_SRID(geom)
+     FROM sensor_observations ORDER BY measurement_time DESC LIMIT 10;"
+
+# Vom Host (psql installiert):
+PGPASSWORD=nifi-demo-password psql -h localhost -p 5435 -U nifi -d nifi_demo
+```
+
+GUI: DBeaver / pgAdmin gegen `localhost:5435`, User `nifi`, Passwort
+`nifi-demo-password`, DB `nifi_demo`.
+
+### NiFi-UI
+
+`https://localhost:8443/nifi` → Login `admin` / `nifi-dev-password-1234567890`.
+Rechtsklick auf eine Connection → **List queue** für FlowFiles in transit.
+Rechtsklick auf einen Processor → **View data provenance** für die Historie.
+
+### Kontinuierlich publishen (Demo-Strom)
+
+```bash
+./scripts/publish-loop.sh                       # alle 2s, 5 Stationen, bis Ctrl+C
+INTERVAL=1 STATIONS=10 ./scripts/publish-loop.sh
+COUNT=20 ./scripts/publish-loop.sh              # 20 Messages, dann stop
+```
+
+Variiert `station_id`, `lat`/`lon` und `temperature` pro Message. Beim
+parallelen `mosquitto_sub` siehst du jede Message, im PostGIS-`SELECT`
+tauchen die Zeilen mit ~1s Verzögerung auf.
+
+---
+
 ## Bekannte Fallstricke
 
 - **Folder-runs, keine Einzelrequests.** Jeder Folder enthält die nötige
