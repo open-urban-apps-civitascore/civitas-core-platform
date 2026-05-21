@@ -19,8 +19,8 @@ import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 /**
- * A named API endpoint exposed by a {@link DataSet}. Each entry produces one published distribution
- * and, after release, one APISIX route at {@code /v1/datasets/{datasetId}/{slug}}.
+ * A named API endpoint exposed by a {@link DataSet}. Each entry produces one APISIX route at {@code
+ * /v1/datasets/{datasetId}/{slug}} after release.
  *
  * <p>{@code slug} and {@code standard} are immutable once the dataset reaches AVAILABLE. Slug
  * format ({@code ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$}, max 32 chars) is enforced at the DTO boundary;

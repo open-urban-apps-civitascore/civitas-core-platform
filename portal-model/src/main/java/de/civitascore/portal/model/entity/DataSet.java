@@ -103,6 +103,11 @@ public class DataSet extends BaseDataEntity {
   @Builder.Default
   private Set<Agent> agents = new HashSet<>();
 
+  /**
+   * Distribution rows linked to this dataset. Currently has no production writer — the entity is
+   * reserved for the deferred DCAT distribution work. Existing rows are preserved by cascade
+   * delete; the dormancy is documented on {@link Distribution} itself.
+   */
   @OneToMany(
       mappedBy = "dataSet",
       fetch = FetchType.LAZY,
@@ -141,9 +146,8 @@ public class DataSet extends BaseDataEntity {
   private List<String> pipelineIds;
 
   /**
-   * Named API endpoints exposed by this dataset. Each entry produces one published distribution and
-   * one APISIX route after release. Slug uniqueness within the dataset is enforced by a DB unique
-   * constraint.
+   * Named API endpoints exposed by this dataset. Each entry produces one APISIX route after
+   * release. Slug uniqueness within the dataset is enforced by a DB unique constraint.
    */
   @OneToMany(
       mappedBy = "dataSet",

@@ -33,10 +33,14 @@ public class NamedApiAllowedSlugValidator
   public static final List<String> RESERVED = List.of("apis", "api", "v1", "admin");
 
   /**
-   * URL-safe slug shape: lowercase alphanumeric with optional internal hyphens, no leading or
-   * trailing hyphen. Combined with {@code @Size(max = 32)} at the DTO layer to cap length.
+   * URL-safe slug shape regex: lowercase alphanumeric with optional internal hyphens, no leading or
+   * trailing hyphen. Combined with {@code @Size(max = 32)} at the DTO layer to cap length. Exposed
+   * as a compile-time constant so {@code @Schema(pattern = ...)} on the input DTO can reference the
+   * same source of truth.
    */
-  private static final Pattern SHAPE = Pattern.compile("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$");
+  public static final String SHAPE_REGEX = "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$";
+
+  private static final Pattern SHAPE = Pattern.compile(SHAPE_REGEX);
 
   @Override
   public boolean isValid(String slug, ConstraintValidatorContext ctx) {

@@ -96,7 +96,6 @@ const makeDraftDataset = (overrides: Partial<Dataset> = {}): Dataset => ({
   description: 'A test dataset',
   dataSetStatus: 'DRAFT',
   pipelines: [],
-  distributions: [],
   createdAt: '2024-01-01',
   modifiedAt: '2024-01-01',
   openDataAccess: false,
@@ -161,9 +160,9 @@ describe('DatasetOverview', () => {
 
   describe('Status availability and auto-revert', () => {
     describe('READY and AVAILABLE are disabled when canSetAvailable is false', () => {
-      it('when no distributions and no pipelines are present', async () => {
+      it('when no pipelines are present', async () => {
         renderComponent({
-          dataset: makeDraftDataset({ pipelines: [], distributions: [] }),
+          dataset: makeDraftDataset({ pipelines: [] }),
           groupCount: 1,
           roleCount: 1,
         })
