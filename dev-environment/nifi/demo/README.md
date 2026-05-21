@@ -223,12 +223,3 @@ Beyond just running, the demo establishes that:
 What's intentionally outside the MVP: building the snapshot programmatically
 from raw inputs (template + parameters + mapping rules). The MVP ships a
 finished snapshot; the build step is the next milestone.
-
----
-
-## Concept references
-
-- [overview.md](https://docs.core.civitasconnect.digital/) — introduction, data flow
-- [explanation.md](https://docs.core.civitasconnect.digital/) — principles, mapping concept, snapshot-in-blob
-- [reference/snapshot-format.md](https://docs.core.civitasconnect.digital/) — snapshot layout, RecordPath functions, NiFi REST endpoints
-- [reference/pipeline-spec.md](https://docs.core.civitasconnect.digital/) — engine-neutral pipeline spec (draft)
