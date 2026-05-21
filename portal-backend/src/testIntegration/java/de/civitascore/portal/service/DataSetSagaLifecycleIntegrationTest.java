@@ -268,6 +268,27 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("Only DRAFT datasets can be staged");
     }
+
+    @Test
+    @DisplayName("unstage() reverts a READY dataset back to DRAFT")
+    void unstageRevertsReadyDatasetToDraft() {
+      DataSource dataSource = data.createMqttDataSource();
+      DataSet dataSet = data.createDataSet("Unstage Dataset");
+      data.createGeneratePipeline(dataSet, dataSource);
+      data.seedGroupAndAssignment(dataSet);
+      UUID dataSetId = dataSet.getId();
+
+      DataSet staged = dataSetService.stage(dataSetId);
+      assertThat(staged.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+
+      DataSet unstaged = dataSetService.unstage(dataSetId);
+      assertThat(unstaged.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
+
+      DataSet reloaded = dataSetRepository.findById(dataSetId).orElseThrow();
+      assertThat(reloaded.getDataSetStatus())
+          .as("DRAFT status must be persisted")
+          .isEqualTo(DataSetStatus.DRAFT);
+    }
   }
 
   @Test

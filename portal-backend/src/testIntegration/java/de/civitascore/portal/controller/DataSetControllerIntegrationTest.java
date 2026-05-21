@@ -1579,17 +1579,25 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("CREATE saga should persist infrastructure fields")
+    @DisplayName("CREATE saga should persist infrastructure fields and reconcile NamedApi.routeId")
     void createSagaShouldPersistInfrastructure() {
       DataSet dataSet = createReleasedDataSet();
       UUID dataSetId = dataSet.getId();
+
+      NamedApi namedApi = new NamedApi();
+      namedApi.setName("Things");
+      namedApi.setSlug("things");
+      namedApi.setStandard(ApiStandard.STA);
+      namedApi.setDataSet(dataSet);
+      dataSet.getNamedApis().add(namedApi);
+      dataSetRepository.save(dataSet);
 
       SagaResultPayload result =
           new SagaResultPayload(
               dataSetId.toString(),
               "proj-test",
               "https://frost.example.com",
-              Map.of(),
+              Map.of("things", "route-test"),
               "svc-test",
               "https://public.example.com/datasets/" + dataSetId,
               List.of("pipe-test"),
@@ -1604,6 +1612,14 @@ class DataSetControllerIntegrationTest
       assertThat(persisted.getProjectId()).isEqualTo("proj-test");
       assertThat(persisted.getPublicUrl())
           .isEqualTo("https://public.example.com/datasets/" + dataSetId);
+      assertThat(persisted.getNamedApis())
+          .as("Saga must reconcile routeId onto each NamedApi by slug")
+          .singleElement()
+          .satisfies(
+              api -> {
+                assertThat(api.getSlug()).isEqualTo("things");
+                assertThat(api.getRouteId()).isEqualTo("route-test");
+              });
     }
 
     @Test
