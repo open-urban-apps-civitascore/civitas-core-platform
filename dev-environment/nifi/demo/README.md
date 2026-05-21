@@ -39,10 +39,9 @@ demo/
 ├── mosquitto/mosquitto.conf       # anonymes 1883
 ├── MQTT_TO_POSTGIS_demo.snapshot.json   # der Flow (commited)
 ├── scripts/
-│   ├── upload-snapshot.sh         # Multipart-Upload (Bruno kann das nicht)
-│   ├── deploy.sh                  # all-in-one Alternative zum Bruno-Deploy
-│   ├── cleanup.sh                 # Teardown
-│   └── build-snapshot.sh          # Regenerator (REST-Konstruktion → Download)
+│   ├── cleanup.sh                 # robustes Teardown (Duplikate, Queue-Drop, Poll)
+│   ├── publish-loop.sh            # kontinuierlicher MQTT-Publisher (Demo)
+│   └── build-snapshot.sh          # Snapshot-Regenerator (REST-Konstruktion → Download)
 └── bruno/
     ├── bruno.json
     ├── collection.bru             # collection-level Bearer
@@ -116,18 +115,8 @@ In Bruno Desktop: Folder rechtsklicken → Run. Keine zusätzlichen Flags nötig
 (`collection.bru` kümmert sich um die NiFi-Cookie/CSRF-Falltüre, siehe
 [`bruno/README-bruno-quirks.md`](bruno/README-bruno-quirks.md)).
 
-### Alternative: nur Shell
-
-Für Shell-only Setups gibt es `scripts/deploy.sh` / `scripts/cleanup.sh` mit
-gleicher Funktionalität:
-
-```bash
-cd dev-environment/nifi/demo
-./scripts/cleanup.sh
-./scripts/deploy.sh                     # upload + activate + start
-# publish + select wie oben
-./scripts/cleanup.sh
-```
+`scripts/cleanup.sh` ist die robuste Recovery, wenn der Bruno-Cleanup nicht
+durchkommt (Duplikat-PGs, `HTTP 409 Queue not empty`, async CS-Disable).
 
 ---
 
