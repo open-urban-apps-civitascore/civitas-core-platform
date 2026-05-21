@@ -1,31 +1,161 @@
-# NiFi Pipeline-Konzept — MVP
+# NiFi Pipeline Demo
 
-End-to-end proof that the Civitas pipeline concept
-([concepts_pipeline](https://docs.core.civitasconnect.digital/) — Architecture
-docs) works on Apache NiFi 2.9.0. One pipeline:
-`MQTT → ConvertRecord → UpdateRecord (RecordPath mapping) → PutDatabaseRecord`,
-landing rows in a PostGIS table with WKT-wrapped geometries.
+A small, runnable example of the Civitas pipeline concept on Apache NiFi 2.9.
+A sensor publishes MQTT messages with `lat`/`lon`/`temperature`; NiFi parses
+each message, applies a field-level mapping, and writes a row into PostGIS
+with a real `geometry(Point, 4326)` value.
 
-**Was bewiesen ist:**
+---
 
-- NiFi 2.x nimmt einen Versioned-Flow-Snapshot per Multipart-Upload an und
-  startet die Process Group.
-- Der `UpdateRecord`-Mapping-Node mit `Replacement Value Strategy =
-  record-path-value` wendet RecordPath-Ausdrücke pro Ziel-Feld an.
-- `concat('POINT(', /lon, ' ', /lat, ')')` erzeugt validen WKT für eine
-  `geometry(Point, 4326)`-Spalte — CRS wird durch die PostGIS-Typmod
-  durchgesetzt, nicht durch den Wert.
-- `toDate(/ts, "yyyy-MM-dd'T'HH:mm:ss'Z'")` parst den ISO-Timestamp in einen
-  Record-Date-Typ, den `PutDatabaseRecord` als JDBC-Timestamp an die
-  `timestamptz`-Spalte bindet.
-- Sensitive Properties (PostGIS-Password) sind im Snapshot-Download
-  abwesend; sie werden post-upload per `PUT /controller-services/{id}`
-  gesetzt.
+## How it works
 
-**Was nicht abgedeckt ist:** der adapter-seitige Snapshot-Build aus
-Roh-Inputs (Template-Resolve, Placeholder-Substitution, Mapping-Injection
-aus `mappingRules`). Der MVP versendet einen fertigen Snapshot; die
-Build-Schicht ist die nächste Stufe.
+```
+ MQTT publisher          Mosquitto         NiFi Process Group              PostGIS
+ ───────────────         ─────────         ─────────────────────           ───────
+ mosquitto_pub  ──pub──►  broker  ──sub──► ConsumeMQTT                      
+                                            │                               
+                                            ▼                               
+                                           ConvertRecord                    
+                                            │                               
+                                            ▼                               
+                                           UpdateRecord ("mapping")         
+                                            │  /geom = concat('POINT(', /lon, ' ', /lat, ')')
+                                            │  /measurement_time = toDate(/ts, "...")
+                                            ▼                               
+                                           PutDatabaseRecord  ──INSERT──►   sensor_observations
+```
+
+Inside the NiFi Process Group, four processors are wired together:
+
+1. **ConsumeMQTT** subscribes to `sensors/+/temp` on the local Mosquitto broker.
+2. **ConvertRecord** parses the JSON body into a typed record.
+3. **UpdateRecord** (named `mapping`) rewrites the record using
+   **RecordPath** — a small expression language NiFi understands natively.
+   Each target field gets its own expression: a `concat(...)` produces the
+   WKT geometry string, `toDate(...)` parses the ISO timestamp, the rest
+   pass through.
+4. **PutDatabaseRecord** inserts the transformed record into the PostGIS
+   `sensor_observations` table.
+
+The whole flow is stored as a single JSON file (`MQTT_TO_POSTGIS_demo.snapshot.json`)
+that NiFi can import in one upload. The demo's job is to upload that file,
+finish setup (the DB password is not part of the file by design), and start
+the flow.
+
+---
+
+## Quick start
+
+### 1. Start the containers
+
+```bash
+# NiFi itself
+cd dev-environment/nifi && docker compose up -d
+# Demo sidecars: Mosquitto + PostGIS
+cd dev-environment/nifi/demo && docker compose up -d
+```
+
+This brings up:
+
+| Service     | Where                           | Login                                    |
+|-------------|---------------------------------|------------------------------------------|
+| NiFi UI     | `https://localhost:8443/nifi`   | `admin` / `nifi-dev-password-1234567890` |
+| Mosquitto   | `localhost:1883`                | anonymous                                |
+| PostGIS     | `localhost:5435`, DB `nifi_demo`| `nifi` / `nifi-demo-password`            |
+
+### 2. Deploy the pipeline
+
+```bash
+cd dev-environment/nifi/demo/bruno
+npx --yes @usebruno/cli@3.3.0 run 01_deploy --env local --insecure
+```
+
+This runs 7 REST calls against NiFi: get auth token → find root group →
+upload the snapshot → find the DB connection pool → set the password →
+enable controller services → start the processors. Expect `7 Passed`.
+
+(In Bruno Desktop: right-click the `01_deploy` folder → Run.)
+
+### 3. Send a message
+
+```bash
+# Wait ~10s for ConsumeMQTT to subscribe, then publish:
+sleep 10
+docker exec civitas-nifi-demo-mosquitto mosquitto_pub -h localhost \
+  -t "sensors/sensor-001/temp" \
+  -m '{"lat":50.110,"lon":8.660,"temperature":21.3,"ts":"2026-05-21T08:00:00Z","station_id":"sensor-001"}'
+```
+
+For a continuous stream (rows landing every couple of seconds):
+
+```bash
+cd dev-environment/nifi/demo
+./scripts/publish-loop.sh
+```
+
+### 4. See it arrive in PostGIS
+
+```bash
+docker exec -it -e PGPASSWORD=nifi-demo-password civitas-nifi-demo-postgis \
+  psql -U nifi -d nifi_demo -c \
+  "SELECT station_id, temperature, ST_AsText(geom), measurement_time FROM sensor_observations;"
+```
+
+Expected:
+
+```
+ station_id | temperature |      st_astext     |    measurement_time
+------------+-------------+--------------------+------------------------
+ sensor-001 |        21.3 |  POINT(8.66 50.11) | 2026-05-21 08:00:00+00
+```
+
+### 5. Tear down
+
+```bash
+cd dev-environment/nifi/demo/bruno
+npx --yes @usebruno/cli@3.3.0 run 03_cleanup --env local --insecure
+```
+
+If the Bruno cleanup gets stuck (e.g. `HTTP 409 Queue not empty` because
+messages are still in flight), use the shell fallback:
+
+```bash
+cd dev-environment/nifi/demo
+./scripts/cleanup.sh
+```
+
+---
+
+## Watching what's happening
+
+| Want to see…             | Command                                                                                     |
+|--------------------------|----------------------------------------------------------------------------------------------|
+| MQTT messages live       | `docker exec -it civitas-nifi-demo-mosquitto mosquitto_sub -h localhost -t 'sensors/#' -v`   |
+| PostGIS rows interactive | `docker exec -it -e PGPASSWORD=nifi-demo-password civitas-nifi-demo-postgis psql -U nifi -d nifi_demo` |
+| Flow state in NiFi UI    | open `https://localhost:8443/nifi`, log in, right-click a processor → **View data provenance** |
+| Pipeline health check    | `npx --yes @usebruno/cli@3.3.0 run 02_verify --env local --insecure` (5 Passed = healthy)    |
+
+For a GUI DB browser: DBeaver / pgAdmin against `localhost:5435`,
+user `nifi`, password `nifi-demo-password`, database `nifi_demo`.
+
+---
+
+## Things to watch out for
+
+- **Run the whole folder, not single requests.** Each Bruno folder has a
+  setup prelude that refreshes the runtime variables. Triggering a single
+  `.bru` from Bruno Desktop skips the prelude and can hit stale data from a
+  previous session. Details in
+  [bruno/README-bruno-quirks.md](bruno/README-bruno-quirks.md).
+- **Wait ~10 seconds between start and the first publish.** ConsumeMQTT
+  only subscribes after processor startup; messages sent earlier get
+  dropped at the broker.
+- **Don't deploy twice without cleanup in between.** Two Process Groups
+  with the same name both subscribe to the same MQTT topic, and which one
+  receives a given message is undefined. If the Bruno cleanup ever stalls,
+  `./scripts/cleanup.sh` is the robust fallback.
+- **PostGIS sidecar is on port 5435**, not 5434 — port 5434 is already used
+  by `dev-environment/geoserver`'s own database.
 
 ---
 
@@ -33,182 +163,65 @@ Build-Schicht ist die nächste Stufe.
 
 ```
 demo/
-├── docker-compose.yml             # mosquitto + postgis sidecar (separat,
-│                                  # NICHT in start-portal-dev.sh eingebunden)
-├── init/01-schema.sql             # PostGIS-Extension + sensor_observations
-├── mosquitto/mosquitto.conf       # anonymes 1883
-├── MQTT_TO_POSTGIS_demo.snapshot.json   # der Flow (commited)
+├── docker-compose.yml             # Mosquitto + PostGIS sidecars
+├── init/01-schema.sql             # PostGIS extension + the target table
+├── mosquitto/mosquitto.conf       # broker config (anonymous, port 1883)
+├── MQTT_TO_POSTGIS_demo.snapshot.json   # the flow as a single JSON file
 ├── scripts/
-│   ├── cleanup.sh                 # robustes Teardown (Duplikate, Queue-Drop, Poll)
-│   ├── publish-loop.sh            # kontinuierlicher MQTT-Publisher (Demo)
-│   └── build-snapshot.sh          # Snapshot-Regenerator (REST-Konstruktion → Download)
+│   ├── cleanup.sh                 # robust teardown (recovery fallback)
+│   ├── publish-loop.sh            # continuous synthetic publisher
+│   └── build-snapshot.sh          # snapshot regenerator (maintenance)
 └── bruno/
-    ├── bruno.json
-    ├── collection.bru             # collection-level Bearer
-    ├── environments/local.bru     # nifiBaseUrl, creds, groupName
-    ├── README-bruno-quirks.md     # cookie/CSRF + setEnvVar Falltüren
-    ├── 01_deploy/                 # 7 Requests: token, find, set pw, enable, start
-    ├── 02_verify/                 # 5 Requests: token, find, processor states, bulletins
-    └── 03_cleanup/                # 7 Requests: token, find, stop, disable, delete
+    ├── collection.bru             # collection-level auth
+    ├── environments/local.bru     # base URL, credentials, names
+    ├── README-bruno-quirks.md     # auth / cookie / env-var pitfalls
+    ├── 01_deploy/                 # deploy the flow
+    ├── 02_verify/                 # check the flow is healthy
+    └── 03_cleanup/                # tear down
 ```
 
 ---
 
-## Voraussetzungen
+## Regenerating the snapshot
 
-1. **NiFi** läuft (`dev-environment/nifi/docker-compose.yml`):
-   ```bash
-   cd dev-environment/nifi && docker compose up -d
-   ```
-   NiFi 2.9.0 auf `https://localhost:8443/nifi` (single-user `admin`,
-   Password in `.env.example`).
-
-2. **Demo-Sidecars** (Mosquitto + PostGIS) starten:
-   ```bash
-   cd dev-environment/nifi/demo && docker compose up -d
-   ```
-   - Mosquitto: `localhost:1883`, anonym, network `civitas-network`.
-   - PostGIS: `localhost:5435`, DB `nifi_demo`, User/Pass `nifi`/`nifi-demo-password`,
-     Tabelle `sensor_observations` mit `geom geometry(Point, 4326)` per Init-SQL.
-
-   Beide Container hängen an `civitas-network`, damit NiFi sie als
-   `civitas-nifi-demo-mosquitto:1883` und `civitas-nifi-demo-postgis:5432`
-   erreichen kann.
-
-3. **Mosquitto-Client** für die Test-Publishes (entweder host-installiert
-   oder via `docker exec civitas-nifi-demo-mosquitto mosquitto_pub …`).
-
----
-
-## Demo durchspielen
-
-### Bruno (Standard)
-
-Bruno deckt den kompletten Lifecycle ab — Upload, Aktivierung, Verify,
-Cleanup. Keine Shell-Vorbereitung nötig.
+If the NiFi version, bundle versions, or the flow topology changes:
 
 ```bash
-cd dev-environment/nifi/demo/bruno
-BRU="npx --yes @usebruno/cli@3.3.0 run"
-
-$BRU 01_deploy --env local --insecure   # upload + set pw + enable + start (7 Requests)
-
-sleep 10                                # ConsumeMQTT braucht ~10s zum Subscribe
-
-docker exec civitas-nifi-demo-mosquitto mosquitto_pub -h localhost \
-  -t "sensors/sensor-001/temp" \
-  -m '{"lat":50.110,"lon":8.660,"temperature":21.3,"ts":"2026-05-21T08:00:00Z","station_id":"sensor-001"}'
-
-$BRU 02_verify --env local --insecure   # processors RUNNING, bulletins clear
-$BRU 03_cleanup --env local --insecure  # stop, disable, delete
-```
-
-Erwartete Zeile (`psql` gegen `civitas-nifi-demo-postgis`):
-
-```
- station_id | temperature |    measurement_time    |    st_astext     | st_srid
-------------+-------------+------------------------+------------------+---------
- sensor-001 |        21.3 | 2026-05-21 08:00:00+00 | POINT(8.66 50.11)| 4326
-```
-
-In Bruno Desktop: Folder rechtsklicken → Run. Keine zusätzlichen Flags nötig
-(`collection.bru` kümmert sich um die NiFi-Cookie/CSRF-Falltüre, siehe
-[`bruno/README-bruno-quirks.md`](bruno/README-bruno-quirks.md)).
-
-`scripts/cleanup.sh` ist die robuste Recovery, wenn der Bruno-Cleanup nicht
-durchkommt (Duplikat-PGs, `HTTP 409 Queue not empty`, async CS-Disable).
-
----
-
-## Daten beobachten
-
-### MQTT live mitlesen
-
-```bash
-docker exec -it civitas-nifi-demo-mosquitto mosquitto_sub -h localhost -t 'sensors/#' -v
-```
-
-GUI-Alternative: MQTT Explorer / MQTTX gegen `localhost:1883` (anonym).
-
-### PostGIS abfragen
-
-```bash
-# Quickest — keine Host-Installation nötig:
-`docker exec -e PGPASSWORD=nifi-demo-password civitas-nifi-demo-postgis \
-  psql -U nifi -d nifi_demo -c \
-  "SELECT station_id, temperature, measurement_time, ST_AsText(geom), ST_SRID(geom)
-     FROM sensor_observations ORDER BY measurement_time DESC LIMIT 100;"`
-
-# Vom Host (psql installiert):
-PGPASSWORD=nifi-demo-password psql -h localhost -p 5435 -U nifi -d nifi_demo
-```
-
-GUI: DBeaver / pgAdmin gegen `localhost:5435`, User `nifi`, Passwort
-`nifi-demo-password`, DB `nifi_demo`.
-
-### NiFi-UI
-
-`https://localhost:8443/nifi` → Login `admin` / `nifi-dev-password-1234567890`.
-Rechtsklick auf eine Connection → **List queue** für FlowFiles in transit.
-Rechtsklick auf einen Processor → **View data provenance** für die Historie.
-
-### Kontinuierlich publishen (Demo-Strom)
-
-```bash
-./scripts/publish-loop.sh                       # alle 2s, 5 Stationen, bis Ctrl+C
-INTERVAL=1 STATIONS=10 ./scripts/publish-loop.sh
-COUNT=20 ./scripts/publish-loop.sh              # 20 Messages, dann stop
-```
-
-Variiert `station_id`, `lat`/`lon` und `temperature` pro Message. Beim
-parallelen `mosquitto_sub` siehst du jede Message, im PostGIS-`SELECT`
-tauchen die Zeilen mit ~1s Verzögerung auf.
-
----
-
-## Bekannte Fallstricke
-
-- **Folder-runs, keine Einzelrequests.** Jeder Folder enthält die nötige
-  Token+Lookup-Prelude. Die `find_demo_pg`-Schritte setzen ihre Ziel-Var
-  vor dem Lookup explizit auf `null` und brechen die Kette per
-  `bru.setNextRequest(null)` ab, wenn keine PG existiert — so können keine
-  stalen IDs ins Folge-Request leaken. Wer in Bruno Desktop trotzdem nur
-  einzelne `.bru` triggert, umgeht die Prelude und kann auf stale-env-Daten
-  treffen. Siehe [bruno/README-bruno-quirks.md](bruno/README-bruno-quirks.md).
-- **10 Sekunden Wartezeit zwischen Start und Publish.** ConsumeMQTT
-  abonniert das Topic erst nach der Processor-Initialisierung. Sleep zu
-  knapp → Messages werden vor dem Subscribe vom Broker mit QoS 0 verworfen.
-- **Doppel-Deploy ohne Cleanup führt zu duplikatem PG.** Beide PGs
-  abonnieren `sensors/+/temp` — Messages landen unvorhersagbar. Wenn der
-  Bruno-Cleanup mit `HTTP 409 Queue not empty` scheitert, ist `./scripts/cleanup.sh`
-  die robuste Recovery (Drop-FlowFiles + Poll-bis-DISABLED + DELETE über alle
-  Duplikate).
-- **Sensitive Properties.** Beim Snapshot-Download strippt NiFi die
-  `Password`-Property. `01_deploy/05_set_dbcp_password.bru` (bzw. der
-  entsprechende Schritt in `deploy.sh`) muss vor dem Enable laufen.
-- **PostGIS-Sidecar-Port 5435** (nicht 5434 — letzteres ist von
-  `dev-environment/geoserver` belegt).
-
----
-
-## Den Snapshot regenerieren
-
-Wenn sich an Bundle-Versionen, Property-Namen oder Flow-Topologie etwas
-ändert:
-
-```bash
+cd dev-environment/nifi/demo
 ./scripts/build-snapshot.sh ./MQTT_TO_POSTGIS_demo.snapshot.json
 ```
 
-Das Skript konstruiert die PG via NiFi-REST (Controller-Services,
-Processors mit RecordPath-Mapping, Connections), lädt sie via
-`GET /process-groups/{id}/download` herunter und löscht die temporäre PG.
-Es benötigt eine laufende NiFi-Instanz.
+This rebuilds the flow in NiFi via REST, downloads it as a fresh snapshot,
+and removes the temporary Process Group. Needs a running NiFi.
 
 ---
 
-## Konzept-Referenzen
+## What this MVP demonstrates
 
-- [overview.md](https://docs.core.civitasconnect.digital/) — Einstieg, Datenfluss
-- [explanation.md](https://docs.core.civitasconnect.digital/) — Grundprinzipien, Mapping-Konzept, Snapshot-im-Blob
-- [reference/snapshot-format.md](https://docs.core.civitasconnect.digital/) — Snapshot-Aufbau, RecordPath-Funktionen, NiFi-REST-Endpoints
+Beyond just running, the demo establishes that:
+
+- NiFi 2.x accepts a single-file snapshot upload and starts the resulting
+  flow.
+- A field-level mapping (built from RecordPath expressions like
+  `concat(...)` and `toDate(...)`) is enough to bridge a source schema
+  (`lat`, `lon`, …) to a sink schema (`geom`, `measurement_time`, …) — no
+  custom code.
+- Geometry handling works without a custom processor: a plain WKT string
+  written into a `geometry(Point, 4326)` column gets the SRID from the
+  column type, not from the value.
+- Sensitive properties stay out of the snapshot file — the DB password is
+  set via a separate REST call after upload — so the snapshot itself is
+  safe to commit.
+
+What's intentionally outside the MVP: building the snapshot programmatically
+from raw inputs (template + parameters + mapping rules). The MVP ships a
+finished snapshot; the build step is the next milestone.
+
+---
+
+## Concept references
+
+- [overview.md](https://docs.core.civitasconnect.digital/) — introduction, data flow
+- [explanation.md](https://docs.core.civitasconnect.digital/) — principles, mapping concept, snapshot-in-blob
+- [reference/snapshot-format.md](https://docs.core.civitasconnect.digital/) — snapshot layout, RecordPath functions, NiFi REST endpoints
+- [reference/pipeline-spec.md](https://docs.core.civitasconnect.digital/) — engine-neutral pipeline spec (draft)

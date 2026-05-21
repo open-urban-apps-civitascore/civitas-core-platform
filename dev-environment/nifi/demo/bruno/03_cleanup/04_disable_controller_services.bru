@@ -26,6 +26,7 @@ tests {
 }
 
 docs {
-  Controller services must be DISABLED before the parent PG can be deleted.
-  NiFi disables them asynchronously — give it ~3s before step 04.
+  Controller services must be DISABLED before the PG can be deleted.
+  NiFi disables them asynchronously, so the next request gives them a
+  moment to settle.
 }

@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
-# Build the MVP flow via NiFi REST, download as snapshot, clean up.
+# Regenerate MQTT_TO_POSTGIS_demo.snapshot.json.
+#
+# Builds the flow in NiFi via REST (controller services, processors with
+# RecordPath mapping, connections), downloads it as a snapshot, then deletes
+# the temporary PG. Needs a running NiFi instance.
+#
+# Usage:
+#   ./build-snapshot.sh                # writes to /tmp/nifi-scaffold/snapshot.json
+#   ./build-snapshot.sh ./out.json     # writes to ./out.json
+
 set -euo pipefail
 
 BASE="${NIFI_BASE:-https://localhost:8443}"

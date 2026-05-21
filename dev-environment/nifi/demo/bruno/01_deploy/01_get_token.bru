@@ -34,9 +34,9 @@ tests {
 
 docs {
   Authenticates against NiFi's single-user provider and stashes the JWT in
-  the `nifiToken` collection variable. All subsequent requests use
+  the `nifiToken` environment variable. All subsequent requests use
   `Authorization: Bearer {{nifiToken}}`.
 
-  NiFi uses a self-signed cert in dev; enable "Disable SSL Verification" in
-  Bruno settings (or per-collection) before running.
+  NiFi uses a self-signed cert in dev — run the CLI with `--insecure`, or
+  disable SSL verification in Bruno Desktop's settings.
 }
