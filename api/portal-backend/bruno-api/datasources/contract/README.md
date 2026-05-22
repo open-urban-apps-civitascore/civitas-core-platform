@@ -21,9 +21,10 @@ A typical chain looks like:
    don't leave orphans.
 
 Each test is self-contained — it doesn't depend on resources created by
-the `00-setup/` folder. All tests pass `dataStructureVersionId: null`;
-the contract accepts that and it keeps the tests independent of any
-shared setup state.
+the `00-setup/` folder. Most scenarios pass `dataStructureVersionId: null`,
+which the contract accepts and which keeps them independent of any shared
+setup state. Release-lifecycle chains (`*-release-rejects-empty-*`) create
+and link their own DSV within the chain.
 
 ## CONCERN tests
 
