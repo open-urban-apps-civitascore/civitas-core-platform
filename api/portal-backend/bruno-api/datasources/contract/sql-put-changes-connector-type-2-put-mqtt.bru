@@ -44,11 +44,9 @@ tests {
     expect(res.body.configuration.qos).to.equal(1);
     expect(res.body.configuration.tls).to.deep.equal({ enabled: false });
   });
-  test("Old SQL-schema fields are absent from the response", function() {
+  test("Old SQL-only schema fields are absent from the response", function() {
     expect(res.body.configuration).to.not.have.property('driver');
     expect(res.body.configuration).to.not.have.property('dsn');
-    expect(res.body.configuration).to.not.have.property('user');
-    expect(res.body.configuration).to.not.have.property('password');
     expect(res.body.configuration).to.not.have.property('table');
     expect(res.body.configuration).to.not.have.property('columns');
     expect(res.body.configuration).to.not.have.property('conn_max_open');

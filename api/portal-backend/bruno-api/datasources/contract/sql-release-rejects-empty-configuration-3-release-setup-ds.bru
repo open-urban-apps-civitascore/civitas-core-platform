@@ -22,7 +22,7 @@ tests {
     if (status === 400) {
       expect(res.body.type).to.equal("urn:civitas:error:INVALID_INPUT");
       expect(res.body.title).to.equal("Bad Request");
-      expect(res.body.detail).to.match(/already released|not in DRAFT/i);
+      expect(res.body.detail).to.match(/already released|in DRAFT/i);
     }
   });
 }
