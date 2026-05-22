@@ -47,6 +47,10 @@ tests {
   test("Old SQL-schema fields are absent from the response", function() {
     expect(res.body.configuration).to.not.have.property('driver');
     expect(res.body.configuration).to.not.have.property('dsn');
+    expect(res.body.configuration).to.not.have.property('user');
+    expect(res.body.configuration).to.not.have.property('password');
+    expect(res.body.configuration).to.not.have.property('table');
+    expect(res.body.configuration).to.not.have.property('columns');
     expect(res.body.configuration).to.not.have.property('conn_max_open');
     expect(res.body.configuration).to.not.have.property('conn_max_idle');
   });
