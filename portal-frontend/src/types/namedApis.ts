@@ -70,7 +70,15 @@ export const NamedApiSchema = z.object({
 
 export type NamedApi = z.infer<typeof NamedApiSchema>
 
-export const NamedApiInputSchema = z.object({
+export const BoundingBoxPayloadSchema = z.object({
+  minX: z.number(),
+  minY: z.number(),
+  maxX: z.number(),
+  maxY: z.number(),
+  crs: z.string(),
+})
+
+export const NamedApiPayloadSchema = z.object({
   name: z.string(),
   slug: z.string(),
   standard: z.enum([API_STANDARDS.WFS, API_STANDARDS.WMS, API_STANDARDS.STA, API_STANDARDS.CUSTOM]),
@@ -78,13 +86,13 @@ export const NamedApiInputSchema = z.object({
   description: z.string().optional(),
 })
 
-export type NamedApiInput = z.infer<typeof NamedApiInputSchema>
+export type NamedApiPayload = z.infer<typeof NamedApiPayloadSchema>
 
 interface BuildSchemaArgs {
   existingSlugs: string[]
 }
 
-export const buildNamedApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) => {
+export const NamedApiBaseInfoFormSchema = ({ existingSlugs }: BuildSchemaArgs) => {
   const normalizedExisting = existingSlugs.map(s => s.toLowerCase())
   return z.object({
     name: z.string().trim().min(1, 'datasets.overview.completion.apis.config.errors.name.required'),
@@ -111,18 +119,89 @@ export const buildNamedApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) => {
   })
 }
 
-const boundingBoxCoord = z.string().transform((v, ctx) => {
-  if (v === '') {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'common.errors.required' })
-    return z.NEVER
-  }
-  const n = Number(v)
-  if (!Number.isFinite(n)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'common.errors.invalidNumber' })
-    return z.NEVER
-  }
-  return n
+// ============================================================================
+// Types for Sta-Api
+// ============================================================================
+
+export const StaApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) =>
+  z.object({
+    type: z.literal(API_TYPE_QUERY.SENSORTHINGS),
+    baseInfo: NamedApiBaseInfoFormSchema({ existingSlugs }),
+  })
+
+export type StaApiFormData = z.input<ReturnType<typeof StaApiFormSchema>>
+export type StaApiPayloadData = {
+  baseInfo: NamedApiPayload
+}
+
+// ============================================================================
+// Types for Layer config
+// ============================================================================
+
+export const BoundingBoxResponseSchema = z.object({
+  minx: z.number(),
+  miny: z.number(),
+  maxx: z.number(),
+  maxy: z.number(),
+  crs: z.string(),
 })
+
+const LayerBaseSchema = z.object({
+  dataSinkId: z.uuid(),
+  layerName: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  keywords: z.array(z.string()).optional(),
+  attribute: z.array(z.string()),
+  geometryColumnRef: z.string(),
+  cqlFilter: z.string().nullable(),
+  alternativeStyleIds: z.array(z.uuid()),
+  crs: z.string(),
+})
+
+export const LayerSchema = LayerBaseSchema.extend({
+  id: z.uuid(),
+  datasetId: z.uuid(),
+  defaultStyleId: z.uuid().nullable(),
+  geometryType: z.string(),
+  nativeCRS: z.string(),
+  bboxAutoCalculate: z.boolean(),
+  nativeBoundingBox: BoundingBoxResponseSchema,
+  latLonBoundingBox: BoundingBoxResponseSchema,
+  createdAt: z.string(),
+  modifiedAt: z.string(),
+})
+
+export const LayerPayloadSchema = LayerBaseSchema.extend({
+  defaultStyleId: z.uuid().optional().nullable(),
+  bboxAutoCalculate: z.literal(false).default(false),
+  nativeBoundingBox: BoundingBoxPayloadSchema,
+  latLonBoundingBox: BoundingBoxPayloadSchema,
+})
+
+export type Layer = z.infer<typeof LayerSchema>
+
+export type LayerApiPayload = z.infer<typeof LayerPayloadSchema>
+
+export type CreateLayerInput = {
+  datasetId: string
+  data: LayerApiPayload
+}
+
+export type UpdateLayerInput = {
+  datasetId: string
+  layerId: string
+  data: LayerApiPayload
+}
+
+// ============================================================================
+// Types for WFS/WMS-API
+// ============================================================================
+
+const boundingBoxCoord = z
+  .string()
+  .refine(v => v !== '', { message: 'common.errors.required' })
+  .refine(v => Number.isFinite(Number(v)), { message: 'common.errors.invalidNumber' })
 
 export const BoundingBoxSchema = z.object({
   minX: boundingBoxCoord,
@@ -146,15 +225,24 @@ export const WfsWmsLayerFormSchema = z.object({
   cqlFilter: z.string().trim(),
   geometryColumnRef: z.string().min(1, 'common.errors.required'),
   crs: z.string().min(1, 'common.errors.required'),
-  bboxAutoCalculate: z.boolean(),
+  bboxAutoCalculate: z.literal(false),
   nativeBoundingBox: BoundingBoxSchema,
   latLonBoundingBox: BoundingBoxSchema,
-  defaultStilId: z.string().optional(),
-  alternativeStilIds: z.string().optional(),
+  defaultStyleId: z.string().nullable(),
+  alternativeStyleIds: z.array(z.string()),
 })
 
 export const WfsWmsApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) =>
-  buildNamedApiFormSchema({ existingSlugs }).extend({ layer: WfsWmsLayerFormSchema })
+  z.object({
+    type: z.literal(API_TYPE_QUERY.WFS_WMS),
+    baseInfo: NamedApiBaseInfoFormSchema({ existingSlugs }),
+    layer: WfsWmsLayerFormSchema,
+  })
 
-export type NamedApiFormData = z.input<ReturnType<typeof buildNamedApiFormSchema>>
-export type WfsWmsApiFormData = z.input<ReturnType<typeof WfsWmsApiFormSchema>>
+export type WfsWmsApiFormData = z.infer<ReturnType<typeof WfsWmsApiFormSchema>>
+
+export const WfsWmsApiPayloadSchema = z.object({
+  baseInfo: NamedApiPayloadSchema,
+  layer: LayerPayloadSchema,
+})
+export type WfsWmsApiApiPayloadData = z.infer<typeof WfsWmsApiPayloadSchema>

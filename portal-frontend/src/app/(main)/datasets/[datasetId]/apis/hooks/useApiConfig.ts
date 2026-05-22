@@ -10,24 +10,68 @@ import { useCreateNamedApi, usePatchDataset } from '@/app/services/api/datasets/
 import { useError } from '@/hooks/use-error'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { Dataset } from '@/types/datasets'
-import { NamedApi, NamedApiFormData, NamedApiInput } from '@/types/namedApis'
+import {
+  API_TYPE_QUERY,
+  DEFAULTS_BY_TYPE,
+  NamedApi,
+  NamedApiPayload,
+  StaApiFormData,
+  StaApiPayloadData,
+  WfsWmsApiApiPayloadData,
+  WfsWmsApiFormData,
+} from '@/types/namedApis'
 
-interface UseApiConfigActionsArgs<TFormData extends NamedApiFormData> {
+type FormData = StaApiFormData | WfsWmsApiFormData
+interface UseApiConfigActionsArgs<TFormData extends FormData> {
   form: UseFormReturn<TFormData>
   dataset: Dataset
   existingApi?: NamedApi
   otherNamedApis: NamedApi[]
   initialSlug: string
-  buildPayload: (data: TFormData) => NamedApiInput
 }
 
-export const useApiConfig = <TFormData extends NamedApiFormData>({
+const toBoundingBoxPayload = (bbox: WfsWmsApiFormData['layer']['nativeBoundingBox']) => ({
+  ...bbox,
+  minX: Number(bbox.minX),
+  minY: Number(bbox.minY),
+  maxX: Number(bbox.maxX),
+  maxY: Number(bbox.maxY),
+})
+
+const buildStaPayloadData = (data: StaApiFormData): StaApiPayloadData => ({
+  baseInfo: { ...data.baseInfo, standard: DEFAULTS_BY_TYPE.sensorthings.standard },
+})
+
+const buildWfsWmsPayload = (data: WfsWmsApiFormData): WfsWmsApiApiPayloadData => ({
+  baseInfo: {
+    ...data.baseInfo,
+    standard: DEFAULTS_BY_TYPE['wfs-wms'].standard,
+    description: data.baseInfo.description || undefined,
+  },
+  layer: {
+    ...data.layer,
+    dataSinkId: '',
+    description: data.layer.layerDescription || undefined,
+    nativeBoundingBox: toBoundingBoxPayload(data.layer.nativeBoundingBox),
+    latLonBoundingBox: toBoundingBoxPayload(data.layer.latLonBoundingBox),
+    defaultStyleId: data.layer.defaultStyleId || null,
+    alternativeStyleIds: data.layer.alternativeStyleIds,
+  },
+})
+
+const isWfsWmsFormData = (data: StaApiFormData | WfsWmsApiFormData) => data.type === API_TYPE_QUERY.WFS_WMS
+
+const buildPayloadData = (data: FormData) => {
+  if (isWfsWmsFormData(data)) return buildWfsWmsPayload(data)
+  return buildStaPayloadData(data)
+}
+
+export const useApiConfig = <TFormData extends FormData>({
   form,
   dataset,
   existingApi,
   otherNamedApis,
   initialSlug,
-  buildPayload,
 }: UseApiConfigActionsArgs<TFormData>) => {
   const t = useTranslations('datasets.overview.completion.apis.config')
   const router = useRouter()
@@ -43,6 +87,8 @@ export const useApiConfig = <TFormData extends NamedApiFormData>({
   const updateDataset = usePatchDataset()
   const { handleFormValidationError } = useError()
   const isLoading = createNamedApi.isPending || updateDataset.isPending
+  const isDirty = form.formState.isDirty
+  const dirtyFields = form.formState.dirtyFields
 
   const updateMode = useCallback(
     (isEditing: boolean) => {
@@ -59,30 +105,47 @@ export const useApiConfig = <TFormData extends NamedApiFormData>({
     [pathname, router, searchParams],
   )
 
+  const handleSaveBaseInfo = async (data: TFormData) => {
+    console.log(dirtyFields)
+    if (!dirtyFields.baseInfo) return
+    const newApi = buildPayloadData(data)
+    if (isCreate) {
+      await createNamedApi.mutateAsync({
+        datasetId: dataset.id,
+        api: newApi?.baseInfo,
+        existingApis: otherNamedApis,
+      })
+      toast.success(t('messages.createSuccess'))
+      router.push(`/datasets/${dataset.id}/apis/${newApi.baseInfo.slug}?mode=edit`)
+    } else {
+      const otherInputs: NamedApiPayload[] = otherNamedApis.map(a => ({
+        name: a.name,
+        slug: a.slug,
+        standard: a.standard,
+        version: a.version,
+        description: a.description,
+      }))
+      await updateDataset.mutateAsync({ id: dataset.id, namedApis: [...otherInputs, newApi.baseInfo] })
+      toast.success(t('messages.updateSuccess'))
+      form.reset(data)
+      router.refresh()
+      updateMode(false)
+    }
+  }
+
+  const handleSaveLayers = (data: WfsWmsApiFormData) => {
+    const wfsDirtyFields = dirtyFields as Partial<Record<keyof WfsWmsApiFormData, unknown>>
+    if (!wfsDirtyFields.layer) return
+    console.log('saving layers', data)
+  }
+
   const handleSave = async (): Promise<boolean> => {
     let isSaved = false
     await form.handleSubmit(
       async data => {
         try {
-          const newApi = buildPayload(data)
-          if (isCreate) {
-            await createNamedApi.mutateAsync({ datasetId: dataset.id, api: newApi, existingApis: otherNamedApis })
-            toast.success(t('messages.createSuccess'))
-            router.push(`/datasets/${dataset.id}/apis/${newApi.slug}?mode=edit`)
-          } else {
-            const otherInputs: NamedApiInput[] = otherNamedApis.map(a => ({
-              name: a.name,
-              slug: a.slug,
-              standard: a.standard,
-              version: a.version,
-              description: a.description,
-            }))
-            await updateDataset.mutateAsync({ id: dataset.id, namedApis: [...otherInputs, newApi] })
-            toast.success(t('messages.updateSuccess'))
-            form.reset(data)
-            router.refresh()
-            updateMode(false)
-          }
+          await handleSaveBaseInfo(data)
+          if (isWfsWmsFormData(data)) await handleSaveLayers(data)
           isSaved = true
         } catch {
           toast.error(t('messages.saveError'))
@@ -100,7 +163,7 @@ export const useApiConfig = <TFormData extends NamedApiFormData>({
   }
 
   const handleExit = () => {
-    if (form.formState.isDirty) {
+    if (isDirty) {
       setIsExitModalOpen(true)
       return
     }
@@ -133,7 +196,7 @@ export const useApiConfig = <TFormData extends NamedApiFormData>({
     void handleSave()
   }
 
-  useRegisterUnsavedChanges(form.formState.isDirty, handleSave)
+  useRegisterUnsavedChanges(isDirty, handleSave)
 
   return {
     isReadOnly,

@@ -6,9 +6,9 @@ import { vi } from 'vitest'
 import {
   API_TYPE_QUERY,
   ApiTypeQuery,
-  buildNamedApiFormSchema,
   DEFAULTS_BY_TYPE,
-  NamedApiFormData,
+  NamedApiBaseInfoFormSchema,
+  StaApiFormData,
 } from '@/types/namedApis'
 
 import { ApiConfigForm } from './ApiConfigForm'
@@ -25,7 +25,7 @@ interface WrapperProps {
   apiType: ApiTypeQuery
   isReadOnly?: boolean
   existingSlugs?: string[]
-  defaultValues?: Partial<NamedApiFormData>
+  defaultValues?: Partial<StaApiFormData>
   urlPreviewSlug?: string
   onSlugBlur?: () => void
 }
@@ -40,8 +40,8 @@ const Wrapper = (props: WrapperProps) => {
     onSlugBlur = () => undefined,
   } = props
   const defaults = DEFAULTS_BY_TYPE[apiType]
-  const schema = buildNamedApiFormSchema({ existingSlugs })
-  const form = useForm<NamedApiFormData>({
+  const schema = NamedApiBaseInfoFormSchema({ existingSlugs })
+  const form = useForm<StaApiFormData>({
     resolver: zodResolver(schema),
     mode: 'onChange',
     defaultValues: {

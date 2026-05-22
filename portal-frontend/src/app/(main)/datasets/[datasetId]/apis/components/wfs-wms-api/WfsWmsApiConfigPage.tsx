@@ -1,17 +1,22 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQueries } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm, UseFormReturn } from 'react-hook-form'
 
+import { useGetDatasinks } from '@/app/services/api/datasinks/clientRequests'
+import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { Form } from '@/components/ui/form'
 import { Dataset } from '@/types/datasets'
+import { DATASINK_TYPES } from '@/types/datasinks'
+import { DatastructureVersion } from '@/types/datastructures'
 import {
   API_TYPE_QUERY,
   DEFAULTS_BY_TYPE,
   NamedApi,
-  NamedApiFormData,
+  StaApiFormData,
   WfsWmsApiFormData,
   WfsWmsApiFormSchema,
 } from '@/types/namedApis'
@@ -40,25 +45,53 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
   const formSchema = useMemo(() => WfsWmsApiFormSchema({ existingSlugs }), [existingSlugs])
   const initialSlug = existingApi?.slug ?? defaults.defaultSlug
 
+  const { data: datasinksData } = useGetDatasinks()
+
+  const postgisDatasinks =
+    datasinksData?.data.filter(datasink => datasink.dataSinkType === DATASINK_TYPES.POSTGIS) || []
+  const datastructuresToFetch = postgisDatasinks?.map(datasink => ({
+    datastructureId: datasink.configuration.dataStructureVersion.dataStructureId,
+    versionId: datasink.configuration.dataStructureVersion.id,
+  }))
+
+  const postgisDatastructuresResponse = useQueries({
+    queries: datastructuresToFetch.map(({ datastructureId, versionId }) => ({
+      queryKey: [`datastructures/${datastructureId}/versions`, versionId],
+      queryFn: () =>
+        apiRequest<DatastructureVersion>({
+          endpoint: `/datastructures/${datastructureId}/versions/${versionId}`,
+          method: 'GET',
+          headers: { 'x-api-request': 'true' },
+          errorMessage: 'An error occurred while fetching datastructure versions.',
+        }),
+    })),
+  })
+
+  const validPostgisDatastructureResponses = postgisDatastructuresResponse.filter(res => !!res.data)
+  const postgisDatastructures = validPostgisDatastructureResponses.map(datastructure => datastructure.data.data)
+
   const wfsWmsDefaults: WfsWmsApiFormData = {
-    name: existingApi?.name ?? '',
-    slug: initialSlug,
-    description: existingApi?.description ?? '',
-    persistence: defaults.persistenceValue,
+    type: API_TYPE_QUERY.WFS_WMS,
+    baseInfo: {
+      name: existingApi?.name ?? '',
+      slug: initialSlug,
+      description: existingApi?.description ?? '',
+      persistence: defaults.persistenceValue,
+    },
     layer: {
       title: '',
       layerName: '',
-      layerDescription: '' as string | undefined,
+      layerDescription: '',
       table: '',
-      attribute: [] as string[],
+      attribute: [],
       cqlFilter: '',
       geometryColumnRef: '',
       crs: '',
-      bboxAutoCalculate: false,
+      bboxAutoCalculate: false as const,
       nativeBoundingBox: { minX: '', minY: '', maxX: '', maxY: '', crs: '' },
       latLonBoundingBox: { minX: '', minY: '', maxX: '', maxY: '', crs: '' },
-      defaultStilId: '',
-      alternativeStilIds: undefined,
+      defaultStyleId: '',
+      alternativeStyleIds: [],
     },
   }
 
@@ -91,12 +124,6 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     existingApi,
     otherNamedApis,
     initialSlug,
-    buildPayload: data => ({
-      name: data.name.trim(),
-      slug: data.slug,
-      standard: defaults.standard,
-      description: data.description?.trim() || undefined,
-    }),
   })
 
   const [selectedTab, setSelectedTab] = useState<ApiConfigTab>('basicInfo')
@@ -131,7 +158,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
       <Form {...form}>
         {selectedTab === 'basicInfo' && (
           <BaseInfoForm
-            form={form as unknown as UseFormReturn<NamedApiFormData>}
+            form={form as unknown as UseFormReturn<StaApiFormData>}
             apiType={apiType}
             isReadOnly={isReadOnly}
             datasetId={dataset.id}
@@ -140,7 +167,9 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
             onSlugBlur={handleSlugBlur}
           />
         )}
-        {selectedTab === 'layer' && <LayerConfig form={form} />}
+        {selectedTab === 'layer' && (
+          <LayerConfig form={form} postgisDatasinks={postgisDatasinks} postGisDatastructures={postgisDatastructures} />
+        )}
         {selectedTab === 'styles' && (
           <div data-testid={`tabPlaceholder-${selectedTab}`} className="py-12 text-center text-muted-foreground">
             {t('tabs.placeholder')}

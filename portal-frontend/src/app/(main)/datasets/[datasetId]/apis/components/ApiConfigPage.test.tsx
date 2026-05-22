@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Dataset } from '@/types/datasets'
-import { API_TYPE_QUERY, NamedApi, NamedApiFormData } from '@/types/namedApis'
+import { API_TYPE_QUERY, NamedApi, StaApiFormData } from '@/types/namedApis'
 
 import { ApiConfigPage } from './ApiConfigPage'
 
@@ -38,10 +38,10 @@ vi.mock('sonner', () => ({
 }))
 
 vi.mock('./ApiConfigForm', () => ({
-  ApiConfigForm: ({ form }: { form: UseFormReturn<NamedApiFormData> }) => (
+  ApiConfigForm: ({ form }: { form: UseFormReturn<StaApiFormData> }) => (
     <div>
-      <input data-testid="nameInput" {...form.register('name')} />
-      <input data-testid="slugInput" {...form.register('slug')} />
+      <input data-testid="nameInput" {...form.register('baseInfo.name')} />
+      <input data-testid="slugInput" {...form.register('baseInfo.slug')} />
     </div>
   ),
 }))

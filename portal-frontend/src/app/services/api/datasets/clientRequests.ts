@@ -6,7 +6,7 @@ import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useDeleteMutation } from '@/hooks/use-delete-mutation'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
 import { Dataset, DatasetCreateApiData, DatasetPatchApiData, DatasetUpdateApiData } from '@/types/datasets'
-import { NamedApi, NamedApiInput } from '@/types/namedApis'
+import { NamedApi, NamedApiPayload } from '@/types/namedApis'
 
 const key = 'datasets'
 
@@ -42,7 +42,7 @@ export const useDeleteDataset = () =>
 
 type CreateNamedApiInput = {
   datasetId: string
-  api: NamedApiInput
+  api: NamedApiPayload
   existingApis: NamedApi[]
 }
 
@@ -52,7 +52,7 @@ export const useCreateNamedApi = () => {
   const queryClient = useQueryClient()
   return useMutation<ApiServiceResponse<Dataset>, AxiosError, CreateNamedApiInput>({
     mutationFn: ({ datasetId, api, existingApis }) => {
-      const existingInputs: NamedApiInput[] = existingApis.map(a => ({
+      const existingInputs: NamedApiPayload[] = existingApis.map(a => ({
         name: a.name,
         slug: a.slug,
         standard: a.standard,

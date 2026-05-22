@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { ApiStandard, NamedApi, NamedApiInput } from '@/types/namedApis'
+import { ApiStandard, NamedApi, NamedApiPayload } from '@/types/namedApis'
 
 const STANDARD_ICONS: Record<ApiStandard, ComponentType<{ className?: string }>> = {
   STA: Timer,
@@ -56,7 +56,7 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, isOpenDataAcces
   }
 
   const handleConfirmDelete = async () => {
-    const remainingInputs: NamedApiInput[] = existingApis
+    const remainingInputs: NamedApiPayload[] = existingApis
       .filter(a => a.slug !== api.slug)
       .map(a => ({
         name: a.name,
