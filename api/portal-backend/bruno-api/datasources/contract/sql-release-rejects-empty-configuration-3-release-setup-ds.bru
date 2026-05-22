@@ -19,6 +19,11 @@ tests {
     const status = res.getStatus();
     // 200=released now, 400=already released by an earlier chain in the same run
     expect(status === 200 || status === 400).to.be.true;
+    if (status === 400) {
+      expect(res.body.type).to.equal("urn:civitas:error:INVALID_INPUT");
+      expect(res.body.title).to.equal("Bad Request");
+      expect(res.body.detail).to.match(/already released|not in DRAFT/i);
+    }
   });
 }
 
