@@ -237,9 +237,6 @@ saga-e2e-test-backend:
 api-test-backend:
   image: docker:27
   stage: test # runs after build jobs provide JAR artifacts
-  # TODO: Remove this, once nifi is integrated
-  # Currently pipeline fails, because redpanda is removed and nifi not yet integrated.
-  allow_failure: true 
   needs:
     - job: build-backend
       artifacts: true
@@ -316,11 +313,16 @@ api-test-backend:
     # Run Bruno API tests from a container on the same Compose network
     - docker run -d --name bruno-runner --network api-test-net node:22-alpine sleep infinity
     - docker cp api/portal-backend/bruno-api/. bruno-runner:/tests/
+    # NOTE: --exclude-tags=requires-nifi skips saga steps that need a pipeline
+    # adapter. Redpanda Connect was removed (commit 568d52bc) and the NiFi adapter
+    # is not yet implemented (#1462), so dataset-saga-workflow/5-create-pipeline
+    # and the matching cleanup are tagged and skipped here. Remove this flag once
+    # the NiFi adapter ships and re-enable the tags on the .bru files.
     - |
       docker exec bruno-runner sh -c '
         npm install -g @usebruno/cli 2>/dev/null
         cd /tests
-        npx @usebruno/cli run --env ci > /tests/bruno-output.txt 2>&1
+        npx @usebruno/cli run --env ci --exclude-tags=requires-nifi > /tests/bruno-output.txt 2>&1
         RESULT=$?
         cat /tests/bruno-output.txt
         exit $RESULT
