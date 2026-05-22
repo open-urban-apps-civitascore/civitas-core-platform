@@ -146,6 +146,11 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
     return JsonPath.read(exchange(HttpMethod.POST, DATASOURCES_ENDPOINT, body), "$.id");
   }
 
+  /**
+   * Pins what lands in the {@code data_sources.configuration} JSONB column for a fresh POST. The
+   * Bruno chain pins the HTTP response shape; this nested class pins the storage shape so a
+   * refactor that changes one but not the other is caught at integration-test time.
+   */
   @Nested
   @DisplayName("Persisted JSONB shape after create")
   class PersistedShapeOnCreate {
@@ -204,6 +209,13 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
     }
   }
 
+  /**
+   * Pins the JSONB mutation semantics across PUT and PATCH — specifically the masked-password
+   * round-trip (the placeholder must resolve back to the stored ciphertext, not overwrite it with a
+   * literal {@code "********"}) and the connector-type-change normalization on DRAFT. These
+   * invariants are easy to break with a refactor that touches the merge-on-update path; pinning
+   * them here turns silent corruption into a failing integration test.
+   */
   @Nested
   @DisplayName("Persisted JSONB shape after PUT and PATCH (mutation contracts)")
   class PersistedShapeOnMutation {
