@@ -801,11 +801,12 @@ if [ "$config_adapter_option" = "2" ]; then
     CONFIG_ADAPTER_JAR="$(pwd)/config-adapter-application/target/config-adapter-application-$DEV_VERSION.jar"
 
     # Create a startup script with environment variables
+    # TODO: Add nifi to list of adapter once implemented in CA
     cat > /tmp/start-config-adapter.sh << SCRIPT_EOF
 #!/bin/bash
 # Config Adapter environment variables (from application.properties)
 export HEALTHCHECK_PORT=8088
-export ADAPTERS=keycloak,apisix,frost,nifi
+export ADAPTERS=keycloak,apisix,frost
 export EVENTHANDLER_NAME=kafka
 export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 export KAFKA_GROUP_ID=config-adapter-group
