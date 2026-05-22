@@ -1,10 +1,11 @@
 package de.civitascore.portal.model.input;
 
 import de.civitascore.portal.model.embedded.ApiStandard;
+import de.civitascore.portal.model.input.validation.NamedApiAllowedSlug;
+import de.civitascore.portal.model.input.validation.NamedApiAllowedSlugValidator;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -23,16 +24,15 @@ public class NamedApiInputDTO {
       example = "Traffic Sensor Readings")
   private String name;
 
-  @NotBlank(message = "Slug is required") @Pattern(
-      regexp = "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
-      message =
-          "Slug must be lowercase alphanumeric with internal hyphens (e.g. 'traffic-counter')")
+  @NotBlank(message = "Slug is required") @NamedApiAllowedSlug
   @Size(max = 32, message = "Slug must be at most 32 characters") @Schema(
       description =
           "URL slug used as the path segment in the public route"
               + " /v1/datasets/{datasetId}/{slug}. Lowercase alphanumeric with internal hyphens,"
-              + " max 32 characters, unique within a dataset, immutable while AVAILABLE.",
-      example = "traffic")
+              + " max 32 characters, unique within a dataset, not one of the reserved platform"
+              + " names (apis, api, v1, admin), immutable while AVAILABLE.",
+      example = "traffic",
+      pattern = NamedApiAllowedSlugValidator.SHAPE_REGEX)
   private String slug;
 
   @NotNull(message = "Standard is required") @Schema(

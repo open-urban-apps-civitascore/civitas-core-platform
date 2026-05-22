@@ -119,7 +119,7 @@ public class DataSetController
       operationId = "stageDataSet",
       summary = "Stage a dataset",
       description =
-          "Validates the dataset and generates distributions from pipeline APIs, transitioning status from DRAFT to READY.")
+          "Validates the dataset's pipeline configuration and transitions status from DRAFT to READY.")
   public ResponseEntity<DataSetOutputDTO> stage(@PathVariable UUID id) {
     DataSet ready = dataSetService.stage(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(ready);
@@ -130,8 +130,7 @@ public class DataSetController
   @Operation(
       operationId = "unstageDataSet",
       summary = "Unstage a dataset",
-      description =
-          "Removes auto-generated distributions and reverts the dataset from READY to DRAFT.")
+      description = "Reverts the dataset from READY to DRAFT.")
   public ResponseEntity<DataSetOutputDTO> unstage(@PathVariable UUID id) {
     DataSet draft = dataSetService.unstage(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(draft);

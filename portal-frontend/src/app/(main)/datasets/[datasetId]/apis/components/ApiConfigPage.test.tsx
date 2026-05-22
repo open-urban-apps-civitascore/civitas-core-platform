@@ -72,7 +72,6 @@ const makeDataset = (overrides: Partial<Dataset> = {}): Dataset => ({
   description: 'A test dataset',
   dataSetStatus: 'DRAFT',
   pipelines: [],
-  distributions: [],
   createdAt: '2024-01-01',
   modifiedAt: '2024-01-01',
   openDataAccess: false,

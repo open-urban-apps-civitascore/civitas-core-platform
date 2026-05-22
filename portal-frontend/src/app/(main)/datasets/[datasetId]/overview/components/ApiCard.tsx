@@ -1,6 +1,6 @@
 'use client'
 
-import { Globe, Layers, Map, MoreVertical, Timer } from 'lucide-react'
+import { Copy, Globe, Layers, Map, MoreVertical, Timer } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { ComponentType, useState } from 'react'
@@ -78,7 +78,11 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, isOpenDataAcces
 
   return (
     <>
-      <div data-testid={`apiCard-${api.slug}`} className="flex flex-col bg-white border rounded-sm overflow-hidden">
+      <div
+        data-testid={`apiCard-${api.slug}`}
+        className="flex flex-col bg-white border rounded-sm overflow-hidden group cursor-pointer"
+        onClick={goToView}
+      >
         <div className="flex items-start gap-3 p-5">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted">
             <Icon className="h-5 w-5 text-muted-foreground" />
@@ -98,7 +102,7 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, isOpenDataAcces
                 </Tooltip>
               )}
             </div>
-            <span className="font-medium truncate">{api.name}</span>
+            <span className="font-medium truncate group-hover:underline">{api.name}</span>
             {api.description ? (
               <span className="text-sm font-normal text-muted-foreground line-clamp-2">{api.description}</span>
             ) : (
@@ -114,6 +118,7 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, isOpenDataAcces
                 className="h-8 w-8 shrink-0"
                 data-testid={`apiCardMenu-${api.slug}`}
                 aria-label={api.name}
+                onClick={e => e.stopPropagation()}
               >
                 <MoreVertical className="h-4 w-4" />
               </Button>
@@ -145,9 +150,22 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, isOpenDataAcces
 
         <div className="border-t" />
 
-        <div className="pl-17 pr-4 py-6 text-sm break-all">
-          <span className="text-muted-foreground font-normal">{pathPrefix}</span>
-          <strong>{api.slug}</strong>
+        <div className="pl-17 pr-4 py-6 text-sm break-all flex items-center gap-2">
+          <span className="flex-1">
+            <span className="text-muted-foreground font-normal">{pathPrefix}</span>
+            <strong>{api.slug}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={e => {
+              e.stopPropagation()
+              handleCopyPath()
+            }}
+            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Copy API path"
+          >
+            <Copy className="h-4 w-4" />
+          </button>
         </div>
       </div>
 

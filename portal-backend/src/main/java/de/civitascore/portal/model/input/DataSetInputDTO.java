@@ -26,7 +26,7 @@ public class DataSetInputDTO extends BaseDataEntityInputDTO {
    */
   @Valid @Schema(
       description =
-          "Named API endpoints exposed by this dataset. Each entry produces one published"
-              + " distribution and one APISIX route after release.")
+          "Named API endpoints exposed by this dataset. Each entry produces one APISIX route"
+              + " after release.")
   private List<NamedApiInputDTO> namedApis = null;
 }

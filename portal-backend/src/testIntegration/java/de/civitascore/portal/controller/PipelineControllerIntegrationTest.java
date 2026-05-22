@@ -107,7 +107,6 @@ class PipelineControllerIntegrationTest
     input.setDescription("A test pipeline for integration testing");
     input.setStyles(createSampleStyles());
     input.setModel(createSampleModel());
-    input.setApis(new String[] {"/api/v1/traffic", "/api/v1/weather"});
     input.setPersistences(new Long[] {12345L});
     return input;
   }
@@ -127,7 +126,6 @@ class PipelineControllerIntegrationTest
     input.setDescription("Updated description");
     input.setStyles(createSampleStyles());
     input.setModel(createSampleModel());
-    input.setApis(new String[] {"/api/v1/sensors"});
     input.setPersistences(new Long[] {12345L});
     return input;
   }
@@ -172,7 +170,6 @@ class PipelineControllerIntegrationTest
           .isEqualTo(input.getDescription());
       assertThat(output.getStyles()).as("Styles should match input").isEqualTo(input.getStyles());
       assertThat(output.getModel()).as("Model should match input").isEqualTo(input.getModel());
-      assertThat(output.getApis()).as("APIs should match input").containsExactly(input.getApis());
       assertThat(output.getPersistences())
           .as("Persistences should match input")
           .containsExactly(input.getPersistences());
@@ -470,20 +467,6 @@ class PipelineControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getName()).isEqualTo("PatchedPipeline");
       assertThat(response.getBody().getDescription()).isEqualTo("Patched description");
-    }
-
-    @Test
-    @DisplayName("Should update pipeline's APIs with PATCH")
-    void shouldUpdateApisWithPatch() {
-      UUID pipelineId = createTestEntity();
-
-      Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("apis", new String[] {"/api/v2/newapi"});
-
-      ResponseEntity<PipelineOutputDTO> response = performPatch(pipelineId, patchMap);
-
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getApis()).containsExactly("/api/v2/newapi");
     }
 
     @Test
@@ -806,30 +789,6 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should handle empty APIs array")
-    void shouldHandleEmptyApisArray() {
-      PipelineInputDTO input = createValidInput();
-      input.setApis(new String[] {});
-
-      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getApis()).isEmpty();
-    }
-
-    @Test
-    @DisplayName("Should handle null APIs")
-    void shouldHandleNullApis() {
-      PipelineInputDTO input = createValidInput();
-      input.setApis(null);
-
-      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-    }
-
-    @Test
     @DisplayName("Should handle empty persistences array")
     void shouldHandleEmptyPersistencesArray() {
       PipelineInputDTO input = createValidInput();
@@ -886,22 +845,6 @@ class PipelineControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getModel()).isEqualTo(complexModel);
-    }
-
-    @Test
-    @DisplayName("Should handle multiple API paths")
-    void shouldHandleMultipleApiPaths() {
-      PipelineInputDTO input = createValidInput();
-      input.setApis(
-          new String[] {
-            "/api/v1/traffic", "/api/v1/weather", "/api/v1/sensors", "/api/v2/advanced"
-          });
-
-      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getApis()).hasSize(4);
     }
 
     @Test

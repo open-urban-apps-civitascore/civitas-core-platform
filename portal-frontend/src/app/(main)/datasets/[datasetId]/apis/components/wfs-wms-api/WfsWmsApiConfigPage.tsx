@@ -64,7 +64,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
 
   const form = useForm<WfsWmsApiFormData>({
     resolver: zodResolver(formSchema),
-    mode: 'onBlur',
+    mode: 'onChange',
     defaultValues: wfsWmsDefaults,
   })
 

@@ -99,12 +99,12 @@ echo "Checking prerequisites..."
 
 # Java
 if ! command -v java >/dev/null 2>&1; then
-    echo "ERROR: Java is not installed. Please install Java 21+."
+    echo "ERROR: Java is not installed. Please install Java 25+."
     exit 1
 fi
 
 # Auto-detect JDK if JAVA_HOME not set or invalid.
-# Supports Temurin, OpenJDK, Oracle, GraalVM, SDKMAN-installed JDKs (21+).
+# Supports Temurin, OpenJDK, Oracle, GraalVM, SDKMAN-installed JDKs (25+).
 if [ -z "$JAVA_HOME" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
     JAVA_HOME=""
     if [ "$OS_TYPE" = "Darwin" ]; then
@@ -113,7 +113,7 @@ if [ -z "$JAVA_HOME" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
             JAVA_HOME=$(/usr/libexec/java_home 2>/dev/null || true)
         fi
     else
-        # Linux / WSL: search common JDK locations, pick newest >= 21
+        # Linux / WSL: search common JDK locations, pick newest >= 25
         best_ver=0
         for jdk_dir in /usr/lib/jvm/temurin-*-jdk-* \
                         /usr/lib/jvm/java-*-openjdk-* \
@@ -122,7 +122,7 @@ if [ -z "$JAVA_HOME" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
                         "$HOME/.sdkman/candidates/java"/*/; do
             if [ -x "$jdk_dir/bin/java" ]; then
                 ver=$("$jdk_dir/bin/java" -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
-                if [ "$ver" -ge 21 ] 2>/dev/null && [ "$ver" -gt "$best_ver" ]; then
+                if [ "$ver" -ge 25 ] 2>/dev/null && [ "$ver" -gt "$best_ver" ]; then
                     best_ver=$ver
                     JAVA_HOME="$jdk_dir"
                 fi
@@ -138,9 +138,9 @@ else
     export PATH="$JAVA_HOME/bin:$PATH"
 fi
 JAVA_VERSION=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
-if [ "$JAVA_VERSION" -lt 21 ] 2>/dev/null; then
-    echo "ERROR: Java 21 or higher is required. Found Java $JAVA_VERSION."
-    echo "       Install any JDK >= 21 (Temurin, OpenJDK, Oracle, GraalVM) or set JAVA_HOME."
+if [ "$JAVA_VERSION" -lt 25 ] 2>/dev/null; then
+    echo "ERROR: Java 25 or higher is required. Found Java $JAVA_VERSION."
+    echo "       Install any JDK >= 25 (Temurin, OpenJDK, Oracle, GraalVM) or set JAVA_HOME."
     exit 1
 fi
 echo "  Java $JAVA_VERSION found (JAVA_HOME=${JAVA_HOME:-system default})"
@@ -654,12 +654,12 @@ export REDPANDA_URL=http://localhost:4195
 export REDPANDA_TOPICS=de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
 export GEOSERVER_URL=http://localhost:8082/geoserver
 export GEOSERVER_ADMIN_USER=admin
-export GEOSERVER_ADMIN_PASSWORD=changeme-generate-a-strong-password
+export GEOSERVER_ADMIN_PASSWORD=geoserver
 export GEOSERVER_POSTGIS_HOST=localhost
 export GEOSERVER_POSTGIS_PORT=5434
 export GEOSERVER_POSTGIS_DB=geoserver
 export GEOSERVER_POSTGIS_USER=geoserver
-export GEOSERVER_POSTGIS_PASSWORD=changeme-generate-a-strong-password
+export GEOSERVER_POSTGIS_PASSWORD=geoserver
 
 java -jar "$CONFIG_ADAPTER_JAR"
 exec bash
@@ -703,12 +703,12 @@ else
     echo "  REDPANDA_URL=http://localhost:4195"
     echo "  GEOSERVER_URL=http://localhost:8082/geoserver"
     echo "  GEOSERVER_ADMIN_USER=admin"
-    echo "  GEOSERVER_ADMIN_PASSWORD=changeme-generate-a-strong-password"
+    echo "  GEOSERVER_ADMIN_PASSWORD=geoserver"
     echo "  GEOSERVER_POSTGIS_HOST=localhost"
     echo "  GEOSERVER_POSTGIS_PORT=5434"
     echo "  GEOSERVER_POSTGIS_DB=geoserver"
     echo "  GEOSERVER_POSTGIS_USER=geoserver"
-    echo "  GEOSERVER_POSTGIS_PASSWORD=changeme-generate-a-strong-password"
+    echo "  GEOSERVER_POSTGIS_PASSWORD=geoserver"
     echo
 fi
 
@@ -933,9 +933,10 @@ echo "  Keycloak Admin:   http://localhost:8080 (admin/admin)"
 echo "  Kafka UI:         http://localhost:8090"
 echo "  FROST Server:     http://localhost:8085/FROST-Server/v1.1 (HTTP)"
 echo "  FROST MQTT:       mqtt://localhost:1883"
-echo "  GeoServer Admin:  http://localhost:8082/geoserver/web (admin / see geoserver/.env)"
+echo "  GeoServer Admin:  http://localhost:8082/geoserver/web (admin / geoserver)"
 echo "  GeoServer WFS:    http://localhost:9080/geoserver/{workspace}/wfs (via APISIX)"
 echo "  GeoServer PostGIS: localhost:5434  db=geoserver  user=geoserver  (see geoserver/.env)"
+echo "  GeoServer Consul: http://localhost:8500"
 echo "  APISIX Gateway:   http://localhost:9080"
 echo "  APISIX Admin API: http://localhost:9180"
 echo "  Redpanda Connect: http://localhost:4195"

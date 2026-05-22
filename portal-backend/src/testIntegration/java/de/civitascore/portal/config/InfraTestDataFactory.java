@@ -121,29 +121,17 @@ public class InfraTestDataFactory {
    * model contains no placeholder because {@code generate} produces its own data.
    */
   public Pipeline createGeneratePipeline(DataSet dataSet, DataSource dataSource) {
-    return createGeneratePipeline(dataSet, dataSource, "/v1.1/Things", "default");
+    return createGeneratePipeline(dataSet, dataSource, "default");
   }
 
   public Pipeline createGeneratePipeline(
-      DataSet dataSet, DataSource dataSource, String apiPath, String nameSuffix) {
+      DataSet dataSet, DataSource dataSource, String nameSuffix) {
     return portalData.pipeline(
         dataSet,
         b ->
             b.name("pipeline-" + nameSuffix + "-" + System.nanoTime())
                 .description("Generate → FROST pipeline")
                 .dataSources(Set.of(dataSource))
-                .apis(List.of(apiPath))
-                .model(loadPipelineConfig("pipelines/generate-pipeline-config.json")));
-  }
-
-  public Pipeline createGeneratePipelineWithMultipleApis(DataSet dataSet, DataSource dataSource) {
-    return portalData.pipeline(
-        dataSet,
-        b ->
-            b.name("pipeline-multi-api-" + System.nanoTime())
-                .description("Pipeline with multiple APIs")
-                .dataSources(Set.of(dataSource))
-                .apis(List.of("/v1.1/Things", "/v1.1/Datastreams"))
                 .model(loadPipelineConfig("pipelines/generate-pipeline-config.json")));
   }
 
@@ -159,7 +147,6 @@ public class InfraTestDataFactory {
             b.name("sql-pipeline-" + System.nanoTime())
                 .description("SQL → FROST pipeline")
                 .dataSources(Set.of(dataSource))
-                .apis(List.of("/v1.1/Things"))
                 .model(
                     injectDatasourceId(
                         loadPipelineConfig("pipelines/sql-pipeline-config.json"),
@@ -178,7 +165,6 @@ public class InfraTestDataFactory {
             b.name("mqtt-pipeline-" + System.nanoTime())
                 .description("MQTT → FROST pipeline")
                 .dataSources(Set.of(dataSource))
-                .apis(List.of("/v1.1/Things"))
                 .model(
                     injectDatasourceId(
                         loadPipelineConfig("pipelines/mqtt-pipeline-config.json"),

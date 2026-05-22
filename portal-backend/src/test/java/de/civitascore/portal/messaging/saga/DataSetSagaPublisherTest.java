@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.portal.configuration.SagaProperties;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -29,7 +30,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
-import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -44,9 +44,9 @@ class DataSetSagaPublisherTest {
 
   @BeforeEach
   void setUp() {
-    publisher = new DataSetSagaPublisher(kafkaTemplate, new JsonMapper());
-    ReflectionTestUtils.setField(publisher, "triggerTopic", "test.saga.trigger");
-    ReflectionTestUtils.setField(publisher, "publishTimeoutSeconds", 5);
+    publisher =
+        new DataSetSagaPublisher(
+            kafkaTemplate, new JsonMapper(), new SagaProperties("test.saga.trigger", 5));
   }
 
   private DataSource dataSource(UUID id, ConnectorType type) {

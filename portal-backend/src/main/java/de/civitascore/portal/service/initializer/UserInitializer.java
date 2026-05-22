@@ -3,6 +3,8 @@ package de.civitascore.portal.service.initializer;
 import de.civitascore.configadapter.model.ConfigResultEvent;
 import de.civitascore.configadapter.model.idm.UserConfig;
 import de.civitascore.configadapter.model.idm.UserConfig.CredentialConfig;
+import de.civitascore.portal.configuration.EventProperties;
+import de.civitascore.portal.configuration.KeycloakProperties;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
@@ -20,7 +22,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
@@ -45,12 +46,8 @@ public class UserInitializer {
   private final AssignmentRepository assignmentRepository;
   private final ConfigEventPublisherService configEventPublisher;
   private final Environment environment;
-
-  @Value("${keycloak.target-realm}")
-  private String targetRealm;
-
-  @Value("${event.config-adapter-timeout-seconds:10}")
-  private int configAdapterTimeoutSeconds;
+  private final KeycloakProperties keycloakProperties;
+  private final EventProperties eventProperties;
 
   public UserInitializer(
       InitProperties properties,
@@ -59,7 +56,9 @@ public class UserInitializer {
       RoleRepository roleRepository,
       AssignmentRepository assignmentRepository,
       ConfigEventPublisherService configEventPublisher,
-      Environment environment) {
+      Environment environment,
+      KeycloakProperties keycloakProperties,
+      EventProperties eventProperties) {
     this.properties = properties;
     this.userRepository = userRepository;
     this.groupRepository = groupRepository;
@@ -67,6 +66,8 @@ public class UserInitializer {
     this.assignmentRepository = assignmentRepository;
     this.configEventPublisher = configEventPublisher;
     this.environment = environment;
+    this.keycloakProperties = keycloakProperties;
+    this.eventProperties = eventProperties;
   }
 
   /**
@@ -216,8 +217,8 @@ public class UserInitializer {
     try {
       ConfigResultEvent result =
           configEventPublisher
-              .publishUserCreated(targetRealm, userConfig)
-              .get(configAdapterTimeoutSeconds, TimeUnit.SECONDS);
+              .publishUserCreated(keycloakProperties.targetRealm(), userConfig)
+              .get(eventProperties.configAdapterTimeoutSeconds(), TimeUnit.SECONDS);
 
       if (result != null
           && result.status() == ConfigResultEvent.Status.SUCCESS

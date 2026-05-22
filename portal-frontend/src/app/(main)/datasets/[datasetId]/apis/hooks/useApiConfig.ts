@@ -79,6 +79,7 @@ export const useApiConfig = <TFormData extends NamedApiFormData>({
             }))
             await updateDataset.mutateAsync({ id: dataset.id, namedApis: [...otherInputs, newApi] })
             toast.success(t('messages.updateSuccess'))
+            form.reset(data)
             router.refresh()
             updateMode(false)
           }

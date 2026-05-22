@@ -19,11 +19,6 @@ const enumFromConst = <T extends Record<string, string>>(obj: T) =>
 
 export const DatasetStatusSchema = enumFromConst(DATASET_STATUS_TYPES)
 
-export type Distribution = {
-  id: string
-  accessUrl: string
-}
-
 export type PipelineBasicInfo = {
   id: string
   name: string
@@ -42,7 +37,6 @@ export const DatasetApiResponseSchema = z.object({
   description: z.string(),
   dataSetStatus: DatasetStatusSchema,
   openDataAccess: z.boolean(),
-  distributions: z.array(z.object({ id: z.string(), accessUrl: z.string() })),
   pipelines: z.array(z.object({ id: z.string(), name: z.string() })),
   namedApis: z.array(NamedApiSchema).optional(),
 })

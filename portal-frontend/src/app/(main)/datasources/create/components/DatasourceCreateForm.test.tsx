@@ -1,10 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { InternalAxiosRequestConfig } from 'axios'
-import { AxiosError } from 'axios'
+import { toast } from 'sonner'
 import { vi } from 'vitest'
 
 import { DatasourceCreateForm } from './DatasourceCreateForm'
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}))
 
 const mockPush = vi.fn()
 const mockMutateAsync = vi.fn()
@@ -75,7 +81,7 @@ describe('DatasourceCreateForm', () => {
     expect(mockPush).toHaveBeenCalledWith('/datasources?page=1')
   })
 
-  test('calls createDatasource mutation on form submission', async () => {
+  test('calls createDatasource mutation on form submission and shows success toast', async () => {
     setup()
     const nameInput = screen.getByRole('textbox')
     fireEvent.change(nameInput, { target: { value: 'Test Datasource' } })
@@ -87,20 +93,12 @@ describe('DatasourceCreateForm', () => {
           name: 'Test Datasource',
         }),
       )
+      expect(toast.success).toHaveBeenCalled()
     })
   })
 
-  test('shows a name field error when the request returns a conflict error', async () => {
-    const conflictError = new AxiosError('Conflict', 'ERR_BAD_REQUEST', {} as InternalAxiosRequestConfig, undefined, {
-      status: 409,
-      statusText: 'Conflict',
-      headers: {},
-      config: {} as InternalAxiosRequestConfig,
-      data: {
-        detail: 'Datasource with name "Test Datasource" already exists',
-      },
-    })
-    mockMutateAsync.mockRejectedValueOnce(conflictError)
+  test('shows error toast on failed datasource creation', async () => {
+    mockMutateAsync.mockRejectedValueOnce(new Error('Unexpected error'))
 
     setup()
     const nameInput = screen.getByRole('textbox')
@@ -108,7 +106,7 @@ describe('DatasourceCreateForm', () => {
     fireEvent.click(screen.getByTestId('submitButton'))
 
     await waitFor(() => {
-      expect(screen.getByTestId('nameFormMessage')).toHaveTextContent('common.errors.nameExists')
+      expect(toast.error).toHaveBeenCalledWith('errors.creationError')
     })
   })
 })

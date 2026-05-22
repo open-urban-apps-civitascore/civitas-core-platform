@@ -47,7 +47,7 @@ export const StaApiConfigPage = ({ dataset, existingApi, testId }: StaApiConfigP
 
   const form = useForm<NamedApiFormData>({
     resolver: zodResolver(formSchema),
-    mode: 'onBlur',
+    mode: 'onChange',
     defaultValues: staDefaults,
   })
 

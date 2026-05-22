@@ -1025,6 +1025,7 @@
       "apiResponse": "API Response",
       "cronTrigger": "CRON Trigger",
       "frostStorage": "FROST Server",
+      "geoPersistence": "Geo Persistence",
       "mapping": "Mapping"
     },
     "palette": {
@@ -1052,6 +1053,8 @@
       "cronDesc": "Scheduled trigger. Executes pipeline on schedule.",
       "frostServer": "FROST Server",
       "frostServerDesc": "SensorThings API persistence. Store or retrieve data.",
+      "geoPersistence": "Geo Persistence",
+      "geoPersistenceDesc": "WFS/WMS geo data persistence.",
       "mapping": "Mapping",
       "mappingDesc": "Bloblang data transformation. Map and transform data."
     },
@@ -1095,6 +1098,17 @@
       "serverUrl": "Server URL",
       "internalServer": "Internal Frost Server",
       "version": "Version"
+    },
+    "geoPersistencePanel": {
+      "title": "Geo Persistence",
+      "tableName": "Table Name",
+      "tableNamePlaceholder": "Enter table name...",
+      "dataStructureVersion": "Data Structure Version",
+      "importDataStructure": "Import Data Structure",
+      "changeDataStructure": "Change Data Structure",
+      "details": "Data Structure Details",
+      "dataStructureName": "Data Structure",
+      "versionNumber": "Version"
     },
     "mappingPanel": {
       "hint": "Define your data transformation mapping using YAML or JSON format.",
