@@ -28,6 +28,7 @@ interface UseApiConfigActionsArgs<TFormData extends FormData> {
   existingApi?: NamedApi
   otherNamedApis: NamedApi[]
   initialSlug: string
+  isCreateLayerMode?: boolean
 }
 
 const toBoundingBoxPayload = (bbox: WfsWmsApiFormData['layer']['nativeBoundingBox']) => ({
@@ -72,6 +73,7 @@ export const useApiConfig = <TFormData extends FormData>({
   existingApi,
   otherNamedApis,
   initialSlug,
+  isCreateLayerMode = false,
 }: UseApiConfigActionsArgs<TFormData>) => {
   const t = useTranslations('datasets.overview.completion.apis.config')
   const router = useRouter()
@@ -136,6 +138,7 @@ export const useApiConfig = <TFormData extends FormData>({
   const handleSaveLayers = (data: WfsWmsApiFormData) => {
     const wfsDirtyFields = dirtyFields as Partial<Record<keyof WfsWmsApiFormData, unknown>>
     if (!wfsDirtyFields.layer) return
+    if (isCreateLayerMode) console.log('create layer')
     console.log('saving layers', data)
   }
 

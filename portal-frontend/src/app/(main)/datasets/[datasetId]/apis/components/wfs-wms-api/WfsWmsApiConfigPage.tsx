@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm, UseFormReturn } from 'react-hook-form'
 
 import { useGetDatasinks } from '@/app/services/api/datasinks/clientRequests'
+import { useGetLayers } from '@/app/services/api/layers/clientRequests'
 import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { Form } from '@/components/ui/form'
 import { Dataset } from '@/types/datasets'
@@ -15,6 +16,7 @@ import { DatastructureVersion } from '@/types/datastructures'
 import {
   API_TYPE_QUERY,
   DEFAULTS_BY_TYPE,
+  LayerFormData,
   NamedApi,
   StaApiFormData,
   WfsWmsApiFormData,
@@ -25,6 +27,7 @@ import { useApiConfig } from '../../hooks/useApiConfig'
 import { ApiConfigTab, ApiConfigWrapper } from '../ApiConfigWrapper'
 import { BaseInfoForm } from '../base-info/BaseInfoForm'
 import { LayerConfig } from './LayerConfig'
+import { mockLayerList } from './mockData'
 
 interface WfsWmsApiConfigPageProps {
   dataset: Dataset
@@ -46,6 +49,11 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
   const initialSlug = existingApi?.slug ?? defaults.defaultSlug
 
   const { data: datasinksData } = useGetDatasinks()
+
+  const { data } = useGetLayers(dataset.id)
+  const [isCreateLayerMode, setIsCreateLayerMode] = useState(!!data?.data.length && data?.data.length > 0)
+
+  const layers = mockLayerList
 
   const postgisDatasinks =
     datasinksData?.data.filter(datasink => datasink.dataSinkType === DATASINK_TYPES.POSTGIS) || []
@@ -70,6 +78,21 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
   const validPostgisDatastructureResponses = postgisDatastructuresResponse.filter(res => !!res.data)
   const postgisDatastructures = validPostgisDatastructureResponses.map(datastructure => datastructure.data.data)
 
+  const defaultLayer: LayerFormData = {
+    title: '',
+    layerName: '',
+    layerDescription: '',
+    table: '',
+    attribute: [],
+    cqlFilter: '',
+    geometryColumnRef: '',
+    crs: '',
+    bboxAutoCalculate: false as const,
+    nativeBoundingBox: { minX: '', minY: '', maxX: '', maxY: '', crs: '' },
+    latLonBoundingBox: { minX: '', minY: '', maxX: '', maxY: '', crs: '' },
+    defaultStyleId: '',
+    alternativeStyleIds: [],
+  }
   const wfsWmsDefaults: WfsWmsApiFormData = {
     type: API_TYPE_QUERY.WFS_WMS,
     baseInfo: {
@@ -78,21 +101,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
       description: existingApi?.description ?? '',
       persistence: defaults.persistenceValue,
     },
-    layer: {
-      title: '',
-      layerName: '',
-      layerDescription: '',
-      table: '',
-      attribute: [],
-      cqlFilter: '',
-      geometryColumnRef: '',
-      crs: '',
-      bboxAutoCalculate: false as const,
-      nativeBoundingBox: { minX: '', minY: '', maxX: '', maxY: '', crs: '' },
-      latLonBoundingBox: { minX: '', minY: '', maxX: '', maxY: '', crs: '' },
-      defaultStyleId: '',
-      alternativeStyleIds: [],
-    },
+    layer: defaultLayer,
   }
 
   const form = useForm<WfsWmsApiFormData>({
@@ -124,6 +133,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     existingApi,
     otherNamedApis,
     initialSlug,
+    isCreateLayerMode,
   })
 
   const [selectedTab, setSelectedTab] = useState<ApiConfigTab>('basicInfo')
@@ -134,6 +144,16 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     { value: 'styles' as ApiConfigTab, label: 'datasets.overview.completion.apis.config.tabs.styles' },
   ]
   const completedTabs: ApiConfigTab[] = form.formState.isValid ? ['basicInfo'] : []
+
+  const handleSelectLayer = (layerId: string) => {
+    // TODO: set form value layer to selected layer
+    setIsCreateLayerMode(false)
+  }
+
+  const handleAddLayer = () => {
+    form.setValue('layer', defaultLayer)
+    setIsCreateLayerMode(true)
+  }
 
   return (
     <ApiConfigWrapper
@@ -168,7 +188,14 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
           />
         )}
         {selectedTab === 'layer' && (
-          <LayerConfig form={form} postgisDatasinks={postgisDatasinks} postGisDatastructures={postgisDatastructures} />
+          <LayerConfig
+            form={form}
+            existingLayers={layers}
+            postgisDatasinks={postgisDatasinks}
+            postGisDatastructures={postgisDatastructures}
+            onSelectLayer={handleSelectLayer}
+            onAddLayer={handleAddLayer}
+          />
         )}
         {selectedTab === 'styles' && (
           <div data-testid={`tabPlaceholder-${selectedTab}`} className="py-12 text-center text-muted-foreground">

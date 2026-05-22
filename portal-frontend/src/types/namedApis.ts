@@ -179,25 +179,6 @@ export const LayerPayloadSchema = LayerBaseSchema.extend({
   latLonBoundingBox: BoundingBoxPayloadSchema,
 })
 
-export type Layer = z.infer<typeof LayerSchema>
-
-export type LayerApiPayload = z.infer<typeof LayerPayloadSchema>
-
-export type CreateLayerInput = {
-  datasetId: string
-  data: LayerApiPayload
-}
-
-export type UpdateLayerInput = {
-  datasetId: string
-  layerId: string
-  data: LayerApiPayload
-}
-
-// ============================================================================
-// Types for WFS/WMS-API
-// ============================================================================
-
 const boundingBoxCoord = z
   .string()
   .refine(v => v !== '', { message: 'common.errors.required' })
@@ -211,7 +192,7 @@ export const BoundingBoxSchema = z.object({
   crs: z.string(),
 })
 
-export const WfsWmsLayerFormSchema = z.object({
+export const LayerFormSchema = z.object({
   title: z.string().trim().min(1, 'common.errors.required'),
   layerName: z.string().trim().min(1, 'common.errors.required'),
   layerDescription: z
@@ -232,11 +213,30 @@ export const WfsWmsLayerFormSchema = z.object({
   alternativeStyleIds: z.array(z.string()),
 })
 
+export type Layer = z.infer<typeof LayerSchema>
+export type LayerFormData = z.infer<typeof LayerFormSchema>
+export type LayerApiPayload = z.infer<typeof LayerPayloadSchema>
+
+export type CreateLayerInput = {
+  datasetId: string
+  data: LayerApiPayload
+}
+
+export type UpdateLayerInput = {
+  datasetId: string
+  layerId: string
+  data: LayerApiPayload
+}
+
+// ============================================================================
+// Types for WFS/WMS-API
+// ============================================================================
+
 export const WfsWmsApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) =>
   z.object({
     type: z.literal(API_TYPE_QUERY.WFS_WMS),
     baseInfo: NamedApiBaseInfoFormSchema({ existingSlugs }),
-    layer: WfsWmsLayerFormSchema,
+    layer: LayerFormSchema,
   })
 
 export type WfsWmsApiFormData = z.infer<ReturnType<typeof WfsWmsApiFormSchema>>

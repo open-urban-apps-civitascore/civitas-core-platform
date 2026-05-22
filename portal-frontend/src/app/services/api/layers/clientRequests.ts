@@ -1,10 +1,22 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
 
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { CreateLayerInput, Layer, UpdateLayerInput } from '@/types/namedApis'
 
 const key = 'layers'
+
+export const useGetLayers = (datasetId: string) =>
+  useQuery<ApiServiceResponse<Layer[]>, AxiosError>({
+    queryKey: [key, datasetId],
+    queryFn: () =>
+      apiRequest<Layer[]>({
+        method: 'GET',
+        endpoint: `/datasets/${datasetId}/layers`,
+        headers: { 'x-api-request': 'true' },
+        errorMessage: 'An error occurred while loading layers.',
+      }),
+  })
 
 export const useCreateLayer = () => {
   const queryClient = useQueryClient()
