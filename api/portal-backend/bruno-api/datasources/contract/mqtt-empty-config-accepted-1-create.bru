@@ -25,9 +25,10 @@ body:json {
 }
 
 script:post-response {
-  if (res.body && res.body.id) {
-    bru.setVar('contractMqttEmptyConfigId', res.body.id);
+  if (!res.body || !res.body.id) {
+    throw new Error("Expected create response to include non-empty 'id'");
   }
+  bru.setVar('contractMqttEmptyConfigId', res.body.id);
 }
 
 tests {
