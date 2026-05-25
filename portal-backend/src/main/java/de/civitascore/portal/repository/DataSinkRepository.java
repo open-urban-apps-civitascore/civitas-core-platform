@@ -1,6 +1,7 @@
 package de.civitascore.portal.repository;
 
 import de.civitascore.portal.model.entity.DataSink;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -20,4 +21,6 @@ public interface DataSinkRepository extends BaseRepository<DataSink, UUID> {
   @EntityGraph(attributePaths = {"dataSet", "pipeline"})
   @Query("SELECT s FROM DataSink s WHERE s.id = :id")
   Optional<DataSink> findByIdWithRelations(UUID id);
+
+  List<DataSink> findByPipelineId(UUID pipelineId);
 }

@@ -8,7 +8,6 @@ import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -21,7 +20,6 @@ class DataSinkInputDTOTest {
   private DataSinkInputDTO valid() {
     DataSinkInputDTO dto = new DataSinkInputDTO();
     dto.setDataSinkType(DataSinkType.FROST);
-    dto.setPipelineId(UUID.randomUUID());
     dto.setConfiguration(Map.of());
     return dto;
   }
@@ -42,18 +40,6 @@ class DataSinkInputDTOTest {
 
     assertThat(violations).hasSize(1);
     assertThat(violations.iterator().next().getPropertyPath().toString()).isEqualTo("dataSinkType");
-  }
-
-  @Test
-  @DisplayName("Missing pipelineId should fail validation")
-  void missingPipelineIdShouldFail() {
-    DataSinkInputDTO dto = valid();
-    dto.setPipelineId(null);
-
-    Set<ConstraintViolation<DataSinkInputDTO>> violations = VALIDATOR.validate(dto);
-
-    assertThat(violations).hasSize(1);
-    assertThat(violations.iterator().next().getPropertyPath().toString()).isEqualTo("pipelineId");
   }
 
   @Test

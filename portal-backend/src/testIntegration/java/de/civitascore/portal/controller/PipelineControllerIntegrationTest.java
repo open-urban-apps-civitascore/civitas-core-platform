@@ -4,13 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.PipelineInputDTO;
+import de.civitascore.portal.model.output.DataSinkOutputDTO;
 import de.civitascore.portal.model.output.PipelineOutputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.util.RestPage;
@@ -40,6 +45,7 @@ class PipelineControllerIntegrationTest
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
+  @Autowired private DataSinkRepository dataSinkRepository;
 
   private UUID testDataSetId;
 
@@ -107,7 +113,6 @@ class PipelineControllerIntegrationTest
     input.setDescription("A test pipeline for integration testing");
     input.setStyles(createSampleStyles());
     input.setModel(createSampleModel());
-    input.setPersistences(new Long[] {12345L});
     return input;
   }
 
@@ -126,7 +131,6 @@ class PipelineControllerIntegrationTest
     input.setDescription("Updated description");
     input.setStyles(createSampleStyles());
     input.setModel(createSampleModel());
-    input.setPersistences(new Long[] {12345L});
     return input;
   }
 
@@ -170,9 +174,7 @@ class PipelineControllerIntegrationTest
           .isEqualTo(input.getDescription());
       assertThat(output.getStyles()).as("Styles should match input").isEqualTo(input.getStyles());
       assertThat(output.getModel()).as("Model should match input").isEqualTo(input.getModel());
-      assertThat(output.getPersistences())
-          .as("Persistences should match input")
-          .containsExactly(input.getPersistences());
+      assertThat(output.getDataSinks()).as("DataSinks should be empty").isEmpty();
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
     }
 
@@ -789,19 +791,6 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should handle empty persistences array")
-    void shouldHandleEmptyPersistencesArray() {
-      PipelineInputDTO input = createValidInput();
-      input.setPersistences(new Long[] {});
-
-      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getPersistences()).isEmpty();
-    }
-
-    @Test
     @DisplayName("Should handle complex nested JSON in styles")
     void shouldHandleComplexNestedJsonInStyles() {
       PipelineInputDTO input = createValidInput();
@@ -848,16 +837,16 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should handle multiple persistence IDs")
-    void shouldHandleMultiplePersistenceIds() {
+    @DisplayName("Should handle null dataSinks (treated as empty — no DataSinks created)")
+    void shouldHandleNullDataSinks() {
       PipelineInputDTO input = createValidInput();
-      input.setPersistences(new Long[] {12345L, 67890L});
+      input.setDataSinks(null);
 
       ResponseEntity<PipelineOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getPersistences()).containsExactly(12345L, 67890L);
+      assertThat(response.getBody().getDataSinks()).isEmpty();
     }
 
     @Test
@@ -1161,6 +1150,105 @@ class PipelineControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
       assertThat(response.getBody()).contains("AVAILABLE status");
+    }
+  }
+
+  @Nested
+  @DisplayName("Nested DataSink Tests")
+  class NestedDataSinkTests {
+
+    private DataSinkInputDTO frostSinkInput() {
+      DataSinkInputDTO sink = new DataSinkInputDTO();
+      sink.setDataSinkType(DataSinkType.FROST);
+      sink.setConfiguration(Map.of());
+      return sink;
+    }
+
+    @Test
+    @DisplayName("Creating a pipeline with DataSinks persists them")
+    void shouldCreatePipelineWithDataSinks() {
+      PipelineInputDTO input = createValidInput();
+      input.setDataSinks(List.of(frostSinkInput()));
+
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody()).isNotNull();
+      UUID pipelineId = response.getBody().getId();
+
+      assertThat(dataSinkRepository.findByPipelineId(pipelineId)).hasSize(1);
+      assertThat(response.getBody().getDataSinks()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Updating a pipeline with empty dataSinks removes existing DataSinks")
+    void shouldDeleteDataSinksOnPutWithEmptyList() {
+      UUID pipelineId = createTestEntity();
+      Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
+
+      DataSink sink = new DataSink();
+      sink.setDataSet(pipeline.getDataSet());
+      sink.setPipeline(pipeline);
+      sink.setDataSinkType(DataSinkType.FROST);
+      dataSinkRepository.save(sink);
+      assertThat(dataSinkRepository.findByPipelineId(pipelineId)).hasSize(1);
+
+      PipelineInputDTO updateInput = createUpdateInput();
+      updateInput.setDataSinks(List.of());
+
+      ResponseEntity<PipelineOutputDTO> response = performUpdate(pipelineId, updateInput);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(dataSinkRepository.findByPipelineId(pipelineId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Updating a pipeline with an existing DataSink ID updates it")
+    void shouldUpdateExistingDataSinkViaNestedInput() {
+      UUID pipelineId = createTestEntity();
+      Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
+
+      DataSink sink = new DataSink();
+      sink.setDataSet(pipeline.getDataSet());
+      sink.setPipeline(pipeline);
+      sink.setDataSinkType(DataSinkType.FROST);
+      DataSink savedSink = dataSinkRepository.save(sink);
+
+      DataSinkInputDTO sinkUpdate = new DataSinkInputDTO();
+      sinkUpdate.setId(savedSink.getId());
+      sinkUpdate.setDataSinkType(DataSinkType.FROST);
+      sinkUpdate.setConfiguration(Map.of());
+
+      PipelineInputDTO updateInput = createUpdateInput();
+      updateInput.setDataSinks(List.of(sinkUpdate));
+
+      ResponseEntity<PipelineOutputDTO> response = performUpdate(pipelineId, updateInput);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      List<DataSink> sinks = dataSinkRepository.findByPipelineId(pipelineId);
+      assertThat(sinks).hasSize(1);
+      assertThat(sinks.getFirst().getId()).isEqualTo(savedSink.getId());
+    }
+
+    @Test
+    @DisplayName("GET pipeline includes its DataSinks in the response")
+    void shouldReturnDataSinksInGetResponse() {
+      UUID pipelineId = createTestEntity();
+      Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
+
+      DataSink sink = new DataSink();
+      sink.setDataSet(pipeline.getDataSet());
+      sink.setPipeline(pipeline);
+      sink.setDataSinkType(DataSinkType.FROST);
+      dataSinkRepository.save(sink);
+
+      ResponseEntity<PipelineOutputDTO> response = performGetById(pipelineId);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSinks()).hasSize(1);
+      DataSinkOutputDTO sinkDto = response.getBody().getDataSinks().getFirst();
+      assertThat(sinkDto.getDataSinkType()).isEqualTo(DataSinkType.FROST);
     }
   }
 }

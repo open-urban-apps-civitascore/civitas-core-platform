@@ -16,9 +16,11 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class DataSinkInputDTO extends BaseInputDTO {
 
+  private UUID id;
+
   @NotNull private DataSinkType dataSinkType;
 
-  @NotNull private UUID pipelineId;
+  private UUID pipelineId;
 
   @NotNull @Schema(oneOf = {PostgisConfiguration.class, FrostConfiguration.class})
   private Map<String, Object> configuration;

@@ -29,6 +29,7 @@ import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.CatalogRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSetSeriesRepository;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
@@ -68,6 +69,7 @@ public class PortalTestDataFactory {
   @Autowired private DataStructureRepository dataStructureRepository;
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
   @Autowired private PipelineRepository pipelineRepository;
+  @Autowired private DataSinkRepository dataSinkRepository;
   @Autowired private CatalogRepository catalogRepository;
   @Autowired private DataSpaceRepository dataSpaceRepository;
   @Autowired private DistributionRepository distributionRepository;
@@ -373,6 +375,7 @@ public class PortalTestDataFactory {
   public void cleanAll() {
     assignmentRepository.deleteAll();
     distributionRepository.deleteAll();
+    dataSinkRepository.deleteAll();
     pipelineRepository.deleteAll();
     catalogRepository.deleteAll();
     dataSetRepository.deleteAll();

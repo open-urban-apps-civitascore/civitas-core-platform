@@ -4,10 +4,13 @@ import de.civitascore.portal.mapper.PipelineMapper;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.PipelineInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.util.InvalidInputException;
@@ -15,8 +18,11 @@ import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -33,16 +39,22 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
   private final PipelineMapper pipelineMapper;
   private final DataSetRepository dataSetRepository;
   private final DataSourceRepository dataSourceRepository;
+  private final DataSinkService dataSinkService;
+  private final DataSinkRepository dataSinkRepository;
 
   public PipelineService(
       PipelineRepository pipelineRepository,
       PipelineMapper pipelineMapper,
       DataSetRepository dataSetRepository,
-      DataSourceRepository dataSourceRepository) {
+      DataSourceRepository dataSourceRepository,
+      DataSinkService dataSinkService,
+      DataSinkRepository dataSinkRepository) {
     this.pipelineRepository = pipelineRepository;
     this.pipelineMapper = pipelineMapper;
     this.dataSetRepository = dataSetRepository;
     this.dataSourceRepository = dataSourceRepository;
+    this.dataSinkService = dataSinkService;
+    this.dataSinkRepository = dataSinkRepository;
   }
 
   @Override
@@ -151,6 +163,42 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
     return super.preSave(entity);
   }
 
+  /**
+   * Syncs nested DataSinks after the pipeline is persisted. DataSinks with an id are updated; those
+   * without an id are created; existing DataSinks absent from the input are deleted.
+   */
+  @Override
+  protected Pipeline postSave(Pipeline saved, PipelineInputDTO input) {
+    List<DataSinkInputDTO> dataSinks =
+        input.getDataSinks() != null ? input.getDataSinks() : List.of();
+
+    UUID pipelineId = saved.getId();
+    UUID dataSetId = saved.getDataSet().getId();
+
+    Set<UUID> inputIds =
+        dataSinks.stream()
+            .map(DataSinkInputDTO::getId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+
+    dataSinkRepository.findByPipelineId(pipelineId).stream()
+        .map(DataSink::getId)
+        .filter(id -> !inputIds.contains(id))
+        .forEach(dataSinkService::deleteById);
+
+    for (DataSinkInputDTO sinkInput : dataSinks) {
+      sinkInput.setPipelineId(pipelineId);
+      sinkInput.setDataSetId(dataSetId);
+      if (sinkInput.getId() == null) {
+        dataSinkService.create(sinkInput);
+      } else {
+        dataSinkService.update(sinkInput.getId(), sinkInput);
+      }
+    }
+
+    return saved;
+  }
+
   private void validateDataSourceLinkable(DataSource dataSource) {
     if (dataSource.getDataSourceStatus() != DataSourceStatus.AVAILABLE) {
       throw new InvalidInputException(
@@ -167,7 +215,7 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
         .filter(result -> !result.getId().equals(entity.getId()))
         .findFirst()
         .ifPresent(
-            existing -> {
+            _ -> {
               throw new UniqueConstraintViolationException(
                   Pipeline.class.getSimpleName(),
                   "name",

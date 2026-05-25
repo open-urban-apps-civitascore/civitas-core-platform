@@ -1,6 +1,8 @@
 package de.civitascore.portal.model.output;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -14,6 +16,6 @@ public class PipelineOutputDTO extends BaseOutputDTO {
   private String name;
   private String description;
   private Map<String, Object> styles;
-  private Long[] persistences;
+  private List<DataSinkOutputDTO> dataSinks = new ArrayList<>();
   private Map<String, Object> model;
 }

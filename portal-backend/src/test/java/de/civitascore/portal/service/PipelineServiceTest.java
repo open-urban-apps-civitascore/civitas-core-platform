@@ -3,28 +3,37 @@ package de.civitascore.portal.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.PipelineMapper;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.PipelineInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -36,6 +45,8 @@ class PipelineServiceTest {
   @Mock private PipelineMapper pipelineMapper;
   @Mock private DataSetRepository dataSetRepository;
   @Mock private DataSourceRepository dataSourceRepository;
+  @Mock private DataSinkService dataSinkService;
+  @Mock private DataSinkRepository dataSinkRepository;
 
   @InjectMocks private PipelineService pipelineService;
 
@@ -107,6 +118,7 @@ class PipelineServiceTest {
           .thenReturn(List.of(availableDataSource));
       when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
       when(pipelineRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+      when(dataSinkRepository.findByPipelineId(any())).thenReturn(List.of());
 
       Pipeline result = pipelineService.create(input);
 
@@ -137,10 +149,132 @@ class PipelineServiceTest {
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
       when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
       when(pipelineRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+      when(dataSinkRepository.findByPipelineId(any())).thenReturn(List.of());
 
       Pipeline result = pipelineService.create(input);
 
       assertThat(result).isNotNull();
+    }
+  }
+
+  @Nested
+  @DisplayName("Nested DataSink CRUD")
+  class NestedDataSinkCrud {
+
+    private DataSet dataSet(UUID id) {
+      DataSet ds = new DataSet();
+      ds.setId(id);
+      ds.setDataSetStatus(DataSetStatus.DRAFT);
+      return ds;
+    }
+
+    private Pipeline pipeline(UUID id, DataSet dataSet) {
+      Pipeline p = new Pipeline();
+      p.setId(id);
+      p.setName("test-pipeline");
+      p.setDataSet(dataSet);
+      p.setVersion(1L);
+      return p;
+    }
+
+    static Stream<List<DataSinkInputDTO>> emptyAndNullDataSinks() {
+      return Stream.of(List.of(), null);
+    }
+
+    @Test
+    @DisplayName("Creating a pipeline with a new DataSink delegates to DataSinkService.create")
+    void createPipeline_withNewDataSink_callsDataSinkServiceCreate() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID pipelineId = UUID.randomUUID();
+      DataSet dataSet = dataSet(dataSetId);
+
+      DataSinkInputDTO sinkInput = new DataSinkInputDTO();
+      sinkInput.setDataSinkType(DataSinkType.FROST);
+      sinkInput.setConfiguration(Map.of());
+
+      PipelineInputDTO input = new PipelineInputDTO();
+      input.setName("test-pipeline");
+      input.setDataSetId(dataSetId);
+      input.setDataSinks(List.of(sinkInput));
+
+      Pipeline pipelineEntity = pipeline(pipelineId, dataSet);
+
+      when(pipelineMapper.toEntity(any())).thenReturn(pipelineEntity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
+      when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
+      when(pipelineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of());
+
+      pipelineService.create(input);
+
+      verify(dataSinkService).create(sinkInput);
+      assertThat(sinkInput.getPipelineId()).isEqualTo(pipelineId);
+      assertThat(sinkInput.getDataSetId()).isEqualTo(dataSetId);
+    }
+
+    @ParameterizedTest(name = "dataSinks={0}")
+    @MethodSource("emptyAndNullDataSinks")
+    @DisplayName("Updating a pipeline with empty or null dataSinks deletes existing DataSinks")
+    void updatePipeline_withEmptyOrNullDataSinks_deletesExisting(List<DataSinkInputDTO> dataSinks) {
+      UUID dataSetId = UUID.randomUUID();
+      UUID pipelineId = UUID.randomUUID();
+      UUID existingSinkId = UUID.randomUUID();
+      DataSet dataSet = dataSet(dataSetId);
+
+      Pipeline existing = pipeline(pipelineId, dataSet);
+
+      PipelineInputDTO input = new PipelineInputDTO();
+      input.setName("test-pipeline");
+      input.setDataSetId(dataSetId);
+      input.setDataSinks(dataSinks);
+
+      DataSink existingSink = new DataSink();
+      existingSink.setId(existingSinkId);
+
+      when(pipelineRepository.findById(pipelineId)).thenReturn(Optional.of(existing));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
+      when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
+      when(pipelineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of(existingSink));
+
+      pipelineService.update(pipelineId, input);
+
+      verify(dataSinkService).deleteById(existingSinkId);
+    }
+
+    @Test
+    @DisplayName(
+        "Updating a pipeline with existing DataSink ID delegates to DataSinkService.update")
+    void updatePipeline_withExistingDataSinkId_callsDataSinkServiceUpdate() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID pipelineId = UUID.randomUUID();
+      UUID existingSinkId = UUID.randomUUID();
+      DataSet dataSet = dataSet(dataSetId);
+
+      Pipeline existing = pipeline(pipelineId, dataSet);
+
+      DataSinkInputDTO sinkInput = new DataSinkInputDTO();
+      sinkInput.setId(existingSinkId);
+      sinkInput.setDataSinkType(DataSinkType.FROST);
+      sinkInput.setConfiguration(Map.of());
+
+      PipelineInputDTO input = new PipelineInputDTO();
+      input.setName("test-pipeline");
+      input.setDataSetId(dataSetId);
+      input.setDataSinks(List.of(sinkInput));
+
+      DataSink existingSink = new DataSink();
+      existingSink.setId(existingSinkId);
+
+      when(pipelineRepository.findById(pipelineId)).thenReturn(Optional.of(existing));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
+      when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
+      when(pipelineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of(existingSink));
+
+      pipelineService.update(pipelineId, input);
+
+      verify(dataSinkService).update(existingSinkId, sinkInput);
     }
   }
 }
