@@ -38,6 +38,7 @@ public interface DataSinkMapper extends DtoMapper<DataSinkInputDTO, DataSinkOutp
   DataSinkInputDTO toInput(DataSink entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
+  @Mapping(target = "id", ignore = true)
   @Mapping(target = "dataSet", ignore = true)
   @Mapping(target = "pipeline", ignore = true)
   @Override
