@@ -28,7 +28,7 @@
       "description": "Backend dependencies (Spring Boot)",
       "matchFileNames": ["portal-backend/**"],
       "commitMessagePrefix": "chore(backend):",
-      "reviewers": ["franklex", "jonasfrz", "lukas.wydra"],
+      "reviewers": ["franklex", "fm41", "jonasfrz", "lukas.wydra"],
       "reviewersSampleSize": 1,
       "addLabels": ["cop backend", "team data mgmt"]
     },
