@@ -12,6 +12,7 @@ package de.civitascore.configadapter.flowable.bpmn;
 import java.util.List;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.repository.Deployment;
+import org.flowable.engine.repository.DeploymentBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +39,7 @@ public final class BpmnProcessDeployer {
    * @param repositoryService the Flowable repository service
    */
   public static void deploy(RepositoryService repositoryService) {
-    var deploymentBuilder =
+    DeploymentBuilder deploymentBuilder =
         repositoryService
             .createDeployment()
             .name("config-adapter-saga-processes")

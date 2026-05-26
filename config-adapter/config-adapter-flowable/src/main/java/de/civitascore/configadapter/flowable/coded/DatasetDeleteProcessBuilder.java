@@ -9,122 +9,57 @@
  */
 package de.civitascore.configadapter.flowable.coded;
 
-import static de.civitascore.configadapter.flowable.coded.ProcessBuilderUtils.conditionalFlow;
-import static de.civitascore.configadapter.flowable.coded.ProcessBuilderUtils.errorBoundary;
-import static de.civitascore.configadapter.flowable.coded.ProcessBuilderUtils.flow;
-import static de.civitascore.configadapter.flowable.coded.ProcessBuilderUtils.resultPublishTask;
-import static de.civitascore.configadapter.flowable.coded.ProcessBuilderUtils.sagaStep;
-
-import org.flowable.bpmn.model.BoundaryEvent;
 import org.flowable.bpmn.model.BpmnModel;
 import org.flowable.bpmn.model.EndEvent;
 import org.flowable.bpmn.model.ExclusiveGateway;
-import org.flowable.bpmn.model.Process;
 import org.flowable.bpmn.model.ServiceTask;
 import org.flowable.bpmn.model.StartEvent;
 
 /**
  * Builds the Dataset Delete saga process programmatically. Reverse order (Redpanda → APISIX →
- * FROST), best-effort: on failure, continue to next step. No compensation. Produces identical
+ * FROST), best-effort: on failure, continue to next step. No compensation. Produces equivalent
  * behavior to {@code dataset-delete.bpmn}.
  */
 public final class DatasetDeleteProcessBuilder {
 
-  private static final String STEP_DELETE_ROUTE = "delete-route";
-  private static final String STEP_DELETE_PROJECT = "delete-project";
-
   private DatasetDeleteProcessBuilder() {}
 
   public static BpmnModel build() {
-    BpmnModel model = new BpmnModel();
+    SagaProcessBuilder saga =
+        SagaProcessBuilder.create("dataset-delete", "Dataset Delete Saga (Coded)");
 
-    Process process = new Process();
-    process.setId("dataset-delete");
-    process.setName("Dataset Delete Saga (Coded)");
-    process.setExecutable(true);
-    model.addProcess(process);
+    StartEvent start = saga.startEvent("start");
+    ExclusiveGateway pipelineGw =
+        saga.exclusiveGateway(ProcessBuilderUtils.PIPELINE_GATEWAY_ID, "Has Pipelines?");
+    SagaStepRef redpanda =
+        saga.sagaStep("delete-pipelines", "Delete Pipelines", "redpanda", "DELETE_PIPELINES");
+    SagaStepRef apisix =
+        saga.sagaStep("delete-route", "Delete APISIX Route", "apisix", "DELETE_ROUTE");
+    SagaStepRef frost =
+        saga.sagaStep("delete-project", "Delete FROST Project", "frost", "DELETE_PROJECT");
 
-    StartEvent start = new StartEvent();
-    start.setId("start");
-    process.addFlowElement(start);
+    ExclusiveGateway resultGw =
+        saga.exclusiveGateway(ProcessBuilderUtils.RESULT_GATEWAY_ID, "Has Errors?");
+    ServiceTask publishOk = saga.publishResult(ProcessBuilderUtils.PUBLISH_SUCCESS_ID, "success");
+    ServiceTask publishFail =
+        saga.publishResult(ProcessBuilderUtils.PUBLISH_FAILURE_ID, "failure", false);
+    EndEvent end = saga.endEvent("end");
 
-    ExclusiveGateway gateway = new ExclusiveGateway();
-    gateway.setId(ProcessBuilderUtils.PIPELINE_GATEWAY_ID);
-    gateway.setName("Has Pipelines?");
-    process.addFlowElement(gateway);
+    // Happy path
+    saga.flow(start, pipelineGw);
+    saga.flow(pipelineGw, redpanda.task()).when("${hasPipelines == true}");
+    saga.flow(pipelineGw, apisix.task()).when("${hasPipelines == false}");
+    saga.flow(redpanda.task(), apisix.task(), frost.task(), resultGw);
+    saga.flow(resultGw, publishFail).when("${execution.getVariable('sagaError') != null}");
+    saga.flow(resultGw, publishOk).asDefault();
+    saga.flow(publishOk, end);
+    saga.flow(publishFail, end);
 
-    ServiceTask redpanda =
-        sagaStep("delete-pipelines", "Delete Pipelines", "redpanda", "DELETE_PIPELINES");
-    process.addFlowElement(redpanda);
-    BoundaryEvent redpandaError = errorBoundary("redpanda-error", redpanda);
-    process.addFlowElement(redpandaError);
+    // Best-effort: error on any step continues to the next
+    saga.errorFlow(redpanda, apisix.task());
+    saga.errorFlow(apisix, frost.task());
+    saga.errorFlow(frost, resultGw);
 
-    ServiceTask apisix =
-        sagaStep(STEP_DELETE_ROUTE, "Delete APISIX Route", "apisix", "DELETE_ROUTE");
-    process.addFlowElement(apisix);
-    BoundaryEvent apisixError = errorBoundary("apisix-error", apisix);
-    process.addFlowElement(apisixError);
-
-    ServiceTask frost =
-        sagaStep(STEP_DELETE_PROJECT, "Delete FROST Project", "frost", "DELETE_PROJECT");
-    process.addFlowElement(frost);
-    BoundaryEvent frostError = errorBoundary("frost-error", frost);
-    process.addFlowElement(frostError);
-
-    process.addFlowElement(resultPublishTask(ProcessBuilderUtils.PUBLISH_SUCCESS_ID, "success"));
-    process.addFlowElement(
-        resultPublishTask(ProcessBuilderUtils.PUBLISH_FAILURE_ID, "failure", false));
-
-    ExclusiveGateway resultGateway = new ExclusiveGateway();
-    resultGateway.setId(ProcessBuilderUtils.RESULT_GATEWAY_ID);
-    resultGateway.setName("Has Errors?");
-    resultGateway.setDefaultFlow("flow-result-success");
-    process.addFlowElement(resultGateway);
-
-    EndEvent end = new EndEvent();
-    end.setId("end");
-    process.addFlowElement(end);
-
-    process.addFlowElement(flow("flow-start", "start", ProcessBuilderUtils.PIPELINE_GATEWAY_ID));
-    process.addFlowElement(
-        conditionalFlow(
-            "flow-gw-redpanda",
-            ProcessBuilderUtils.PIPELINE_GATEWAY_ID,
-            "delete-pipelines",
-            "${hasPipelines == true}"));
-    process.addFlowElement(
-        conditionalFlow(
-            "flow-gw-skip",
-            ProcessBuilderUtils.PIPELINE_GATEWAY_ID,
-            STEP_DELETE_ROUTE,
-            "${hasPipelines == false}"));
-    process.addFlowElement(flow("flow-redpanda-apisix", "delete-pipelines", STEP_DELETE_ROUTE));
-    process.addFlowElement(flow("flow-apisix-frost", STEP_DELETE_ROUTE, STEP_DELETE_PROJECT));
-    process.addFlowElement(
-        flow("flow-frost-result", STEP_DELETE_PROJECT, ProcessBuilderUtils.RESULT_GATEWAY_ID));
-
-    process.addFlowElement(
-        conditionalFlow(
-            "flow-result-failure",
-            ProcessBuilderUtils.RESULT_GATEWAY_ID,
-            ProcessBuilderUtils.PUBLISH_FAILURE_ID,
-            "${execution.getVariable('sagaError') != null}"));
-    process.addFlowElement(
-        flow(
-            "flow-result-success",
-            ProcessBuilderUtils.RESULT_GATEWAY_ID,
-            ProcessBuilderUtils.PUBLISH_SUCCESS_ID));
-
-    process.addFlowElement(
-        flow("flow-publish-success-end", ProcessBuilderUtils.PUBLISH_SUCCESS_ID, "end"));
-    process.addFlowElement(
-        flow("flow-publish-failure-end", ProcessBuilderUtils.PUBLISH_FAILURE_ID, "end"));
-
-    process.addFlowElement(flow("flow-redpanda-error", "redpanda-error", STEP_DELETE_ROUTE));
-    process.addFlowElement(flow("flow-apisix-error", "apisix-error", STEP_DELETE_PROJECT));
-    process.addFlowElement(
-        flow("flow-frost-error", "frost-error", ProcessBuilderUtils.RESULT_GATEWAY_ID));
-
-    return model;
+    return saga.build();
   }
 }

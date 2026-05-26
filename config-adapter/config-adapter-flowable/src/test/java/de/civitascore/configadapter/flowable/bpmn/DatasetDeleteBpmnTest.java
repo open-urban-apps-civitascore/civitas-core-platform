@@ -75,7 +75,9 @@ class DatasetDeleteBpmnTest {
 
   @Test
   void shouldCompleteHappyPathWithPipelines() {
-    stubAllDeleteSuccess();
+    stubRedpandaDeleteSuccess();
+    stubApisixDeleteSuccess();
+    stubFrostDeleteSuccess();
 
     ProcessInstance instance = startProcess(true);
     executeAllJobs();
@@ -170,12 +172,6 @@ class DatasetDeleteBpmnTest {
 
   private void assertProcessFinished(String processInstanceId) {
     FlowableTestSupport.assertProcessFinished(historyService, processInstanceId);
-  }
-
-  private void stubAllDeleteSuccess() {
-    stubRedpandaDeleteSuccess();
-    stubApisixDeleteSuccess();
-    stubFrostDeleteSuccess();
   }
 
   private void stubRedpandaDeleteSuccess() {

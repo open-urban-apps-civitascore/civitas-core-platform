@@ -27,6 +27,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
+import org.flowable.engine.runtime.ProcessInstance;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -136,15 +137,9 @@ public class FlowableTriggerConsumer {
         // Transient error — seek ALL partitions to their last safe offset
         LOG.error(
             "Failed to process trigger (transient error): {}", Encode.forJava(e.getMessage()), e);
-        seekToRecovery(recoveryOffsets);
+        recoveryOffsets.forEach(kafkaConsumer::seek);
         return;
       }
-    }
-  }
-
-  private void seekToRecovery(Map<TopicPartition, Long> recoveryOffsets) {
-    for (var entry : recoveryOffsets.entrySet()) {
-      kafkaConsumer.seek(entry.getKey(), entry.getValue());
     }
   }
 
@@ -212,7 +207,8 @@ public class FlowableTriggerConsumer {
     // Always derive — never trust external payload for this control flag
     variables.put("hasPipelines", deriveHasPipelines(trigger));
 
-    var instance = runtimeService.startProcessInstanceByKey(processKey, businessKey, variables);
+    ProcessInstance instance =
+        runtimeService.startProcessInstanceByKey(processKey, businessKey, variables);
 
     LOG.info(
         "Started Flowable process: type={}, datasetId={}, processKey={}, instanceId={}",

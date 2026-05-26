@@ -9,134 +9,64 @@
  */
 package de.civitascore.configadapter.flowable.coded;
 
-import static de.civitascore.configadapter.flowable.coded.ProcessBuilderUtils.compensationStep;
-import static de.civitascore.configadapter.flowable.coded.ProcessBuilderUtils.conditionalFlow;
-import static de.civitascore.configadapter.flowable.coded.ProcessBuilderUtils.errorBoundary;
-import static de.civitascore.configadapter.flowable.coded.ProcessBuilderUtils.flow;
-import static de.civitascore.configadapter.flowable.coded.ProcessBuilderUtils.resultPublishTask;
-import static de.civitascore.configadapter.flowable.coded.ProcessBuilderUtils.sagaStep;
-
-import org.flowable.bpmn.model.BoundaryEvent;
 import org.flowable.bpmn.model.BpmnModel;
 import org.flowable.bpmn.model.EndEvent;
 import org.flowable.bpmn.model.ExclusiveGateway;
-import org.flowable.bpmn.model.Process;
 import org.flowable.bpmn.model.ServiceTask;
 import org.flowable.bpmn.model.StartEvent;
 
 /**
  * Builds the Dataset Update saga process programmatically. Same structure as Create but with
- * UPDATE/RESTORE operations. Produces identical behavior to {@code dataset-update.bpmn}.
+ * UPDATE/RESTORE operations. Produces equivalent behavior to {@code dataset-update.bpmn}.
  */
 public final class DatasetUpdateProcessBuilder {
-
-  private static final String STEP_UPDATE_PROJECT = "update-project";
-  private static final String STEP_UPDATE_ROUTE = "update-route";
 
   private DatasetUpdateProcessBuilder() {}
 
   public static BpmnModel build() {
-    BpmnModel model = new BpmnModel();
+    SagaProcessBuilder saga =
+        SagaProcessBuilder.create("dataset-update", "Dataset Update Saga (Coded)");
 
-    Process process = new Process();
-    process.setId("dataset-update");
-    process.setName("Dataset Update Saga (Coded)");
-    process.setExecutable(true);
-    model.addProcess(process);
+    StartEvent start = saga.startEvent("start");
+    SagaStepRef frost =
+        saga.sagaStep("update-project", "Update FROST Project", "frost", "UPDATE_PROJECT");
+    SagaStepRef apisix =
+        saga.sagaStep("update-route", "Update APISIX Route", "apisix", "UPDATE_ROUTE");
+    ExclusiveGateway pipelineGw = saga.exclusiveGateway(ProcessBuilderUtils.PIPELINE_GATEWAY_ID);
+    SagaStepRef redpanda =
+        saga.sagaStep("update-pipelines", "Update Pipelines", "redpanda", "UPDATE_PIPELINES");
 
-    StartEvent start = new StartEvent();
-    start.setId("start");
-    process.addFlowElement(start);
+    // Two FROST compensation tasks (after-apisix, after-redpanda) currently delegate to the same
+    // adapter operation but are kept as distinct activities so the two error paths remain visually
+    // separate in the BPMN diagram and can diverge later (e.g. richer rollback for the redpanda
+    // case) without restructuring the flow.
+    ServiceTask compFrostAfterApisix =
+        saga.compensation("compensate-frost-after-apisix", frost, "RESTORE_PROJECT");
+    ServiceTask compApisixAfterRedpanda =
+        saga.compensation("compensate-apisix-after-redpanda", apisix, "RESTORE_ROUTE");
+    ServiceTask compFrostAfterRedpanda =
+        saga.compensation("compensate-frost-after-redpanda", frost, "RESTORE_PROJECT");
 
-    ServiceTask frost =
-        sagaStep(STEP_UPDATE_PROJECT, "Update FROST Project", "frost", "UPDATE_PROJECT");
-    process.addFlowElement(frost);
-    BoundaryEvent frostError = errorBoundary("frost-error", frost);
-    process.addFlowElement(frostError);
+    ServiceTask publishOk = saga.publishResult(ProcessBuilderUtils.PUBLISH_SUCCESS_ID, "success");
+    ServiceTask publishFail = saga.publishResult(ProcessBuilderUtils.PUBLISH_FAILURE_ID, "failure");
+    EndEvent end = saga.endEvent("end");
+    EndEvent errorEnd = saga.endEvent("error-end", "Saga Failed");
 
-    ServiceTask apisix =
-        sagaStep(STEP_UPDATE_ROUTE, "Update APISIX Route", "apisix", "UPDATE_ROUTE");
-    process.addFlowElement(apisix);
-    BoundaryEvent apisixError = errorBoundary("apisix-error", apisix);
-    process.addFlowElement(apisixError);
+    // Happy path
+    saga.flow(start, frost.task(), apisix.task(), pipelineGw);
+    saga.flow(pipelineGw, redpanda.task()).when("${hasPipelines == true}");
+    saga.flow(pipelineGw, publishOk).when("${hasPipelines == false}");
+    saga.flow(redpanda.task(), publishOk);
+    saga.flow(publishOk, end);
 
-    ExclusiveGateway gateway = new ExclusiveGateway();
-    gateway.setId(ProcessBuilderUtils.PIPELINE_GATEWAY_ID);
-    process.addFlowElement(gateway);
+    // Error/compensation paths
+    saga.errorFlow(frost, publishFail);
+    saga.errorFlow(apisix, compFrostAfterApisix);
+    saga.flow(compFrostAfterApisix, publishFail);
+    saga.errorFlow(redpanda, compApisixAfterRedpanda);
+    saga.flow(compApisixAfterRedpanda, compFrostAfterRedpanda, publishFail);
+    saga.flow(publishFail, errorEnd);
 
-    ServiceTask redpanda =
-        sagaStep("update-pipelines", "Update Pipelines", "redpanda", "UPDATE_PIPELINES");
-    process.addFlowElement(redpanda);
-    BoundaryEvent redpandaError = errorBoundary("redpanda-error", redpanda);
-    process.addFlowElement(redpandaError);
-
-    process.addFlowElement(
-        compensationStep(
-            "compensate-frost-after-apisix", "frost", "RESTORE_PROJECT", STEP_UPDATE_PROJECT));
-    process.addFlowElement(
-        compensationStep(
-            "compensate-apisix-after-redpanda", "apisix", "RESTORE_ROUTE", STEP_UPDATE_ROUTE));
-    process.addFlowElement(
-        compensationStep(
-            "compensate-frost-after-redpanda", "frost", "RESTORE_PROJECT", STEP_UPDATE_PROJECT));
-
-    process.addFlowElement(resultPublishTask(ProcessBuilderUtils.PUBLISH_SUCCESS_ID, "success"));
-    process.addFlowElement(resultPublishTask(ProcessBuilderUtils.PUBLISH_FAILURE_ID, "failure"));
-
-    EndEvent end = new EndEvent();
-    end.setId("end");
-    process.addFlowElement(end);
-
-    EndEvent errorEnd = new EndEvent();
-    errorEnd.setId("error-end");
-    errorEnd.setName("Saga Failed");
-    process.addFlowElement(errorEnd);
-
-    process.addFlowElement(flow("flow-start", "start", STEP_UPDATE_PROJECT));
-    process.addFlowElement(flow("flow-frost-apisix", STEP_UPDATE_PROJECT, STEP_UPDATE_ROUTE));
-    process.addFlowElement(
-        flow("flow-apisix-gateway", STEP_UPDATE_ROUTE, ProcessBuilderUtils.PIPELINE_GATEWAY_ID));
-    process.addFlowElement(
-        conditionalFlow(
-            "flow-gw-redpanda",
-            ProcessBuilderUtils.PIPELINE_GATEWAY_ID,
-            "update-pipelines",
-            "${hasPipelines == true}"));
-    process.addFlowElement(
-        conditionalFlow(
-            "flow-gw-skip",
-            ProcessBuilderUtils.PIPELINE_GATEWAY_ID,
-            ProcessBuilderUtils.PUBLISH_SUCCESS_ID,
-            "${hasPipelines == false}"));
-    process.addFlowElement(
-        flow("flow-redpanda-success", "update-pipelines", ProcessBuilderUtils.PUBLISH_SUCCESS_ID));
-    process.addFlowElement(
-        flow("flow-publish-success-end", ProcessBuilderUtils.PUBLISH_SUCCESS_ID, "end"));
-
-    process.addFlowElement(
-        flow("flow-frost-error", "frost-error", ProcessBuilderUtils.PUBLISH_FAILURE_ID));
-    process.addFlowElement(
-        flow("flow-apisix-error", "apisix-error", "compensate-frost-after-apisix"));
-    process.addFlowElement(
-        flow(
-            "flow-comp-frost-after-apisix",
-            "compensate-frost-after-apisix",
-            ProcessBuilderUtils.PUBLISH_FAILURE_ID));
-    process.addFlowElement(
-        flow("flow-redpanda-error", "redpanda-error", "compensate-apisix-after-redpanda"));
-    process.addFlowElement(
-        flow(
-            "flow-comp-apisix",
-            "compensate-apisix-after-redpanda",
-            "compensate-frost-after-redpanda"));
-    process.addFlowElement(
-        flow(
-            "flow-comp-frost",
-            "compensate-frost-after-redpanda",
-            ProcessBuilderUtils.PUBLISH_FAILURE_ID));
-    process.addFlowElement(
-        flow("flow-publish-failure-end", ProcessBuilderUtils.PUBLISH_FAILURE_ID, "error-end"));
-
-    return model;
+    return saga.build();
   }
 }

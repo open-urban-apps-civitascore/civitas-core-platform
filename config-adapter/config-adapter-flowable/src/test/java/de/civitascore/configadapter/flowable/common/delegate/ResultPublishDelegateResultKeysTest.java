@@ -11,7 +11,6 @@ package de.civitascore.configadapter.flowable.common.delegate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -109,11 +108,11 @@ class ResultPublishDelegateResultKeysTest {
         "https://gateway.example.com/datasets/ds-1",
         results.get("publicUrl"),
         "publicUrl from APISIX handler must be in published results");
-    assertNotNull(results.get("projectId"));
-    assertNotNull(results.get("routeId"));
-    assertNotNull(results.get("baseUrl"));
-    assertNotNull(results.get("sagaId"));
-    assertNotNull(results.get("datasetId"));
+    assertEquals("p1", results.get("projectId"));
+    assertEquals("r1", results.get("routeId"));
+    assertEquals("http://frost/v1.1/Projects(1)", results.get("baseUrl"));
+    assertEquals("saga-1", results.get("sagaId"));
+    assertEquals("ds-1", results.get("datasetId"));
 
     assertFalse(
         results.containsKey("datasetName"), "Trigger field 'datasetName' must not be in results");

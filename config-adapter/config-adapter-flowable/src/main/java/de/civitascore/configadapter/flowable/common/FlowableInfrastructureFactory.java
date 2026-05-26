@@ -23,6 +23,17 @@ import org.apache.kafka.common.serialization.StringSerializer;
 /**
  * Creates infrastructure dependencies (DataSource, Kafka clients) for the Flowable orchestrator.
  * Separated from {@link FlowableSagaOrchestrator} to follow SRP.
+ *
+ * <p>Configuration properties (all may be overridden via env vars, dots → underscores, uppercase):
+ *
+ * <ul>
+ *   <li>{@code flowable.jdbc.url} — JDBC URL for the Flowable database (required, no default).
+ *   <li>{@code flowable.jdbc.username} — DB user (required, no default).
+ *   <li>{@code flowable.jdbc.password} — DB password (required, no default).
+ *   <li>{@code kafka.bootstrap.servers} — Kafka bootstrap servers, default {@code localhost:9092}.
+ *   <li>{@code flowable.kafka.group.id} — Consumer group id, default {@code
+ *       config-adapter-flowable-group}.
+ * </ul>
  */
 final class FlowableInfrastructureFactory {
 

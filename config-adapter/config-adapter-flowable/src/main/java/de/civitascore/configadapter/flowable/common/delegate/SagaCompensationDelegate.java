@@ -18,7 +18,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.flowable.common.engine.api.delegate.Expression;
 import org.flowable.engine.delegate.DelegateExecution;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
@@ -31,14 +30,10 @@ import org.slf4j.LoggerFactory;
  * <p>Best-effort: does NOT throw on compensation failure. Instead, errors are collected in a {@code
  * compensationErrors} process variable for final reporting.
  */
-public class SagaCompensationDelegate extends AbstractSagaDelegate {
+public class SagaCompensationDelegate extends AbstractAdapterCallDelegate {
 
   private static final Logger LOG = LoggerFactory.getLogger(SagaCompensationDelegate.class);
   private static final String TYPE_COMPENSATION_COMPLETED = "COMPENSATION_COMPLETED";
-
-  private Expression adapterName;
-  private Expression operation;
-  private Expression stepId;
 
   @Override
   @SuppressWarnings("PMD.CloseResource") // Handler lifecycle managed by ServiceLoader, not callers
@@ -114,17 +109,5 @@ public class SagaCompensationDelegate extends AbstractSagaDelegate {
     }
     errors.add(Map.of("step", step, "adapter", adapter, "error", error));
     execution.setVariable("compensationErrors", errors);
-  }
-
-  public void setAdapterName(Expression adapterName) {
-    this.adapterName = adapterName;
-  }
-
-  public void setOperation(Expression operation) {
-    this.operation = operation;
-  }
-
-  public void setStepId(Expression stepId) {
-    this.stepId = stepId;
   }
 }

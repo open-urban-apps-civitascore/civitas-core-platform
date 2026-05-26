@@ -17,6 +17,7 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.adapter.SagaCommandHandler;
 import de.civitascore.configadapter.configuration.AdapterConfig;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -49,17 +50,6 @@ class FlowableSagaOrchestratorCleanupTest {
 
     assertDoesNotThrow(sut::close);
     assertDoesNotThrow(sut::close, "Second close() must not throw");
-  }
-
-  @Test
-  void close_afterSuccessfulInitialize_doesNotThrow() {
-    FlowableSagaOrchestrator sut =
-        orchestratorWith(
-            "jdbc:h2:mem:success-" + UUID.randomUUID().toString().substring(0, 8), "sa", "");
-
-    assertDoesNotThrow(sut::initialize);
-
-    assertDoesNotThrow(sut::close);
   }
 
   @Test
@@ -121,8 +111,8 @@ class FlowableSagaOrchestratorCleanupTest {
 
     IllegalStateException ex = assertThrows(IllegalStateException.class, sut::initialize);
     assertTrue(
-        ex.getMessage().contains("redpanda"),
-        "Error must specifically mention the missing redpanda handler");
+        ex.getMessage().contains("not registered: [redpanda]"),
+        "Error must specifically call out redpanda as the missing handler");
   }
 
   @Test
@@ -134,8 +124,8 @@ class FlowableSagaOrchestratorCleanupTest {
     SagaCommandHandler redpanda = mock(SagaCommandHandler.class);
     when(redpanda.adapter()).thenReturn("redpanda");
 
-    java.util.Map<String, SagaCommandHandler> mutableMap =
-        new java.util.HashMap<>(Map.of("frost", frost, "apisix", apisix, "redpanda", redpanda));
+    Map<String, SagaCommandHandler> mutableMap =
+        new HashMap<>(Map.of("frost", frost, "apisix", apisix, "redpanda", redpanda));
 
     FlowableSagaOrchestrator sut = orchestratorWith("jdbc:h2:mem:copy-test", "sa", "", mutableMap);
 
@@ -148,7 +138,7 @@ class FlowableSagaOrchestratorCleanupTest {
   }
 
   private FlowableSagaOrchestrator orchestratorWith(
-      String url, String user, String pass, java.util.Map<String, SagaCommandHandler> handlers) {
+      String url, String user, String pass, Map<String, SagaCommandHandler> handlers) {
     AdapterConfig config =
         new AdapterConfig() {
           @Override

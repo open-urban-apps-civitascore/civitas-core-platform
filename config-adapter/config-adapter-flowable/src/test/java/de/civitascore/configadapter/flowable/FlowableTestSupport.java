@@ -19,7 +19,9 @@ import de.civitascore.configadapter.adapter.SagaCommandHandler;
 import de.civitascore.configadapter.flowable.common.FlowableEngineFactory;
 import de.civitascore.configadapter.flowable.common.SagaHandlerRegistry;
 import de.civitascore.configadapter.flowable.common.kafka.FlowableResultPublisher;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.flowable.common.engine.api.delegate.Expression;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.ManagementService;
@@ -40,8 +42,8 @@ public final class FlowableTestSupport {
    * Creates a test ProcessEngine with the given beans plus a no-op FlowableResultPublisher (if not
    * already present). Ensures ResultPublishDelegate doesn't throw in tests.
    */
-  public static ProcessEngine createTestEngine(java.util.Map<String, Object> beans) {
-    java.util.Map<String, Object> allBeans = new java.util.HashMap<>(beans);
+  public static ProcessEngine createTestEngine(Map<String, Object> beans) {
+    Map<String, Object> allBeans = new HashMap<>(beans);
     allBeans.putIfAbsent("resultPublisher", mock(FlowableResultPublisher.class));
     return FlowableEngineFactory.createWithH2(allBeans);
   }
@@ -114,11 +116,24 @@ public final class FlowableTestSupport {
         .toList();
   }
 
-  /** Creates a mock SagaCommandHandler for the given adapter name. */
+  /**
+   * Creates a mock SagaCommandHandler for the given adapter name, pre-stubbed with the field
+   * aliases the real adapter would declare. Keeps tests realistic — payload field renaming (e.g.
+   * baseUrl→upstreamUrl) happens just like in production.
+   */
   public static SagaCommandHandler mockHandler(String adapter) {
     SagaCommandHandler handler = mock(SagaCommandHandler.class);
     when(handler.adapter()).thenReturn(adapter);
+    when(handler.fieldAliases()).thenReturn(fieldAliasesFor(adapter));
     return handler;
+  }
+
+  private static Map<String, String> fieldAliasesFor(String adapter) {
+    return switch (adapter) {
+      case "apisix" -> Map.of("baseUrl", "upstreamUrl");
+      case "redpanda" -> Map.of("baseUrl", "targetUrl");
+      default -> Map.of();
+    };
   }
 
   /** Creates a SagaHandlerRegistry with the given handlers. */

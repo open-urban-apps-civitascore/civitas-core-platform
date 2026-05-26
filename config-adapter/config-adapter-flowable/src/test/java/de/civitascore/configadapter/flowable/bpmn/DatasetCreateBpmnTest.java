@@ -14,7 +14,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -50,12 +49,9 @@ class DatasetCreateBpmnTest {
 
   @BeforeEach
   void setUp() {
-    frostHandler = mock(SagaCommandHandler.class);
-    apisixHandler = mock(SagaCommandHandler.class);
-    redpandaHandler = mock(SagaCommandHandler.class);
-    when(frostHandler.adapter()).thenReturn("frost");
-    when(apisixHandler.adapter()).thenReturn("apisix");
-    when(redpandaHandler.adapter()).thenReturn("redpanda");
+    frostHandler = FlowableTestSupport.mockHandler("frost");
+    apisixHandler = FlowableTestSupport.mockHandler("apisix");
+    redpandaHandler = FlowableTestSupport.mockHandler("redpanda");
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
@@ -124,7 +120,6 @@ class DatasetCreateBpmnTest {
 
     assertProcessFinished(instance.getId());
 
-    verify(frostHandler, times(2)).handle(any());
     ArgumentCaptor<SagaCommandMessage> captor = ArgumentCaptor.forClass(SagaCommandMessage.class);
     verify(frostHandler, times(2)).handle(captor.capture());
 

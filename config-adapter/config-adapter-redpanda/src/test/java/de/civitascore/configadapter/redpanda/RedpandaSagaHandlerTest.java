@@ -47,6 +47,14 @@ class RedpandaSagaHandlerTest {
     }
   }
 
+  @Test
+  @DisplayName("fieldAliases() declares baseUrl→targetUrl so the saga forwards FROST's baseUrl")
+  void fieldAliases_declaresBaseUrlToTargetUrl() {
+    try (RedpandaSagaHandler handler = createHandler()) {
+      assertEquals(Map.of("baseUrl", "targetUrl"), handler.fieldAliases());
+    }
+  }
+
   @Nested
   @DisplayName("DEPLOY_PIPELINES")
   class DeployPipelines {

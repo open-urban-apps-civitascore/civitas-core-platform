@@ -18,7 +18,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import org.flowable.common.engine.api.delegate.Expression;
 import org.flowable.engine.delegate.BpmnError;
 import org.flowable.engine.delegate.DelegateExecution;
 import org.flowable.engine.delegate.JavaDelegate;
@@ -35,7 +34,7 @@ import org.slf4j.LoggerFactory;
  * result/compensation data back as process variables. On handler failure, throws a {@link
  * BpmnError} to trigger BPMN compensation.
  */
-public class SagaStepDelegate extends AbstractSagaDelegate {
+public class SagaStepDelegate extends AbstractAdapterCallDelegate {
 
   private static final Logger LOG = LoggerFactory.getLogger(SagaStepDelegate.class);
   private static final String TYPE_STEP_COMPLETED = "STEP_COMPLETED";
@@ -45,10 +44,6 @@ public class SagaStepDelegate extends AbstractSagaDelegate {
 
   private static final Set<String> INTERNAL_VARIABLE_NAMES =
       Set.of("compensationErrors", "failedStep", "sagaError", "_resultKeys");
-
-  private Expression adapterName;
-  private Expression operation;
-  private Expression stepId;
 
   @Override
   @SuppressWarnings("PMD.CloseResource") // Handler lifecycle managed by ServiceLoader, not callers
@@ -61,7 +56,7 @@ public class SagaStepDelegate extends AbstractSagaDelegate {
     SagaCommandHandler handler = registry.getHandler(adapter);
 
     Map<String, Object> allVariables = execution.getVariables();
-    Map<String, Object> payload = buildPayload(allVariables, adapter);
+    Map<String, Object> payload = buildPayload(allVariables, handler);
     String saga = sagaIdFrom(allVariables, execution);
     SagaCommandMessage command =
         new SagaCommandMessage(
@@ -113,14 +108,25 @@ public class SagaStepDelegate extends AbstractSagaDelegate {
     }
   }
 
-  private Map<String, Object> buildPayload(Map<String, Object> allVariables, String adapter) {
+  private Map<String, Object> buildPayload(
+      Map<String, Object> allVariables, SagaCommandHandler handler) {
     Map<String, Object> payload = new HashMap<>();
     for (var entry : allVariables.entrySet()) {
       if (isPayloadVariable(entry.getKey())) {
         payload.put(entry.getKey(), entry.getValue());
       }
     }
-    AdapterFieldMappings.apply(payload, adapter);
+    // Adapters declare their own field aliases (e.g. APISIX renames baseUrl → upstreamUrl).
+    // Existing target keys win over aliased ones, so callers can override the adapter's default.
+    handler
+        .fieldAliases()
+        .forEach(
+            (source, target) -> {
+              Object value = payload.get(source);
+              if (value != null && !payload.containsKey(target)) {
+                payload.put(target, value);
+              }
+            });
     return payload;
   }
 
@@ -134,17 +140,5 @@ public class SagaStepDelegate extends AbstractSagaDelegate {
       }
     }
     return true;
-  }
-
-  public void setAdapterName(Expression adapterName) {
-    this.adapterName = adapterName;
-  }
-
-  public void setOperation(Expression operation) {
-    this.operation = operation;
-  }
-
-  public void setStepId(Expression stepId) {
-    this.stepId = stepId;
   }
 }

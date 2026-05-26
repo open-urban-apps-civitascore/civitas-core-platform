@@ -35,9 +35,9 @@ public final class CodedProcessDeployer {
             .createDeployment()
             .name("config-adapter-saga-processes-coded")
             .enableDuplicateFiltering()
-            .addBpmnModel("dataset-create-coded.bpmn20.xml", DatasetCreateProcessBuilder.build())
-            .addBpmnModel("dataset-update-coded.bpmn20.xml", DatasetUpdateProcessBuilder.build())
-            .addBpmnModel("dataset-delete-coded.bpmn20.xml", DatasetDeleteProcessBuilder.build())
+            .addBpmnModel("dataset-create-coded.bpmn", DatasetCreateProcessBuilder.build())
+            .addBpmnModel("dataset-update-coded.bpmn", DatasetUpdateProcessBuilder.build())
+            .addBpmnModel("dataset-delete-coded.bpmn", DatasetDeleteProcessBuilder.build())
             .deploy();
     LOG.info("Deployed 3 coded saga processes (deployment ID: {})", deployment.getId());
   }

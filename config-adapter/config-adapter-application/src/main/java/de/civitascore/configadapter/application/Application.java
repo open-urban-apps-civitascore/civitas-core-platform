@@ -13,6 +13,7 @@ import static java.util.Objects.requireNonNull;
 
 import de.civitascore.configadapter.configuration.AppConfig;
 import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.flowable.common.FlowableSagaOrchestrator;
 import de.civitascore.configadapter.messaging.EventConsumer;
 import de.civitascore.event.handler.kafka.KafkaSagaCommandConsumer;
 import java.util.List;
@@ -96,7 +97,7 @@ public class Application {
                 pair.triggerConsumer().start();
               });
 
-      sagaComponents.flowableOrchestrator().ifPresent(flowable -> flowable.start());
+      sagaComponents.flowableOrchestrator().ifPresent(FlowableSagaOrchestrator::start);
 
       sagaComponents.commandConsumer().ifPresent(KafkaSagaCommandConsumer::start);
 

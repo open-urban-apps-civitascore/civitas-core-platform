@@ -45,7 +45,7 @@ abstract class AbstractSagaDelegate implements JavaDelegate {
     return (SagaHandlerRegistry) config.getBeans().get("sagaHandlerRegistry");
   }
 
-  public void setSagaHandlerRegistry(SagaHandlerRegistry sagaHandlerRegistry) {
+  void setSagaHandlerRegistry(SagaHandlerRegistry sagaHandlerRegistry) {
     this.sagaHandlerRegistry = sagaHandlerRegistry;
   }
 }

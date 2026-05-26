@@ -66,7 +66,7 @@ class DatasetCreateCodedTest {
     processEngine
         .getRepositoryService()
         .createDeployment()
-        .addBpmnModel("dataset-create-coded.bpmn20.xml", DatasetCreateProcessBuilder.build())
+        .addBpmnModel("dataset-create-coded.bpmn", DatasetCreateProcessBuilder.build())
         .deploy();
   }
 

@@ -47,7 +47,6 @@ public class FlowableResultPublisher implements SagaResultPublisher {
     this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
   }
 
-  /** {@inheritDoc} */
   @Override
   public void publishCompleted(String sagaId, Map<String, Object> resultPayload) {
     var message = new HashMap<String, Object>();
@@ -61,7 +60,6 @@ public class FlowableResultPublisher implements SagaResultPublisher {
     LOG.info("Published SAGA_COMPLETED: sagaId={}", Encode.forJava(sagaId));
   }
 
-  /** {@inheritDoc} */
   @Override
   public void publishFailed(SagaFailure failure) {
     var message = new HashMap<String, Object>();
@@ -100,7 +98,6 @@ public class FlowableResultPublisher implements SagaResultPublisher {
     }
   }
 
-  /** {@inheritDoc} */
   @Override
   public void close() {
     producer.close();

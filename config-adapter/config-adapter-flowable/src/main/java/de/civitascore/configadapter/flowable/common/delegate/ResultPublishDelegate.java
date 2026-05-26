@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import org.flowable.common.engine.api.delegate.Expression;
 import org.flowable.engine.delegate.DelegateExecution;
+import org.flowable.engine.impl.cfg.ProcessEngineConfigurationImpl;
 import org.flowable.engine.impl.context.Context;
 
 /**
@@ -85,7 +86,7 @@ public class ResultPublishDelegate extends AbstractSagaDelegate {
   }
 
   private SagaResultPublisher resolvePublisher() {
-    var config = Context.getProcessEngineConfiguration();
+    ProcessEngineConfigurationImpl config = Context.getProcessEngineConfiguration();
     if (config == null || config.getBeans() == null) {
       return null;
     }

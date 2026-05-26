@@ -42,8 +42,11 @@ class FlowableInfrastructureFactoryTest {
                 "flowable.jdbc.url", "jdbc:h2:mem:test",
                 "flowable.jdbc.username", "user"));
 
-    assertThrows(
-        IllegalStateException.class, () -> FlowableInfrastructureFactory.createDataSource(config));
+    IllegalStateException ex =
+        assertThrows(
+            IllegalStateException.class,
+            () -> FlowableInfrastructureFactory.createDataSource(config));
+    assertTrue(ex.getMessage().contains("flowable.jdbc.password"));
   }
 
   @Test

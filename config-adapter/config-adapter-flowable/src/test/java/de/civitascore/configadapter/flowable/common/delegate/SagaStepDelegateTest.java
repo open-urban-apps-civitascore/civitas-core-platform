@@ -128,6 +128,7 @@ class SagaStepDelegateTest {
   void shouldApplyAdapterMappingBaseUrlToUpstreamUrlForApisix() {
     SagaCommandHandler apisixHandler = mock(SagaCommandHandler.class);
     when(apisixHandler.adapter()).thenReturn("apisix");
+    when(apisixHandler.fieldAliases()).thenReturn(Map.of("baseUrl", "upstreamUrl"));
     registry.register(apisixHandler);
 
     SagaStepDelegate apisixDelegate = new SagaStepDelegate();
@@ -159,6 +160,7 @@ class SagaStepDelegateTest {
   void shouldApplyAdapterMappingBaseUrlToTargetUrlForRedpanda() {
     SagaCommandHandler redpandaHandler = mock(SagaCommandHandler.class);
     when(redpandaHandler.adapter()).thenReturn("redpanda");
+    when(redpandaHandler.fieldAliases()).thenReturn(Map.of("baseUrl", "targetUrl"));
     registry.register(redpandaHandler);
 
     SagaStepDelegate redpandaDelegate = new SagaStepDelegate();

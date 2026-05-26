@@ -76,6 +76,11 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
   }
 
   @Override
+  public Map<String, String> fieldAliases() {
+    return Map.of("baseUrl", FIELD_TARGET_URL);
+  }
+
+  @Override
   protected void doInitialize(AdapterConfig config) {
     String baseUrl = getProperty("url", DEFAULT_URL);
     String masterKeyHex = getProperty("master-key", null);

@@ -20,6 +20,7 @@ import static org.mockito.Mockito.mock;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import de.civitascore.configadapter.apisix.ApisixSagaHandler;
+import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.flowable.bpmn.BpmnProcessDeployer;
 import de.civitascore.configadapter.flowable.coded.CodedProcessDeployer;
 import de.civitascore.configadapter.flowable.common.FlowableEngineFactory;
@@ -335,9 +336,8 @@ class DatasetCreateFlowableIT {
             });
   }
 
-  private de.civitascore.configadapter.configuration.AdapterConfig mapConfig(
-      Map<String, String> props) {
-    return new de.civitascore.configadapter.configuration.AdapterConfig() {
+  private AdapterConfig mapConfig(Map<String, String> props) {
+    return new AdapterConfig() {
       @Override
       public String getProperty(String key) {
         return props.get(key);

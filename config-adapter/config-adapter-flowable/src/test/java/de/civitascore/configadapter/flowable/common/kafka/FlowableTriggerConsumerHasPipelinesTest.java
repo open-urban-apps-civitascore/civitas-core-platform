@@ -72,7 +72,7 @@ class FlowableTriggerConsumerHasPipelinesTest {
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
     verify(runtimeService).startProcessInstanceByKey(anyString(), anyString(), captor.capture());
-    assertEquals(true, captor.getValue().get("hasPipelines"));
+    assertEquals(Boolean.TRUE, captor.getValue().get("hasPipelines"));
   }
 
   @Test
@@ -89,7 +89,7 @@ class FlowableTriggerConsumerHasPipelinesTest {
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
     verify(runtimeService).startProcessInstanceByKey(anyString(), anyString(), captor.capture());
-    assertEquals(false, captor.getValue().get("hasPipelines"));
+    assertEquals(Boolean.FALSE, captor.getValue().get("hasPipelines"));
   }
 
   @Test
@@ -106,7 +106,7 @@ class FlowableTriggerConsumerHasPipelinesTest {
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
     verify(runtimeService).startProcessInstanceByKey(anyString(), anyString(), captor.capture());
-    assertEquals(true, captor.getValue().get("hasPipelines"));
+    assertEquals(Boolean.TRUE, captor.getValue().get("hasPipelines"));
   }
 
   @Test
@@ -122,7 +122,7 @@ class FlowableTriggerConsumerHasPipelinesTest {
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
     verify(runtimeService).startProcessInstanceByKey(anyString(), anyString(), captor.capture());
-    assertEquals(false, captor.getValue().get("hasPipelines"));
+    assertEquals(Boolean.FALSE, captor.getValue().get("hasPipelines"));
   }
 
   @Test
@@ -140,6 +140,6 @@ class FlowableTriggerConsumerHasPipelinesTest {
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
     verify(runtimeService).startProcessInstanceByKey(anyString(), anyString(), captor.capture());
-    assertEquals(false, captor.getValue().get("hasPipelines"));
+    assertEquals(Boolean.FALSE, captor.getValue().get("hasPipelines"));
   }
 }

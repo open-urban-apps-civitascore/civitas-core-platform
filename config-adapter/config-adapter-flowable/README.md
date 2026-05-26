@@ -22,7 +22,7 @@ The module implements the same workflows in two ways:
 
 | Approach | Description | Files |
 |----------|-------------|-------|
-| **BPMN XML** (default) | Standard `.bpmn20.xml` files | `src/main/resources/processes/` |
+| **BPMN XML** (default) | Standard BPMN 2.0 `.bpmn` files | `src/main/resources/processes/` |
 | **Java Coded** | Programmatic `BpmnModel` builders | `src/main/java/.../coded/` |
 
 Both use the same delegates, same handlers, same Kafka integration. An equivalence test proves identical behavior.
@@ -46,24 +46,28 @@ All properties support automatic environment variable override (dots → undersc
 
 ### Local Development Example
 
+The local `docker-compose.yml` provisions a dedicated `flowable` database and user via `docker/postgres/init-flowable.sql` on first start.
+
 ```properties
-# application.properties (local dev)
-flowable.jdbc.url=jdbc:postgresql://localhost:5433/configadapter
-flowable.jdbc.username=postgres
-flowable.jdbc.password=postgres
+# application.properties (local dev — matches the docker-compose setup)
+flowable.jdbc.url=jdbc:postgresql://localhost:5433/flowable
+flowable.jdbc.username=flowable
+flowable.jdbc.password=flowable
 ```
 
 Or via environment variables:
 
 ```bash
-export FLOWABLE_JDBC_URL=jdbc:postgresql://localhost:5433/configadapter
-export FLOWABLE_JDBC_USERNAME=postgres
-export FLOWABLE_JDBC_PASSWORD=postgres
+export FLOWABLE_JDBC_URL=jdbc:postgresql://localhost:5433/flowable
+export FLOWABLE_JDBC_USERNAME=flowable
+export FLOWABLE_JDBC_PASSWORD=flowable
 ```
 
 ### Database
 
-Flowable uses the existing PostgreSQL instance. It creates ~36 tables with the `ACT_` prefix (e.g., `ACT_RE_DEPLOYMENT`, `ACT_RU_EXECUTION`, `ACT_HI_ACTINST`). Schema is auto-created on first startup. Duplicate process deployments are filtered — restarting the application does not create new versions unless the BPMN files changed.
+Flowable runs against a dedicated `flowable` database, separate from the Keycloak database that shares the same PostgreSQL container. It creates ~36 tables with the `ACT_` prefix (e.g., `ACT_RE_DEPLOYMENT`, `ACT_RU_EXECUTION`, `ACT_HI_ACTINST`). Schema is auto-created on first startup. Duplicate process deployments are filtered — restarting the application does not create new versions unless the BPMN files changed.
+
+If the PostgreSQL volume already exists from before this split, recreate it: `docker compose down -v && docker compose up -d`.
 
 ## Saga Workflows
 
@@ -79,30 +83,13 @@ Flowable uses the existing PostgreSQL instance. It creates ~36 tables with the `
 
 ## Architecture
 
-### Module Structure
+The module is organized into three top-level packages:
 
-```
-common/
-  FlowableEngineFactory          — ProcessEngine creation (standalone, no Spring)
-  FlowableInfrastructureFactory  — DataSource + Kafka client creation
-  FlowableSagaOrchestrator       — Lifecycle management (init, start, close)
-  SagaHandlerRegistry            — Bridge to existing adapter handlers
-  delegate/
-    AbstractSagaDelegate         — Shared delegate helpers
-    SagaStepDelegate             — Forward-execution JavaDelegate
-    SagaCompensationDelegate     — Compensation JavaDelegate
-    AdapterFieldMappings         — Adapter-specific field name mappings
-  kafka/
-    FlowableTriggerConsumer      — Kafka trigger → Flowable process
-    FlowableResultPublisher      — Flowable result → Kafka
-bpmn/
-  BpmnProcessDeployer            — Deploys .bpmn20.xml from classpath
-coded/
-  ProcessBuilderUtils            — Shared BPMN model building helpers
-  DatasetCreate/Update/Delete    — Programmatic BpmnModel builders
-    ProcessBuilder
-  CodedProcessDeployer           — Deploys programmatic models
-```
+- `common` — engine bootstrap, infrastructure factories, saga handler registry, JavaDelegate base classes, and the Kafka trigger/result bridge.
+- `bpmn` — deployment of the XML-based BPMN process definitions from `src/main/resources/processes/`.
+- `coded` — deployment of the programmatically built equivalents (`BpmnModel`-builder).
+
+Both `bpmn` and `coded` produce equivalent process definitions and share the delegates in `common`. An equivalence test enforces this.
 
 ### Key Design Decisions
 
@@ -126,7 +113,7 @@ mvn test -pl config-adapter-flowable -Dtest=DatasetCreateBpmnTest
 
 ## Viewing BPMN Diagrams
 
-The `.bpmn20.xml` files in `src/main/resources/processes/` can be viewed with:
+The `.bpmn` files in `src/main/resources/processes/` can be viewed with:
 
 - **Camunda Modeler** (Desktop, MIT) — best option, auto-generates layout. Download: https://camunda.com/download/modeler/
 - **bpmn.io** (Browser) — requires DI section in the XML (Camunda Modeler adds it on save)

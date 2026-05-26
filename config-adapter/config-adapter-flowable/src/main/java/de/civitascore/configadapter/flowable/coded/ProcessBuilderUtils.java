@@ -13,7 +13,6 @@ import java.util.List;
 import org.flowable.bpmn.model.BoundaryEvent;
 import org.flowable.bpmn.model.ErrorEventDefinition;
 import org.flowable.bpmn.model.FieldExtension;
-import org.flowable.bpmn.model.SequenceFlow;
 import org.flowable.bpmn.model.ServiceTask;
 
 /** Shared BPMN model building utilities used by all saga process builders. */
@@ -75,19 +74,6 @@ final class ProcessBuilderUtils {
     f.setFieldName(name);
     f.setStringValue(value);
     return f;
-  }
-
-  static SequenceFlow flow(String id, String source, String target) {
-    SequenceFlow sf = new SequenceFlow(source, target);
-    sf.setId(id);
-    return sf;
-  }
-
-  static SequenceFlow conditionalFlow(String id, String source, String target, String condition) {
-    SequenceFlow sf = new SequenceFlow(source, target);
-    sf.setId(id);
-    sf.setConditionExpression(condition);
-    return sf;
   }
 
   /**
