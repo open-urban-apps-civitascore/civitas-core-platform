@@ -10,63 +10,18 @@
 package de.civitascore.configadapter.flowable.coded;
 
 import org.flowable.bpmn.model.BpmnModel;
-import org.flowable.bpmn.model.EndEvent;
-import org.flowable.bpmn.model.ExclusiveGateway;
-import org.flowable.bpmn.model.ServiceTask;
-import org.flowable.bpmn.model.StartEvent;
 
 /**
- * Builds the Dataset Update saga process programmatically. Same structure as Create but with
- * UPDATE/RESTORE operations. Produces equivalent behavior to {@code dataset-update.bpmn}.
+ * Builds the Dataset Update saga process programmatically. Same topology as Create — only the
+ * adapter operation codes differ (UPDATE_* / RESTORE_*). Produces equivalent behavior to {@code
+ * dataset-update.bpmn}.
  */
 public final class DatasetUpdateProcessBuilder {
 
   private DatasetUpdateProcessBuilder() {}
 
   public static BpmnModel build() {
-    SagaProcessBuilder saga =
-        SagaProcessBuilder.create("dataset-update", "Dataset Update Saga (Coded)");
-
-    StartEvent start = saga.startEvent("start");
-    SagaStepRef frost =
-        saga.sagaStep("update-project", "Update FROST Project", "frost", "UPDATE_PROJECT");
-    SagaStepRef apisix =
-        saga.sagaStep("update-route", "Update APISIX Route", "apisix", "UPDATE_ROUTE");
-    ExclusiveGateway pipelineGw = saga.exclusiveGateway(ProcessBuilderUtils.PIPELINE_GATEWAY_ID);
-    SagaStepRef redpanda =
-        saga.sagaStep("update-pipelines", "Update Pipelines", "redpanda", "UPDATE_PIPELINES");
-
-    // Two FROST compensation tasks (after-apisix, after-redpanda) currently delegate to the same
-    // adapter operation but are kept as distinct activities so the two error paths remain visually
-    // separate in the BPMN diagram and can diverge later (e.g. richer rollback for the redpanda
-    // case) without restructuring the flow.
-    ServiceTask compFrostAfterApisix =
-        saga.compensation("compensate-frost-after-apisix", frost, "RESTORE_PROJECT");
-    ServiceTask compApisixAfterRedpanda =
-        saga.compensation("compensate-apisix-after-redpanda", apisix, "RESTORE_ROUTE");
-    ServiceTask compFrostAfterRedpanda =
-        saga.compensation("compensate-frost-after-redpanda", frost, "RESTORE_PROJECT");
-
-    ServiceTask publishOk = saga.publishResult(ProcessBuilderUtils.PUBLISH_SUCCESS_ID, "success");
-    ServiceTask publishFail = saga.publishResult(ProcessBuilderUtils.PUBLISH_FAILURE_ID, "failure");
-    EndEvent end = saga.endEvent("end");
-    EndEvent errorEnd = saga.endEvent("error-end", "Saga Failed");
-
-    // Happy path
-    saga.flow(start, frost.task(), apisix.task(), pipelineGw);
-    saga.flow(pipelineGw, redpanda.task()).when("${hasPipelines == true}");
-    saga.flow(pipelineGw, publishOk).when("${hasPipelines == false}");
-    saga.flow(redpanda.task(), publishOk);
-    saga.flow(publishOk, end);
-
-    // Error/compensation paths
-    saga.errorFlow(frost, publishFail);
-    saga.errorFlow(apisix, compFrostAfterApisix);
-    saga.flow(compFrostAfterApisix, publishFail);
-    saga.errorFlow(redpanda, compApisixAfterRedpanda);
-    saga.flow(compApisixAfterRedpanda, compFrostAfterRedpanda, publishFail);
-    saga.flow(publishFail, errorEnd);
-
-    return saga.build();
+    return DatasetProvisioningSagaTemplate.build(
+        "dataset-update", "Dataset Update Saga (Coded)", DatasetProvisioningSagaTemplate.UPDATE);
   }
 }

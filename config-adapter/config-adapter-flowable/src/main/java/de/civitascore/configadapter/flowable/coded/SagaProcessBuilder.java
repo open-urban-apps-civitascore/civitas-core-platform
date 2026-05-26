@@ -26,6 +26,7 @@ import org.flowable.bpmn.model.StartEvent;
  * flows. Element IDs are generated from source/target to match the {@code flow-<from>-<to>}
  * convention used in the equivalent {@code .bpmn} XML files.
  */
+@SuppressWarnings("PMD.TooManyMethods") // Builder with one method per BPMN element type — expected
 final class SagaProcessBuilder {
 
   private final BpmnModel model;
