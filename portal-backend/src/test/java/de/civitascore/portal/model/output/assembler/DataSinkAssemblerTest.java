@@ -118,6 +118,24 @@ class DataSinkAssemblerTest {
     }
 
     @Test
+    @DisplayName(
+        "Should leave DSV null and not query the repository when dataStructureVersionId is not a valid UUID")
+    void shouldLeaveDataStructureVersionNullWhenDsvIdIsMalformed() {
+      DataSink entity = new DataSink();
+      entity.setDataSinkType(DataSinkType.POSTGIS);
+      entity.setConfiguration(
+          Map.of("tableName", "traffic_data", "dataStructureVersionId", "not-a-uuid"));
+
+      DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
+
+      assertThat(result.getConfiguration()).isInstanceOf(PostgisOutputConfiguration.class);
+      PostgisOutputConfiguration config = (PostgisOutputConfiguration) result.getConfiguration();
+      assertThat(config.getTableName()).isEqualTo("traffic_data");
+      assertThat(config.getDataStructureVersion()).isNull();
+      verifyNoInteractions(dataStructureVersionRepository);
+    }
+
+    @Test
     @DisplayName("Should return empty PostgisOutputConfiguration when entity configuration is null")
     void shouldHandleNullConfigurationForPostgis() {
       DataSink entity = new DataSink();

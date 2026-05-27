@@ -78,11 +78,15 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
 
     Object dsvIdRaw = raw.get("dataStructureVersionId");
     if (dsvIdRaw != null) {
-      UUID dsvId = UUID.fromString(dsvIdRaw.toString());
-      dataStructureVersionRepository
-          .findById(dsvId)
-          .ifPresent(
-              dsv -> output.setDataStructureVersion(dataStructureVersionMapper.toSummary(dsv)));
+      try {
+        UUID dsvId = UUID.fromString(dsvIdRaw.toString());
+        dataStructureVersionRepository
+            .findById(dsvId)
+            .ifPresent(
+                dsv -> output.setDataStructureVersion(dataStructureVersionMapper.toSummary(dsv)));
+      } catch (IllegalArgumentException ignored) {
+        // keep dataStructureVersion unset for malformed persisted config
+      }
     }
 
     return output;
