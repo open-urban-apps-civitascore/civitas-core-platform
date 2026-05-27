@@ -2,8 +2,7 @@ package de.civitascore.portal.model.output;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import de.civitascore.portal.model.datasink.DataSinkConfiguration;
-import de.civitascore.portal.model.datasink.FrostConfiguration;
+import de.civitascore.portal.model.datasink.DataSinkConfigurationOutput;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
@@ -22,9 +21,9 @@ public class DataSinkOutputDTO extends BaseOutputDTO {
 
   @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
   @JsonSubTypes({
-    @JsonSubTypes.Type(value = FrostConfiguration.class, name = "FROST"),
-    @JsonSubTypes.Type(value = PostgisOutputConfiguration.class, name = "POSTGIS")
+    @JsonSubTypes.Type(value = FrostConfigurationOutput.class, name = "FROST"),
+    @JsonSubTypes.Type(value = PostgisConfigurationOutput.class, name = "POSTGIS")
   })
-  @Schema(oneOf = {PostgisOutputConfiguration.class, FrostConfiguration.class})
-  private DataSinkConfiguration configuration;
+  @Schema(oneOf = {PostgisConfigurationOutput.class, FrostConfigurationOutput.class})
+  private DataSinkConfigurationOutput configuration;
 }

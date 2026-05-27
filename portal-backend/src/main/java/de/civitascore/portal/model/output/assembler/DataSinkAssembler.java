@@ -2,12 +2,12 @@ package de.civitascore.portal.model.output.assembler;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
-import de.civitascore.portal.model.datasink.DataSinkConfiguration;
-import de.civitascore.portal.model.datasink.FrostConfiguration;
+import de.civitascore.portal.model.datasink.DataSinkConfigurationOutput;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.output.DataSinkOutputDTO;
-import de.civitascore.portal.model.output.PostgisOutputConfiguration;
+import de.civitascore.portal.model.output.FrostConfigurationOutput;
+import de.civitascore.portal.model.output.PostgisConfigurationOutput;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import java.util.Map;
 import java.util.UUID;
@@ -21,9 +21,9 @@ import org.springframework.stereotype.Component;
  * <p>{@link #enrichDto} resolves the type-specific configuration:
  *
  * <ul>
- *   <li>FROST — sets an empty {@link FrostConfiguration}.
+ *   <li>FROST — sets an empty {@link FrostConfigurationOutput}.
  *   <li>POSTGIS — looks up the {@link de.civitascore.portal.model.entity.DataStructureVersion} and
- *       builds a {@link PostgisOutputConfiguration} with the nested summary.
+ *       builds a {@link PostgisConfigurationOutput} with the nested summary.
  * </ul>
  */
 @Component
@@ -60,16 +60,17 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
     return (I) dataSinkMapper.toInput(entity);
   }
 
-  private DataSinkConfiguration buildConfiguration(DataSinkType type, Map<String, Object> raw) {
+  private DataSinkConfigurationOutput buildConfiguration(
+      DataSinkType type, Map<String, Object> raw) {
     return switch (type) {
-      case FROST -> new FrostConfiguration();
+      case FROST -> new FrostConfigurationOutput();
       case POSTGIS -> buildPostgisConfiguration(raw);
       default -> null;
     };
   }
 
-  private PostgisOutputConfiguration buildPostgisConfiguration(Map<String, Object> raw) {
-    PostgisOutputConfiguration output = new PostgisOutputConfiguration();
+  private PostgisConfigurationOutput buildPostgisConfiguration(Map<String, Object> raw) {
+    PostgisConfigurationOutput output = new PostgisConfigurationOutput();
 
     if (raw == null) {
       return output;

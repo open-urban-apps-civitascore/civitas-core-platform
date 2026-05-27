@@ -7,12 +7,12 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
-import de.civitascore.portal.model.datasink.FrostConfiguration;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.output.DataSinkOutputDTO;
-import de.civitascore.portal.model.output.PostgisOutputConfiguration;
+import de.civitascore.portal.model.output.FrostConfigurationOutput;
+import de.civitascore.portal.model.output.PostgisConfigurationOutput;
 import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import java.util.Map;
@@ -48,7 +48,7 @@ class DataSinkAssemblerTest {
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
-      assertThat(result.getConfiguration()).isInstanceOf(FrostConfiguration.class);
+      assertThat(result.getConfiguration()).isInstanceOf(FrostConfigurationOutput.class);
       verifyNoInteractions(dataStructureVersionRepository);
     }
 
@@ -61,7 +61,7 @@ class DataSinkAssemblerTest {
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
-      assertThat(result.getConfiguration()).isInstanceOf(FrostConfiguration.class);
+      assertThat(result.getConfiguration()).isInstanceOf(FrostConfigurationOutput.class);
       verifyNoInteractions(dataStructureVersionRepository);
     }
   }
@@ -90,8 +90,8 @@ class DataSinkAssemblerTest {
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
-      assertThat(result.getConfiguration()).isInstanceOf(PostgisOutputConfiguration.class);
-      PostgisOutputConfiguration config = (PostgisOutputConfiguration) result.getConfiguration();
+      assertThat(result.getConfiguration()).isInstanceOf(PostgisConfigurationOutput.class);
+      PostgisConfigurationOutput config = (PostgisConfigurationOutput) result.getConfiguration();
       assertThat(config.getTableName()).isEqualTo("traffic_data");
       assertThat(config.getDataStructureVersion()).isSameAs(dsvSummary);
       verify(dataStructureVersionRepository).findById(dsvId);
@@ -111,8 +111,8 @@ class DataSinkAssemblerTest {
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
-      assertThat(result.getConfiguration()).isInstanceOf(PostgisOutputConfiguration.class);
-      PostgisOutputConfiguration config = (PostgisOutputConfiguration) result.getConfiguration();
+      assertThat(result.getConfiguration()).isInstanceOf(PostgisConfigurationOutput.class);
+      PostgisConfigurationOutput config = (PostgisConfigurationOutput) result.getConfiguration();
       assertThat(config.getTableName()).isEqualTo("traffic_data");
       assertThat(config.getDataStructureVersion()).isNull();
     }
@@ -128,8 +128,8 @@ class DataSinkAssemblerTest {
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
-      assertThat(result.getConfiguration()).isInstanceOf(PostgisOutputConfiguration.class);
-      PostgisOutputConfiguration config = (PostgisOutputConfiguration) result.getConfiguration();
+      assertThat(result.getConfiguration()).isInstanceOf(PostgisConfigurationOutput.class);
+      PostgisConfigurationOutput config = (PostgisConfigurationOutput) result.getConfiguration();
       assertThat(config.getTableName()).isEqualTo("traffic_data");
       assertThat(config.getDataStructureVersion()).isNull();
       verifyNoInteractions(dataStructureVersionRepository);
@@ -144,8 +144,8 @@ class DataSinkAssemblerTest {
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
-      assertThat(result.getConfiguration()).isInstanceOf(PostgisOutputConfiguration.class);
-      PostgisOutputConfiguration config = (PostgisOutputConfiguration) result.getConfiguration();
+      assertThat(result.getConfiguration()).isInstanceOf(PostgisConfigurationOutput.class);
+      PostgisConfigurationOutput config = (PostgisConfigurationOutput) result.getConfiguration();
       assertThat(config.getTableName()).isNull();
       assertThat(config.getDataStructureVersion()).isNull();
       verifyNoInteractions(dataStructureVersionRepository);
