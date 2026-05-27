@@ -90,6 +90,13 @@ public abstract class BaseController<
   @Autowired protected ObjectMapper objectMapper;
   @Autowired protected Validator validator;
 
+  /**
+   * Retrieves a paginated, filterable list of all entities matching the given specification.
+   *
+   * @param spec the specification used for filtering results
+   * @param pageable pagination and sorting parameters
+   * @return a page of output DTOs with HTTP 200 status
+   */
   @Operation(
       summary = "List all {entities}",
       description =
@@ -123,13 +130,6 @@ public abstract class BaseController<
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", format = "date-time", example = "2024-12-31T23:59:59Z"))
   })
-  /**
-   * Retrieves a paginated, filterable list of all entities matching the given specification.
-   *
-   * @param spec the specification used for filtering results
-   * @param pageable pagination and sorting parameters
-   * @return a page of output DTOs with HTTP 200 status
-   */
   @GetMapping
   public ResponseEntity<Page<O>> getAll(
       @ParameterObject @Parameter(description = "Search/filter spec") S spec,
@@ -155,6 +155,12 @@ public abstract class BaseController<
     return ResponseEntity.ok(outputs);
   }
 
+  /**
+   * Retrieves a single entity by its unique identifier.
+   *
+   * @param id the UUID of the entity to retrieve
+   * @return the entity output DTO with HTTP 200 status
+   */
   @Operation(
       summary = "Get {entity} by ID",
       description = "Returns a single {entity} identified by its UUID.")
@@ -163,12 +169,6 @@ public abstract class BaseController<
       responseCode = "404",
       description = "{Entity} not found",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  /**
-   * Retrieves a single entity by its unique identifier.
-   *
-   * @param id the UUID of the entity to retrieve
-   * @return the entity output DTO with HTTP 200 status
-   */
   @GetMapping("/{id}")
   public ResponseEntity<O> getById(@PathVariable UUID id) {
     E entity = getService().findByIdOrThrow(id);
@@ -176,6 +176,12 @@ public abstract class BaseController<
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Creates a new entity from the provided input DTO.
+   *
+   * @param input the validated input DTO containing the entity data
+   * @return the created entity output DTO with HTTP 201 status and a Location header
+   */
   @Operation(
       summary = "Create a new {entity}",
       description =
@@ -189,12 +195,6 @@ public abstract class BaseController<
       responseCode = "409",
       description = "Conflict (e.g. unique constraint violation)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  /**
-   * Creates a new entity from the provided input DTO.
-   *
-   * @param input the validated input DTO containing the entity data
-   * @return the created entity output DTO with HTTP 201 status and a Location header
-   */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   public ResponseEntity<O> create(@Valid @RequestBody I input) {
@@ -210,6 +210,13 @@ public abstract class BaseController<
     return ResponseEntity.created(location).body(output);
   }
 
+  /**
+   * Fully replaces an existing entity with the provided input DTO.
+   *
+   * @param id the UUID of the entity to replace
+   * @param input the validated input DTO containing the replacement data
+   * @return the updated entity output DTO with HTTP 200 status
+   */
   @Operation(
       summary = "Replace a {entity}",
       description = "Fully replaces an existing {entity} with the provided input.")
@@ -226,13 +233,6 @@ public abstract class BaseController<
       responseCode = "409",
       description = "Conflict (e.g. unique constraint violation)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  /**
-   * Fully replaces an existing entity with the provided input DTO.
-   *
-   * @param id the UUID of the entity to replace
-   * @param input the validated input DTO containing the replacement data
-   * @return the updated entity output DTO with HTTP 200 status
-   */
   @PutMapping("/{id}")
   public ResponseEntity<O> update(@PathVariable UUID id, @Valid @RequestBody I input) {
     I preProcessedInput = preProcessInput(input);
@@ -241,6 +241,14 @@ public abstract class BaseController<
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Applies a partial JSON-merge patch to an existing entity.
+   *
+   * @param id the UUID of the entity to patch
+   * @param updates the JSON node containing the fields to update
+   * @return the patched entity output DTO with HTTP 200 status
+   * @throws IOException if there is an error during JSON processing
+   */
   @Operation(
       summary = "Partially update a {entity}",
       description =
@@ -258,14 +266,6 @@ public abstract class BaseController<
       responseCode = "409",
       description = "Conflict (e.g. unique constraint violation)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  /**
-   * Applies a partial JSON-merge patch to an existing entity.
-   *
-   * @param id the UUID of the entity to patch
-   * @param updates the JSON node containing the fields to update
-   * @return the patched entity output DTO with HTTP 200 status
-   * @throws IOException if there is an error during JSON processing
-   */
   @PatchMapping("/{id}")
   public ResponseEntity<O> patch(@PathVariable UUID id, @RequestBody JsonNode updates)
       throws IOException {
@@ -289,6 +289,11 @@ public abstract class BaseController<
     return ResponseEntity.ok(output);
   }
 
+  /**
+   * Permanently deletes an entity by its unique identifier.
+   *
+   * @param id the UUID of the entity to delete
+   */
   @Operation(
       summary = "Delete a {entity}",
       description = "Permanently deletes a {entity} by its UUID.")
@@ -301,11 +306,6 @@ public abstract class BaseController<
       responseCode = "409",
       description = "Conflict ({entity} still in use)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  /**
-   * Permanently deletes an entity by its unique identifier.
-   *
-   * @param id the UUID of the entity to delete
-   */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@PathVariable UUID id) {
