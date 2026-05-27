@@ -159,7 +159,6 @@ class DataSetControllerIntegrationTest
     dataSet.setName("test_dataset_with_relationships_" + System.currentTimeMillis());
     dataSet.setDescription("Test dataset with pipelines and distributions");
     dataSet.setDataSetStatus(DataSetStatus.DRAFT);
-    dataSet.setPersistenceId(12345L);
     dataSet.setIdentifier("test-identifier-001");
     dataSet.setVersion("1.0.0");
     dataSet.setExternalId("ext-dataset-" + System.currentTimeMillis());
@@ -1467,7 +1466,6 @@ class DataSetControllerIntegrationTest
       dataSet.setName("test_dataset_stage_" + System.currentTimeMillis());
       dataSet.setDescription("Test dataset with pipelines");
       dataSet.setDataSetStatus(DataSetStatus.DRAFT);
-      dataSet.setPersistenceId(12345L);
       dataSet.setIdentifier("test-identifier-stage");
       dataSet.setVersion("1.0.0");
       dataSet.setExternalId("ext-dataset-stage-" + System.currentTimeMillis());
