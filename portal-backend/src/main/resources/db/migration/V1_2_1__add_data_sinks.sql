@@ -16,3 +16,6 @@ CREATE TABLE data_sinks
 
 CREATE INDEX idx_data_sinks_dataset ON data_sinks (dataset_id);
 CREATE INDEX idx_data_sinks_pipeline ON data_sinks (pipeline_id);
+
+ALTER TABLE pipelines
+    DROP COLUMN IF EXISTS persistences;

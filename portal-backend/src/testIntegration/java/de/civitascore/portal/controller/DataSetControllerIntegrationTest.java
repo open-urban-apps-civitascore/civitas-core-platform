@@ -30,7 +30,6 @@ import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.service.DataSetService;
 import de.civitascore.portal.util.RestPage;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -208,7 +207,7 @@ class DataSetControllerIntegrationTest
     pipeline1.setStyles(createSampleStyles());
     pipeline1.getDataSources().add(dataSource1);
     pipeline1.getDataSources().add(dataSource2);
-    pipeline1.setPersistences(Collections.singletonList(12345L));
+
     pipeline1.setModel(createSampleModel());
     pipeline1 = pipelineRepository.save(pipeline1);
 
@@ -219,7 +218,7 @@ class DataSetControllerIntegrationTest
     pipeline2.setStyles(createSampleStyles());
     pipeline2.getDataSources().add(dataSource3);
     pipeline2.getDataSources().add(dataSource4);
-    pipeline2.setPersistences(Collections.singletonList(12345L));
+
     pipeline2.setModel(createSampleModel());
     pipeline2 = pipelineRepository.save(pipeline2);
 
@@ -1482,7 +1481,7 @@ class DataSetControllerIntegrationTest
       pipeline1.setDataSet(dataSet);
       pipeline1.setStyles(createSampleStyles());
       pipeline1.setModel(createSampleModel());
-      pipeline1.setPersistences(Collections.singletonList(12345L));
+
       pipelineRepository.save(pipeline1);
 
       Pipeline pipeline2 = new Pipeline();
@@ -1491,7 +1490,7 @@ class DataSetControllerIntegrationTest
       pipeline2.setDataSet(dataSet);
       pipeline2.setStyles(createSampleStyles());
       pipeline2.setModel(createSampleModel());
-      pipeline2.setPersistences(Collections.singletonList(12345L));
+
       pipelineRepository.save(pipeline2);
 
       seedStageRequirements(pipeline1, pipeline2);
