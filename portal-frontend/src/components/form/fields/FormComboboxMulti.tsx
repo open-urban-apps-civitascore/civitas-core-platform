@@ -6,11 +6,12 @@ import { ComboboxMultiSelect } from '@/components/combobox-multi-select/Combobox
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
+import { SelectOption } from '@/types/common'
 
 interface FormComboboxMultiProps<T extends FieldValues> {
   id: string
   label: string
-  items: string[]
+  items: SelectOption[]
   form: UseFormReturn<T>
   name: Path<T>
   // eslint-disable-next-line react/boolean-prop-naming

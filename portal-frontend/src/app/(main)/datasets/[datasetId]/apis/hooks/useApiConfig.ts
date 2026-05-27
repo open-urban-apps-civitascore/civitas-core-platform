@@ -10,16 +10,8 @@ import { useCreateNamedApi, usePatchDataset } from '@/app/services/api/datasets/
 import { useError } from '@/hooks/use-error'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { Dataset } from '@/types/datasets'
-import {
-  API_TYPE_QUERY,
-  DEFAULTS_BY_TYPE,
-  NamedApi,
-  NamedApiPayload,
-  StaApiFormData,
-  StaApiPayloadData,
-  WfsWmsApiApiPayloadData,
-  WfsWmsApiFormData,
-} from '@/types/namedApis'
+import { API_TYPE_QUERY, NamedApi, NamedApiPayload, StaApiFormData, WfsWmsApiFormData } from '@/types/namedApis'
+import { buildStaPayloadData, buildWfsWmsPayload } from '@/utils/namedApis'
 
 type FormData = StaApiFormData | WfsWmsApiFormData
 interface UseApiConfigActionsArgs<TFormData extends FormData> {
@@ -30,35 +22,6 @@ interface UseApiConfigActionsArgs<TFormData extends FormData> {
   initialSlug: string
   isCreateLayerMode?: boolean
 }
-
-const toBoundingBoxPayload = (bbox: WfsWmsApiFormData['layer']['nativeBoundingBox']) => ({
-  ...bbox,
-  minX: Number(bbox.minX),
-  minY: Number(bbox.minY),
-  maxX: Number(bbox.maxX),
-  maxY: Number(bbox.maxY),
-})
-
-const buildStaPayloadData = (data: StaApiFormData): StaApiPayloadData => ({
-  baseInfo: { ...data.baseInfo, standard: DEFAULTS_BY_TYPE.sensorthings.standard },
-})
-
-const buildWfsWmsPayload = (data: WfsWmsApiFormData): WfsWmsApiApiPayloadData => ({
-  baseInfo: {
-    ...data.baseInfo,
-    standard: DEFAULTS_BY_TYPE['wfs-wms'].standard,
-    description: data.baseInfo.description || undefined,
-  },
-  layer: {
-    ...data.layer,
-    dataSinkId: '',
-    description: data.layer.layerDescription || undefined,
-    nativeBoundingBox: toBoundingBoxPayload(data.layer.nativeBoundingBox),
-    latLonBoundingBox: toBoundingBoxPayload(data.layer.latLonBoundingBox),
-    defaultStyleId: data.layer.defaultStyleId || null,
-    alternativeStyleIds: data.layer.alternativeStyleIds,
-  },
-})
 
 const isWfsWmsFormData = (data: StaApiFormData | WfsWmsApiFormData) => data.type === API_TYPE_QUERY.WFS_WMS
 

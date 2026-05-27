@@ -350,7 +350,7 @@
                 "definedCrs": "Defined Coordinate Reference System (CRS)",
                 "crsPlaceHolder": "Select CRS ...",
                 "boundingBox": "Bounding Box",
-                "calculateFromCrs": "Calculate from native CRS",
+                "calculateFromCrs": "Calculate from CRS bounds",
                 "calculateFromData": "Calculate from Data"
               },
               "style": {

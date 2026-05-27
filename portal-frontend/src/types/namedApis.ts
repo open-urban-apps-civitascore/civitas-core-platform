@@ -139,12 +139,14 @@ export type StaApiPayloadData = {
 // ============================================================================
 
 export const BoundingBoxResponseSchema = z.object({
-  minx: z.number(),
-  miny: z.number(),
-  maxx: z.number(),
-  maxy: z.number(),
+  minX: z.number(),
+  minY: z.number(),
+  maxX: z.number(),
+  maxY: z.number(),
   crs: z.string(),
 })
+
+export type BoundingBox = z.infer<typeof BoundingBoxResponseSchema>
 
 const LayerBaseSchema = z.object({
   dataSinkId: z.uuid(),
@@ -172,13 +174,6 @@ export const LayerSchema = LayerBaseSchema.extend({
   modifiedAt: z.string(),
 })
 
-export const LayerPayloadSchema = LayerBaseSchema.extend({
-  defaultStyleId: z.uuid().optional().nullable(),
-  bboxAutoCalculate: z.literal(false).default(false),
-  nativeBoundingBox: BoundingBoxPayloadSchema,
-  latLonBoundingBox: BoundingBoxPayloadSchema,
-})
-
 const boundingBoxCoord = z
   .string()
   .refine(v => v !== '', { message: 'common.errors.required' })
@@ -193,24 +188,33 @@ export const BoundingBoxSchema = z.object({
 })
 
 export const LayerFormSchema = z.object({
+  id: z.uuid(),
   title: z.string().trim().min(1, 'common.errors.required'),
   layerName: z.string().trim().min(1, 'common.errors.required'),
-  layerDescription: z
+  description: z
     .string()
     .trim()
     .max(NAMED_API_DESCRIPTION_MAX_LENGTH, 'datasets.overview.completion.apis.config.errors.description.tooLong')
     .optional()
     .or(z.literal('')),
-  table: z.string().min(1, 'common.errors.required'),
+  dataSinkId: z.string().min(1, 'common.errors.required'),
   attribute: z.array(z.string()).min(1, 'common.errors.required'),
   cqlFilter: z.string().trim(),
   geometryColumnRef: z.string().min(1, 'common.errors.required'),
+  nativeCRS: z.string().min(1, 'common.errors.required'),
   crs: z.string().min(1, 'common.errors.required'),
   bboxAutoCalculate: z.literal(false),
   nativeBoundingBox: BoundingBoxSchema,
-  latLonBoundingBox: BoundingBoxSchema,
+  latLonBoundingBox: BoundingBoxSchema.nullable(),
   defaultStyleId: z.string().nullable(),
   alternativeStyleIds: z.array(z.string()),
+})
+
+export const LayerPayloadSchema = LayerBaseSchema.extend({
+  defaultStyleId: z.uuid().optional().nullable(),
+  bboxAutoCalculate: z.literal(false).default(false),
+  nativeBoundingBox: BoundingBoxPayloadSchema,
+  latLonBoundingBox: BoundingBoxPayloadSchema,
 })
 
 export type Layer = z.infer<typeof LayerSchema>
@@ -227,6 +231,22 @@ export type UpdateLayerInput = {
   layerId: string
   data: LayerApiPayload
 }
+
+// ============================================================================
+// Types for Style
+// ============================================================================
+
+export const StyleSchema = z.object({
+  id: z.uuid(),
+  datasetId: z.uuid(),
+  name: z.string(),
+  sldContent: z.string(),
+  inUse: z.boolean(),
+  createdAt: z.string(),
+  modifiedAt: z.string(),
+})
+
+export type Style = z.infer<typeof StyleSchema>
 
 // ============================================================================
 // Types for WFS/WMS-API

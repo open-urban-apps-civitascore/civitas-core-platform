@@ -322,7 +322,7 @@
               "descriptionPlaceholder": ""
             },
             "layer": {
-              "title": "Layer",
+              "sectionTitle": "Layer",
               "addLayer": "Layer hinzufügen",
               "deleteLayer": "Layer löschen",
               "baseInfo": {
@@ -349,7 +349,7 @@
                 "definedCrs": "Angegebenes Koordinatenreferenzsystem (CRS)",
                 "crsPlaceHolder": "CRS auswählen ...",
                 "boundingBox": "Bounding Box",
-                "calculateFromCrs": "Aus nativem CRS berechnen",
+                "calculateFromCrs": "Aus den Grenzen des CRS berechnen",
                 "calculateFromData": "Aus Daten berechnen"
               },
               "style": {

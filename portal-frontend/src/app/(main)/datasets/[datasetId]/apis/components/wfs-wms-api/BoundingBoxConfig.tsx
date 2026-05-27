@@ -9,12 +9,13 @@ import { WfsWmsApiFormData } from '@/types/namedApis'
 
 interface BoundingBoxConfigProps {
   form: UseFormReturn<WfsWmsApiFormData>
+  className?: string
 }
 
 const BBOX_FIELDS = ['minX', 'minY', 'maxX', 'maxY'] as const
 
 export const BoundingBoxConfig = (props: BoundingBoxConfigProps) => {
-  const { form } = props
+  const { form, className } = props
   const tError = useTranslations()
   const t = useTranslations('datasets.overview.completion.apis.config.layer')
 
@@ -23,7 +24,7 @@ export const BoundingBoxConfig = (props: BoundingBoxConfigProps) => {
   const bboxError = BBOX_FIELDS.map(f => bbox?.[f]?.message).find(Boolean)
 
   return (
-    <div className={cn(isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]')}>
+    <div className={cn(isMobile ? 'grid gap-4' : 'grid gap-2 grid-cols-[minmax(0,270px)_minmax(0,384px)]', className)}>
       <label className="text-sm font-medium leading-none">
         {t('geometry.boundingBox')}
         <span className="text-red-500 ml-1">*</span>
