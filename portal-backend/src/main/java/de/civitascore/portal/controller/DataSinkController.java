@@ -11,7 +11,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.Collections;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -111,23 +110,11 @@ public class DataSinkController
    */
   @Override
   protected DataSinkInputDTO preProcessInput(DataSinkInputDTO input) {
-    Optional.ofNullable(extractPathVariables().get("dataSetId"))
-        .map(UUID::fromString)
-        .ifPresentOrElse(
-            input::setDataSetId,
-            () -> {
-              throw new InvalidInputException(
-                  "DataSink", "dataSetId", "Missing or invalid dataSetId in path variables");
-            });
+    input.setDataSetId(extractUUIDFromPathVariable("dataSetId", DataSink.class));
     return super.preProcessInput(input);
   }
 
   private UUID extractDataSetId() {
-    return Optional.ofNullable(extractPathVariables().get("dataSetId"))
-        .map(UUID::fromString)
-        .orElseThrow(
-            () ->
-                new InvalidInputException(
-                    "DataSink", "dataSetId", "Missing or invalid dataSetId in path variables"));
+    return extractUUIDFromPathVariable("dataSetId", DataSink.class);
   }
 }

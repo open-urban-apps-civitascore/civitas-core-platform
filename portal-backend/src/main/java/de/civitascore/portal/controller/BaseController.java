@@ -17,10 +17,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.experimental.FieldDefaults;
@@ -328,6 +331,35 @@ public abstract class BaseController<
         (Map<String, String>)
             attributes.getRequest().getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
     return Objects.nonNull(pathVariables) ? pathVariables : Map.of();
+  }
+
+  /**
+   * Extracts and parses a UUID from the named path variable of the current HTTP request.
+   *
+   * @param parameterName the path variable name to look up
+   * @param clazz the entity class, used to populate the {@link InvalidInputException} resource type
+   * @return the parsed UUID
+   * @throws InvalidInputException if the path variable is absent or not a valid UUID
+   */
+  protected UUID extractUUIDFromPathVariable(
+      @NotBlank String parameterName, @NotNull Class<E> clazz) {
+    String rawId =
+        Optional.ofNullable(extractPathVariables().get(parameterName))
+            .orElseThrow(
+                () ->
+                    new InvalidInputException(
+                        clazz.getSimpleName(),
+                        parameterName,
+                        String.format("Missing or invalid %s in path variables", parameterName)));
+
+    try {
+      return UUID.fromString(rawId);
+    } catch (IllegalArgumentException ex) {
+      throw new InvalidInputException(
+          clazz.getSimpleName(),
+          parameterName,
+          String.format("Missing or invalid %s in path variables", parameterName));
+    }
   }
 
   /**

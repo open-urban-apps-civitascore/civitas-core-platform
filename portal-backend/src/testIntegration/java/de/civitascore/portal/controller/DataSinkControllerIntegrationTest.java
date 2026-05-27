@@ -215,6 +215,22 @@ class DataSinkControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should return 400 when creating DataSink with a non-UUID dataSetId")
+    void shouldReturn400WhenCreateWithInvalidDataSetId() {
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              "/datasets/not-a-valid-uuid/datasinks",
+              HttpMethod.POST,
+              createAuthHeaders(),
+              createValidInput());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail())
+          .isEqualTo("Missing or invalid dataSetId in path variables");
+    }
+
+    @Test
     @DisplayName("Should reject POSTGIS DataSink without tableName")
     void shouldRejectPostgisDataSinkWithoutTableName() {
       var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
@@ -256,6 +272,24 @@ class DataSinkControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should return 400 when getting DataSink by ID with a non-UUID dataSetId")
+    void shouldReturn400WhenGetByIdWithInvalidDataSetId() {
+      UUID sinkId = createTestEntity();
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              "/datasets/not-a-valid-uuid/datasinks/" + sinkId,
+              HttpMethod.GET,
+              createAuthHeaders(),
+              null);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail())
+          .isEqualTo("Missing or invalid dataSetId in path variables");
+    }
+
+    @Test
     @DisplayName("Should return 404 when getting DataSink from wrong dataset")
     void shouldReturn404WhenGettingFromWrongDataset() {
       UUID sinkId = createTestEntity();
@@ -291,6 +325,24 @@ class DataSinkControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should return 400 when updating DataSink with a non-UUID dataSetId")
+    void shouldReturn400WhenUpdateWithInvalidDataSetId() {
+      UUID sinkId = createTestEntity();
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              "/datasets/not-a-valid-uuid/datasinks/" + sinkId,
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              createUpdateInput());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail())
+          .isEqualTo("Missing or invalid dataSetId in path variables");
+    }
+
+    @Test
     @DisplayName("Should return 404 when updating DataSink from wrong dataset")
     void shouldReturn404WhenUpdatingFromWrongDataset() {
       UUID sinkId = createTestEntity();
@@ -311,6 +363,24 @@ class DataSinkControllerIntegrationTest
   @Nested
   @DisplayName("Delete DataSink Tests")
   class DeleteDataSinkTests {
+
+    @Test
+    @DisplayName("Should return 400 when deleting DataSink with a non-UUID dataSetId")
+    void shouldReturn400WhenDeleteWithInvalidDataSetId() {
+      UUID sinkId = createTestEntity();
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              "/datasets/not-a-valid-uuid/datasinks/" + sinkId,
+              HttpMethod.DELETE,
+              createAuthHeaders(),
+              null);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail())
+          .isEqualTo("Missing or invalid dataSetId in path variables");
+    }
 
     @Test
     @DisplayName("Should return 404 when deleting DataSink from wrong dataset")
