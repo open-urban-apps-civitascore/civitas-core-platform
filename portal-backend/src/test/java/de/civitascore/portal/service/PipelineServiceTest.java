@@ -265,16 +265,56 @@ class PipelineServiceTest {
 
       DataSink existingSink = new DataSink();
       existingSink.setId(existingSinkId);
+      existingSink.setPipeline(existing);
 
       when(pipelineRepository.findById(pipelineId)).thenReturn(Optional.of(existing));
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
       when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
       when(pipelineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataSinkRepository.findAllById(List.of(existingSinkId)))
+          .thenReturn(List.of(existingSink));
       when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of(existingSink));
 
       pipelineService.update(pipelineId, input);
 
       verify(dataSinkService).update(existingSinkId, sinkInput);
+    }
+
+    @Test
+    @DisplayName(
+        "Should throw InvalidInputException when a DataSink with an id belongs to a different pipeline")
+    void updatePipeline_withDataSinkFromDifferentPipeline_throws() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID pipelineId = UUID.randomUUID();
+      UUID otherPipelineId = UUID.randomUUID();
+      UUID existingSinkId = UUID.randomUUID();
+      DataSet dataSet = dataSet(dataSetId);
+
+      Pipeline existing = pipeline(pipelineId, dataSet);
+      Pipeline otherPipeline = pipeline(otherPipelineId, dataSet);
+
+      DataSinkInputDTO sinkInput = new DataSinkInputDTO();
+      sinkInput.setId(existingSinkId);
+      sinkInput.setDataSinkType(DataSinkType.FROST);
+      sinkInput.setConfiguration(Map.of());
+
+      PipelineInputDTO input = new PipelineInputDTO();
+      input.setName("test-pipeline");
+      input.setDataSetId(dataSetId);
+      input.setDataSinks(List.of(sinkInput));
+
+      DataSink sinkOnOtherPipeline = new DataSink();
+      sinkOnOtherPipeline.setId(existingSinkId);
+      sinkOnOtherPipeline.setPipeline(otherPipeline);
+
+      when(pipelineRepository.findById(pipelineId)).thenReturn(Optional.of(existing));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
+      when(dataSinkRepository.findAllById(List.of(existingSinkId)))
+          .thenReturn(List.of(sinkOnOtherPipeline));
+
+      assertThatThrownBy(() -> pipelineService.update(pipelineId, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("cannot be moved");
     }
   }
 }

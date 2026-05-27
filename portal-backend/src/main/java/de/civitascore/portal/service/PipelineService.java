@@ -142,6 +142,27 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
       entity.setDataSources(null);
     }
 
+    if (input.getDataSinks() != null) {
+      UUID currentPipelineId = entity.getId();
+      List<UUID> existingSinkIds =
+          input.getDataSinks().stream()
+              .map(DataSinkInputDTO::getId)
+              .filter(Objects::nonNull)
+              .toList();
+      if (!existingSinkIds.isEmpty()) {
+        dataSinkRepository.findAllById(existingSinkIds).stream()
+            .filter(existing -> !existing.getPipeline().getId().equals(currentPipelineId))
+            .findFirst()
+            .ifPresent(
+                sink -> {
+                  throw new InvalidInputException(
+                      "DataSink",
+                      sink.getId(),
+                      "DataSink does not belong to this pipeline and cannot be moved");
+                });
+      }
+    }
+
     return super.postConvertToEntity(entity, input);
   }
 
