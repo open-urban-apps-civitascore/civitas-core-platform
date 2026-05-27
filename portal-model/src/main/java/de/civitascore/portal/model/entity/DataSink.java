@@ -43,7 +43,7 @@ public class DataSink extends BaseEntity {
   @NotNull private DataSet dataSet;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "pipeline_id", nullable = false)
+  @JoinColumn(name = "pipeline_id")
   @NotNull private Pipeline pipeline;
 
   @Enumerated(EnumType.STRING)

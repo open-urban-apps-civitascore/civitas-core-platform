@@ -139,6 +139,16 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
   }
 
   /**
+   * Deletes all DataSinks belonging to the given pipeline, invoking the full deletion lifecycle
+   * (including downstream notifications) for each.
+   *
+   * @param pipelineId the pipeline whose DataSinks should be deleted
+   */
+  public void deleteByPipelineId(UUID pipelineId) {
+    dataSinkRepository.findByPipelineId(pipelineId).forEach(sink -> deleteById(sink.getId()));
+  }
+
+  /**
    * Guards DELETE against references from Layer and Stil entities.
    *
    * <p>The actual repository checks are stubbed here and will be connected once the Layer and Stil

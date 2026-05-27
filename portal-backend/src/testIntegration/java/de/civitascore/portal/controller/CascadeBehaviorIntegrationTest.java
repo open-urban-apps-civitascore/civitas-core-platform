@@ -4,12 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.DataStructure;
@@ -20,6 +22,7 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
@@ -53,6 +56,7 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private EntityManager entityManager;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private PipelineRepository pipelineRepository;
+  @Autowired private DataSinkRepository dataSinkRepository;
   @Autowired private DistributionRepository distributionRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private DataStructureRepository dataStructureRepository;
@@ -71,6 +75,7 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
   @AfterEach
   void cleanup() {
     assignmentRepository.deleteAll();
+    dataSinkRepository.deleteAll();
     pipelineRepository.deleteAll();
     distributionRepository.deleteAll();
     dataSetRepository.deleteAll();
@@ -140,6 +145,14 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
     DataSource ds = new DataSource();
     ds.setName(uniqueName("datasource"));
     return dataSourceRepository.save(ds);
+  }
+
+  private DataSink createDataSink(DataSet dataSet, Pipeline pipeline) {
+    DataSink sink = new DataSink();
+    sink.setDataSet(dataSet);
+    sink.setPipeline(pipeline);
+    sink.setDataSinkType(DataSinkType.FROST);
+    return dataSinkRepository.save(sink);
   }
 
   private DataSpace createDataSpace() {
@@ -230,6 +243,36 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
       entityManager.flush();
 
       assertThat(assignmentRepository.findById(assignmentId)).isEmpty();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pipeline cascades
+  // ---------------------------------------------------------------------------
+
+  @Nested
+  @DisplayName("Pipeline cascades")
+  class PipelineCascades {
+
+    @Test
+    @Transactional
+    @DisplayName("Deleting Pipeline row directly should set pipeline_id to NULL on its DataSinks")
+    void deletingPipelineRow_shouldSetPipelineIdNullOnDataSinks() {
+      DataSet dataSet = createDataSet();
+      Pipeline pipeline = createPipeline(dataSet);
+      DataSink sink = createDataSink(dataSet, pipeline);
+      UUID sinkId = sink.getId();
+
+      entityManager.flush();
+      entityManager.clear();
+
+      pipelineRepository.deleteById(pipeline.getId());
+      entityManager.flush();
+      entityManager.clear();
+
+      assertThat(dataSinkRepository.findById(sinkId))
+          .isPresent()
+          .hasValueSatisfying(s -> assertThat(s.getPipeline()).isNull());
     }
   }
 

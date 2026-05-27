@@ -267,6 +267,8 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
           "Cannot delete pipeline associated with a dataset that is not in DRAFT status.");
     }
 
+    dataSinkService.deleteByPipelineId(id);
+
     return pipeline;
   }
 }

@@ -697,6 +697,25 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should delete all DataSinks belonging to the pipeline when pipeline is deleted")
+    void shouldDeleteDataSinksWhenPipelineIsDeleted() {
+      UUID pipelineId = createTestEntity();
+      Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
+
+      DataSink sink = new DataSink();
+      sink.setDataSet(pipeline.getDataSet());
+      sink.setPipeline(pipeline);
+      sink.setDataSinkType(DataSinkType.FROST);
+      DataSink savedSink = dataSinkRepository.save(sink);
+      assertThat(dataSinkRepository.findByPipelineId(pipelineId)).hasSize(1);
+
+      ResponseEntity<Void> deleteResponse = performDelete(pipelineId);
+      assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+      assertThat(dataSinkRepository.findById(savedSink.getId())).isEmpty();
+    }
+
+    @Test
     @DisplayName("Should cascade delete pipeline data sources associations")
     void shouldCascadeDeletePipelineDataSourceAssociations() {
       DataSource ds1 = createAvailableTestDataSource();
