@@ -1,6 +1,6 @@
 import { useTranslations } from 'next-intl'
 import React from 'react'
-import { UseFormReturn } from 'react-hook-form'
+import { FieldPath, UseFormReturn } from 'react-hook-form'
 
 import { TextField } from '@/components/form/fields/TextField'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -9,18 +9,19 @@ import { WfsWmsApiFormData } from '@/types/namedApis'
 
 interface BoundingBoxConfigProps {
   form: UseFormReturn<WfsWmsApiFormData>
+  layerFieldIndex: number
   className?: string
 }
 
 const BBOX_FIELDS = ['minX', 'minY', 'maxX', 'maxY'] as const
 
 export const BoundingBoxConfig = (props: BoundingBoxConfigProps) => {
-  const { form, className } = props
+  const { form, layerFieldIndex, className } = props
   const tError = useTranslations()
   const t = useTranslations('datasets.overview.completion.apis.config.layer')
 
   const isMobile = useIsMobile()
-  const bbox = form.formState.errors.layer?.nativeBoundingBox
+  const bbox = form.formState.errors.layers?.[layerFieldIndex]?.nativeBoundingBox
   const bboxError = BBOX_FIELDS.map(f => bbox?.[f]?.message).find(Boolean)
 
   return (
@@ -36,7 +37,7 @@ export const BoundingBoxConfig = (props: BoundingBoxConfigProps) => {
               key={field}
               form={form}
               label={field}
-              name={`layer.nativeBoundingBox.${field}`}
+              name={`layers.${layerFieldIndex}.nativeBoundingBox.${field}` as FieldPath<WfsWmsApiFormData>}
               placeholder=""
               type="number"
               required

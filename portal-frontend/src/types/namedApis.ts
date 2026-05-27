@@ -130,9 +130,6 @@ export const StaApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) =>
   })
 
 export type StaApiFormData = z.input<ReturnType<typeof StaApiFormSchema>>
-export type StaApiPayloadData = {
-  baseInfo: NamedApiPayload
-}
 
 // ============================================================================
 // Types for Layer config
@@ -188,7 +185,7 @@ export const BoundingBoxSchema = z.object({
 })
 
 export const LayerFormSchema = z.object({
-  id: z.uuid(),
+  id: z.string(),
   title: z.string().trim().min(1, 'common.errors.required'),
   layerName: z.string().trim().min(1, 'common.errors.required'),
   description: z
@@ -214,7 +211,7 @@ export const LayerPayloadSchema = LayerBaseSchema.extend({
   defaultStyleId: z.uuid().optional().nullable(),
   bboxAutoCalculate: z.literal(false).default(false),
   nativeBoundingBox: BoundingBoxPayloadSchema,
-  latLonBoundingBox: BoundingBoxPayloadSchema,
+  latLonBoundingBox: BoundingBoxPayloadSchema.nullable(),
 })
 
 export type Layer = z.infer<typeof LayerSchema>
@@ -256,13 +253,7 @@ export const WfsWmsApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) =>
   z.object({
     type: z.literal(API_TYPE_QUERY.WFS_WMS),
     baseInfo: NamedApiBaseInfoFormSchema({ existingSlugs }),
-    layer: LayerFormSchema,
+    layers: z.array(LayerFormSchema),
   })
 
 export type WfsWmsApiFormData = z.infer<ReturnType<typeof WfsWmsApiFormSchema>>
-
-export const WfsWmsApiPayloadSchema = z.object({
-  baseInfo: NamedApiPayloadSchema,
-  layer: LayerPayloadSchema,
-})
-export type WfsWmsApiApiPayloadData = z.infer<typeof WfsWmsApiPayloadSchema>

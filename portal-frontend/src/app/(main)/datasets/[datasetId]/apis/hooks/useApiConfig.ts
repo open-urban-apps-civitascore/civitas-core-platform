@@ -7,11 +7,12 @@ import { UseFormReturn } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { useCreateNamedApi, usePatchDataset } from '@/app/services/api/datasets/clientRequests'
+import { useCreateLayer, useUpdateLayer } from '@/app/services/api/datasets/layers/clientRequests'
 import { useError } from '@/hooks/use-error'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { Dataset } from '@/types/datasets'
-import { API_TYPE_QUERY, NamedApi, NamedApiPayload, StaApiFormData, WfsWmsApiFormData } from '@/types/namedApis'
-import { buildStaPayloadData, buildWfsWmsPayload } from '@/utils/namedApis'
+import { API_TYPE_QUERY, LayerApiPayload, LayerFormData, NamedApi, NamedApiPayload, StaApiFormData, WfsWmsApiFormData } from '@/types/namedApis'
+import { buildStaPayloadData, buildWfsWmsPayload, mapFormLayerToPayload } from '@/utils/namedApis'
 
 type FormData = StaApiFormData | WfsWmsApiFormData
 interface UseApiConfigActionsArgs<TFormData extends FormData> {
@@ -20,7 +21,6 @@ interface UseApiConfigActionsArgs<TFormData extends FormData> {
   existingApi?: NamedApi
   otherNamedApis: NamedApi[]
   initialSlug: string
-  isCreateLayerMode?: boolean
 }
 
 const isWfsWmsFormData = (data: StaApiFormData | WfsWmsApiFormData) => data.type === API_TYPE_QUERY.WFS_WMS
@@ -36,7 +36,6 @@ export const useApiConfig = <TFormData extends FormData>({
   existingApi,
   otherNamedApis,
   initialSlug,
-  isCreateLayerMode = false,
 }: UseApiConfigActionsArgs<TFormData>) => {
   const t = useTranslations('datasets.overview.completion.apis.config')
   const router = useRouter()
@@ -50,8 +49,10 @@ export const useApiConfig = <TFormData extends FormData>({
 
   const createNamedApi = useCreateNamedApi()
   const updateDataset = usePatchDataset()
+  const createLayer = useCreateLayer()
+  const updateLayer = useUpdateLayer()
   const { handleFormValidationError } = useError()
-  const isLoading = createNamedApi.isPending || updateDataset.isPending
+  const isLoading = createNamedApi.isPending || updateDataset.isPending || createLayer.isPending || updateLayer.isPending
   const isDirty = form.formState.isDirty
   const dirtyFields = form.formState.dirtyFields
 
@@ -71,17 +72,16 @@ export const useApiConfig = <TFormData extends FormData>({
   )
 
   const handleSaveBaseInfo = async (data: TFormData) => {
-    console.log(dirtyFields)
     if (!dirtyFields.baseInfo) return
     const newApi = buildPayloadData(data)
     if (isCreate) {
       await createNamedApi.mutateAsync({
         datasetId: dataset.id,
-        api: newApi?.baseInfo,
+        api: newApi,
         existingApis: otherNamedApis,
       })
       toast.success(t('messages.createSuccess'))
-      router.push(`/datasets/${dataset.id}/apis/${newApi.baseInfo.slug}?mode=edit`)
+      router.push(`/datasets/${dataset.id}/apis/${newApi.slug}?mode=edit`)
     } else {
       const otherInputs: NamedApiPayload[] = otherNamedApis.map(a => ({
         name: a.name,
@@ -90,7 +90,7 @@ export const useApiConfig = <TFormData extends FormData>({
         version: a.version,
         description: a.description,
       }))
-      await updateDataset.mutateAsync({ id: dataset.id, namedApis: [...otherInputs, newApi.baseInfo] })
+      await updateDataset.mutateAsync({ id: dataset.id, namedApis: [...otherInputs, newApi] })
       toast.success(t('messages.updateSuccess'))
       form.reset(data)
       router.refresh()
@@ -98,11 +98,34 @@ export const useApiConfig = <TFormData extends FormData>({
     }
   }
 
-  const handleSaveLayers = (data: WfsWmsApiFormData) => {
+  const handleSaveLayers = async (data: WfsWmsApiFormData) => {
     const wfsDirtyFields = dirtyFields as Partial<Record<keyof WfsWmsApiFormData, unknown>>
-    if (!wfsDirtyFields.layer) return
-    if (isCreateLayerMode) console.log('create layer')
-    console.log('saving layers', data)
+    if (!wfsDirtyFields.layers) return
+
+    type LayersDirty = ({ [K in keyof LayerFormData]?: boolean } | undefined)[]
+    const layersDirty = (wfsDirtyFields.layers as LayersDirty) ?? []
+
+    const isNew = (layer: LayerFormData) => layer.id.startsWith('new-')
+
+    const isDirtyOrNew = (layer: LayerFormData, i: number) =>
+      isNew(layer) || !!(layersDirty[i] && Object.keys(layersDirty[i] as object).length > 0)
+
+    const layersToSave = data.layers.filter(isDirtyOrNew)
+    if (layersToSave.length === 0) return
+
+    const payloads: LayerApiPayload[] = mapFormLayerToPayload(layersToSave)
+    await Promise.all(
+      layersToSave.map(async (layer, i) => {
+        if (isNew(layer)) {
+          await createLayer.mutateAsync({ datasetId: dataset.id, data: payloads[i] })
+        } else {
+          await updateLayer.mutateAsync({ datasetId: dataset.id, layerId: layer.id, data: payloads[i] })
+        }
+      }),
+    )
+
+    if (layersToSave.some(isNew)) toast.success(t('messages.createLayerSuccess'))
+    if (layersToSave.some(l => !isNew(l))) toast.success(t('messages.updateLayerSuccess'))
   }
 
   const handleSave = async (): Promise<boolean> => {

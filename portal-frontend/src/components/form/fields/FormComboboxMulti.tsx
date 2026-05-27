@@ -14,6 +14,7 @@ interface FormComboboxMultiProps<T extends FieldValues> {
   items: SelectOption[]
   form: UseFormReturn<T>
   name: Path<T>
+  placeholder?: string
   // eslint-disable-next-line react/boolean-prop-naming
   required?: boolean
   // eslint-disable-next-line react/boolean-prop-naming
@@ -31,6 +32,7 @@ export const FormComboboxMulti = <T extends FieldValues>(props: FormComboboxMult
     items,
     form,
     name,
+    placeholder,
     required = false,
     disabled = false,
     hasSelectAllOption,
@@ -62,6 +64,8 @@ export const FormComboboxMulti = <T extends FieldValues>(props: FormComboboxMult
             <FormControl>
               <ComboboxMultiSelect
                 items={items}
+                value={field.value ?? []}
+                placeholder={placeholder}
                 hasSelectAllOption={hasSelectAllOption}
                 onValueChange={field.onChange}
                 disabled={disabled}

@@ -4,19 +4,18 @@ import {
   Layer,
   LayerApiPayload,
   LayerFormData,
+  NamedApiPayload,
   StaApiFormData,
-  StaApiPayloadData,
-  WfsWmsApiApiPayloadData,
   WfsWmsApiFormData,
 } from '@/types/namedApis'
 
-export const toBoundingBoxPayload = (bbox: WfsWmsApiFormData['layer']['nativeBoundingBox']) => ({
-  ...bbox,
-  minX: Number(bbox.minX),
-  minY: Number(bbox.minY),
-  maxX: Number(bbox.maxX),
-  maxY: Number(bbox.maxY),
-})
+type BoundingBoxPayload = { minX: number; minY: number; maxX: number; maxY: number; crs: string }
+export function toBoundingBoxPayload(bbox: LayerFormData['nativeBoundingBox']): BoundingBoxPayload
+export function toBoundingBoxPayload(bbox: LayerFormData['nativeBoundingBox'] | null): BoundingBoxPayload | null
+export function toBoundingBoxPayload(bbox: LayerFormData['nativeBoundingBox'] | null): BoundingBoxPayload | null {
+  if (!bbox) return null
+  return { ...bbox, minX: Number(bbox.minX), minY: Number(bbox.minY), maxX: Number(bbox.maxX), maxY: Number(bbox.maxY) }
+}
 
 export const toBoundingBoxFormData = (bbox: BoundingBox) => ({
   ...bbox,
@@ -37,7 +36,7 @@ export const mapApiLayerToFormData = (layers: Layer[]): LayerFormData[] =>
     cqlFilter: layer.cqlFilter || '',
     geometryColumnRef: layer.geometryColumnRef,
     nativeCRS: layer.nativeCRS,
-    crs: layer.crs,
+    crs: layer.crs || layer.nativeCRS,
     bboxAutoCalculate: false,
     nativeBoundingBox: toBoundingBoxFormData(layer.nativeBoundingBox),
     latLonBoundingBox: toBoundingBoxFormData(layer.latLonBoundingBox),
@@ -53,23 +52,13 @@ export const mapFormLayerToPayload = (layers: LayerFormData[]): LayerApiPayload[
     latLonBoundingBox: toBoundingBoxPayload(layer.latLonBoundingBox),
   }))
 
-export const buildStaPayloadData = (data: StaApiFormData): StaApiPayloadData => ({
-  baseInfo: { ...data.baseInfo, standard: DEFAULTS_BY_TYPE.sensorthings.standard },
+export const buildStaPayloadData = (data: StaApiFormData): NamedApiPayload => ({
+  ...data.baseInfo,
+  standard: DEFAULTS_BY_TYPE.sensorthings.standard,
 })
 
-export const buildWfsWmsPayload = (data: WfsWmsApiFormData): WfsWmsApiApiPayloadData => ({
-  baseInfo: {
-    ...data.baseInfo,
-    standard: DEFAULTS_BY_TYPE['wfs-wms'].standard,
-    description: data.baseInfo.description || undefined,
-  },
-  layer: {
-    ...data.layer,
-    dataSinkId: '',
-    description: data.layer.description || undefined,
-    nativeBoundingBox: toBoundingBoxPayload(data.layer.nativeBoundingBox),
-    latLonBoundingBox: toBoundingBoxPayload(data.layer.latLonBoundingBox),
-    defaultStyleId: data.layer.defaultStyleId || null,
-    alternativeStyleIds: data.layer.alternativeStyleIds,
-  },
+export const buildWfsWmsPayload = (data: WfsWmsApiFormData): NamedApiPayload => ({
+  ...data.baseInfo,
+  standard: DEFAULTS_BY_TYPE['wfs-wms'].standard,
+  description: data.baseInfo.description || undefined,
 })

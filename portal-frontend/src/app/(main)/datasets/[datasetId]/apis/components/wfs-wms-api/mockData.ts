@@ -38,6 +38,28 @@ export const mockLayerList: Layer[] = [
     createdAt: '2026-05-04T10:30:00',
     modifiedAt: '2026-05-04T10:30:00',
   },
+  {
+    id: '00000000-0000-0000-0000-000000000007',
+    datasetId: '00000000-0000-0000-0000-000000000002',
+    dataSinkId: '00000000-0000-0000-0000-000000000005',
+    layerName: 'green_spaces_polygons',
+    title: 'Green Spaces',
+    description: '',
+    keywords: [],
+    attribute: ['area_id', 'name', 'boundary'],
+    geometryColumnRef: 'boundary',
+    cqlFilter: null,
+    alternativeStyleIds: [],
+    crs: '',
+    defaultStyleId: null,
+    geometryType: 'POLYGON',
+    nativeCRS: 'EPSG:4326',
+    bboxAutoCalculate: false,
+    nativeBoundingBox: { minX: 5.8, minY: 47.2, maxX: 15.0, maxY: 55.0, crs: 'EPSG:4326' },
+    latLonBoundingBox: { minX: 5.8, minY: 47.2, maxX: 15.0, maxY: 55.0, crs: 'EPSG:4326' },
+    createdAt: '2026-05-04T10:30:00',
+    modifiedAt: '2026-05-04T10:30:00',
+  },
 ]
 
 export const mockDatastructureVersionSummary: DatastructureVersionSummary = {

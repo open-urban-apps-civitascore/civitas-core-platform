@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
-import { useForm, UseFormReturn } from 'react-hook-form'
+import { FieldPath, useFieldArray, useForm, UseFormReturn } from 'react-hook-form'
 
 import { useGetLayers } from '@/app/services/api/datasets/layers/clientRequests'
 import { useGetStyles } from '@/app/services/api/datasets/styles/clientRequests'
@@ -59,6 +59,7 @@ const defaultLayer: LayerFormData = {
   defaultStyleId: '',
   alternativeStyleIds: [],
 }
+
 interface WfsWmsApiConfigPageProps {
   dataset: Dataset
   existingApi?: NamedApi
@@ -83,16 +84,14 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
   const initialSlug = existingApi?.slug ?? defaults.defaultSlug
 
   const { data: datasinksData } = useGetDatasinks()
-
   const { data: layersData } = useGetLayers(dataset.id)
   const { data: stylesData } = useGetStyles(dataset.id)
 
   // TODO: remove mockData once API is working
   const layers = useMemo(() => mapApiLayerToFormData(layersData ? layersData.data : mockLayerList), [layersData])
   const styles = useMemo(() => stylesData?.data ?? mockStyleList, [stylesData])
-  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(layers[0].id || null)
-  const selectedLayer = layers.find(layer => layer.id === selectedLayerId) || defaultLayer
-  const isCreateLayerMode = !selectedLayerId
+
+  const [selectedLayerIndex, setSelectedLayerIndex] = useState<number | null>(layers.length > 0 ? 0 : null)
 
   const postgisDatasinks = (datasinksData?.data ?? [mockDatasink, mockDatasink2]).filter(
     datasink => datasink.dataSinkType === DATASINK_TYPES.POSTGIS,
@@ -128,7 +127,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
       description: existingApi?.description ?? '',
       persistence: defaults.persistenceValue,
     },
-    layer: selectedLayer,
+    layers,
   }
 
   const form = useForm<WfsWmsApiFormData>({
@@ -137,12 +136,24 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     defaultValues: wfsWmsDefaults,
   })
 
+  const { fields, append } = useFieldArray({ control: form.control, name: 'layers', keyName: '_key' })
+
   useEffect(() => {
     form.reset(wfsWmsDefaults)
+    setSelectedLayerIndex(layers.length > 0 ? 0 : null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existingApi?.id])
 
-  const completedTabs: ApiConfigTab[] = form.formState.isValid ? ['basicInfo'] : []
+  const baseInfoValues = form.watch('baseInfo')
+  const isBaseInfoValid = formSchema.shape.baseInfo.safeParse(baseInfoValues).success
+
+  const layersValues = form.watch('layers')
+  const isLayersValid = formSchema.shape.layers.safeParse(layersValues).success
+
+  const completedTabs: ApiConfigTab[] = [
+    ...(isBaseInfoValid ? (['basicInfo'] as ApiConfigTab[]) : []),
+    ...(isLayersValid ? (['layer'] as ApiConfigTab[]) : []),
+  ]
 
   const {
     isReadOnly,
@@ -162,33 +173,36 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     existingApi,
     otherNamedApis,
     initialSlug,
-    isCreateLayerMode,
   })
 
-  useEffect(() => {
-    if (selectedLayerId === null) {
-      form.setValue('layer', defaultLayer)
-    } else {
-      const layer = layers.find(l => l.id === selectedLayerId)
-      if (layer) form.setValue('layer', layer)
-    }
-  }, [selectedLayerId, layers, form])
-
-  const handleSelectLayer = (layerId: string | null) => {
-    setSelectedLayerId(layerId)
+  const handleSelectLayer = (index: number) => {
+    setSelectedLayerIndex(index)
   }
 
   const handleAddLayer = () => {
-    setSelectedLayerId(null)
+    const newIndex = fields.length
+    append({ ...defaultLayer, id: `new-${crypto.randomUUID()}` })
+    setSelectedLayerIndex(newIndex)
   }
 
   const handleTableChange = (datasinkId: string) => {
-    form.setValue('layer.dataSinkId', datasinkId, { shouldDirty: true })
+    if (selectedLayerIndex === null) return
+    form.setValue(`layers.${selectedLayerIndex}.dataSinkId` as FieldPath<WfsWmsApiFormData>, datasinkId, {
+      shouldDirty: true,
+    })
     const datasink = postgisDatasinks.find(d => d.id === datasinkId)
     const datastructure = postgisDatastructures.find(d => d.id === datasink?.configuration.dataStructureVersion.id)
     const umlClass = datastructure?.styles?.nodes[0].data.element as UMLClass | undefined
     const nativeCRS = umlClass?.attributes?.find(a => a.meta?.gisInfo?.crs)?.meta?.gisInfo?.crs ?? ''
-    form.setValue('layer.nativeCRS', nativeCRS, { shouldDirty: true })
+    form.setValue(`layers.${selectedLayerIndex}.nativeCRS` as FieldPath<WfsWmsApiFormData>, nativeCRS, {
+      shouldDirty: true,
+    })
+    const currentCrs = form.getValues(`layers.${selectedLayerIndex}.crs` as FieldPath<WfsWmsApiFormData>)
+    if (!currentCrs && nativeCRS) {
+      form.setValue(`layers.${selectedLayerIndex}.crs` as FieldPath<WfsWmsApiFormData>, nativeCRS, {
+        shouldDirty: true,
+      })
+    }
   }
 
   return (
@@ -226,11 +240,11 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
         {selectedTab === 'layer' && (
           <LayerConfig
             form={form}
-            existingLayers={layers}
+            existingLayers={fields}
             styles={styles}
             postgisDatasinks={postgisDatasinks}
             postGisDatastructures={postgisDatastructures}
-            selectedLayerId={selectedLayerId}
+            selectedLayerIndex={selectedLayerIndex}
             onSelectLayer={handleSelectLayer}
             onAddLayer={handleAddLayer}
             onTableChange={handleTableChange}

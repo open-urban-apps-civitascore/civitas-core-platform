@@ -325,6 +325,8 @@
               "sectionTitle": "Layer",
               "addLayer": "Layer hinzufügen",
               "deleteLayer": "Layer löschen",
+              "untitledLayer": "Unbenannter Layer {index}",
+              "newLayer": "Neuer Layer {index}",
               "baseInfo": {
                 "sectionTitle": "Basisinformationen",
                 "title": "Bezeichnung",
@@ -344,7 +346,7 @@
               "geometry": {
                 "sectionTitle": "Geometrie",
                 "geometryField": "Geometriefield",
-                "geometryFieldPlaceHolder": "Geometrie auswählen ...",
+                "geometryFieldPlaceHolder": "Geometriefeld auswählen ...",
                 "nativeCrs": "Natives Koordinatenreferenzsystem (CRS)",
                 "definedCrs": "Angegebenes Koordinatenreferenzsystem (CRS)",
                 "crsPlaceHolder": "CRS auswählen ...",
@@ -357,13 +359,17 @@
                 "standardStyle": "Standardanzeige",
                 "default": "Standard (Geoserver default)",
                 "alternativeStyles": "Alternative Stile",
+                "alternativeStylesPlaceHolder": "Alternative Stile auswählen ...",
                 "addAlternativeStyle": "Alternativen Stil hinzufügen"
               }
             },
             "messages": {
               "createSuccess": "API wurde erfolgreich angelegt.",
               "updateSuccess": "API wurde erfolgreich aktualisiert.",
-              "saveError": "Beim Speichern der API ist ein Fehler aufgetreten. Bitte versuche es erneut."
+              "saveError": "Beim Speichern der API ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "createLayerSuccess": "Layer wurde erfolgreich angelegt.",
+              "updateLayerSuccess": "Layer wurde erfolgreich aktualisiert.",
+              "saveLayerError": "Beim Speichern des Layers ist ein Fehler aufgetreten. Bitte versuche es erneut."
             },
             "errors": {
               "name": {

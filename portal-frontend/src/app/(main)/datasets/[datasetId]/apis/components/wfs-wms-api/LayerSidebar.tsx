@@ -6,31 +6,37 @@ import { LayerFormData } from '@/types/namedApis'
 
 interface LayerSidebarProps {
   existingLayers: LayerFormData[]
-  selectedLayerId: string | null
-  onSelectLayer: (layerId: string) => void
+  selectedLayerIndex: number | null
+  onSelectLayer: (index: number) => void
   onAddLayer: () => void
 }
 
-export const LayerSidebar = ({ existingLayers, selectedLayerId, onSelectLayer, onAddLayer }: LayerSidebarProps) => {
+export const LayerSidebar = ({ existingLayers, selectedLayerIndex, onSelectLayer, onAddLayer }: LayerSidebarProps) => {
   const t = useTranslations('datasets.overview.completion.apis.config.layer')
 
   return (
     <div className="flex w-52 shrink-0 flex-col gap-2 mt-6">
       <ul className="flex flex-col gap-1">
-        {existingLayers.map(layer => (
-          <li key={layer.id}>
-            <button
-              type="button"
-              onClick={() => onSelectLayer(layer.id)}
-              className={cn(
-                'w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm hover:bg-accent',
-                selectedLayerId === layer.id && 'bg-muted font-medium',
-              )}
-            >
-              {layer.title}
-            </button>
-          </li>
-        ))}
+        {existingLayers.map((layer, index) => {
+          const isNew = layer.id.startsWith('new-')
+          const fallbackKey = isNew ? 'newLayer' : 'untitledLayer'
+          const untitledIndex = !layer.title ? existingLayers.slice(0, index + 1).filter(l => !l.title).length : 0
+          const displayTitle = layer.title || t(fallbackKey, { index: untitledIndex })
+          return (
+            <li key={layer.id}>
+              <button
+                type="button"
+                onClick={() => onSelectLayer(index)}
+                className={cn(
+                  'w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm hover:bg-accent',
+                  selectedLayerIndex === index && 'bg-muted font-medium',
+                )}
+              >
+                {displayTitle}
+              </button>
+            </li>
+          )
+        })}
       </ul>
       <Button type="button" variant="outline" onClick={onAddLayer} className="mt-2">
         + {t('addLayer')}

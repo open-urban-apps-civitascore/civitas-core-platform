@@ -21,8 +21,9 @@ import { SelectOption } from '@/types/common'
 
 interface ComboboxMultiSelectProps {
   items: SelectOption[]
+  value: string[]
   hasSelectAllOption?: boolean
-  // makes it a controlled component
+  placeholder?: string
   onValueChange?: (newValues: string[]) => void
   testId?: string
   disabled?: ComboboxTriggerProps['disabled']
@@ -30,25 +31,24 @@ interface ComboboxMultiSelectProps {
   className?: string
 }
 export const ComboboxMultiSelect = (props: ComboboxMultiSelectProps) => {
-  const { items, hasSelectAllOption, onValueChange, testId, disabled, isInvalid, className } = props
+  const { items, value, hasSelectAllOption, placeholder, onValueChange, testId, disabled, isInvalid, className } = props
   const anchor = useComboboxAnchor()
-  const [selected, setSelected] = React.useState<string[]>(items[0] ? [items[0].value] : [])
 
   const labelByValue = React.useMemo(() => Object.fromEntries(items.map(o => [o.value, o.label])), [items])
   const allValues = React.useMemo(() => items.map(o => o.value), [items])
 
+  const selected = React.useMemo(() => {
+    const areAllSelected = allValues.length > 0 && allValues.every(v => value.includes(v))
+    return areAllSelected ? ['select_all', ...value] : value
+  }, [value, allValues])
+
   const handleValueChange = (newValues: string[]) => {
     if (newValues.includes('select_all') && !selected.includes('select_all')) {
-      setSelected(['select_all', ...allValues])
       onValueChange?.([...allValues])
     } else if (selected.includes('select_all') && !newValues.includes('select_all')) {
-      setSelected([])
       onValueChange?.([])
     } else {
-      const selectedValues = newValues.filter(v => v !== 'select_all')
-      const areAllValuesSelected = allValues.every(v => selectedValues.includes(v))
-      setSelected(areAllValuesSelected ? ['select_all', ...selectedValues] : selectedValues)
-      onValueChange?.([...selectedValues])
+      onValueChange?.(newValues.filter(v => v !== 'select_all'))
     }
   }
 
@@ -67,13 +67,15 @@ export const ComboboxMultiSelect = (props: ComboboxMultiSelectProps) => {
           {(values: string[]) => (
             <React.Fragment>
               {values
-                .filter(value => value !== 'select_all')
-                .map((value: string) => (
-                  <ComboboxChip key={value} aria-invalid={isInvalid}>
-                    {labelByValue[value] ?? value}
+                .filter(v => v !== 'select_all')
+                .map((v: string) => (
+                  <ComboboxChip key={v} aria-invalid={isInvalid}>
+                    {labelByValue[v] ?? v}
                   </ComboboxChip>
                 ))}
-              <ComboboxChipsInput />
+              <ComboboxChipsInput
+                placeholder={values.filter(v => v !== 'select_all').length === 0 ? placeholder : undefined}
+              />
             </React.Fragment>
           )}
         </ComboboxValue>
@@ -81,7 +83,7 @@ export const ComboboxMultiSelect = (props: ComboboxMultiSelectProps) => {
       <ComboboxContent anchor={anchor}>
         <ComboboxEmpty>No items found.</ComboboxEmpty>
         <ComboboxList>
-          {hasSelectAllOption && (
+          {hasSelectAllOption && items.length > 0 && (
             <>
               <ComboboxItem key="selectAll" value="select_all">
                 Select All

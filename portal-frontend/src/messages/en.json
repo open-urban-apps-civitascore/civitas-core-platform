@@ -326,6 +326,8 @@
               "title": "Layer",
               "addLayer": "Add Layer",
               "deleteLayer": "Delete Layer",
+              "untitledLayer": "Untitled Layer {index}",
+              "newLayer": "New Layer {index}",
               "baseInfo": {
                 "sectionTitle": "Base Information",
                 "title": "Title",
@@ -345,7 +347,7 @@
               "geometry": {
                 "sectionTitle": "Geometry",
                 "geometryField": "Geometry Field",
-                "geometryFieldPlaceHolder": "Select Geometry ...",
+                "geometryFieldPlaceHolder": "Select Geometry Field ...",
                 "nativeCrs": "Native Coordinate Reference System (CRS)",
                 "definedCrs": "Defined Coordinate Reference System (CRS)",
                 "crsPlaceHolder": "Select CRS ...",
@@ -358,13 +360,17 @@
                 "standardStyle": "Standard Style",
                 "default": "Standard (Geoserver default)",
                 "alternativeStyles": "Alternative Styles",
+                "alternativeStylesPlaceHolder": "Select Alternative Styles ...",
                 "addAlternativeStyle": "Add an alternative style"
               }
             },
             "messages": {
               "createSuccess": "API has been successfully created.",
               "updateSuccess": "API has been successfully updated.",
-              "saveError": "An error occurred while saving the API. Please try again."
+              "saveError": "An error occurred while saving the API. Please try again.",
+              "createLayerSuccess": "Layer has been successfully created.",
+              "updateLayerSuccess": "Layer has been successfully updated.",
+              "saveLayerError": "An error occurred while saving the layer. Please try again."
             },
             "errors": {
               "name": {
