@@ -64,6 +64,7 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
     return switch (type) {
       case FROST -> new FrostConfiguration();
       case POSTGIS -> buildPostgisConfiguration(raw);
+      default -> null;
     };
   }
 
