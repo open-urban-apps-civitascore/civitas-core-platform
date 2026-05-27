@@ -1231,6 +1231,36 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should return 400 when creating a pipeline with a DataSink missing dataSinkType")
+    void shouldRejectCreateWithDataSinkMissingType() {
+      DataSinkInputDTO invalidSink = new DataSinkInputDTO();
+      // dataSinkType intentionally null
+      invalidSink.setConfiguration(Map.of());
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSinks(List.of(invalidSink));
+
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should return 400 when creating a pipeline with a DataSink missing configuration")
+    void shouldRejectCreateWithDataSinkMissingConfiguration() {
+      DataSinkInputDTO invalidSink = new DataSinkInputDTO();
+      invalidSink.setDataSinkType(DataSinkType.FROST);
+      // configuration intentionally null
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSinks(List.of(invalidSink));
+
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     @DisplayName("GET pipeline includes its DataSinks in the response")
     void shouldReturnDataSinksInGetResponse() {
       UUID pipelineId = createTestEntity();
