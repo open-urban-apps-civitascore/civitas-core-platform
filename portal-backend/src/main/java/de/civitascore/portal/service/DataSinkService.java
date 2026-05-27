@@ -185,8 +185,8 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
           "DataSink", "configuration", "POSTGIS sinks require a non-null configuration");
     }
 
-    String tableName = (String) config.get("tableName");
-    if (tableName == null || tableName.isBlank()) {
+    Object tableNameRaw = config.get("tableName");
+    if (!(tableNameRaw instanceof String tableName) || tableName.isBlank()) {
       throw new InvalidInputException(
           "DataSink", "configuration.tableName", "tableName is required for POSTGIS sinks");
     }

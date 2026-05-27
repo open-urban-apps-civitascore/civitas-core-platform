@@ -223,6 +223,31 @@ class DataSinkServiceTest {
     }
 
     @Test
+    @DisplayName("Should throw InvalidInputException when tableName is not a String")
+    void shouldThrowWhenTableNameIsNotAString() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID pipelineId = UUID.randomUUID();
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(dataSetId);
+      dataSet.setName("ds");
+
+      Pipeline pipeline = new Pipeline();
+      pipeline.setId(pipelineId);
+      pipeline.setName("pl");
+      pipeline.setDataSet(dataSet);
+
+      DataSinkInputDTO input = basePostgisInput(dataSetId, pipelineId);
+      input.setConfiguration(
+          Map.of("tableName", 42, "dataStructureVersionId", UUID.randomUUID().toString()));
+
+      stubDataSetAndPipeline(dataSetId, pipelineId, dataSet, pipeline);
+
+      assertThatThrownBy(() -> dataSinkService.create(input))
+          .isInstanceOf(InvalidInputException.class);
+    }
+
+    @Test
     @DisplayName("Should throw InvalidInputException when tableName is blank")
     void shouldThrowWhenTableNameBlank() {
       UUID dataSetId = UUID.randomUUID();
