@@ -245,6 +245,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
             postgisDatasinks={postgisDatasinks}
             postGisDatastructures={postgisDatastructures}
             selectedLayerIndex={selectedLayerIndex}
+            isReadOnly={isReadOnly}
             onSelectLayer={handleSelectLayer}
             onAddLayer={handleAddLayer}
             onTableChange={handleTableChange}

@@ -7,11 +7,18 @@ import { LayerFormData } from '@/types/namedApis'
 interface LayerSidebarProps {
   existingLayers: LayerFormData[]
   selectedLayerIndex: number | null
+  isReadOnly: boolean
   onSelectLayer: (index: number) => void
   onAddLayer: () => void
 }
 
-export const LayerSidebar = ({ existingLayers, selectedLayerIndex, onSelectLayer, onAddLayer }: LayerSidebarProps) => {
+export const LayerSidebar = ({
+  existingLayers,
+  selectedLayerIndex,
+  isReadOnly,
+  onSelectLayer,
+  onAddLayer,
+}: LayerSidebarProps) => {
   const t = useTranslations('datasets.overview.completion.apis.config.layer')
 
   return (
@@ -38,9 +45,11 @@ export const LayerSidebar = ({ existingLayers, selectedLayerIndex, onSelectLayer
           )
         })}
       </ul>
-      <Button type="button" variant="outline" onClick={onAddLayer} className="mt-2">
-        + {t('addLayer')}
-      </Button>
+      {!isReadOnly && (
+        <Button type="button" variant="outline" onClick={onAddLayer} className="mt-2">
+          + {t('addLayer')}
+        </Button>
+      )}
     </div>
   )
 }

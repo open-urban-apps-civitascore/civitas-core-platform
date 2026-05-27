@@ -23,6 +23,7 @@ interface LayerConfigProps {
   postgisDatasinks: Datasink[]
   postGisDatastructures: DatastructureVersion[]
   selectedLayerIndex: number | null
+  isReadOnly: boolean
   onSelectLayer: (index: number) => void
   onAddLayer: () => void
   onTableChange: (datasinkId: string) => void
@@ -45,6 +46,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
     postgisDatasinks,
     postGisDatastructures,
     selectedLayerIndex,
+    isReadOnly,
     onSelectLayer,
     onAddLayer,
     onTableChange,
@@ -94,6 +96,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
         <LayerSidebar
           existingLayers={existingLayers}
           selectedLayerIndex={selectedLayerIndex}
+          isReadOnly={isReadOnly}
           onSelectLayer={onSelectLayer}
           onAddLayer={onAddLayer}
         />
@@ -109,6 +112,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 name={lp('title')}
                 placeholder={t('baseInfo.title')}
                 required
+                disabled={isReadOnly}
                 formItemProps={wideField}
               />
             </DetailsFieldContainer>
@@ -119,6 +123,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 name={lp('layerName')}
                 placeholder={t('baseInfo.technicalName')}
                 required
+                disabled={isReadOnly}
                 formItemProps={wideField}
               />
             </DetailsFieldContainer>
@@ -128,6 +133,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 label={t('baseInfo.description')}
                 name={lp('description')}
                 placeholder={t('baseInfo.description')}
+                disabled={isReadOnly}
                 formItemProps={wideField}
               />
             </DetailsFieldContainer>
@@ -146,6 +152,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 formItemProps={wideField}
                 placeholder={t('dataSelection.tablePlaceHolder')}
                 required
+                disabled={isReadOnly}
               />
             </DetailsFieldContainer>
             <DetailsFieldContainer className="border-b-0 py-2">
@@ -158,6 +165,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 placeholder={t('dataSelection.attributesPlaceHolder')}
                 required
                 hasSelectAllOption
+                disabled={isReadOnly}
                 formItemProps={wideField}
               />
             </DetailsFieldContainer>
@@ -167,6 +175,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 label={t('dataSelection.filter')}
                 name={lp('cqlFilter')}
                 placeholder={t('dataSelection.filter')}
+                disabled={isReadOnly}
                 formItemProps={wideField}
               />
             </DetailsFieldContainer>
@@ -183,6 +192,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 options={attributeOptions}
                 placeholder={t('geometry.geometryFieldPlaceHolder')}
                 required
+                disabled={isReadOnly}
                 formItemProps={wideField}
               />
             </DetailsFieldContainer>
@@ -205,6 +215,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 id="wfsWmsLayerCrs"
                 options={crsOptions}
                 placeholder={t('geometry.crsPlaceHolder')}
+                disabled={isReadOnly}
                 formItemProps={wideField}
               />
             </DetailsFieldContainer>
@@ -213,6 +224,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 form={form}
                 layerFieldIndex={selectedLayerIndex}
                 className="grid-cols-[minmax(0,270px)_minmax(0,512px)]"
+                isDisabled={isReadOnly}
               />
               <div className="grid grid-cols-[minmax(0,270px)_minmax(0,512px)]">
                 <div />
@@ -221,7 +233,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    disabled={!crsWatch}
+                    disabled={!crsWatch || isReadOnly}
                     onClick={handleCalculateFromCrs}
                     className="text-xs h-7 px-2 hover:text-primary hover:bg-transparent"
                   >
@@ -242,6 +254,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 name={lp('defaultStyleId')}
                 options={styleOptions}
                 placeholder={t('style.default')}
+                disabled={isReadOnly}
                 formItemProps={wideField}
               />
             </DetailsFieldContainer>
@@ -253,6 +266,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 label={t('style.alternativeStyles')}
                 name={lp('alternativeStyleIds')}
                 placeholder={t('style.alternativeStylesPlaceHolder')}
+                disabled={isReadOnly}
                 formItemProps={wideField}
               />
             </DetailsFieldContainer>

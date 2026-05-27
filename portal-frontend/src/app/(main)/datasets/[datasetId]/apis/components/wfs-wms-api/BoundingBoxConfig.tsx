@@ -11,12 +11,13 @@ interface BoundingBoxConfigProps {
   form: UseFormReturn<WfsWmsApiFormData>
   layerFieldIndex: number
   className?: string
+  isDisabled?: boolean
 }
 
 const BBOX_FIELDS = ['minX', 'minY', 'maxX', 'maxY'] as const
 
 export const BoundingBoxConfig = (props: BoundingBoxConfigProps) => {
-  const { form, layerFieldIndex, className } = props
+  const { form, layerFieldIndex, className, isDisabled } = props
   const tError = useTranslations()
   const t = useTranslations('datasets.overview.completion.apis.config.layer')
 
@@ -41,6 +42,7 @@ export const BoundingBoxConfig = (props: BoundingBoxConfigProps) => {
               placeholder=""
               type="number"
               required
+              disabled={isDisabled}
               shouldShowErrors={false}
               formItemProps={{ className: 'flex flex-col gap-1' }}
             />
