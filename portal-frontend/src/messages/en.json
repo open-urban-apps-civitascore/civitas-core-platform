@@ -362,6 +362,14 @@
                 "alternativeStyles": "Alternative Styles",
                 "alternativeStylesPlaceHolder": "Select Alternative Styles ...",
                 "addAlternativeStyle": "Add an alternative style"
+              },
+              "deleteConfirm": {
+                "title": "Really delete layer?",
+                "description": "This change has the following effects:",
+                "impact1": "The layer will no longer be available",
+                "impact2": "The display in connected services will change",
+                "impact3": "External applications may be affected if they use this layer",
+                "confirm": "Delete Layer"
               }
             },
             "messages": {
@@ -370,7 +378,9 @@
               "saveError": "An error occurred while saving the API. Please try again.",
               "createLayerSuccess": "Layer has been successfully created.",
               "updateLayerSuccess": "Layer has been successfully updated.",
-              "saveLayerError": "An error occurred while saving the layer. Please try again."
+              "saveLayerError": "An error occurred while saving the layer. Please try again.",
+              "deleteLayerSuccess": "Layer has been successfully deleted.",
+              "deleteLayerError": "An error occurred while deleting the layer. Please try again."
             },
             "errors": {
               "name": {

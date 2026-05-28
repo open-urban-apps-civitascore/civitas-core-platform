@@ -65,12 +65,13 @@ export const FormComboboxMulti = <T extends FieldValues>(props: FormComboboxMult
               <ComboboxMultiSelect
                 items={items}
                 value={field.value ?? []}
-                placeholder={placeholder}
+                placeholder={disabled ? undefined : placeholder}
                 hasSelectAllOption={hasSelectAllOption}
                 onValueChange={field.onChange}
                 disabled={disabled}
                 isInvalid={fieldState.invalid}
                 testId={`${String(name)}Combobox`}
+                className={disabled ? 'border-transparent shadow-none pointer-events-none opacity-100' : undefined}
               />
             </FormControl>
             {shouldShowErrors && <FormMessage data-testid={`${String(name)}FormMessage`} className="mt-2" />}

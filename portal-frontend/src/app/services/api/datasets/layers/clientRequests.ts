@@ -51,3 +51,19 @@ export const useUpdateLayer = () => {
     },
   })
 }
+
+export const useDeleteLayer = () => {
+  const queryClient = useQueryClient()
+  return useMutation<ApiServiceResponse<void>, AxiosError, { datasetId: string; layerId: string }>({
+    mutationFn: ({ datasetId, layerId }) =>
+      apiRequest<void>({
+        method: 'DELETE',
+        endpoint: `/datasets/${datasetId}/layers/${layerId}`,
+        headers: { 'x-api-request': 'true' },
+        errorMessage: 'An error occurred while deleting the layer.',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [key] })
+    },
+  })
+}

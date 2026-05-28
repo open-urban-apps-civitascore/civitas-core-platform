@@ -361,6 +361,14 @@
                 "alternativeStyles": "Alternative Stile",
                 "alternativeStylesPlaceHolder": "Alternative Stile auswählen ...",
                 "addAlternativeStyle": "Alternativen Stil hinzufügen"
+              },
+              "deleteConfirm": {
+                "title": "Layer wirklich löschen?",
+                "description": "Diese Änderung hat folgende Auswirkungen:",
+                "impact1": "Der Layer ist nicht mehr verfügbar",
+                "impact2": "Die Darstellung in verbundenen Diensten ändert sich",
+                "impact3": "Externe Anwendungen können betroffen sein, wenn sie diesen Layer verwenden",
+                "confirm": "Layer löschen"
               }
             },
             "messages": {
@@ -369,7 +377,9 @@
               "saveError": "Beim Speichern der API ist ein Fehler aufgetreten. Bitte versuche es erneut.",
               "createLayerSuccess": "Layer wurde erfolgreich angelegt.",
               "updateLayerSuccess": "Layer wurde erfolgreich aktualisiert.",
-              "saveLayerError": "Beim Speichern des Layers ist ein Fehler aufgetreten. Bitte versuche es erneut."
+              "saveLayerError": "Beim Speichern des Layers ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "deleteLayerSuccess": "Layer wurde erfolgreich gelöscht.",
+              "deleteLayerError": "Beim Löschen des Layers ist ein Fehler aufgetreten. Bitte versuche es erneut."
             },
             "errors": {
               "name": {

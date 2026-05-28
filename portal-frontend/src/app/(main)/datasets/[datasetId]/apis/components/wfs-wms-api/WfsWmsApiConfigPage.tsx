@@ -4,8 +4,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { FieldPath, useFieldArray, useForm, UseFormReturn } from 'react-hook-form'
+import { toast } from 'sonner'
 
-import { useGetLayers } from '@/app/services/api/datasets/layers/clientRequests'
+import { useDeleteLayer, useGetLayers } from '@/app/services/api/datasets/layers/clientRequests'
 import { useGetStyles } from '@/app/services/api/datasets/styles/clientRequests'
 import { useGetDatasinks } from '@/app/services/api/datasinks/clientRequests'
 import { Form } from '@/components/ui/form'
@@ -136,7 +137,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     defaultValues: wfsWmsDefaults,
   })
 
-  const { fields, append } = useFieldArray({ control: form.control, name: 'layers', keyName: '_key' })
+  const { fields, append, remove } = useFieldArray({ control: form.control, name: 'layers', keyName: '_key' })
 
   useEffect(() => {
     form.reset(wfsWmsDefaults)
@@ -185,6 +186,26 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     const newIndex = fields.length
     append({ ...defaultLayer, id: `new-${crypto.randomUUID()}` })
     setSelectedLayerIndex(newIndex)
+  }
+
+  const deleteLayer = useDeleteLayer()
+
+  const handleDeleteLayer = async () => {
+    if (selectedLayerIndex === null) return
+    const layer = fields[selectedLayerIndex]
+    const isNew = layer.id.startsWith('new-')
+    if (!isNew) {
+      try {
+        await deleteLayer.mutateAsync({ datasetId: dataset.id, layerId: layer.id })
+        toast.success(t('messages.deleteLayerSuccess'))
+      } catch {
+        toast.error(t('messages.deleteLayerError'))
+        throw new Error()
+      }
+    }
+    remove(selectedLayerIndex)
+    const remaining = fields.length - 1
+    setSelectedLayerIndex(remaining === 0 ? null : Math.min(selectedLayerIndex, remaining - 1))
   }
 
   const handleTableChange = (datasinkId: string) => {
@@ -247,8 +268,10 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
             postGisDatastructures={postgisDatastructures}
             selectedLayerIndex={selectedLayerIndex}
             isReadOnly={isReadOnly}
+            isDeleteLayerLoading={deleteLayer.isPending}
             onSelectLayer={handleSelectLayer}
             onAddLayer={handleAddLayer}
+            onDeleteLayer={handleDeleteLayer}
             onTableChange={handleTableChange}
           />
         )}

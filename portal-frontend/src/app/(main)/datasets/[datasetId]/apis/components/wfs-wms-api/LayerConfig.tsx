@@ -1,10 +1,13 @@
+import { Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { useState } from 'react'
 import { FieldPath, UseFormReturn } from 'react-hook-form'
 
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { FormComboboxMulti } from '@/components/form/fields/FormComboboxMulti'
 import { FormSelect } from '@/components/form/fields/FormSelect'
 import { TextField } from '@/components/form/fields/TextField'
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { FormItem, FormLabel } from '@/components/ui/form'
@@ -27,8 +30,10 @@ interface LayerConfigProps {
   postGisDatastructures: DatastructureVersion[]
   selectedLayerIndex: number | null
   isReadOnly: boolean
+  isDeleteLayerLoading?: boolean
   onSelectLayer: (index: number) => void
   onAddLayer: () => void
+  onDeleteLayer?: () => Promise<void>
   onTableChange: (datasinkId: string) => void
 }
 
@@ -50,13 +55,35 @@ export const LayerConfig = (props: LayerConfigProps) => {
     postGisDatastructures,
     selectedLayerIndex,
     isReadOnly,
+    isDeleteLayerLoading,
     onSelectLayer,
     onAddLayer,
+    onDeleteLayer,
     onTableChange,
   } = props
   const t = useTranslations('datasets.overview.completion.apis.config.layer')
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
 
-  const lp = (path: string): FieldPath<WfsWmsApiFormData> =>
+  const isSelectedLayerNewAndClean = () => {
+    if (selectedLayerIndex === null) return false
+    const layer = form.getValues(`layers.${selectedLayerIndex}`)
+    if (!layer?.id.startsWith('new-')) return false
+    return !layer.title && !layer.layerName && !layer.dataSinkId
+  }
+
+  const handleDeleteClick = () => {
+    if (isSelectedLayerNewAndClean()) {
+      void onDeleteLayer?.()
+    } else {
+      setIsDeleteModalOpen(true)
+    }
+  }
+
+  const handleConfirmDelete = () => {
+    void onDeleteLayer?.().then(() => setIsDeleteModalOpen(false))
+  }
+
+  const layerPath = (path: string): FieldPath<WfsWmsApiFormData> =>
     `layers.${selectedLayerIndex}.${path}` as FieldPath<WfsWmsApiFormData>
 
   const allLayers = form.watch('layers')
@@ -69,10 +96,10 @@ export const LayerConfig = (props: LayerConfigProps) => {
     const crsOption = crsOptions.find(o => o.value === crsWatch)
     if (!crsOption) return
     const [minX, minY, maxX, maxY] = crsOption.nativeBounds
-    form.setValue(lp('nativeBoundingBox.minX'), String(minX), { shouldDirty: true, shouldValidate: true })
-    form.setValue(lp('nativeBoundingBox.minY'), String(minY), { shouldDirty: true, shouldValidate: true })
-    form.setValue(lp('nativeBoundingBox.maxX'), String(maxX), { shouldDirty: true, shouldValidate: true })
-    form.setValue(lp('nativeBoundingBox.maxY'), String(maxY), { shouldDirty: true, shouldValidate: true })
+    form.setValue(layerPath('nativeBoundingBox.minX'), String(minX), { shouldDirty: true, shouldValidate: true })
+    form.setValue(layerPath('nativeBoundingBox.minY'), String(minY), { shouldDirty: true, shouldValidate: true })
+    form.setValue(layerPath('nativeBoundingBox.maxX'), String(maxX), { shouldDirty: true, shouldValidate: true })
+    form.setValue(layerPath('nativeBoundingBox.maxY'), String(maxY), { shouldDirty: true, shouldValidate: true })
   }
 
   const wideField = { className: 'grid-cols-[minmax(0,270px)_minmax(0,512px)]' }
@@ -115,7 +142,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
               <TextField
                 form={form}
                 label={t('baseInfo.title')}
-                name={lp('title')}
+                name={layerPath('title')}
                 placeholder={t('baseInfo.title')}
                 required
                 disabled={isReadOnly}
@@ -126,7 +153,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
               <TextField
                 form={form}
                 label={t('baseInfo.technicalName')}
-                name={lp('layerName')}
+                name={layerPath('layerName')}
                 placeholder={t('baseInfo.technicalName')}
                 required
                 disabled={isReadOnly}
@@ -137,7 +164,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
               <TextField
                 form={form}
                 label={t('baseInfo.description')}
-                name={lp('description')}
+                name={layerPath('description')}
                 placeholder={t('baseInfo.description')}
                 disabled={isReadOnly}
                 formItemProps={wideField}
@@ -152,7 +179,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 form={form}
                 id="tableSelect"
                 label={t('dataSelection.table')}
-                name={lp('dataSinkId')}
+                name={layerPath('dataSinkId')}
                 options={tableOptions}
                 onChange={onTableChange}
                 formItemProps={wideField}
@@ -167,7 +194,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 id="layerAttribute"
                 items={attributeOptions}
                 label={t('dataSelection.attributes')}
-                name={lp('attribute')}
+                name={layerPath('attribute')}
                 placeholder={t('dataSelection.attributesPlaceHolder')}
                 required
                 hasSelectAllOption
@@ -179,7 +206,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
               <TextField
                 form={form}
                 label={t('dataSelection.filter')}
-                name={lp('cqlFilter')}
+                name={layerPath('cqlFilter')}
                 placeholder={t('dataSelection.filter')}
                 disabled={isReadOnly}
                 formItemProps={wideField}
@@ -194,7 +221,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 form={form}
                 id="geometryColumnRef"
                 label={t('geometry.geometryField')}
-                name={lp('geometryColumnRef')}
+                name={layerPath('geometryColumnRef')}
                 options={attributeOptions}
                 placeholder={t('geometry.geometryFieldPlaceHolder')}
                 required
@@ -217,7 +244,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
               <FormSelect
                 form={form}
                 label={t('geometry.definedCrs')}
-                name={lp('crs')}
+                name={layerPath('crs')}
                 id="wfsWmsLayerCrs"
                 options={crsOptions}
                 disabled={isReadOnly}
@@ -256,7 +283,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 form={form}
                 id="defaultStyleId"
                 label={t('style.standardStyle')}
-                name={lp('defaultStyleId')}
+                name={layerPath('defaultStyleId')}
                 options={styleOptions}
                 placeholder={t('style.default')}
                 disabled={isReadOnly}
@@ -269,15 +296,49 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 id="alternativeStyleIds"
                 items={styleOptions}
                 label={t('style.alternativeStyles')}
-                name={lp('alternativeStyleIds')}
+                name={layerPath('alternativeStyleIds')}
                 placeholder={t('style.alternativeStylesPlaceHolder')}
                 disabled={isReadOnly}
                 formItemProps={wideField}
               />
             </DetailsFieldContainer>
+            {!isReadOnly && onDeleteLayer && (
+              <div className="flex justify-end pt-4 pb-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  // className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5"
+                  onClick={handleDeleteClick}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {t('deleteLayer')}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      <WarningModal
+        open={isDeleteModalOpen}
+        onOpenChange={setIsDeleteModalOpen}
+        title={t('deleteConfirm.title')}
+        description={
+          <>
+            <span>{t('deleteConfirm.description')}</span>
+            <ul className="mt-2 list-disc pl-5 space-y-1">
+              <li>{t('deleteConfirm.impact1')}</li>
+              <li>{t('deleteConfirm.impact2')}</li>
+              <li>{t('deleteConfirm.impact3')}</li>
+            </ul>
+          </>
+        }
+        confirmButtonTitle={t('deleteConfirm.confirm')}
+        onDiscard={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        isLoading={isDeleteLayerLoading}
+      />
     </>
   )
 }
