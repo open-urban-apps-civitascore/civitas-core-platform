@@ -25,7 +25,7 @@ export const LayerSidebar = ({
     <div className="flex w-52 shrink-0 flex-col gap-2 mt-6">
       <ul className="flex flex-col gap-1">
         {existingLayers.map((layer, index) => {
-          const isNew = layer.id.startsWith('new-')
+          const isNew = layer.id?.startsWith('new-') ?? false
           const fallbackKey = isNew ? 'newLayer' : 'untitledLayer'
           const untitledIndex = !layer.title ? existingLayers.slice(0, index + 1).filter(l => !l.title).length : 0
           const displayTitle = layer.title || t(fallbackKey, { index: untitledIndex })

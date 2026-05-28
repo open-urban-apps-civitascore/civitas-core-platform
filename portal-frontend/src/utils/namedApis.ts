@@ -47,7 +47,7 @@ export const mapApiLayerToFormData = (layers: Layer[]): LayerFormData[] =>
 export const mapFormLayerToPayload = (layers: LayerFormData[]): LayerApiPayload[] =>
   layers.map(layer => ({
     ...layer,
-    defaultStyleId: layer.defaultStyleId || null,
+    defaultStyleId: layer.defaultStyleId && layer.defaultStyleId !== 'none' ? layer.defaultStyleId : null,
     nativeBoundingBox: toBoundingBoxPayload(layer.nativeBoundingBox),
     latLonBoundingBox: toBoundingBoxPayload(layer.latLonBoundingBox),
   }))

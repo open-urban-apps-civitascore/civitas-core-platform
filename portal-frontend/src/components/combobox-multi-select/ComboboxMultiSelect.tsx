@@ -69,7 +69,7 @@ export const ComboboxMultiSelect = (props: ComboboxMultiSelectProps) => {
               {values
                 .filter(v => v !== 'select_all')
                 .map((v: string) => (
-                  <ComboboxChip key={v} aria-invalid={isInvalid}>
+                  <ComboboxChip key={v} aria-invalid={isInvalid} showRemove={!disabled}>
                     {labelByValue[v] ?? v}
                   </ComboboxChip>
                 ))}

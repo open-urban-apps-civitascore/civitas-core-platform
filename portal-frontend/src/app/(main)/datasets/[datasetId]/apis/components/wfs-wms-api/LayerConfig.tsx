@@ -7,8 +7,11 @@ import { FormSelect } from '@/components/form/fields/FormSelect'
 import { TextField } from '@/components/form/fields/TextField'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
+import { FormItem, FormLabel } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 import { UMLAttribute, UMLClass } from '@/components/uml-modeler/types/uml'
 import { crsOptions } from '@/const/crs'
+import { cn } from '@/lib/utils'
 import { Datasink } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
 import { LayerFormData, Style, WfsWmsApiFormData } from '@/types/namedApis'
@@ -66,13 +69,16 @@ export const LayerConfig = (props: LayerConfigProps) => {
     const crsOption = crsOptions.find(o => o.value === crsWatch)
     if (!crsOption) return
     const [minX, minY, maxX, maxY] = crsOption.nativeBounds
-    form.setValue(lp('nativeBoundingBox.minX'), String(minX), { shouldDirty: true })
-    form.setValue(lp('nativeBoundingBox.minY'), String(minY), { shouldDirty: true })
-    form.setValue(lp('nativeBoundingBox.maxX'), String(maxX), { shouldDirty: true })
-    form.setValue(lp('nativeBoundingBox.maxY'), String(maxY), { shouldDirty: true })
+    form.setValue(lp('nativeBoundingBox.minX'), String(minX), { shouldDirty: true, shouldValidate: true })
+    form.setValue(lp('nativeBoundingBox.minY'), String(minY), { shouldDirty: true, shouldValidate: true })
+    form.setValue(lp('nativeBoundingBox.maxX'), String(maxX), { shouldDirty: true, shouldValidate: true })
+    form.setValue(lp('nativeBoundingBox.maxY'), String(maxY), { shouldDirty: true, shouldValidate: true })
   }
 
   const wideField = { className: 'grid-cols-[minmax(0,270px)_minmax(0,512px)]' }
+
+  const nativeCRSLabel =
+    crsOptions.find(o => o.value === selectedLayer?.nativeCRS)?.label ?? selectedLayer?.nativeCRS ?? ''
 
   const styleOptions = styles.map(style => ({ value: style.id, label: style.name }))
 
@@ -197,15 +203,15 @@ export const LayerConfig = (props: LayerConfigProps) => {
               />
             </DetailsFieldContainer>
             <DetailsFieldContainer className="border-b-0 py-2">
-              <TextField
-                form={form}
-                label={t('geometry.nativeCrs')}
-                name={lp('nativeCRS')}
-                className="disabled:opacity-100 disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
-                disabled={true}
-                placeholder=""
-                formItemProps={wideField}
-              />
+              <FormItem className={cn('grid', wideField.className)}>
+                <FormLabel>{t('geometry.nativeCrs')}</FormLabel>
+                <Input
+                  value={nativeCRSLabel}
+                  disabled
+                  readOnly
+                  className="disabled:opacity-100 disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
+                />
+              </FormItem>
             </DetailsFieldContainer>
             <DetailsFieldContainer className="border-b-0 py-2 pb-6 flex flex-col gap-2">
               <FormSelect
@@ -214,7 +220,6 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 name={lp('crs')}
                 id="wfsWmsLayerCrs"
                 options={crsOptions}
-                placeholder={t('geometry.crsPlaceHolder')}
                 disabled={isReadOnly}
                 formItemProps={wideField}
               />

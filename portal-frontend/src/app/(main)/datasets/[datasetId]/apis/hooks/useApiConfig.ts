@@ -11,7 +11,16 @@ import { useCreateLayer, useUpdateLayer } from '@/app/services/api/datasets/laye
 import { useError } from '@/hooks/use-error'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { Dataset } from '@/types/datasets'
-import { API_TYPE_QUERY, LayerApiPayload, LayerFormData, NamedApi, NamedApiPayload, StaApiFormData, WfsWmsApiFormData } from '@/types/namedApis'
+import {
+  API_TYPE_QUERY,
+  LayerApiPayload,
+  LayerFormData,
+  NamedApi,
+  NamedApiPayload,
+  StaApiFormData,
+  WfsWmsApiFormData,
+} from '@/types/namedApis'
+import { hasDirtyField } from '@/utils/form'
 import { buildStaPayloadData, buildWfsWmsPayload, mapFormLayerToPayload } from '@/utils/namedApis'
 
 type FormData = StaApiFormData | WfsWmsApiFormData
@@ -21,6 +30,8 @@ interface UseApiConfigActionsArgs<TFormData extends FormData> {
   existingApi?: NamedApi
   otherNamedApis: NamedApi[]
   initialSlug: string
+  initialFormData?: TFormData
+  onAfterDiscard?: () => void
 }
 
 const isWfsWmsFormData = (data: StaApiFormData | WfsWmsApiFormData) => data.type === API_TYPE_QUERY.WFS_WMS
@@ -36,6 +47,8 @@ export const useApiConfig = <TFormData extends FormData>({
   existingApi,
   otherNamedApis,
   initialSlug,
+  initialFormData,
+  onAfterDiscard,
 }: UseApiConfigActionsArgs<TFormData>) => {
   const t = useTranslations('datasets.overview.completion.apis.config')
   const router = useRouter()
@@ -52,7 +65,8 @@ export const useApiConfig = <TFormData extends FormData>({
   const createLayer = useCreateLayer()
   const updateLayer = useUpdateLayer()
   const { handleFormValidationError } = useError()
-  const isLoading = createNamedApi.isPending || updateDataset.isPending || createLayer.isPending || updateLayer.isPending
+  const isLoading =
+    createNamedApi.isPending || updateDataset.isPending || createLayer.isPending || updateLayer.isPending
   const isDirty = form.formState.isDirty
   const dirtyFields = form.formState.dirtyFields
 
@@ -72,7 +86,7 @@ export const useApiConfig = <TFormData extends FormData>({
   )
 
   const handleSaveBaseInfo = async (data: TFormData) => {
-    if (!dirtyFields.baseInfo) return
+    if (!hasDirtyField(dirtyFields.baseInfo)) return
     const newApi = buildPayloadData(data)
     if (isCreate) {
       await createNamedApi.mutateAsync({
@@ -100,15 +114,12 @@ export const useApiConfig = <TFormData extends FormData>({
 
   const handleSaveLayers = async (data: WfsWmsApiFormData) => {
     const wfsDirtyFields = dirtyFields as Partial<Record<keyof WfsWmsApiFormData, unknown>>
-    if (!wfsDirtyFields.layers) return
-
-    type LayersDirty = ({ [K in keyof LayerFormData]?: boolean } | undefined)[]
-    const layersDirty = (wfsDirtyFields.layers as LayersDirty) ?? []
+    if (!hasDirtyField(wfsDirtyFields.layers)) return
 
     const isNew = (layer: LayerFormData) => layer.id.startsWith('new-')
 
     const isDirtyOrNew = (layer: LayerFormData, i: number) =>
-      isNew(layer) || !!(layersDirty[i] && Object.keys(layersDirty[i] as object).length > 0)
+      isNew(layer) || hasDirtyField(Array.isArray(wfsDirtyFields.layers) ? wfsDirtyFields.layers[i] : undefined)
 
     const layersToSave = data.layers.filter(isDirtyOrNew)
     if (layersToSave.length === 0) return
@@ -129,6 +140,15 @@ export const useApiConfig = <TFormData extends FormData>({
   }
 
   const handleSave = async (): Promise<boolean> => {
+    const dirtyLayers = (form.formState.dirtyFields as Partial<Record<keyof WfsWmsApiFormData, unknown>>).layers
+    const layerValues = (form.getValues as () => WfsWmsApiFormData)().layers
+    console.log(
+      '[dirty layer fields]',
+      (dirtyLayers as Record<string, unknown>[] | undefined)?.map((dirty, i) => ({
+        layerName: layerValues?.[i]?.layerName,
+        dirtyFields: dirty,
+      })),
+    )
     let isSaved = false
     await form.handleSubmit(
       async data => {
@@ -169,7 +189,8 @@ export const useApiConfig = <TFormData extends FormData>({
       router.push(`/datasets/${dataset.id}`)
       return
     }
-    form.reset()
+    form.reset(initialFormData)
+    onAfterDiscard?.()
     setUrlPreviewSlug(initialSlug)
     updateMode(false)
   }

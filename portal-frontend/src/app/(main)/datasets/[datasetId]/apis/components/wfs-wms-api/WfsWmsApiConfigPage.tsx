@@ -173,6 +173,8 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     existingApi,
     otherNamedApis,
     initialSlug,
+    initialFormData: wfsWmsDefaults,
+    onAfterDiscard: () => setSelectedLayerIndex(layers.length > 0 ? 0 : null),
   })
 
   const handleSelectLayer = (index: number) => {
@@ -197,8 +199,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     form.setValue(`layers.${selectedLayerIndex}.nativeCRS` as FieldPath<WfsWmsApiFormData>, nativeCRS, {
       shouldDirty: true,
     })
-    const currentCrs = form.getValues(`layers.${selectedLayerIndex}.crs` as FieldPath<WfsWmsApiFormData>)
-    if (!currentCrs && nativeCRS) {
+    if (nativeCRS) {
       form.setValue(`layers.${selectedLayerIndex}.crs` as FieldPath<WfsWmsApiFormData>, nativeCRS, {
         shouldDirty: true,
       })
