@@ -71,7 +71,6 @@
       "role": "Role",
       "roles": "Roles",
       "datasets": "Datasets",
-      "dataspaces": "Data spaces",
       "permissions": "Permissions",
       "datasources": "Data sources",
       "datasource": "Data source",
@@ -189,7 +188,6 @@
     "edit": "Edit",
     "users": "User",
     "groups": "Groups",
-    "dataspaces": "Data spaces",
     "tenants": "Tenant management",
     "uml-modeler": "UML modeler",
     "data-flow": "Data flow",
@@ -631,24 +629,6 @@
       "lastPage": "Go to last page"
     }
   },
-  "dataspaces": {
-    "title": "Data Spaces",
-    "newDataSpace": "New Data Space",
-    "createDataSpace": "Create Data Space",
-    "tableHeaders": {
-      "name": "Name",
-      "description": "Description",
-      "protected": "Protected"
-    },
-    "form": {
-      "inputs": {
-        "name": "Data space name",
-        "description": "Data space description",
-        "protected": "Protect Data space",
-        "protectedDescription": "Protected Data spaces require elevated permissions for access"
-      }
-    }
-  },
   "permissions": {
     "title": "Overview: {permissionType}",
     "infoBox": "Permissions are predefined and cannot be edited here.",
@@ -886,8 +866,7 @@
       "basicInfo": "Base Information",
       "connector": "Connector",
       "dataStructure": "Data structure",
-      "accessManagement": "Access Management",
-      "dataspaces": "Data spaces"
+      "accessManagement": "Access Management"
     },
     "form": {
       "name": "Name",

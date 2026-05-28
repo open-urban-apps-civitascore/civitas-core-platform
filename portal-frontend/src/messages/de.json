@@ -70,7 +70,6 @@
       "role": "Rolle",
       "roles": "Rollen",
       "datasets": "Datensätze",
-      "dataspaces": "Datenräume",
       "permissions": "Berechtigungen",
       "datasources": "Datenquellen",
       "datasource": "Datenquelle",
@@ -188,7 +187,6 @@
     "edit": "bearbeiten",
     "users": "User",
     "groups": "Gruppen",
-    "dataspaces": "Datenräume",
     "tenants": "Mandanten-Management",
     "uml-modeler": "UML Modeler",
     "data-flow": "Datenfluss",
@@ -624,24 +622,6 @@
       "lastPage": "Zur letzten Seite wechseln"
     }
   },
-  "dataspaces": {
-    "title": "Datenräume",
-    "newDataSpace": "Neuer Datenraum",
-    "createDataSpace": "Datenraum erstellen",
-    "tableHeaders": {
-      "name": "Name",
-      "description": "Beschreibung",
-      "protected": "Geschützt"
-    },
-    "form": {
-      "inputs": {
-        "name": "Name des Datenraums",
-        "description": "Beschreibung des Datenraums",
-        "protected": "Datenraum schützen",
-        "protectedDescription": "Geschützte Datenräume erfordern erweiterte Berechtigungen für den Zugriff"
-      }
-    }
-  },
   "permissions": {
     "title": "Übersicht: {permissionType}",
     "infoBox": "Die Berechtigungen sind vordefiniert und hier nicht bearbeitbar.",
@@ -883,8 +863,7 @@
       "basicInfo": "Basisinformationen",
       "connector": "Konnektor",
       "dataStructure": "Datenstruktur",
-      "accessManagement": "Zugriffsberechtigungen",
-      "dataspaces": "Datenräume"
+      "accessManagement": "Zugriffsberechtigungen"
     },
     "connectorTab": {
       "title1": "Konnektor",
