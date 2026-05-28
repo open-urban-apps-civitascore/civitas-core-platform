@@ -367,6 +367,10 @@
                 "impact2": "Die Darstellung in verbundenen Diensten ändert sich",
                 "impact3": "Externe Anwendungen können betroffen sein, wenn sie diesen Layer verwenden",
                 "confirm": "Layer löschen"
+              },
+              "noData": {
+                "title": "Keine Layer vorhanden",
+                "description": "Layer definieren die bereitgestellten Daten und deren Darstellung"
               }
             },
             "messages": {
@@ -436,7 +440,12 @@
       "subheader": "Persönliche Angaben und allgemeine Informationen.",
       "id": "ID",
       "displayName": "Name",
-      "title": { "title": "Anrede", "mr": "Herr", "ms": "Frau", "other": "Keine Angabe" },
+      "title": {
+        "title": "Anrede",
+        "mr": "Herr",
+        "ms": "Frau",
+        "other": "Keine Angabe"
+      },
       "firstName": "Vorname",
       "lastName": "Name",
       "role": "Systemrolle",
@@ -539,7 +548,10 @@
       "baseInfo": "Basisinformationen",
       "name": "Name",
       "description": "Beschreibung",
-      "contact": { "label": "Ansprechpartner", "placeholder": "Nach Name oder Email suchen" }
+      "contact": {
+        "label": "Ansprechpartner",
+        "placeholder": "Nach Name oder Email suchen"
+      }
     },
     "roles": {
       "scopeTabs": {

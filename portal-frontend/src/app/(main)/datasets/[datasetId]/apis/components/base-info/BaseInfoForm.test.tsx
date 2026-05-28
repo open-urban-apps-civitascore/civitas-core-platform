@@ -3,13 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { FormProvider, useForm } from 'react-hook-form'
 import { vi } from 'vitest'
 
-import {
-  API_TYPE_QUERY,
-  ApiTypeQuery,
-  DEFAULTS_BY_TYPE,
-  StaApiFormData,
-  StaApiFormSchema,
-} from '@/types/namedApis'
+import { API_TYPE_QUERY, ApiTypeQuery, DEFAULTS_BY_TYPE, StaApiFormData, StaApiFormSchema } from '@/types/namedApis'
 
 import { BaseInfoForm } from './BaseInfoForm'
 

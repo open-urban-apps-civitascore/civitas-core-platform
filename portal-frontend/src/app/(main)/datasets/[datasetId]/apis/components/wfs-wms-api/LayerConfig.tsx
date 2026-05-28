@@ -1,13 +1,15 @@
-import { Trash2 } from 'lucide-react'
+import { List, Plus, Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { FieldPath, UseFormReturn } from 'react-hook-form'
 
+import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { FormComboboxMulti } from '@/components/form/fields/FormComboboxMulti'
 import { FormSelect } from '@/components/form/fields/FormSelect'
 import { TextField } from '@/components/form/fields/TextField'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
+import { NoDataCard } from '@/components/no-data/no-data-card/NoDataCard'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { FormItem, FormLabel } from '@/components/ui/form'
@@ -122,203 +124,230 @@ export const LayerConfig = (props: LayerConfigProps) => {
 
   return (
     <>
-      <DetailsFieldContainer className="pt-0 pb-3">
-        <SubHeader title={t('sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
-      </DetailsFieldContainer>
-      <div className="flex gap-6">
-        <LayerSidebar
-          existingLayers={existingLayers}
-          selectedLayerIndex={selectedLayerIndex}
-          isReadOnly={isReadOnly}
-          onSelectLayer={onSelectLayer}
-          onAddLayer={onAddLayer}
-        />
-        {selectedLayerIndex !== null && (
-          <div className="flex flex-col">
-            <DetailsFieldContainer isTitleField>
-              <SubHeader title={t('baseInfo.sectionTitle')} titleClassName="text-2xl leading-none font-bold mt-6" />
-            </DetailsFieldContainer>
-            <DetailsFieldContainer className="border-b-0 py-2 pt-6">
-              <TextField
-                form={form}
-                label={t('baseInfo.title')}
-                name={layerPath('title')}
-                placeholder={t('baseInfo.title')}
-                required
-                disabled={isReadOnly}
-                formItemProps={wideField}
-              />
-            </DetailsFieldContainer>
-            <DetailsFieldContainer className="border-b-0 py-2">
-              <TextField
-                form={form}
-                label={t('baseInfo.technicalName')}
-                name={layerPath('layerName')}
-                placeholder={t('baseInfo.technicalName')}
-                required
-                disabled={isReadOnly}
-                formItemProps={wideField}
-              />
-            </DetailsFieldContainer>
-            <DetailsFieldContainer className="border-b-0 py-2 pb-6">
-              <TextField
-                form={form}
-                label={t('baseInfo.description')}
-                name={layerPath('description')}
-                placeholder={t('baseInfo.description')}
-                disabled={isReadOnly}
-                formItemProps={wideField}
-              />
-            </DetailsFieldContainer>
-
-            <DetailsFieldContainer isTitleField>
-              <SubHeader title={t('dataSelection.sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
-            </DetailsFieldContainer>
-            <DetailsFieldContainer className="border-b-0 py-2 pt-6">
-              <FormSelect
-                form={form}
-                id="tableSelect"
-                label={t('dataSelection.table')}
-                name={layerPath('dataSinkId')}
-                options={tableOptions}
-                onChange={onTableChange}
-                formItemProps={wideField}
-                placeholder={t('dataSelection.tablePlaceHolder')}
-                required
-                disabled={isReadOnly}
-              />
-            </DetailsFieldContainer>
-            <DetailsFieldContainer className="border-b-0 py-2">
-              <FormComboboxMulti
-                form={form}
-                id="layerAttribute"
-                items={attributeOptions}
-                label={t('dataSelection.attributes')}
-                name={layerPath('attribute')}
-                placeholder={t('dataSelection.attributesPlaceHolder')}
-                required
-                hasSelectAllOption
-                disabled={isReadOnly}
-                formItemProps={wideField}
-              />
-            </DetailsFieldContainer>
-            <DetailsFieldContainer className="border-b-0 py-2 pb-6">
-              <TextField
-                form={form}
-                label={t('dataSelection.filter')}
-                name={layerPath('cqlFilter')}
-                placeholder={t('dataSelection.filter')}
-                disabled={isReadOnly}
-                formItemProps={wideField}
-              />
-            </DetailsFieldContainer>
-
-            <DetailsFieldContainer isTitleField>
-              <SubHeader title={t('geometry.sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
-            </DetailsFieldContainer>
-            <DetailsFieldContainer className="border-b-0 py-2 pt-6">
-              <FormSelect
-                form={form}
-                id="geometryColumnRef"
-                label={t('geometry.geometryField')}
-                name={layerPath('geometryColumnRef')}
-                options={attributeOptions}
-                placeholder={t('geometry.geometryFieldPlaceHolder')}
-                required
-                disabled={isReadOnly}
-                formItemProps={wideField}
-              />
-            </DetailsFieldContainer>
-            <DetailsFieldContainer className="border-b-0 py-2">
-              <FormItem className={cn('grid', wideField.className)}>
-                <FormLabel>{t('geometry.nativeCrs')}</FormLabel>
-                <Input
-                  value={nativeCRSLabel}
-                  disabled
-                  readOnly
-                  className="disabled:opacity-100 disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
-                />
-              </FormItem>
-            </DetailsFieldContainer>
-            <DetailsFieldContainer className="border-b-0 py-2 pb-6 flex flex-col gap-2">
-              <FormSelect
-                form={form}
-                label={t('geometry.definedCrs')}
-                name={layerPath('crs')}
-                id="wfsWmsLayerCrs"
-                options={crsOptions}
-                disabled={isReadOnly}
-                formItemProps={wideField}
-              />
-            </DetailsFieldContainer>
-            <DetailsFieldContainer className="border-b-0 py-2 pb-6">
-              <BoundingBoxConfig
-                form={form}
-                layerFieldIndex={selectedLayerIndex}
-                className="grid-cols-[minmax(0,270px)_minmax(0,512px)]"
-                isDisabled={isReadOnly}
-              />
-              <div className="grid grid-cols-[minmax(0,270px)_minmax(0,512px)]">
-                <div />
-                <div className="mt-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={!crsWatch || isReadOnly}
-                    onClick={handleCalculateFromCrs}
-                    className="text-xs h-7 px-2 hover:text-primary hover:bg-transparent"
-                  >
-                    {t('geometry.calculateFromCrs')}
+      {existingLayers.length === 0 ? (
+        <>
+          {!isReadOnly && (
+            <div className="flex justify-end mb-3">
+              <Button type="button" onClick={onAddLayer}>
+                <Plus className="h-4 w-4 mr-2" />
+                {t('addLayer')}
+              </Button>
+            </div>
+          )}
+          <NoDataCard
+            icon={<List size={24} />}
+            title={t('noData.title')}
+            subTitle={t('noData.description')}
+            isDisabled={isReadOnly}
+          />
+        </>
+      ) : (
+        <ContentCard>
+          <DetailsFieldContainer className="pt-0 pb-3">
+            <SubHeader
+              title={t('sectionTitle')}
+              titleClassName="text-2xl leading-none font-bold"
+              customElement={
+                !isReadOnly &&
+                !selectedLayer?.id.startsWith('new-') && (
+                  <Button type="button" onClick={onAddLayer}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    {t('addLayer')}
                   </Button>
-                </div>
-              </div>
-            </DetailsFieldContainer>
+                )
+              }
+            />
+          </DetailsFieldContainer>
+          <div className="flex gap-6">
+            <LayerSidebar
+              existingLayers={existingLayers}
+              selectedLayerIndex={selectedLayerIndex}
+              isReadOnly={isReadOnly}
+              onSelectLayer={onSelectLayer}
+              onAddLayer={onAddLayer}
+            />
+            {selectedLayerIndex !== null && (
+              <div className="flex flex-col">
+                <DetailsFieldContainer isTitleField>
+                  <SubHeader title={t('baseInfo.sectionTitle')} titleClassName="text-2xl leading-none font-bold mt-6" />
+                </DetailsFieldContainer>
+                <DetailsFieldContainer className="border-b-0 py-2 pt-6">
+                  <TextField
+                    form={form}
+                    label={t('baseInfo.title')}
+                    name={layerPath('title')}
+                    placeholder={t('baseInfo.title')}
+                    required
+                    disabled={isReadOnly}
+                    formItemProps={wideField}
+                  />
+                </DetailsFieldContainer>
+                <DetailsFieldContainer className="border-b-0 py-2">
+                  <TextField
+                    form={form}
+                    label={t('baseInfo.technicalName')}
+                    name={layerPath('layerName')}
+                    placeholder={t('baseInfo.technicalName')}
+                    required
+                    disabled={isReadOnly}
+                    formItemProps={wideField}
+                  />
+                </DetailsFieldContainer>
+                <DetailsFieldContainer className="border-b-0 py-2 pb-6">
+                  <TextField
+                    form={form}
+                    label={t('baseInfo.description')}
+                    name={layerPath('description')}
+                    placeholder={t('baseInfo.description')}
+                    disabled={isReadOnly}
+                    formItemProps={wideField}
+                  />
+                </DetailsFieldContainer>
 
-            <DetailsFieldContainer isTitleField>
-              <SubHeader title={t('style.sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
-            </DetailsFieldContainer>
-            <DetailsFieldContainer className="border-b-0 py-2 pt-6">
-              <FormSelect
-                form={form}
-                id="defaultStyleId"
-                label={t('style.standardStyle')}
-                name={layerPath('defaultStyleId')}
-                options={styleOptions}
-                placeholder={t('style.default')}
-                disabled={isReadOnly}
-                formItemProps={wideField}
-              />
-            </DetailsFieldContainer>
-            <DetailsFieldContainer className="border-b-0 py-2 pb-6">
-              <FormComboboxMulti
-                form={form}
-                id="alternativeStyleIds"
-                items={styleOptions}
-                label={t('style.alternativeStyles')}
-                name={layerPath('alternativeStyleIds')}
-                placeholder={t('style.alternativeStylesPlaceHolder')}
-                disabled={isReadOnly}
-                formItemProps={wideField}
-              />
-            </DetailsFieldContainer>
-            {!isReadOnly && onDeleteLayer && (
-              <div className="flex justify-end pt-4 pb-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  // className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5"
-                  onClick={handleDeleteClick}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  {t('deleteLayer')}
-                </Button>
+                <DetailsFieldContainer isTitleField>
+                  <SubHeader title={t('dataSelection.sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
+                </DetailsFieldContainer>
+                <DetailsFieldContainer className="border-b-0 py-2 pt-6">
+                  <FormSelect
+                    form={form}
+                    id="tableSelect"
+                    label={t('dataSelection.table')}
+                    name={layerPath('dataSinkId')}
+                    options={tableOptions}
+                    onChange={onTableChange}
+                    formItemProps={wideField}
+                    placeholder={t('dataSelection.tablePlaceHolder')}
+                    required
+                    disabled={isReadOnly}
+                  />
+                </DetailsFieldContainer>
+                <DetailsFieldContainer className="border-b-0 py-2">
+                  <FormComboboxMulti
+                    form={form}
+                    id="layerAttribute"
+                    items={attributeOptions}
+                    label={t('dataSelection.attributes')}
+                    name={layerPath('attribute')}
+                    placeholder={t('dataSelection.attributesPlaceHolder')}
+                    required
+                    hasSelectAllOption
+                    disabled={isReadOnly}
+                    formItemProps={wideField}
+                  />
+                </DetailsFieldContainer>
+                <DetailsFieldContainer className="border-b-0 py-2 pb-6">
+                  <TextField
+                    form={form}
+                    label={t('dataSelection.filter')}
+                    name={layerPath('cqlFilter')}
+                    placeholder={t('dataSelection.filter')}
+                    disabled={isReadOnly}
+                    formItemProps={wideField}
+                  />
+                </DetailsFieldContainer>
+
+                <DetailsFieldContainer isTitleField>
+                  <SubHeader title={t('geometry.sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
+                </DetailsFieldContainer>
+                <DetailsFieldContainer className="border-b-0 py-2 pt-6">
+                  <FormSelect
+                    form={form}
+                    id="geometryColumnRef"
+                    label={t('geometry.geometryField')}
+                    name={layerPath('geometryColumnRef')}
+                    options={attributeOptions}
+                    placeholder={t('geometry.geometryFieldPlaceHolder')}
+                    required
+                    disabled={isReadOnly}
+                    formItemProps={wideField}
+                  />
+                </DetailsFieldContainer>
+                <DetailsFieldContainer className="border-b-0 py-2">
+                  <FormItem className={cn('grid', wideField.className)}>
+                    <FormLabel>{t('geometry.nativeCrs')}</FormLabel>
+                    <Input
+                      value={nativeCRSLabel}
+                      disabled
+                      readOnly
+                      className="disabled:opacity-100 disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
+                    />
+                  </FormItem>
+                </DetailsFieldContainer>
+                <DetailsFieldContainer className="border-b-0 py-2 pb-6 flex flex-col gap-2">
+                  <FormSelect
+                    form={form}
+                    label={t('geometry.definedCrs')}
+                    name={layerPath('crs')}
+                    id="wfsWmsLayerCrs"
+                    options={crsOptions}
+                    disabled={isReadOnly}
+                    formItemProps={wideField}
+                  />
+                </DetailsFieldContainer>
+                <DetailsFieldContainer className="border-b-0 py-2 pb-6">
+                  <BoundingBoxConfig
+                    form={form}
+                    layerFieldIndex={selectedLayerIndex}
+                    className="grid-cols-[minmax(0,270px)_minmax(0,512px)]"
+                    isDisabled={isReadOnly}
+                  />
+                  <div className="grid grid-cols-[minmax(0,270px)_minmax(0,512px)]">
+                    <div />
+                    <div className="mt-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={!crsWatch || isReadOnly}
+                        onClick={handleCalculateFromCrs}
+                        className="text-xs h-7 px-2 hover:text-primary hover:bg-transparent"
+                      >
+                        {t('geometry.calculateFromCrs')}
+                      </Button>
+                    </div>
+                  </div>
+                </DetailsFieldContainer>
+
+                <DetailsFieldContainer isTitleField>
+                  <SubHeader title={t('style.sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
+                </DetailsFieldContainer>
+                <DetailsFieldContainer className="border-b-0 py-2 pt-6">
+                  <FormSelect
+                    form={form}
+                    id="defaultStyleId"
+                    label={t('style.standardStyle')}
+                    name={layerPath('defaultStyleId')}
+                    options={styleOptions}
+                    placeholder={t('style.default')}
+                    disabled={isReadOnly}
+                    formItemProps={wideField}
+                  />
+                </DetailsFieldContainer>
+                <DetailsFieldContainer className="border-b-0 py-2 pb-6">
+                  <FormComboboxMulti
+                    form={form}
+                    id="alternativeStyleIds"
+                    items={styleOptions}
+                    label={t('style.alternativeStyles')}
+                    name={layerPath('alternativeStyleIds')}
+                    placeholder={t('style.alternativeStylesPlaceHolder')}
+                    disabled={isReadOnly}
+                    formItemProps={wideField}
+                  />
+                </DetailsFieldContainer>
+                {!isReadOnly && onDeleteLayer && (
+                  <div className="flex justify-end pt-4 pb-2">
+                    <Button type="button" variant="outline" size="sm" onClick={handleDeleteClick}>
+                      <Trash2 className="h-4 w-4" />
+                      {t('deleteLayer')}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
-      </div>
+        </ContentCard>
+      )}
 
       <WarningModal
         open={isDeleteModalOpen}

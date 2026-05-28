@@ -1,6 +1,6 @@
 'use client'
 
-import { NoDataPage } from '@/components/no-data-page/NoDataPage'
+import { NoDataPage } from '@/components/no-data/no-data-page/NoDataPage'
 import { Dataset } from '@/types/datasets'
 import { API_TYPE_QUERY, ApiTypeQuery, NamedApi } from '@/types/namedApis'
 

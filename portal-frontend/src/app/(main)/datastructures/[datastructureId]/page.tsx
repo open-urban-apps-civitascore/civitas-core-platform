@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server'
 
 import { getDatastructure, getDatastructureAssignments } from '@/app/services/api/datastructures/serverRequests'
-import { NoDataPage } from '@/components/no-data-page/NoDataPage'
+import { NoDataPage } from '@/components/no-data/no-data-page/NoDataPage'
 import { DatastructureApiResponseSchema } from '@/types/datastructures'
 import { mapAssignmentApiResponseToTable } from '@/utils/assignments'
 

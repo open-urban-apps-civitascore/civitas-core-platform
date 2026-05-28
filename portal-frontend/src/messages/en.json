@@ -368,6 +368,10 @@
                 "impact2": "The display in connected services will change",
                 "impact3": "External applications may be affected if they use this layer",
                 "confirm": "Delete Layer"
+              },
+              "noData": {
+                "title": "No Layers available",
+                "description": "Layers define the provided data and their presentation"
               }
             },
             "messages": {
@@ -438,7 +442,12 @@
       "subheader": "Personal details and general information.",
       "id": "ID",
       "displayName": "Name",
-      "title": { "title": "Title", "mr": "Mr", "ms": "Ms", "other": "No Specification" },
+      "title": {
+        "title": "Title",
+        "mr": "Mr",
+        "ms": "Ms",
+        "other": "No Specification"
+      },
       "firstName": "First Name",
       "lastName": "Last Name",
       "role": "System Role",
@@ -542,7 +551,10 @@
       "baseInfo": "Base Information",
       "name": "Name",
       "description": "Description",
-      "contact": { "label": "Contact Person", "placeholder": "Search by name or email" }
+      "contact": {
+        "label": "Contact Person",
+        "placeholder": "Search by name or email"
+      }
     },
     "roles": {
       "scopeTabs": {
@@ -913,7 +925,6 @@
     "subtitle": "All Data sources available in our tenant.",
     "newDatasource": "Create Data structure",
     "newVersion": "Create version",
-
     "tableHeaders": {
       "name": "Name",
       "description": "Description",

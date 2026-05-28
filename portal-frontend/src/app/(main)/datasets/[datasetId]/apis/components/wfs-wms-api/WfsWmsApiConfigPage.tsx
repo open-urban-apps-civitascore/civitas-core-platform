@@ -6,9 +6,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { FieldPath, useFieldArray, useForm, UseFormReturn } from 'react-hook-form'
 import { toast } from 'sonner'
 
+import { useGetDatasinks } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { useDeleteLayer, useGetLayers } from '@/app/services/api/datasets/layers/clientRequests'
 import { useGetStyles } from '@/app/services/api/datasets/styles/clientRequests'
-import { useGetDatasinks } from '@/app/services/api/datasinks/clientRequests'
+import { ContentCard } from '@/components/content-card/ContentCard'
 import { Form } from '@/components/ui/form'
 import { UMLClass } from '@/components/uml-modeler/types/uml'
 import { Dataset } from '@/types/datasets'
@@ -33,7 +34,6 @@ import {
   mockDatasink2,
   mockDatastructureVersion,
   mockDatastructureVersion2,
-  mockLayerList,
   mockStyleList,
 } from './mockData'
 
@@ -84,7 +84,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
   const formSchema = useMemo(() => WfsWmsApiFormSchema({ existingSlugs }), [existingSlugs])
   const initialSlug = existingApi?.slug ?? defaults.defaultSlug
 
-  const { data: datasinksData } = useGetDatasinks()
+  const { data: datasinksData } = useGetDatasinks(dataset.id)
   const { data: layersData } = useGetLayers(dataset.id)
   const { data: stylesData } = useGetStyles(dataset.id)
 
@@ -249,15 +249,17 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     >
       <Form {...form}>
         {selectedTab === 'basicInfo' && (
-          <BaseInfoForm
-            form={form as unknown as UseFormReturn<StaApiFormData>}
-            apiType={apiType}
-            isReadOnly={isReadOnly}
-            datasetId={dataset.id}
-            typeLabel={typeLabel}
-            urlPreviewSlug={urlPreviewSlug}
-            onSlugBlur={handleSlugBlur}
-          />
+          <ContentCard>
+            <BaseInfoForm
+              form={form as unknown as UseFormReturn<StaApiFormData>}
+              apiType={apiType}
+              isReadOnly={isReadOnly}
+              datasetId={dataset.id}
+              typeLabel={typeLabel}
+              urlPreviewSlug={urlPreviewSlug}
+              onSlugBlur={handleSlugBlur}
+            />
+          </ContentCard>
         )}
         {selectedTab === 'layer' && (
           <LayerConfig
@@ -276,9 +278,11 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
           />
         )}
         {selectedTab === 'styles' && (
-          <div data-testid={`tabPlaceholder-${selectedTab}`} className="py-12 text-center text-muted-foreground">
-            {t('tabs.placeholder')}
-          </div>
+          <ContentCard>
+            <div data-testid={`tabPlaceholder-${selectedTab}`} className="py-12 text-center text-muted-foreground">
+              {t('tabs.placeholder')}
+            </div>
+          </ContentCard>
         )}
       </Form>
     </ApiConfigWrapper>

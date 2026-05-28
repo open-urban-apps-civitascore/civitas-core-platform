@@ -3,14 +3,12 @@
 import { useTranslations } from 'next-intl'
 import { FormEvent } from 'react'
 
-import { ContentCard } from '@/components/content-card/ContentCard'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 export type ApiConfigTab = 'basicInfo' | 'layer' | 'styles'
 
@@ -105,7 +103,7 @@ export const ApiConfigWrapper = (props: ApiConfigWrapperProps) => {
           onSubmit={onSubmit}
           className="h-full"
         >
-          <ContentCard className={cn('h-auto')}>{children}</ContentCard>
+          {children}
         </form>
       </PageBackground>
       <ExitWarningModal
