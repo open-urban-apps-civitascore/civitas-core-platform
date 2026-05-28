@@ -7,11 +7,11 @@ import {
   API_TYPE_QUERY,
   ApiTypeQuery,
   DEFAULTS_BY_TYPE,
-  NamedApiBaseInfoFormSchema,
   StaApiFormData,
+  StaApiFormSchema,
 } from '@/types/namedApis'
 
-import { ApiConfigForm } from './ApiConfigForm'
+import { BaseInfoForm } from './BaseInfoForm'
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
@@ -25,7 +25,7 @@ interface WrapperProps {
   apiType: ApiTypeQuery
   isReadOnly?: boolean
   existingSlugs?: string[]
-  defaultValues?: Partial<StaApiFormData>
+  defaultValues?: Partial<StaApiFormData['baseInfo']>
   urlPreviewSlug?: string
   onSlugBlur?: () => void
 }
@@ -40,21 +40,24 @@ const Wrapper = (props: WrapperProps) => {
     onSlugBlur = () => undefined,
   } = props
   const defaults = DEFAULTS_BY_TYPE[apiType]
-  const schema = NamedApiBaseInfoFormSchema({ existingSlugs })
+  const schema = StaApiFormSchema({ existingSlugs })
   const form = useForm<StaApiFormData>({
     resolver: zodResolver(schema),
     mode: 'onChange',
     defaultValues: {
-      name: defaultValues?.name ?? '',
-      slug: defaultValues?.slug ?? defaults.defaultSlug,
-      description: defaultValues?.description ?? '',
-      persistence: defaultValues?.persistence ?? defaults.persistenceValue,
+      type: API_TYPE_QUERY.SENSORTHINGS,
+      baseInfo: {
+        name: defaultValues?.name ?? '',
+        slug: defaultValues?.slug ?? defaults.defaultSlug,
+        description: defaultValues?.description ?? '',
+        persistence: defaultValues?.persistence ?? defaults.persistenceValue,
+      },
     },
   })
 
   return (
     <FormProvider {...form}>
-      <ApiConfigForm
+      <BaseInfoForm
         form={form}
         apiType={apiType}
         isReadOnly={isReadOnly}
@@ -93,7 +96,7 @@ describe('ApiConfigForm', () => {
   describe('WFS/WMS variant', () => {
     test('renders persistence as a dropdown', () => {
       render(<Wrapper apiType={API_TYPE_QUERY.WFS_WMS} />)
-      expect(screen.getByTestId('persistenceSelectTrigger')).toBeInTheDocument()
+      expect(screen.getByTestId('baseInfo.persistenceSelectTrigger')).toBeInTheDocument()
       expect(screen.queryByTestId('apiPersistenceReadOnly')).not.toBeInTheDocument()
     })
 
@@ -107,8 +110,8 @@ describe('ApiConfigForm', () => {
     test('disables editable fields', () => {
       render(<Wrapper apiType={API_TYPE_QUERY.SENSORTHINGS} isReadOnly />)
       expect(screen.getByTestId('slugTextField')).toBeDisabled()
-      expect(screen.getByTestId('nameTextField')).toBeDisabled()
-      expect(screen.getByTestId('descriptionTextArea')).toBeDisabled()
+      expect(screen.getByTestId('baseInfo.nameTextField')).toBeDisabled()
+      expect(screen.getByTestId('baseInfo.descriptionTextArea')).toBeDisabled()
     })
   })
 
@@ -208,7 +211,7 @@ describe('ApiConfigForm', () => {
   describe('Description validation', () => {
     test('accepts a description of exactly 150 characters', async () => {
       render(<Wrapper apiType={API_TYPE_QUERY.SENSORTHINGS} />)
-      const description = screen.getByTestId('descriptionTextArea') as HTMLTextAreaElement
+      const description = screen.getByTestId('baseInfo.descriptionTextArea') as HTMLTextAreaElement
       const text = 'a'.repeat(150)
       fireEvent.change(description, { target: { value: text } })
       await waitFor(() => {
