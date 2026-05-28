@@ -46,7 +46,13 @@ export const LayerSidebar = ({
         })}
       </ul>
       {!isReadOnly && (
-        <Button type="button" variant="outline" onClick={onAddLayer} className="mt-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onAddLayer}
+          className="mt-2"
+          data-testid="sidebarAddLayerButton"
+        >
           + {t('addLayer')}
         </Button>
       )}
