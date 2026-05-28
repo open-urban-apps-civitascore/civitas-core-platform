@@ -77,11 +77,19 @@ describe('ApiList', () => {
       expect(link).toHaveAttribute('href', '/datasets/ds-1/apis?type=sensorthings')
     })
 
-    it('WFS/WMS link points to the wfs-wms type route', async () => {
+    it('WFS/WMS link points to the wfs-wms type route when no WFS/WMS api exists', async () => {
       renderComponent({ datasetId: 'ds-1' })
       await userEvent.click(screen.getByText('addButton'))
       const link = screen.getByText('wfsWms').closest('a')
       expect(link).toHaveAttribute('href', '/datasets/ds-1/apis?type=wfs-wms')
+    })
+
+    it('WFS/WMS item is disabled when a WFS/WMS api already exists', async () => {
+      renderComponent({ apis: [makeApi({ standard: 'WFS' })] })
+      await userEvent.click(screen.getByText('addButton'))
+      const item = screen.getByText('wfsWms').closest('[role="menuitem"]')
+      expect(item).toHaveAttribute('data-disabled')
+      expect(screen.getByText('wfsWms').closest('a')).toBeNull()
     })
   })
 })

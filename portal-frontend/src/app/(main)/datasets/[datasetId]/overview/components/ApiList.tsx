@@ -6,7 +6,8 @@ import { useTranslations } from 'next-intl'
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { NamedApi } from '@/types/namedApis'
+import { API_STANDARDS, NamedApi } from '@/types/namedApis'
+import { hasApiType } from '@/utils/namedApis'
 
 import { ApiCard } from './ApiCard'
 
@@ -19,6 +20,7 @@ interface ApiListProps {
 
 export const ApiList = ({ datasetId, apis, canEdit, isOpenDataAccess }: ApiListProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.apis')
+  const hasWfsWms = hasApiType(apis, API_STANDARDS.WFS) || hasApiType(apis, API_STANDARDS.WMS)
 
   return (
     <div className="py-3">
@@ -38,11 +40,18 @@ export const ApiList = ({ datasetId, apis, canEdit, isOpenDataAccess }: ApiListP
                 <span className="text-xs text-muted-foreground">{t('sensorThingsSubtitle')}</span>
               </GuardedLink>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <GuardedLink href={`/datasets/${datasetId}/apis?type=wfs-wms`} className="flex items-center gap-3">
-                <span>{t('wfsWms')}</span>
-                <span className="text-xs text-muted-foreground">{t('wfsWmsSubtitle')}</span>
-              </GuardedLink>
+            <DropdownMenuItem disabled={hasWfsWms} asChild={!hasWfsWms}>
+              {hasWfsWms ? (
+                <div className="flex items-center gap-3">
+                  <span>{t('wfsWms')}</span>
+                  <span className="text-xs text-muted-foreground">{t('wfsWmsSubtitle')}</span>
+                </div>
+              ) : (
+                <GuardedLink href={`/datasets/${datasetId}/apis?type=wfs-wms`} className="flex items-center gap-3">
+                  <span>{t('wfsWms')}</span>
+                  <span className="text-xs text-muted-foreground">{t('wfsWmsSubtitle')}</span>
+                </GuardedLink>
+              )}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

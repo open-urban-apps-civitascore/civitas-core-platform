@@ -125,20 +125,41 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, isOpenDataAcces
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {canEdit && (
-                <DropdownMenuItem onClick={goToEdit} data-testid={`apiCardMenuEdit-${api.slug}`}>
+                <DropdownMenuItem
+                  onClick={e => {
+                    e.stopPropagation()
+                    goToEdit()
+                  }}
+                  data-testid={`apiCardMenuEdit-${api.slug}`}
+                >
                   {t('actions.edit')}
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onClick={goToView} data-testid={`apiCardMenuView-${api.slug}`}>
+              <DropdownMenuItem
+                onClick={e => {
+                  e.stopPropagation()
+                  goToView()
+                }}
+                data-testid={`apiCardMenuView-${api.slug}`}
+              >
                 {t('actions.view')}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleCopyPath} data-testid={`apiCardMenuCopy-${api.slug}`}>
+              <DropdownMenuItem
+                onClick={e => {
+                  e.stopPropagation()
+                  handleCopyPath()
+                }}
+                data-testid={`apiCardMenuCopy-${api.slug}`}
+              >
                 {t('actions.copyPath')}
               </DropdownMenuItem>
               {canEdit && (
                 <DropdownMenuItem
                   variant="destructive"
-                  onClick={() => setIsDeleteOpen(true)}
+                  onClick={e => {
+                    e.stopPropagation()
+                    setIsDeleteOpen(true)
+                  }}
                   data-testid={`apiCardMenuDelete-${api.slug}`}
                 >
                   {t('actions.delete')}
