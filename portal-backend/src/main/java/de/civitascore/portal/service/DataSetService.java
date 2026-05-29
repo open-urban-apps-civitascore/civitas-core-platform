@@ -7,16 +7,21 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataSet;
-import de.civitascore.portal.model.entity.Distribution;
+import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.encoder.Encode;
@@ -25,20 +30,25 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for managing {@link DataSet} entities through their full lifecycle: DRAFT, READY, and
- * AVAILABLE. Orchestrates staging (DRAFT → READY: generating distributions from pipeline APIs),
- * releasing (READY → AVAILABLE: triggering infrastructure provisioning via sagas), and the
- * corresponding reverse operations (unstage, unrelease). Handles saga completion and failure
- * callbacks to reconcile dataset state.
+ * AVAILABLE. Orchestrates staging (DRAFT → READY: validating pipeline configuration), releasing
+ * (READY → AVAILABLE: triggering infrastructure provisioning via sagas), and the corresponding
+ * reverse operations (unstage, unrelease). Handles saga completion and failure callbacks to
+ * reconcile dataset state.
  */
 @Slf4j
 @Service
 public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputDTO> {
 
+  // Stable identifiers for drift events emitted by applyInfrastructureResult.
+  private static final String DRIFT_ORPHAN_SLUGS = "orphan-slugs";
+  private static final String DRIFT_UNPROVISIONED_SLUGS = "unprovisioned-slugs";
+  private static final String DRIFT_REPLACED_ROUTEID = "replaced-routeid";
+  private static final String DRIFT_UNEXPECTED_ROUTEIDS = "unexpected-routeids";
+
   private final DataSetRepository dataSetRepository;
   private final DataSetMapper dataSetMapper;
 
   private final AssignmentFactory assignmentFactory;
-  private final DistributionService distributionService;
 
   private final DataSetSagaPublisher sagaPublisher;
 
@@ -46,12 +56,10 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       DataSetRepository dataSetRepository,
       DataSetMapper dataSetMapper,
       AssignmentFactory assignmentFactory,
-      DistributionService distributionService,
       DataSetSagaPublisher sagaPublisher) {
     this.dataSetRepository = dataSetRepository;
     this.dataSetMapper = dataSetMapper;
     this.assignmentFactory = assignmentFactory;
-    this.distributionService = distributionService;
     this.sagaPublisher = sagaPublisher;
   }
 
@@ -96,6 +104,46 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
+   * Reconciles the entity's {@code namedApis} collection with the incoming input. A {@code null}
+   * input list means "field omitted from the patch body" — leave the entity untouched. An empty
+   * list clears the collection. A non-empty list is the new source of truth: entries are matched by
+   * slug; existing rows are updated in place (preserving {@code id} and {@code routeId}, both of
+   * which are server-managed), entries with new slugs are added, and entries whose slug is absent
+   * from the input are removed (orphan removal).
+   *
+   * <p>The in-place update avoids the orphan-removal + unique-constraint flush-order foot-gun: a
+   * DELETE+INSERT of a row with the same {@code (dataset_id, slug)} pair in the same flush would
+   * violate {@code uk_named_api_dataset_slug}.
+   */
+  @Override
+  protected DataSet postConvertToEntity(DataSet entity, DataSetInputDTO input) {
+    List<NamedApiInputDTO> incoming = input.getNamedApis();
+    if (incoming != null) {
+      Map<String, NamedApi> existingBySlug = new HashMap<>();
+      for (NamedApi api : entity.getNamedApis()) {
+        existingBySlug.put(api.getSlug(), api);
+      }
+      Set<String> incomingSlugs = new HashSet<>();
+      for (NamedApiInputDTO dto : incoming) {
+        incomingSlugs.add(dto.getSlug());
+        NamedApi existing = existingBySlug.get(dto.getSlug());
+        if (existing != null) {
+          existing.setName(dto.getName());
+          existing.setStandard(dto.getStandard());
+          existing.setVersion(dto.getVersion());
+          existing.setDescription(dto.getDescription());
+        } else {
+          NamedApi created = dataSetMapper.toNamedApiEntity(dto);
+          created.setDataSet(entity);
+          entity.getNamedApis().add(created);
+        }
+      }
+      entity.getNamedApis().removeIf(api -> !incomingSlugs.contains(api.getSlug()));
+    }
+    return super.postConvertToEntity(entity, input);
+  }
+
+  /**
    * Override update to ensure it can only be called for DRAFT datasets. For released datasets, use
    * updateReleasedMeta instead.
    *
@@ -118,14 +166,16 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Updates only the metadata (name, description) of a released dataset. Cannot modify
-   * persistenceId or pipelines. For AVAILABLE datasets with existing infrastructure, triggers a
-   * saga UPDATE if no saga is currently in-flight.
+   * Updates the editable metadata of a released dataset: {@code name}, {@code description}, {@code
+   * openDataAccess}, and {@code assignments}. The {@code namedApis} set is immutable while the
+   * dataset is in READY / AVAILABLE — per concept #1379 + #1384 the only path to change it is
+   * unrelease → edit in DRAFT → release. For AVAILABLE datasets with existing infrastructure,
+   * triggers a saga UPDATE if no saga is currently in-flight.
    *
    * @param id the dataset ID
    * @param input the update input
    * @return the updated dataset
-   * @throws InvalidInputException if trying to update a DRAFT dataset
+   * @throws InvalidInputException if the dataset is DRAFT or the input carries {@code namedApis}
    * @throws ResourceInUseException if a saga is in-flight for this dataset
    */
   @Override
@@ -147,6 +197,15 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
               + existingEntity.getPendingSagaType());
     }
 
+    if (input.getNamedApis() != null) {
+      throw new InvalidInputException(
+          "namedApis",
+          id,
+          "Named APIs cannot be changed while the dataset is "
+              + existingEntity.getDataSetStatus()
+              + ". Unrelease the dataset and edit it in DRAFT.");
+    }
+
     Set<Pipeline> previousPipelines = new HashSet<>(existingEntity.getPipelines());
     DataSet updated = super.update(id, input);
 
@@ -162,8 +221,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Stages a dataset by validating it has at least one pipeline, generating distributions from
-   * pipeline APIs, and setting status to READY.
+   * Stages a dataset by validating it has at least one pipeline with data sources and setting
+   * status to READY.
    *
    * @param id the dataset ID
    * @return the staged dataset
@@ -173,47 +232,33 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   public DataSet stage(UUID id) {
     DataSet dataSet = findByIdOrThrow(id);
 
-    // Validate status is DRAFT
     if (dataSet.getDataSetStatus() != DataSetStatus.DRAFT) {
       throw new InvalidInputException("dataSetStatus", id, "Only DRAFT datasets can be staged");
     }
-
-    // Validate name not blank
     if (StringUtils.isBlank(dataSet.getName())) {
       throw new InvalidInputException("name", id, "DataSet name must not be blank");
     }
-
-    // Validate description not blank
     if (StringUtils.isBlank(dataSet.getDescription())) {
       throw new InvalidInputException("description", id, "DataSet description must not be blank");
     }
-
-    // Validate that dataset has at least one pipeline
     if (dataSet.getPipelines() == null || dataSet.getPipelines().isEmpty()) {
       throw new InvalidInputException(
           "pipelines", id, "DataSet must contain at least one Pipeline before staging");
     }
-
-    // Each pipeline must have either datasources (feed-in) or APIs (provide)
-    boolean hasDataSourceOrApi =
+    boolean hasDataSource =
         dataSet.getPipelines().stream()
-            .anyMatch(
-                p ->
-                    (p.getDataSources() != null && !p.getDataSources().isEmpty())
-                        || (p.getApis() != null && !p.getApis().isEmpty()));
-    if (!hasDataSourceOrApi) {
+            .anyMatch(p -> p.getDataSources() != null && !p.getDataSources().isEmpty());
+    if (!hasDataSource) {
       throw new InvalidInputException(
-          "pipelines", id, "DataSet must have at least one Pipeline with DataSources or APIs");
+          "pipelines", id, "DataSet must have at least one Pipeline with DataSources");
     }
-
-    generateDistributions(dataSet);
 
     dataSet.setDataSetStatus(DataSetStatus.READY);
     return dataSetRepository.save(dataSet);
   }
 
   /**
-   * Unstages a dataset, reverting it from READY to DRAFT. Removes auto-generated distributions.
+   * Unstages a dataset, reverting it from READY to DRAFT.
    *
    * @param id the dataset ID
    * @return the unstaged dataset
@@ -228,7 +273,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           "dataSetStatus", id, "DataSet can only be unstaged from READY status");
     }
 
-    dataSet.getDistributions().removeIf(Distribution::getAutoGenerated);
     dataSet.setDataSetStatus(DataSetStatus.DRAFT);
     return dataSetRepository.save(dataSet);
   }
@@ -311,16 +355,9 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     if (pendingType == PendingSagaType.DELETE) {
       dataSet.clearInfrastructureFields();
       dataSet.setDataSetStatus(DataSetStatus.READY);
-      dataSet.getDistributions().removeIf(Distribution::getAutoGenerated);
       log.info("Saga DELETE completed for dataset {}, reverted to READY", datasetId);
     } else if (pendingType == PendingSagaType.CREATE) {
       applyInfrastructureResult(dataSet, result);
-      boolean hasAutoGenerated =
-          dataSet.getDistributions().stream().anyMatch(Distribution::getAutoGenerated);
-      if (!hasAutoGenerated) {
-        generateDistributions(dataSet);
-      }
-      updateDistributionUrls(dataSet);
       log.info("Saga CREATE completed for dataset {}, infrastructure provisioned", datasetId);
     } else if (pendingType == PendingSagaType.UPDATE) {
       applyInfrastructureResult(dataSet, result);
@@ -414,6 +451,12 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * PATCH-style semantics: only non-null fields in the result are applied. This is intentional
    * because partial saga results (e.g., UPDATE saga that only touches APISIX) should not null out
    * fields set by earlier steps.
+   *
+   * <p><b>Drift policy:</b> divergence between the saga result and the entity (orphan slugs,
+   * unprovisioned slugs, replaced routeIds) is logged as drift events but does not fail the saga.
+   * Throwing here would not undo the upstream APISIX/FROST mutations and would cause Kafka
+   * redelivery to retry indefinitely without the orchestrator being able to compensate. Real
+   * compensation (fail-saga + cleanup) is not yet implemented.
    */
   private void applyInfrastructureResult(DataSet dataSet, SagaResultPayload result) {
     if (result.projectId() != null) {
@@ -422,8 +465,65 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     if (result.baseUrl() != null) {
       dataSet.setFrostBaseUrl(result.baseUrl());
     }
-    if (result.routeId() != null) {
-      dataSet.setRouteId(result.routeId());
+    if (!dataSet.getNamedApis().isEmpty()) {
+      boolean resultHasRouteIds = result.routeIds() != null && !result.routeIds().isEmpty();
+      Set<String> entitySlugs =
+          dataSet.getNamedApis().stream().map(NamedApi::getSlug).collect(Collectors.toSet());
+      Set<String> resultSlugs = resultHasRouteIds ? result.routeIds().keySet() : Set.of();
+
+      List<String> orphanSlugs =
+          resultSlugs.stream().filter(slug -> !entitySlugs.contains(slug)).toList();
+      if (!orphanSlugs.isEmpty()) {
+        log.error(
+            "drift={} dataset={} slugs={} — saga returned routeIds for slugs not on the entity;"
+                + " APISIX routes are likely leaked.",
+            DRIFT_ORPHAN_SLUGS,
+            dataSet.getId(),
+            Encode.forJava(orphanSlugs.toString()));
+      }
+
+      List<String> unprovisionedSlugs =
+          entitySlugs.stream().filter(slug -> !resultSlugs.contains(slug)).toList();
+      if (!unprovisionedSlugs.isEmpty()) {
+        log.error(
+            "drift={} dataset={} slugs={} — saga did not return routeIds for these entity slugs;"
+                + " user-facing endpoints will 404.",
+            DRIFT_UNPROVISIONED_SLUGS,
+            dataSet.getId(),
+            Encode.forJava(unprovisionedSlugs.toString()));
+      }
+
+      if (resultHasRouteIds) {
+        dataSet
+            .getNamedApis()
+            .forEach(
+                api -> {
+                  String incomingRouteId = result.routeIds().get(api.getSlug());
+                  if (incomingRouteId == null) {
+                    // Already logged as unprovisioned above; preserve current routeId.
+                    return;
+                  }
+                  String currentRouteId = api.getRouteId();
+                  if (currentRouteId != null && !currentRouteId.equals(incomingRouteId)) {
+                    log.error(
+                        "drift={} dataset={} slug={} previous={} incoming={} — prior APISIX route"
+                            + " is likely leaked.",
+                        DRIFT_REPLACED_ROUTEID,
+                        dataSet.getId(),
+                        Encode.forJava(api.getSlug()),
+                        Encode.forJava(currentRouteId),
+                        Encode.forJava(incomingRouteId));
+                  }
+                  api.setRouteId(incomingRouteId);
+                });
+      }
+    } else if (result.routeIds() != null && !result.routeIds().isEmpty()) {
+      log.error(
+          "drift={} dataset={} slugs={} — saga returned routeIds but entity has no namedApis;"
+              + " APISIX routes are likely leaked.",
+          DRIFT_UNEXPECTED_ROUTEIDS,
+          dataSet.getId(),
+          Encode.forJava(result.routeIds().keySet().toString()));
     }
     if (result.serviceId() != null) {
       dataSet.setServiceId(result.serviceId());
@@ -433,33 +533,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
     if (result.pipelineIds() != null) {
       dataSet.setPipelineIds(result.pipelineIds());
-    }
-  }
-
-  private void generateDistributions(DataSet dataSet) {
-    dataSet.getPipelines().stream()
-        .filter(pipeline -> pipeline.getApis() != null)
-        .flatMap(pipeline -> pipeline.getApis().stream())
-        .distinct()
-        .forEach(
-            apiPath -> {
-              Distribution distribution =
-                  distributionService.createFromApiUrlAndDataSet(apiPath, dataSet);
-              dataSet.getDistributions().add(distribution);
-            });
-  }
-
-  private void updateDistributionUrls(DataSet dataSet) {
-    if (dataSet.getPublicUrl() == null) {
-      return;
-    }
-    String baseUrl = StringUtils.stripEnd(dataSet.getPublicUrl(), "/");
-    for (Distribution dist : dataSet.getDistributions()) {
-      if (Boolean.TRUE.equals(dist.getAutoGenerated())
-          && dist.getAccessUrl() != null
-          && !dist.getAccessUrl().startsWith(dataSet.getPublicUrl())) {
-        dist.setAccessUrl(baseUrl + dist.getAccessUrl());
-      }
     }
   }
 }

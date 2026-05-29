@@ -44,7 +44,7 @@ class DataSetSagaResultListenerTest {
                 "datasetId", datasetId.toString(),
                 "projectId", "proj-1",
                 "baseUrl", "http://frost",
-                "routeId", "route-1",
+                "routeIds", Map.of("traffic", "route-1"),
                 "serviceId", "svc-1",
                 "publicUrl", "http://public",
                 "pipelineIds", List.of("pipe-1"))));
@@ -113,7 +113,7 @@ class DataSetSagaResultListenerTest {
                       datasetId.toString(),
                       "proj-1",
                       "http://frost",
-                      "route-1",
+                      Map.of("traffic", "route-1"),
                       "svc-1",
                       "http://public",
                       List.of("pipe-1"),

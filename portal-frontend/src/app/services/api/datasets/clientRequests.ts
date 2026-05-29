@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
 
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { useCreateMutation } from '@/hooks/use-create-mutation'
@@ -7,6 +8,7 @@ import { useDeleteMutation } from '@/hooks/use-delete-mutation'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
 import { GetListInput } from '@/types/common'
 import { Dataset, DatasetCreateApiData, DatasetPatchApiData, DatasetUpdateApiData } from '@/types/datasets'
+import { NamedApi, NamedApiInput } from '@/types/namedApis'
 
 const key = 'datasets'
 
@@ -48,6 +50,42 @@ export const useDeleteDataset = () =>
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while deleting the dataset.',
   })
+
+type CreateNamedApiInput = {
+  datasetId: string
+  api: NamedApiInput
+  existingApis: NamedApi[]
+}
+
+// PATCH /datasets/{id} merges namedApis by slug (backend PR #1315). No dedicated POST endpoint exists,
+// so create-on-dataset goes through PATCH while presenting a standard create-mutation shape to callers.
+export const useCreateNamedApi = () => {
+  const queryClient = useQueryClient()
+  return useMutation<ApiServiceResponse<Dataset>, AxiosError, CreateNamedApiInput>({
+    mutationFn: ({ datasetId, api, existingApis }) => {
+      const existingInputs: NamedApiInput[] = existingApis.map(a => ({
+        name: a.name,
+        slug: a.slug,
+        standard: a.standard,
+        version: a.version,
+        description: a.description,
+      }))
+      return apiRequest<Dataset>({
+        method: 'PATCH',
+        endpoint: `/datasets/${datasetId}`,
+        headers: { 'x-api-request': 'true' },
+        data: { namedApis: [...existingInputs, api] },
+        errorMessage: 'An error occurred while creating the API.',
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [key] })
+    },
+    onError: error => {
+      console.error('Error creating named API:', error.message)
+    },
+  })
+}
 
 const useDatasetTransition = (action: 'stage' | 'unstage' | 'release' | 'unrelease') => {
   const queryClient = useQueryClient()

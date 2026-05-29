@@ -5,8 +5,10 @@
  * Designed for easy extension to support import functionality in the future.
  */
 
+import { UML_GEOMETRY_TYPES, UML_PRIMITIVE_TYPES } from '../constants/umlTypes'
 import type { UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
 import type {
+  AttributeMeta,
   UMLAbstractClass,
   UMLAttribute,
   UMLClass,
@@ -36,24 +38,6 @@ const VISIBILITY_XMI_MAP: Record<Visibility, string> = {
   package: 'package',
 }
 
-// Primitive type mapping to XMI href (using 20131001 namespace for Eclipse compatibility)
-const PRIMITIVE_TYPE_HREF: Record<string, string> = {
-  String: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
-  Integer: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
-  Boolean: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Boolean',
-  Real: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
-  UnlimitedNatural: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#UnlimitedNatural',
-  // Extended types mapped to closest UML primitive
-  Float: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
-  Double: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
-  Long: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
-  Short: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
-  Byte: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
-  Character: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
-  Date: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
-  void: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
-}
-
 /**
  * Generates a unique ID (UUID v4 format)
  */
@@ -81,14 +65,17 @@ const escapeXml = (text: string): string => {
  * Converts a UML type to XMI type reference
  */
 const typeToXmi = (type: UMLType, indent: string): string => {
-  if (typeof type === 'string') {
-    // Primitive type
-    const href = PRIMITIVE_TYPE_HREF[type] || PRIMITIVE_TYPE_HREF['String']
-    return `${indent}<type xmi:type="uml:PrimitiveType" href="${href}"/>`
-  } else {
-    // Type reference to another element in the model
+  if (typeof type !== 'string') {
     return `${indent}<type xmi:type="uml:Class" xmi:idref="${type.id}"/>`
   }
+
+  const primitiveHref = UML_PRIMITIVE_TYPES[type as keyof typeof UML_PRIMITIVE_TYPES]?.uri
+  if (primitiveHref) return `${indent}<type xmi:type="uml:PrimitiveType" href="${primitiveHref}"/>`
+
+  const geometryHref = UML_GEOMETRY_TYPES[type as keyof typeof UML_GEOMETRY_TYPES]?.uri
+  if (geometryHref) return `${indent}<type xmi:type="uml:GeometryType" href="${geometryHref}"/>`
+
+  return `${indent}<type xmi:type="uml:PrimitiveType" href="${UML_PRIMITIVE_TYPES.String.uri}"/>`
 }
 
 /**
@@ -135,6 +122,26 @@ const parameterToXmi = (param: UMLParameter, indent: string): string => {
   return lines.join('\n')
 }
 
+const metaToXmi = (meta: AttributeMeta, indent: string) => {
+  const lines: string[] = []
+  const childIndent = `${indent}  `
+  const metaInfoKey = Object.keys(meta) as (keyof AttributeMeta)[]
+
+  for (const infoKey of metaInfoKey) {
+    const infoValue = meta[infoKey]
+    if (!infoValue) continue
+    const detailsKey = Object.keys(infoValue) as (keyof typeof infoValue)[]
+    lines.push(`${indent}<eAnnotations xmi:id="${crypto.randomUUID()}" source="${infoKey}">`)
+    for (const detail of detailsKey) {
+      lines.push(
+        `${childIndent}<details xmi:id="${crypto.randomUUID()}" key="${detail}" value="${infoValue[detail]}"/>`,
+      )
+    }
+    lines.push(`${indent}</eAnnotations>`)
+  }
+  return lines.join('\n')
+}
+
 /**
  * Converts a UML attribute to XMI
  */
@@ -145,6 +152,10 @@ const attributeToXmi = (attr: UMLAttribute, indent: string): string => {
 
   let propertyAttrs = `xmi:id="${attr.id}" name="${escapeXml(attr.name)}" visibility="${visibility}"`
 
+  if (attr.isId) {
+    propertyAttrs += ' isID="true"'
+  }
+
   if (attr.isStatic) {
     propertyAttrs += ' isStatic="true"'
   }
@@ -153,6 +164,9 @@ const attributeToXmi = (attr: UMLAttribute, indent: string): string => {
   }
 
   lines.push(`${indent}<ownedAttribute ${propertyAttrs}>`)
+  if (attr.meta) {
+    lines.push(metaToXmi(attr.meta, childIndent))
+  }
   lines.push(typeToXmi(attr.type, childIndent))
 
   if (attr.multiplicity) {

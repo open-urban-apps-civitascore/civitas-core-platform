@@ -9,7 +9,7 @@
 #
 # The cold-start.sh script handles this automatically.
 
-FROM eclipse-temurin:21-jre-alpine AS authz-repo-service
+FROM eclipse-temurin:25-jre-alpine AS authz-repo-service
 
 WORKDIR /app
 

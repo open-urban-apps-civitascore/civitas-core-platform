@@ -13,17 +13,9 @@ import { useTranslations } from 'next-intl'
 
 import type { ControlNodeData } from '../../../_types/nodes'
 
-// ============================================================================
-// Props
-// ============================================================================
-
 interface ControlPanelProps {
   data: ControlNodeData
 }
-
-// ============================================================================
-// Component
-// ============================================================================
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({ data }) => {
   const t = useTranslations('pipelineEditor')

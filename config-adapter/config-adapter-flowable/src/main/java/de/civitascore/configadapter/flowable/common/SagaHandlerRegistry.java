@@ -49,6 +49,15 @@ public final class SagaHandlerRegistry {
     return handler;
   }
 
+  /**
+   * Returns the handler for the given adapter name, or {@code null} if none is registered. Used by
+   * delegates for conditionally-required adapters (e.g. the pipeline step) so a missing handler can
+   * be turned into a saga failure instead of an opaque exception.
+   */
+  public SagaCommandHandler findHandler(String adapterName) {
+    return handlers.get(adapterName);
+  }
+
   /** Returns the set of registered adapter names. */
   public Set<String> adapterNames() {
     return Set.copyOf(handlers.keySet());

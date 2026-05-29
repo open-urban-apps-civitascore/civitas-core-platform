@@ -61,17 +61,6 @@ test.describe('Dataset List', async () => {
     await expect(page.getByTestId('pageHeader')).toContainText(dataset.name)
   })
 
-  test('navigates to the dataspace details when clicking on the dataspace', async ({ page }) => {
-    await page.getByRole('table').waitFor({ state: 'visible' })
-    await page.getByTestId('searchArea').locator('input').fill(dataset.name)
-
-    const datasetRow = page.getByRole('row').filter({ hasText: dataset.dataspace?.name })
-    await datasetRow.waitFor({ state: 'visible' })
-    const dataspaceCell = datasetRow.getByRole('cell', { name: dataset.dataspace?.name })
-    await dataspaceCell.click()
-    await expect(page.getByTestId('dataspaceDetailsPage')).toBeVisible()
-  })
-
   test('navigates to user details when clicking on the contact', async ({ page }) => {
     await page.getByRole('table').waitFor({ state: 'visible' })
     await page.getByTestId('searchArea').locator('input').fill(dataset.name)

@@ -81,6 +81,21 @@ If the PostgreSQL volume already exists from before this split, recreate it: `do
 ### Dataset Delete (Redpanda → APISIX → FROST)
 - Reverse order, best-effort: continues on failure, no compensation
 
+### Adapter handlers: required vs optional
+
+The orchestrator only **requires** the handlers that every saga path uses unconditionally — `frost`
+and `apisix` — and fails fast at startup if either is missing. The **pipeline** adapter (`redpanda`,
+and `nifi` once it exists) is **conditional**: it runs only when a trigger carries pipelines
+(`hasPipelines == true`) and is resolved lazily per step. Therefore:
+
+- A deployment **without** the pipeline adapter still boots, and pipeline-free sagas complete normally.
+- A saga that *does* carry pipelines but finds no pipeline handler **fails gracefully** — the step
+  raises a saga failure routed through the normal compensation/failure path, not an opaque crash.
+
+This keeps the engine runnable during the RedPanda → NiFi migration, while the pipeline adapter may
+be temporarily absent. Both the BPMN and coded variants share this behavior (enforced by the
+equivalence tests).
+
 ## Architecture
 
 The module is organized into three top-level packages:
@@ -94,7 +109,7 @@ Both `bpmn` and `coded` produce equivalent process definitions and share the del
 ### Key Design Decisions
 
 - **No Spring Boot required** — Flowable runs standalone with programmatic `ProcessEngineConfiguration`
-- **Handlers reused** — Existing `SagaCommandHandler` implementations (FROST, APISIX, Redpanda) called via JavaDelegate wrappers
+- **Handlers reused** — Existing `SagaCommandHandler` implementations (FROST, APISIX, pipeline) called via JavaDelegate wrappers; only FROST and APISIX are required at startup (see *Adapter handlers: required vs optional*)
 - **In-process execution** — No Kafka round-trip per step (unlike custom orchestrator). Only trigger and result go through Kafka.
 - **Async disabled for tests** — Test engines run synchronously for deterministic testing. Production engines use async execution for crash recovery.
 

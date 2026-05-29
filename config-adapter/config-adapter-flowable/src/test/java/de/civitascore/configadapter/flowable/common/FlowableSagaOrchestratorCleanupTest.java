@@ -59,13 +59,15 @@ class FlowableSagaOrchestratorCleanupTest {
     FlowableSagaOrchestrator sut = new FlowableSagaOrchestrator(config, Map.of());
 
     IllegalStateException ex = assertThrows(IllegalStateException.class, sut::initialize);
+    // Only the unconditional adapters are required at startup.
     assertTrue(ex.getMessage().contains("frost"));
     assertTrue(ex.getMessage().contains("apisix"));
-    assertTrue(ex.getMessage().contains("redpanda"));
   }
 
   @Test
-  void initialize_withoutRedpandaHandler_throwsMentioningRedpanda() {
+  void initialize_withoutRedpandaHandler_succeeds() {
+    // redpanda is the conditional pipeline adapter — a deployment without it (e.g. mid NiFi
+    // migration) must still boot; only pipeline sagas need it, and they fail gracefully per step.
     AdapterConfig config = jdbcConfig("jdbc:h2:mem:no-redpanda", "sa", "");
 
     SagaCommandHandler frost = mock(SagaCommandHandler.class);
@@ -76,10 +78,8 @@ class FlowableSagaOrchestratorCleanupTest {
     FlowableSagaOrchestrator sut =
         new FlowableSagaOrchestrator(config, Map.of("frost", frost, "apisix", apisix));
 
-    IllegalStateException ex = assertThrows(IllegalStateException.class, sut::initialize);
-    assertTrue(
-        ex.getMessage().contains("not registered: [redpanda]"),
-        "Error must specifically call out redpanda as the missing handler");
+    assertDoesNotThrow(sut::initialize);
+    sut.close();
   }
 
   @Test

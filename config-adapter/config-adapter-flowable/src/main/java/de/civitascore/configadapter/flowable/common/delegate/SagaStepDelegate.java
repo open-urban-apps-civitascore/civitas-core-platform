@@ -54,7 +54,14 @@ public class SagaStepDelegate extends AbstractAdapterCallDelegate {
     String step = resolveString(stepId, execution);
 
     SagaHandlerRegistry registry = resolveRegistry(execution);
-    SagaCommandHandler handler = registry.getHandler(adapter);
+    SagaCommandHandler handler = registry.findHandler(adapter);
+    if (handler == null) {
+      // Conditional adapter (e.g. pipeline step) not deployed in this environment. Fail the step
+      // through the normal saga-failure path (compensation + failure result) instead of letting an
+      // opaque exception escape the delegate.
+      recordFailureAndThrow(
+          execution, step, "No SagaCommandHandler registered for adapter: " + adapter);
+    }
 
     Map<String, Object> allVariables = execution.getVariables();
     Map<String, Object> payload = buildPayload(allVariables, handler);
@@ -94,19 +101,24 @@ public class SagaStepDelegate extends AbstractAdapterCallDelegate {
           Encode.forJava(result.sagaId()),
           Encode.forJava(step));
     } else {
-      LOG.error(
-          "Saga step failed: sagaId={}, step={}, error={}",
-          Encode.forJava(result.sagaId()),
-          Encode.forJava(step),
-          Encode.forJava(result.error()));
-      execution.setVariable(step + "_error", result.error());
-      // Only record the FIRST failure — subsequent failures in best-effort delete don't overwrite
-      if (execution.getVariable("sagaError") == null) {
-        execution.setVariable("failedStep", step);
-        execution.setVariable("sagaError", result.error());
-      }
-      throw new BpmnError("STEP_FAILED", result.error());
+      recordFailureAndThrow(execution, step, result.error());
     }
+  }
+
+  /**
+   * Records a step failure into the process variables (so the failure result can be published) and
+   * throws a {@link BpmnError} to route the saga into its rollback/failure path. Used both for
+   * handler-reported failures and for a missing (conditional) handler.
+   */
+  private void recordFailureAndThrow(DelegateExecution execution, String step, String error) {
+    LOG.error("Saga step failed: step={}, error={}", Encode.forJava(step), Encode.forJava(error));
+    execution.setVariable(step + "_error", error);
+    // Only record the FIRST failure — subsequent failures in best-effort delete don't overwrite
+    if (execution.getVariable("sagaError") == null) {
+      execution.setVariable("failedStep", step);
+      execution.setVariable("sagaError", error);
+    }
+    throw new BpmnError("STEP_FAILED", error);
   }
 
   private Map<String, Object> buildPayload(

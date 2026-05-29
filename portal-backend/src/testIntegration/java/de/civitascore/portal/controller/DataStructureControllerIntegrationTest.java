@@ -161,10 +161,13 @@ class DataStructureControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should fail to create duplicate data structure with same name")
-    void shouldFailToCreateDuplicateDataStructure() {
+    @DisplayName("Should allow creating data structures with the same name")
+    void shouldAllowDuplicateDataStructureName() {
+      // Name uniqueness was removed (#1453) to close a create-oracle: read access on
+      // DataStructures is scope-restricted but create access is global, so a uniqueness
+      // violation leaked the existence of records the caller had no permission to read.
       DataStructureInputDTO input = new DataStructureInputDTO();
-      input.setName("Unique Data Structure");
+      input.setName("Shared Data Structure Name");
       input.setDescription("First one");
       input.setDataStructureStatus(DataStructureStatus.DRAFT);
       input.setCreatedFromDataSource(false);
@@ -175,8 +178,9 @@ class DataStructureControllerIntegrationTest
       ResponseEntity<DataStructureOutputDTO> secondResponse = performCreate(input);
 
       assertThat(secondResponse.getStatusCode())
-          .as("Should return CONFLICT status for duplicate")
-          .isEqualTo(HttpStatus.CONFLICT);
+          .as("Duplicate name must be accepted to avoid create-oracle leak")
+          .isEqualTo(HttpStatus.CREATED);
+      assertThat(secondResponse.getBody().getId()).isNotEqualTo(firstResponse.getBody().getId());
     }
   }
 

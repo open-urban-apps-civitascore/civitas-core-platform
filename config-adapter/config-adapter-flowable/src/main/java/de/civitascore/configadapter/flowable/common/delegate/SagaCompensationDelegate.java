@@ -48,11 +48,23 @@ public class SagaCompensationDelegate extends AbstractAdapterCallDelegate {
     String step = resolveString(stepId, execution);
 
     SagaHandlerRegistry registry = resolveRegistry(execution);
-    SagaCommandHandler handler = registry.getHandler(adapter);
+    SagaCommandHandler handler = registry.findHandler(adapter);
 
     Map<String, Object> allVariables = execution.getVariables();
     Map<String, Object> payload = buildCompensationPayload(allVariables, step);
     String saga = sagaIdFrom(allVariables, execution);
+
+    if (handler == null) {
+      // Best-effort: a conditional adapter not deployed here cannot compensate. Record and skip
+      // instead of aborting the compensation chain.
+      LOG.error(
+          "Cannot compensate — no handler for adapter: sagaId={}, step={}, adapter={}",
+          Encode.forJava(saga),
+          Encode.forJava(step),
+          Encode.forJava(adapter));
+      collectError(execution, step, adapter, "No SagaCommandHandler registered for adapter");
+      return;
+    }
 
     SagaCommandMessage command =
         new SagaCommandMessage(

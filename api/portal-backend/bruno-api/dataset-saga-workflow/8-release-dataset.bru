@@ -2,6 +2,9 @@ meta {
   name: 8. Release DataSet (triggers saga)
   type: http
   seq: 21
+  tags: [
+    requires-nifi
+  ]
 }
 
 post {
@@ -28,10 +31,10 @@ docs {
   Transitions the dataset from `READY` to `AVAILABLE` and triggers the **DATASET_CREATE** saga asynchronously. The saga orchestrator provisions infrastructure in this order:
 
   1. **FROST Server** — creates a Project for the dataset
-  2. **APISIX Gateway** — creates upstream + route (with OpenID-Connect auth plugin)
+  2. **APISIX Gateway** — creates upstream + one route per named API (with OpenID-Connect auth plugin)
   3. **Redpanda Connect** — deploys any attached pipelines
 
-  On success, infrastructure references (`projectId`, `routeId`, `serviceId`, `publicUrl`, `pipelineIds`) are stored on the dataset. On failure, compensation runs in reverse order and the dataset reverts to `READY`.
+  On success, infrastructure references (`projectId`, per-namedApi `routeId`, `serviceId`, `publicUrl`, `pipelineIds`) are stored on the dataset. On failure, compensation runs in reverse order and the dataset reverts to `READY`.
 
   **Precondition:** `sagaDataSetId` is set; dataset is in `READY` state.
 
