@@ -12,6 +12,7 @@ package de.civitascore.configadapter.application;
 import de.civitascore.configadapter.adapter.SagaCommandHandler;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.configuration.AppConfig;
+import de.civitascore.configadapter.flowable.common.FlowableSagaOrchestrator;
 import de.civitascore.configadapter.orchestrator.DatasetSagaOrchestrator;
 import de.civitascore.configadapter.orchestrator.kafka.SagaTriggerConsumer;
 import de.civitascore.event.handler.kafka.KafkaSagaCommandConsumer;
@@ -44,13 +45,52 @@ class SagaComponentFactory {
   private static final String DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092";
 
   SagaComponents create(AppConfig config) {
+    String engine = config.getProperty("orchestrator.engine", "flowable");
+
+    if ("flowable".equals(engine)) {
+      logger.info("Using Flowable saga orchestrator (orchestrator.engine=flowable)");
+      return createFlowableComponents(config);
+    }
+
+    if (!"custom".equals(engine)) {
+      throw new IllegalArgumentException(
+          "Unknown orchestrator.engine '" + engine + "'. Supported values: flowable, custom");
+    }
+
+    logger.info("Using custom saga orchestrator (orchestrator.engine=custom)");
     String bootstrapServers =
         config.getProperty(KAFKA_BOOTSTRAP_SERVERS, DEFAULT_BOOTSTRAP_SERVERS);
-
     Optional<KafkaSagaCommandConsumer> commandConsumer =
         Optional.ofNullable(createSagaCommandConsumer(config, bootstrapServers));
     Optional<OrchestratorPair> orchestratorPair = initializeSagaOrchestrator(bootstrapServers);
     return new SagaComponents(commandConsumer, orchestratorPair);
+  }
+
+  private SagaComponents createFlowableComponents(AppConfig config) {
+    Map<String, SagaCommandHandler> handlers = discoverSagaHandlers(config);
+    FlowableSagaOrchestrator flowable = new FlowableSagaOrchestrator(config, handlers);
+    try {
+      flowable.initialize();
+    } catch (Exception e) {
+      try {
+        flowable.close();
+      } catch (Exception closeEx) {
+        e.addSuppressed(closeEx);
+      }
+      for (SagaCommandHandler handler : handlers.values()) {
+        try {
+          handler.close();
+        } catch (Exception closeEx) {
+          e.addSuppressed(closeEx);
+        }
+      }
+      throw new IllegalStateException(
+          "Flowable orchestrator initialization failed (orchestrator.engine=flowable). "
+              + "Check flowable.jdbc.* configuration.",
+          e);
+    }
+    logger.info("FlowableSagaOrchestrator initialized successfully");
+    return SagaComponents.flowable(flowable);
   }
 
   private Optional<OrchestratorPair> initializeSagaOrchestrator(String bootstrapServers) {
