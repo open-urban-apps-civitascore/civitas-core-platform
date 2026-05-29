@@ -34,6 +34,7 @@ import {
   mockDatasink2,
   mockDatastructureVersion,
   mockDatastructureVersion2,
+  mockLayerList,
   mockStyleList,
 } from './mockData'
 
@@ -97,12 +98,12 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
   const postgisDatasinks = (datasinksData?.data ?? [mockDatasink, mockDatasink2]).filter(
     datasink => datasink.dataSinkType === DATASINK_TYPES.POSTGIS,
   )
-  const datastructuresToFetch = postgisDatasinks?.map(datasink => ({
-    datastructureId: datasink.configuration.dataStructureVersion.dataStructureId,
-    versionId: datasink.configuration.dataStructureVersion.id,
-  }))
+  // TODO: enable this request and remove mock data once API is working
+  // const datastructuresToFetch = postgisDatasinks?.map(datasink => ({
+  //   datastructureId: datasink.configuration.dataStructureVersion.dataStructureId,
+  //   versionId: datasink.configuration.dataStructureVersion.id,
+  // }))
 
-  // TODO: enable request and remove mock data once API is working
   // const postgisDatastructuresResponse = useQueries({
   //   queries: datastructuresToFetch.map(({ datastructureId, versionId }) => ({
   //     queryKey: [`datastructures/${datastructureId}/versions`, versionId],
