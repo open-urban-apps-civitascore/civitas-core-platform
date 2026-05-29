@@ -61,6 +61,14 @@ class ApisixSagaHandlerTest {
     }
   }
 
+  @Test
+  @DisplayName("fieldAliases() declares baseUrl→upstreamUrl so the saga forwards FROST's baseUrl")
+  void shouldDeclareBaseUrlAlias() {
+    try (ApisixSagaHandler handler = createHandler()) {
+      assertEquals(Map.of("baseUrl", "upstreamUrl"), handler.fieldAliases());
+    }
+  }
+
   @Nested
   @DisplayName("Initialization")
   class Initialization {

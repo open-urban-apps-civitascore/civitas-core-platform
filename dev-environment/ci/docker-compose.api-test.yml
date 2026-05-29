@@ -17,7 +17,11 @@ services:
   # ── Databases ──────────────────────────────────────────────
 
   postgres-portal:
-    image: postgres:18.1-alpine
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM postgres:18.1-alpine
+        RUN echo "CREATE DATABASE flowable OWNER admin;" > /docker-entrypoint-initdb.d/20-flowable.sql
     environment:
       POSTGRES_DB: portal_backend
       POSTGRES_USER: admin
@@ -280,17 +284,30 @@ services:
 
   # ── Data Pipelines ──────────────────────────────────────
 
-  redpanda-connect:
-    image: redpandadata/connect:4
-    command: ["streams"]
+  nifi:
+    image: apache/nifi:2.9.0
+    env_file:
+     - ../nifi/.env.example
     environment:
-      FROST_BASE: http://civitas-frost:8080/FROST-Server/v1.1
+      NIFI_WEB_HTTPS_PORT: "8443"
+      NIFI_WEB_PROXY_HOST: "nifi:8443"
+      NIFI_JVM_HEAP_INIT: "512m"
+      NIFI_JVM_HEAP_MAX: "1g"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost:4195/ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      test:
+        - "CMD-SHELL"
+        - |
+          TOKEN=$$(curl -k -sf -H 'Host: nifi:8443' -X POST \
+            --data-urlencode "username=$$SINGLE_USER_CREDENTIALS_USERNAME" \
+            --data-urlencode "password=$$SINGLE_USER_CREDENTIALS_PASSWORD" \
+            https://$$HOSTNAME:8443/nifi-api/access/token) \
+          && curl -k -sf -o /dev/null -H 'Host: nifi:8443' \
+            -H "Authorization: Bearer $$TOKEN" \
+            https://$$HOSTNAME:8443/nifi-api/system-diagnostics
+      interval: 30s
+      timeout: 15s
+      retries: 10
+      start_period: 90s
 
   # ── Email (SMTP sink for Keycloak verification emails) ──
 
@@ -348,7 +365,7 @@ services:
     image: ${CI_REGISTRY_IMAGE}/config-adapter:${IMAGE_TAG:-develop}
     environment:
       HEALTHCHECK_PORT: 8088
-      ADAPTERS: keycloak,apisix,frost,redpanda
+      ADAPTERS: keycloak,apisix,frost # ,nifi (add after implementation)
       EVENTHANDLER_NAME: kafka
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_GROUP_ID: config-adapter-group
@@ -374,17 +391,20 @@ services:
       # Headers the saga's route-level proxy-rewrite must strip in lieu of plugin_config 1
       # (Route-over-PluginConfig precedence overrides plugin_config's proxy-rewrite).
       APISIX_PROXY_REWRITE_HEADERS_REMOVE: X-Allowed-Scope-Ids
-      # FROST upstream auth that APISIX forwards to private projects — mirrors FROST_* below.
+      # FROST upstream auth that APISIX forwards to private projects (mirrors FROST_* below).
       APISIX_FROST_API_KEY: dev-frost-api-key
       APISIX_FROST_API_KEY_HEADER: X-API-Key
       APISIX_TOPICS: de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted
-      # FROST_PUBLIC_URL falls back to FROST_URL when unset (same value here in CI).
       FROST_URL: http://civitas-frost:8080/FROST-Server/v1.1
+      FROST_PUBLIC_URL: http://civitas-frost:8080/FROST-Server/v1.1
       FROST_API_KEY: dev-frost-api-key
       FROST_API_KEY_HEADER: X-API-Key
       FROST_TOPICS: de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
-      REDPANDA_URL: http://redpanda-connect:4195
-      REDPANDA_TOPICS: de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
+      NIFI_URL: https://nifi:8443
+      NIFI_TOPICS: de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
+      FLOWABLE_JDBC_URL: jdbc:postgresql://postgres-portal:5432/flowable
+      FLOWABLE_JDBC_USERNAME: admin
+      FLOWABLE_JDBC_PASSWORD: admin
     depends_on:
       kafka:
         condition: service_healthy

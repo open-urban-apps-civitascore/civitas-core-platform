@@ -105,6 +105,11 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
   }
 
   @Override
+  public Map<String, String> fieldAliases() {
+    return Map.of("baseUrl", "upstreamUrl");
+  }
+
+  @Override
   protected void doInitialize(AdapterConfig config) {
     this.adminApiUrl = getProperty("admin.url", ADMIN_URL_DEFAULT);
     this.adminApiKey = getProperty("admin.key");
