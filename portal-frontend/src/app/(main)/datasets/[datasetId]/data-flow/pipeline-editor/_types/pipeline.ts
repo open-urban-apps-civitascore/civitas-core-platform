@@ -23,6 +23,7 @@ export const PIPELINE_NODE_TYPES = {
   DataSource: 'dataSource',
   // Storage nodes
   Frost: 'frost',
+  GeoPersistence: 'geoPersistence',
   // Transform nodes
   Mapping: 'mapping',
 } as const

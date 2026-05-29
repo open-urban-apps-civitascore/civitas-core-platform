@@ -3,6 +3,8 @@ package de.civitascore.portal.service;
 import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.idm.UserConfig;
+import de.civitascore.portal.configuration.EventProperties;
+import de.civitascore.portal.configuration.KeycloakProperties;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.User;
@@ -19,7 +21,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
@@ -35,19 +36,20 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   private final UserRepository userRepository;
   private final UserMapper userMapper;
   private final GroupRepository groupRepository;
-  private final String targetRealm;
+  private final KeycloakProperties keycloakProperties;
 
   public UserService(
       ConfigEventPublisherService configEventPublisher,
       UserRepository userRepository,
       UserMapper userMapper,
       GroupRepository groupRepository,
-      @Value("${keycloak.target-realm}") String targetRealm) {
-    super(configEventPublisher);
+      KeycloakProperties keycloakProperties,
+      EventProperties eventProperties) {
+    super(configEventPublisher, eventProperties);
     this.userRepository = userRepository;
     this.userMapper = userMapper;
     this.groupRepository = groupRepository;
-    this.targetRealm = targetRealm;
+    this.keycloakProperties = keycloakProperties;
   }
 
   @Override
@@ -199,7 +201,7 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
    */
   @Override
   protected String getRealm(User entity) {
-    return targetRealm;
+    return keycloakProperties.targetRealm();
   }
 
   @Override

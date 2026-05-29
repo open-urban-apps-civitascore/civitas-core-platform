@@ -13,7 +13,6 @@ const dataset: Dataset = {
   modifiedAt: '2024-01-02T00:00:00Z',
   openDataAccess: true,
   dataSetStatus: DATASET_STATUS_TYPES.DRAFT,
-  distributions: [],
   pipelines: [],
 }
 

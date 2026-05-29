@@ -1,56 +1,90 @@
-import type { UMLPrimitiveType, UMLTypeReference } from '../types/uml'
+import type { UMLGeometryType, UMLPrimitiveType, UMLTypeReference } from '../types/uml'
 
 // UML 2.5 Primitive Types with their official URIs
 export const UML_PRIMITIVE_TYPES: Record<UMLPrimitiveType, { name: string; uri: string }> = {
   String: {
     name: 'String',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#String',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
   },
   Integer: {
     name: 'Integer',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Integer',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
   },
   Boolean: {
     name: 'Boolean',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Boolean',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Boolean',
   },
   Float: {
     name: 'Float',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Real',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
   },
   Double: {
     name: 'Double',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Real',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
   },
   Long: {
     name: 'Long',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Integer',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
   },
   Short: {
     name: 'Short',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Integer',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
   },
   Byte: {
     name: 'Byte',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#Integer',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
   },
   Character: {
     name: 'Character',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#String',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
   },
   Date: {
     name: 'Date',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#String',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
+  },
+  Uuid: {
+    name: 'Uuid',
+    uri: 'http://models.civitasconnect.org/Types/1.0#//Uuid',
   },
   void: {
     name: 'void',
-    uri: 'http://www.eclipse.org/uml2/5.0.0/Types#void',
+    uri: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
+  },
+}
+export const UML_GEOMETRY_TYPES: Record<UMLGeometryType, { name: string; uri: string }> = {
+  Point: {
+    name: 'Point',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//Point',
+  },
+  LineString: {
+    name: 'LineString',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//LineString',
+  },
+  Polygon: {
+    name: 'Polygon',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//Polygon',
+  },
+  MultiPoint: {
+    name: 'MultiPoint',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//MultiPoint',
+  },
+  MultiLineString: {
+    name: 'MultiLineString',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//MultiLineString',
+  },
+  MultiPolygon: {
+    name: 'MultiPolygon',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//MultiPolygon',
+  },
+  GeometryCollection: {
+    name: 'GeometryCollection',
+    uri: 'http://models.civitasconnect.org/models/postgis/1.0#//GeometryCollection',
   },
 }
 
 // Categorized primitive types for UI dropdowns
 export const PRIMITIVE_TYPE_CATEGORIES = {
-  Text: ['String', 'Character'] as UMLPrimitiveType[],
+  Text: ['String', 'Character', 'Uuid'] as UMLPrimitiveType[],
   Numbers: ['Integer', 'Long', 'Short', 'Byte', 'Float', 'Double'] as UMLPrimitiveType[],
   Other: ['Boolean', 'Date', 'void'] as UMLPrimitiveType[],
 }

@@ -14,7 +14,6 @@ public class PipelineOutputDTO extends BaseOutputDTO {
   private String name;
   private String description;
   private Map<String, Object> styles;
-  private String[] apis;
   private Long[] persistences;
   private Map<String, Object> model;
 }

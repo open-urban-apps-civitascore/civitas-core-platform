@@ -4,7 +4,6 @@ import { Dataset } from '@/types/datasets'
 
 import { createTestDataset } from '../../playwright/helpers/dataset/createTestDataset'
 import { removeTestDataset } from '../../playwright/helpers/dataset/removeTestDataset'
-import { pickSelectOption } from '../utils/formUtils'
 
 const COMPLETION_STEPS = [
   'Metadata',
@@ -91,7 +90,6 @@ test.describe('Edit Dataset Page', async () => {
     await page.getByTestId('editButton').click()
 
     // edit form data
-    await pickSelectOption(page, 'dataspace', 'Placeholder')
     await page.getByTestId('nameTextField').fill(`edited ${dataset.name}`)
     await page.getByTestId('descriptionTextField').fill(`edited ${dataset.description}`)
 

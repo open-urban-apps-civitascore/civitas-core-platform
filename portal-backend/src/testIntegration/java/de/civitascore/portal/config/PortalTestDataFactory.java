@@ -186,6 +186,11 @@ public class PortalTestDataFactory {
     return dataSetRepository.save(builder.build());
   }
 
+  /** Re-saves an existing dataset (e.g. after wiring child collections post-build). */
+  public DataSet saveDataSet(DataSet dataSet) {
+    return dataSetRepository.save(dataSet);
+  }
+
   // ---------------------------------------------------------------------------
   // DataSource
   // ---------------------------------------------------------------------------

@@ -29,7 +29,6 @@ import {
 } from '@/types/datastructures'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
 import { containsNonStatusField, mapDatastructureApiToFormData } from '@/utils/datastructures'
-import { isNameConflictError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 import { tabs } from '../components/DatastructureOverview'
@@ -44,7 +43,7 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
   const router = useRouter()
   const t = useTranslations('datastructures')
   const tCommon = useTranslations('common')
-  const { handleFormValidationError, handleNameError } = useError()
+  const { handleFormValidationError } = useError()
   const [selectedTab, setSelectedTab] = useState(tabs[0].value)
 
   const defaultValues = useMemo<DatastructureFormDraft>(
@@ -207,11 +206,8 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
       await handleUpdateDatastructure(parsed.data)
       return true
     } catch (error) {
-      if (isNameConflictError(error as AxiosError)) {
-        handleNameError(form, form.getValues('name'))
-      } else {
-        console.error('An error occurred while submitting datastructure data.', (error as AxiosError).message)
-      }
+      console.error('An error occurred while submitting datastructure data.', (error as AxiosError).message)
+      toast.error(tCommon('errors.updateError', { item: tCommon('items.datastructure') }))
       return false
     }
   }

@@ -43,7 +43,7 @@
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <apache-jena.version>5.6.0</apache-jena.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
-        <config-adapter.version>1.0.2-MR-410</config-adapter.version>
+        <config-adapter.version>1.0.2-MR-465-SNAPSHOT</config-adapter.version>
         <portal-model.version>1.0.0</portal-model.version>
     </properties>
 
@@ -306,9 +306,23 @@
                         <ignoredUnusedDeclaredDependency>org.hibernate.orm:hibernate-processor</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>de.civitas-core:event-handler-kafka</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>org.postgresql:postgresql</ignoredUnusedDeclaredDependency>
+                        <!-- portal-model is heavily used but analyzer can't detect it
+                             through the ${revision}/flatten-plugin indirection -->
+                        <ignoredUnusedDeclaredDependency>de.civitascore:portal-model</ignoredUnusedDeclaredDependency>
                     </ignoredUnusedDeclaredDependencies>
                     <ignoredNonTestScopedDependencies>
                         <ignoredNonTestScopedDependency>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</ignoredNonTestScopedDependency>
+                        <!-- Used at runtime by Spring Security autoconfig; main code uses
+                             only the .oauth2ResourceServer().jwt() DSL, no direct imports -->
+                        <ignoredNonTestScopedDependency>org.springframework.boot:spring-boot-security-oauth2-resource-server</ignoredNonTestScopedDependency>
+                        <!-- KafkaSagaCommandConsumer is test-only, but main code imports
+                             cloudevents-kafka transitively from event-handler-kafka -->
+                        <ignoredNonTestScopedDependency>de.civitas-core:event-handler-kafka</ignoredNonTestScopedDependency>
+                        <!-- Transitively pulled compile-scope by oauth2-resource-server;
+                             only direct use is JWTParser in UserMeIntegrationTest -->
+                        <ignoredNonTestScopedDependency>com.nimbusds:nimbus-jose-jwt</ignoredNonTestScopedDependency>
+                        <!-- Transitively pulled test-only -->
+                        <ignoredUsedUndeclaredDependency>ch.qos.logback:*</ignoredUsedUndeclaredDependency>
                     </ignoredNonTestScopedDependencies>
                     <ignoredUsedUndeclaredDependencies>
                         <ignoredUsedUndeclaredDependency>org.springframework.boot:*</ignoredUsedUndeclaredDependency>
@@ -319,6 +333,9 @@
                         <ignoredUsedUndeclaredDependency>org.springdoc:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.slf4j:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>com.fasterxml.jackson.*:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>tools.jackson.*:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>org.hibernate.*:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>org.springframework.kafka:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.apache.commons:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.assertj:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.jspecify:*</ignoredUsedUndeclaredDependency>
@@ -335,6 +352,13 @@
                         <ignoredUsedUndeclaredDependency>org.wiremock:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.apache.logging.log4j:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.postgresql:*</ignoredUsedUndeclaredDependency>
+                        <!-- Transitively pulled, used directly only in tests; versions
+                             managed by upstream BOMs (testcontainers, oauth2-resource-server) -->
+                        <ignoredUsedUndeclaredDependency>com.github.docker-java:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>com.nimbusds:*</ignoredUsedUndeclaredDependency>
+                        <!-- Transitively pulled, used directly only in tests; versions
+                             managed by upstream BOMs (springframework) -->
+                        <ignoredUsedUndeclaredDependency>ch.qos.logback:*</ignoredUsedUndeclaredDependency>
                     </ignoredUsedUndeclaredDependencies>
                 </configuration>
                 <executions>

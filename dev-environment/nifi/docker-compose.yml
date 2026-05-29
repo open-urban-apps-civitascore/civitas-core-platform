@@ -1,0 +1,69 @@
+# Apache NiFi — Data integration and pipeline engine
+#
+# Provides a web-based UI for designing, controlling, and monitoring data flows.
+# Used for dataset pipeline deployment (replaces Redpanda Connect).
+#
+# UI: https://localhost:8443/nifi (self-signed cert, accept browser warning)
+# Credentials: configured via dev-environment/nifi/.env (see .env.example).
+
+services:
+  nifi:
+    image: apache/nifi:2.9.0
+    container_name: civitas-nifi
+    restart: unless-stopped
+    ports:
+      - "8443:8443" # HTTPS UI / REST API
+      - "10000:10000" # Site-to-Site
+      - "8000:8000" # JVM debug
+    env_file:
+      - path: .env
+        required: false
+      - path: .env.example
+        required: false
+    environment:
+      NIFI_WEB_HTTPS_PORT: "8443"
+      NIFI_WEB_PROXY_HOST: "localhost:8443"
+      NIFI_JVM_HEAP_INIT: "1g"
+      NIFI_JVM_HEAP_MAX: "2g"
+    volumes:
+      - nifi_database_repository:/opt/nifi/nifi-current/database_repository
+      - nifi_flowfile_repository:/opt/nifi/nifi-current/flowfile_repository
+      - nifi_content_repository:/opt/nifi/nifi-current/content_repository
+      - nifi_provenance_repository:/opt/nifi/nifi-current/provenance_repository
+      - nifi_state:/opt/nifi/nifi-current/state
+      - nifi_logs:/opt/nifi/nifi-current/logs
+      - nifi_conf:/opt/nifi/nifi-current/conf
+      # Drop the Postgres JDBC driver here so NiFi can load it (see README).
+      - ./extensions:/opt/nifi/nifi-current/extensions
+      - ./drivers:/opt/nifi/drivers:ro
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - |
+          TOKEN=$$(curl -k -sf -H 'Host: localhost:8443' -X POST \
+            --data-urlencode "username=$$SINGLE_USER_CREDENTIALS_USERNAME" \
+            --data-urlencode "password=$$SINGLE_USER_CREDENTIALS_PASSWORD" \
+            https://$$HOSTNAME:8443/nifi-api/access/token) \
+          && curl -k -sf -o /dev/null -H 'Host: localhost:8443' \
+            -H "Authorization: Bearer $$TOKEN" \
+            https://$$HOSTNAME:8443/nifi-api/system-diagnostics
+      interval: 30s
+      timeout: 15s
+      retries: 10
+      start_period: 90s
+    networks:
+      - civitas-network
+
+volumes:
+  nifi_database_repository:
+  nifi_flowfile_repository:
+  nifi_content_repository:
+  nifi_provenance_repository:
+  nifi_state:
+  nifi_logs:
+  nifi_conf:
+
+networks:
+  civitas-network:
+    name: civitas-network
+    external: true
