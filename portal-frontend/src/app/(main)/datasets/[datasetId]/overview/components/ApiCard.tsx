@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { ApiStandard, NamedApi, NamedApiInput } from '@/types/namedApis'
+import { ApiStandard, namedApiPathPrefix, NamedApi, NamedApiInput } from '@/types/namedApis'
 
 const STANDARD_ICONS: Record<ApiStandard, ComponentType<{ className?: string }>> = {
   STA: Timer,
@@ -41,7 +41,7 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, isOpenDataAcces
 
   const Icon = STANDARD_ICONS[api.standard]
   const typeLabel = tStandard(api.standard)
-  const pathPrefix = `/datasets/${datasetId}/`
+  const pathPrefix = namedApiPathPrefix(datasetId)
 
   const goToEdit = () => router.push(`/datasets/${datasetId}/apis/${api.slug}?mode=edit`)
   const goToView = () => router.push(`/datasets/${datasetId}/apis/${api.slug}`)

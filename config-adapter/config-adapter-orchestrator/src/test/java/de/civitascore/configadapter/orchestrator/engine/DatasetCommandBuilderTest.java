@@ -93,6 +93,7 @@ class DatasetCommandBuilderTest {
       assertEquals(DATASET_ID, payload.get("datasetId"));
       assertEquals("Test Dataset", payload.get("datasetName"));
       assertEquals("A test dataset", payload.get("description"));
+      assertEquals(true, payload.get("openDataAccess"));
     }
 
     @Test
@@ -120,6 +121,8 @@ class DatasetCommandBuilderTest {
               "Updated Name",
               "description",
               "Updated desc",
+              "openDataAccess",
+              true,
               "properties",
               List.of(Map.of("projectId", "proj-123")));
 
@@ -132,6 +135,7 @@ class DatasetCommandBuilderTest {
       assertEquals(DATASET_ID, payload.get("datasetId"));
       assertEquals("proj-123", payload.get("projectId"));
       assertEquals("Updated Name", payload.get("datasetName"));
+      assertEquals(true, payload.get("openDataAccess"));
     }
 
     @Test

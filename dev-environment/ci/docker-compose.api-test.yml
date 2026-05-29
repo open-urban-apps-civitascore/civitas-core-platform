@@ -143,6 +143,12 @@ services:
     depends_on:
       etcd:
         condition: service_healthy
+    networks:
+      default:
+        aliases:
+          # So containers in this network can resolve http://api.localhost:9080 natively and
+          # the Host header matches the saga-provisioned route's hosts filter (issue #1368).
+          - api.localhost
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:9180/apisix/admin/routes -H 'X-API-KEY: edd1c9f034335f136f87ad84b625c8f1' > /dev/null"]
       interval: 10s
@@ -357,12 +363,23 @@ services:
       KEYCLOAK_TOPICS: de.civitascore.idm.user.created,de.civitascore.idm.user.updated,de.civitascore.idm.user.deleted,de.civitascore.idm.group.created,de.civitascore.idm.group.updated,de.civitascore.idm.group.deleted
       APISIX_ADMIN_URL: http://apisix:9180
       APISIX_ADMIN_KEY: edd1c9f034335f136f87ad84b625c8f1
-      APISIX_GATEWAY_URL: http://apisix:9080
+      # Public API host (issue #1368). The saga handler binds every dataset route to this
+      # virtual host and reports the resulting publicUrl back to the portal-backend. The
+      # APISIX service has `api.localhost` as a network alias so containers resolve the
+      # publicUrl natively and its Host header matches the route's `hosts` filter.
+      APISIX_API_HOST: api.localhost
+      APISIX_API_PUBLIC_URL: http://api.localhost:9080
       APISIX_PLUGIN_CONFIG_ID: "1"
       APISIX_SERVICE_ID: svc-frost-server
+      # Headers the saga's route-level proxy-rewrite must strip in lieu of plugin_config 1
+      # (Route-over-PluginConfig precedence overrides plugin_config's proxy-rewrite).
+      APISIX_PROXY_REWRITE_HEADERS_REMOVE: X-Allowed-Scope-Ids
+      # FROST upstream auth that APISIX forwards to private projects — mirrors FROST_* below.
+      APISIX_FROST_API_KEY: dev-frost-api-key
+      APISIX_FROST_API_KEY_HEADER: X-API-Key
       APISIX_TOPICS: de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted
+      # FROST_PUBLIC_URL falls back to FROST_URL when unset (same value here in CI).
       FROST_URL: http://civitas-frost:8080/FROST-Server/v1.1
-      FROST_PUBLIC_URL: http://civitas-frost:8080/FROST-Server/v1.1
       FROST_API_KEY: dev-frost-api-key
       FROST_API_KEY_HEADER: X-API-Key
       FROST_TOPICS: de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted

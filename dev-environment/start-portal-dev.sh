@@ -641,9 +641,18 @@ export KEYCLOAK_INVITATION_CLIENT_ID=portal-frontend
 export KEYCLOAK_INVITATION_REDIRECT_URI=http://localhost:3000/
 export APISIX_ADMIN_URL=http://localhost:9180
 export APISIX_ADMIN_KEY=edd1c9f034335f136f87ad84b625c8f1
-export APISIX_GATEWAY_URL=http://localhost:9080
+# Dev-only public API host (issue #1368). Required — adapter fails fast when unset.
+# Needs a matching /etc/hosts entry: 127.0.0.1 api.localhost
+export APISIX_API_HOST=api.localhost
+export APISIX_API_PUBLIC_URL=http://api.localhost:9080
 export APISIX_PLUGIN_CONFIG_ID=1
 export APISIX_SERVICE_ID=svc-frost-server
+# Headers the saga's route-level proxy-rewrite must strip in lieu of plugin_config 1
+# (Route-over-PluginConfig precedence overrides plugin_config's proxy-rewrite).
+export APISIX_PROXY_REWRITE_HEADERS_REMOVE=X-Allowed-Scope-Ids
+# FROST upstream auth APISIX injects into proxy-rewrite for private dataset routes.
+export APISIX_FROST_API_KEY=dev-frost-api-key
+export APISIX_FROST_API_KEY_HEADER=X-API-Key
 export APISIX_TOPICS=de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted
 export FROST_URL=http://localhost:8085/FROST-Server/v1.1
 export FROST_PUBLIC_URL=http://civitas-frost:8080/FROST-Server/v1.1
@@ -696,7 +705,8 @@ else
     echo "  KEYCLOAK_INVITATION_REDIRECT_URI=http://localhost:3000/"
     echo "  APISIX_ADMIN_URL=http://localhost:9180"
     echo "  APISIX_ADMIN_KEY=edd1c9f034335f136f87ad84b625c8f1"
-    echo "  APISIX_GATEWAY_URL=http://localhost:9080"
+    echo "  APISIX_API_HOST=api.localhost"
+    echo "  APISIX_API_PUBLIC_URL=http://api.localhost:9080"
     echo "  FROST_URL=http://localhost:8085/FROST-Server/v1.1"
     echo "  FROST_PUBLIC_URL=http://civitas-frost:8080/FROST-Server/v1.1"
     echo "  FROST_API_KEY=dev-frost-api-key"

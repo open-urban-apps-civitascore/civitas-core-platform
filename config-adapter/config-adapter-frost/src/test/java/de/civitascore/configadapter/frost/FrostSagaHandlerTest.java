@@ -33,6 +33,7 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class FrostSagaHandlerTest {
 
@@ -240,6 +241,56 @@ class FrostSagaHandlerTest {
         assertNotNull(result.error());
       }
     }
+
+    @Test
+    @DisplayName("sets public=true on body when openDataAccess is true")
+    void shouldSetPublicTrueWhenOpenDataAccess() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(201);
+        when(mockResponse.getHeaderString("Location"))
+            .thenReturn("http://frost:8080/v1.1/Projects(42)");
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.post(captor.capture())).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "CREATE_PROJECT",
+                Map.of("datasetName", "Public Dataset", "openDataAccess", true));
+
+        handler.handle(command);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        assertEquals(true, body.get("public"));
+      }
+    }
+
+    @Test
+    @DisplayName("defaults public to false when openDataAccess missing or false")
+    void shouldDefaultPublicToFalse() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(201);
+        when(mockResponse.getHeaderString("Location"))
+            .thenReturn("http://frost:8080/v1.1/Projects(42)");
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.post(captor.capture())).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Private Dataset"));
+
+        handler.handle(command);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        assertEquals(false, body.get("public"));
+      }
+    }
   }
 
   @Nested
@@ -306,6 +357,47 @@ class FrostSagaHandlerTest {
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals(
             "http://public-frost:80/v1.1/Projects(42)", result.resultData().get("baseUrl"));
+      }
+    }
+
+    @Test
+    @DisplayName("sets public on body and captures previousPublic in compensationData")
+    void shouldSetPublicAndCapturePreviousPublic() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response getResponse = mock(Response.class);
+        when(getResponse.getStatus()).thenReturn(200);
+        when(getResponse.readEntity(Map.class))
+            .thenReturn(
+                Map.of("name", "Old Name", "description", "Old Description", "public", false));
+        when(mockBuilder.get()).thenReturn(getResponse);
+
+        Response patchResponse = mock(Response.class);
+        when(patchResponse.getStatus()).thenReturn(200);
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(patchResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "UPDATE_PROJECT",
+                Map.of(
+                    "projectId",
+                    "42",
+                    "datasetName",
+                    "Updated Dataset",
+                    "description",
+                    "Updated",
+                    "openDataAccess",
+                    true));
+
+        SagaCommandResult result = handler.handle(command);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        assertEquals(true, body.get("public"));
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals(false, result.compensationData().get("previousPublic"));
       }
     }
   }
@@ -442,6 +534,61 @@ class FrostSagaHandlerTest {
 
         assertEquals("COMPENSATION_FAILED", result.type());
         assertNotNull(result.error());
+      }
+    }
+
+    @Test
+    @DisplayName("restores previousPublic in body when present in payload")
+    void shouldRestorePreviousPublicWhenPresent() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(200);
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_PROJECT",
+                Map.of(
+                    "projectId", "42",
+                    "previousName", "Old Name",
+                    "previousDescription", "Old Description",
+                    "previousPublic", true));
+
+        handler.handle(command);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        assertEquals(true, body.get("public"));
+      }
+    }
+
+    @Test
+    @DisplayName("omits public from body when previousPublic missing (back-compat)")
+    void shouldOmitPublicWhenPreviousPublicMissing() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(200);
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_PROJECT",
+                Map.of(
+                    "projectId", "42",
+                    "previousName", "Old Name",
+                    "previousDescription", "Old Description"));
+
+        handler.handle(command);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        assertNull(body.get("public"));
       }
     }
   }

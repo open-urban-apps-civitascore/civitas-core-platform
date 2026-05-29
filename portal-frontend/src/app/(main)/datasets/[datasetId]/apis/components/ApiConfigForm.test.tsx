@@ -113,10 +113,12 @@ describe('ApiConfigForm', () => {
   })
 
   describe('URL preview', () => {
-    test('renders the preview path with the slug bolded', () => {
+    test('renders the preview path with the /v1 data-plane scheme and slug bolded', () => {
       render(<Wrapper apiType={API_TYPE_QUERY.SENSORTHINGS} urlPreviewSlug="my-slug" />)
       const preview = screen.getByTestId('apiUrlPreview')
-      expect(preview).toHaveTextContent('/datasets/dataset-123/my-slug')
+      // The gateway serves named APIs at /v1/datasets/{id}/{slug} (issue #1368).
+      expect(preview).toHaveTextContent('/v1/datasets/dataset-123/my-slug')
+      expect(preview.textContent?.startsWith('/v1/datasets/')).toBe(true)
       expect(preview.querySelector('strong')).toHaveTextContent('my-slug')
     })
 

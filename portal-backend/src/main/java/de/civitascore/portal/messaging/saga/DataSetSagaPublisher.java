@@ -48,7 +48,12 @@ public class DataSetSagaPublisher {
     this.sagaProperties = sagaProperties;
   }
 
-  /** Publishes a {@code DATASET_CREATE} saga trigger. See {@link SagaTrigger} for the contract. */
+  /**
+   * Publishes a {@code DATASET_CREATE} saga trigger. See {@link SagaTrigger} for the contract. The
+   * dataset's {@code openDataAccess} flag is propagated downstream: FROST sets it as the project's
+   * {@code public} flag (anonymous read access) and APISIX attaches the auth plugin only for
+   * protected datasets.
+   */
   public void publishCreateRequested(DataSet dataset) {
     var trigger =
         SagaTrigger.DatasetCreate.of(
@@ -64,7 +69,8 @@ public class DataSetSagaPublisher {
 
   /**
    * Publishes a {@code DATASET_UPDATE} saga trigger with a pipeline diff against {@code
-   * previousPipelines}.
+   * previousPipelines}. Toggling {@code openDataAccess} re-applies the FROST {@code public} flag and
+   * the APISIX auth-plugin attachment.
    */
   public void publishUpdateRequested(DataSet dataset, Set<Pipeline> previousPipelines) {
     var trigger =

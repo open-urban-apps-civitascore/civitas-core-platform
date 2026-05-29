@@ -86,12 +86,14 @@ public final class DatasetCommandBuilder {
       case "CREATE_PROJECT" -> {
         payload.put("datasetName", dataset.name());
         payload.put("description", trigger.getOrDefault("description", ""));
+        payload.put("openDataAccess", dataset.openDataAccess());
         yield Map.copyOf(payload);
       }
       case "UPDATE_PROJECT" -> {
         payload.put("projectId", getProperty(trigger, "projectId"));
         payload.put("datasetName", dataset.name());
         payload.put("description", trigger.getOrDefault("description", ""));
+        payload.put("openDataAccess", dataset.openDataAccess());
         yield Map.copyOf(payload);
       }
       case "DELETE_PROJECT" -> {

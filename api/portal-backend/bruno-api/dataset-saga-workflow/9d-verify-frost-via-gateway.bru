@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{apisixGatewayUrl}}/datasets/{{sagaDataSetId}}
+  url: {{sagaPublicUrl}}
   body: none
   auth: inherit
 }
@@ -15,7 +15,15 @@ headers {
 }
 
 tests {
-  test("FROST reachable via APISIX gateway", function() {
+  test("sagaPublicUrl is populated by step 9", function() {
+    // If step 9 observed the saga still running, sagaPublicUrl is unset and hitting
+    // it would dereference a literal `{{sagaPublicUrl}}`. Fail loudly instead so the
+    // root cause (saga didn't complete in time) is obvious.
+    const url = bru.getVar('sagaPublicUrl');
+    expect(url, "step 9 must have stored the publicUrl — saga likely did not complete").to.be.a('string').and.not.empty;
+  });
+
+  test("FROST reachable via persisted publicUrl", function() {
     expect(res.getStatus()).to.equal(200);
   });
 
@@ -25,11 +33,11 @@ tests {
 }
 
 docs {
-  **Saga step 9d of 18** — Verify end-to-end data access through the gateway.
+  **Saga step 9d of 18** — Verify end-to-end data access using the publicUrl that the saga persisted on the dataset.
 
-  Sends an authenticated request through the APISIX gateway to the FROST server for the dataset route. This confirms the full data path is working: Keycloak token → APISIX (auth validation) → FROST (data response).
+  Uses `sagaPublicUrl` (captured from `body.publicUrl` in step 9) directly as the request target, so the test pins the actual contract clients rely on: the URL produced by the adapter (`apisix.api.public.url` + `/v1/datasets/{id}`) must be reachable through the gateway, with its `Host` header matching the saga-provisioned route's `hosts` filter. A silent drift between `APISIX_API_PUBLIC_URL` and `APISIX_API_HOST` would make the persisted URL unusable and this test would 404 (issue #1368).
 
-  **Precondition:** `sagaDataSetId` is set; bearer token is valid; APISIX gateway reachable at `apisixGatewayUrl`; saga completed and route + upstream exist.
+  **Precondition:** `sagaPublicUrl` is set by step 9 (saga completed); bearer token is valid; the persisted host resolves to the APISIX gateway.
 
   **Expected Response:** 200 OK, body is a valid JSON object from the FROST SensorThings API.
 }

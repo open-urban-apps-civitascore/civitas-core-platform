@@ -118,6 +118,10 @@ curl -sf -X PUT "$ADMIN_URL/apisix/admin/plugin_configs/1" \
   }" > /dev/null && echo " OK" || echo " FAILED"
 
 # 4. Create route: portal-backend API
+# Host-agnostic management API catch-all (issue #1368): the frontend reaches it on
+# localhost:9080. The FROST proxy lives under api.localhost/v1/datasets/{id}/* and is
+# created dynamically by the APISIX saga handler — it matches a more specific URI and
+# therefore wins over this /v1/* catch-all on the API vhost.
 echo "Creating route: portal-backend-api (/v1/*)..."
 curl -sf -X PUT "$ADMIN_URL/apisix/admin/routes/portal-backend-api" \
   -H "X-API-KEY: $ADMIN_KEY" \

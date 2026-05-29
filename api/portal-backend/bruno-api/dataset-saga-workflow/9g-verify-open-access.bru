@@ -1,0 +1,48 @@
+meta {
+  name: 9g. Verify Open Access (no token → 200)
+  type: http
+  seq: 28
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  // The UPDATE saga from 9f reconciles the APISIX route to open asynchronously. Poll the
+  // data-plane WITHOUT a token until it returns 200 (auth plugin removed, FROST public),
+  // max ~40s. While still protected the gateway answers 401.
+  // Bruno's QuickJS axios does not honour a validateStatus function, so it throws on non-2xx;
+  // catch the 401 (still-protected) state instead of letting it abort the loop.
+  const axios = require('axios');
+  const url = `${bru.getEnvVar('apisixApiUrl')}/v1/datasets/${bru.getVar('sagaDataSetId')}`;
+  for (let i = 0; i < 25; i++) {
+    let status = 0;
+    try { status = (await axios.get(url)).status; }
+    catch (e) { status = e.response ? e.response.status : 0; }
+    if (status === 200) break;
+    await new Promise(res => setTimeout(res, 2000));
+  }
+}
+
+tests {
+  test("Open dataset is reachable through the gateway WITHOUT a token (200)", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is valid JSON from FROST", function() {
+    expect(res.body).to.be.an('object');
+  });
+}
+
+docs {
+  **Saga step 9g of 18** — Verify the open data-access workflow end-to-end (issue #1368, journeys J1/J3).
+
+  After 9f flipped `openDataAccess` to true, the dataset's APISIX route must drop its OpenID-Connect auth plugin and the FROST project must be public — so an **unauthenticated** GET to `api.<host>/v1/datasets/{id}` returns 200. This is the counterpart to the protected path (9c → 401): together they cover both `openDataAccess` workflows (false **and** true).
+
+  **Precondition:** 9f accepted; pre-request polled the data-plane until 200 (UPDATE saga reconciled the route to open).
+
+  **Expected Response:** 200 OK, JSON body — no bearer token sent.
+}

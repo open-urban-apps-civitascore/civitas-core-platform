@@ -1,18 +1,20 @@
 # CIVITAS CORE AuthZ - FROST Server Provider
 # Maps HTTP requests for the FROST Server (OGC SensorThings API proxy).
 #
-# FROST is accessed via APISIX gateway at dataset-scoped proxy paths:
-#   /datasets/{dataset_id}       →  DATASET_READ (STA service root)
-#   /datasets/{dataset_id}/...   →  DATASET_READ (STA sub-resources)
+# FROST is accessed via APISIX gateway on the public API virtual host (issue #1368):
+#
+#   https://api.<domain>/v1/datasets/{dataset_id}       →  DATASET_READ (STA service root)
+#   https://api.<domain>/v1/datasets/{dataset_id}/...   →  DATASET_READ (STA sub-resources)
 #
 # The {dataset_id} is the same dataset ID from portal_backend's PostgreSQL.
-# APISIX proxy-rewrite maps /datasets/{id}/* to the upstream FROST path.
+# APISIX proxy-rewrite maps /v1/datasets/{id}/* to the upstream FROST path.
 # OPA only checks that the user has DATASET_READ for that specific dataset.
 #
-# Path structure differs from portal_backend (/v1/resource/{id}):
-# FROST uses /datasets/{id} directly (ID at position 1, no version prefix).
-# This requires prefix-based matching instead of the generic REST mapper's
-# segment-count rules.
+# Secondary sanity check: the provider enforces that the request arrived via the
+# configured API gateway host (data.backends.frost_server.api_host). This catches
+# unexpected paths (service-to-service calls, sidecar misconfigurations, lost
+# `hosts` filters) and fails closed, preventing a stray `Host` header from
+# silently slipping through.
 
 package civitas.authz.providers.frost_server
 
@@ -34,41 +36,90 @@ endpoints := {} if {
 }
 
 # =============================================================================
+# HOST MATCHING (sanity check for issue #1368)
+# =============================================================================
+
+# Configured API host (lowercase). Empty if unconfigured → fail-closed.
+default api_host := ""
+
+api_host := lower(data.backends.frost_server.api_host) if {
+	data.backends.frost_server.api_host
+}
+
+# Incoming request's Host header (lowercase, port stripped, empty if missing).
+# APISIX does host matching on the name only (ignoring the port), so we normalise
+# the header the same way — otherwise clients that send `api.example.test:9080`
+# while `api_host` is configured without a port would be denied.
+#
+# Handles two cases:
+#   - IPv6 bracketed literals: `[::1]:9080` → `[::1]`
+#     (cannot split on `:` because colons appear inside the address)
+#   - Everything else: split on `:` and take the first component.
+default request_host := ""
+
+request_host := lower(substring(raw, 0, indexof(raw, "]") + 1)) if {
+	raw := input.request.headers.host
+	startswith(raw, "[")
+	indexof(raw, "]") > 0
+}
+
+request_host := lower(split(raw, ":")[0]) if {
+	raw := input.request.headers.host
+	not startswith(raw, "[")
+}
+
+# True when the request targets the configured API host.
+is_api_host if {
+	api_host != ""
+	request_host == api_host
+}
+
+# =============================================================================
+# PATH VALIDATION
+# =============================================================================
+# Shared validation for the FROST published-data URI shape. Both `path_pattern`
+# and `resource_id` build on this, so there is a single source of truth for the
+# expected host + prefix + dataset-id layout (DRY, see review feedback).
+
+# Parsed segments of the incoming request path, cached once for reuse below.
+path_parts := restmapper.parse_path(input.request.path)
+
+# Segments of a valid FROST published-data request: `["v1", "datasets", "<id>", ...]`
+# Undefined when the request does not match — downstream rules using this helper
+# inherit fail-closed semantics for free.
+v1_dataset_parts := path_parts if {
+	is_api_host
+	count(path_parts) >= 3
+	path_parts[0] == "v1"
+	path_parts[1] == "datasets"
+	path_parts[2] != ""
+	not restmapper.is_reserved_segment(path_parts[2])
+}
+
+# =============================================================================
 # PATH PATTERN MATCHING
 # =============================================================================
 
 default path_pattern := ""
 
-# Match any request path starting with /datasets/{uuid}[/*].
-# All FROST sub-resources (Things, Datastreams, Observations, etc.) map to
-# the same /datasets/{id} pattern — permission is always DATASET_READ.
+# Match any request path starting with /v1/datasets/{uuid}[/*] ON THE API HOST.
+# All FROST sub-resources (Things, Datastreams, Observations, etc.) map to the
+# same /v1/datasets/{id} pattern — permission is always DATASET_READ.
 #
 # Uses prefix matching instead of genericrestmapper because FROST paths have
-# the dataset ID at position 1 (not position 2 like /v1/resource/{id}).
-path_pattern := "/datasets/{id}" if {
-	parts := restmapper.parse_path(input.request.path)
-	count(parts) >= 2
-	parts[0] == "datasets"
-	parts[1] != ""
-	not restmapper.is_reserved_segment(parts[1])
+# the dataset ID at position 2 (not at the generic REST position).
+path_pattern := "/v1/datasets/{id}" if {
+	v1_dataset_parts
 }
 
 # =============================================================================
 # SCOPE ENFORCEMENT
 # =============================================================================
-# FROST paths are /datasets/{dataset_id}[/*] — the {id} is always a dataset ID.
+# FROST paths are /v1/datasets/{dataset_id}[/*] — the {id} is always a dataset ID.
 # Scope type is always DATASET since all FROST access is dataset-scoped.
 
-# Path parts for internal use (resource ID extraction)
-path_parts := restmapper.parse_path(input.request.path)
-
-# Extract dataset ID from path (second segment: /datasets/{id}[/*])
-resource_id := path_parts[1] if {
-	count(path_parts) >= 2
-	path_parts[0] == "datasets"
-	path_parts[1] != ""
-	not restmapper.is_reserved_segment(path_parts[1])
-}
+# Extract dataset ID from path (third segment: /v1/datasets/{id}[/*]).
+resource_id := v1_dataset_parts[2]
 
 # All FROST endpoints are dataset-scoped
 expected_scope_type := "DATASET" if {

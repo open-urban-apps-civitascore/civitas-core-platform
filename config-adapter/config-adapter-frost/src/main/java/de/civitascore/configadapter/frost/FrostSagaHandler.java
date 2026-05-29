@@ -78,10 +78,13 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   private SagaCommandResult handleCreateProject(SagaCommandMessage command) {
     String datasetName = requireString(command, "datasetName");
     String description = (String) command.payload().getOrDefault("description", "");
+    boolean openDataAccess =
+        Boolean.TRUE.equals(command.payload().getOrDefault("openDataAccess", false));
 
     Map<String, Object> body = new HashMap<>();
     body.put("name", datasetName);
     body.put("description", description);
+    body.put("public", openDataAccess);
 
     try (Response response =
         authStrategy
@@ -171,10 +174,13 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     String projectId = requireString(command, "projectId");
     String datasetName = requireString(command, "datasetName");
     String description = (String) command.payload().getOrDefault("description", "");
+    boolean openDataAccess =
+        Boolean.TRUE.equals(command.payload().getOrDefault("openDataAccess", false));
 
     // Read current state before updating (needed for compensation)
     String previousName;
     String previousDescription;
+    boolean previousPublic;
     try (Response getResponse =
         authStrategy
             .apply(
@@ -188,11 +194,13 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       Map<String, Object> currentProject = getResponse.readEntity(Map.class);
       previousName = (String) currentProject.getOrDefault("name", "");
       previousDescription = (String) currentProject.getOrDefault("description", "");
+      previousPublic = Boolean.TRUE.equals(currentProject.getOrDefault("public", false));
     }
 
     Map<String, Object> body = new HashMap<>();
     body.put("name", datasetName);
     body.put("description", description);
+    body.put("public", openDataAccess);
 
     try (Response response =
         authStrategy
@@ -211,7 +219,8 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
           Map.of(
               "projectId", projectId,
               "previousName", previousName,
-              "previousDescription", previousDescription);
+              "previousDescription", previousDescription,
+              "previousPublic", previousPublic);
 
       log.info(
           "FROST project updated: projectId={}, saga={}",
@@ -256,6 +265,12 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     Map<String, Object> body = new HashMap<>();
     body.put("name", previousName);
     body.put("description", previousDescription);
+    // Only restore previousPublic when the UPDATE saga captured it (older sagas may
+    // predate this field — leaving it unset preserves the current value via PATCH semantics).
+    Object previousPublic = command.payload().get("previousPublic");
+    if (previousPublic != null) {
+      body.put("public", Boolean.TRUE.equals(previousPublic));
+    }
 
     try (Response response =
         authStrategy

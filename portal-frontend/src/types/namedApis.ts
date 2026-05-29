@@ -10,6 +10,11 @@ export const SLUG_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/
 // Slugs that would collide with sibling routes under /datasets/{id}/...
 export const RESERVED_SLUGS = ['apis'] as const
 
+// Public data-plane path prefix for a dataset's named APIs. The gateway serves them at
+// /v1/datasets/{datasetId}/{slug} (issue #1368). Single source of truth so the scheme
+// can't drift across the UI (URL preview, copy-to-clipboard); the caller appends the slug.
+export const namedApiPathPrefix = (datasetId: string) => `/v1/datasets/${datasetId}/`
+
 export const API_STANDARDS = {
   WFS: 'WFS',
   WMS: 'WMS',

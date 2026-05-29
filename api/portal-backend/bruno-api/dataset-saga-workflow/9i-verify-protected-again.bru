@@ -1,0 +1,43 @@
+meta {
+  name: 9i. Verify Re-Protected (no token → 401)
+  type: http
+  seq: 30
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  // The UPDATE saga from 9h re-attaches the auth plugin asynchronously. Poll the data-plane
+  // WITHOUT a token until it returns 401 again (route re-protected), max ~40s.
+  // Bruno's QuickJS axios does not honour a validateStatus function, so it throws on non-2xx;
+  // catch the 401 (re-protected) state — that is exactly the status we are polling for.
+  const axios = require('axios');
+  const url = `${bru.getEnvVar('apisixApiUrl')}/v1/datasets/${bru.getVar('sagaDataSetId')}`;
+  for (let i = 0; i < 25; i++) {
+    let status = 0;
+    try { status = (await axios.get(url)).status; }
+    catch (e) { status = e.response ? e.response.status : 0; }
+    if (status === 401) break;
+    await new Promise(res => setTimeout(res, 2000));
+  }
+}
+
+tests {
+  test("Re-protected dataset rejects the unauthenticated request (401)", function() {
+    expect(res.getStatus()).to.equal(401);
+  });
+}
+
+docs {
+  **Saga step 9i of 18** — Confirm the toggle is fully reversible (issue #1368, journey J3).
+
+  After 9h flipped `openDataAccess` back to false, an unauthenticated GET must again be rejected with 401 — proving the UPDATE saga re-attached the OpenID-Connect auth plugin. Together, 9c/9g/9i pin the complete state machine: protected → open → protected.
+
+  **Precondition:** 9h accepted; pre-request polled the data-plane until 401 (UPDATE saga re-protected the route).
+
+  **Expected Response:** 401 Unauthorized (no bearer token).
+}

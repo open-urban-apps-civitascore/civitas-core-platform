@@ -110,7 +110,16 @@ public class SagaOrchestratorTestHelper implements AutoCloseable {
 
     ApisixSagaHandler apisixHandler = new ApisixSagaHandler();
     apisixHandler.initialize(
-        mapConfig(Map.of("apisix.admin.url", apisixMockUrl, "apisix.admin.key", "test-admin-key")));
+        mapConfig(
+            Map.ofEntries(
+                Map.entry("apisix.admin.url", apisixMockUrl),
+                Map.entry("apisix.admin.key", "test-admin-key"),
+                Map.entry("apisix.api.host", "api.example.test"),
+                Map.entry("apisix.api.public.url", "https://api.example.test"),
+                Map.entry("apisix.plugin.config.id", "auth-plugin-default"),
+                Map.entry("apisix.proxy.rewrite.headers.remove", "X-Allowed-Scope-Ids"),
+                Map.entry("apisix.frost.api.key", "test-api-key"),
+                Map.entry("apisix.frost.api.key.header", "X-API-Key"))));
 
     RedpandaSagaHandler redpandaHandler = new RedpandaSagaHandler();
     redpandaHandler.initialize(

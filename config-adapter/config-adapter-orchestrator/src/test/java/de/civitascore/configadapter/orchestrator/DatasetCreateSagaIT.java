@@ -235,6 +235,11 @@ class DatasetCreateSagaIT {
       assertEquals(200, frostResponse.getStatus(), "FROST project should exist after saga");
       String body = frostResponse.readEntity(String.class);
       assertTrue(body.contains("E2E Test Dataset"), "Project name should match trigger payload");
+      // openDataAccess=true in the trigger must propagate to the FROST project's public flag
+      // (DataSetSagaPublisher → DatasetCommandBuilder.CREATE_PROJECT → FrostSagaHandler).
+      assertTrue(
+          body.replaceAll("\\s", "").contains("\"public\":true"),
+          "FROST project should be public when openDataAccess=true");
     }
 
     // Verify: APISIX mock received PUT requests for upstream and route
@@ -293,7 +298,16 @@ class DatasetCreateSagaIT {
 
     ApisixSagaHandler apisixHandler = new ApisixSagaHandler();
     apisixHandler.initialize(
-        mapConfig(Map.of("apisix.admin.url", apisixMockUrl, "apisix.admin.key", "test-admin-key")));
+        mapConfig(
+            Map.ofEntries(
+                Map.entry("apisix.admin.url", apisixMockUrl),
+                Map.entry("apisix.admin.key", "test-admin-key"),
+                Map.entry("apisix.api.host", "api.example.test"),
+                Map.entry("apisix.api.public.url", "https://api.example.test"),
+                Map.entry("apisix.plugin.config.id", "auth-plugin-default"),
+                Map.entry("apisix.proxy.rewrite.headers.remove", "X-Allowed-Scope-Ids"),
+                Map.entry("apisix.frost.api.key", "test-api-key"),
+                Map.entry("apisix.frost.api.key.header", "X-API-Key"))));
 
     // Create the Kafka command consumer with both handlers
     KafkaConsumer<String, byte[]> commandKafkaConsumer =

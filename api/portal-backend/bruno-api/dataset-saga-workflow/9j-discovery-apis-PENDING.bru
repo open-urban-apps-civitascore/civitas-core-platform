@@ -1,0 +1,67 @@
+meta {
+  name: 9j. Discovery API forward-guard (#1379, PENDING)
+  type: http
+  seq: 31
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}/apis
+  body: none
+  auth: inherit
+}
+
+tests {
+  // FORWARD GUARD for the deferred discovery endpoint GET /v1/datasets/{id}/apis (#1379/#1362).
+  // It is intentionally inert until discovery is built: set env var `discoveryEnabled: true` while
+  // implementing discovery and these assertions become the acceptance gate. They are designed to
+  // FAIL on the three classic discovery mistakes (see docs).
+  const enabled = bru.getEnvVar('discoveryEnabled') === 'true';
+
+  if (!enabled) {
+    test("Discovery API (#1379) is pending — set discoveryEnabled=true to activate this guard", function() {
+      expect(true).to.equal(true);
+    });
+  } else {
+    test("Discovery is NOT swallowed by the FROST /v1/datasets/{id}/* route (not 404)", function() {
+      // A 404 means the dedicated higher-priority /v1/datasets/*/apis carve-out route is missing
+      // or mis-prioritised, so the dynamic FROST route caught /apis.
+      expect(res.getStatus()).to.not.equal(404);
+    });
+
+    test("Authorized discovery request succeeds (200, not 403)", function() {
+      // A 403 means OPA is missing the /v1/datasets/{id}/apis GET -> DATASET_READ mapping
+      // (authz/rego/data/backends/portal_backend/data.json).
+      expect(res.getStatus()).to.equal(200);
+    });
+
+    test("Returns the named-API list as an array, not a FROST SensorThings document", function() {
+      // FROST's root returns an object with a `value` array of entity-set links. The discovery
+      // endpoint must return the dataset's named APIs as an array — this catches a routing
+      // collision that reached FROST instead of portal-backend.
+      expect(res.body).to.be.an('array');
+      expect(res.body).to.not.have.property('value');
+    });
+
+    test("Discovery list includes the dataset's named API slug 'things'", function() {
+      const slugs = (res.body || []).map(a => a.slug);
+      expect(slugs).to.include('things');
+    });
+  }
+}
+
+docs {
+  **Saga step 9j of 18 — FORWARD GUARD (discovery API, #1379 — currently DEFERRED).**
+
+  The discovery endpoint `GET /v1/datasets/{id}/apis` is intentionally out of scope for #1368 but reserved for: it lists a dataset's named APIs. This step is a guard that stays **green and inert** today (one placeholder assertion) and turns into the **acceptance gate** the moment someone implements discovery — flip `discoveryEnabled: true` in the environment.
+
+  It fails on the three classic discovery mistakes:
+  1. **Routing collision** — the dynamic FROST route `/v1/datasets/{id}/*` swallows `/apis`. Needs a dedicated higher-priority APISIX route `/v1/datasets/*/apis` → portal-backend. Detected via 404 / a FROST-shaped (object with `value`) response instead of an array.
+  2. **Missing OPA permission** — `/v1/datasets/{id}/apis` GET not mapped to `DATASET_READ` in `authz/rego/data/backends/portal_backend/data.json` (+ a `portal_backend_test.rego` case). Detected via 403.
+  3. **Wrong contract** — not returning the named-API list (array including the known slug `things`).
+
+  **Reserved slug:** `apis` is already reserved (frontend `RESERVED_SLUGS`, backend `NamedApiAllowedSlugValidator`) so no named API can shadow this path — that guard is active today (see ApiConfigForm Vitest test).
+
+  **Precondition (when enabled):** released dataset with named API `things` (steps 4-9); bearer token has DATASET_READ.
+
+  **Expected (when enabled):** 200 OK, JSON array of named APIs including slug `things`.
+}

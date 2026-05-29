@@ -81,6 +81,13 @@ plugin_configs:
       # APISIX forwards all client headers by default — without this, a
       # malicious client could send X-Allowed-Scope-Ids: * and bypass
       # collection-level authorization filtering in the backend.
+      #
+      # NOTE: Saga-created dataset routes (managed by the APISIX adapter) define their own
+      # route-level proxy-rewrite for path rewriting + FROST upstream auth. Per APISIX
+      # plugin merging precedence (Route > PluginConfig), the route-level proxy-rewrite
+      # fully overrides this one. The saga adapter mirrors the same strip list via the
+      # APISIX_PROXY_REWRITE_HEADERS_REMOVE env var to preserve this behaviour on those
+      # routes — keep the two lists in sync if you add headers here.
       proxy-rewrite:
         headers:
           remove:
@@ -93,9 +100,23 @@ plugin_configs:
 # =============================================================================
 # ROUTES
 # =============================================================================
+#
+# Routing (issue #1368):
+#   - /v1/*                              → portal-backend management API catch-all
+#                                           (static, below; host-agnostic — the frontend
+#                                           reaches it on localhost:9080)
+#   - api.<host>/v1/datasets/{id}[/*]    → FROST-Server (created dynamically by the
+#                                           APISIX saga handler into etcd; bound to the
+#                                           API vhost, more specific URI wins over /v1/*)
+#
+# For local dev add to /etc/hosts:
+#   127.0.0.1  api.localhost
+# (Chrome/Firefox resolve *.localhost automatically, curl/JDK-HttpClient need the entry.)
 
 routes:
-  # Protected API routes - require valid JWT and OPA authorization
+  # Protected management API catch-all - requires valid JWT and OPA authorization.
+  # Host-agnostic: the frontend reaches it on localhost; on the API vhost the more
+  # specific dynamic /v1/datasets/{id} FROST routes take precedence.
   - id: portal-backend-api
     name: "Portal Backend API (AuthZ)"
     uri: /v1/*
