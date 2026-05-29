@@ -1,8 +1,10 @@
 package de.civitascore.portal.model.input;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -17,4 +19,14 @@ public class DataSetInputDTO extends BaseDataEntityInputDTO {
 
   @Schema(description = "Whether this dataset is publicly accessible, defaults to false")
   private Boolean openDataAccess = false;
+
+  /**
+   * Defaults to {@code null} so the PATCH reconciler distinguishes "field omitted" (leave the
+   * entity collection untouched) from "explicit empty list" (clear the collection).
+   */
+  @Valid @Schema(
+      description =
+          "Named API endpoints exposed by this dataset. Each entry produces one APISIX route"
+              + " after release.")
+  private List<NamedApiInputDTO> namedApis = null;
 }

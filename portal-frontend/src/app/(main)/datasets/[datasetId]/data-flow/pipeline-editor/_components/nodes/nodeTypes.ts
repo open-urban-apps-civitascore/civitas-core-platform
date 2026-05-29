@@ -13,6 +13,7 @@ import { EndNode } from './control/EndNode'
 import { StartNode } from './control/StartNode'
 import { DataSourceNode } from './source/DataSourceNode'
 import { FrostNode } from './storage/FrostNode'
+import { GeoPersistenceNode } from './storage/GeoPersistenceNode'
 import { MappingNode } from './transform/MappingNode'
 import { ApiRequestNode } from './trigger/ApiRequestNode'
 import { ApiResponseNode } from './trigger/ApiResponseNode'
@@ -42,6 +43,7 @@ export const pipelineNodeTypes: NodeTypes = {
 
   // Storage nodes
   [PIPELINE_NODE_TYPES.Frost]: FrostNode,
+  [PIPELINE_NODE_TYPES.GeoPersistence]: GeoPersistenceNode,
 
   // Transform nodes
   [PIPELINE_NODE_TYPES.Mapping]: MappingNode,
@@ -56,6 +58,7 @@ export { EndNode } from './control/EndNode'
 export { StartNode } from './control/StartNode'
 export { DataSourceNode } from './source/DataSourceNode'
 export { FrostNode } from './storage/FrostNode'
+export { GeoPersistenceNode } from './storage/GeoPersistenceNode'
 export { MappingNode } from './transform/MappingNode'
 export { ApiRequestNode } from './trigger/ApiRequestNode'
 export { ApiResponseNode } from './trigger/ApiResponseNode'

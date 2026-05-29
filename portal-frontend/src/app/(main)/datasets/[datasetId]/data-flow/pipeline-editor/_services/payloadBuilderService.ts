@@ -10,8 +10,8 @@
  * - RedPandaConnect model from the graph
  */
 
-import type { ApiNodeData, DataSourceNodeData } from '../_types/nodes'
-import { isApiNodeData, isDataSourceNodeData } from '../_types/nodes'
+import type { ApiNodeData, DataSourceNodeData, GeoPersistenceNodeData } from '../_types/nodes'
+import { isApiNodeData, isDataSourceNodeData, isGeoPersistenceNodeData } from '../_types/nodes'
 import type { Pipeline, PipelinePayload, PipelineStylesPayload } from '../_types/pipeline'
 import { buildRedPandaConnectModel } from './modelBuilderService'
 
@@ -42,8 +42,11 @@ export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
     ...new Set(pipeline.nodes.filter(n => isApiNodeData(n.data)).map(n => (n.data as ApiNodeData).apiPath)),
   ]
 
-  // Persistences: numeric IDs (Long[] in backend). Currently empty array.
-  const persistences: number[] = []
+  // Persistences: dataStructureVersionIds from configured GeoPersistence nodes
+  const persistences: number[] = pipeline.nodes
+    .filter(n => isGeoPersistenceNodeData(n.data) && n.data.dataStructureVersionId != null)
+    .map(n => Number((n.data as GeoPersistenceNodeData).dataStructureVersionId))
+    .filter(id => !isNaN(id))
 
   // 3. Build RedPandaConnect model
   const model = buildRedPandaConnectModel(pipeline)

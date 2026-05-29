@@ -20,7 +20,6 @@ import { useError } from '@/hooks/use-error'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
 import { DatasourceCreateData, DatasourceCreateFormSchema } from '@/types/datasources'
-import { isNameConflictError } from '@/utils/errors'
 
 export const DatasourceCreateForm = () => {
   const t = useTranslations('datasources')
@@ -28,7 +27,7 @@ export const DatasourceCreateForm = () => {
 
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { handleFormValidationError, handleNameError } = useError()
+  const { handleFormValidationError } = useError()
 
   const createDatasource = useCreateDatasource()
   const isLoading = createDatasource.isPending
@@ -46,10 +45,8 @@ export const DatasourceCreateForm = () => {
       toast.success(tCommon('messages.createSuccess', { item: tCommon('items.datasource') }))
       router.push(`/datasources/${data.id}?mode=edit`)
       return true
-    } catch (error) {
-      if (isNameConflictError(error)) {
-        handleNameError(form, formData.name)
-      } else toast.error(t('errors.creationError'))
+    } catch {
+      toast.error(t('errors.creationError'))
       return false
     }
   }

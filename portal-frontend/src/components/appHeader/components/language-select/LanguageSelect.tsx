@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 
-import { BasicSelect } from '@/components/basicSelect/BasicSelect'
+import { BasicSelect } from '@/components/select/basicSelect/BasicSelect'
 import { LOCALES } from '@/i18n/locales'
 
 export const LanguageSelect = () => {
@@ -26,7 +26,7 @@ export const LanguageSelect = () => {
       options={options}
       placeholder={tLang('selectLanguagePlaceholder')}
       triggerClassName="w-[140px]"
-      defaultValue={initialLocale}
+      value={initialLocale}
     />
   )
 }

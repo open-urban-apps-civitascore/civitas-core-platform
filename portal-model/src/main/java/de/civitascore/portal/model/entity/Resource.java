@@ -16,6 +16,9 @@ import lombok.experimental.SuperBuilder;
 /**
  * Represents a downloadable or addressable resource that is exposed through one or more {@link
  * Distribution Distributions}.
+ *
+ * <p><b>Dormant:</b> currently has no production writer or controller — reserved for the deferred
+ * DCAT distribution work. See {@link Distribution} for the dormancy contract.
  */
 @Entity
 @Table(name = "resources")

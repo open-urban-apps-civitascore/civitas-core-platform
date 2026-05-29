@@ -1,19 +1,26 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import de.civitascore.portal.config.PortalTestDataFactory;
+import de.civitascore.portal.configuration.CivitasProperties;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.Distribution;
+import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.NamedApiInputDTO;
+import de.civitascore.portal.model.input.validation.NamedApiAllowedSlugValidator;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
+import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
@@ -23,18 +30,20 @@ import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.service.DataSetService;
 import de.civitascore.portal.util.RestPage;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
@@ -55,10 +64,23 @@ class DataSetControllerIntegrationTest
   @Autowired private UserRepository userRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private DataSetService dataSetService;
+  @Autowired private CivitasProperties civitasProperties;
+  @Autowired private org.springframework.transaction.support.TransactionTemplate txTemplate;
 
   @Override
   protected String getEndpointPath() {
     return DATASETS_ENDPOINT;
+  }
+
+  /** Helper to construct a {@link NamedApiInputDTO} with the four explicit fields. */
+  private NamedApiInputDTO namedApi(
+      String name, String slug, ApiStandard standard, String version) {
+    NamedApiInputDTO dto = new NamedApiInputDTO();
+    dto.setName(name);
+    dto.setSlug(slug);
+    dto.setStandard(standard);
+    dto.setVersion(version);
+    return dto;
   }
 
   /** Helper method to create a sample styles map for Pipeline. */
@@ -186,7 +208,6 @@ class DataSetControllerIntegrationTest
     pipeline1.setStyles(createSampleStyles());
     pipeline1.getDataSources().add(dataSource1);
     pipeline1.getDataSources().add(dataSource2);
-    pipeline1.setApis(Collections.singletonList("/api/v1/traffic"));
     pipeline1.setPersistences(Collections.singletonList(12345L));
     pipeline1.setModel(createSampleModel());
     pipeline1 = pipelineRepository.save(pipeline1);
@@ -198,7 +219,6 @@ class DataSetControllerIntegrationTest
     pipeline2.setStyles(createSampleStyles());
     pipeline2.getDataSources().add(dataSource3);
     pipeline2.getDataSources().add(dataSource4);
-    pipeline2.setApis(Collections.singletonList("/api/v1/weather"));
     pipeline2.setPersistences(Collections.singletonList(12345L));
     pipeline2.setModel(createSampleModel());
     pipeline2 = pipelineRepository.save(pipeline2);
@@ -305,6 +325,547 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should round-trip namedApis with server-populated previewUrl")
+    void shouldRoundTripNamedApisWithPreviewUrl() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(
+          List.of(
+              namedApi("Traffic Sensor Readings", "traffic", ApiStandard.STA, "1.1"),
+              namedApi("Weather Sensor Readings", "weather", ApiStandard.STA, null)));
+
+      ResponseEntity<DataSetOutputDTO> create = performCreate(input);
+      assertThat(create.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      DataSetOutputDTO created = create.getBody();
+      assertThat(created).isNotNull();
+      assertThat(created.getId()).isNotNull();
+
+      String baseUrl = civitasProperties.api().baseUrl();
+      String trafficUrl = baseUrl + "/v1/datasets/" + created.getId() + "/traffic";
+      String weatherUrl = baseUrl + "/v1/datasets/" + created.getId() + "/weather";
+
+      // POST response: namedApis populated with previewUrl
+      assertThat(created.getNamedApis())
+          .extracting(
+              NamedApiOutputDTO::getSlug,
+              NamedApiOutputDTO::getStandard,
+              NamedApiOutputDTO::getPreviewUrl)
+          .containsExactlyInAnyOrder(
+              tuple("traffic", ApiStandard.STA, trafficUrl),
+              tuple("weather", ApiStandard.STA, weatherUrl));
+
+      // GET round-trip returns the same shape
+      ResponseEntity<DataSetOutputDTO> get = performGetById(created.getId());
+      assertThat(get.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(get.getBody()).isNotNull();
+      assertThat(get.getBody().getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getPreviewUrl)
+          .containsExactlyInAnyOrder(tuple("traffic", trafficUrl), tuple("weather", weatherUrl));
+
+      // GET-all (paginated) returns namedApis on each result (#1315 AC)
+      ResponseEntity<de.civitascore.portal.util.RestPage<DataSetOutputDTO>> page = performGetAll();
+      assertThat(page.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(page.getBody()).isNotNull();
+      DataSetOutputDTO fromPage =
+          page.getBody().getContent().stream()
+              .filter(d -> created.getId().equals(d.getId()))
+              .findFirst()
+              .orElseThrow();
+      assertThat(fromPage.getNamedApis())
+          .as("paginated GET must include namedApis with previewUrl")
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getPreviewUrl)
+          .containsExactlyInAnyOrder(tuple("traffic", trafficUrl), tuple("weather", weatherUrl));
+    }
+
+    @Test
+    @DisplayName("Should replace namedApis list on PATCH (array replace, not merge)")
+    void shouldReplaceNamedApisOnPatch() {
+      // Setup: dataset with two namedApis
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(
+          List.of(
+              namedApi("Traffic", "traffic", ApiStandard.STA, null),
+              namedApi("Weather", "weather", ApiStandard.STA, null)));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+      UUID id = created.getId();
+
+      // PATCH with single-entry namedApis array — must REPLACE, not merge into existing entries
+      Map<String, Object> patchBody =
+          Map.of(
+              "namedApis",
+              List.of(Map.of("name", "Air Quality", "slug", "air", "standard", "STA")));
+
+      ResponseEntity<DataSetOutputDTO> patch = performPatch(id, patchBody);
+      assertThat(patch.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patch.getBody()).isNotNull();
+      assertThat(patch.getBody().getNamedApis())
+          .as("PATCH with namedApis array replaces the list — no traffic/weather, only air")
+          .extracting(NamedApiOutputDTO::getSlug)
+          .containsExactly("air");
+
+      // GET confirms persistence
+      assertThat(performGetById(id).getBody().getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug)
+          .containsExactly("air");
+    }
+
+    @Test
+    @DisplayName("Should replace namedApis with same slugs (no unique-constraint violation)")
+    void shouldReplaceNamedApisWithSameSlugs() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(
+          List.of(
+              namedApi("Traffic", "traffic", ApiStandard.STA, null),
+              namedApi("Weather", "weather", ApiStandard.STA, null)));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+
+      // PATCH with the same slugs but different display name + description.
+      // Orphan removal of old rows + insert of new rows must not collide on
+      // uk_named_api_dataset_slug.
+      Map<String, Object> patchBody =
+          Map.of(
+              "namedApis",
+              List.of(
+                  Map.of(
+                      "name", "Traffic Sensor Readings",
+                      "slug", "traffic",
+                      "standard", "STA",
+                      "description", "Live traffic counter readings."),
+                  Map.of(
+                      "name", "Weather Sensor Readings",
+                      "slug", "weather",
+                      "standard", "STA")));
+
+      ResponseEntity<DataSetOutputDTO> patch = performPatch(created.getId(), patchBody);
+      assertThat(patch.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patch.getBody()).isNotNull();
+      assertThat(patch.getBody().getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getName)
+          .containsExactlyInAnyOrder(
+              tuple("traffic", "Traffic Sensor Readings"),
+              tuple("weather", "Weather Sensor Readings"));
+    }
+
+    @Test
+    @DisplayName("Should replace (not merge) entry fields on PATCH with same slug")
+    void shouldReplaceEntryFieldsOnPatchWithSameSlug() {
+      // PATCH replaces by slug: a non-empty namedApis list is the new source of truth, including
+      // the optional fields of each entry. Omitting version/description on a slug that previously
+      // carried them clears them. To preserve a field, the client must re-send it.
+      DataSetInputDTO input = createValidInput();
+      NamedApiInputDTO traffic = namedApi("Traffic", "traffic", ApiStandard.STA, "1.1");
+      traffic.setDescription("Live traffic counter readings.");
+      input.setNamedApis(List.of(traffic));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+
+      Map<String, Object> patchBody =
+          Map.of(
+              "namedApis",
+              List.of(
+                  Map.of(
+                      "name", "Traffic v2",
+                      "slug", "traffic",
+                      "standard", "STA")));
+
+      ResponseEntity<DataSetOutputDTO> patch = performPatch(created.getId(), patchBody);
+      assertThat(patch.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patch.getBody()).isNotNull();
+      assertThat(patch.getBody().getNamedApis())
+          .extracting(
+              NamedApiOutputDTO::getSlug,
+              NamedApiOutputDTO::getName,
+              NamedApiOutputDTO::getVersion,
+              NamedApiOutputDTO::getDescription)
+          .containsExactly(tuple("traffic", "Traffic v2", null, null));
+    }
+
+    @Test
+    @DisplayName("Should clear namedApis on PATCH with empty array")
+    void shouldClearNamedApisOnPatchWithEmptyArray() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(List.of(namedApi("Traffic", "traffic", ApiStandard.STA, null)));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+
+      ResponseEntity<DataSetOutputDTO> patch =
+          performPatch(created.getId(), Map.of("namedApis", List.of()));
+      assertThat(patch.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patch.getBody()).isNotNull();
+      assertThat(patch.getBody().getNamedApis()).isEmpty();
+      assertThat(performGetById(created.getId()).getBody().getNamedApis()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should reject namedApis entry with blank name")
+    void shouldRejectBlankNamedApiName() {
+      DataSetInputDTO input = createValidInput();
+      NamedApiInputDTO bad = new NamedApiInputDTO();
+      bad.setName("   "); // whitespace, exercises @NotBlank (vs @NotNull)
+      bad.setSlug("traffic");
+      bad.setStandard(ApiStandard.STA);
+      input.setNamedApis(List.of(bad));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode())
+          .as("blank name on a namedApis entry should be rejected via @Valid cascade")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject namedApis entry with blank slug")
+    void shouldRejectBlankNamedApiSlug() {
+      DataSetInputDTO input = createValidInput();
+      NamedApiInputDTO bad = new NamedApiInputDTO();
+      bad.setName("Traffic");
+      bad.setSlug("");
+      bad.setStandard(ApiStandard.STA);
+      input.setNamedApis(List.of(bad));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject namedApis entry with blank standard")
+    void shouldRejectBlankNamedApiStandard() {
+      DataSetInputDTO input = createValidInput();
+      NamedApiInputDTO bad = new NamedApiInputDTO();
+      bad.setName("Traffic");
+      bad.setSlug("traffic");
+      bad.setStandard(null);
+      input.setNamedApis(List.of(bad));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @ParameterizedTest(name = "[{index}] slug={0}")
+    @ValueSource(
+        strings = {
+          "Traffic-Counter", // uppercase
+          "-traffic", // leading hyphen
+          "traffic-", // trailing hyphen
+          "traffic_counter", // underscore
+          "traffic.counter", // dot
+          "traffic counter", // space
+        })
+    @DisplayName("Should reject namedApis entry with malformed slug")
+    void shouldRejectMalformedNamedApiSlug(String slug) {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(List.of(namedApi("Traffic", slug, ApiStandard.STA, null)));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    static Stream<String> reservedSlugs() {
+      return NamedApiAllowedSlugValidator.RESERVED.stream();
+    }
+
+    @ParameterizedTest(name = "[{index}] slug={0}")
+    @MethodSource("reservedSlugs")
+    @DisplayName("Should reject namedApis entry with reserved slug (collides with platform path)")
+    void shouldRejectReservedNamedApiSlug(String slug) {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(List.of(namedApi("Traffic", slug, ApiStandard.STA, null)));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject reserved slug on PUT update too (constraint wired on every @Valid)")
+    void shouldRejectReservedNamedApiSlugOnUpdate() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(List.of(namedApi("Traffic", "traffic", ApiStandard.STA, null)));
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+
+      DataSetInputDTO updateBody = createValidInput();
+      updateBody.setName(created.getName());
+      updateBody.setNamedApis(List.of(namedApi("Apis", "apis", ApiStandard.STA, null)));
+
+      ResponseEntity<DataSetOutputDTO> response = performUpdate(created.getId(), updateBody);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should accept single-character slug (regex boundary case)")
+    void shouldAcceptSingleCharSlug() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(List.of(namedApi("Traffic", "a", ApiStandard.STA, null)));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    @DisplayName("Should reject namedApis entry with slug over 32 characters")
+    void shouldRejectOverlongNamedApiSlug() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(List.of(namedApi("Traffic", "a".repeat(33), ApiStandard.STA, null)));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject namedApis entry with unknown standard value")
+    void shouldRejectUnknownNamedApiStandard() {
+      // Raw-map body so we can post a value outside the ApiStandard enum and exercise the
+      // Jackson-level rejection that returns 400 before bean validation.
+      Map<String, Object> body =
+          Map.of(
+              "name",
+              "DataSet with bad standard",
+              "namedApis",
+              List.of(
+                  Map.of(
+                      "name", "Traffic",
+                      "slug", "traffic",
+                      "standard", "OGCAPI")));
+
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath(),
+              HttpMethod.POST,
+              createAuthHeaders(),
+              body,
+              getOutputTypeReference());
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject when an invalid entry follows a valid entry (cascade visits all)")
+    void shouldRejectWhenSecondNamedApiEntryIsInvalid() {
+      DataSetInputDTO input = createValidInput();
+      NamedApiInputDTO good = new NamedApiInputDTO();
+      good.setName("Traffic");
+      good.setSlug("traffic");
+      good.setStandard(ApiStandard.STA);
+      NamedApiInputDTO bad = new NamedApiInputDTO();
+      bad.setName("");
+      bad.setSlug("weather");
+      bad.setStandard(ApiStandard.STA);
+      input.setNamedApis(List.of(good, bad));
+
+      // Pins that @Valid cascade visits every element, not just the first. A future regression
+      // (e.g. someone short-circuits validation on first valid entry) would not be caught by the
+      // single-entry tests above.
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should round-trip null version alongside a populated version")
+    void shouldRoundTripNullVersion() {
+      DataSetInputDTO input = createValidInput();
+      // version on weather is intentionally null — must round-trip as null, not empty string
+      input.setNamedApis(
+          List.of(
+              namedApi("Traffic", "traffic", ApiStandard.STA, "1.1"),
+              namedApi("Weather", "weather", ApiStandard.STA, null)));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+      assertThat(created.getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getVersion)
+          .containsExactlyInAnyOrder(tuple("traffic", "1.1"), tuple("weather", null));
+
+      DataSetOutputDTO refetched = performGetById(created.getId()).getBody();
+      assertThat(refetched).isNotNull();
+      assertThat(refetched.getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getVersion)
+          .containsExactlyInAnyOrder(tuple("traffic", "1.1"), tuple("weather", null));
+    }
+
+    @Test
+    @DisplayName("Should round-trip optional description alongside a null description")
+    void shouldRoundTripDescription() {
+      DataSetInputDTO input = createValidInput();
+      NamedApiInputDTO traffic = namedApi("Traffic", "traffic", ApiStandard.STA, "1.1");
+      traffic.setDescription("Live traffic counter readings from city sensors.");
+      NamedApiInputDTO weather = namedApi("Weather", "weather", ApiStandard.STA, "1.1");
+      // weather.description intentionally null — must round-trip as null
+
+      input.setNamedApis(List.of(traffic, weather));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+      assertThat(created.getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getDescription)
+          .containsExactlyInAnyOrder(
+              tuple("traffic", "Live traffic counter readings from city sensors."),
+              tuple("weather", null));
+
+      DataSetOutputDTO refetched = performGetById(created.getId()).getBody();
+      assertThat(refetched).isNotNull();
+      assertThat(refetched.getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getDescription)
+          .containsExactlyInAnyOrder(
+              tuple("traffic", "Live traffic counter readings from city sensors."),
+              tuple("weather", null));
+    }
+
+    @Test
+    @DisplayName("Should reject namedApis entry with description over 150 characters")
+    void shouldRejectOverlongDescription() {
+      DataSetInputDTO input = createValidInput();
+      NamedApiInputDTO bad = namedApi("Traffic", "traffic", ApiStandard.STA, null);
+      bad.setDescription("x".repeat(151));
+      input.setNamedApis(List.of(bad));
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should preserve NamedApi rows (id + routeId) when PATCH body omits namedApis")
+    void shouldLeaveNamedApisUntouchedWhenPatchOmitsField() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(List.of(namedApi("Traffic", "traffic", ApiStandard.STA, null)));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+      UUID dataSetId = created.getId();
+
+      // Seed the saga-populated routeId directly on the entity (the saga normally does this
+      // post-release; we shortcut that here so we can assert the PATCH preserves it).
+      // namedApis is FetchType.LAZY, so the read + mutation happens inside a transactional
+      // boundary. Capture the entry id for later equality assertion.
+      UUID originalEntryId =
+          txTemplate.execute(
+              status -> {
+                DataSet ds = dataSetRepository.findById(dataSetId).orElseThrow();
+                NamedApi traffic = ds.getNamedApis().iterator().next();
+                traffic.setRouteId("route-saga-1");
+                return traffic.getId();
+              });
+      assertThat(originalEntryId).isNotNull();
+
+      // PATCH only the description — namedApis must stay intact (slug, id, AND routeId)
+      ResponseEntity<DataSetOutputDTO> patch =
+          performPatch(dataSetId, Map.of("description", "patched"));
+      assertThat(patch.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patch.getBody()).isNotNull();
+      assertThat(patch.getBody().getDescription()).isEqualTo("patched");
+      assertThat(patch.getBody().getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug)
+          .containsExactly("traffic");
+
+      // Re-fetch to verify the underlying entity row was not destroyed and recreated.
+      // findById eagerly loads namedApis via @EntityGraph, so no transaction wrapper needed.
+      DataSet afterPatch = dataSetRepository.findById(dataSetId).orElseThrow();
+      assertThat(afterPatch.getNamedApis())
+          .as("PATCH that omits namedApis must preserve entity rows (same id, same routeId)")
+          .singleElement()
+          .satisfies(
+              api -> {
+                assertThat(api.getId()).isEqualTo(originalEntryId);
+                assertThat(api.getRouteId()).isEqualTo("route-saga-1");
+              });
+    }
+
+    @Test
+    @DisplayName(
+        "Should partially overlap namedApis on PATCH (preserve overlap, drop missing, add new)")
+    void shouldPartiallyOverlapNamedApisOnPatch() {
+      // Pins the partial-overlap merge path distinct from the all-overlap
+      // (shouldReplaceNamedApisWithSameSlugs) and no-overlap (shouldReplaceNamedApisOnPatch) cases:
+      // overlapping slugs must keep their id + saga-populated routeId.
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(
+          List.of(
+              namedApi("Traffic", "traffic", ApiStandard.STA, null),
+              namedApi("Weather", "weather", ApiStandard.STA, null)));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+      UUID dataSetId = created.getId();
+
+      UUID trafficOriginalId =
+          txTemplate.execute(
+              status -> {
+                DataSet ds = dataSetRepository.findById(dataSetId).orElseThrow();
+                NamedApi traffic =
+                    ds.getNamedApis().stream()
+                        .filter(api -> "traffic".equals(api.getSlug()))
+                        .findFirst()
+                        .orElseThrow();
+                traffic.setRouteId("route-saga-traffic");
+                return traffic.getId();
+              });
+
+      Map<String, Object> patchBody =
+          Map.of(
+              "namedApis",
+              List.of(
+                  Map.of("name", "Traffic v2", "slug", "traffic", "standard", "STA"),
+                  Map.of("name", "Air Quality", "slug", "air", "standard", "STA")));
+
+      ResponseEntity<DataSetOutputDTO> patch = performPatch(dataSetId, patchBody);
+      assertThat(patch.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patch.getBody()).isNotNull();
+      assertThat(patch.getBody().getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getName)
+          .containsExactlyInAnyOrder(tuple("traffic", "Traffic v2"), tuple("air", "Air Quality"));
+
+      DataSet afterPatch = dataSetRepository.findById(dataSetId).orElseThrow();
+      assertThat(afterPatch.getNamedApis())
+          .anySatisfy(
+              api -> {
+                assertThat(api.getSlug()).isEqualTo("traffic");
+                assertThat(api.getId()).isEqualTo(trafficOriginalId);
+                assertThat(api.getRouteId()).isEqualTo("route-saga-traffic");
+              })
+          .anySatisfy(
+              api -> {
+                assertThat(api.getSlug()).isEqualTo("air");
+                assertThat(api.getRouteId()).isNull();
+              })
+          .extracting(NamedApi::getSlug)
+          .doesNotContain("weather");
+    }
+
+    @Test
+    @DisplayName("Should replace namedApis on PUT with the supplied list")
+    void shouldReplaceNamedApisOnPut() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(
+          List.of(
+              namedApi("Traffic", "traffic", ApiStandard.STA, null),
+              namedApi("Weather", "weather", ApiStandard.STA, null)));
+
+      DataSetOutputDTO created = performCreate(input).getBody();
+      assertThat(created).isNotNull();
+      UUID dataSetId = created.getId();
+
+      DataSetInputDTO putBody = createValidInput();
+      putBody.setName(created.getName());
+      putBody.setNamedApis(
+          List.of(
+              namedApi("Traffic v2", "traffic", ApiStandard.STA, "1.1"),
+              namedApi("Air Quality", "air", ApiStandard.STA, null)));
+
+      ResponseEntity<DataSetOutputDTO> put = performUpdate(dataSetId, putBody);
+      assertThat(put.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(put.getBody()).isNotNull();
+      assertThat(put.getBody().getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getName)
+          .containsExactlyInAnyOrder(tuple("traffic", "Traffic v2"), tuple("air", "Air Quality"));
+
+      assertThat(performGetById(dataSetId).getBody().getNamedApis())
+          .extracting(NamedApiOutputDTO::getSlug)
+          .containsExactlyInAnyOrder("traffic", "air");
+    }
+
+    @Test
     @DisplayName("Should populate createdBy with user name when creator exists in database")
     void shouldPopulateCreatedByWhenCreatorExistsInDatabase() {
       String keycloakId = getUsersResource().search("testuser", true).get(0).getId();
@@ -393,16 +954,6 @@ class DataSetControllerIntegrationTest
           .hasSize(2)
           .allMatch(pipeline -> pipeline.getId() != null)
           .allMatch(pipeline -> pipeline.getName() != null);
-
-      assertThat(output.getDistributions())
-          .as("Distributions should be included in the response")
-          .isNotNull()
-          .hasSize(2)
-          .allMatch(distribution -> distribution.getId() != null)
-          .allMatch(distribution -> distribution.getAccessUrl() != null)
-          .extracting("accessUrl")
-          .containsExactlyInAnyOrder(
-              "http://localhost:8080/api/v1/traffic", "http://localhost:8080/api/v1/weather");
 
       assertThat(output.getDataSetStatus())
           .as("Status should be DRAFT")
@@ -927,21 +1478,19 @@ class DataSetControllerIntegrationTest
 
       Pipeline pipeline1 = new Pipeline();
       pipeline1.setName("test_pipeline_api1_" + System.currentTimeMillis());
-      pipeline1.setDescription("Pipeline with API 1");
+      pipeline1.setDescription("Pipeline 1");
       pipeline1.setDataSet(dataSet);
       pipeline1.setStyles(createSampleStyles());
       pipeline1.setModel(createSampleModel());
-      pipeline1.setApis(Arrays.asList("/api/v1/traffic", "/api/v1/sensors"));
       pipeline1.setPersistences(Collections.singletonList(12345L));
       pipelineRepository.save(pipeline1);
 
       Pipeline pipeline2 = new Pipeline();
       pipeline2.setName("test_pipeline_api2_" + System.currentTimeMillis());
-      pipeline2.setDescription("Pipeline with API 2");
+      pipeline2.setDescription("Pipeline 2");
       pipeline2.setDataSet(dataSet);
       pipeline2.setStyles(createSampleStyles());
       pipeline2.setModel(createSampleModel());
-      pipeline2.setApis(Collections.singletonList("/api/v1/weather"));
       pipeline2.setPersistences(Collections.singletonList(12345L));
       pipelineRepository.save(pipeline2);
 
@@ -962,78 +1511,6 @@ class DataSetControllerIntegrationTest
       assertThat(response.getBody().getDataSetStatus())
           .as("DataSet status should be READY after staging")
           .isEqualTo(DataSetStatus.READY);
-
-      long distributionCount =
-          distributionRepository.findAll().stream()
-              .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
-              .count();
-
-      assertThat(distributionCount)
-          .as("Should create 3 distributions for 3 unique API paths")
-          .isEqualTo(3);
-
-      distributionRepository.findAll().stream()
-          .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
-          .forEach(
-              distribution -> {
-                assertThat(distribution.getAccessUrl())
-                    .as("Access URL should be set with their respective API paths")
-                    .startsWith("/api/v1/");
-                assertThat(distribution.getApiType())
-                    .as("API type should be SensorThings")
-                    .isEqualTo("SensorThings");
-                assertThat(distribution.getFormat())
-                    .as("Format should be application/json")
-                    .isEqualTo("application/json");
-                assertThat(distribution.getAutoGenerated())
-                    .as("Distribution should be marked as auto-generated")
-                    .isTrue();
-              });
-    }
-
-    @Test
-    @DisplayName("Should stage dataset with provide pipeline (APIs only, no datasources)")
-    void shouldStageDataSetWithApisOnly() {
-      DataSet dataSet = new DataSet();
-      dataSet.setName("test_dataset_provide_" + System.currentTimeMillis());
-      dataSet.setDescription("Test dataset with provide pipeline");
-      dataSet.setDataSetStatus(DataSetStatus.DRAFT);
-      dataSet.setFormat("JSON");
-      dataSet.setOpenDataAccess(false);
-      dataSet = dataSetRepository.save(dataSet);
-
-      Pipeline pipeline = new Pipeline();
-      pipeline.setName("test_pipeline_provide_" + System.currentTimeMillis());
-      pipeline.setDescription("Provide pipeline with APIs only");
-      pipeline.setDataSet(dataSet);
-      pipeline.setStyles(createSampleStyles());
-      pipeline.setApis(Arrays.asList("/v1.1/Things", "/v1.1/Observations"));
-      pipelineRepository.save(pipeline);
-
-      UUID dataSetId = dataSet.getId();
-
-      ResponseEntity<DataSetOutputDTO> response =
-          exchange(
-              getEndpointPath() + "/" + dataSetId + "/stage",
-              org.springframework.http.HttpMethod.POST,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDataSetStatus())
-          .as("DataSet status should be READY after staging")
-          .isEqualTo(DataSetStatus.READY);
-
-      long distributionCount =
-          distributionRepository.findAll().stream()
-              .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
-              .count();
-
-      assertThat(distributionCount)
-          .as("Should create 2 distributions for 2 API paths")
-          .isEqualTo(2);
     }
 
     @Test
@@ -1085,119 +1562,42 @@ class DataSetControllerIntegrationTest
           .as("Should return NOT_FOUND status")
           .isEqualTo(HttpStatus.NOT_FOUND);
     }
-
-    @Test
-    @DisplayName("Should avoid duplicate distributions for same API path")
-    void shouldAvoidDuplicateDistributions() {
-      DataSet dataSet = new DataSet();
-      dataSet.setName("test_dataset_duplicate_apis_" + System.currentTimeMillis());
-      dataSet.setDescription("Test dataset with duplicate API paths");
-      dataSet.setDataSetStatus(DataSetStatus.DRAFT);
-      dataSet.setPersistenceId(12345L);
-      dataSet.setFormat("JSON");
-      dataSet.setOpenDataAccess(false);
-      dataSet = dataSetRepository.save(dataSet);
-
-      Pipeline pipeline1 = new Pipeline();
-      pipeline1.setName("test_pipeline_dup1_" + System.currentTimeMillis());
-      pipeline1.setDescription("Pipeline 1 with duplicate API");
-      pipeline1.setDataSet(dataSet);
-      pipeline1.setStyles(createSampleStyles());
-      pipeline1.setModel(createSampleModel());
-      pipeline1.setApis(Arrays.asList("/api/v1/traffic", "/api/v1/weather"));
-      pipeline1.setPersistences(Collections.singletonList(12345L));
-      pipelineRepository.save(pipeline1);
-
-      Pipeline pipeline2 = new Pipeline();
-      pipeline2.setName("test_pipeline_dup2_" + System.currentTimeMillis());
-      pipeline2.setDescription("Pipeline 2 with duplicate API");
-      pipeline2.setDataSet(dataSet);
-      pipeline2.setStyles(createSampleStyles());
-      pipeline2.setModel(createSampleModel());
-      pipeline2.setApis(Collections.singletonList("/api/v1/traffic")); // Same as in pipeline1
-      pipeline2.setPersistences(Collections.singletonList(12345L));
-      pipelineRepository.save(pipeline2);
-
-      seedStageRequirements(pipeline1, pipeline2);
-
-      UUID dataSetId = dataSet.getId();
-
-      ResponseEntity<DataSetOutputDTO> response =
-          exchange(
-              getEndpointPath() + "/" + dataSetId + "/stage",
-              org.springframework.http.HttpMethod.POST,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-
-      long distributionCount =
-          distributionRepository.findAll().stream()
-              .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
-              .count();
-
-      assertThat(distributionCount)
-          .as("Should create only 2 distributions for 2 unique API paths (not 3)")
-          .isEqualTo(2);
-    }
   }
 
   @Nested
   @DisplayName("Saga Completion Tests")
   class SagaCompletionTests {
 
-    /**
-     * Creates a staged (READY) dataset with a pipeline containing the given API paths. Reuses the
-     * existing stage HTTP endpoint which does not require Kafka.
-     */
-    private DataSet createReadyDataSetWithApis(List<String> apiPaths) {
+    private DataSet createReleasedDataSet() {
       DataSet dataSet = new DataSet();
       dataSet.setName("test_dataset_saga_" + System.currentTimeMillis());
       dataSet.setDescription("Test dataset for saga completion");
-      dataSet.setDataSetStatus(DataSetStatus.DRAFT);
+      dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+      dataSet.setPendingSagaType(PendingSagaType.CREATE);
       dataSet.setOpenDataAccess(false);
-      dataSet = dataSetRepository.save(dataSet);
+      return dataSetRepository.save(dataSet);
+    }
 
-      Pipeline pipeline = new Pipeline();
-      pipeline.setName("test_pipeline_saga_" + System.currentTimeMillis());
-      pipeline.setDataSet(dataSet);
-      pipeline.setApis(apiPaths);
-      pipelineRepository.save(pipeline);
-
+    @Test
+    @DisplayName("CREATE saga should persist infrastructure fields and reconcile NamedApi.routeId")
+    void createSagaShouldPersistInfrastructure() {
+      DataSet dataSet = createReleasedDataSet();
       UUID dataSetId = dataSet.getId();
-      exchange(
-          getEndpointPath() + "/" + dataSetId + "/stage",
-          HttpMethod.POST,
-          createAuthHeaders(),
-          null,
-          getOutputTypeReference());
 
-      return dataSetRepository.findById(dataSetId).orElseThrow();
-    }
+      NamedApi namedApi = new NamedApi();
+      namedApi.setName("Things");
+      namedApi.setSlug("things");
+      namedApi.setStandard(ApiStandard.STA);
+      namedApi.setDataSet(dataSet);
+      dataSet.getNamedApis().add(namedApi);
+      dataSetRepository.save(dataSet);
 
-    /** Simulates what release() does in the DB, without Kafka. */
-    private void simulateRelease(UUID dataSetId) {
-      DataSet ds = dataSetRepository.findById(dataSetId).orElseThrow();
-      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
-      ds.setPendingSagaType(PendingSagaType.CREATE);
-      dataSetRepository.save(ds);
-    }
-
-    /** Simulates what unrelease() does in the DB, without Kafka. */
-    private void simulateUnrelease(UUID dataSetId) {
-      DataSet ds = dataSetRepository.findById(dataSetId).orElseThrow();
-      ds.setPendingSagaType(PendingSagaType.DELETE);
-      dataSetRepository.save(ds);
-    }
-
-    private void handleCreateSagaCompleted(UUID dataSetId) {
       SagaResultPayload result =
           new SagaResultPayload(
               dataSetId.toString(),
               "proj-test",
               "https://frost.example.com",
-              "route-test",
+              Map.of("things", "route-test"),
               "svc-test",
               "https://public.example.com/datasets/" + dataSetId,
               List.of("pipe-test"),
@@ -1205,105 +1605,43 @@ class DataSetControllerIntegrationTest
               null,
               null);
       dataSetService.handleSagaCompleted(dataSetId, result);
+
+      DataSet persisted = dataSetRepository.findById(dataSetId).orElseThrow();
+      assertThat(persisted.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
+      assertThat(persisted.getPendingSagaType()).isNull();
+      assertThat(persisted.getProjectId()).isEqualTo("proj-test");
+      assertThat(persisted.getPublicUrl())
+          .isEqualTo("https://public.example.com/datasets/" + dataSetId);
+      assertThat(persisted.getNamedApis())
+          .as("Saga must reconcile routeId onto each NamedApi by slug")
+          .singleElement()
+          .satisfies(
+              api -> {
+                assertThat(api.getSlug()).isEqualTo("things");
+                assertThat(api.getRouteId()).isEqualTo("route-test");
+              });
     }
 
-    private void handleDeleteSagaCompleted(UUID dataSetId) {
+    @Test
+    @DisplayName("DELETE saga should clear infrastructure and revert to READY")
+    void deleteSagaShouldClearInfrastructure() {
+      DataSet dataSet = createReleasedDataSet();
+      dataSet.setProjectId("proj-test");
+      dataSet.setPublicUrl("https://public.example.com/datasets/" + dataSet.getId());
+      dataSet.setPendingSagaType(PendingSagaType.DELETE);
+      dataSetRepository.save(dataSet);
+      UUID dataSetId = dataSet.getId();
+
       SagaResultPayload result =
           new SagaResultPayload(
               dataSetId.toString(), null, null, null, null, null, null, null, null, null);
       dataSetService.handleSagaCompleted(dataSetId, result);
-    }
 
-    @Test
-    @DisplayName("CREATE saga should persist infrastructure and update distribution URLs")
-    void createSagaShouldPersistInfrastructure() {
-      DataSet dataSet = createReadyDataSetWithApis(List.of("/v1.1/Things"));
-      UUID dataSetId = dataSet.getId();
-
-      simulateRelease(dataSetId);
-      handleCreateSagaCompleted(dataSetId);
-
-      DataSet result = dataSetRepository.findById(dataSetId).orElseThrow();
-      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
-      assertThat(result.getPendingSagaType()).isNull();
-      assertThat(result.getProjectId()).isEqualTo("proj-test");
-      assertThat(result.getPublicUrl())
-          .isEqualTo("https://public.example.com/datasets/" + dataSetId);
-    }
-
-    @Test
-    @DisplayName("DELETE saga should remove distributions and revert to READY")
-    void deleteSagaShouldRemoveDistributions() {
-      DataSet dataSet = createReadyDataSetWithApis(List.of("/v1.1/Things", "/v1.1/Observations"));
-      UUID dataSetId = dataSet.getId();
-
-      simulateRelease(dataSetId);
-      handleCreateSagaCompleted(dataSetId);
-
-      long distsBefore =
-          distributionRepository.findAll().stream()
-              .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
-              .count();
-      assertThat(distsBefore).as("Should have 2 distributions before unrelease").isEqualTo(2);
-
-      simulateUnrelease(dataSetId);
-      handleDeleteSagaCompleted(dataSetId);
-
-      DataSet result = dataSetRepository.findById(dataSetId).orElseThrow();
-      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
-
-      long distsAfter =
-          distributionRepository.findAll().stream()
-              .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
-              .count();
-      assertThat(distsAfter).as("Should have 0 distributions after DELETE saga").isEqualTo(0);
-    }
-
-    @Test
-    @DisplayName("CREATE saga should regenerate distributions after prior DELETE saga")
-    void shouldRegenerateDistributionsAfterUnreleaseAndRerelease() {
-      DataSet dataSet = createReadyDataSetWithApis(List.of("/v1.1/Things", "/v1.1/Observations"));
-      UUID dataSetId = dataSet.getId();
-
-      // First release cycle
-      simulateRelease(dataSetId);
-      handleCreateSagaCompleted(dataSetId);
-
-      long distsAfterFirstRelease =
-          distributionRepository.findAll().stream()
-              .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
-              .count();
-      assertThat(distsAfterFirstRelease)
-          .as("Should have 2 distributions after first release")
-          .isEqualTo(2);
-
-      // Unrelease (DELETE saga removes distributions)
-      simulateUnrelease(dataSetId);
-      handleDeleteSagaCompleted(dataSetId);
-
-      long distsAfterUnrelease =
-          distributionRepository.findAll().stream()
-              .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
-              .count();
-      assertThat(distsAfterUnrelease)
-          .as("Should have 0 distributions after unrelease")
-          .isEqualTo(0);
-
-      // Re-release (CREATE saga should regenerate distributions)
-      simulateRelease(dataSetId);
-      handleCreateSagaCompleted(dataSetId);
-
-      long distsAfterRerelease =
-          distributionRepository.findAll().stream()
-              .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
-              .count();
-      assertThat(distsAfterRerelease)
-          .as("Should have 2 distributions again after re-release")
-          .isEqualTo(2);
-
-      DataSet finalState = dataSetRepository.findById(dataSetId).orElseThrow();
-      assertThat(finalState.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
-      assertThat(finalState.getPendingSagaType()).isNull();
+      DataSet persisted = dataSetRepository.findById(dataSetId).orElseThrow();
+      assertThat(persisted.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+      assertThat(persisted.getProjectId()).isNull();
+      assertThat(persisted.getPublicUrl()).isNull();
+      assertThat(persisted.getPendingSagaType()).isNull();
     }
   }
 }

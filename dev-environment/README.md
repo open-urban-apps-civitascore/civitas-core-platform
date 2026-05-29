@@ -8,7 +8,8 @@ Docker Compose setup for running the **CIVITAS CORE Platform** locally.
 
 ```
 dev-environment/
-├── backend/    # Full backend stack — all services in Docker
+├── apps/       # Application services (Config Adapter + Portal Backend) as Docker containers
+├── backend/    # Full backend stack — all services in Docker (CI/demos)
 ├── authz/      # AuthZ test data and integration tests
 ├── kafka/      # Kafka only
 ├── postgres/   # PostgreSQL only
@@ -16,6 +17,7 @@ dev-environment/
 ├── apisix/     # API Gateway + Authorization (OPA, AuthZ Repository)
 ├── frost/      # FROST IoT Server
 ├── geoserver/  # GeoServer OGC Services (WFS/WMS)
+├── nifi/       # Apache NiFi (data integration / pipeline engine)
 └── modelatlas/ # Model Atlas
 ```
 
@@ -23,9 +25,17 @@ dev-environment/
 
 ## Prerequisites
 
+**Required:**
 * Docker + Docker Compose v2
-* Java 21+ JDK (any distribution: Temurin, OpenJDK, Oracle, GraalVM)
-* Maven 3.9+
+
+**Additionally required for cmd/IDE mode (running services locally without Docker):**
+* Java 25+ JDK (Temurin, OpenJDK, Oracle, GraalVM)
+* Maven 3.6+
+
+> The default Docker (`auto`) mode builds JARs inside a containerized Maven + JDK 25
+> image, so no local Java or Maven installation is needed for the Quick Start path.
+
+**Optional:**
 * jq (for dev-mode scripts)
 
 Supported platforms: **Linux**, **macOS** (including Apple Silicon / ARM), and **Windows** (WSL / Git Bash).
@@ -42,14 +52,11 @@ cd dev-environment
 ```
 
 This script:
-1. Starts all infrastructure services (Kafka, PostgreSQL, Keycloak, APISIX, FROST)
+1. Starts all infrastructure services (Kafka, PostgreSQL, Keycloak, APISIX, FROST, NiFi, etc.)
 2. Asks how you want to start each backend service:
-   - **auto**: builds and starts the service in a new terminal window
-   - **ide**: prints IDE setup instructions for debugging in Eclipse/IntelliJ
+   - **auto** (recommended): builds JARs and runs as Docker containers — no local JDK required at runtime
+   - **ide**: prints IDE setup instructions for debugging in Eclipse/IntelliJ (requires Java 25+ & Maven locally)
 3. Optionally starts the portal frontend
-
-On Linux, new terminal windows are opened via `gnome-terminal` or `xterm`.
-On macOS, new terminal windows are opened via `Terminal.app`.
 
 ### Command-line Options
 
@@ -59,21 +66,29 @@ All interactive prompts can be bypassed with command-line flags, which is useful
 Usage: start-portal-dev.sh [OPTIONS]
 
 Options:
-  --config-adapter=auto|ide    Config Adapter startup (default: prompt)
-  --backend=auto|ide           Portal Backend startup (default: prompt)
-  --frontend=auto|manual|skip  Portal Frontend startup (default: prompt)
-  --keycloak-secret=SECRET     Keycloak client secret for portal-frontend
-  -h, --help                   Show this help message
+  --config-adapter=auto|cmd|ide    Config Adapter startup (default: prompt)
+  --backend=auto|cmd|ide           Portal Backend startup (default: prompt)
+  --frontend=auto|cmd|manual       Portal Frontend startup (default: prompt)
+  --keycloak-secret=SECRET         Keycloak client secret for portal-frontend
+  -h, --help                       Show this help message
+
+Startup modes:
+  auto = Docker container (recommended, no local JDK at runtime)
+  cmd  = Command line (java -jar / mvn spring-boot:run, requires Java 25+)
+  ide  = Manual/IDE debugging (requires Java 25+)
 ```
 
 **Examples:**
 
 ```bash
-# Fully non-interactive: start everything automatically
+# Fully non-interactive: start everything automatically (Docker)
 ./start-portal-dev.sh --config-adapter=auto --backend=auto --frontend=auto
 
-# Run backend in IDE, skip frontend
-./start-portal-dev.sh --config-adapter=ide --backend=ide --frontend=skip
+# Legacy command-line mode (java -jar in new terminal windows)
+./start-portal-dev.sh --config-adapter=cmd --backend=cmd --frontend=manual
+
+# Run backend in IDE, start frontend manually later
+./start-portal-dev.sh --config-adapter=ide --backend=ide --frontend=manual
 
 # Provide the Keycloak client secret directly
 ./start-portal-dev.sh --backend=auto --keycloak-secret=<secret>
@@ -130,22 +145,25 @@ All interactive prompts can be bypassed with command-line flags, which is useful
 Usage: start-portal-dev.sh [OPTIONS]
 
 Options:
-  --authz=full|allowall        AuthZ mode (default: prompt, default answer: allowall)
-  --config-adapter=auto|ide    Config Adapter startup (default: prompt)
-  --backend=auto|ide           Portal Backend startup (default: prompt)
-  --frontend=auto|manual|skip  Portal Frontend startup (default: prompt)
-  --keycloak-secret=SECRET     Keycloak client secret for portal-frontend
-  -h, --help                   Show this help message
+  --authz=full|allowall            AuthZ mode (default: prompt, default answer: allowall)
+  --config-adapter=auto|cmd|ide    Config Adapter startup (default: prompt)
+  --backend=auto|cmd|ide           Portal Backend startup (default: prompt)
+  --frontend=auto|cmd|manual       Portal Frontend startup (default: prompt)
+  --keycloak-secret=SECRET         Keycloak client secret for portal-frontend
+  -h, --help                       Show this help message
 ```
 
 **Examples:**
 
 ```bash
-# Fully non-interactive: start everything automatically
+# Fully non-interactive: start everything automatically (Docker)
 ./start-portal-dev.sh --authz=allowall --config-adapter=auto --backend=auto --frontend=auto
 
-# Run backend in IDE, skip frontend
-./start-portal-dev.sh --config-adapter=ide --backend=ide --frontend=skip
+# Legacy command-line mode (java -jar in new terminal windows)
+./start-portal-dev.sh --authz=allowall --config-adapter=cmd --backend=cmd --frontend=manual
+
+# Run backend in IDE, start frontend manually later
+./start-portal-dev.sh --config-adapter=ide --backend=ide --frontend=manual
 
 # Provide the Keycloak client secret directly
 ./start-portal-dev.sh --backend=auto --keycloak-secret=<secret>
@@ -197,6 +215,7 @@ cd apisix    && docker compose up -d
 | FROST Server | http://localhost:8085/FROST-Server/v1.1 | |
 | GeoServer Admin | http://localhost:8082/geoserver/web | admin / see geoserver/.env |
 | GeoServer WFS | http://localhost:9080/geoserver/{workspace}/wfs | via APISIX |
+| Apache NiFi | https://localhost:8443/nifi | admin / see nifi/.env |
 
 ---
 

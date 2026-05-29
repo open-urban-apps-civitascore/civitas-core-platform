@@ -20,6 +20,9 @@ import lombok.experimental.SuperBuilder;
 /**
  * Represents an activity that groups {@link Agent}s and produces {@link Distribution}s within the
  * data catalog.
+ *
+ * <p><b>Dormant:</b> currently has no production writer or controller — reserved for the deferred
+ * DCAT distribution work. See {@link Distribution} for the dormancy contract.
  */
 @Entity
 @Table(name = "activities")

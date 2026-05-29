@@ -70,7 +70,6 @@
       "role": "Rolle",
       "roles": "Rollen",
       "datasets": "Datensätze",
-      "dataspaces": "Datenräume",
       "permissions": "Berechtigungen",
       "datasources": "Datenquellen",
       "datasource": "Datenquelle",
@@ -188,7 +187,6 @@
     "edit": "bearbeiten",
     "users": "User",
     "groups": "Gruppen",
-    "dataspaces": "Datenräume",
     "tenants": "Mandanten-Management",
     "uml-modeler": "UML Modeler",
     "data-flow": "Datenfluss",
@@ -197,7 +195,8 @@
     "data-management": "Daten-Management",
     "datasources": "Datenquellen",
     "datastructures": "Datenstrukturen",
-    "access-management": "Zugriffsmanagement"
+    "access-management": "Zugriffsmanagement",
+    "apis": "APIs"
   },
   "datasets": {
     "title": "Datensätze",
@@ -250,13 +249,100 @@
         },
         "dataFlow": {
           "title": "Datenfluss",
-          "button": {
-            "readOnly": "Daten laden und bereitstellen",
-            "editable": "Datenfluss bearbeiten"
+          "description": "Konfiguriert, wie Daten durch Pipelines verarbeitet und über APIs bereitgestellt werden",
+          "pipelines": {
+            "title": "Pipeline(s)",
+            "empty": "Noch keine Pipeline vorhanden",
+            "addButton": "Pipeline hinzufügen"
           },
-          "pipelines": "Pipeline",
-          "distributionAccessURLs": "SensorThings API",
-          "noDataFlow": "Es sind noch keine Daten vorhanden."
+          "apis": {
+            "title": "APIs",
+            "empty": "Noch keine API vorhanden",
+            "noDescription": "Keine Beschreibung vorhanden",
+            "addButton": "API hinzufügen",
+            "sensorThings": "SensorThings API",
+            "sensorThingsSubtitle": "Zeitreihendaten",
+            "wfsWms": "WFS/WMS API",
+            "wfsWmsSubtitle": "Geodaten",
+            "standardLabels": {
+              "STA": "SensorThings API",
+              "WFS": "WFS",
+              "WMS": "WMS",
+              "CUSTOM": "Custom API"
+            },
+            "card": {
+              "actions": {
+                "edit": "Bearbeiten",
+                "view": "Öffnen",
+                "delete": "Löschen",
+                "copyPath": "Pfad kopieren"
+              },
+              "deleteConfirm": {
+                "title": "API löschen",
+                "description": "Möchtest du die API \"{name}\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+                "confirm": "Löschen"
+              },
+              "messages": {
+                "copySuccess": "Pfad wurde in die Zwischenablage kopiert.",
+                "deleteSuccess": "API wurde erfolgreich gelöscht.",
+                "deleteError": "Beim Löschen der API ist ein Fehler aufgetreten. Bitte versuche es erneut."
+              }
+            }
+          }
+        },
+        "apis": {
+          "config": {
+            "title": {
+              "sensorthings": "SensorThings API",
+              "wfs-wms": "WFS/WMS API"
+            },
+            "protectedBadge": "Geschützt",
+            "openDataBadge": "Open Data",
+            "protectedBadgeTooltip": "Der Zugriff auf diese API ist eingeschränkt und erfordert entsprechende Berechtigungen.",
+            "tabs": {
+              "basicInfo": "Basisinformationen",
+              "layer": "Layer",
+              "styles": "Stile",
+              "placeholder": "Inhalte folgen in einem späteren Schritt."
+            },
+            "form": {
+              "sectionTitle": "Basisinformationen",
+              "type": "Typ",
+              "persistence": "Persistenz",
+              "persistenceHint": "aus Pipeline",
+              "persistencePlaceholder": "Persistenz auswählen",
+              "slug": "Slug",
+              "urlPreview": "URL-Vorschau",
+              "name": "Bezeichnung",
+              "nameHint": "Beschreibt, welche Daten diese API bereitstellt.",
+              "description": "Beschreibung",
+              "descriptionHint": "max. 150 Zeichen, optional",
+              "descriptionPlaceholder": ""
+            },
+            "messages": {
+              "createSuccess": "API wurde erfolgreich angelegt.",
+              "updateSuccess": "API wurde erfolgreich aktualisiert.",
+              "saveError": "Beim Speichern der API ist ein Fehler aufgetreten. Bitte versuche es erneut."
+            },
+            "errors": {
+              "name": {
+                "required": "Bezeichnung ist erforderlich"
+              },
+              "slug": {
+                "required": "Slug ist erforderlich",
+                "tooLong": "Slug darf maximal 32 Zeichen lang sein",
+                "invalidFormat": "Slug darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten und nicht mit einem Bindestrich beginnen oder enden",
+                "reserved": "Dieser Slug ist reserviert und kann nicht verwendet werden",
+                "notUnique": "Dieser Slug existiert bereits in diesem Datensatz"
+              },
+              "description": {
+                "tooLong": "Beschreibung darf maximal 150 Zeichen lang sein"
+              },
+              "persistence": {
+                "required": "Persistenz ist erforderlich"
+              }
+            }
+          }
         }
       }
     },
@@ -479,24 +565,6 @@
       "previousPage": "Zur vorherigen Seite wechseln",
       "nextPage": "Zur nächsten Seite wechseln",
       "lastPage": "Zur letzten Seite wechseln"
-    }
-  },
-  "dataspaces": {
-    "title": "Datenräume",
-    "newDataSpace": "Neuer Datenraum",
-    "createDataSpace": "Datenraum erstellen",
-    "tableHeaders": {
-      "name": "Name",
-      "description": "Beschreibung",
-      "protected": "Geschützt"
-    },
-    "form": {
-      "inputs": {
-        "name": "Name des Datenraums",
-        "description": "Beschreibung des Datenraums",
-        "protected": "Datenraum schützen",
-        "protectedDescription": "Geschützte Datenräume erfordern erweiterte Berechtigungen für den Zugriff"
-      }
     }
   },
   "permissions": {
@@ -740,8 +808,7 @@
       "basicInfo": "Basisinformationen",
       "connector": "Konnektor",
       "dataStructure": "Datenstruktur",
-      "accessManagement": "Zugriffsberechtigungen",
-      "dataspaces": "Datenräume"
+      "accessManagement": "Zugriffsberechtigungen"
     },
     "connectorTab": {
       "title1": "Konnektor",
@@ -884,6 +951,7 @@
       "apiResponse": "API-Response",
       "cronTrigger": "CRON-Trigger",
       "frostStorage": "FROST-Server",
+      "geoPersistence": "Geo-Persistenz",
       "mapping": "Mapping"
     },
     "palette": {
@@ -911,6 +979,8 @@
       "cronDesc": "Geplanter Trigger. Führt Pipeline nach Zeitplan aus.",
       "frostServer": "FROST Server",
       "frostServerDesc": "SensorThings API Persistenz. Daten speichern oder abrufen.",
+      "geoPersistence": "Geo-Persistenz",
+      "geoPersistenceDesc": "WFS/WMS Geo-Daten-Persistenz.",
       "mapping": "Mapping",
       "mappingDesc": "Bloblang-Datentransformation. Daten zuordnen und transformieren."
     },
@@ -954,6 +1024,17 @@
       "serverUrl": "Server-URL",
       "internalServer": "Interner Frost Server",
       "version": "Version"
+    },
+    "geoPersistencePanel": {
+      "title": "Geo-Persistenz",
+      "tableName": "Tabellenname",
+      "tableNamePlaceholder": "Tabellennamen eingeben...",
+      "dataStructureVersion": "Datenstruktur-Version",
+      "importDataStructure": "Datenstruktur importieren",
+      "changeDataStructure": "Datenstruktur ändern",
+      "details": "Datenstruktur-Details",
+      "dataStructureName": "Datenstruktur",
+      "versionNumber": "Version"
     },
     "mappingPanel": {
       "hint": "Definiere deine Datentransformations-Zuordnung im YAML- oder JSON-Format.",

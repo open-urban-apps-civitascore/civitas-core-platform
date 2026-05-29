@@ -9,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
-import de.civitascore.portal.configuration.ModelAtlasConfig;
+import de.civitascore.portal.configuration.ModelAtlasProperties;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,11 +29,9 @@ class ModelRestClientRequestServiceTest {
 
   @BeforeEach
   void setUp() {
-    ModelAtlasConfig config = new ModelAtlasConfig();
-    config.setBaseUrl(wireMock.baseUrl());
-    config.setScope("testScope");
-    config.setStage("testStage");
-    service = new ModelRestClientRequestService(config, RestClient.builder());
+    ModelAtlasProperties properties =
+        new ModelAtlasProperties(wireMock.baseUrl(), "testScope", "testStage", 5000, 30000);
+    service = new ModelRestClientRequestService(properties, RestClient.builder());
   }
 
   @Test

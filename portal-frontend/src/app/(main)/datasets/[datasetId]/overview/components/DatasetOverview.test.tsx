@@ -96,7 +96,6 @@ const makeDraftDataset = (overrides: Partial<Dataset> = {}): Dataset => ({
   description: 'A test dataset',
   dataSetStatus: 'DRAFT',
   pipelines: [],
-  distributions: [],
   createdAt: '2024-01-01',
   modifiedAt: '2024-01-01',
   openDataAccess: false,
@@ -161,9 +160,9 @@ describe('DatasetOverview', () => {
 
   describe('Status availability and auto-revert', () => {
     describe('READY and AVAILABLE are disabled when canSetAvailable is false', () => {
-      it('when no distributions and no pipelines are present', async () => {
+      it('when no pipelines are present', async () => {
         renderComponent({
-          dataset: makeDraftDataset({ pipelines: [], distributions: [] }),
+          dataset: makeDraftDataset({ pipelines: [] }),
           groupCount: 1,
           roleCount: 1,
         })
@@ -173,9 +172,9 @@ describe('DatasetOverview', () => {
         expect(getStatusOption('AVAILABLE')).toHaveAttribute('aria-disabled', 'true')
       })
 
-      it('when there are distributions but no assignments', async () => {
+      it('when there are namedApis but no assignments', async () => {
         renderComponent({
-          dataset: makeDraftDataset({ distributions: [{ id: 'd1', accessUrl: 'http://example.com' }] }),
+          dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
           groupCount: 0,
           roleCount: 0,
         })
@@ -204,7 +203,7 @@ describe('DatasetOverview', () => {
         renderComponent({
           dataset: makeDraftDataset({
             description: '',
-            distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+            namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
           }),
           groupCount: 1,
           roleCount: 1,
@@ -229,9 +228,9 @@ describe('DatasetOverview', () => {
         expect(getStatusOption('AVAILABLE')).not.toHaveAttribute('aria-disabled', 'true')
       })
 
-      it('when distributions present, assignments set, and form passes strict schema', async () => {
+      it('when namedApis present, assignments set, and form passes strict schema', async () => {
         renderComponent({
-          dataset: makeDraftDataset({ distributions: [{ id: 'd1', accessUrl: 'http://example.com' }] }),
+          dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
           groupCount: 1,
           roleCount: 1,
         })
@@ -245,7 +244,7 @@ describe('DatasetOverview', () => {
         renderComponent({
           dataset: makeDraftDataset({
             description: '',
-            distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+            namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
           }),
           groupCount: 1,
           roleCount: 1,
@@ -272,7 +271,7 @@ describe('DatasetOverview', () => {
           const { rerender } = renderComponent({
             dataset: makeDraftDataset({
               dataSetStatus,
-              distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+              namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
             }),
             groupCount: 1,
             roleCount: 1,
@@ -285,7 +284,7 @@ describe('DatasetOverview', () => {
               <DatasetOverview
                 dataset={makeDraftDataset({
                   dataSetStatus,
-                  distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+                  namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
                 })}
                 groupCount={0}
                 roleCount={0}
@@ -303,7 +302,7 @@ describe('DatasetOverview', () => {
           dataset: makeDraftDataset({
             dataSetStatus: 'READY',
             description: 'A meaningful description',
-            distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+            namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
           }),
           groupCount: 1,
           roleCount: 1,
@@ -316,7 +315,7 @@ describe('DatasetOverview', () => {
             dataset={makeDraftDataset({
               dataSetStatus: 'READY',
               description: '',
-              distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+              namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
             })}
             groupCount={1}
             roleCount={1}
@@ -359,7 +358,7 @@ describe('DatasetOverview', () => {
 
     it('calls stageDataset when status changes from DRAFT to READY', async () => {
       renderComponent({
-        dataset: makeDraftDataset({ distributions: [{ id: 'd1', accessUrl: 'http://example.com' }] }),
+        dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
         groupCount: 1,
         roleCount: 1,
       })
@@ -378,7 +377,7 @@ describe('DatasetOverview', () => {
       renderComponent({
         dataset: makeDraftDataset({
           dataSetStatus: 'READY',
-          distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+          namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
         }),
         groupCount: 1,
         roleCount: 1,
@@ -398,7 +397,7 @@ describe('DatasetOverview', () => {
       renderComponent({
         dataset: makeDraftDataset({
           dataSetStatus: 'AVAILABLE',
-          distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+          namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
         }),
         groupCount: 1,
         roleCount: 1,
@@ -418,7 +417,7 @@ describe('DatasetOverview', () => {
       renderComponent({
         dataset: makeDraftDataset({
           dataSetStatus: 'AVAILABLE',
-          distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+          namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
         }),
         groupCount: 1,
         roleCount: 1,
@@ -439,7 +438,7 @@ describe('DatasetOverview', () => {
       renderComponent({
         dataset: makeDraftDataset({
           dataSetStatus: 'AVAILABLE',
-          distributions: [{ id: 'd1', accessUrl: 'http://example.com' }],
+          namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
         }),
         groupCount: 1,
         roleCount: 1,
@@ -509,7 +508,7 @@ describe('DatasetOverview', () => {
 
     it('discarding resets form values and status to original dataset values and clears exit modal', async () => {
       renderComponent({
-        dataset: makeDraftDataset({ distributions: [{ id: 'd1', accessUrl: 'http://example.com' }] }),
+        dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
       })
       clickEditButton()
 
@@ -528,7 +527,7 @@ describe('DatasetOverview', () => {
 
     it('save-and-exit from modal calls mockStageDataset and closes modal on success', async () => {
       renderComponent({
-        dataset: makeDraftDataset({ distributions: [{ id: 'd1', accessUrl: 'http://example.com' }] }),
+        dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
       })
 
       clickEditButton()
