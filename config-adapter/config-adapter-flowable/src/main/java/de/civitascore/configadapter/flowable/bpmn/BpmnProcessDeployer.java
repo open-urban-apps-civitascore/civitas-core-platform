@@ -33,8 +33,9 @@ public final class BpmnProcessDeployer {
   private BpmnProcessDeployer() {}
 
   /**
-   * Deploys all saga BPMN process definitions. If a process definition with the same key already
-   * exists, Flowable automatically creates a new version.
+   * Deploys all saga BPMN process definitions. Duplicate filtering is enabled, so Flowable creates
+   * a new process version only when a resource's content has actually changed; redeploying
+   * unchanged definitions is a no-op.
    *
    * @param repositoryService the Flowable repository service
    */

@@ -42,7 +42,13 @@ abstract class AbstractSagaDelegate implements JavaDelegate {
       return sagaHandlerRegistry;
     }
     var config = Context.getProcessEngineConfiguration();
-    return (SagaHandlerRegistry) config.getBeans().get("sagaHandlerRegistry");
+    Object bean = config.getBeans().get("sagaHandlerRegistry");
+    if (!(bean instanceof SagaHandlerRegistry registry)) {
+      throw new IllegalStateException(
+          "sagaHandlerRegistry bean missing or of wrong type in process engine configuration: "
+              + bean);
+    }
+    return registry;
   }
 
   void setSagaHandlerRegistry(SagaHandlerRegistry sagaHandlerRegistry) {

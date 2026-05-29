@@ -57,6 +57,21 @@ class SagaHandlerRegistryTest {
   }
 
   @Test
+  void shouldRejectDuplicateAdapterRegistration() {
+    SagaCommandHandler frostHandler = mock(SagaCommandHandler.class);
+    when(frostHandler.adapter()).thenReturn("frost");
+    SagaCommandHandler anotherFrost = mock(SagaCommandHandler.class);
+    when(anotherFrost.adapter()).thenReturn("frost");
+
+    SagaHandlerRegistry registry = new SagaHandlerRegistry();
+    registry.register(frostHandler);
+
+    IllegalStateException ex =
+        assertThrows(IllegalStateException.class, () -> registry.register(anotherFrost));
+    assertTrue(ex.getMessage().contains("frost"));
+  }
+
+  @Test
   void shouldReturnRegisteredAdapterNames() {
     SagaCommandHandler frostHandler = mock(SagaCommandHandler.class);
     SagaCommandHandler apisixHandler = mock(SagaCommandHandler.class);

@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.flowable.coded;
 
+import java.util.Objects;
 import org.flowable.bpmn.model.BpmnModel;
 import org.flowable.bpmn.model.EndEvent;
 import org.flowable.bpmn.model.ExclusiveGateway;
@@ -56,7 +57,18 @@ final class DatasetProvisioningSagaTemplate {
       String pipelinesDisplayName,
       String pipelinesForwardOp,
       String frostCompensationOp,
-      String apisixCompensationOp) {}
+      String apisixCompensationOp) {
+    OpVerbs {
+      Objects.requireNonNull(stepPrefix, "stepPrefix");
+      Objects.requireNonNull(forwardDisplayVerb, "forwardDisplayVerb");
+      Objects.requireNonNull(forwardOpSuffix, "forwardOpSuffix");
+      Objects.requireNonNull(pipelinesStepId, "pipelinesStepId");
+      Objects.requireNonNull(pipelinesDisplayName, "pipelinesDisplayName");
+      Objects.requireNonNull(pipelinesForwardOp, "pipelinesForwardOp");
+      Objects.requireNonNull(frostCompensationOp, "frostCompensationOp");
+      Objects.requireNonNull(apisixCompensationOp, "apisixCompensationOp");
+    }
+  }
 
   static BpmnModel build(String processId, String processName, OpVerbs v) {
     SagaProcessBuilder saga = SagaProcessBuilder.create(processId, processName);
@@ -98,7 +110,7 @@ final class DatasetProvisioningSagaTemplate {
 
     saga.flow(start, frost.task(), apisix.task(), pipelineGw);
     saga.flow(pipelineGw, redpanda.task()).when("${hasPipelines == true}");
-    saga.flow(pipelineGw, publishOk).when("${hasPipelines == false}");
+    saga.flow(pipelineGw, publishOk).asDefault();
     saga.flow(redpanda.task(), publishOk);
     saga.flow(publishOk, end);
 

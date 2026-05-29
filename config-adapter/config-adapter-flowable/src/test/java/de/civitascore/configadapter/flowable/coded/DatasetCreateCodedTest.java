@@ -12,7 +12,6 @@ package de.civitascore.configadapter.flowable.coded;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -118,13 +117,13 @@ class DatasetCreateCodedTest {
 
     ArgumentCaptor<SagaCommandMessage> apisixCaptor =
         ArgumentCaptor.forClass(SagaCommandMessage.class);
-    verify(apisixHandler, atLeast(2)).handle(apisixCaptor.capture());
+    verify(apisixHandler, times(2)).handle(apisixCaptor.capture());
     assertTrue(
         apisixCaptor.getAllValues().stream().anyMatch(c -> "DELETE_ROUTE".equals(c.operation())));
 
     ArgumentCaptor<SagaCommandMessage> frostCaptor =
         ArgumentCaptor.forClass(SagaCommandMessage.class);
-    verify(frostHandler, atLeast(2)).handle(frostCaptor.capture());
+    verify(frostHandler, times(2)).handle(frostCaptor.capture());
     assertTrue(
         frostCaptor.getAllValues().stream().anyMatch(c -> "DELETE_PROJECT".equals(c.operation())));
   }

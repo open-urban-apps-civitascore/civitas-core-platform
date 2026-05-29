@@ -12,6 +12,9 @@ package de.civitascore.configadapter.flowable.common;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import java.util.Map;
@@ -82,16 +85,10 @@ class FlowableInfrastructureFactoryTest {
   }
 
   private AdapterConfig mapConfig(Map<String, String> props) {
-    return new AdapterConfig() {
-      @Override
-      public String getProperty(String key) {
-        return props.get(key);
-      }
-
-      @Override
-      public String getProperty(String key, String defaultValue) {
-        return props.getOrDefault(key, defaultValue);
-      }
-    };
+    AdapterConfig config = mock(AdapterConfig.class);
+    when(config.getProperty(anyString())).thenAnswer(inv -> props.get(inv.getArgument(0)));
+    when(config.getProperty(anyString(), anyString()))
+        .thenAnswer(inv -> props.getOrDefault(inv.getArgument(0), inv.getArgument(1)));
+    return config;
   }
 }

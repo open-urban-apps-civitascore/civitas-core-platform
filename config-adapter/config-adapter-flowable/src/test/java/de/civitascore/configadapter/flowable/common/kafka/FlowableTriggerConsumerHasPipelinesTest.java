@@ -19,8 +19,11 @@ import static org.mockito.Mockito.verify;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
+import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
+import org.flowable.engine.history.HistoricProcessInstanceQuery;
 import org.flowable.engine.runtime.ProcessInstance;
+import org.flowable.engine.runtime.ProcessInstanceQuery;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,15 +40,15 @@ class FlowableTriggerConsumerHasPipelinesTest {
 
   @BeforeEach
   void setUp() {
-    var historyService = mock(org.flowable.engine.HistoryService.class);
+    var historyService = mock(HistoryService.class);
     consumer = new FlowableTriggerConsumer(runtimeService, historyService);
 
-    var query = mock(org.flowable.engine.runtime.ProcessInstanceQuery.class);
+    var query = mock(ProcessInstanceQuery.class);
     lenient().when(runtimeService.createProcessInstanceQuery()).thenReturn(query);
     lenient().when(query.processInstanceBusinessKey(anyString())).thenReturn(query);
     lenient().when(query.count()).thenReturn(0L);
 
-    var histQuery = mock(org.flowable.engine.history.HistoricProcessInstanceQuery.class);
+    var histQuery = mock(HistoricProcessInstanceQuery.class);
     lenient().when(historyService.createHistoricProcessInstanceQuery()).thenReturn(histQuery);
     lenient().when(histQuery.processInstanceBusinessKey(anyString())).thenReturn(histQuery);
     lenient().when(histQuery.finished()).thenReturn(histQuery);
@@ -67,7 +70,7 @@ class FlowableTriggerConsumerHasPipelinesTest {
                 "datasetId", "ds-1",
                 "dataPipelines", List.of(Map.of("id", "p-1"))));
 
-    consumer.processTrigger(trigger);
+    TriggerTestSupport.processTrigger(consumer, trigger);
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
@@ -84,7 +87,7 @@ class FlowableTriggerConsumerHasPipelinesTest {
                 "datasetId", "ds-1",
                 "dataPipelines", List.of()));
 
-    consumer.processTrigger(trigger);
+    TriggerTestSupport.processTrigger(consumer, trigger);
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
@@ -101,7 +104,7 @@ class FlowableTriggerConsumerHasPipelinesTest {
                 "datasetId", "ds-1",
                 "pipelineIds", List.of("p-1")));
 
-    consumer.processTrigger(trigger);
+    TriggerTestSupport.processTrigger(consumer, trigger);
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
@@ -117,7 +120,7 @@ class FlowableTriggerConsumerHasPipelinesTest {
                 "sagaType", "DATASET_CREATE",
                 "datasetId", "ds-1"));
 
-    consumer.processTrigger(trigger);
+    TriggerTestSupport.processTrigger(consumer, trigger);
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
@@ -135,7 +138,7 @@ class FlowableTriggerConsumerHasPipelinesTest {
                 "datasetId", "ds-1",
                 "hasPipelines", true));
 
-    consumer.processTrigger(trigger);
+    TriggerTestSupport.processTrigger(consumer, trigger);
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);

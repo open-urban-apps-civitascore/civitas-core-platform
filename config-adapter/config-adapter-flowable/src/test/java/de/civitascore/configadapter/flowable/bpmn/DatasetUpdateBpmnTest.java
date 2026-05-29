@@ -12,10 +12,10 @@ package de.civitascore.configadapter.flowable.bpmn;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -124,7 +124,7 @@ class DatasetUpdateBpmnTest {
     assertProcessFinished(instance.getId());
 
     ArgumentCaptor<SagaCommandMessage> captor = ArgumentCaptor.forClass(SagaCommandMessage.class);
-    verify(frostHandler, atLeast(2)).handle(captor.capture());
+    verify(frostHandler, times(2)).handle(captor.capture());
 
     SagaCommandMessage compensationCall =
         captor.getAllValues().stream()
@@ -154,7 +154,7 @@ class DatasetUpdateBpmnTest {
 
     ArgumentCaptor<SagaCommandMessage> apisixCaptor =
         ArgumentCaptor.forClass(SagaCommandMessage.class);
-    verify(apisixHandler, atLeast(2)).handle(apisixCaptor.capture());
+    verify(apisixHandler, times(2)).handle(apisixCaptor.capture());
     SagaCommandMessage apisixComp =
         apisixCaptor.getAllValues().stream()
             .filter(c -> "COMPENSATE_STEP".equals(c.type()))
@@ -164,7 +164,7 @@ class DatasetUpdateBpmnTest {
 
     ArgumentCaptor<SagaCommandMessage> frostCaptor =
         ArgumentCaptor.forClass(SagaCommandMessage.class);
-    verify(frostHandler, atLeast(2)).handle(frostCaptor.capture());
+    verify(frostHandler, times(2)).handle(frostCaptor.capture());
     SagaCommandMessage frostComp =
         frostCaptor.getAllValues().stream()
             .filter(c -> "COMPENSATE_STEP".equals(c.type()))

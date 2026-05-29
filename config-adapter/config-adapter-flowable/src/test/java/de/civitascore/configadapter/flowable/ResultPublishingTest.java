@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.flowable;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -21,8 +22,10 @@ import de.civitascore.configadapter.adapter.SagaCommandHandler;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.flowable.bpmn.BpmnProcessDeployer;
 import de.civitascore.configadapter.flowable.coded.CodedProcessDeployer;
+import de.civitascore.configadapter.flowable.common.SagaFailure;
 import de.civitascore.configadapter.flowable.common.kafka.FlowableResultPublisher;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.flowable.engine.ProcessEngine;
@@ -31,6 +34,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
 
 class ResultPublishingTest {
 
@@ -110,8 +114,30 @@ class ResultPublishingTest {
 
       start("dataset-create", createVars("saga-c3"));
 
-      verify(resultPublisher, never())
-          .publishFailed(any(de.civitascore.configadapter.flowable.common.SagaFailure.class));
+      verify(resultPublisher, never()).publishFailed(any(SagaFailure.class));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("de.civitascore.configadapter.flowable.ResultPublishingTest#approaches")
+    void threeStepSuccess_publishesResultKeysFromAllSteps(String label, boolean useBpmn) {
+      setUp(useBpmn);
+      stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1", "baseUrl", "http://f"));
+      stubSuccess(apisixHandler, "create-route", Map.of("routeId", "r1"));
+      stubSuccess(redpandaHandler, "deploy-pipelines", Map.of("pipelineIds", List.of("pl1")));
+
+      Map<String, Object> vars = new HashMap<>();
+      vars.put("sagaId", "saga-3step");
+      vars.put("datasetId", "ds-1");
+      vars.put("hasPipelines", true);
+      start("dataset-create", vars);
+
+      @SuppressWarnings("unchecked")
+      ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+      verify(resultPublisher).publishCompleted(eq("saga-3step"), captor.capture());
+      Map<String, Object> results = captor.getValue();
+      assertTrue(results.containsKey("projectId"), "FROST result key missing");
+      assertTrue(results.containsKey("routeId"), "APISIX result key missing");
+      assertTrue(results.containsKey("pipelineIds"), "Redpanda result key missing");
     }
   }
 

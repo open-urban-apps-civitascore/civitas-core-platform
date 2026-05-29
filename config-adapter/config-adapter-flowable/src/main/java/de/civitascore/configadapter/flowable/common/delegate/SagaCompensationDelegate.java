@@ -24,8 +24,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Flowable {@link JavaDelegate} for BPMN compensation handlers. Reads stored compensation data from
- * process variables and calls the adapter handler's compensation operation.
+ * Flowable delegate for saga rollback (compensation) steps. Reads stored compensation data from
+ * process variables and calls the adapter handler's compensation operation. This is a plain service
+ * task on an error-boundary path, not BPMN 2.0 compensation (there are no {@code
+ * compensateEventDefinition} markers in the process models).
  *
  * <p>Best-effort: does NOT throw on compensation failure. Instead, errors are collected in a {@code
  * compensationErrors} process variable for final reporting.
@@ -36,7 +38,10 @@ public class SagaCompensationDelegate extends AbstractAdapterCallDelegate {
   private static final String TYPE_COMPENSATION_COMPLETED = "COMPENSATION_COMPLETED";
 
   @Override
-  @SuppressWarnings("PMD.CloseResource") // Handler lifecycle managed by ServiceLoader, not callers
+  @SuppressWarnings({
+    "PMD.CloseResource", // Handler lifecycle managed by ServiceLoader, not callers
+    "PMD.AvoidCatchingGenericException" // Best-effort: a throwing handler must not break the chain
+  })
   public void execute(DelegateExecution execution) {
     String adapter = resolveString(adapterName, execution);
     String op = resolveString(operation, execution);
@@ -60,7 +65,21 @@ public class SagaCompensationDelegate extends AbstractAdapterCallDelegate {
         Encode.forJava(adapter),
         Encode.forJava(op));
 
-    SagaCommandResult result = handler.handle(command);
+    SagaCommandResult result;
+    try {
+      result = handler.handle(command);
+    } catch (RuntimeException e) {
+      // Best-effort contract (see class Javadoc): a handler that throws must not abort the
+      // compensation chain. Record the failure and continue.
+      LOG.error(
+          "Compensation handler threw: sagaId={}, step={}, error={}",
+          Encode.forJava(saga),
+          Encode.forJava(step),
+          Encode.forJava(e.getMessage()),
+          e);
+      collectError(execution, step, adapter, e.getMessage());
+      return;
+    }
 
     if (TYPE_COMPENSATION_COMPLETED.equals(result.type())) {
       LOG.info(

@@ -22,9 +22,17 @@ public final class SagaHandlerRegistry {
 
   private final Map<String, SagaCommandHandler> handlers = new ConcurrentHashMap<>();
 
-  /** Registers a handler. Uses {@link SagaCommandHandler#adapter()} as the key. */
+  /**
+   * Registers a handler. Uses {@link SagaCommandHandler#adapter()} as the key.
+   *
+   * @throws IllegalStateException if a handler is already registered for the same adapter
+   */
   public void register(SagaCommandHandler handler) {
-    handlers.put(handler.adapter(), handler);
+    SagaCommandHandler existing = handlers.putIfAbsent(handler.adapter(), handler);
+    if (existing != null) {
+      throw new IllegalStateException(
+          "Duplicate SagaCommandHandler registered for adapter: " + handler.adapter());
+    }
   }
 
   /**

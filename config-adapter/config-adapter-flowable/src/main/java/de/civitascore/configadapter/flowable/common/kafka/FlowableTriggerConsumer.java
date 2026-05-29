@@ -93,14 +93,25 @@ public class FlowableTriggerConsumer {
     LOG.info("FlowableTriggerConsumer stopped");
   }
 
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // Loop must survive transient poll errors
   private void pollLoop() {
-    try {
-      while (running) {
+    while (running) {
+      try {
         processRecordBatch(kafkaConsumer.poll(Duration.ofSeconds(1)));
-      }
-    } catch (WakeupException e) {
-      if (running) {
-        throw e;
+      } catch (WakeupException e) {
+        // stop() calls kafkaConsumer.wakeup(). A wakeup while still running is unexpected and must
+        // propagate; otherwise it's the normal shutdown signal and we exit the loop quietly.
+        if (running) {
+          throw e;
+        }
+        return;
+      } catch (RuntimeException e) {
+        // Survive transient consumer errors (auth/rebalance/deserialization) instead of silently
+        // killing the consumer thread — mirrors RetryConsumerLoop. During shutdown (running=false)
+        // we exit quietly on the next loop check.
+        if (running) {
+          LOG.error("Error in trigger consumer poll loop, continuing", e);
+        }
       }
     }
   }
@@ -155,7 +166,7 @@ public class FlowableTriggerConsumer {
 
     if (!(rawSagaType instanceof String sagaTypeStr)
         || !(rawDatasetId instanceof String datasetId)) {
-      LOG.warn("Ignoring malformed trigger: missing or wrong type for sagaType/datasetId");
+      LOG.error("Dropping malformed trigger: missing or wrong type for sagaType/datasetId");
       return;
     }
 
@@ -163,13 +174,13 @@ public class FlowableTriggerConsumer {
     try {
       sagaType = SagaType.valueOf(sagaTypeStr);
     } catch (IllegalArgumentException e) {
-      LOG.warn("Ignoring trigger with unknown sagaType: {}", Encode.forJava(sagaTypeStr));
+      LOG.error("Dropping trigger with unknown sagaType: {}", Encode.forJava(sagaTypeStr));
       return;
     }
 
     String processKey = sagaType.getKey();
     if (processKey == null) {
-      LOG.warn("No process key for saga type: {}", sagaType);
+      LOG.error("Dropping trigger: no process key for saga type: {}", sagaType);
       return;
     }
 
@@ -216,14 +227,6 @@ public class FlowableTriggerConsumer {
         Encode.forJava(datasetId),
         processKey,
         instance.getId());
-  }
-
-  /**
-   * Process a trigger from raw bytes with a synthetic record key. Package-private for unit tests
-   * that don't need real Kafka record metadata.
-   */
-  void processTrigger(byte[] value) throws IOException {
-    processTriggerRecord(new ConsumerRecord<>(TRIGGER_TOPIC, 0, System.nanoTime(), null, value));
   }
 
   private void commitOffset(ConsumerRecord<String, byte[]> record) {

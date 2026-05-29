@@ -79,6 +79,22 @@ class SagaComponentFactoryTest {
     }
 
     @Test
+    @DisplayName(
+        "Should reject unknown orchestrator.engine values instead of silently using custom")
+    void unknownEngine_failsFast() {
+      AppConfig config =
+          configWith(
+              Map.of(
+                  "orchestrator.engine", "flowabel",
+                  "kafka.bootstrap.servers", "localhost:9092"));
+
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> factory.create(config),
+          "Unknown orchestrator.engine must be rejected, not silently treated as custom");
+    }
+
+    @Test
     @DisplayName("Should fail-fast when orchestrator.engine=flowable but JDBC config is missing")
     void flowableWithoutJdbcConfig_failsFast() {
       AppConfig config =

@@ -52,6 +52,11 @@ class SagaComponentFactory {
       return createFlowableComponents(config);
     }
 
+    if (!"custom".equals(engine)) {
+      throw new IllegalArgumentException(
+          "Unknown orchestrator.engine '" + engine + "'. Supported values: flowable, custom");
+    }
+
     logger.info("Using custom saga orchestrator (orchestrator.engine=custom)");
     String bootstrapServers =
         config.getProperty(KAFKA_BOOTSTRAP_SERVERS, DEFAULT_BOOTSTRAP_SERVERS);
@@ -71,6 +76,13 @@ class SagaComponentFactory {
         flowable.close();
       } catch (Exception closeEx) {
         e.addSuppressed(closeEx);
+      }
+      for (SagaCommandHandler handler : handlers.values()) {
+        try {
+          handler.close();
+        } catch (Exception closeEx) {
+          e.addSuppressed(closeEx);
+        }
       }
       throw new IllegalStateException(
           "Flowable orchestrator initialization failed (orchestrator.engine=flowable). "

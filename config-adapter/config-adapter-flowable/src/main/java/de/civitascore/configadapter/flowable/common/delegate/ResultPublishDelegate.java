@@ -90,7 +90,15 @@ public class ResultPublishDelegate extends AbstractSagaDelegate {
     if (config == null || config.getBeans() == null) {
       return null;
     }
-    return (SagaResultPublisher) config.getBeans().get("resultPublisher");
+    Object bean = config.getBeans().get("resultPublisher");
+    if (bean == null) {
+      return null;
+    }
+    if (!(bean instanceof SagaResultPublisher publisher)) {
+      throw new IllegalStateException(
+          "resultPublisher bean is of wrong type: " + bean.getClass().getName());
+    }
+    return publisher;
   }
 
   private String stringVar(DelegateExecution execution, String name) {

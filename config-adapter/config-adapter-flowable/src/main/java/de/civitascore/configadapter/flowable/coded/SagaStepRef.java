@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.flowable.coded;
 
+import java.util.Objects;
 import org.flowable.bpmn.model.BoundaryEvent;
 import org.flowable.bpmn.model.ServiceTask;
 
@@ -17,4 +18,10 @@ import org.flowable.bpmn.model.ServiceTask;
  * its attached error boundary event, and the originating adapter — so callers can wire error flows
  * and compensations without restating those values.
  */
-record SagaStepRef(ServiceTask task, BoundaryEvent boundary, String adapter) {}
+record SagaStepRef(ServiceTask task, BoundaryEvent boundary, String adapter) {
+  SagaStepRef {
+    Objects.requireNonNull(task, "task");
+    Objects.requireNonNull(boundary, "boundary");
+    Objects.requireNonNull(adapter, "adapter");
+  }
+}

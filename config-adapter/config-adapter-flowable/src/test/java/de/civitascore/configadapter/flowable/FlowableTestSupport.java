@@ -22,6 +22,7 @@ import de.civitascore.configadapter.flowable.common.kafka.FlowableResultPublishe
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.flowable.common.engine.api.FlowableException;
 import org.flowable.common.engine.api.delegate.Expression;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.ManagementService;
@@ -29,12 +30,16 @@ import org.flowable.engine.ProcessEngine;
 import org.flowable.engine.history.HistoricActivityInstance;
 import org.flowable.engine.history.HistoricProcessInstance;
 import org.flowable.job.api.Job;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Shared test utilities for Flowable process tests. Eliminates duplication across BPMN and coded
  * test classes.
  */
 public final class FlowableTestSupport {
+
+  private static final Logger LOG = LoggerFactory.getLogger(FlowableTestSupport.class);
 
   private FlowableTestSupport() {}
 
@@ -48,15 +53,29 @@ public final class FlowableTestSupport {
     return FlowableEngineFactory.createWithH2(allBeans);
   }
 
-  /** Executes all pending jobs until none remain. Handles timer and dead-letter jobs. */
+  /**
+   * Executes all pending jobs until none remain. A job that fails is left for Flowable to retry
+   * (its retry count is decremented and the loop re-runs it). A job that exhausts its retries lands
+   * in the dead-letter queue and fails this method — so transient/retried failures (e.g. a Kafka
+   * publish that succeeds on retry) are tolerated, while a permanently failing job (e.g. a buggy
+   * delegate) surfaces instead of being silently swallowed.
+   */
   public static void executeAllJobs(ProcessEngine engine) {
     ManagementService mgmt = engine.getManagementService();
     for (int i = 0; i < 100; i++) {
       List<Job> jobs = mgmt.createJobQuery().list();
       if (jobs.isEmpty()) {
-        List<Job> timerJobs = mgmt.createTimerJobQuery().list();
         List<Job> deadLetterJobs = mgmt.createDeadLetterJobQuery().list();
-        if (timerJobs.isEmpty() && deadLetterJobs.isEmpty()) {
+        if (!deadLetterJobs.isEmpty()) {
+          Job dead = deadLetterJobs.get(0);
+          throw new IllegalStateException(
+              "Job "
+                  + dead.getId()
+                  + " exhausted its retries and moved to the dead-letter queue: "
+                  + dead.getExceptionMessage());
+        }
+        List<Job> timerJobs = mgmt.createTimerJobQuery().list();
+        if (timerJobs.isEmpty()) {
           break;
         }
         for (Job timerJob : timerJobs) {
@@ -67,8 +86,10 @@ public final class FlowableTestSupport {
       for (Job job : jobs) {
         try {
           mgmt.executeJob(job.getId());
-        } catch (Exception e) {
-          // Job may have already been executed by async executor
+        } catch (FlowableException e) {
+          // The job failed; Flowable decremented its retry count and keeps it executable, so the
+          // loop re-runs it. Permanent failures end up in the dead-letter queue (surfaced above).
+          LOG.debug("Job {} failed, will retry: {}", job.getId(), e.getMessage());
         }
       }
     }

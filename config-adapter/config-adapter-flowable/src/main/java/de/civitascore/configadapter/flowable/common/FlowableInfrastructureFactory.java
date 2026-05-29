@@ -13,8 +13,10 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import java.util.Properties;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -75,12 +77,16 @@ final class FlowableInfrastructureFactory {
   static KafkaConsumer<String, byte[]> createKafkaConsumer(AdapterConfig config) {
     Properties props = new Properties();
     props.put(
-        "bootstrap.servers", config.getProperty(PROP_KAFKA_BOOTSTRAP, DEFAULT_KAFKA_BOOTSTRAP));
-    props.put("group.id", config.getProperty(PROP_KAFKA_GROUP_ID, DEFAULT_KAFKA_GROUP_ID));
-    props.put("key.deserializer", StringDeserializer.class.getName());
-    props.put("value.deserializer", ByteArrayDeserializer.class.getName());
-    props.put("auto.offset.reset", "earliest");
-    props.put("enable.auto.commit", "false");
+        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
+        config.getProperty(PROP_KAFKA_BOOTSTRAP, DEFAULT_KAFKA_BOOTSTRAP));
+    props.put(
+        ConsumerConfig.GROUP_ID_CONFIG,
+        config.getProperty(PROP_KAFKA_GROUP_ID, DEFAULT_KAFKA_GROUP_ID));
+    props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+    props.put(
+        ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+    props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+    props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
     return new KafkaConsumer<>(props);
   }
 
@@ -88,10 +94,15 @@ final class FlowableInfrastructureFactory {
   static KafkaProducer<String, byte[]> createKafkaProducer(AdapterConfig config) {
     Properties props = new Properties();
     props.put(
-        "bootstrap.servers", config.getProperty(PROP_KAFKA_BOOTSTRAP, DEFAULT_KAFKA_BOOTSTRAP));
-    props.put("key.serializer", StringSerializer.class.getName());
-    props.put("value.serializer", ByteArraySerializer.class.getName());
-    props.put("acks", "all");
+        ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
+        config.getProperty(PROP_KAFKA_BOOTSTRAP, DEFAULT_KAFKA_BOOTSTRAP));
+    props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+    props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+    // Result events must not be lost or duplicated — make the exactly-once guarantees explicit
+    // instead of relying on Kafka 4.x defaults (mirrors the custom orchestrator's producer).
+    props.put(ProducerConfig.ACKS_CONFIG, "all");
+    props.put(ProducerConfig.RETRIES_CONFIG, Integer.MAX_VALUE);
+    props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
     return new KafkaProducer<>(props);
   }
 }

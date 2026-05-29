@@ -24,6 +24,7 @@ import de.civitascore.configadapter.flowable.FlowableTestSupport;
 import de.civitascore.configadapter.flowable.common.SagaHandlerRegistry;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.flowable.common.engine.api.delegate.Expression;
 import org.flowable.engine.delegate.DelegateExecution;
@@ -122,7 +123,26 @@ class SagaCompensationDelegateTest {
 
     ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
     verify(execution).setVariable(eq("compensationErrors"), captor.capture());
-    assertTrue(captor.getValue() instanceof java.util.List);
+    assertTrue(captor.getValue() instanceof List);
+  }
+
+  @Test
+  void shouldNotThrowAndCollectErrorWhenHandlerThrows() {
+    Map<String, Object> variables = new HashMap<>();
+    variables.put("sagaId", "saga-123");
+    variables.put("datasetId", "ds-456");
+    variables.put("compensationData_create-project", Map.of("projectId", "proj-789"));
+    variables.put("projectId", "proj-789");
+    when(execution.getVariables()).thenReturn(variables);
+    when(execution.getVariable("compensationErrors")).thenReturn(new ArrayList<>());
+    when(frostHandler.handle(any())).thenThrow(new RuntimeException("handler exploded"));
+
+    // Best-effort: a throwing handler must not break the compensation chain.
+    assertDoesNotThrow(() -> delegate.execute(execution));
+
+    ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+    verify(execution).setVariable(eq("compensationErrors"), captor.capture());
+    assertTrue(captor.getValue() instanceof List);
   }
 
   @Test

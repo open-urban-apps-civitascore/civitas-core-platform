@@ -32,7 +32,7 @@
       <outgoing>flow-apisix-error</outgoing>
       <errorEventDefinition id="ErrorEventDefinition_2" errorRef="stepFailedError"/>
     </boundaryEvent>
-    <exclusiveGateway id="pipeline-gateway" name="Has Pipelines?">
+    <exclusiveGateway id="pipeline-gateway" name="Has Pipelines?" default="flow-gateway-skip">
       <incoming>flow-apisix-gateway</incoming>
       <outgoing>flow-gateway-redpanda</outgoing>
       <outgoing>flow-gateway-skip</outgoing>
@@ -97,9 +97,7 @@
     <sequenceFlow id="flow-gateway-redpanda" name="yes" sourceRef="pipeline-gateway" targetRef="update-pipelines">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_1">${hasPipelines == true}</conditionExpression>
     </sequenceFlow>
-    <sequenceFlow id="flow-gateway-skip" name="no" sourceRef="pipeline-gateway" targetRef="publish-success">
-      <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_2">${hasPipelines == false}</conditionExpression>
-    </sequenceFlow>
+    <sequenceFlow id="flow-gateway-skip" name="no" sourceRef="pipeline-gateway" targetRef="publish-success"/>
     <sequenceFlow id="flow-redpanda-success" sourceRef="update-pipelines" targetRef="publish-success"/>
     <sequenceFlow id="flow-publish-success-end" sourceRef="publish-success" targetRef="end"/>
     <sequenceFlow id="flow-frost-error" sourceRef="frost-error" targetRef="publish-failure"/>

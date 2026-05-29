@@ -48,7 +48,7 @@ public final class DatasetDeleteProcessBuilder {
     // Happy path
     saga.flow(start, pipelineGw);
     saga.flow(pipelineGw, redpanda.task()).when("${hasPipelines == true}");
-    saga.flow(pipelineGw, apisix.task()).when("${hasPipelines == false}");
+    saga.flow(pipelineGw, apisix.task()).asDefault();
     saga.flow(redpanda.task(), apisix.task(), frost.task(), resultGw);
     saga.flow(resultGw, publishFail).when("${execution.getVariable('sagaError') != null}");
     saga.flow(resultGw, publishOk).asDefault();

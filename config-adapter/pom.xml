@@ -36,11 +36,11 @@
 
 	<properties>
 		<revision>1.0.2</revision>
-		<maven.compiler.source>21</maven.compiler.source>
-		<maven.compiler.target>21</maven.compiler.target>
+		<maven.compiler.source>25</maven.compiler.source>
+		<maven.compiler.target>25</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-		<kafka.version>4.1.1</kafka.version>
+		<kafka.version>4.1.2</kafka.version>
 		<keycloak.version>26.0.7</keycloak.version>
 		<cloudevents.version>3.0.0</cloudevents.version>
 		<slf4j.version>2.0.9</slf4j.version>
@@ -53,7 +53,7 @@
 		<testcontainers.version>2.0.2</testcontainers.version>
 		<awaitility.version>4.2.2</awaitility.version>
 		<jacoco.version>0.8.14</jacoco.version>
-		<spotless.version>2.46.1</spotless.version>
+		<spotless.version>3.4.0</spotless.version>
 		<commons.beanutils.version>1.11.0</commons.beanutils.version>
 		<commons.io.version>2.21.0</commons.io.version>
 		<commons.lang.version>3.20.0</commons.lang.version>
@@ -63,7 +63,7 @@
 		<owasp.encoder.version>1.4.0</owasp.encoder.version>
 		<flowable.version>7.1.0</flowable.version>
 		<hikaricp.version>6.2.1</hikaricp.version>
-		<postgresql.version>42.7.4</postgresql.version>
+		<postgresql.version>42.7.11</postgresql.version>
 		<h2.version>2.3.232</h2.version>
 		<cyclonedx-maven-plugin.version>2.9.0</cyclonedx-maven-plugin.version>
 	</properties>
@@ -327,9 +327,7 @@
 							<include>src/main/java/**/*.java</include>
 							<include>src/test/java/**/*.java</include>
 						</includes>
-                        <googleJavaFormat>
-                            <version>1.28.0</version>
-                        </googleJavaFormat>
+                        <googleJavaFormat/>
 						<licenseHeader>
 							<content>/**
  * &lt;p&gt;This work and the accompanying materials are made available under the terms of the European Union Public License (EU-PL) 1.2 which is available at https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12

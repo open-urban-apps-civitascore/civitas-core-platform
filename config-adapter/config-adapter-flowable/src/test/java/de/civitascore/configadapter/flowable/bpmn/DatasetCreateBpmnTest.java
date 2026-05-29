@@ -12,7 +12,6 @@ package de.civitascore.configadapter.flowable.bpmn;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -144,7 +143,7 @@ class DatasetCreateBpmnTest {
 
     ArgumentCaptor<SagaCommandMessage> apisixCaptor =
         ArgumentCaptor.forClass(SagaCommandMessage.class);
-    verify(apisixHandler, atLeast(2)).handle(apisixCaptor.capture());
+    verify(apisixHandler, times(2)).handle(apisixCaptor.capture());
 
     List<SagaCommandMessage> apisixCalls = apisixCaptor.getAllValues();
     SagaCommandMessage apisixCompensation =
@@ -156,7 +155,7 @@ class DatasetCreateBpmnTest {
 
     ArgumentCaptor<SagaCommandMessage> frostCaptor =
         ArgumentCaptor.forClass(SagaCommandMessage.class);
-    verify(frostHandler, atLeast(2)).handle(frostCaptor.capture());
+    verify(frostHandler, times(2)).handle(frostCaptor.capture());
 
     List<SagaCommandMessage> frostCalls = frostCaptor.getAllValues();
     SagaCommandMessage frostCompensation =

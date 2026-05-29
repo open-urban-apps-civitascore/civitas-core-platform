@@ -15,7 +15,16 @@ import org.flowable.bpmn.model.ErrorEventDefinition;
 import org.flowable.bpmn.model.FieldExtension;
 import org.flowable.bpmn.model.ServiceTask;
 
-/** Shared BPMN model building utilities used by all saga process builders. */
+/**
+ * Shared BPMN model building utilities used by all saga process builders.
+ *
+ * <p>Delegate class names are intentionally referenced as string literals rather than {@code
+ * SomeDelegate.class.getName()}: the delegates live in the {@code common.delegate} package, and a
+ * compile-time reference from this {@code coded} package would create a {@code coded → common}
+ * dependency cycle (the {@code common} orchestrator already depends on {@code coded}), which {@code
+ * ArchitectureTest.noCircularPackageDependencies} forbids. The BPMN XML references the same
+ * delegates by string for the same reason.
+ */
 final class ProcessBuilderUtils {
 
   static final String STEP_DELEGATE =

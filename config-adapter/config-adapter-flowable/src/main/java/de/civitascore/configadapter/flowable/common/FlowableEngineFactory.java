@@ -42,16 +42,6 @@ public final class FlowableEngineFactory {
   }
 
   /**
-   * Creates a {@link ProcessEngine} backed by the given DataSource with no additional beans.
-   *
-   * @param dataSource the JDBC DataSource
-   * @return a configured and started ProcessEngine
-   */
-  public static ProcessEngine create(DataSource dataSource) {
-    return create(dataSource, Map.of());
-  }
-
-  /**
    * Creates a {@link ProcessEngine} with an in-memory H2 database. Intended for unit and process
    * tests.
    *

@@ -38,7 +38,6 @@ public class FlowableSagaOrchestrator implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(FlowableSagaOrchestrator.class);
 
   private static final String PROP_APPROACH = "flowable.approach";
-  private static final String APPROACH_CODED = "coded";
   private static final Set<String> REQUIRED_HANDLERS = Set.of("frost", "apisix", "redpanda");
 
   private final AdapterConfig config;
@@ -81,10 +80,11 @@ public class FlowableSagaOrchestrator implements AutoCloseable {
           new FlowableTriggerConsumer(
               processEngine.getRuntimeService(), processEngine.getHistoryService());
 
-      String approach = config.getProperty(PROP_APPROACH, "bpmn");
+      DeploymentApproach approach =
+          DeploymentApproach.fromConfig(config.getProperty(PROP_APPROACH));
       LOG.info(
           "FlowableSagaOrchestrator initialized (approach={}, handlers={})",
-          Encode.forJava(approach),
+          approach,
           Encode.forJava(String.valueOf(handlers.keySet())));
     } catch (Exception e) {
       LOG.error("Initialization failed, cleaning up partially created resources", e);
@@ -99,6 +99,9 @@ public class FlowableSagaOrchestrator implements AutoCloseable {
 
   /** Start consuming saga triggers from Kafka. */
   public void start() {
+    if (triggerConsumer == null) {
+      throw new IllegalStateException("initialize() must be called before start()");
+    }
     triggerConsumer.start(FlowableInfrastructureFactory.createKafkaConsumer(config));
     LOG.info("FlowableSagaOrchestrator started");
   }
@@ -168,8 +171,8 @@ public class FlowableSagaOrchestrator implements AutoCloseable {
   }
 
   private void deployProcesses() {
-    String approach = config.getProperty(PROP_APPROACH, "bpmn");
-    if (APPROACH_CODED.equals(approach)) {
+    DeploymentApproach approach = DeploymentApproach.fromConfig(config.getProperty(PROP_APPROACH));
+    if (approach == DeploymentApproach.CODED) {
       CodedProcessDeployer.deploy(processEngine.getRepositoryService());
     } else {
       BpmnProcessDeployer.deploy(processEngine.getRepositoryService());

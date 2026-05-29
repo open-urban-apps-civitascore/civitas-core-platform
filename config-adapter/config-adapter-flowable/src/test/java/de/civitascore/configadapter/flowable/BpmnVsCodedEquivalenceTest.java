@@ -159,9 +159,10 @@ class BpmnVsCodedEquivalenceTest {
           engine.getRuntimeService().startProcessInstanceByKey("dataset-delete", vars);
       FlowableTestSupport.executeAllJobs(engine);
 
-      verify(redpanda).handle(any());
-      verify(apisix).handle(any());
-      verify(frost).handle(any());
+      var inOrder = inOrder(redpanda, apisix, frost);
+      inOrder.verify(redpanda).handle(any());
+      inOrder.verify(apisix).handle(any());
+      inOrder.verify(frost).handle(any());
       FlowableTestSupport.assertProcessFinished(engine.getHistoryService(), instance.getId());
     } finally {
       engine.close();

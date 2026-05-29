@@ -6,7 +6,7 @@ Flowable-based saga orchestrator for multi-adapter provisioning workflows (Datas
 
 Flowable Engine runs **embedded** in the config-adapter JVM — no extra server or container needed. Saga workflows are defined as BPMN processes. Each saga step calls an existing `SagaCommandHandler` (FROST, APISIX, Redpanda) via a JavaDelegate bridge. State is persisted in PostgreSQL (Flowable's built-in tables with `ACT_` prefix).
 
-```
+```text
 Kafka Trigger → FlowableTriggerConsumer → Flowable Engine (in-process)
                                              ├─ FROST handler (REST)
                                              ├─ APISIX handler (REST)

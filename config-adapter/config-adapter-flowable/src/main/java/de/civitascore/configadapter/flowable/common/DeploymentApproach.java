@@ -9,13 +9,18 @@
  */
 package de.civitascore.configadapter.flowable.common;
 
-import java.util.Objects;
+/**
+ * Selectable saga process deployment style, configured via the {@code flowable.approach} property.
+ */
+enum DeploymentApproach {
+  BPMN,
+  CODED;
 
-/** Immutable container for saga failure details, used by {@link SagaResultPublisher}. */
-public record SagaFailure(
-    String sagaId, String datasetId, String failedStep, String error, boolean compensated) {
-  public SagaFailure {
-    Objects.requireNonNull(sagaId, "sagaId");
-    // datasetId, failedStep and error may be null on some failure paths (e.g. delete best-effort).
+  /**
+   * Resolves the approach from a config value; defaults to {@link #BPMN} for null or unknown
+   * values.
+   */
+  static DeploymentApproach fromConfig(String value) {
+    return "coded".equalsIgnoreCase(value) ? CODED : BPMN;
   }
 }

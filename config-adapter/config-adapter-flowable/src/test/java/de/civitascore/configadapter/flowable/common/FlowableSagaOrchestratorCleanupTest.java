@@ -12,6 +12,7 @@ package de.civitascore.configadapter.flowable.common;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -54,24 +55,7 @@ class FlowableSagaOrchestratorCleanupTest {
 
   @Test
   void initialize_withoutRequiredHandlers_throwsWithClearMessage() {
-    AdapterConfig config =
-        new AdapterConfig() {
-          @Override
-          public String getProperty(String key) {
-            return switch (key) {
-              case "flowable.jdbc.url" -> "jdbc:h2:mem:no-handlers";
-              case "flowable.jdbc.username" -> "sa";
-              case "flowable.jdbc.password" -> "";
-              default -> null;
-            };
-          }
-
-          @Override
-          public String getProperty(String key, String defaultValue) {
-            String value = getProperty(key);
-            return value != null ? value : defaultValue;
-          }
-        };
+    AdapterConfig config = jdbcConfig("jdbc:h2:mem:no-handlers", "sa", "");
     FlowableSagaOrchestrator sut = new FlowableSagaOrchestrator(config, Map.of());
 
     IllegalStateException ex = assertThrows(IllegalStateException.class, sut::initialize);
@@ -82,24 +66,7 @@ class FlowableSagaOrchestratorCleanupTest {
 
   @Test
   void initialize_withoutRedpandaHandler_throwsMentioningRedpanda() {
-    AdapterConfig config =
-        new AdapterConfig() {
-          @Override
-          public String getProperty(String key) {
-            return switch (key) {
-              case "flowable.jdbc.url" -> "jdbc:h2:mem:no-redpanda";
-              case "flowable.jdbc.username" -> "sa";
-              case "flowable.jdbc.password" -> "";
-              default -> null;
-            };
-          }
-
-          @Override
-          public String getProperty(String key, String defaultValue) {
-            String value = getProperty(key);
-            return value != null ? value : defaultValue;
-          }
-        };
+    AdapterConfig config = jdbcConfig("jdbc:h2:mem:no-redpanda", "sa", "");
 
     SagaCommandHandler frost = mock(SagaCommandHandler.class);
     when(frost.adapter()).thenReturn("frost");
@@ -113,6 +80,14 @@ class FlowableSagaOrchestratorCleanupTest {
     assertTrue(
         ex.getMessage().contains("not registered: [redpanda]"),
         "Error must specifically call out redpanda as the missing handler");
+  }
+
+  @Test
+  void start_withoutInitialize_throwsWithClearMessage() {
+    FlowableSagaOrchestrator sut = orchestratorWith("jdbc:h2:mem:no-init", "sa", "");
+
+    IllegalStateException ex = assertThrows(IllegalStateException.class, sut::start);
+    assertTrue(ex.getMessage().contains("initialize"));
   }
 
   @Test
@@ -139,47 +114,29 @@ class FlowableSagaOrchestratorCleanupTest {
 
   private FlowableSagaOrchestrator orchestratorWith(
       String url, String user, String pass, Map<String, SagaCommandHandler> handlers) {
-    AdapterConfig config =
-        new AdapterConfig() {
-          @Override
-          public String getProperty(String key) {
-            return switch (key) {
-              case "flowable.jdbc.url" -> url;
-              case "flowable.jdbc.username" -> user;
-              case "flowable.jdbc.password" -> pass;
-              default -> null;
-            };
-          }
-
-          @Override
-          public String getProperty(String key, String defaultValue) {
-            String value = getProperty(key);
-            return value != null ? value : defaultValue;
-          }
-        };
-    return new FlowableSagaOrchestrator(config, handlers);
+    return new FlowableSagaOrchestrator(jdbcConfig(url, user, pass), handlers);
   }
 
   private FlowableSagaOrchestrator orchestratorWith(String url, String user, String pass) {
-    AdapterConfig config =
-        new AdapterConfig() {
-          @Override
-          public String getProperty(String key) {
-            return switch (key) {
-              case "flowable.jdbc.url" -> url;
-              case "flowable.jdbc.username" -> user;
-              case "flowable.jdbc.password" -> pass;
-              default -> null;
-            };
-          }
+    return new FlowableSagaOrchestrator(jdbcConfig(url, user, pass), minimalHandlers());
+  }
 
-          @Override
-          public String getProperty(String key, String defaultValue) {
-            String value = getProperty(key);
-            return value != null ? value : defaultValue;
-          }
-        };
-    return new FlowableSagaOrchestrator(config, minimalHandlers());
+  private AdapterConfig jdbcConfig(String url, String user, String pass) {
+    Map<String, String> props = new HashMap<>();
+    if (url != null) {
+      props.put("flowable.jdbc.url", url);
+    }
+    if (user != null) {
+      props.put("flowable.jdbc.username", user);
+    }
+    if (pass != null) {
+      props.put("flowable.jdbc.password", pass);
+    }
+    AdapterConfig config = mock(AdapterConfig.class);
+    when(config.getProperty(anyString())).thenAnswer(inv -> props.get(inv.getArgument(0)));
+    when(config.getProperty(anyString(), anyString()))
+        .thenAnswer(inv -> props.getOrDefault(inv.getArgument(0), inv.getArgument(1)));
+    return config;
   }
 
   private Map<String, SagaCommandHandler> minimalHandlers() {

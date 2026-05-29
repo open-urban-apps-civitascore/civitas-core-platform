@@ -23,8 +23,9 @@ import org.flowable.bpmn.model.StartEvent;
  * Fluent builder for the saga BPMN processes. Wraps the lower-level {@link ProcessBuilderUtils}
  * helpers and the Flowable {@link BpmnModel} API so that each dataset workflow can be expressed in
  * a top-to-bottom narrative: declare activities once, then wire happy path and error/compensation
- * flows. Element IDs are generated from source/target to match the {@code flow-<from>-<to>}
- * convention used in the equivalent {@code .bpmn} XML files.
+ * flows. Sequence-flow IDs are generated from source/target (e.g. {@code flow-<from>-<to>}); the
+ * equivalent {@code .bpmn} XML files use short semantic IDs in the same spirit but do not follow
+ * that scheme verbatim.
  */
 @SuppressWarnings("PMD.TooManyMethods") // Builder with one method per BPMN element type — expected
 final class SagaProcessBuilder {

@@ -6,7 +6,7 @@
     <startEvent id="start" name="Start">
       <outgoing>flow-start</outgoing>
     </startEvent>
-    <exclusiveGateway id="pipeline-gateway" name="Has Pipelines?">
+    <exclusiveGateway id="pipeline-gateway" name="Has Pipelines?" default="flow-gateway-skip">
       <incoming>flow-start</incoming>
       <outgoing>flow-gateway-redpanda</outgoing>
       <outgoing>flow-gateway-skip</outgoing>
@@ -86,9 +86,7 @@
     <sequenceFlow id="flow-gateway-redpanda" name="yes" sourceRef="pipeline-gateway" targetRef="delete-pipelines">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_1">${hasPipelines == true}</conditionExpression>
     </sequenceFlow>
-    <sequenceFlow id="flow-gateway-skip" name="no" sourceRef="pipeline-gateway" targetRef="delete-route">
-      <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_2">${hasPipelines == false}</conditionExpression>
-    </sequenceFlow>
+    <sequenceFlow id="flow-gateway-skip" name="no" sourceRef="pipeline-gateway" targetRef="delete-route"/>
     <sequenceFlow id="flow-redpanda-apisix" sourceRef="delete-pipelines" targetRef="delete-route"/>
     <sequenceFlow id="flow-apisix-frost" sourceRef="delete-route" targetRef="delete-project"/>
     <sequenceFlow id="flow-frost-result" sourceRef="delete-project" targetRef="result-merge"/>

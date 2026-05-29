@@ -32,7 +32,8 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Reads process variables to build a {@link SagaCommandMessage}, calls the handler, and writes
  * result/compensation data back as process variables. On handler failure, throws a {@link
- * BpmnError} to trigger BPMN compensation.
+ * BpmnError} to trigger the saga rollback path (compensation steps routed via error boundary
+ * events, not BPMN 2.0 compensation).
  */
 public class SagaStepDelegate extends AbstractAdapterCallDelegate {
 

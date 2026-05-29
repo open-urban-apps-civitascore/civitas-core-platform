@@ -80,7 +80,7 @@ class FlowableTriggerConsumerTest {
                 "datasetName", "Test",
                 "hasPipelines", false));
 
-    consumer.processTrigger(trigger);
+    TriggerTestSupport.processTrigger(consumer, trigger);
 
     ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
     @SuppressWarnings("unchecked")
@@ -99,7 +99,7 @@ class FlowableTriggerConsumerTest {
         objectMapper.writeValueAsBytes(
             Map.of("sagaType", "DATASET_UPDATE", "datasetId", "ds-456", "hasPipelines", true));
 
-    consumer.processTrigger(trigger);
+    TriggerTestSupport.processTrigger(consumer, trigger);
 
     verify(runtimeService).startProcessInstanceByKey(eq("dataset-update"), anyString(), anyMap());
   }
@@ -110,7 +110,7 @@ class FlowableTriggerConsumerTest {
         objectMapper.writeValueAsBytes(
             Map.of("sagaType", "DATASET_DELETE", "datasetId", "ds-456", "hasPipelines", false));
 
-    consumer.processTrigger(trigger);
+    TriggerTestSupport.processTrigger(consumer, trigger);
 
     verify(runtimeService).startProcessInstanceByKey(eq("dataset-delete"), anyString(), anyMap());
   }
@@ -121,7 +121,7 @@ class FlowableTriggerConsumerTest {
         objectMapper.writeValueAsBytes(
             Map.of("sagaType", "DATASET_CREATE", "datasetId", "ds-456", "hasPipelines", false));
 
-    consumer.processTrigger(trigger);
+    TriggerTestSupport.processTrigger(consumer, trigger);
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, Object>> varsCaptor = ArgumentCaptor.forClass(Map.class);
@@ -135,7 +135,7 @@ class FlowableTriggerConsumerTest {
   void shouldIgnoreMalformedTrigger() throws Exception {
     byte[] trigger = objectMapper.writeValueAsBytes(Map.of("foo", "bar"));
 
-    consumer.processTrigger(trigger);
+    TriggerTestSupport.processTrigger(consumer, trigger);
 
     verify(runtimeService, never()).startProcessInstanceByKey(anyString(), anyString(), anyMap());
   }
@@ -144,7 +144,7 @@ class FlowableTriggerConsumerTest {
   void shouldIgnoreWrongFieldTypes() throws Exception {
     byte[] trigger = objectMapper.writeValueAsBytes(Map.of("sagaType", 123, "datasetId", "ds-456"));
 
-    consumer.processTrigger(trigger);
+    TriggerTestSupport.processTrigger(consumer, trigger);
 
     verify(runtimeService, never()).startProcessInstanceByKey(anyString(), anyString(), anyMap());
   }
@@ -154,7 +154,7 @@ class FlowableTriggerConsumerTest {
     byte[] trigger =
         objectMapper.writeValueAsBytes(Map.of("sagaType", "UNKNOWN_TYPE", "datasetId", "ds-456"));
 
-    consumer.processTrigger(trigger);
+    TriggerTestSupport.processTrigger(consumer, trigger);
 
     verify(runtimeService, never()).startProcessInstanceByKey(anyString(), anyString(), anyMap());
   }
