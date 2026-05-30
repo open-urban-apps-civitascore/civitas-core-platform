@@ -27,7 +27,7 @@ import tools.jackson.core.type.TypeReference;
 public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O extends BaseOutputDTO>
     extends BaseReadOnlyControllerIntegrationTest<I, O> {
 
-  /** Whether the controller supports PUT/PATCH. Return false to replace 404 tests with 405. */
+  /** Whether the controller supports PUT/PATCH. Return false to replace 404 tests with 500. */
   protected boolean supportsUpdateAndPatch() {
     return true;
   }
