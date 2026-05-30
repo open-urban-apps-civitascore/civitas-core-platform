@@ -45,6 +45,10 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
    */
   @Override
   public DataSinkOutputDTO enrichDto(DataSinkOutputDTO dto, DataSink entity) {
+    if (entity.getPipeline() != null && entity.getPipeline().getDataSet() != null) {
+      dto.setDataSetId(entity.getPipeline().getDataSet().getId());
+    }
+
     if (entity.getDataSinkType() == null) {
       return dto;
     }

@@ -18,7 +18,7 @@ public interface DataSinkRepository extends BaseRepository<DataSink, UUID> {
    * @param id the DataSink ID
    * @return the DataSink with eagerly fetched dataSet and pipeline
    */
-  @EntityGraph(attributePaths = {"dataSet", "pipeline"})
+  @EntityGraph(attributePaths = {"pipeline", "pipeline.dataSet"})
   @Query("SELECT s FROM DataSink s WHERE s.id = :id")
   Optional<DataSink> findByIdWithRelations(UUID id);
 

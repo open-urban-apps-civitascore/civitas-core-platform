@@ -194,7 +194,6 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
         input.getDataSinks() != null ? input.getDataSinks() : List.of();
 
     UUID pipelineId = saved.getId();
-    UUID dataSetId = saved.getDataSet().getId();
 
     Set<UUID> inputIds =
         dataSinks.stream()
@@ -209,7 +208,6 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
 
     for (DataSinkInputDTO sinkInput : dataSinks) {
       sinkInput.setPipelineId(pipelineId);
-      sinkInput.setDataSetId(dataSetId);
       if (sinkInput.getId() == null) {
         dataSinkService.create(sinkInput);
       } else {

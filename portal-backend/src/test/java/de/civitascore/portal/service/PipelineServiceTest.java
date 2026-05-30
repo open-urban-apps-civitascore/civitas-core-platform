@@ -209,7 +209,6 @@ class PipelineServiceTest {
 
       verify(dataSinkService).create(sinkInput);
       assertThat(sinkInput.getPipelineId()).isEqualTo(pipelineId);
-      assertThat(sinkInput.getDataSetId()).isEqualTo(dataSetId);
     }
 
     @ParameterizedTest(name = "dataSinks={0}")

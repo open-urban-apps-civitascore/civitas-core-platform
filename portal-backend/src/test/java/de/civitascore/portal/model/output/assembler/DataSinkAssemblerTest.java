@@ -8,8 +8,10 @@ import static org.mockito.Mockito.when;
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataSinkType;
+import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.output.DataSinkOutputDTO;
 import de.civitascore.portal.model.output.FrostConfigurationOutput;
 import de.civitascore.portal.model.output.PostgisConfigurationOutput;
@@ -35,6 +37,23 @@ class DataSinkAssemblerTest {
 
   @InjectMocks private DataSinkAssembler assembler;
 
+  private DataSink sinkWithPipeline(DataSinkType type, Map<String, Object> configuration) {
+    DataSet dataSet = new DataSet();
+    dataSet.setId(UUID.randomUUID());
+    dataSet.setName("ds");
+
+    Pipeline pipeline = new Pipeline();
+    pipeline.setId(UUID.randomUUID());
+    pipeline.setName("pl");
+    pipeline.setDataSet(dataSet);
+
+    DataSink entity = new DataSink();
+    entity.setPipeline(pipeline);
+    entity.setDataSinkType(type);
+    entity.setConfiguration(configuration);
+    return entity;
+  }
+
   @Nested
   @DisplayName("enrichDto() — FROST")
   class FrostEnrichment {
@@ -42,9 +61,7 @@ class DataSinkAssemblerTest {
     @Test
     @DisplayName("Should set an empty FrostConfiguration")
     void shouldSetEmptyFrostConfiguration() {
-      DataSink entity = new DataSink();
-      entity.setDataSinkType(DataSinkType.FROST);
-      entity.setConfiguration(Map.of());
+      DataSink entity = sinkWithPipeline(DataSinkType.FROST, Map.of());
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
@@ -55,9 +72,7 @@ class DataSinkAssemblerTest {
     @Test
     @DisplayName("Should set FrostConfiguration even when entity configuration is null")
     void shouldHandleNullConfigurationForFrost() {
-      DataSink entity = new DataSink();
-      entity.setDataSinkType(DataSinkType.FROST);
-      entity.setConfiguration(null);
+      DataSink entity = sinkWithPipeline(DataSinkType.FROST, null);
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
@@ -75,10 +90,10 @@ class DataSinkAssemblerTest {
     void shouldBuildPostgisConfigurationWithDsv() {
       UUID dsvId = UUID.randomUUID();
 
-      DataSink entity = new DataSink();
-      entity.setDataSinkType(DataSinkType.POSTGIS);
-      entity.setConfiguration(
-          Map.of("tableName", "traffic_data", "dataStructureVersionId", dsvId.toString()));
+      DataSink entity =
+          sinkWithPipeline(
+              DataSinkType.POSTGIS,
+              Map.of("tableName", "traffic_data", "dataStructureVersionId", dsvId.toString()));
 
       DataStructureVersion dsv = new DataStructureVersion();
       DataStructureVersionSummaryDTO dsvSummary = new DataStructureVersionSummaryDTO();
@@ -102,10 +117,10 @@ class DataSinkAssemblerTest {
     void shouldLeaveDataStructureVersionNullWhenNotFound() {
       UUID dsvId = UUID.randomUUID();
 
-      DataSink entity = new DataSink();
-      entity.setDataSinkType(DataSinkType.POSTGIS);
-      entity.setConfiguration(
-          Map.of("tableName", "traffic_data", "dataStructureVersionId", dsvId.toString()));
+      DataSink entity =
+          sinkWithPipeline(
+              DataSinkType.POSTGIS,
+              Map.of("tableName", "traffic_data", "dataStructureVersionId", dsvId.toString()));
 
       when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.empty());
 
@@ -121,10 +136,10 @@ class DataSinkAssemblerTest {
     @DisplayName(
         "Should leave DSV null and not query the repository when dataStructureVersionId is not a valid UUID")
     void shouldLeaveDataStructureVersionNullWhenDsvIdIsMalformed() {
-      DataSink entity = new DataSink();
-      entity.setDataSinkType(DataSinkType.POSTGIS);
-      entity.setConfiguration(
-          Map.of("tableName", "traffic_data", "dataStructureVersionId", "not-a-uuid"));
+      DataSink entity =
+          sinkWithPipeline(
+              DataSinkType.POSTGIS,
+              Map.of("tableName", "traffic_data", "dataStructureVersionId", "not-a-uuid"));
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
@@ -138,9 +153,7 @@ class DataSinkAssemblerTest {
     @Test
     @DisplayName("Should return empty PostgisOutputConfiguration when entity configuration is null")
     void shouldHandleNullConfigurationForPostgis() {
-      DataSink entity = new DataSink();
-      entity.setDataSinkType(DataSinkType.POSTGIS);
-      entity.setConfiguration(null);
+      DataSink entity = sinkWithPipeline(DataSinkType.POSTGIS, null);
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 
@@ -159,8 +172,7 @@ class DataSinkAssemblerTest {
     @Test
     @DisplayName("Should leave configuration null when dataSinkType is null")
     void shouldLeaveConfigurationNullWhenTypeIsNull() {
-      DataSink entity = new DataSink();
-      entity.setDataSinkType(null);
+      DataSink entity = sinkWithPipeline(null, null);
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
 

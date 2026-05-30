@@ -6,9 +6,12 @@ import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
+import de.civitascore.portal.model.embedded.DataStructureStatus;
+import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.PipelineInputDTO;
@@ -703,7 +706,6 @@ class PipelineControllerIntegrationTest
       Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
 
       DataSink sink = new DataSink();
-      sink.setDataSet(pipeline.getDataSet());
       sink.setPipeline(pipeline);
       sink.setDataSinkType(DataSinkType.FROST);
       DataSink savedSink = dataSinkRepository.save(sink);
@@ -1206,7 +1208,6 @@ class PipelineControllerIntegrationTest
       Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
 
       DataSink sink = new DataSink();
-      sink.setDataSet(pipeline.getDataSet());
       sink.setPipeline(pipeline);
       sink.setDataSinkType(DataSinkType.FROST);
       dataSinkRepository.save(sink);
@@ -1228,7 +1229,6 @@ class PipelineControllerIntegrationTest
       Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
 
       DataSink sink = new DataSink();
-      sink.setDataSet(pipeline.getDataSet());
       sink.setPipeline(pipeline);
       sink.setDataSinkType(DataSinkType.FROST);
       DataSink savedSink = dataSinkRepository.save(sink);
@@ -1286,7 +1286,6 @@ class PipelineControllerIntegrationTest
       Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
 
       DataSink sink = new DataSink();
-      sink.setDataSet(pipeline.getDataSet());
       sink.setPipeline(pipeline);
       sink.setDataSinkType(DataSinkType.FROST);
       dataSinkRepository.save(sink);
@@ -1298,6 +1297,111 @@ class PipelineControllerIntegrationTest
       assertThat(response.getBody().getDataSinks()).hasSize(1);
       DataSinkOutputDTO sinkDto = response.getBody().getDataSinks().getFirst();
       assertThat(sinkDto.getDataSinkType()).isEqualTo(DataSinkType.FROST);
+    }
+
+    @Test
+    @DisplayName("Should reject FROST DataSink with non-empty configuration")
+    void shouldRejectFrostDataSinkWithNonEmptyConfig() {
+      DataSinkInputDTO invalidSink = new DataSinkInputDTO();
+      invalidSink.setDataSinkType(DataSinkType.FROST);
+      invalidSink.setConfiguration(Map.of("unexpected", "value"));
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSinks(List.of(invalidSink));
+
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName(
+        "Should create pipeline with POSTGIS DataSink and populate dataSetId on the response")
+    void shouldCreatePostgisDataSink() {
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      DataSinkInputDTO postgisSink = new DataSinkInputDTO();
+      postgisSink.setDataSinkType(DataSinkType.POSTGIS);
+      postgisSink.setConfiguration(
+          Map.of("tableName", "sensor_data", "dataStructureVersionId", dsv.getId().toString()));
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSinks(List.of(postgisSink));
+
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSinks()).hasSize(1);
+      DataSinkOutputDTO sinkDto = response.getBody().getDataSinks().getFirst();
+      assertThat(sinkDto.getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
+      assertThat(sinkDto.getDataSetId()).isEqualTo(response.getBody().getDataSetId());
+    }
+
+    @Test
+    @DisplayName("Should reject POSTGIS DataSink with non-existent dataStructureVersionId")
+    void shouldRejectPostgisDataSinkWithInvalidDsvId() {
+      DataSinkInputDTO invalidSink = new DataSinkInputDTO();
+      invalidSink.setDataSinkType(DataSinkType.POSTGIS);
+      invalidSink.setConfiguration(
+          Map.of(
+              "tableName", "sensor_data", "dataStructureVersionId", UUID.randomUUID().toString()));
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSinks(List.of(invalidSink));
+
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject POSTGIS DataSink without tableName")
+    void shouldRejectPostgisDataSinkWithoutTableName() {
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      DataSinkInputDTO invalidSink = new DataSinkInputDTO();
+      invalidSink.setDataSinkType(DataSinkType.POSTGIS);
+      invalidSink.setConfiguration(Map.of("dataStructureVersionId", dsv.getId().toString()));
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSinks(List.of(invalidSink));
+
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject update when DataSink ID belongs to a different pipeline")
+    void shouldRejectDataSinkFromAnotherPipeline() {
+      UUID pipelineId = createTestEntity();
+
+      // DataSink belonging to a different pipeline
+      DataSet otherDs = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT));
+      Pipeline otherPipeline = portalData.pipeline(otherDs);
+      DataSink foreignSink = new DataSink();
+      foreignSink.setPipeline(otherPipeline);
+      foreignSink.setDataSinkType(DataSinkType.FROST);
+      UUID foreignSinkId = dataSinkRepository.save(foreignSink).getId();
+
+      DataSinkInputDTO hijackAttempt = new DataSinkInputDTO();
+      hijackAttempt.setId(foreignSinkId);
+      hijackAttempt.setDataSinkType(DataSinkType.FROST);
+      hijackAttempt.setConfiguration(Map.of());
+
+      PipelineInputDTO updateInput = createUpdateInput();
+      updateInput.setDataSinks(List.of(hijackAttempt));
+
+      ResponseEntity<PipelineOutputDTO> response = performUpdate(pipelineId, updateInput);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
   }
 }

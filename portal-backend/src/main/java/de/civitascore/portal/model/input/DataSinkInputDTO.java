@@ -1,6 +1,5 @@
 package de.civitascore.portal.model.input;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.civitascore.portal.model.datasink.FrostConfiguration;
 import de.civitascore.portal.model.datasink.PostgisConfiguration;
 import de.civitascore.portal.model.embedded.DataSinkType;
@@ -24,6 +23,4 @@ public class DataSinkInputDTO extends BaseInputDTO {
 
   @NotNull @Schema(oneOf = {PostgisConfiguration.class, FrostConfiguration.class})
   private Map<String, Object> configuration;
-
-  @JsonIgnore private UUID dataSetId;
 }

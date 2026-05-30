@@ -30,6 +30,8 @@ import org.hibernate.type.SqlTypes;
  *   <li>{@link DataSinkType#FROST}: the object must be empty.
  * </ul>
  *
+ * <p>The parent {@link DataSet} is accessible transitively via {@code pipeline.dataSet}.
+ *
  * @see DataSinkType
  */
 @Entity
@@ -39,11 +41,7 @@ import org.hibernate.type.SqlTypes;
 public class DataSink extends BaseEntity {
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "dataset_id", nullable = false)
-  @NotNull private DataSet dataSet;
-
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "pipeline_id")
+  @JoinColumn(name = "pipeline_id", nullable = false)
   @NotNull private Pipeline pipeline;
 
   @Enumerated(EnumType.STRING)

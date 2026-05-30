@@ -4,14 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
-import de.civitascore.portal.model.embedded.DataSinkType;
+import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataSet;
-import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.DataStructure;
@@ -95,6 +94,7 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
     DataSet ds = new DataSet();
     ds.setName(uniqueName("dataset"));
     ds.setDescription("cascade test dataset");
+    ds.setDataSetStatus(DataSetStatus.DRAFT);
     return dataSetRepository.save(ds);
   }
 
@@ -145,14 +145,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
     DataSource ds = new DataSource();
     ds.setName(uniqueName("datasource"));
     return dataSourceRepository.save(ds);
-  }
-
-  private DataSink createDataSink(DataSet dataSet, Pipeline pipeline) {
-    DataSink sink = new DataSink();
-    sink.setDataSet(dataSet);
-    sink.setPipeline(pipeline);
-    sink.setDataSinkType(DataSinkType.FROST);
-    return dataSinkRepository.save(sink);
   }
 
   private DataSpace createDataSpace() {
@@ -243,36 +235,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
       entityManager.flush();
 
       assertThat(assignmentRepository.findById(assignmentId)).isEmpty();
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Pipeline cascades
-  // ---------------------------------------------------------------------------
-
-  @Nested
-  @DisplayName("Pipeline cascades")
-  class PipelineCascades {
-
-    @Test
-    @Transactional
-    @DisplayName("Deleting Pipeline row directly should set pipeline_id to NULL on its DataSinks")
-    void deletingPipelineRow_shouldSetPipelineIdNullOnDataSinks() {
-      DataSet dataSet = createDataSet();
-      Pipeline pipeline = createPipeline(dataSet);
-      DataSink sink = createDataSink(dataSet, pipeline);
-      UUID sinkId = sink.getId();
-
-      entityManager.flush();
-      entityManager.clear();
-
-      pipelineRepository.deleteById(pipeline.getId());
-      entityManager.flush();
-      entityManager.clear();
-
-      assertThat(dataSinkRepository.findById(sinkId))
-          .isPresent()
-          .hasValueSatisfying(s -> assertThat(s.getPipeline()).isNull());
     }
   }
 

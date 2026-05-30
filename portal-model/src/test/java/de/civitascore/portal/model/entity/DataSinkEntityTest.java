@@ -12,13 +12,6 @@ import org.junit.jupiter.api.Test;
 @DisplayName("DataSink Entity Tests")
 class DataSinkEntityTest {
 
-  private DataSet dataSet(UUID id) {
-    DataSet ds = new DataSet();
-    ds.setId(id);
-    ds.setName("dataset-" + id.toString().substring(0, 8));
-    return ds;
-  }
-
   private Pipeline pipeline(UUID id) {
     Pipeline p = new Pipeline();
     p.setId(id);
@@ -33,19 +26,16 @@ class DataSinkEntityTest {
     @Test
     @DisplayName("Should hold all assigned fields for a POSTGIS sink")
     void shouldHoldPostgisFields() {
-      DataSet ds = dataSet(UUID.randomUUID());
       Pipeline pipeline = pipeline(UUID.randomUUID());
       Map<String, Object> config =
           Map.of(
               "tableName", "traffic_data", "dataStructureVersionId", UUID.randomUUID().toString());
 
       DataSink sink = new DataSink();
-      sink.setDataSet(ds);
       sink.setPipeline(pipeline);
       sink.setDataSinkType(DataSinkType.POSTGIS);
       sink.setConfiguration(config);
 
-      assertThat(sink.getDataSet()).isSameAs(ds);
       assertThat(sink.getPipeline()).isSameAs(pipeline);
       assertThat(sink.getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
       assertThat(sink.getConfiguration()).containsKey("tableName");
