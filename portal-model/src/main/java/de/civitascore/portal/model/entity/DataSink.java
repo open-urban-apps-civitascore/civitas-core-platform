@@ -27,7 +27,7 @@ import org.hibernate.type.SqlTypes;
  * <ul>
  *   <li>{@link DataSinkType#POSTGIS}: {@code tableName} and {@code dataStructureVersionId} are
  *       required.
- *   <li>{@link DataSinkType#FROST}: the object must be empty.
+ *   <li>{@link DataSinkType#FROST}: the object must be absent or empty.
  * </ul>
  *
  * <p>The parent {@link DataSet} is accessible transitively via {@code pipeline.dataSet}.

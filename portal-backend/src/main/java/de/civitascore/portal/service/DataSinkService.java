@@ -147,7 +147,7 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
       case FROST -> {
         if (config != null && !config.isEmpty()) {
           throw new InvalidInputException(
-              "DataSink", "configuration", "FROST sinks require an empty configuration");
+              "DataSink", "configuration", "FROST sinks require an absent or empty configuration");
         }
       }
       case POSTGIS -> validatePostgisConfiguration(config);
