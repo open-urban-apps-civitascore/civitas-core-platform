@@ -145,9 +145,15 @@ class LayerControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should persist layerName and dataSinkId in database after create")
+    @DisplayName(
+        "Should persist layerName, dataSinkId and alternativeStyleIds in database after create")
     void shouldPersistEntityInDatabase() {
+      ensurePrerequisites();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      Style altStyle = portalData.style(dataSet);
+
       LayerInputDTO input = createValidInput();
+      input.setAlternativeStyleIds(List.of(altStyle.getId()));
 
       ResponseEntity<LayerOutputDTO> response = performCreate(input);
 
@@ -157,7 +163,7 @@ class LayerControllerIntegrationTest
       assertThat(output.getDataSetId()).isEqualTo(testDataSetId);
       assertThat(output.getDataSinkId()).isEqualTo(testDataSink.getId());
       assertThat(output.getLayerName()).isEqualTo(input.getLayerName());
-      assertThat(output.getAlternativeStyleIds()).isNotNull().isEmpty();
+      assertThat(output.getAlternativeStyleIds()).containsExactly(altStyle.getId());
 
       var saved = layerRepository.findById(output.getId()).orElseThrow();
       assertThat(saved.getLayerName()).isEqualTo(input.getLayerName());
@@ -205,6 +211,35 @@ class LayerControllerIntegrationTest
 
       var saved = layerRepository.findById(id).orElseThrow();
       assertThat(saved.getLayerName()).isEqualTo(update.getLayerName());
+    }
+
+    @Test
+    @DisplayName("alternativeStyleIds round-trip: POST → GET → PUT → GET")
+    void shouldRoundTripAlternativeStyleIds() {
+      ensurePrerequisites();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      Style altStyle1 = portalData.style(dataSet);
+      Style altStyle2 = portalData.style(dataSet);
+
+      LayerInputDTO create = createValidInput();
+      create.setAlternativeStyleIds(List.of(altStyle1.getId(), altStyle2.getId()));
+      LayerOutputDTO created = performCreate(create).getBody();
+      assertThat(created).isNotNull();
+      UUID id = getIdFromOutput(created);
+
+      ResponseEntity<LayerOutputDTO> afterCreate = performGetById(id);
+      assertThat(afterCreate.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(afterCreate.getBody()).isNotNull();
+      assertThat(afterCreate.getBody().getAlternativeStyleIds())
+          .containsExactlyInAnyOrder(altStyle1.getId(), altStyle2.getId());
+
+      LayerInputDTO update = createUpdateInput();
+      update.setAlternativeStyleIds(List.of(altStyle1.getId()));
+      performUpdate(id, update);
+
+      ResponseEntity<LayerOutputDTO> afterUpdate = performGetById(id);
+      assertThat(afterUpdate.getBody()).isNotNull();
+      assertThat(afterUpdate.getBody().getAlternativeStyleIds()).containsExactly(altStyle1.getId());
     }
   }
 
