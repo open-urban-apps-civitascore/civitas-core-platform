@@ -162,6 +162,9 @@ public class LayerService extends BaseService<Layer, LayerInputDTO> {
                 () ->
                     new ResourceNotFoundException(
                         DataSink.class.getSimpleName(), input.getDataSinkId()));
+    if (!entity.getDataSet().getId().equals(dataSink.getPipeline().getDataSet().getId())) {
+      throw new ResourceNotFoundException(DataSink.class.getSimpleName(), input.getDataSinkId());
+    }
     entity.setDataSink(dataSink);
 
     if (input.getDefaultStyleId() != null) {

@@ -163,6 +163,30 @@ class LayerServiceTest {
 
     @Test
     @DisplayName(
+        "Should throw ResourceNotFoundException when dataSink belongs to a different dataset")
+    void shouldThrowWhenDataSinkFromWrongDataset() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dataSinkId = UUID.randomUUID();
+      DataSet ds = dataSet(dataSetId);
+
+      DataSet otherDataSet = dataSet(UUID.randomUUID());
+      Pipeline pipeline = new Pipeline();
+      pipeline.setDataSet(otherDataSet);
+      DataSink dataSink = new DataSink();
+      dataSink.setId(dataSinkId);
+      dataSink.setPipeline(pipeline);
+
+      Layer entity = new Layer();
+      when(layerMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.findById(dataSinkId)).thenReturn(Optional.of(dataSink));
+
+      assertThatThrownBy(() -> layerService.create(baseInput(dataSetId, dataSinkId)))
+          .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName(
         "Should throw ResourceNotFoundException when a referenced alternative Style is not found")
     void shouldThrowWhenAlternativeStyleNotFound() {
       UUID dataSetId = UUID.randomUUID();
