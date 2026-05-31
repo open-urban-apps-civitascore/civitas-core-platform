@@ -92,7 +92,7 @@ public class LayerService extends BaseService<Layer, LayerInputDTO> {
         .ifPresent(
             _ -> {
               throw new UniqueConstraintViolationException(
-                  Layer.class.getSimpleName(),
+                  getEntityName(),
                   "layerName",
                   entity.getLayerName(),
                   "dataSinkId",
