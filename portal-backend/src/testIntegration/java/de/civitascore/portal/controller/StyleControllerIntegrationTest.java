@@ -120,6 +120,21 @@ class StyleControllerIntegrationTest
   class CreateStyleTests {
 
     @Test
+    @DisplayName("Should return 400 when dataSetId in path is not a valid UUID")
+    void shouldReturn400WhenCreateWithInvalidDataSetId() {
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              "/datasets/not-a-valid-uuid/styles",
+              HttpMethod.POST,
+              createAuthHeaders(),
+              createValidInput());
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail())
+          .isEqualTo("Missing or invalid dataSetId in path variables");
+    }
+
+    @Test
     @DisplayName("Should persist name and sldContent in database after create")
     void shouldPersistEntityInDatabase() {
       StyleInputDTO input = createValidInput();
@@ -142,6 +157,21 @@ class StyleControllerIntegrationTest
   @Nested
   @DisplayName("Update Style Tests")
   class UpdateStyleTests {
+
+    @Test
+    @DisplayName("Should return 400 when dataSetId in path is not a valid UUID")
+    void shouldReturn400WhenUpdateWithInvalidDataSetId() {
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              "/datasets/not-a-valid-uuid/styles/" + UUID.randomUUID(),
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              createUpdateInput());
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail())
+          .isEqualTo("Missing or invalid dataSetId in path variables");
+    }
 
     @Test
     @DisplayName("Should persist updated name and sldContent in database after PUT")
@@ -181,6 +211,36 @@ class StyleControllerIntegrationTest
               null);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("Should return 400 when dataSetId in path is not a valid UUID on GET by ID")
+    void shouldReturn400WhenGetByIdWithInvalidDataSetId() {
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              "/datasets/not-a-valid-uuid/styles/" + UUID.randomUUID(),
+              HttpMethod.GET,
+              createAuthHeaders(),
+              null);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail())
+          .isEqualTo("Missing or invalid dataSetId in path variables");
+    }
+
+    @Test
+    @DisplayName("Should return 400 when dataSetId in path is not a valid UUID on DELETE")
+    void shouldReturn400WhenDeleteWithInvalidDataSetId() {
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              "/datasets/not-a-valid-uuid/styles/" + UUID.randomUUID(),
+              HttpMethod.DELETE,
+              createAuthHeaders(),
+              null);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail())
+          .isEqualTo("Missing or invalid dataSetId in path variables");
     }
   }
 

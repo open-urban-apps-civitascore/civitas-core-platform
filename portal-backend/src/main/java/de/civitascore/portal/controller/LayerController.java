@@ -6,13 +6,11 @@ import de.civitascore.portal.model.output.LayerOutputDTO;
 import de.civitascore.portal.model.output.assembler.LayerAssembler;
 import de.civitascore.portal.repository.specification.LayerSpec;
 import de.civitascore.portal.service.LayerService;
-import de.civitascore.portal.util.InvalidInputException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -100,23 +98,11 @@ public class LayerController
 
   @Override
   protected LayerInputDTO preProcessInput(LayerInputDTO input) {
-    Optional.ofNullable(extractPathVariables().get("dataSetId"))
-        .map(UUID::fromString)
-        .ifPresentOrElse(
-            input::setDataSetId,
-            () -> {
-              throw new InvalidInputException(
-                  "Layer", "dataSetId", "Missing or invalid dataSetId in path variables");
-            });
+    input.setDataSetId(extractDataSetId());
     return super.preProcessInput(input);
   }
 
   private UUID extractDataSetId() {
-    return Optional.ofNullable(extractPathVariables().get("dataSetId"))
-        .map(UUID::fromString)
-        .orElseThrow(
-            () ->
-                new InvalidInputException(
-                    "Layer", "dataSetId", "Missing or invalid dataSetId in path variables"));
+    return extractUUIDFromPathVariable("dataSetId", Layer.class);
   }
 }

@@ -6,13 +6,11 @@ import de.civitascore.portal.model.output.StyleOutputDTO;
 import de.civitascore.portal.model.output.assembler.StyleAssembler;
 import de.civitascore.portal.repository.specification.StyleSpec;
 import de.civitascore.portal.service.StyleService;
-import de.civitascore.portal.util.InvalidInputException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -100,23 +98,11 @@ public class StyleController
 
   @Override
   protected StyleInputDTO preProcessInput(StyleInputDTO input) {
-    Optional.ofNullable(extractPathVariables().get("dataSetId"))
-        .map(UUID::fromString)
-        .ifPresentOrElse(
-            input::setDataSetId,
-            () -> {
-              throw new InvalidInputException(
-                  "Style", "dataSetId", "Missing or invalid dataSetId in path variables");
-            });
+    input.setDataSetId(extractDataSetId());
     return super.preProcessInput(input);
   }
 
   private UUID extractDataSetId() {
-    return Optional.ofNullable(extractPathVariables().get("dataSetId"))
-        .map(UUID::fromString)
-        .orElseThrow(
-            () ->
-                new InvalidInputException(
-                    "Style", "dataSetId", "Missing or invalid dataSetId in path variables"));
+    return extractUUIDFromPathVariable("dataSetId", Style.class);
   }
 }
