@@ -13,7 +13,5 @@ public interface LayerRepository extends BaseRepository<Layer, UUID> {
 
   Optional<Layer> findByDataSinkIdAndLayerName(UUID dataSinkId, String layerName);
 
-  boolean existsByDefaultStyleId(UUID styleId);
-
   boolean existsByDefaultStyleIdOrAlternativeStylesId(UUID defaultStyleId, UUID alternativeStyleId);
 }

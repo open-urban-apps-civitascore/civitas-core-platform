@@ -127,9 +127,9 @@ public class StyleService extends BaseService<Style, StyleInputDTO> {
     Style style =
         findById(id).orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
 
-    if (layerRepository.existsByDefaultStyleId(id)) {
+    if (layerRepository.existsByDefaultStyleIdOrAlternativeStylesId(id, id)) {
       throw new ResourceInUseException(
-          getEntityName(), id, "Style is referenced by one or more Layers as the default Style");
+          getEntityName(), id, "Style is referenced by one or more Layers");
     }
 
     return style;

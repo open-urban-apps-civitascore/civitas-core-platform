@@ -215,7 +215,7 @@ class StyleServiceTest {
   class PreProcessDelete {
 
     @Test
-    @DisplayName("Should allow delete when no Layer references this Style as default")
+    @DisplayName("Should allow delete when no Layer references this Style")
     void shouldAllowDeleteWhenNoLayerReferences() {
       UUID styleId = UUID.randomUUID();
       Style style = new Style();
@@ -223,22 +223,24 @@ class StyleServiceTest {
 
       when(styleRepository.existsById(styleId)).thenReturn(true);
       when(styleRepository.findById(styleId)).thenReturn(Optional.of(style));
-      when(layerRepository.existsByDefaultStyleId(styleId)).thenReturn(false);
+      when(layerRepository.existsByDefaultStyleIdOrAlternativeStylesId(styleId, styleId))
+          .thenReturn(false);
 
       assertThatCode(() -> styleService.deleteById(styleId)).doesNotThrowAnyException();
     }
 
     @Test
     @DisplayName(
-        "Should throw ResourceInUseException when a Layer references this Style as default")
-    void shouldThrowWhenLayerReferencesStyleAsDefault() {
+        "Should throw ResourceInUseException when a Layer references this Style as default or alternative")
+    void shouldThrowWhenLayerReferencesStyle() {
       UUID styleId = UUID.randomUUID();
       Style style = new Style();
       style.setId(styleId);
 
       when(styleRepository.existsById(styleId)).thenReturn(true);
       when(styleRepository.findById(styleId)).thenReturn(Optional.of(style));
-      when(layerRepository.existsByDefaultStyleId(styleId)).thenReturn(true);
+      when(layerRepository.existsByDefaultStyleIdOrAlternativeStylesId(styleId, styleId))
+          .thenReturn(true);
 
       assertThatThrownBy(() -> styleService.deleteById(styleId))
           .isInstanceOf(ResourceInUseException.class);

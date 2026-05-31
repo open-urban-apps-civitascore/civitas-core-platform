@@ -289,5 +289,26 @@ class StyleControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
+
+    @Test
+    @DisplayName("Should return 409 when deleting a Style that is a Layer's alternative style")
+    void shouldReturn409WhenStyleReferencedByLayerAsAlternative() {
+      getEndpointPath(); // ensures testDataSetId is initialized
+      DataSet ds = dataSetRepository.findById(testDataSetId).orElseThrow();
+      Style style = portalData.style(ds);
+      DataSink dataSink = portalData.dataSink(ds, portalData.pipeline(ds));
+      Layer layer = portalData.layer(ds, dataSink);
+      layer.getAlternativeStyles().add(style);
+      layerRepository.save(layer);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + style.getId(),
+              HttpMethod.DELETE,
+              createAuthHeaders(),
+              null);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
   }
 }
