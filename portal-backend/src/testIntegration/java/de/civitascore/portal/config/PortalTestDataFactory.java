@@ -281,7 +281,6 @@ public class PortalTestDataFactory {
 
   public DataSink dataSink(DataSet dataSet, Pipeline pipeline) {
     DataSink sink = new DataSink();
-    sink.setDataSet(dataSet);
     sink.setPipeline(pipeline);
     sink.setDataSinkType(DataSinkType.FROST);
     return dataSinkRepository.save(sink);
