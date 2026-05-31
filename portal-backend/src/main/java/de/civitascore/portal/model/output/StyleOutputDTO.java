@@ -11,8 +11,13 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class StyleOutputDTO extends BaseOutputDTO {
 
+  @Schema(description = "ID of the dataset this style belongs to")
   private UUID dataSetId;
+
+  @Schema(description = "Unique name of the style within its dataset")
   private String name;
+
+  @Schema(description = "SLD (Styled Layer Descriptor) XML content")
   private String sldContent;
 
   @Schema(
