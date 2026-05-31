@@ -21,12 +21,17 @@ import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -368,47 +373,43 @@ class LayerServiceTest {
   @DisplayName("validateBboxConsistency()")
   class ValidateBboxConsistency {
 
-    @Test
-    @DisplayName(
-        "Should throw InvalidInputException when bboxAutoCalculate is true but nativeBoundingBox is set")
-    void shouldThrowWhenBboxSetWithAutoCalculateTrue() {
-      LayerInputDTO input = new LayerInputDTO();
-      input.setBboxAutoCalculate(true);
-      input.setNativeBoundingBox(java.util.Map.of("minx", -180));
-      input.setDataSinkId(UUID.randomUUID());
-      input.setLayerName("layer");
-
-      assertThatThrownBy(() -> layerService.preProcessCreateInput(input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("bboxAutoCalculate");
+    static Stream<Arguments> bboxConsistencyCases() {
+      Map<String, Object> bbox = Map.of("minx", -180, "miny", -90, "maxx", 180, "maxy", 90);
+      return Stream.of(
+          // autoCalculate=true: bbox fields must be absent
+          Arguments.of(true, null, null, false),
+          Arguments.of(true, bbox, null, true),
+          Arguments.of(true, null, bbox, true),
+          Arguments.of(true, bbox, bbox, true),
+          // autoCalculate=false: both bbox fields are required
+          Arguments.of(false, bbox, bbox, false),
+          Arguments.of(false, null, null, true),
+          Arguments.of(false, bbox, null, true),
+          Arguments.of(false, null, bbox, true));
     }
 
-    @Test
-    @DisplayName(
-        "Should throw InvalidInputException when bboxAutoCalculate is true but latLonBoundingBox is set")
-    void shouldThrowWhenLatLonBboxSetWithAutoCalculateTrue() {
+    @ParameterizedTest(name = "autoCalculate={0}, nativeBbox={1}, latLonBbox={2} → shouldThrow={3}")
+    @MethodSource("bboxConsistencyCases")
+    @DisplayName("Should validate bbox field combinations against bboxAutoCalculate")
+    void shouldValidateBboxConsistency(
+        boolean autoCalculate,
+        Map<String, Object> nativeBbox,
+        Map<String, Object> latLonBbox,
+        boolean shouldThrow) {
       LayerInputDTO input = new LayerInputDTO();
-      input.setBboxAutoCalculate(true);
-      input.setLatLonBoundingBox(java.util.Map.of("minx", -180));
+      input.setBboxAutoCalculate(autoCalculate);
+      input.setNativeBoundingBox(nativeBbox);
+      input.setLatLonBoundingBox(latLonBbox);
       input.setDataSinkId(UUID.randomUUID());
       input.setLayerName("layer");
 
-      assertThatThrownBy(() -> layerService.preProcessCreateInput(input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("bboxAutoCalculate");
-    }
-
-    @Test
-    @DisplayName("Should allow nativeBoundingBox when bboxAutoCalculate is false")
-    void shouldAllowBboxWhenAutoCalculateFalse() {
-      LayerInputDTO input = new LayerInputDTO();
-      input.setBboxAutoCalculate(false);
-      input.setNativeBoundingBox(java.util.Map.of("minx", -180));
-      input.setLatLonBoundingBox(java.util.Map.of("minx", -180));
-      input.setDataSinkId(UUID.randomUUID());
-      input.setLayerName("layer");
-
-      assertThatCode(() -> layerService.preProcessCreateInput(input)).doesNotThrowAnyException();
+      if (shouldThrow) {
+        assertThatThrownBy(() -> layerService.preProcessCreateInput(input))
+            .isInstanceOf(InvalidInputException.class)
+            .hasMessageContaining("bboxAutoCalculate");
+      } else {
+        assertThatCode(() -> layerService.preProcessCreateInput(input)).doesNotThrowAnyException();
+      }
     }
   }
 }

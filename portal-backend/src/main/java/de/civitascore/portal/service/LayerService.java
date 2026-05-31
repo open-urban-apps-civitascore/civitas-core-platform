@@ -128,6 +128,13 @@ public class LayerService extends BaseService<Layer, LayerInputDTO> {
           "bboxAutoCalculate",
           "nativeBoundingBox and latLonBoundingBox must be null when bboxAutoCalculate is true");
     }
+    if (!input.isBboxAutoCalculate()
+        && (input.getNativeBoundingBox() == null || input.getLatLonBoundingBox() == null)) {
+      throw new InvalidInputException(
+          getEntityName(),
+          "bboxAutoCalculate",
+          "nativeBoundingBox and latLonBoundingBox are both required when bboxAutoCalculate is false");
+    }
   }
 
   /**
