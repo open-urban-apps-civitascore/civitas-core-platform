@@ -11,6 +11,7 @@ package de.civitascore.configadapter.geoserver;
 
 import de.civitascore.configadapter.adapter.AbstractConfigAdapter;
 import de.civitascore.configadapter.configuration.AdapterConfig;
+import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
@@ -18,6 +19,7 @@ import de.civitascore.configadapter.model.AdapterOperation;
 import de.civitascore.configadapter.model.ConfigEvent;
 import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.Operation;
+import de.civitascore.configadapter.model.geoserver.DataStoreConfig;
 import de.civitascore.configadapter.model.geoserver.GeoServerConfigValue;
 import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
@@ -26,6 +28,10 @@ import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.owasp.encoder.Encode;
@@ -82,6 +88,17 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
           "layergroups",
           "namespaces");
 
+  /** Maps a REST collection keyword to the resource type of items it contains. */
+  static final Map<String, ResourceType> COLLECTION_TYPES =
+      Map.of(
+          "workspaces", ResourceType.WORKSPACE,
+          "datastores", ResourceType.DATASTORE,
+          "coveragestores", ResourceType.COVERAGE_STORE,
+          "coverages", ResourceType.COVERAGE,
+          "featuretypes", ResourceType.FEATURE_TYPE,
+          "styles", ResourceType.STYLE,
+          "layers", ResourceType.LAYER);
+
   /** GeoServer resource types resolved from the {@code targetResource} path. */
   enum ResourceType {
     WORKSPACE,
@@ -97,14 +114,25 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
   private Client client;
   private String serverUrl;
   private GeoServerAuth auth;
+  private byte[] stretchedKey = new byte[0];
 
   @Override
   public void initialize(AdapterConfig config) {
     super.initialize(config);
     this.serverUrl =
-        getAdapterProperty(SERVER_URL_PROPERTY_KEY, DEFAULT_SERVER_URL).replaceAll("/$", "");
+        getAdapterProperty(SERVER_URL_PROPERTY_KEY, DEFAULT_SERVER_URL).replaceAll("/+$", "");
+
+    this.stretchedKey =
+        CryptoKeyLoader.loadAndStretchKeyFromEnv(GeoServerCredentials.MASTER_KEY_ENV);
+    if (this.stretchedKey.length == 0) {
+      logger.warn(
+          "{} not set — encrypted GeoServer credentials cannot be decrypted",
+          GeoServerCredentials.MASTER_KEY_ENV);
+    }
+
     String username = getAdapterProperty(USERNAME_PROPERTY_KEY);
-    String password = getAdapterProperty(PASSWORD_PROPERTY_KEY);
+    String password =
+        GeoServerCredentials.decrypt(getAdapterProperty(PASSWORD_PROPERTY_KEY), stretchedKey);
     this.auth = GeoServerAuth.create(username, password);
     if (this.client == null) {
       this.client = createClient();
@@ -138,6 +166,11 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
   @Override
   public void doProcessConfigEvent(String topic, ConfigEvent event)
       throws FatalAdapterException, RetryableAdapterException {
+    if (event == null || event.payload() == null || event.payload().operation() == null) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD, "event payload and operation must not be null");
+    }
+
     Operation operation = event.payload().operation();
     String targetResource = event.payload().targetResource();
     String targetComponent = event.payload().targetComponent();
@@ -153,6 +186,9 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
       throw new FatalAdapterException(
           AdapterErrorCode.INVALID_PAYLOAD, "targetResource must not be blank");
     }
+
+    // Normalize leading/trailing slashes once so REST path building and parsing are consistent.
+    targetResource = targetResource.replaceAll("^/+|/+$", "");
 
     ResourceType resourceType = detectResourceType(targetResource);
     if (resourceType == ResourceType.UNKNOWN) {
@@ -184,7 +220,7 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
         AdapterOperation.GEOSERVER_RESOURCE_CREATE,
         event,
         "GeoServer " + resourceType.name() + " created successfully",
-        null,
+        extractNameFromBody(body),
         () ->
             auth.apply(client.target(serverUrl).path(restPath).request(MediaType.APPLICATION_JSON))
                 .post(Entity.json(body)));
@@ -320,25 +356,52 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
 
   // ============== HELPERS ==============
 
-  private Object extractBody(ConfigEvent event) {
+  private Object extractBody(ConfigEvent event) throws FatalAdapterException {
+    if (event.payload().config() == null || event.payload().config().value() == null) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD,
+          "config.value is required for create/update operations");
+    }
     ConfigValue configValue = event.payload().config().value();
+    if (configValue instanceof DataStoreConfig dataStore && dataStore.getPasswd() != null) {
+      // Datastore password may arrive ENC(...)-encrypted; decrypt in-memory before serializing.
+      dataStore.setPasswd(GeoServerCredentials.decrypt(dataStore.getPasswd(), stretchedKey));
+    }
     if (configValue instanceof GeoServerConfigValue geoValue) {
       return geoValue.toApiMap();
     }
     return configValue;
   }
 
+  /**
+   * Best-effort resource name from a GeoServer REST body such as {@code
+   * {"workspace":{"name":"x"}}}. Used to label idempotent 409 results, which carry no {@code
+   * Location} header to parse.
+   */
+  private static String extractNameFromBody(Object body) {
+    if (body instanceof Map<?, ?> outer && outer.size() == 1) {
+      Object inner = outer.values().iterator().next();
+      if (inner instanceof Map<?, ?> resource && resource.get("name") != null) {
+        return resource.get("name").toString();
+      }
+    }
+    return null;
+  }
+
   static ResourceType detectResourceType(String targetResource) {
-    String lower = targetResource.toLowerCase();
-    if (lower.contains("featuretypes")) return ResourceType.FEATURE_TYPE;
-    if (lower.contains("coveragestores")) return ResourceType.COVERAGE_STORE;
-    if (lower.contains("coverages")) return ResourceType.COVERAGE;
-    if (lower.contains("datastores")) return ResourceType.DATASTORE;
-    // styles/layers can appear at root or scoped under a workspace — check before workspaces
-    if (lower.startsWith("styles") || lower.contains("/styles")) return ResourceType.STYLE;
-    if (lower.startsWith("layers") || lower.contains("/layers")) return ResourceType.LAYER;
-    if (lower.contains("workspaces")) return ResourceType.WORKSPACE;
-    return ResourceType.UNKNOWN;
+    // REST paths alternate collection/name (e.g. workspaces/{ws}/styles/{s}), so collection
+    // keywords sit at even indices and names at odd ones. The resource type is the last collection
+    // keyword at an even index; a keyword appearing at an odd index is a resource name (e.g. a
+    // workspace literally named "styles") and must not change the type.
+    String[] parts = targetResource.replaceAll("^/+|/+$", "").split("/");
+    ResourceType type = ResourceType.UNKNOWN;
+    for (int i = 0; i < parts.length; i += 2) {
+      ResourceType collectionType = COLLECTION_TYPES.get(parts[i].toLowerCase());
+      if (collectionType != null) {
+        type = collectionType;
+      }
+    }
+    return type;
   }
 
   static boolean hasResourceName(String targetResource) {
@@ -347,7 +410,7 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
   }
 
   static String extractResourceName(String targetResource) {
-    String[] parts = targetResource.split("/");
+    String[] parts = targetResource.replaceAll("^/+|/+$", "").split("/");
     return parts[parts.length - 1];
   }
 
@@ -371,7 +434,11 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
     }
     String path = locationHeader.replaceAll("\\?.*$", "");
     int lastSlash = path.lastIndexOf('/');
-    return (lastSlash >= 0 && lastSlash < path.length() - 1) ? path.substring(lastSlash + 1) : null;
+    if (lastSlash < 0 || lastSlash >= path.length() - 1) {
+      return null;
+    }
+    // GeoServer percent-encodes names with special characters in the Location header.
+    return URLDecoder.decode(path.substring(lastSlash + 1), StandardCharsets.UTF_8);
   }
 
   @Override
@@ -379,6 +446,7 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
     if (client != null) {
       client.close();
     }
+    Arrays.fill(stretchedKey, (byte) 0);
     logger.info("GeoServer adapter closed");
   }
 }

@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.geoserver;
 
 import java.time.Duration;
+import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -61,7 +62,7 @@ abstract class AbstractGeoServerIntegrationTest {
             .withClasspathResourceMapping(
                 "geoserver-init/01_schema.sql",
                 "/docker-entrypoint-initdb.d/01_schema.sql",
-                org.testcontainers.containers.BindMode.READ_ONLY)
+                BindMode.READ_ONLY)
             .waitingFor(
                 Wait.forLogMessage(".*database system is ready to accept connections.*", 2)
                     .withStartupTimeout(Duration.ofMinutes(2)));

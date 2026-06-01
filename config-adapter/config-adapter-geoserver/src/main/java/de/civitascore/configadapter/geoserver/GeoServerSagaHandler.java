@@ -13,14 +13,17 @@ import de.civitascore.configadapter.adapter.AbstractSagaCommandHandler;
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
+import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.owasp.encoder.Encode;
 
 /**
@@ -53,6 +56,8 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   private static final String DEFAULT_POSTGIS_DATABASE = "civitas_geo";
   private static final String DEFAULT_POSTGIS_SCHEMA = "public";
 
+  private static final Pattern WORKSPACE_NAME_PATTERN = Pattern.compile("[a-z0-9_]+");
+
   private String serverUrl;
   private String publicUrl;
   private GeoServerAuth auth;
@@ -71,18 +76,31 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   @Override
   protected void doInitialize(AdapterConfig config) {
-    this.serverUrl = getProperty("url", DEFAULT_SERVER_URL).replaceAll("/$", "");
+    this.serverUrl = getProperty("url", DEFAULT_SERVER_URL).replaceAll("/+$", "");
     this.publicUrl = getProperty("public.url", this.serverUrl);
-    String username = getProperty("admin.user");
-    String password = getProperty("admin.password");
-    this.auth = GeoServerAuth.create(username, password);
 
-    this.postgisHost = getProperty("postgis.host", DEFAULT_POSTGIS_HOST);
-    this.postgisPort = getProperty("postgis.port", DEFAULT_POSTGIS_PORT);
-    this.postgisDatabase = getProperty("postgis.database", DEFAULT_POSTGIS_DATABASE);
-    this.postgisSchema = getProperty("postgis.schema", DEFAULT_POSTGIS_SCHEMA);
-    this.postgisUser = getProperty("postgis.user");
-    this.postgisPassword = getProperty("postgis.password");
+    byte[] stretchedKey =
+        CryptoKeyLoader.loadAndStretchKeyFromEnv(GeoServerCredentials.MASTER_KEY_ENV);
+    if (stretchedKey.length == 0) {
+      log.warn(
+          "{} not set — encrypted GeoServer credentials cannot be decrypted",
+          GeoServerCredentials.MASTER_KEY_ENV);
+    }
+    try {
+      String username = getProperty("admin.user");
+      String password = GeoServerCredentials.decrypt(getProperty("admin.password"), stretchedKey);
+      this.auth = GeoServerAuth.create(username, password);
+
+      this.postgisHost = getProperty("postgis.host", DEFAULT_POSTGIS_HOST);
+      this.postgisPort = getProperty("postgis.port", DEFAULT_POSTGIS_PORT);
+      this.postgisDatabase = getProperty("postgis.database", DEFAULT_POSTGIS_DATABASE);
+      this.postgisSchema = getProperty("postgis.schema", DEFAULT_POSTGIS_SCHEMA);
+      this.postgisUser = getProperty("postgis.user");
+      this.postgisPassword =
+          GeoServerCredentials.decrypt(getProperty("postgis.password"), stretchedKey);
+    } finally {
+      Arrays.fill(stretchedKey, (byte) 0);
+    }
 
     log.info("GeoServerSagaHandler initialized for: {}", Encode.forJava(serverUrl));
   }
@@ -142,9 +160,14 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       Map<String, Object> configuration =
           (Map<String, Object>) sink.getOrDefault("configuration", Map.of());
       String tableName = (String) configuration.get("tableName");
-      if (tableName != null) {
-        createFeatureType(workspaceName, datastoreName, tableName, configuration);
+      if (tableName == null || tableName.isBlank()) {
+        log.warn(
+            "Skipping datasink without a tableName for workspace {} (saga {})",
+            Encode.forJava(workspaceName),
+            Encode.forJava(command.sagaId()));
+        continue;
       }
+      createFeatureType(workspaceName, datastoreName, tableName, configuration);
     }
 
     String wfsUrl = publicUrl + "/" + workspaceName + "/wfs";
@@ -164,7 +187,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   @SuppressWarnings("unchecked")
   private SagaCommandResult handleUpdateWorkspace(SagaCommandMessage command) {
-    String workspaceName = requireString(command, "workspaceName");
+    String workspaceName = requireWorkspaceName(command);
     String datastoreName = workspaceName + "_postgis";
 
     // Read current feature types for compensation
@@ -178,9 +201,14 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       Map<String, Object> configuration =
           (Map<String, Object>) sink.getOrDefault("configuration", Map.of());
       String tableName = (String) configuration.get("tableName");
-      if (tableName != null) {
-        createFeatureType(workspaceName, datastoreName, tableName, configuration);
+      if (tableName == null || tableName.isBlank()) {
+        log.warn(
+            "Skipping datasink without a tableName for workspace {} (saga {})",
+            Encode.forJava(workspaceName),
+            Encode.forJava(command.sagaId()));
+        continue;
       }
+      createFeatureType(workspaceName, datastoreName, tableName, configuration);
     }
 
     String wfsUrl = publicUrl + "/" + workspaceName + "/wfs";
@@ -199,7 +227,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleDeleteWorkspace(SagaCommandMessage command) {
-    String workspaceName = requireString(command, "workspaceName");
+    String workspaceName = requireWorkspaceName(command);
 
     try (Response response =
         auth.apply(
@@ -229,7 +257,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   @SuppressWarnings("unchecked")
   private SagaCommandResult handleRestoreWorkspace(SagaCommandMessage command) {
-    String workspaceName = requireString(command, "workspaceName");
+    String workspaceName = requireWorkspaceName(command);
     String datastoreName = workspaceName + "_postgis";
     List<Map<String, Object>> previousFeatureTypes =
         (List<Map<String, Object>>)
@@ -266,6 +294,12 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   // ============== HELPERS ==============
 
+  /**
+   * Creates a feature type from a datasink {@code configuration}. Only {@code tableName} and {@code
+   * crs} are mapped; other datasink fields (e.g. {@code primaryKey}, {@code geometryColumn}) are
+   * intentionally not forwarded — GeoServer derives them from the PostGIS table. Richer mapping is
+   * deferred to the Flowable-based saga implementation.
+   */
   private void createFeatureType(
       String workspaceName,
       String datastoreName,
@@ -315,8 +349,17 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
                             + "/featuretypes.json")
                     .request(MediaType.APPLICATION_JSON))
             .get()) {
-      if (response.getStatus() != 200) {
+      int status = response.getStatus();
+      if (status == 404) {
+        // Datastore/workspace has no feature types yet — an empty snapshot is correct here.
         return List.of();
+      }
+      if (status != 200) {
+        // Auth/server errors must not be mistaken for "zero feature types": that would let
+        // UPDATE_WORKSPACE proceed with an empty compensation snapshot and lose restore state.
+        String body = response.readEntity(String.class);
+        throw new SagaApiException(
+            "UPDATE_WORKSPACE/read-featuretypes failed: HTTP " + status + " — " + body, status);
       }
       Map<String, Object> result = response.readEntity(Map.class);
       Map<String, Object> featureTypes =
@@ -353,5 +396,20 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       throw new IllegalArgumentException("datasetId must not be blank");
     }
     return datasetId.toLowerCase().replaceAll("[^a-z0-9_]", "_");
+  }
+
+  /**
+   * Reads {@code workspaceName} from the command payload and rejects values that are not a safe
+   * REST path segment. The name is concatenated into GeoServer REST URIs in update/delete/restore
+   * flows, so unvalidated input (e.g. containing {@code /}) could target unintended endpoints.
+   * Matches the character set produced by {@link #toWorkspaceName(String)}.
+   */
+  private static String requireWorkspaceName(SagaCommandMessage command) {
+    String workspaceName = requireString(command, "workspaceName");
+    if (!WORKSPACE_NAME_PATTERN.matcher(workspaceName).matches()) {
+      throw new IllegalArgumentException(
+          "workspaceName contains invalid characters (allowed: a-z, 0-9, _): " + workspaceName);
+    }
+    return workspaceName;
   }
 }

@@ -101,6 +101,17 @@ class GeoServerAdapterTest {
   }
 
   @Test
+  void initializationWithoutPasswordThrowsException() {
+    when(mockConfig.getProperty("geoserver.topics"))
+        .thenReturn("de.civitascore.geo.workspace.created");
+    when(mockConfig.getProperty("geoserver.url", "http://localhost:8080/geoserver"))
+        .thenReturn("http://localhost:8080/geoserver");
+    when(mockConfig.getProperty("geoserver.admin.user")).thenReturn("admin");
+
+    assertThrows(IllegalArgumentException.class, () -> adapter.initialize(mockConfig));
+  }
+
+  @Test
   void closeReleasesResources() {
     stubBaseConfig("de.civitascore.geo.workspace.created");
 
@@ -146,6 +157,28 @@ class GeoServerAdapterTest {
       assertEquals(LAYER, GeoServerAdapter.detectResourceType("layers"));
       assertEquals(LAYER, GeoServerAdapter.detectResourceType("layers/mylayer"));
     }
+
+    @Test
+    void detectsCoverageStoreAndCoverage() {
+      assertEquals(
+          COVERAGE_STORE, GeoServerAdapter.detectResourceType("workspaces/ws/coveragestores/cs"));
+      assertEquals(
+          COVERAGE,
+          GeoServerAdapter.detectResourceType("workspaces/ws/coveragestores/cs/coverages/c"));
+    }
+
+    @Test
+    void resourceNamedLikeCollectionIsNotMisclassified() {
+      assertEquals(WORKSPACE, GeoServerAdapter.detectResourceType("workspaces/styles"));
+      assertEquals(WORKSPACE, GeoServerAdapter.detectResourceType("workspaces/layers"));
+    }
+
+    @Test
+    void ignoresLeadingAndTrailingSlashes() {
+      assertEquals(WORKSPACE, GeoServerAdapter.detectResourceType("/workspaces/myws/"));
+      assertEquals(
+          DATASTORE, GeoServerAdapter.detectResourceType("/workspaces/myws/datastores/myds/"));
+    }
   }
 
   @Nested
@@ -173,6 +206,11 @@ class GeoServerAdapterTest {
           "myft",
           GeoServerAdapter.extractResourceName(
               "workspaces/myws/datastores/myds/featuretypes/myft"));
+    }
+
+    @Test
+    void extractsResourceNameIgnoringTrailingSlash() {
+      assertEquals("myws", GeoServerAdapter.extractResourceName("workspaces/myws/"));
     }
   }
 
@@ -234,6 +272,14 @@ class GeoServerAdapterTest {
     @Test
     void returnsNullForBlankHeader() {
       assertNull(GeoServerAdapter.extractNameFromLocation("  "));
+    }
+
+    @Test
+    void decodesUrlEncodedName() {
+      assertEquals(
+          "my layer",
+          GeoServerAdapter.extractNameFromLocation(
+              "http://localhost:8080/geoserver/rest/layers/my%20layer"));
     }
   }
 
@@ -332,6 +378,41 @@ class GeoServerAdapterTest {
       ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
       verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
       assertEquals(ConfigResultEvent.Status.SUCCESS, captor.getValue().status());
+    }
+
+    @Test
+    void createConflictResultIncludesResourceNameFromBody()
+        throws FatalAdapterException, RetryableAdapterException {
+      when(mockResponse.getStatus()).thenReturn(409);
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+      ConfigEvent event = createConfigEvent(Operation.CREATE, "workspaces", workspace("myws"));
+
+      adapter.processConfigEvent("de.civitascore.geo.workspace.created", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
+      assertEquals("myws", result.resourceId());
+    }
+
+    @Test
+    void createWithNullConfigValueThrowsFatalException() {
+      Metadata metadata =
+          new Metadata(
+              "msg-001", OffsetDateTime.now(), "test-source", "corr-001", "v1.0.0", "result-topic");
+      Payload payload =
+          new Payload("geoserver", "workspaces", Operation.CREATE, new Config(null, null));
+      ConfigEvent event = new ConfigEvent(metadata, payload);
+
+      FatalAdapterException exception =
+          assertThrows(
+              FatalAdapterException.class,
+              () -> adapter.processConfigEvent("de.civitascore.geo.workspace.created", event));
+
+      assertEquals(AdapterErrorCode.INVALID_PAYLOAD, exception.getErrorCode());
     }
 
     @Test

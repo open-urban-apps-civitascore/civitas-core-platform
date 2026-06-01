@@ -10,14 +10,14 @@ The GeoServer adapter integrates with the [GeoServer REST API](https://docs.geos
 - Full CRUD operations for GeoServer resources (workspaces, datastores, feature types, layers, styles)
 - Typed configuration model per resource type with `toApiMap()` producing the exact GeoServer REST body
 - HTTP Basic Auth for the GeoServer management REST API (data access secured by APISIX + OPA upstream)
-- Automatic `?recurse=true` on workspace and datastore deletes
+- Automatic `?recurse=true` on deletes of workspaces, datastores, coverage stores, feature types, and coverages
 - Idempotent operations: HTTP 409 on CREATE and HTTP 404 on DELETE are treated as success
 - Asynchronous result publishing via CloudEvents
 - Saga command handler for atomic workspace provisioning (PROVISION_WORKSPACE)
 
 ## Architecture
 
-```
+```text
 ┌──────────────────────────┐
 │    Kafka Topics          │
 │  - geo.workspace.*       │
@@ -66,7 +66,7 @@ The GeoServer adapter integrates with the [GeoServer REST API](https://docs.geos
 | Workspace     | ✅ | ✅ | ✅ | `/rest/workspaces` |
 | Datastore     | ✅ | ✅ | ✅ | `/rest/workspaces/{ws}/datastores` |
 | Feature Type  | ✅ | ✅ | ✅ | `/rest/workspaces/{ws}/datastores/{ds}/featuretypes` |
-| Layer         | ✅ | ✅ | ✅ | `/rest/layers` or `/rest/workspaces/{ws}/layers` |
+| Layer         | ❌ | ✅ | ✅ | `/rest/layers` or `/rest/workspaces/{ws}/layers` (created implicitly with its feature type) |
 | Style         | ✅ | ✅ | ✅ | `/rest/styles` or `/rest/workspaces/{ws}/styles` |
 
 The `targetResource` in the config event maps directly to the REST path relative to `/rest/`. Examples:
@@ -81,7 +81,7 @@ The `targetResource` in the config event maps directly to the REST path relative
 | UPDATE featuretype | `workspaces/myws/datastores/myds/featuretypes/myft` | `PUT /rest/…/featuretypes/myft` |
 | CREATE style | `styles` | `POST /rest/styles` |
 
-### Subscribed Topics (15 Topics)
+### Subscribed Topics (14 Topics)
 
 **Workspace Events (3):**
 - `de.civitascore.geo.workspace.created`
@@ -136,6 +136,16 @@ geoserver.postgis.schema=public
 geoserver.postgis.user=geo_user
 geoserver.postgis.password=secret
 ```
+
+### Encrypted credentials
+
+Passwords (`geoserver.admin.password`, `geoserver.postgis.password`, and the `passwd` of an
+incoming `DataStoreConfig`) may be supplied encrypted as `ENC(<base64>)` values, following the same
+AES-256-GCM scheme as the RedPanda adapter. They are decrypted in-memory only when needed; plaintext
+values are accepted unchanged for backward compatibility. The master key is read from the
+`CIVITAS_MASTER_KEY` environment variable, and encrypted values must be produced with the
+`portal-backend:datasource-connector` credential context. If `CIVITAS_MASTER_KEY` is not set,
+`ENC(...)` values cannot be decrypted (a warning is logged at startup).
 
 ### Environment Variables
 
@@ -420,7 +430,7 @@ The `GeoServerSagaHandler` provides atomic workspace provisioning for the datase
 
 ### Saga Topics
 
-```
+```text
 de.civitascore.dataset.geoserver.execute
 de.civitascore.dataset.geoserver.compensate
 de.civitascore.dataset.geoserver.result
@@ -542,7 +552,7 @@ mvn test -pl config-adapter-geoserver -Dtest=GeoServerAdapterIntegrationTest
 
 ### Connection Refused
 
-```
+```text
 Network error during GeoServer resource creation: Connection refused
 ```
 
@@ -550,7 +560,7 @@ Verify GeoServer is running and `geoserver.url` is correct.
 
 ### Unauthorized (401)
 
-```
+```text
 GeoServer client error during GeoServer resource creation: HTTP 401
 ```
 
@@ -558,7 +568,7 @@ Verify `geoserver.admin.user` and `geoserver.admin.password` match the GeoServer
 
 ### Bad Request (400)
 
-```
+```text
 GeoServer client error during GeoServer resource creation: HTTP 400
 ```
 
@@ -567,7 +577,7 @@ Ensure required fields (e.g., `name` for workspaces, `nativeName` + `srs` for fe
 
 ### Resource Not Found (404) on UPDATE/DELETE
 
-```
+```text
 GeoServer client error during GeoServer resource update: HTTP 404
 ```
 

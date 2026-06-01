@@ -259,8 +259,16 @@ class TopicsTest {
     assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.workspace.updated"));
     assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.workspace.deleted"));
     assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.datastore.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.datastore.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.datastore.deleted"));
     assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.featuretype.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.featuretype.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.featuretype.deleted"));
     assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.style.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.style.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.style.deleted"));
+    // Layer has no 'created' topic: GeoServer publishes layers implicitly with their feature type.
     assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.layer.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.layer.deleted"));
   }
 }

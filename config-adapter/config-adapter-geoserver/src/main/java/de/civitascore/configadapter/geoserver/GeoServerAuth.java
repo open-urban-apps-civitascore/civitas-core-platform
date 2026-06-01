@@ -52,14 +52,19 @@ interface GeoServerAuth {
    * {@code geoserver.admin.user} must be configured.
    *
    * @param username the Basic Auth username
-   * @param password the Basic Auth password (may be {@code null})
+   * @param password the Basic Auth password
    * @return a Basic Auth strategy
-   * @throws IllegalArgumentException if {@code username} is {@code null} or blank
+   * @throws IllegalArgumentException if {@code username} or {@code password} is {@code null} or
+   *     blank
    */
   static GeoServerAuth create(String username, String password) {
     if (username == null || username.isBlank()) {
       throw new IllegalArgumentException(
           "GeoServer authentication not configured: provide geoserver.admin.user");
+    }
+    if (password == null || password.isBlank()) {
+      throw new IllegalArgumentException(
+          "GeoServer authentication not configured: provide geoserver.admin.password");
     }
     return basicAuth(username, password);
   }

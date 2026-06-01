@@ -26,6 +26,9 @@ script:post-response {
         match.dataStructureVersions.find(v => v.version === '1.0.0');
       if (existingVersion) {
         bru.setVar('sagaDataStructureVersionId', existingVersion.id);
+      } else {
+        // Clear any stale value from a previous run so downstream steps don't reuse a wrong id.
+        bru.setVar('sagaDataStructureVersionId', null);
       }
     }
   }

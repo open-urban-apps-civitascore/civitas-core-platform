@@ -179,6 +179,58 @@ class GeoServerSagaHandlerTest {
   }
 
   @Nested
+  class UpdateWorkspace {
+
+    @Test
+    void returnsFailureWhenSnapshotReadFails() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response errorResponse = mock(Response.class);
+        when(errorResponse.getStatus()).thenReturn(500);
+        when(errorResponse.readEntity(String.class)).thenReturn("Internal Server Error");
+        when(mockBuilder.get()).thenReturn(errorResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "UPDATE_WORKSPACE",
+                Map.of("workspaceName", "myws", "datasinks", List.of()));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+      }
+    }
+
+    @Test
+    void treatsMissingSnapshotAsEmptyAndUpdatesSuccessfully() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response notFound = mock(Response.class);
+        when(notFound.getStatus()).thenReturn(404);
+        when(mockBuilder.get()).thenReturn(notFound);
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "UPDATE_WORKSPACE",
+                Map.of(
+                    "workspaceName",
+                    "myws",
+                    "datasinks",
+                    List.of(Map.of("configuration", Map.of("tableName", "t1")))));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertNull(result.error());
+      }
+    }
+  }
+
+  @Nested
   class DeleteWorkspace {
 
     @Test

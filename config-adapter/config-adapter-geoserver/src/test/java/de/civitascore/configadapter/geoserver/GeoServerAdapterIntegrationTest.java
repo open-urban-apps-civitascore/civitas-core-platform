@@ -450,8 +450,14 @@ class GeoServerAdapterIntegrationTest extends AbstractGeoServerIntegrationTest {
             .request(MediaType.APPLICATION_JSON)
             .header(HttpHeaders.AUTHORIZATION, basicAuthHeader)
             .delete()) {
-      // 200, 404 (already gone), or 403/500 all acceptable for cleanup
-      response.readEntity(String.class);
+      int status = response.getStatus();
+      String body = response.readEntity(String.class);
+      // Only "deleted" (200) and "already gone" (404) are acceptable. A 403/500 here means a broken
+      // test environment (auth/server failure) and would leave residual state — surface it loudly.
+      if (status != 200 && status != 404) {
+        throw new AssertionError(
+            "Workspace cleanup for '" + name + "' failed: HTTP " + status + " — " + body);
+      }
     }
   }
 
