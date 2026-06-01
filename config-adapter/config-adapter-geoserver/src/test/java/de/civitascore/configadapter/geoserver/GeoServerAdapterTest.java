@@ -9,6 +9,8 @@
  */
 package de.civitascore.configadapter.geoserver;
 
+import static de.civitascore.configadapter.geoserver.GeoServerAdapter.ResourceType.COVERAGE;
+import static de.civitascore.configadapter.geoserver.GeoServerAdapter.ResourceType.COVERAGE_STORE;
 import static de.civitascore.configadapter.geoserver.GeoServerAdapter.ResourceType.DATASTORE;
 import static de.civitascore.configadapter.geoserver.GeoServerAdapter.ResourceType.FEATURE_TYPE;
 import static de.civitascore.configadapter.geoserver.GeoServerAdapter.ResourceType.LAYER;
@@ -179,28 +181,37 @@ class GeoServerAdapterTest {
 
     @Test
     void workspaceDeletionUsesRecurse() {
-      assertTrue(GeoServerAdapter.shouldUseRecurse("workspaces/myws"));
+      assertTrue(GeoServerAdapter.shouldUseRecurse(WORKSPACE));
     }
 
     @Test
     void datastoreDeletionUsesRecurse() {
-      assertTrue(GeoServerAdapter.shouldUseRecurse("workspaces/myws/datastores/myds"));
+      assertTrue(GeoServerAdapter.shouldUseRecurse(DATASTORE));
     }
 
     @Test
-    void featureTypeDeletionDoesNotUseRecurse() {
-      assertFalse(
-          GeoServerAdapter.shouldUseRecurse("workspaces/myws/datastores/myds/featuretypes/myft"));
+    void coverageStoreDeletionUsesRecurse() {
+      assertTrue(GeoServerAdapter.shouldUseRecurse(COVERAGE_STORE));
+    }
+
+    @Test
+    void featureTypeDeletionUsesRecurse() {
+      assertTrue(GeoServerAdapter.shouldUseRecurse(FEATURE_TYPE));
+    }
+
+    @Test
+    void coverageDeletionUsesRecurse() {
+      assertTrue(GeoServerAdapter.shouldUseRecurse(COVERAGE));
     }
 
     @Test
     void styleDeletionDoesNotUseRecurse() {
-      assertFalse(GeoServerAdapter.shouldUseRecurse("styles/mystyle"));
+      assertFalse(GeoServerAdapter.shouldUseRecurse(STYLE));
     }
 
     @Test
-    void collectionPathDoesNotUseRecurse() {
-      assertFalse(GeoServerAdapter.shouldUseRecurse("workspaces"));
+    void layerDeletionDoesNotUseRecurse() {
+      assertFalse(GeoServerAdapter.shouldUseRecurse(LAYER));
     }
   }
 
@@ -542,7 +553,7 @@ class GeoServerAdapterTest {
     }
 
     @Test
-    void deleteFeatureTypeDoesNotAddRecurseQueryParam()
+    void deleteFeatureTypeAddsRecurseQueryParam()
         throws FatalAdapterException, RetryableAdapterException {
       when(mockResponse.getStatus()).thenReturn(200);
       when(mockBuilder.delete()).thenReturn(mockResponse);
@@ -552,7 +563,11 @@ class GeoServerAdapterTest {
               Operation.DELETE, "workspaces/myws/datastores/myds/featuretypes/myft", null);
       adapter.processConfigEvent("de.civitascore.geo.featuretype.deleted", event);
 
-      verify(mockPathTarget, never()).queryParam(any(), any());
+      ArgumentCaptor<String> paramNameCaptor = ArgumentCaptor.forClass(String.class);
+      ArgumentCaptor<Object> paramValueCaptor = ArgumentCaptor.forClass(Object.class);
+      verify(mockPathTarget).queryParam(paramNameCaptor.capture(), paramValueCaptor.capture());
+      assertEquals("recurse", paramNameCaptor.getValue());
+      assertEquals("true", paramValueCaptor.getValue());
     }
   }
 

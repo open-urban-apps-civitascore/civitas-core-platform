@@ -29,6 +29,7 @@ import de.civitascore.configadapter.model.Payload;
 import de.civitascore.configadapter.model.geoserver.DataStoreConfig;
 import de.civitascore.configadapter.model.geoserver.FeatureTypeConfig;
 import de.civitascore.configadapter.model.geoserver.GeoServerConfigValue;
+import de.civitascore.configadapter.model.geoserver.LayerConfig;
 import de.civitascore.configadapter.model.geoserver.WorkspaceConfig;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
@@ -65,7 +66,8 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
  *   <li>Create PostGIS datastore
  *   <li>Create feature types (sensor_locations, districts)
  *   <li>Update feature type
- *   <li>Recursive workspace delete
+ *   <li>Update and delete the layer implicitly published with a feature type
+ *   <li>Recursive workspace delete and recursive feature-type delete (removes the implicit layer)
  *   <li>Idempotency: 409 on duplicate CREATE, 404 on missing DELETE
  * </ol>
  *
@@ -118,12 +120,15 @@ class GeoServerAdapterIntegrationTest extends AbstractGeoServerIntegrationTest {
         "geoserver.topics",
         String.join(
             ",",
-            Topics.WORKSPACE_CREATED.toString(),
-            Topics.WORKSPACE_UPDATED.toString(),
-            Topics.WORKSPACE_DELETED.toString(),
-            Topics.DATASTORE_CREATED.toString(),
-            Topics.FEATURE_TYPE_CREATED.toString(),
-            Topics.FEATURE_TYPE_UPDATED.toString()));
+            Topics.GEO_WORKSPACE_CREATED.toString(),
+            Topics.GEO_WORKSPACE_UPDATED.toString(),
+            Topics.GEO_WORKSPACE_DELETED.toString(),
+            Topics.GEO_DATASTORE_CREATED.toString(),
+            Topics.GEO_FEATURE_TYPE_CREATED.toString(),
+            Topics.GEO_FEATURE_TYPE_UPDATED.toString(),
+            Topics.GEO_FEATURE_TYPE_DELETED.toString(),
+            Topics.GEO_LAYER_UPDATED.toString(),
+            Topics.GEO_LAYER_DELETED.toString()));
     AppConfig config = new AppConfig(new MapConfiguration(props));
 
     adapter = new GeoServerAdapter();
@@ -147,33 +152,33 @@ class GeoServerAdapterIntegrationTest extends AbstractGeoServerIntegrationTest {
    */
   @Test
   void provisionWorkspaceDatastoreAndFeatureTypesEndToEnd() throws Exception {
-    sendCreate(Topics.WORKSPACE_CREATED, "workspaces", workspace(WORKSPACE));
+    sendCreate(Topics.GEO_WORKSPACE_CREATED, "workspaces", workspace(WORKSPACE));
     assertLastResultSuccess();
     assertWorkspaceExists(WORKSPACE);
 
     sendCreate(
-        Topics.DATASTORE_CREATED,
+        Topics.GEO_DATASTORE_CREATED,
         "workspaces/" + WORKSPACE + "/datastores",
         postgisDatastore(DATASTORE, TEST_SCHEMA));
     assertLastResultSuccess();
     assertDatastoreExists(WORKSPACE, DATASTORE);
 
     sendCreate(
-        Topics.FEATURE_TYPE_CREATED,
+        Topics.GEO_FEATURE_TYPE_CREATED,
         "workspaces/" + WORKSPACE + "/datastores/" + DATASTORE + "/featuretypes",
         featureType(FEATURE_TYPE_POINT, "Sensor Locations"));
     assertLastResultSuccess();
     assertFeatureTypeExists(WORKSPACE, DATASTORE, FEATURE_TYPE_POINT);
 
     sendCreate(
-        Topics.FEATURE_TYPE_CREATED,
+        Topics.GEO_FEATURE_TYPE_CREATED,
         "workspaces/" + WORKSPACE + "/datastores/" + DATASTORE + "/featuretypes",
         featureType(FEATURE_TYPE_POLYGON, "Districts"));
     assertLastResultSuccess();
     assertFeatureTypeExists(WORKSPACE, DATASTORE, FEATURE_TYPE_POLYGON);
 
     sendUpdate(
-        Topics.FEATURE_TYPE_UPDATED,
+        Topics.GEO_FEATURE_TYPE_UPDATED,
         "workspaces/"
             + WORKSPACE
             + "/datastores/"
@@ -188,10 +193,10 @@ class GeoServerAdapterIntegrationTest extends AbstractGeoServerIntegrationTest {
 
   @Test
   void duplicateWorkspaceCreateIsIdempotent409() {
-    sendCreate(Topics.WORKSPACE_CREATED, "workspaces", workspace("it_idempotent_001"));
+    sendCreate(Topics.GEO_WORKSPACE_CREATED, "workspaces", workspace("it_idempotent_001"));
     assertLastResultSuccess();
 
-    sendCreate(Topics.WORKSPACE_CREATED, "workspaces", workspace("it_idempotent_001"));
+    sendCreate(Topics.GEO_WORKSPACE_CREATED, "workspaces", workspace("it_idempotent_001"));
     assertLastResultSuccess();
 
     deleteWorkspace("it_idempotent_001");
@@ -200,7 +205,7 @@ class GeoServerAdapterIntegrationTest extends AbstractGeoServerIntegrationTest {
   @Test
   void deleteMissingWorkspaceIsIdempotent404() {
     String missing = "it_does_not_exist_" + UUID.randomUUID().toString().substring(0, 8);
-    sendDelete(Topics.WORKSPACE_DELETED, "workspaces/" + missing);
+    sendDelete(Topics.GEO_WORKSPACE_DELETED, "workspaces/" + missing);
     assertLastResultSuccess();
   }
 
@@ -208,19 +213,101 @@ class GeoServerAdapterIntegrationTest extends AbstractGeoServerIntegrationTest {
   void deleteWorkspaceUsesRecurseTrue() {
     String ws = "it_recurse_test";
     String ds = "child_ds";
-    sendCreate(Topics.WORKSPACE_CREATED, "workspaces", workspace(ws));
+    sendCreate(Topics.GEO_WORKSPACE_CREATED, "workspaces", workspace(ws));
     assertLastResultSuccess();
 
     sendCreate(
-        Topics.DATASTORE_CREATED,
+        Topics.GEO_DATASTORE_CREATED,
         "workspaces/" + ws + "/datastores",
         postgisDatastore(ds, TEST_SCHEMA));
     assertLastResultSuccess();
 
-    sendDelete(Topics.WORKSPACE_DELETED, "workspaces/" + ws);
+    sendDelete(Topics.GEO_WORKSPACE_DELETED, "workspaces/" + ws);
     assertLastResultSuccess();
     assertFalse(
         workspaceExists(ws), "Workspace and its child datastore should be deleted recursively");
+  }
+
+  /**
+   * Publishing a feature type implicitly creates a layer in GeoServer (there is no REST endpoint to
+   * create a layer directly). This exercises the two layer operations the adapter supports against
+   * that implicit layer: updating its default style (PUT) and deleting it (DELETE).
+   */
+  @Test
+  void updateAndDeleteImplicitLayerOfFeatureType() {
+    String ws = "it_layer_test";
+    sendCreate(Topics.GEO_WORKSPACE_CREATED, "workspaces", workspace(ws));
+    assertLastResultSuccess();
+    sendCreate(
+        Topics.GEO_DATASTORE_CREATED,
+        "workspaces/" + ws + "/datastores",
+        postgisDatastore(DATASTORE, TEST_SCHEMA));
+    assertLastResultSuccess();
+    sendCreate(
+        Topics.GEO_FEATURE_TYPE_CREATED,
+        "workspaces/" + ws + "/datastores/" + DATASTORE + "/featuretypes",
+        featureType(FEATURE_TYPE_POINT, "Sensor Locations"));
+    assertLastResultSuccess();
+
+    String layerResource = "workspaces/" + ws + "/layers/" + FEATURE_TYPE_POINT;
+    assertEquals(
+        200, layerStatus(ws, FEATURE_TYPE_POINT), "Publishing a feature type creates a layer");
+
+    sendUpdate(Topics.GEO_LAYER_UPDATED, layerResource, layerWithDefaultStyle("generic"));
+    assertLastResultSuccess();
+    assertEquals(
+        "generic",
+        getLayer(ws, FEATURE_TYPE_POINT).path("layer").path("defaultStyle").path("name").asText());
+
+    sendDelete(Topics.GEO_LAYER_DELETED, layerResource);
+    assertLastResultSuccess();
+    assertEquals(404, layerStatus(ws, FEATURE_TYPE_POINT), "Layer should be gone after delete");
+
+    deleteWorkspace(ws);
+  }
+
+  /**
+   * A feature type that has a published layer can only be deleted with {@code recurse=true};
+   * GeoServer rejects the delete otherwise. This verifies the adapter sets recurse so the feature
+   * type and its implicit layer are removed together.
+   */
+  @Test
+  void deleteFeatureTypeRecursivelyRemovesItsLayer() {
+    String ws = "it_ft_recurse";
+    sendCreate(Topics.GEO_WORKSPACE_CREATED, "workspaces", workspace(ws));
+    assertLastResultSuccess();
+    sendCreate(
+        Topics.GEO_DATASTORE_CREATED,
+        "workspaces/" + ws + "/datastores",
+        postgisDatastore(DATASTORE, TEST_SCHEMA));
+    assertLastResultSuccess();
+    sendCreate(
+        Topics.GEO_FEATURE_TYPE_CREATED,
+        "workspaces/" + ws + "/datastores/" + DATASTORE + "/featuretypes",
+        featureType(FEATURE_TYPE_POINT, "Sensor Locations"));
+    assertLastResultSuccess();
+    assertEquals(200, layerStatus(ws, FEATURE_TYPE_POINT));
+
+    sendDelete(
+        Topics.GEO_FEATURE_TYPE_DELETED,
+        "workspaces/" + ws + "/datastores/" + DATASTORE + "/featuretypes/" + FEATURE_TYPE_POINT);
+    assertLastResultSuccess();
+
+    assertEquals(
+        404,
+        statusOf(
+            "/rest/workspaces/"
+                + ws
+                + "/datastores/"
+                + DATASTORE
+                + "/featuretypes/"
+                + FEATURE_TYPE_POINT
+                + ".json"),
+        "Feature type should be deleted");
+    assertEquals(
+        404, layerStatus(ws, FEATURE_TYPE_POINT), "Implicit layer should be deleted recursively");
+
+    deleteWorkspace(ws);
   }
 
   // ---------- helpers: sending events ----------
@@ -319,6 +406,25 @@ class GeoServerAdapterIntegrationTest extends AbstractGeoServerIntegrationTest {
     }
   }
 
+  private int layerStatus(String workspace, String layer) {
+    return statusOf("/rest/workspaces/" + workspace + "/layers/" + layer + ".json");
+  }
+
+  private JsonNode getLayer(String workspace, String layer) {
+    try (Response response =
+        httpClient
+            .target(geoServerUrl())
+            .path("/rest/workspaces/" + workspace + "/layers/" + layer + ".json")
+            .request(MediaType.APPLICATION_JSON)
+            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader)
+            .get()) {
+      assertEquals(200, response.getStatus());
+      return objectMapper.readTree(response.readEntity(String.class));
+    } catch (Exception e) {
+      throw new AssertionError("Failed to read layer " + workspace + ":" + layer, e);
+    }
+  }
+
   private int statusOf(String path) {
     try (Response response =
         httpClient
@@ -387,6 +493,12 @@ class GeoServerAdapterIntegrationTest extends AbstractGeoServerIntegrationTest {
     ft.setName(name);
     ft.setTitle(newTitle);
     return ft;
+  }
+
+  private static LayerConfig layerWithDefaultStyle(String styleName) {
+    LayerConfig layer = new LayerConfig();
+    layer.setDefaultStyle(styleName);
+    return layer;
   }
 
   // ---------- event publisher capture ----------

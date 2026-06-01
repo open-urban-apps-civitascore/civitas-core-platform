@@ -98,10 +98,11 @@ The `targetResource` in the config event maps directly to the REST path relative
 - `de.civitascore.geo.featuretype.updated`
 - `de.civitascore.geo.featuretype.deleted`
 
-**Layer Events (3):**
-- `de.civitascore.geo.layer.created`
+**Layer Events (2):**
 - `de.civitascore.geo.layer.updated`
 - `de.civitascore.geo.layer.deleted`
+
+> No `layer.created`: GeoServer has no POST on `/layers`; a layer is created implicitly when its feature type (or coverage) is published.
 
 **Style Events (3):**
 - `de.civitascore.geo.style.created`

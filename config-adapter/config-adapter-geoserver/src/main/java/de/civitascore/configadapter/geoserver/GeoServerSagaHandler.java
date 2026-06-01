@@ -48,6 +48,11 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   private static final String ADAPTER_NAME = "geoserver";
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/geoserver";
 
+  private static final String DEFAULT_POSTGIS_HOST = "localhost";
+  private static final String DEFAULT_POSTGIS_PORT = "5432";
+  private static final String DEFAULT_POSTGIS_DATABASE = "civitas_geo";
+  private static final String DEFAULT_POSTGIS_SCHEMA = "public";
+
   private String serverUrl;
   private String publicUrl;
   private GeoServerAuth auth;
@@ -72,10 +77,10 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     String password = getProperty("admin.password");
     this.auth = GeoServerAuth.create(username, password);
 
-    this.postgisHost = getProperty("postgis.host", "localhost");
-    this.postgisPort = getProperty("postgis.port", "5432");
-    this.postgisDatabase = getProperty("postgis.database", "civitas_geo");
-    this.postgisSchema = getProperty("postgis.schema", "public");
+    this.postgisHost = getProperty("postgis.host", DEFAULT_POSTGIS_HOST);
+    this.postgisPort = getProperty("postgis.port", DEFAULT_POSTGIS_PORT);
+    this.postgisDatabase = getProperty("postgis.database", DEFAULT_POSTGIS_DATABASE);
+    this.postgisSchema = getProperty("postgis.schema", DEFAULT_POSTGIS_SCHEMA);
     this.postgisUser = getProperty("postgis.user");
     this.postgisPassword = getProperty("postgis.password");
 

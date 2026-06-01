@@ -244,13 +244,13 @@ class TopicsTest {
   }
 
   @Test
-  void values_whenCounted_shouldReturn61() {
+  void values_whenCounted_shouldReturn60() {
     // User: 7, Realm: 3, Client: 3, Group: 3, Role: 3, Backend: 3, Route: 3,
     // Thing: 3, Location: 3, Sensor: 3, ObservedProperty: 3, Datastream: 3,
     // FROST Project: 3, Pipeline: 3 = 46
-    // GeoServer: Workspace: 3, Datastore: 3, FeatureType: 3, Style: 3, Layer: 3 = 15
-    // Total: 61
-    assertEquals(61, Topics.values().length);
+    // GeoServer: Workspace: 3, Datastore: 3, FeatureType: 3, Style: 3, Layer: 2 = 14
+    // Total: 60
+    assertEquals(60, Topics.values().length);
   }
 
   @Test
@@ -261,6 +261,6 @@ class TopicsTest {
     assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.datastore.created"));
     assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.featuretype.created"));
     assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.style.created"));
-    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.layer.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.layer.updated"));
   }
 }

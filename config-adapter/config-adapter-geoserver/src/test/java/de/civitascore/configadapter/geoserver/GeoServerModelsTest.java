@@ -18,6 +18,7 @@ import de.civitascore.configadapter.model.geoserver.BoundingBox;
 import de.civitascore.configadapter.model.geoserver.DataStoreConfig;
 import de.civitascore.configadapter.model.geoserver.FeatureTypeConfig;
 import de.civitascore.configadapter.model.geoserver.LayerConfig;
+import de.civitascore.configadapter.model.geoserver.LayerType;
 import de.civitascore.configadapter.model.geoserver.StyleConfig;
 import de.civitascore.configadapter.model.geoserver.WorkspaceConfig;
 import java.util.List;
@@ -212,7 +213,7 @@ class GeoServerModelsTest {
     void toApiMapWrapsInLayerKey() {
       LayerConfig layer = new LayerConfig();
       layer.setName("traffic_counts");
-      layer.setType("VECTOR");
+      layer.setType(LayerType.VECTOR);
       layer.setDefaultStyle("traffic_style");
 
       Map<String, Object> result = layer.toApiMap();

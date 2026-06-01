@@ -222,7 +222,7 @@ Production implementation of GeoServer adapter for managing OGC geo service conf
 - `de.civitascore.geo.workspace.{created,updated,deleted}`
 - `de.civitascore.geo.datastore.{created,updated,deleted}`
 - `de.civitascore.geo.featuretype.{created,updated,deleted}`
-- `de.civitascore.geo.layer.{created,updated,deleted}`
+- `de.civitascore.geo.layer.{updated,deleted}`
 - `de.civitascore.geo.style.{created,updated,deleted}`
 
 **Saga Topics:**
@@ -1175,16 +1175,15 @@ All topics are defined in `de.civitascore.configadapter.Topics` and validated at
 
 | Topic Constant | Topic Value |
 |----------------|-------------|
-| `WORKSPACE_CREATED` | `de.civitascore.geo.workspace.created` |
-| `WORKSPACE_UPDATED` | `de.civitascore.geo.workspace.updated` |
-| `WORKSPACE_DELETED` | `de.civitascore.geo.workspace.deleted` |
-| `DATASTORE_CREATED` | `de.civitascore.geo.datastore.created` |
-| `DATASTORE_UPDATED` | `de.civitascore.geo.datastore.updated` |
-| `DATASTORE_DELETED` | `de.civitascore.geo.datastore.deleted` |
-| `FEATURE_TYPE_CREATED` | `de.civitascore.geo.featuretype.created` |
-| `FEATURE_TYPE_UPDATED` | `de.civitascore.geo.featuretype.updated` |
-| `FEATURE_TYPE_DELETED` | `de.civitascore.geo.featuretype.deleted` |
-| `GEO_LAYER_CREATED` | `de.civitascore.geo.layer.created` |
+| `GEO_WORKSPACE_CREATED` | `de.civitascore.geo.workspace.created` |
+| `GEO_WORKSPACE_UPDATED` | `de.civitascore.geo.workspace.updated` |
+| `GEO_WORKSPACE_DELETED` | `de.civitascore.geo.workspace.deleted` |
+| `GEO_DATASTORE_CREATED` | `de.civitascore.geo.datastore.created` |
+| `GEO_DATASTORE_UPDATED` | `de.civitascore.geo.datastore.updated` |
+| `GEO_DATASTORE_DELETED` | `de.civitascore.geo.datastore.deleted` |
+| `GEO_FEATURE_TYPE_CREATED` | `de.civitascore.geo.featuretype.created` |
+| `GEO_FEATURE_TYPE_UPDATED` | `de.civitascore.geo.featuretype.updated` |
+| `GEO_FEATURE_TYPE_DELETED` | `de.civitascore.geo.featuretype.deleted` |
 | `GEO_LAYER_UPDATED` | `de.civitascore.geo.layer.updated` |
 | `GEO_LAYER_DELETED` | `de.civitascore.geo.layer.deleted` |
 | `GEO_STYLE_CREATED` | `de.civitascore.geo.style.created` |

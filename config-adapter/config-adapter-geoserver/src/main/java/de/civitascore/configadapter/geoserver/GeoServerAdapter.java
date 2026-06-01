@@ -219,7 +219,7 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
     }
 
     String resourceName = extractResourceName(targetResource);
-    boolean useRecurse = shouldUseRecurse(targetResource);
+    boolean useRecurse = shouldUseRecurse(resourceType);
 
     WebTarget target = client.target(serverUrl).path(REST_BASE + targetResource);
     if (useRecurse) {
@@ -351,14 +351,18 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
     return parts[parts.length - 1];
   }
 
-  static boolean shouldUseRecurse(String targetResource) {
-    String[] parts = targetResource.replaceAll("^/+|/+$", "").split("/");
-    // workspace delete: workspaces/{name}
-    if (parts.length == 2 && "workspaces".equalsIgnoreCase(parts[0])) return true;
-    // datastore delete: workspaces/{ws}/datastores/{name}
-    return parts.length == 4
-        && "workspaces".equalsIgnoreCase(parts[0])
-        && "datastores".equalsIgnoreCase(parts[2]);
+  /**
+   * GeoServer requires {@code recurse=true} to delete resources that own or are referenced by
+   * layers. A store (workspace, datastore, coverage store) would otherwise leave orphaned layers,
+   * and a feature type or coverage delete fails outright while a published layer still references
+   * it — and publishing a feature type/coverage always creates such a layer. Layers and styles are
+   * excluded so referenced (possibly shared) styles are never cascade-deleted.
+   */
+  static boolean shouldUseRecurse(ResourceType resourceType) {
+    return switch (resourceType) {
+      case WORKSPACE, DATASTORE, COVERAGE_STORE, FEATURE_TYPE, COVERAGE -> true;
+      case STYLE, LAYER, UNKNOWN -> false;
+    };
   }
 
   static String extractNameFromLocation(String locationHeader) {
