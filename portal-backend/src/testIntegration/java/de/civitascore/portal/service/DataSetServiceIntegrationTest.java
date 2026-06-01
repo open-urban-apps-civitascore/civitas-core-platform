@@ -18,7 +18,6 @@ import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.repository.CatalogRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.InvalidInputException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -177,7 +176,6 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
                 .description("Test pipeline for " + name)
                 .styles(createSampleStyles())
                 .dataSources(new HashSet<>(Set.of(ds1, ds2, ds3)))
-                .persistences(Collections.singletonList(12345L))
                 .model(createSampleModel()));
   }
 

@@ -53,10 +53,6 @@ public class DataSet extends BaseDataEntity {
   @Builder.Default
   private DataSetStatus dataSetStatus = DataSetStatus.DRAFT;
 
-  /** Master persistence ID (FROST ID). Required for publishing the dataset. */
-  @Column(name = "persistence_id")
-  private Long persistenceId;
-
   @OneToMany(
       mappedBy = "dataSet",
       fetch = FetchType.LAZY,

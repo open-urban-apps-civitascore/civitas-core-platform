@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
+import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.RoleType;
@@ -20,6 +21,7 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
@@ -53,6 +55,7 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private EntityManager entityManager;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private PipelineRepository pipelineRepository;
+  @Autowired private DataSinkRepository dataSinkRepository;
   @Autowired private DistributionRepository distributionRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private DataStructureRepository dataStructureRepository;
@@ -71,6 +74,7 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
   @AfterEach
   void cleanup() {
     assignmentRepository.deleteAll();
+    dataSinkRepository.deleteAll();
     pipelineRepository.deleteAll();
     distributionRepository.deleteAll();
     dataSetRepository.deleteAll();
@@ -90,6 +94,7 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
     DataSet ds = new DataSet();
     ds.setName(uniqueName("dataset"));
     ds.setDescription("cascade test dataset");
+    ds.setDataSetStatus(DataSetStatus.DRAFT);
     return dataSetRepository.save(ds);
   }
 
