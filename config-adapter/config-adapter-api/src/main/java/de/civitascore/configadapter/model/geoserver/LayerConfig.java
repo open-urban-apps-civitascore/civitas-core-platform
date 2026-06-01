@@ -34,8 +34,7 @@ import java.util.Objects;
  * }
  * }</pre>
  *
- * <p>Valid {@code type} values: {@code VECTOR}, {@code RASTER}, {@code REMOTE}, {@code WMS}, {@code
- * GROUP}.
+ * <p>Layer {@code type} is constrained to {@link LayerType}.
  *
  * <p>Jackson discriminator: {@code "resourceType": "geoserver-layer"}
  */
@@ -43,7 +42,7 @@ public final class LayerConfig extends AbstractApiModel implements GeoServerConf
 
   private String name;
   private String title;
-  private String type;
+  private LayerType type;
   private String defaultStyle;
   private Boolean enabled;
   private Boolean queryable;
@@ -66,11 +65,11 @@ public final class LayerConfig extends AbstractApiModel implements GeoServerConf
     this.title = title;
   }
 
-  public String getType() {
+  public LayerType getType() {
     return type;
   }
 
-  public void setType(String type) {
+  public void setType(LayerType type) {
     this.type = type;
   }
 
@@ -104,7 +103,7 @@ public final class LayerConfig extends AbstractApiModel implements GeoServerConf
     Map<String, Object> layer = new LinkedHashMap<>();
     if (name != null) layer.put("name", name);
     if (title != null) layer.put("title", title);
-    if (type != null) layer.put("type", type);
+    if (type != null) layer.put("type", type.name());
     if (defaultStyle != null) layer.put("defaultStyle", Map.of("name", defaultStyle));
     if (enabled != null) layer.put("enabled", enabled);
     if (queryable != null) layer.put("queryable", queryable);

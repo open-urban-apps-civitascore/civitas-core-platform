@@ -61,6 +61,8 @@ public final class DataStoreConfig extends AbstractApiModel implements GeoServer
   private String schema;
   private String user;
   private String passwd;
+  // Kept as String while PostGIS is the only supported database. Once a second dbtype is added,
+  // turn this into an enum so the supported values are validated and self-documenting.
   private String dbtype = "postgis";
   private Boolean exposePrimaryKeys;
 
