@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<ruleset name="Config Adapter Flowable"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0
+           https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+  <description>PMD rules for the config-adapter-flowable module.
+    Noise rules are excluded; only actionable findings remain.</description>
+
+  <!-- Best Practices -->
+  <rule ref="category/java/bestpractices.xml">
+    <exclude name="GuardLogStatement"/>          <!-- SLF4J parameterized logging is lazy -->
+  </rule>
+
+  <!-- Design -->
+  <rule ref="category/java/design.xml">
+    <exclude name="LawOfDemeter"/>               <!-- Too strict for fluent Flowable APIs -->
+  </rule>
+
+  <!-- Error Prone -->
+  <rule ref="category/java/errorprone.xml">
+    <exclude name="NullAssignment"/>             <!-- Intentional for idempotent close() pattern -->
+  </rule>
+
+  <!-- Code Style -->
+  <rule ref="category/java/codestyle.xml">
+    <exclude name="LocalVariableCouldBeFinal"/>  <!-- Style preference, not enforced project-wide -->
+    <exclude name="MethodArgumentCouldBeFinal"/> <!-- Same -->
+    <exclude name="CommentDefaultAccessModifier"/><!-- Package-private is intentional in this module -->
+    <exclude name="OnlyOneReturn"/>              <!-- Multiple returns are idiomatic in guard clauses -->
+    <exclude name="AtLeastOneConstructor"/>       <!-- Utility classes with private constructors are fine -->
+    <exclude name="LongVariable"/>               <!-- Descriptive names like processInstanceId are fine -->
+    <exclude name="ShortVariable"/>              <!-- Variables like id, op, ds are clear in context -->
+    <exclude name="UseExplicitTypes"/>           <!-- var usage follows Backend Style Guide rules -->
+    <exclude name="TooManyStaticImports"/>       <!-- Explicit static imports are fine per Style Guide -->
+  </rule>
+</ruleset>

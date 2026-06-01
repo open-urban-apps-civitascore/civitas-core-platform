@@ -21,7 +21,6 @@ public class PipelineInputDTO extends BaseInputDTO {
   private Map<String, Object> model;
 
   private Set<UUID> dataSourceIds;
-  private String[] apis;
   private Long[] persistences;
 
   @JsonIgnore private UUID dataSetId;

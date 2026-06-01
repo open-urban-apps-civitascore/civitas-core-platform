@@ -23,6 +23,9 @@ authz/rego/data/backends-allowall/
 # API collection tooling
 api/**/node_modules/
 
+# NiFi JDBC drivers (downloaded at dev startup)
+dev-environment/nifi/drivers/*.jar
+
 # Claude Code state (symlinked to private archive repo)
 **/CLAUDE.md
 /.claude

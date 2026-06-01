@@ -10,7 +10,7 @@
  */
 
 import type { Connection } from '@xyflow/react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -70,6 +70,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   sessionManager,
 }) => {
   const params = useParams<{ datasetId: string }>()
+  const searchParams = useSearchParams()
+  const requestedPipelineId = searchParams.get('pipeline')
   const t = useTranslations('pipelineEditor')
   const datasetId = params.datasetId
   const activeSession = sessionManager.getActiveSession()
@@ -99,11 +101,14 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
     // Convert backend DTOs to sessions
     const sessions = pipelineDTOs.map(dto => createSessionFromBackendDTO(dto))
-    const activeSessionId = sessions[0]?.id || null
+    // Preselect the session whose backend pipeline id matches the ?pipeline= search param,
+    // so deep-links from the dataset overview open the right tab.
+    const matchedSession = requestedPipelineId ? sessions.find(s => s.pipeline.id === requestedPipelineId) : undefined
+    const activeSessionId = matchedSession?.id ?? sessions[0]?.id ?? null
 
     // Load all sessions into the session manager
     sessionManager.loadSessions(sessions, activeSessionId)
-  }, [pipelinesQuery.data, sessionManager])
+  }, [pipelinesQuery.data, sessionManager, requestedPipelineId])
 
   // ===== Validation State =====
   const [validationResult, setValidationResult] = useState<ValidationResultWithNodeStatus | null>(null)

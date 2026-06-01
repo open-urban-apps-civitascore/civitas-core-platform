@@ -13,6 +13,7 @@ import static java.util.Objects.requireNonNull;
 
 import de.civitascore.configadapter.configuration.AppConfig;
 import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.flowable.common.FlowableSagaOrchestrator;
 import de.civitascore.configadapter.messaging.EventConsumer;
 import de.civitascore.event.handler.kafka.KafkaSagaCommandConsumer;
 import java.util.List;
@@ -96,6 +97,8 @@ public class Application {
                 pair.triggerConsumer().start();
               });
 
+      sagaComponents.flowableOrchestrator().ifPresent(FlowableSagaOrchestrator::start);
+
       sagaComponents.commandConsumer().ifPresent(KafkaSagaCommandConsumer::start);
 
       healthCheckServer.markReady();
@@ -128,6 +131,17 @@ public class Application {
                   pair.orchestrator().stop();
                 } catch (Exception e) {
                   logger.error("Error stopping saga orchestrator", e);
+                }
+              });
+
+      sagaComponents
+          .flowableOrchestrator()
+          .ifPresent(
+              flowable -> {
+                try {
+                  flowable.close();
+                } catch (Exception e) {
+                  logger.error("Error stopping Flowable orchestrator", e);
                 }
               });
 

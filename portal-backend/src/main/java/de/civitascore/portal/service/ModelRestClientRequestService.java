@@ -1,6 +1,6 @@
 package de.civitascore.portal.service;
 
-import de.civitascore.portal.configuration.ModelAtlasConfig;
+import de.civitascore.portal.configuration.ModelAtlasProperties;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;
 import java.nio.charset.StandardCharsets;
@@ -27,18 +27,18 @@ public class ModelRestClientRequestService {
 
   private static final MediaType UML = MediaType.parseMediaType("application/uml");
 
-  private final ModelAtlasConfig modelAtlasConfig;
+  private final ModelAtlasProperties modelAtlasProperties;
   private final RestClient.Builder restClientBuilder;
 
   private String getBaseUrl() {
-    return "%s/atlas/rest".formatted(modelAtlasConfig.getBaseUrl());
+    return "%s/atlas/rest".formatted(modelAtlasProperties.baseUrl());
   }
 
   private String getUploadEndpoint(String nsUri) {
     return UriComponentsBuilder.fromPath("/{scope}/schema/stages/{stage}")
         .queryParam("nsUri", nsUri)
         .queryParam("overwrite", true)
-        .buildAndExpand(modelAtlasConfig.getScope(), modelAtlasConfig.getStage())
+        .buildAndExpand(modelAtlasProperties.scope(), modelAtlasProperties.stage())
         .encode()
         .toUriString();
   }
@@ -46,7 +46,7 @@ public class ModelRestClientRequestService {
   private String getDeleteEndpoint(String nsUri) {
     return UriComponentsBuilder.fromPath("/{scope}/schema/stages/{stage}")
         .queryParam("nsUri", nsUri)
-        .buildAndExpand(modelAtlasConfig.getScope(), modelAtlasConfig.getStage())
+        .buildAndExpand(modelAtlasProperties.scope(), modelAtlasProperties.stage())
         .encode()
         .toUriString();
   }
@@ -54,7 +54,7 @@ public class ModelRestClientRequestService {
   private String getDownloadEndpoint(String nsUri) {
     return UriComponentsBuilder.fromPath("/{scope}/schema/stages/{stage}/content")
         .queryParam("nsUri", nsUri)
-        .buildAndExpand(modelAtlasConfig.getScope(), modelAtlasConfig.getStage())
+        .buildAndExpand(modelAtlasProperties.scope(), modelAtlasProperties.stage())
         .encode()
         .toUriString();
   }

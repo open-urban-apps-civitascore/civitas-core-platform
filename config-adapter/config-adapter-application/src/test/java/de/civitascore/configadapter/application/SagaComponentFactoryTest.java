@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.application;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.civitascore.configadapter.configuration.AppConfig;
@@ -38,6 +39,7 @@ class SagaComponentFactoryTest {
       AppConfig config =
           configWith(
               Map.of(
+                  "orchestrator.engine", "custom",
                   "kafka.bootstrap.servers", "localhost:9092",
                   "kafka.group.id", "test-group"));
 
@@ -50,7 +52,8 @@ class SagaComponentFactoryTest {
     @Test
     @DisplayName("Should not throw when using default bootstrap servers")
     void defaultBootstrapServers() {
-      AppConfig config = configWith(Map.of("kafka.group.id", "test-group"));
+      AppConfig config =
+          configWith(Map.of("orchestrator.engine", "custom", "kafka.group.id", "test-group"));
 
       SagaComponents components = factory.create(config);
 
@@ -64,6 +67,7 @@ class SagaComponentFactoryTest {
       AppConfig config =
           configWith(
               Map.of(
+                  "orchestrator.engine", "custom",
                   "kafka.bootstrap.servers", "localhost:9092",
                   "kafka.group.id", "test-group"));
 
@@ -72,6 +76,37 @@ class SagaComponentFactoryTest {
       assertNotNull(components);
       assertNotNull(components.commandConsumer());
       assertNotNull(components.orchestrator());
+    }
+
+    @Test
+    @DisplayName(
+        "Should reject unknown orchestrator.engine values instead of silently using custom")
+    void unknownEngine_failsFast() {
+      AppConfig config =
+          configWith(
+              Map.of(
+                  "orchestrator.engine", "flowabel",
+                  "kafka.bootstrap.servers", "localhost:9092"));
+
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> factory.create(config),
+          "Unknown orchestrator.engine must be rejected, not silently treated as custom");
+    }
+
+    @Test
+    @DisplayName("Should fail-fast when orchestrator.engine=flowable but JDBC config is missing")
+    void flowableWithoutJdbcConfig_failsFast() {
+      AppConfig config =
+          configWith(
+              Map.of(
+                  "orchestrator.engine", "flowable",
+                  "kafka.bootstrap.servers", "localhost:9092"));
+
+      assertThrows(
+          IllegalStateException.class,
+          () -> factory.create(config),
+          "Flowable mode without JDBC config must fail-fast, not silently degrade");
     }
   }
 }

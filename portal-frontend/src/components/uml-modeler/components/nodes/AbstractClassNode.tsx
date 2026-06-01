@@ -37,6 +37,7 @@ export const AbstractClassNode: React.FC<NodeProps> = ({ data, selected: isSelec
         {element.attributes?.map(attribute => (
           <NodeLine key={attribute.id}>
             {VISIBILITY_SYMBOLS[attribute.visibility]} {attribute.name}: {formatTypeName(attribute.type)}
+            {attribute.isId && ' {id}'}
             {attribute.multiplicity && ` [${attribute.multiplicity}]`}
             {attribute.isStatic && ' {static}'}
             {attribute.isReadonly && ' {readonly}'}

@@ -4,6 +4,7 @@ import de.civitascore.configadapter.model.dataset.ApiStandard;
 import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.model.dataset.NamedApi;
+import de.civitascore.portal.configuration.SagaProperties;
 import de.civitascore.portal.model.embedded.PipelineAction;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -19,7 +20,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
@@ -37,17 +37,15 @@ public class DataSetSagaPublisher {
 
   private final KafkaTemplate<String, String> eventKafkaTemplate;
   private final ObjectMapper objectMapper;
-
-  @Value("${saga.trigger-topic:de.civitascore.dataset.saga.trigger}")
-  private String triggerTopic;
-
-  @Value("${saga.publish-timeout-seconds:10}")
-  private int publishTimeoutSeconds;
+  private final SagaProperties sagaProperties;
 
   public DataSetSagaPublisher(
-      KafkaTemplate<String, String> eventKafkaTemplate, ObjectMapper objectMapper) {
+      KafkaTemplate<String, String> eventKafkaTemplate,
+      ObjectMapper objectMapper,
+      SagaProperties sagaProperties) {
     this.eventKafkaTemplate = eventKafkaTemplate;
     this.objectMapper = objectMapper;
+    this.sagaProperties = sagaProperties;
   }
 
   /** Publishes a {@code DATASET_CREATE} saga trigger. See {@link SagaTrigger} for the contract. */
@@ -236,13 +234,13 @@ public class DataSetSagaPublisher {
     try {
       String json = objectMapper.writeValueAsString(trigger);
       eventKafkaTemplate
-          .send(triggerTopic, datasetId, json)
-          .get(publishTimeoutSeconds, TimeUnit.SECONDS);
+          .send(sagaProperties.triggerTopic(), datasetId, json)
+          .get(sagaProperties.publishTimeoutSeconds(), TimeUnit.SECONDS);
       log.info(
           "Published saga trigger: sagaType={}, datasetId={}, topic={}",
           Encode.forJava(sagaType),
           Encode.forJava(datasetId),
-          Encode.forJava(triggerTopic));
+          Encode.forJava(sagaProperties.triggerTopic()));
     } catch (JacksonException e) {
       log.error(
           "Failed to serialize saga trigger for dataset {}: {}",
@@ -261,7 +259,7 @@ public class DataSetSagaPublisher {
     } catch (TimeoutException e) {
       log.error(
           "Timed out after {}s waiting for Kafka ack for saga trigger: sagaType={}, datasetId={}",
-          publishTimeoutSeconds,
+          sagaProperties.publishTimeoutSeconds(),
           Encode.forJava(sagaType),
           Encode.forJava(datasetId),
           e);

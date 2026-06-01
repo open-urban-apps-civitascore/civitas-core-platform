@@ -20,6 +20,7 @@ import { PipelineEditorProviderComponent } from './PipelineEditorProvider'
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ datasetId: 'dataset-1' }),
+  useSearchParams: () => new URLSearchParams(),
 }))
 
 vi.mock('next-intl', () => ({

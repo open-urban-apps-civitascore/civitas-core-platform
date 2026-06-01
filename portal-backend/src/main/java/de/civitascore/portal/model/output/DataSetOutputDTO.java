@@ -2,7 +2,6 @@ package de.civitascore.portal.model.output;
 
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
-import de.civitascore.portal.model.output.summary.DistributionSummaryDTO;
 import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
 import de.civitascore.portal.model.output.summary.UserSummaryDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -32,8 +31,6 @@ public class DataSetOutputDTO extends BaseOutputDTO {
   private String version;
 
   private List<PipelineSummaryDTO> pipelines = new ArrayList<>();
-
-  private List<DistributionSummaryDTO> distributions = new ArrayList<>();
 
   @Schema(
       description =
