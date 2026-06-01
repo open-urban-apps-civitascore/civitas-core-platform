@@ -153,6 +153,24 @@ public class DataSet extends BaseDataEntity {
   @Builder.Default
   private Set<NamedApi> namedApis = new HashSet<>();
 
+  @OneToMany(
+      mappedBy = "dataSet",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Setter(AccessLevel.NONE)
+  @Builder.Default
+  private Set<Layer> layers = new HashSet<>();
+
+  @OneToMany(
+      mappedBy = "dataSet",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Setter(AccessLevel.NONE)
+  @Builder.Default
+  private Set<Style> styles = new HashSet<>();
+
   @Enumerated(EnumType.STRING)
   @Column(name = "pending_saga_type", length = 30)
   private PendingSagaType pendingSagaType;
@@ -210,6 +228,32 @@ public class DataSet extends BaseDataEntity {
     if (newNamedApis != null) {
       newNamedApis.forEach(api -> api.setDataSet(this));
       this.namedApis.addAll(newNamedApis);
+    }
+  }
+
+  /**
+   * Replaces the current layers with the provided collection, clearing then re-adding to satisfy
+   * Hibernate orphan-removal semantics.
+   *
+   * @param newLayers the new layers, or {@code null} to clear
+   */
+  public void setLayers(Collection<Layer> newLayers) {
+    this.layers.clear();
+    if (newLayers != null) {
+      this.layers.addAll(newLayers);
+    }
+  }
+
+  /**
+   * Replaces the current styles with the provided collection, clearing then re-adding to satisfy
+   * Hibernate orphan-removal semantics.
+   *
+   * @param newStyles the new styles, or {@code null} to clear
+   */
+  public void setStyles(Collection<Style> newStyles) {
+    this.styles.clear();
+    if (newStyles != null) {
+      this.styles.addAll(newStyles);
     }
   }
 

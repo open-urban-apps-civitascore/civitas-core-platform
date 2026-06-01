@@ -7,6 +7,7 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
@@ -30,16 +31,19 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
   private final DataSinkMapper dataSinkMapper;
   private final PipelineRepository pipelineRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
+  private final LayerRepository layerRepository;
 
   public DataSinkService(
       DataSinkRepository dataSinkRepository,
       DataSinkMapper dataSinkMapper,
       PipelineRepository pipelineRepository,
-      DataStructureVersionRepository dataStructureVersionRepository) {
+      DataStructureVersionRepository dataStructureVersionRepository,
+      LayerRepository layerRepository) {
     this.dataSinkRepository = dataSinkRepository;
     this.dataSinkMapper = dataSinkMapper;
     this.pipelineRepository = pipelineRepository;
     this.dataStructureVersionRepository = dataStructureVersionRepository;
+    this.layerRepository = layerRepository;
   }
 
   @Override
@@ -114,30 +118,20 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
   }
 
   /**
-   * Guards DELETE against references from Layer and Stil entities.
-   *
-   * <p>The actual repository checks are stubbed here and will be connected once the Layer and Stil
-   * entities are introduced in the follow-up ticket.
+   * Guards DELETE against Layer references.
    *
    * @throws ResourceNotFoundException if the DataSink does not exist
-   * @throws ResourceInUseException (409) if a Layer or Stil references this DataSink
+   * @throws ResourceInUseException (409) if a Layer references this DataSink
    */
   @Override
   protected DataSink preProcessDelete(UUID id) {
     DataSink sink =
         findById(id).orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
 
-    // TODO: enable when Layer entity is available
-    // if (layerRepository.existsByDataSinkId(id)) {
-    //   throw new ResourceInUseException(getEntityName(), id,
-    //       "DataSink is referenced by one or more Layers");
-    // }
-
-    // TODO: enable when Stil entity is available
-    // if (stilRepository.existsByDataSinkId(id)) {
-    //   throw new ResourceInUseException(getEntityName(), id,
-    //       "DataSink is referenced by one or more Stils");
-    // }
+    if (layerRepository.existsByDataSinkId(id)) {
+      throw new ResourceInUseException(
+          getEntityName(), id, "DataSink is referenced by one or more Layers");
+    }
 
     return sink;
   }
