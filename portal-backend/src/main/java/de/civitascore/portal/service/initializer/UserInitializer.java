@@ -3,7 +3,6 @@ package de.civitascore.portal.service.initializer;
 import de.civitascore.configadapter.model.ConfigResultEvent;
 import de.civitascore.configadapter.model.idm.UserConfig;
 import de.civitascore.configadapter.model.idm.UserConfig.CredentialConfig;
-import de.civitascore.portal.configuration.InitProperties;
 import de.civitascore.portal.configuration.EventProperties;
 import de.civitascore.portal.configuration.KeycloakProperties;
 import de.civitascore.portal.model.entity.Group;

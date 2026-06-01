@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.idm.GroupConfig;
+import de.civitascore.portal.configuration.EventProperties;
 import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
@@ -40,6 +41,7 @@ class GroupServiceTest {
   @Mock private UserService userService;
   @Mock private AssignmentFactory assignmentFactory;
   @Mock private ConfigEventPublisherService configEventPublisher;
+  @Mock private EventProperties eventProperties;
 
   private static final String TARGET_REALM = "test-realm";
 
@@ -50,7 +52,8 @@ class GroupServiceTest {
         groupMapper,
         userService,
         assignmentFactory,
-        TARGET_REALM);
+        TARGET_REALM,
+        eventProperties);
   }
 
   private Role createRole(UUID id, RoleType roleType) {

@@ -3,6 +3,7 @@ package de.civitascore.portal.service;
 import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.idm.GroupConfig;
+import de.civitascore.portal.configuration.EventProperties;
 import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
@@ -27,6 +28,7 @@ public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
   private final UserService userService;
   private final AssignmentFactory assignmentFactory;
   private final String targetRealm;
+  private final EventProperties eventProperties;
 
   public GroupService(
       ConfigEventPublisherService configEventPublisher,
@@ -34,13 +36,15 @@ public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
       GroupMapper groupMapper,
       UserService userService,
       AssignmentFactory assignmentFactory,
-      @Value("${keycloak.target-realm}") String targetRealm) {
-    super(configEventPublisher);
+      @Value("${keycloak.target-realm}") String targetRealm,
+      EventProperties eventProperties) {
+    super(configEventPublisher, eventProperties);
     this.groupRepository = groupRepository;
     this.groupMapper = groupMapper;
     this.userService = userService;
     this.assignmentFactory = assignmentFactory;
     this.targetRealm = targetRealm;
+    this.eventProperties = eventProperties;
   }
 
   @Override
