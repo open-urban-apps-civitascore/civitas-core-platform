@@ -460,6 +460,14 @@ de.civitascore.dataset.geoserver.result
 `PROVISION_WORKSPACE` derives the workspace name from `datasetId` via `toWorkspaceName()`:
 lowercases and replaces all non-alphanumeric/non-underscore characters with `_`.
 
+Only datasinks with `"type": "GEO_PERSISTENCE"` are provisioned as feature types; other sink types
+are skipped. From each sink's `configuration`, only `tableName`, `crs`, and `projectionPolicy`
+(default `REPROJECT_TO_DECLARED`) are forwarded — fields such as `primaryKey` and `geometryColumn`
+are derived by GeoServer from the PostGIS table and intentionally not sent. `UPDATE_WORKSPACE`
+upserts (PUT on HTTP 409) so existing feature types are actually updated, and its compensation
+(`RESTORE_WORKSPACE`) deletes feature types created during the update before restoring the previous
+state.
+
 ### PROVISION_WORKSPACE Result
 
 ```json

@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
@@ -213,19 +214,58 @@ class GeoServerSagaHandlerTest {
         when(mockBuilder.post(any(Entity.class))).thenReturn(created);
 
         SagaCommandMessage command =
-            createCommand(
-                "EXECUTE_STEP",
-                "UPDATE_WORKSPACE",
-                Map.of(
-                    "workspaceName",
-                    "myws",
-                    "datasinks",
-                    List.of(Map.of("configuration", Map.of("tableName", "t1")))));
+            createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
 
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
         assertNull(result.error());
+      }
+    }
+
+    @Test
+    void updatesExistingFeatureTypeViaPutOn409() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response snapshot = snapshotResponse("t1");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response conflict = mock(Response.class);
+        when(conflict.getStatus()).thenReturn(409);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict);
+        Response updated = mock(Response.class);
+        when(updated.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(updated);
+
+        SagaCommandMessage command =
+            createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // Existing feature type (409 on POST) must be updated via PUT, not silently ignored.
+        verify(mockBuilder).put(any(Entity.class));
+      }
+    }
+
+    @Test
+    void returnsFailureWhenFeatureTypeUpdateFails() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response snapshot = snapshotResponse("t1");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response conflict = mock(Response.class);
+        when(conflict.getStatus()).thenReturn(409);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict);
+        Response error = mock(Response.class);
+        when(error.getStatus()).thenReturn(500);
+        when(error.readEntity(String.class)).thenReturn("Internal Server Error");
+        when(mockBuilder.put(any(Entity.class))).thenReturn(error);
+
+        SagaCommandMessage command =
+            createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
       }
     }
   }
@@ -307,6 +347,9 @@ class GeoServerSagaHandlerTest {
     @Test
     void restoresPreviousFeatureTypesSuccessfully() {
       try (GeoServerSagaHandler handler = createHandler()) {
+        // Snapshot matches the previous state — nothing new to delete, only restore via PUT.
+        Response snapshot = snapshotResponse("traffic_counts");
+        when(mockBuilder.get()).thenReturn(snapshot);
         Response putResponse = mock(Response.class);
         when(putResponse.getStatus()).thenReturn(200);
         when(mockBuilder.put(any(Entity.class))).thenReturn(putResponse);
@@ -329,8 +372,39 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
+    void deletesNewlyCreatedFeatureTypesOnRestore() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // Snapshot has a feature type ("new_table") absent from the previous state — compensation
+        // must delete it, then restore the previous one.
+        Response snapshot = snapshotResponse("traffic_counts", "new_table");
+        when(mockBuilder.get()).thenReturn(snapshot);
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(ok);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_WORKSPACE",
+                Map.of(
+                    "workspaceName",
+                    "myws",
+                    "previousFeatureTypes",
+                    List.of(Map.of("name", "traffic_counts"))));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        verify(mockBuilder).delete();
+      }
+    }
+
+    @Test
     void returnsCompensationFailureOnRestoreError() {
       try (GeoServerSagaHandler handler = createHandler()) {
+        Response snapshot = snapshotResponse("traffic_counts");
+        when(mockBuilder.get()).thenReturn(snapshot);
         Response errorResponse = mock(Response.class);
         when(errorResponse.getStatus()).thenReturn(500);
         when(errorResponse.readEntity(String.class)).thenReturn("Internal Server Error");
@@ -415,5 +489,28 @@ class GeoServerSagaHandlerTest {
       String type, String operation, Map<String, Object> payload) {
     return new SagaCommandMessage(
         type, "msg-001", "saga-001", "provision-workspace", "geoserver", operation, payload);
+  }
+
+  /** UPDATE_WORKSPACE payload with a single GEO_PERSISTENCE datasink for the given table. */
+  private static Map<String, Object> updatePayload(String tableName) {
+    return Map.of(
+        "workspaceName",
+        "myws",
+        "datasinks",
+        List.of(
+            Map.of("type", "GEO_PERSISTENCE", "configuration", Map.of("tableName", tableName))));
+  }
+
+  /** Mocks a 200 {@code featuretypes.json} response listing the given feature type names. */
+  private static Response snapshotResponse(String... names) {
+    List<Map<String, Object>> featureTypes = new java.util.ArrayList<>();
+    for (String name : names) {
+      featureTypes.add(Map.of("name", name));
+    }
+    Response response = mock(Response.class);
+    when(response.getStatus()).thenReturn(200);
+    when(response.readEntity(Map.class))
+        .thenReturn(Map.of("featureTypes", Map.of("featureType", featureTypes)));
+    return response;
   }
 }
