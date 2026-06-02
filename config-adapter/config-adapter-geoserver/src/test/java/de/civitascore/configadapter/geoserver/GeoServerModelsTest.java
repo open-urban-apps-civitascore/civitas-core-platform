@@ -14,6 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.geoserver.BoundingBox;
 import de.civitascore.configadapter.model.geoserver.DataStoreConfig;
 import de.civitascore.configadapter.model.geoserver.FeatureTypeConfig;
@@ -144,6 +146,50 @@ class GeoServerModelsTest {
       @SuppressWarnings("unchecked")
       Map<String, Object> inner = (Map<String, Object>) ds.toApiMap().get("dataStore");
       assertFalse(inner.containsKey("connectionParameters"));
+    }
+
+    @Test
+    void toApiMapOmitsNullConnectionParameterEntries() {
+      DataStoreConfig ds = new DataStoreConfig();
+      ds.setName("myds");
+      ds.setHost("db.example.com");
+      // port, database, schema, user, passwd left null
+
+      List<Map<String, Object>> entries = connectionEntries(ds);
+      assertTrue(entries.stream().anyMatch(e -> "host".equals(e.get("@key"))));
+      assertFalse(entries.stream().anyMatch(e -> "port".equals(e.get("@key"))));
+      assertFalse(entries.stream().anyMatch(e -> "database".equals(e.get("@key"))));
+      assertFalse(entries.stream().anyMatch(e -> "user".equals(e.get("@key"))));
+    }
+
+    @Test
+    void toApiMapOmitsExposePrimaryKeysWhenNull() {
+      DataStoreConfig ds = new DataStoreConfig();
+      ds.setName("myds");
+      ds.setHost("db.example.com");
+
+      assertFalse(
+          connectionEntries(ds).stream()
+              .anyMatch(e -> "Expose primary keys".equals(e.get("@key"))));
+    }
+
+    @Test
+    void toApiMapIncludesExposePrimaryKeysWhenSetToFalse() {
+      DataStoreConfig ds = new DataStoreConfig();
+      ds.setName("myds");
+      ds.setExposePrimaryKeys(false);
+
+      assertTrue(
+          connectionEntries(ds).stream()
+              .anyMatch(
+                  e -> "Expose primary keys".equals(e.get("@key")) && "false".equals(e.get("$"))));
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> connectionEntries(DataStoreConfig ds) {
+      Map<String, Object> inner = (Map<String, Object>) ds.toApiMap().get("dataStore");
+      Map<String, Object> connParams = (Map<String, Object>) inner.get("connectionParameters");
+      return (List<Map<String, Object>>) connParams.get("entry");
     }
   }
 
@@ -328,6 +374,85 @@ class GeoServerModelsTest {
 
       assertFalse(result.containsKey("minx"));
       assertEquals("EPSG:4326", result.get("crs"));
+    }
+  }
+
+  /**
+   * Verifies each model survives a Jackson serialize → deserialize round trip through the
+   * polymorphic {@link ConfigValue} contract (the {@code resourceType} discriminator), so the
+   * CloudEvent payload that produced a model reproduces an equal model.
+   */
+  @Nested
+  class JacksonRoundTrip {
+
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    private void assertRoundTrips(ConfigValue value) throws Exception {
+      String json = mapper.writerFor(ConfigValue.class).writeValueAsString(value);
+      ConfigValue restored = mapper.readValue(json, ConfigValue.class);
+      assertEquals(value, restored);
+    }
+
+    @Test
+    void workspaceConfigRoundTrips() throws Exception {
+      WorkspaceConfig ws = new WorkspaceConfig();
+      ws.setName("civitas_dataset1");
+      ws.setIsolated(true);
+      assertRoundTrips(ws);
+    }
+
+    @Test
+    void dataStoreConfigRoundTrips() throws Exception {
+      DataStoreConfig ds = new DataStoreConfig();
+      ds.setName("civitas_postgis");
+      ds.setDescription("PostGIS data source");
+      ds.setEnabled(true);
+      ds.setHost("db.example.com");
+      ds.setPort("5432");
+      ds.setDatabase("civitas_geo");
+      ds.setSchema("public");
+      ds.setUser("geo_user");
+      ds.setPasswd("secret");
+      ds.setExposePrimaryKeys(true);
+      assertRoundTrips(ds);
+    }
+
+    @Test
+    void featureTypeConfigRoundTrips() throws Exception {
+      FeatureTypeConfig ft = new FeatureTypeConfig();
+      ft.setName("traffic_counts");
+      ft.setNativeName("traffic_counts");
+      ft.setTitle("Traffic Counts");
+      ft.setAbstractText("Traffic counting data");
+      ft.setSrs("EPSG:4326");
+      ft.setProjectionPolicy("REPROJECT_TO_DECLARED");
+      ft.setEnabled(true);
+      ft.setNativeBoundingBox(new BoundingBox(-180.0, 180.0, -90.0, 90.0, "EPSG:4326"));
+      ft.setLatLonBoundingBox(new BoundingBox(-180.0, 180.0, -90.0, 90.0, "EPSG:4326"));
+      assertRoundTrips(ft);
+    }
+
+    @Test
+    void layerConfigRoundTrips() throws Exception {
+      LayerConfig layer = new LayerConfig();
+      layer.setName("traffic_counts");
+      layer.setTitle("Traffic Counts");
+      layer.setType(LayerType.VECTOR);
+      layer.setDefaultStyle("traffic_style");
+      layer.setEnabled(true);
+      layer.setQueryable(true);
+      assertRoundTrips(layer);
+    }
+
+    @Test
+    void styleConfigRoundTrips() throws Exception {
+      StyleConfig style = new StyleConfig();
+      style.setName("traffic_style");
+      style.setFilename("traffic_style.sld");
+      style.setFormat("sld");
+      style.setLanguageVersion("1.0.0");
+      style.setWorkspace("civitas_dataset1");
+      assertRoundTrips(style);
     }
   }
 }

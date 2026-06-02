@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -135,6 +136,37 @@ class GeoServerSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
+      }
+    }
+
+    @Test
+    void skipsDatasinksThatAreNotGeoPersistence() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "PROVISION_WORKSPACE",
+                Map.of(
+                    "datasetId",
+                    "ds-skip",
+                    "datasinks",
+                    List.of(
+                        Map.of(
+                            "type",
+                            "SOME_OTHER_SINK",
+                            "configuration",
+                            Map.of("tableName", "ignored")))));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // Only workspace + datastore are created; a non-GEO_PERSISTENCE sink yields no feature
+        // type.
+        verify(mockBuilder, times(2)).post(any(Entity.class));
       }
     }
 
