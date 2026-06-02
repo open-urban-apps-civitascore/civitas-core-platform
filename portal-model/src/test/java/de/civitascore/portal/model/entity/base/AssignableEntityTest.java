@@ -95,7 +95,7 @@ class AssignableEntityTest {
     }
 
     @Test
-    @DisplayName("Should detach a removed assignment from its group's collection (work item 1597)")
+    @DisplayName("Should detach a removed assignment from its group's collection")
     void shouldDetachStaleAssignmentFromGroup() {
       DataSet dataSet = dataSetEntity();
       Group group = groupWithId();

@@ -202,7 +202,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   }
 
   @Nested
-  @DisplayName("Assignment PATCH replacement (work item 1597)")
+  @DisplayName("Assignment PATCH replacement")
   class AssignmentPatchTests {
 
     @Autowired private DataSetAssembler dataSetAssembler;

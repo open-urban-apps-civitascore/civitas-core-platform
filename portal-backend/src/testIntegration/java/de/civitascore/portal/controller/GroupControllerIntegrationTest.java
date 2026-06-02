@@ -828,7 +828,7 @@ class GroupControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should replace a scoped role without leaving the old assignment behind (#1597)")
+    @DisplayName("Should replace a scoped role without leaving the old assignment behind")
     void shouldReplaceScopedAssignmentOnGroupWithoutStaleRow() {
       UUID groupId = createTestEntity();
       DataSet dataSet = portalData.dataSet();
