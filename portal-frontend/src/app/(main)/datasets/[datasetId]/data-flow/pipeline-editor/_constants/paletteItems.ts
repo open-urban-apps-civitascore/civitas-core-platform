@@ -5,10 +5,18 @@
  */
 
 import type { LucideIcon } from 'lucide-react'
-import { Circle, CircleDot, Clock, Database, Globe, Radio, Reply, Workflow } from 'lucide-react'
+import { Circle, Clock, Database, Radio, Workflow } from 'lucide-react'
+import { createElement, forwardRef } from 'react'
 
 import { PIPELINE_NODE_TYPES, type PipelineNodeType } from '../_types/pipeline'
 import { NODE_CATEGORIES, type NodeCategory } from './nodeCategories'
+
+/** Filled circle icon — renders Circle with a solid fill to appear as a full dot. */
+// eslint-disable-next-line react/display-name
+const FilledCircle = forwardRef<SVGSVGElement, React.ComponentPropsWithoutRef<LucideIcon>>((props, ref) =>
+  createElement(Circle, { ...props, ref, fill: 'currentColor' }),
+) as unknown as LucideIcon
+FilledCircle.displayName = 'FilledCircle'
 
 // ============================================================================
 // Palette Item Type
@@ -60,7 +68,7 @@ export const PALETTE_NODE_DEFINITIONS: Record<PipelineNodeType, PaletteItem> = {
   [PIPELINE_NODE_TYPES.Start]: {
     type: PIPELINE_NODE_TYPES.Start,
     label: 'Flow Start',
-    icon: CircleDot,
+    icon: FilledCircle,
     description: 'Pipeline entry point. Execution begins here.',
     singleUse: true,
   },
@@ -80,18 +88,6 @@ export const PALETTE_NODE_DEFINITIONS: Record<PipelineNodeType, PaletteItem> = {
   },
 
   // Trigger nodes
-  [PIPELINE_NODE_TYPES.ApiRequest]: {
-    type: PIPELINE_NODE_TYPES.ApiRequest,
-    label: 'API Request',
-    icon: Globe,
-    description: 'REST API request trigger. Starts pipeline on HTTP request.',
-  },
-  [PIPELINE_NODE_TYPES.ApiResponse]: {
-    type: PIPELINE_NODE_TYPES.ApiResponse,
-    label: 'API Response',
-    icon: Reply,
-    description: 'REST API response. Returns data to HTTP client.',
-  },
   [PIPELINE_NODE_TYPES.Cron]: {
     type: PIPELINE_NODE_TYPES.Cron,
     label: 'CRON',
@@ -147,11 +143,7 @@ export const PIPELINE_PALETTE_CATEGORIES: PaletteCategory[] = [
   {
     id: NODE_CATEGORIES.TRIGGER,
     title: 'Trigger',
-    items: [
-      PALETTE_NODE_DEFINITIONS[PIPELINE_NODE_TYPES.ApiRequest],
-      PALETTE_NODE_DEFINITIONS[PIPELINE_NODE_TYPES.ApiResponse],
-      PALETTE_NODE_DEFINITIONS[PIPELINE_NODE_TYPES.Cron],
-    ],
+    items: [PALETTE_NODE_DEFINITIONS[PIPELINE_NODE_TYPES.Cron]],
     defaultCollapsed: false,
   },
   {
