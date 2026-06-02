@@ -1,7 +1,7 @@
 import { useTranslations } from 'next-intl'
 import { type JSX, useMemo } from 'react'
 
-import { BasicSelect } from '@/components/basicSelect/BasicSelect'
+import { BasicSelect } from '@/components/select/basicSelect/BasicSelect'
 import { Role } from '@/types/roles'
 
 interface RoleTemplateSelectProps {

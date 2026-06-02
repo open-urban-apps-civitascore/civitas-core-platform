@@ -1,0 +1,140 @@
+# ============================================================
+# CIVITAS CORE Platform - Application Services (Dev Mode)
+# ============================================================
+# Builds and runs config-adapter and portal-backend as Docker
+# containers for the "auto" startup mode in start-portal-dev.sh.
+#
+# These services connect to the infrastructure already running
+# on civitas-network (Kafka, PostgreSQL, Keycloak, APISIX, etc.)
+# ============================================================
+
+services:
+  config-adapter:
+    build:
+      context: ../../config-adapter
+      dockerfile: Dockerfile
+    container_name: civitas-config-adapter
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    environment:
+      SERVER_PORT: 8088
+      HEALTHCHECK_PORT: 8088
+      ADAPTERS: keycloak,apisix,frost # ,nifi (add after implementation)
+      EVENTHANDLER_NAME: kafka
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_GROUP_ID: config-adapter-group
+      KAFKA_RETRY_MAX_ATTEMPTS: 3
+      KAFKA_RETRY_INITIAL_BACKOFF_MS: 1000
+      KAFKA_DLQ_TOPIC: de.civitascore.idm.dlq
+      # Flowable saga engine — dedicated database on the portal PostgreSQL
+      # (provisioned by dev-environment/postgres/docker-compose.yml).
+      FLOWABLE_JDBC_URL: jdbc:postgresql://postgres-portal:5432/flowable
+      FLOWABLE_JDBC_USERNAME: admin
+      FLOWABLE_JDBC_PASSWORD: admin
+      KEYCLOAK_URL: http://civitas-keycloak:8080
+      KEYCLOAK_REALM: master
+      KEYCLOAK_USERNAME: admin
+      KEYCLOAK_PASSWORD: admin
+      KEYCLOAK_CLIENT_ID: admin-cli
+      KEYCLOAK_TOPICS: de.civitascore.idm.user.created,de.civitascore.idm.user.updated,de.civitascore.idm.user.deleted,de.civitascore.idm.group.created,de.civitascore.idm.group.updated,de.civitascore.idm.group.deleted
+      KEYCLOAK_INVITATION_CLIENT_ID: portal-frontend
+      KEYCLOAK_INVITATION_REDIRECT_URI: http://localhost:3000/
+      APISIX_ADMIN_URL: http://apisix:9180
+      APISIX_ADMIN_KEY: edd1c9f034335f136f87ad84b625c8f1
+      APISIX_GATEWAY_URL: http://apisix:9080
+      APISIX_PLUGIN_CONFIG_ID: "1"
+      APISIX_SERVICE_ID: svc-frost-server
+      APISIX_TOPICS: de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted
+      FROST_URL: http://civitas-frost:8080/FROST-Server/v1.1
+      FROST_PUBLIC_URL: http://civitas-frost:8080/FROST-Server/v1.1
+      FROST_API_KEY: dev-frost-api-key
+      FROST_API_KEY_HEADER: X-API-Key
+      FROST_TOPICS: de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
+      NIFI_URL: https://civitas-nifi:8443
+      NIFI_TOPICS: de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
+      GEOSERVER_URL: http://civitas-geoserver:8080/geoserver
+      GEOSERVER_ADMIN_USER: admin
+      GEOSERVER_ADMIN_PASSWORD: changeme-generate-a-strong-password
+      GEOSERVER_POSTGIS_HOST: postgres-geoserver
+      GEOSERVER_POSTGIS_PORT: 5432
+      GEOSERVER_POSTGIS_DB: geoserver
+      GEOSERVER_POSTGIS_USER: geoserver
+      GEOSERVER_POSTGIS_PASSWORD: changeme-generate-a-strong-password
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health/ready"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+
+  portal-backend:
+    build:
+      context: ../../portal-backend
+      dockerfile: Dockerfile
+    container_name: civitas-portal-backend
+    restart: unless-stopped
+    ports:
+      - "8089:8089"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KEYCLOAK_AUTH_SERVER_URL: http://civitas-keycloak:8080
+      KEYCLOAK_ISSUER_URI: ${KC_HOSTNAME:-http://localhost:8080}
+      KEYCLOAK_REALM: civitas-core
+      KEYCLOAK_TARGET_REALM: civitas-core
+      MODEL_ATLAS_BASE_URL: http://model-atlas:8080
+      APP_URL: http://localhost:8089
+      SERVER_PORT: 8089
+      SPRING_PROFILES_ACTIVE: local,postgres,init
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/v1/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  portal-frontend:
+    build:
+      context: ../../portal-frontend
+      dockerfile: ../dev-environment/apps/Dockerfile.frontend
+    container_name: civitas-portal-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+    env_file:
+      - path: ../../portal-frontend/.env.local
+        required: false
+    networks:
+      - civitas-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+networks:
+  civitas-network:
+    name: civitas-network
+    external: true

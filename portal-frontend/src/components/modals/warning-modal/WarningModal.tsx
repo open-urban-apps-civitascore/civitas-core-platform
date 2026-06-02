@@ -2,6 +2,7 @@
 
 import { DialogProps } from '@radix-ui/react-dialog'
 import { useTranslations } from 'next-intl'
+import { ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -15,7 +16,7 @@ import {
 
 interface WarningModalProps extends DialogProps {
   title: string
-  description: string
+  description: ReactNode
   isLoading?: boolean
   confirmButtonTitle?: string
   onDiscard: () => void
@@ -31,7 +32,9 @@ export const WarningModal = (props: WarningModalProps) => {
       <DialogContent data-testid="exitWarningModal" className="sm:max-w-md" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogDescription asChild>
+            <div>{description}</div>
+          </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex gap-2 sm:justify-end">
           <Button data-testid="discardButton" type="button" variant="outline" onClick={onDiscard} disabled={isLoading}>

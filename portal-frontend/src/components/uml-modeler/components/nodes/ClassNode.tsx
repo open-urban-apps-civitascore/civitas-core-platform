@@ -32,6 +32,7 @@ export const ClassNode: React.FC<NodeProps> = ({ data, selected: isSelected = fa
         {element.attributes?.map(attribute => (
           <NodeLine key={attribute.id}>
             {VISIBILITY_SYMBOLS[attribute.visibility]} {attribute.name}: {formatTypeName(attribute.type)}
+            {attribute.isId && ' {id}'}
             {attribute.multiplicity && ` [${attribute.multiplicity}]`}
             {attribute.isStatic && ' {static}'}
             {attribute.isReadonly && ' {readonly}'}

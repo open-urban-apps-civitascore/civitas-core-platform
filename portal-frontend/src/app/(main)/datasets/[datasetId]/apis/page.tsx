@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation'
 
 import { getDataset } from '@/app/services/api/datasets/serverRequests'
-import { isApiTypeQuery } from '@/types/namedApis'
+import { API_STANDARDS, API_TYPE_QUERY, isApiTypeQuery } from '@/types/namedApis'
+import { hasApiType } from '@/utils/namedApis'
 
 import { ApiConfigPage } from './components/ApiConfigPage'
 
@@ -19,6 +20,13 @@ const ApisPage = async (props: ApisPageProps) => {
   }
 
   const { data: dataset } = await getDataset(datasetId)
+
+  if (
+    type === API_TYPE_QUERY.WFS_WMS &&
+    (hasApiType(dataset.namedApis ?? [], API_STANDARDS.WFS) || hasApiType(dataset.namedApis ?? [], API_STANDARDS.WMS))
+  ) {
+    redirect(`/datasets/${datasetId}`)
+  }
 
   return <ApiConfigPage testId="apiConfigPage" dataset={dataset} apiType={type} />
 }

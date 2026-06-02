@@ -7,13 +7,7 @@ import { useForm } from 'react-hook-form'
 
 import { Form } from '@/components/ui/form'
 import { Dataset } from '@/types/datasets'
-import {
-  API_TYPE_QUERY,
-  buildNamedApiFormSchema,
-  DEFAULTS_BY_TYPE,
-  NamedApi,
-  NamedApiFormData,
-} from '@/types/namedApis'
+import { API_TYPE_QUERY, DEFAULTS_BY_TYPE, NamedApi, StaApiFormData, StaApiFormSchema } from '@/types/namedApis'
 
 import { useApiConfig } from '../../hooks/useApiConfig'
 import { ApiConfigTab, ApiConfigWrapper } from '../ApiConfigWrapper'
@@ -35,19 +29,22 @@ export const StaApiConfigPage = ({ dataset, existingApi, testId }: StaApiConfigP
     [dataset.namedApis, existingApi?.slug],
   )
   const existingSlugs = useMemo(() => otherNamedApis.map(a => a.slug), [otherNamedApis])
-  const formSchema = useMemo(() => buildNamedApiFormSchema({ existingSlugs }), [existingSlugs])
+  const formSchema = useMemo(() => StaApiFormSchema({ existingSlugs }), [existingSlugs])
   const initialSlug = existingApi?.slug ?? defaults.defaultSlug
 
-  const staDefaults = {
-    name: existingApi?.name ?? '',
-    slug: initialSlug,
-    description: existingApi?.description ?? '',
-    persistence: defaults.persistenceValue,
+  const staDefaults: StaApiFormData = {
+    type: API_TYPE_QUERY.SENSORTHINGS,
+    baseInfo: {
+      name: existingApi?.name ?? '',
+      slug: initialSlug,
+      description: existingApi?.description ?? '',
+      persistence: defaults.persistenceValue,
+    },
   }
 
-  const form = useForm<NamedApiFormData>({
+  const form = useForm<StaApiFormData>({
     resolver: zodResolver(formSchema),
-    mode: 'onBlur',
+    mode: 'onChange',
     defaultValues: staDefaults,
   })
 
@@ -74,12 +71,6 @@ export const StaApiConfigPage = ({ dataset, existingApi, testId }: StaApiConfigP
     existingApi,
     otherNamedApis,
     initialSlug,
-    buildPayload: data => ({
-      name: data.name.trim(),
-      slug: data.slug,
-      standard: defaults.standard,
-      description: data.description?.trim() || undefined,
-    }),
   })
 
   const typeLabel = t(`title.${apiType}`)

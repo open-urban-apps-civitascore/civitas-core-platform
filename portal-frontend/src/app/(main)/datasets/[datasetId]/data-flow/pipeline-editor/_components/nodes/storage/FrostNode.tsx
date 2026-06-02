@@ -10,7 +10,7 @@
  */
 
 import type { NodeProps } from '@xyflow/react'
-import { Snowflake } from 'lucide-react'
+import { Database } from 'lucide-react'
 
 import type { FrostNodeData } from '../../../_types/nodes'
 import { BasePipelineNode } from '../base/BasePipelineNode'
@@ -33,8 +33,8 @@ export const FrostNode: React.FC<NodeProps> = ({ data, selected: isSelected = fa
       isConfigured={true}
       isSelected={isSelected}
       label={nodeData.label || 'FROST'}
-      sublabel={nodeData.serverName}
-      icon={Snowflake}
+      sublabel={nodeData.version}
+      icon={Database}
     />
   )
 }

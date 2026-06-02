@@ -53,10 +53,6 @@ public class DataSet extends BaseDataEntity {
   @Builder.Default
   private DataSetStatus dataSetStatus = DataSetStatus.DRAFT;
 
-  /** Master persistence ID (FROST ID). Required for publishing the dataset. */
-  @Column(name = "persistence_id")
-  private Long persistenceId;
-
   @OneToMany(
       mappedBy = "dataSet",
       fetch = FetchType.LAZY,
@@ -103,6 +99,11 @@ public class DataSet extends BaseDataEntity {
   @Builder.Default
   private Set<Agent> agents = new HashSet<>();
 
+  /**
+   * Distribution rows linked to this dataset. Currently has no production writer — the entity is
+   * reserved for the deferred DCAT distribution work. Existing rows are preserved by cascade
+   * delete; the dormancy is documented on {@link Distribution} itself.
+   */
   @OneToMany(
       mappedBy = "dataSet",
       fetch = FetchType.LAZY,
@@ -141,9 +142,8 @@ public class DataSet extends BaseDataEntity {
   private List<String> pipelineIds;
 
   /**
-   * Named API endpoints exposed by this dataset. Each entry produces one published distribution and
-   * one APISIX route after release. Slug uniqueness within the dataset is enforced by a DB unique
-   * constraint.
+   * Named API endpoints exposed by this dataset. Each entry produces one APISIX route after
+   * release. Slug uniqueness within the dataset is enforced by a DB unique constraint.
    */
   @OneToMany(
       mappedBy = "dataSet",
@@ -152,6 +152,24 @@ public class DataSet extends BaseDataEntity {
       orphanRemoval = true)
   @Builder.Default
   private Set<NamedApi> namedApis = new HashSet<>();
+
+  @OneToMany(
+      mappedBy = "dataSet",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Setter(AccessLevel.NONE)
+  @Builder.Default
+  private Set<Layer> layers = new HashSet<>();
+
+  @OneToMany(
+      mappedBy = "dataSet",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Setter(AccessLevel.NONE)
+  @Builder.Default
+  private Set<Style> styles = new HashSet<>();
 
   @Enumerated(EnumType.STRING)
   @Column(name = "pending_saga_type", length = 30)
@@ -210,6 +228,32 @@ public class DataSet extends BaseDataEntity {
     if (newNamedApis != null) {
       newNamedApis.forEach(api -> api.setDataSet(this));
       this.namedApis.addAll(newNamedApis);
+    }
+  }
+
+  /**
+   * Replaces the current layers with the provided collection, clearing then re-adding to satisfy
+   * Hibernate orphan-removal semantics.
+   *
+   * @param newLayers the new layers, or {@code null} to clear
+   */
+  public void setLayers(Collection<Layer> newLayers) {
+    this.layers.clear();
+    if (newLayers != null) {
+      this.layers.addAll(newLayers);
+    }
+  }
+
+  /**
+   * Replaces the current styles with the provided collection, clearing then re-adding to satisfy
+   * Hibernate orphan-removal semantics.
+   *
+   * @param newStyles the new styles, or {@code null} to clear
+   */
+  public void setStyles(Collection<Style> newStyles) {
+    this.styles.clear();
+    if (newStyles != null) {
+      this.styles.addAll(newStyles);
     }
   }
 

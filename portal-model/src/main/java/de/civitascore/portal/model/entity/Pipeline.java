@@ -12,7 +12,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.Builder;
@@ -25,8 +24,7 @@ import org.hibernate.type.SqlTypes;
 
 /**
  * Represents a data ingestion pipeline belonging to a {@link DataSet}. Holds the executable
- * RedpandaConnect configuration, associated {@link DataSource DataSources}, and API path
- * definitions.
+ * RedpandaConnect configuration and the associated {@link DataSource DataSources}.
  */
 @Entity
 @Table(
@@ -55,14 +53,6 @@ public class Pipeline extends NamedEntity {
       inverseJoinColumns = @JoinColumn(name = "data_source_id"))
   @Builder.Default
   private Set<DataSource> dataSources = new HashSet<>();
-
-  /** Array of API paths (e.g., ["/api/v1/traffic"]). Used to auto-generate Distribution entries. */
-  @Column(name = "apis", columnDefinition = "text[]")
-  private List<String> apis;
-
-  /** Array of persistence IDs. Must only contain the Master ID (persistenceId from DataSet). */
-  @Column(name = "persistences", columnDefinition = "bigint[]")
-  private List<Long> persistences;
 
   /** Executable RedpandaConnect configuration in JSON/YAML format. */
   @JdbcTypeCode(SqlTypes.JSON)

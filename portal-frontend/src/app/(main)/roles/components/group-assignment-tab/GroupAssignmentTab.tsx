@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
-import { NoDataPage } from '@/components/no-data-page/NoDataPage'
+import { NoDataPage } from '@/components/no-data/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { SegmentedControlBar, Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { AlertBox, InfoBox } from '@/components/text-box/TextBox'

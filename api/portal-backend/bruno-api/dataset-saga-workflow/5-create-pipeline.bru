@@ -2,6 +2,9 @@ meta {
   name: 5. Create Pipeline
   type: http
   seq: 18
+  tags: [
+    requires-nifi
+  ]
 }
 
 post {
@@ -19,8 +22,6 @@ body:json {
     "name": "Saga Test Pipeline",
     "description": "Pipeline for saga workflow test",
     "dataSourceIds": ["{{sagaDataSourceId}}"],
-    "apis": ["/v1.1/Things"],
-    "persistences": [],
     "styles": {},
     "model": {
       "input": {

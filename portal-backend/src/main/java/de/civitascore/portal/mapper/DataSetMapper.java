@@ -22,9 +22,6 @@ import org.mapstruct.ReportingPolicy;
 @Mapper(
     componentModel = "spring",
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
-    uses = {
-      DistributionMapper.class,
-    },
     unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputDTO, DataSet> {
   @Mapping(target = "owner", ignore = true)

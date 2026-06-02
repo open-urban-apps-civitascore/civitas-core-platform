@@ -9,7 +9,7 @@ import { useCreateStyle, useDeleteStyle, useGetStyles, useUpdateStyle } from '@/
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
-import { NoDataPage } from '@/components/no-data-page/NoDataPage'
+import { NoDataPage } from '@/components/no-data/no-data-page/NoDataPage'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -32,9 +32,11 @@ export interface StylesConfigHandle {
 
 interface StylesConfigProps {
   datasetId: string
+  isReadOnly?: boolean
 }
 
-export const StylesConfig = React.forwardRef<StylesConfigHandle, StylesConfigProps>(({ datasetId }, ref) => {
+export const StylesConfig = React.forwardRef<StylesConfigHandle, StylesConfigProps>(
+  ({ datasetId, isReadOnly = false }, ref) => {
   const t = useTranslations('datasets.overview.completion.apis.config.styles')
   const isMobile = useIsMobile()
 
@@ -63,6 +65,7 @@ export const StylesConfig = React.forwardRef<StylesConfigHandle, StylesConfigPro
   const selectedStyle = selectedIndex !== null ? allStyles[selectedIndex] : null
 
   const handleAddStyle = () => {
+    if (isReadOnly) return
     const newStyle: DraftStyle = {
       name: '',
       sldContent: '',
@@ -75,7 +78,7 @@ export const StylesConfig = React.forwardRef<StylesConfigHandle, StylesConfigPro
 
   const updateSelectedStyle = useCallback(
     (field: 'name' | 'sldContent', value: string) => {
-      if (selectedIndex === null || !selectedStyle) return
+      if (isReadOnly || selectedIndex === null || !selectedStyle) return
 
       const updatedStyle: DraftStyle = { ...selectedStyle, [field]: value, isDirty: true }
 
@@ -94,7 +97,7 @@ export const StylesConfig = React.forwardRef<StylesConfigHandle, StylesConfigPro
         return [...prev, updatedStyle]
       })
     },
-    [selectedIndex, selectedStyle],
+    [isReadOnly, selectedIndex, selectedStyle],
   )
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -113,6 +116,7 @@ export const StylesConfig = React.forwardRef<StylesConfigHandle, StylesConfigPro
   }
 
   const handleDeleteClick = (index: number) => {
+    if (isReadOnly) return
     setDeleteTargetIndex(index)
   }
 
@@ -196,12 +200,14 @@ export const StylesConfig = React.forwardRef<StylesConfigHandle, StylesConfigPro
   if (allStyles.length === 0) {
     return (
       <div className="flex flex-col gap-4">
-        <div className="flex justify-end">
-          <Button type="button" onClick={handleAddStyle}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t('addStyle')}
-          </Button>
-        </div>
+        {!isReadOnly && (
+          <div className="flex justify-end">
+            <Button type="button" onClick={handleAddStyle}>
+              <Plus className="mr-2 h-4 w-4" />
+              {t('addStyle')}
+            </Button>
+          </div>
+        )}
         <div className="flex flex-col items-center gap-6 p-6 rounded-lg border border-dashed border-border bg-white">
           <div className="flex w-12 h-12 p-2 justify-center items-center gap-2 rounded-md border border-border bg-white shadow-xs">
             <List size={24} />
@@ -218,12 +224,14 @@ export const StylesConfig = React.forwardRef<StylesConfigHandle, StylesConfigPro
 
   return (
     <div className="flex flex-col">
-      <div className="flex justify-end mb-4">
-        <Button type="button" onClick={handleAddStyle}>
-          <Plus className="mr-2 h-4 w-4" />
-          {t('addStyle')}
-        </Button>
-      </div>
+      {!isReadOnly && (
+        <div className="flex justify-end mb-4">
+          <Button type="button" onClick={handleAddStyle}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('addStyle')}
+          </Button>
+        </div>
+      )}
 
       <ContentCard className={cn('flex gap-6 h-auto', isMobile ? 'flex-col' : 'flex-row')}>
         {/* Left sidebar — style list */}
@@ -258,6 +266,7 @@ export const StylesConfig = React.forwardRef<StylesConfigHandle, StylesConfigPro
                   value={selectedStyle.name}
                   onChange={e => updateSelectedStyle('name', e.target.value)}
                   placeholder=""
+                  disabled={isReadOnly}
                 />
               </div>
             </DetailsFieldContainer>
@@ -271,15 +280,20 @@ export const StylesConfig = React.forwardRef<StylesConfigHandle, StylesConfigPro
                     data-testid="styleSldFileInput"
                     type="text"
                     readOnly
+                    disabled={isReadOnly}
                     placeholder={t('sldFilePlaceholder')}
-                    className="cursor-pointer"
-                    onClick={() => fileInputRef.current?.click()}
+                    className={cn(!isReadOnly && 'cursor-pointer')}
+                    onClick={() => {
+                      if (isReadOnly) return
+                      fileInputRef.current?.click()
+                    }}
                   />
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept=".sld,.xml"
                     className="hidden"
+                    disabled={isReadOnly}
                     onChange={handleFileUpload}
                   />
                 </div>
@@ -295,17 +309,20 @@ export const StylesConfig = React.forwardRef<StylesConfigHandle, StylesConfigPro
                   className="min-h-[120px] max-h-[300px] overflow-y-auto font-mono text-sm"
                   value={selectedStyle.sldContent}
                   onChange={e => updateSelectedStyle('sldContent', e.target.value)}
+                  disabled={isReadOnly}
                 />
               </div>
             </DetailsFieldContainer>
 
             {/* Delete button */}
-            <div className="border-t pt-4 flex justify-end">
-              <Button type="button" variant="outline" onClick={() => handleDeleteClick(selectedIndex!)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                {t('deleteStyle')}
-              </Button>
-            </div>
+            {!isReadOnly && (
+              <div className="border-t pt-4 flex justify-end">
+                <Button type="button" variant="outline" onClick={() => handleDeleteClick(selectedIndex!)}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {t('deleteStyle')}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </ContentCard>

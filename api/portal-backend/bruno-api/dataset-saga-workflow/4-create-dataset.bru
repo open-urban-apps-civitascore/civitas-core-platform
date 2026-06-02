@@ -2,6 +2,9 @@ meta {
   name: 4. Create DataSet
   type: http
   seq: 15
+  tags: [
+    requires-nifi
+  ]
 }
 
 post {
@@ -14,7 +17,10 @@ body:json {
   {
     "name": "Saga Test DataSet",
     "description": "Dataset for end-to-end saga workflow test",
-    "openDataAccess": false
+    "openDataAccess": false,
+    "namedApis": [
+      { "name": "Things", "slug": "things", "standard": "STA", "version": "1.1" }
+    ]
   }
 }
 

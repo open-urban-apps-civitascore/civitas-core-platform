@@ -174,7 +174,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   // ===== Node Operations =====
   const addNode = useCallback(
     (context: NodeCreationContext) => {
-      const nodeData = createDefaultNodeData(context.nodeType, datasetId)
+      const nodeData = createDefaultNodeData(context.nodeType)
       const newNode: PipelineNode = {
         id: crypto.randomUUID(),
         type: context.nodeType as PipelineNodeType,
@@ -183,7 +183,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       }
       dispatch({ type: 'ADD_NODE', payload: newNode })
     },
-    [dispatch, datasetId],
+    [dispatch],
   )
 
   const updateNode = useCallback(

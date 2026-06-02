@@ -4,7 +4,6 @@ import { useTranslations } from 'next-intl'
 import { FocusEvent } from 'react'
 import { UseFormReturn } from 'react-hook-form'
 
-import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { FormSelect } from '@/components/form/fields/FormSelect'
 import { FormTextArea } from '@/components/form/fields/FormTextArea'
@@ -18,13 +17,13 @@ import {
   API_TYPE_QUERY,
   ApiTypeQuery,
   NAMED_API_DESCRIPTION_MAX_LENGTH,
-  NamedApiFormData,
   PERSISTENCE_OPTIONS,
   SLUG_MAX_LENGTH,
+  StaApiFormData,
 } from '@/types/namedApis'
 
 interface BaseInfoFormProps {
-  form: UseFormReturn<NamedApiFormData>
+  form: UseFormReturn<StaApiFormData>
   apiType: ApiTypeQuery
   isReadOnly: boolean
   datasetId: string
@@ -49,9 +48,8 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
   const formItemProps = { className: gridClass }
 
   return (
-    <ContentCard className="h-auto">
-      <div className="flex flex-col">
-        <DetailsFieldContainer className="pt-0 pb-3">
+    <div className="flex flex-col">
+      <DetailsFieldContainer className="pt-0 pb-3">
         <SubHeader title={t('baseInfo.sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
       </DetailsFieldContainer>
 
@@ -71,7 +69,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
             label={t('baseInfo.persistence')}
             options={persistenceOptions.map(o => ({ value: o.value, label: o.label }))}
             form={form}
-            name="persistence"
+            name="baseInfo.persistence"
             disabled={isReadOnly}
             required
             formItemProps={formItemProps}
@@ -92,8 +90,8 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
       <DetailsFieldContainer>
         <FormField
           control={form.control}
-          name="slug"
-          render={({ field }) => (
+          name="baseInfo.slug"
+          render={({ field, fieldState }) => (
             <FormItem className={cn(gridClass)}>
               <FormLabel htmlFor="apiSlug">
                 {t('baseInfo.slug')}
@@ -113,10 +111,10 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
                     }}
                     maxLength={SLUG_MAX_LENGTH}
                     disabled={isReadOnly}
-                    aria-invalid={!!form.formState.errors.slug}
+                    aria-invalid={fieldState.isTouched && !!form.formState.errors.baseInfo?.slug}
                   />
                 </FormControl>
-                <FormMessage data-testid="slugFormMessage" className="mt-2" />
+                {fieldState.isTouched && <FormMessage data-testid="slugFormMessage" className="mt-2" />}
               </div>
             </FormItem>
           )}
@@ -138,7 +136,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
           id="apiName"
           form={form}
           label={t('baseInfo.name')}
-          name="name"
+          name="baseInfo.name"
           placeholder={t('baseInfo.name')}
           disabled={isReadOnly}
           required
@@ -146,22 +144,21 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
         />
       </DetailsFieldContainer>
 
-        <DetailsFieldContainer className="border-b-0">
-          <FormTextArea
-            id="apiDescription"
-            form={form}
-            label={t('baseInfo.description')}
-            name="description"
-            placeholder={t('baseInfo.descriptionPlaceholder')}
-            disabled={isReadOnly}
-            hint={t('baseInfo.descriptionHint')}
-            maxLength={NAMED_API_DESCRIPTION_MAX_LENGTH}
-            hasCharacterCount
-            className="min-h-[100px] resize-none"
-            formItemProps={formItemProps}
-          />
-        </DetailsFieldContainer>
-      </div>
-    </ContentCard>
+      <DetailsFieldContainer className="border-b-0">
+        <FormTextArea
+          id="apiDescription"
+          form={form}
+          label={t('baseInfo.description')}
+          name="baseInfo.description"
+          placeholder={t('baseInfo.descriptionPlaceholder')}
+          disabled={isReadOnly}
+          hint={t('baseInfo.descriptionHint')}
+          maxLength={NAMED_API_DESCRIPTION_MAX_LENGTH}
+          hasCharacterCount
+          className="min-h-[100px] resize-none"
+          formItemProps={formItemProps}
+        />
+      </DetailsFieldContainer>
+    </div>
   )
 }

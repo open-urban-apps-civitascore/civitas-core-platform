@@ -51,6 +51,14 @@ class ApisixSagaHandlerTest {
   }
 
   @Test
+  @DisplayName("fieldAliases() declares baseUrl→upstreamUrl so the saga forwards FROST's baseUrl")
+  void shouldDeclareBaseUrlAlias() {
+    try (ApisixSagaHandler handler = createHandler()) {
+      assertEquals(Map.of("baseUrl", "upstreamUrl"), handler.fieldAliases());
+    }
+  }
+
+  @Test
   @DisplayName("initialize throws when admin key is missing")
   void shouldThrowWhenAdminKeyMissing() {
     try (ApisixSagaHandler h = new ApisixSagaHandler()) {

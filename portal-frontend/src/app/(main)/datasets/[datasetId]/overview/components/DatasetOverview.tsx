@@ -19,7 +19,7 @@ import {
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { FooterElement } from '@/components/form/FooterElement'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
-import { NoDataPage } from '@/components/no-data-page/NoDataPage'
+import { NoDataPage } from '@/components/no-data/no-data-page/NoDataPage'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import PageEditControls from '@/components/page-edit-controls/PageEditControls'

@@ -59,8 +59,7 @@
       "nameExistsToast": "Der Name {name} ist bereits vergeben. Bitte wählen sie einen anderen Namen.",
       "emailExists": "Diese E-Mail ist bereits vergeben.",
       "emailExistsToast": "Die E-mail {email} ist bereits vergeben. Bitte wählen Sie eine andere E-Mail-Adresse.",
-      "insufficientPermissions": "Sie verfügen nicht über die notwendigen Berechtigungen für diese Aktion.",
-      "numberRequired": "Nur Zahlen erlaubt."
+      "insufficientPermissions": "Sie verfügen nicht über die notwendigen Berechtigungen für diese Aktion."
     },
     "items": {
       "data": "Daten",
@@ -71,7 +70,6 @@
       "role": "Rolle",
       "roles": "Rollen",
       "datasets": "Datensätze",
-      "dataspaces": "Datenräume",
       "permissions": "Berechtigungen",
       "datasources": "Datenquellen",
       "datasource": "Datenquelle",
@@ -189,7 +187,6 @@
     "edit": "bearbeiten",
     "users": "User",
     "groups": "Gruppen",
-    "dataspaces": "Datenräume",
     "tenants": "Mandanten-Management",
     "uml-modeler": "UML Modeler",
     "data-flow": "Datenfluss",
@@ -348,9 +345,11 @@
               "descriptionPlaceholder": ""
             },
             "layer": {
-              "title": "Layer",
+              "sectionTitle": "Layer",
               "addLayer": "Layer hinzufügen",
               "deleteLayer": "Layer löschen",
+              "untitledLayer": "Unbenannter Layer {index}",
+              "newLayer": "Neuer Layer {index}",
               "baseInfo": {
                 "sectionTitle": "Basisinformationen",
                 "title": "Bezeichnung",
@@ -370,12 +369,12 @@
               "geometry": {
                 "sectionTitle": "Geometrie",
                 "geometryField": "Geometriefield",
-                "geometryFieldPlaceHolder": "Geometrie auswählen ...",
+                "geometryFieldPlaceHolder": "Geometriefeld auswählen ...",
                 "nativeCrs": "Natives Koordinatenreferenzsystem (CRS)",
                 "definedCrs": "Angegebenes Koordinatenreferenzsystem (CRS)",
                 "crsPlaceHolder": "CRS auswählen ...",
                 "boundingBox": "Bounding Box",
-                "calculateFromCrs": "Aus nativem CRS berechnen",
+                "calculateFromCrs": "Aus den Grenzen des CRS berechnen",
                 "calculateFromData": "Aus Daten berechnen"
               },
               "style": {
@@ -383,13 +382,31 @@
                 "standardStyle": "Standardanzeige",
                 "default": "Standard (Geoserver default)",
                 "alternativeStyles": "Alternative Stile",
+                "alternativeStylesPlaceHolder": "Alternative Stile auswählen ...",
                 "addAlternativeStyle": "Alternativen Stil hinzufügen"
+              },
+              "deleteConfirm": {
+                "title": "Layer wirklich löschen?",
+                "description": "Diese Änderung hat folgende Auswirkungen:",
+                "impact1": "Der Layer ist nicht mehr verfügbar",
+                "impact2": "Die Darstellung in verbundenen Diensten ändert sich",
+                "impact3": "Externe Anwendungen können betroffen sein, wenn sie diesen Layer verwenden",
+                "confirm": "Layer löschen"
+              },
+              "noData": {
+                "title": "Keine Layer vorhanden",
+                "description": "Layer definieren die bereitgestellten Daten und deren Darstellung"
               }
             },
             "messages": {
               "createSuccess": "API wurde erfolgreich angelegt.",
               "updateSuccess": "API wurde erfolgreich aktualisiert.",
-              "saveError": "Beim Speichern der API ist ein Fehler aufgetreten. Bitte versuche es erneut."
+              "saveError": "Beim Speichern der API ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "createLayerSuccess": "Layer wurde erfolgreich angelegt.",
+              "updateLayerSuccess": "Layer wurde erfolgreich aktualisiert.",
+              "saveLayerError": "Beim Speichern des Layers ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "deleteLayerSuccess": "Layer wurde erfolgreich gelöscht.",
+              "deleteLayerError": "Beim Löschen des Layers ist ein Fehler aufgetreten. Bitte versuche es erneut."
             },
             "errors": {
               "name": {
@@ -448,7 +465,12 @@
       "subheader": "Persönliche Angaben und allgemeine Informationen.",
       "id": "ID",
       "displayName": "Name",
-      "title": { "title": "Anrede", "mr": "Herr", "ms": "Frau", "other": "Keine Angabe" },
+      "title": {
+        "title": "Anrede",
+        "mr": "Herr",
+        "ms": "Frau",
+        "other": "Keine Angabe"
+      },
       "firstName": "Vorname",
       "lastName": "Name",
       "role": "Systemrolle",
@@ -551,7 +573,10 @@
       "baseInfo": "Basisinformationen",
       "name": "Name",
       "description": "Beschreibung",
-      "contact": { "label": "Ansprechpartner", "placeholder": "Nach Name oder Email suchen" }
+      "contact": {
+        "label": "Ansprechpartner",
+        "placeholder": "Nach Name oder Email suchen"
+      }
     },
     "roles": {
       "scopeTabs": {
@@ -632,24 +657,6 @@
       "previousPage": "Zur vorherigen Seite wechseln",
       "nextPage": "Zur nächsten Seite wechseln",
       "lastPage": "Zur letzten Seite wechseln"
-    }
-  },
-  "dataspaces": {
-    "title": "Datenräume",
-    "newDataSpace": "Neuer Datenraum",
-    "createDataSpace": "Datenraum erstellen",
-    "tableHeaders": {
-      "name": "Name",
-      "description": "Beschreibung",
-      "protected": "Geschützt"
-    },
-    "form": {
-      "inputs": {
-        "name": "Name des Datenraums",
-        "description": "Beschreibung des Datenraums",
-        "protected": "Datenraum schützen",
-        "protectedDescription": "Geschützte Datenräume erfordern erweiterte Berechtigungen für den Zugriff"
-      }
     }
   },
   "permissions": {
@@ -893,8 +900,7 @@
       "basicInfo": "Basisinformationen",
       "connector": "Konnektor",
       "dataStructure": "Datenstruktur",
-      "accessManagement": "Zugriffsberechtigungen",
-      "dataspaces": "Datenräume"
+      "accessManagement": "Zugriffsberechtigungen"
     },
     "connectorTab": {
       "title1": "Konnektor",
@@ -1015,7 +1021,8 @@
     }
   },
   "pipelineEditor": {
-    "title": "Pipeline-Editor",
+    "title": "Pipeline Editor",
+    "subtitle": "Definiert, wie Daten ingestiert, transformiert und persistiert werden",
     "canvas": {
       "noPipeline": "Keine Pipeline verfügbar"
     },
@@ -1033,10 +1040,9 @@
       "start": "Start",
       "end": "Ende",
       "dataSource": "Datenquelle",
-      "apiRequest": "API-Request",
-      "apiResponse": "API-Response",
       "cronTrigger": "CRON-Trigger",
       "frostStorage": "FROST-Server",
+      "geoPersistence": "Geo-Persistenz",
       "mapping": "Mapping"
     },
     "palette": {
@@ -1050,20 +1056,18 @@
       "transformation": "Transformation"
     },
     "paletteItems": {
-      "flowStart": "Flow Start",
+      "flowStart": "Pipeline Start",
       "flowStartDesc": "Pipeline-Einstiegspunkt. Ausführung beginnt hier.",
-      "flowEnd": "Flow Ende",
+      "flowEnd": "Pipeline Ende",
       "flowEndDesc": "Pipeline-Endpunkt. Ausführung endet hier.",
       "dataSource": "Datenquelle",
-      "dataSourceDesc": "Datenquelle. Wähle eine konfigurierte Datenquelle aus.",
-      "apiRequest": "API-Request",
-      "apiRequestDesc": "REST-API Request. Erstellt Endpunkt, der Daten bereitstellt.",
-      "apiResponse": "API-Response",
-      "apiResponseDesc": "REST-API Response.",
+      "dataSourceDesc": "Datenquelle auswählen",
       "cron": "CRON",
       "cronDesc": "Geplanter Trigger. Führt Pipeline nach Zeitplan aus.",
       "frostServer": "FROST Server",
-      "frostServerDesc": "SensorThings API Persistenz. Daten speichern oder abrufen.",
+      "frostServerDesc": "SensorThings API persistence",
+      "geoPersistence": "Geo-Persistenz",
+      "geoPersistenceDesc": "WFS/WMS Geo-Daten-Persistenz.",
       "mapping": "Mapping",
       "mappingDesc": "Bloblang-Datentransformation. Daten zuordnen und transformieren."
     },
@@ -1096,17 +1100,23 @@
       "showDataStructure": "Datenstruktur anzeigen",
       "noPermission": "Keine Berechtigung zum Lesen von Datenquellen"
     },
-    "apiPanel": {
-      "requestDetails": "API-Request-Details",
-      "responseDetails": "API-Response-Details",
-      "apiPath": "API-Pfad"
-    },
     "frostPanel": {
       "details": "FROST Server Details",
       "serverName": "Servername",
       "serverUrl": "Server-URL",
       "internalServer": "Interner Frost Server",
       "version": "Version"
+    },
+    "geoPersistencePanel": {
+      "title": "Geo-Persistenz",
+      "tableName": "Tabellenname",
+      "tableNamePlaceholder": "Tabellennamen eingeben...",
+      "dataStructureVersion": "Datenstruktur-Version",
+      "importDataStructure": "Datenstruktur importieren",
+      "changeDataStructure": "Datenstruktur ändern",
+      "details": "Datenstruktur-Details",
+      "dataStructureName": "Datenstruktur",
+      "versionNumber": "Version"
     },
     "mappingPanel": {
       "hint": "Definiere deine Datentransformations-Zuordnung im YAML- oder JSON-Format.",
@@ -1133,7 +1143,6 @@
       "messages": {
         "startNodeRequired": "Pipeline muss mindestens einen Start-Knoten haben",
         "endNodeRequired": "Pipeline muss mindestens einen End-Knoten haben",
-        "apiPairing": "API-Request-Knoten benötigt einen API-Response-Knoten in der Pipeline",
         "nodeNotConfigured": "{label} ist nicht konfiguriert",
         "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein.",
         "orphanNode": "{label} ist mit keinem anderen Knoten verbunden",
@@ -1164,7 +1173,7 @@
     "tabs": {
       "closeTab": "Tab schließen",
       "newPipeline": "Neue Pipeline",
-      "untitledPipeline": "Unbenannte Pipeline"
+      "untitledPipeline": "Pipeline ohne Namen"
     },
     "nodeLabels": {
       "notConfigured": "Nicht konfiguriert"

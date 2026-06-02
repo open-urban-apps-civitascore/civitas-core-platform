@@ -71,7 +71,6 @@
       "role": "Role",
       "roles": "Roles",
       "datasets": "Datasets",
-      "dataspaces": "Data spaces",
       "permissions": "Permissions",
       "datasources": "Data sources",
       "datasource": "Data source",
@@ -189,7 +188,6 @@
     "edit": "Edit",
     "users": "User",
     "groups": "Groups",
-    "dataspaces": "Data spaces",
     "tenants": "Tenant management",
     "uml-modeler": "UML modeler",
     "data-flow": "Data flow",
@@ -351,6 +349,8 @@
               "title": "Layer",
               "addLayer": "Add Layer",
               "deleteLayer": "Delete Layer",
+              "untitledLayer": "Untitled Layer {index}",
+              "newLayer": "New Layer {index}",
               "baseInfo": {
                 "sectionTitle": "Base Information",
                 "title": "Title",
@@ -370,12 +370,12 @@
               "geometry": {
                 "sectionTitle": "Geometry",
                 "geometryField": "Geometry Field",
-                "geometryFieldPlaceHolder": "Select Geometry ...",
+                "geometryFieldPlaceHolder": "Select Geometry Field ...",
                 "nativeCrs": "Native Coordinate Reference System (CRS)",
                 "definedCrs": "Defined Coordinate Reference System (CRS)",
                 "crsPlaceHolder": "Select CRS ...",
                 "boundingBox": "Bounding Box",
-                "calculateFromCrs": "Calculate from native CRS",
+                "calculateFromCrs": "Calculate from CRS bounds",
                 "calculateFromData": "Calculate from Data"
               },
               "style": {
@@ -383,13 +383,31 @@
                 "standardStyle": "Standard Style",
                 "default": "Standard (Geoserver default)",
                 "alternativeStyles": "Alternative Styles",
+                "alternativeStylesPlaceHolder": "Select Alternative Styles ...",
                 "addAlternativeStyle": "Add an alternative style"
+              },
+              "deleteConfirm": {
+                "title": "Really delete layer?",
+                "description": "This change has the following effects:",
+                "impact1": "The layer will no longer be available",
+                "impact2": "The display in connected services will change",
+                "impact3": "External applications may be affected if they use this layer",
+                "confirm": "Delete Layer"
+              },
+              "noData": {
+                "title": "No Layers available",
+                "description": "Layers define the provided data and their presentation"
               }
             },
             "messages": {
               "createSuccess": "API has been successfully created.",
               "updateSuccess": "API has been successfully updated.",
-              "saveError": "An error occurred while saving the API. Please try again."
+              "saveError": "An error occurred while saving the API. Please try again.",
+              "createLayerSuccess": "Layer has been successfully created.",
+              "updateLayerSuccess": "Layer has been successfully updated.",
+              "saveLayerError": "An error occurred while saving the layer. Please try again.",
+              "deleteLayerSuccess": "Layer has been successfully deleted.",
+              "deleteLayerError": "An error occurred while deleting the layer. Please try again."
             },
             "errors": {
               "name": {
@@ -449,7 +467,12 @@
       "subheader": "Personal details and general information.",
       "id": "ID",
       "displayName": "Name",
-      "title": { "title": "Title", "mr": "Mr", "ms": "Ms", "other": "No Specification" },
+      "title": {
+        "title": "Title",
+        "mr": "Mr",
+        "ms": "Ms",
+        "other": "No Specification"
+      },
       "firstName": "First Name",
       "lastName": "Last Name",
       "role": "System Role",
@@ -553,7 +576,10 @@
       "baseInfo": "Base Information",
       "name": "Name",
       "description": "Description",
-      "contact": { "label": "Contact Person", "placeholder": "Search by name or email" }
+      "contact": {
+        "label": "Contact Person",
+        "placeholder": "Search by name or email"
+      }
     },
     "roles": {
       "scopeTabs": {
@@ -638,24 +664,6 @@
       "previousPage": "Go to previous page",
       "nextPage": "Go to next page",
       "lastPage": "Go to last page"
-    }
-  },
-  "dataspaces": {
-    "title": "Data Spaces",
-    "newDataSpace": "New Data Space",
-    "createDataSpace": "Create Data Space",
-    "tableHeaders": {
-      "name": "Name",
-      "description": "Description",
-      "protected": "Protected"
-    },
-    "form": {
-      "inputs": {
-        "name": "Data space name",
-        "description": "Data space description",
-        "protected": "Protect Data space",
-        "protectedDescription": "Protected Data spaces require elevated permissions for access"
-      }
     }
   },
   "permissions": {
@@ -895,8 +903,7 @@
       "basicInfo": "Base Information",
       "connector": "Connector",
       "dataStructure": "Data structure",
-      "accessManagement": "Access Management",
-      "dataspaces": "Data spaces"
+      "accessManagement": "Access Management"
     },
     "form": {
       "name": "Name",
@@ -943,7 +950,6 @@
     "subtitle": "All Data sources available in our tenant.",
     "newDatasource": "Create Data structure",
     "newVersion": "Create version",
-
     "tableHeaders": {
       "name": "Name",
       "description": "Description",
@@ -1029,6 +1035,7 @@
   },
   "pipelineEditor": {
     "title": "Pipeline Editor",
+    "subtitle": "Defines how data is ingested, transformed, and persisted",
     "canvas": {
       "noPipeline": "No pipeline available"
     },
@@ -1046,10 +1053,9 @@
       "start": "Start",
       "end": "End",
       "dataSource": "Data source",
-      "apiRequest": "API Request",
-      "apiResponse": "API Response",
       "cronTrigger": "CRON Trigger",
       "frostStorage": "FROST Server",
+      "geoPersistence": "Geo Persistence",
       "mapping": "Mapping"
     },
     "palette": {
@@ -1063,20 +1069,18 @@
       "transformation": "Transformation"
     },
     "paletteItems": {
-      "flowStart": "Flow Start",
+      "flowStart": "Pipeline Start",
       "flowStartDesc": "Pipeline entry point. Execution starts here.",
-      "flowEnd": "Flow End",
+      "flowEnd": "Pipeline End",
       "flowEndDesc": "Pipeline exit point. Execution ends here.",
       "dataSource": "Data source",
-      "dataSourceDesc": "Data source. Select a configured Data source.",
-      "apiRequest": "API Request",
-      "apiRequestDesc": "REST API request trigger. Creates endpoint that serves data on HTTP request.",
-      "apiResponse": "API Response",
-      "apiResponseDesc": "REST API response. Returns data to client.",
+      "dataSourceDesc": "Select data source.",
       "cron": "CRON",
       "cronDesc": "Scheduled trigger. Executes pipeline on schedule.",
       "frostServer": "FROST Server",
       "frostServerDesc": "SensorThings API persistence. Store or retrieve data.",
+      "geoPersistence": "Geo Persistence",
+      "geoPersistenceDesc": "WFS/WMS geo data persistence.",
       "mapping": "Mapping",
       "mappingDesc": "Bloblang data transformation. Map and transform data."
     },
@@ -1109,17 +1113,23 @@
       "showDataStructure": "Show Data Structure",
       "noPermission": "No permission to read datasources"
     },
-    "apiPanel": {
-      "requestDetails": "API Request Details",
-      "responseDetails": "API Response Details",
-      "apiPath": "API Path"
-    },
     "frostPanel": {
       "details": "FROST Server Details",
       "serverName": "Server Name",
       "serverUrl": "Server URL",
       "internalServer": "Internal Frost Server",
       "version": "Version"
+    },
+    "geoPersistencePanel": {
+      "title": "Geo Persistence",
+      "tableName": "Table Name",
+      "tableNamePlaceholder": "Enter table name...",
+      "dataStructureVersion": "Data Structure Version",
+      "importDataStructure": "Import Data Structure",
+      "changeDataStructure": "Change Data Structure",
+      "details": "Data Structure Details",
+      "dataStructureName": "Data Structure",
+      "versionNumber": "Version"
     },
     "mappingPanel": {
       "hint": "Define your data transformation mapping using YAML or JSON format.",
@@ -1146,7 +1156,6 @@
       "messages": {
         "startNodeRequired": "Pipeline must have at least one Start node",
         "endNodeRequired": "Pipeline must have at least one End node",
-        "apiPairing": "API Request node requires an API Response node in the pipeline",
         "nodeNotConfigured": "{label} is not configured",
         "invalidCronExpression": "{label} has an invalid cron expression. Must be a 6-field Quartz syntax.",
         "orphanNode": "{label} is not connected to any other node",
