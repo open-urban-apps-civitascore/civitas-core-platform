@@ -73,8 +73,9 @@ class AssignableEntityTest {
       Assignment a1 = createAssignment(group, role, dataSet);
       Assignment a2 = createAssignment(group, role, dataSet);
 
-      // Should not throw IllegalStateException
       assertThatNoException().isThrownBy(() -> dataSet.setAssignments(Set.of(a1, a2)));
+      // Duplicate keys collapse to a single assignment so no duplicate row is attempted.
+      assertThat(dataSet.getAssignments()).hasSize(1);
     }
 
     @Test

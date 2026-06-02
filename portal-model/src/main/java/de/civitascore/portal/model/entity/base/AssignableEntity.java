@@ -4,6 +4,7 @@ import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import jakarta.persistence.MappedSuperclass;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -34,25 +35,28 @@ public abstract class AssignableEntity extends NamedEntity {
 
   /**
    * Diff-based replace: keeps matching assignments (preserves audit fields), removes stale ones,
-   * and adds new ones. Stale assignments are also detached from both owning collections so that
-   * orphan removal deletes them (see {@link #detachFromOwners}).
+   * and adds new ones. Incoming assignments that resolve to the same logical key are collapsed to a
+   * single entry. Stale assignments are also detached from both owning collections so that orphan
+   * removal deletes them (see {@link #detachFromOwners}).
    */
   public void setAssignments(Collection<Assignment> assignments) {
     Set<Assignment> existing = getAssignments();
 
-    Set<Assignment> desired = new HashSet<>();
+    Map<AssignmentKey, Assignment> desiredByKey = new HashMap<>();
     if (assignments != null) {
       Map<AssignmentKey, Assignment> existingByKey =
           existing.stream()
               .collect(Collectors.toMap(AssignmentKey::of, a -> a, (keep, duplicate) -> keep));
 
       for (Assignment a : assignments) {
+        // linkAssignment sets the scope, which the key depends on, so it must run before keying.
         linkAssignment(a);
         AssignmentKey key = AssignmentKey.of(a);
         Assignment match = existingByKey.get(key);
-        desired.add(match != null ? match : a);
+        desiredByKey.putIfAbsent(key, match != null ? match : a);
       }
     }
+    Set<Assignment> desired = new HashSet<>(desiredByKey.values());
 
     // Collected to a list first: detaching mutates the very collections being inspected — including
     // `existing` itself, since this entity is one of the assignment's owners.
