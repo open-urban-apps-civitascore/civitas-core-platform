@@ -7,6 +7,7 @@ import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.RoleType;
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Catalog;
 import de.civitascore.portal.model.entity.DataSet;
@@ -15,6 +16,9 @@ import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Role;
+import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.output.assembler.DataSetAssembler;
+import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.CatalogRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.InvalidInputException;
@@ -31,6 +35,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("DataSet Service Integration Tests")
 class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
@@ -194,6 +199,77 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
         portalData.role(b -> b.description("Test role for " + roleName).roleType(RoleType.DATA));
 
     return portalData.assignment(group, role, dataSet);
+  }
+
+  @Nested
+  @DisplayName("Assignment PATCH replacement (work item 1597)")
+  class AssignmentPatchTests {
+
+    @Autowired private DataSetAssembler dataSetAssembler;
+    @Autowired private ObjectMapper objectMapper;
+    @Autowired private AssignmentRepository assignmentRepository;
+
+    /**
+     * Faithfully reproduces the controller PATCH path: load current entity, map to input DTO, apply
+     * the JSON-merge patch via Jackson's readerForUpdating, then update through the service.
+     */
+    private void patchAssignments(UUID datasetId, UUID groupId, UUID roleId) throws Exception {
+      DataSet current = dataSetService.findByIdOrThrow(datasetId);
+      DataSetInputDTO currentDto = dataSetAssembler.toInput(current);
+      String patchJson =
+          "{\"assignments\":[{\"groupId\":\"%s\",\"roleId\":\"%s\"}]}".formatted(groupId, roleId);
+      DataSetInputDTO patched =
+          objectMapper.readerForUpdating(currentDto).readValue(objectMapper.readTree(patchJson));
+      dataSetService.update(datasetId, patched);
+    }
+
+    @Test
+    @DisplayName("Removing role A and adding role B in one PATCH leaves only role B")
+    void patchReplacesAssignmentRole() throws Exception {
+      DataSet dataSet = portalData.dataSet();
+      Group group = portalData.group();
+      Role roleA = portalData.role(b -> b.roleType(RoleType.DATA));
+      Role roleB = portalData.role(b -> b.roleType(RoleType.DATA));
+
+      // Step 1: assign role A and save (PATCH with [A])
+      patchAssignments(dataSet.getId(), group.getId(), roleA.getId());
+      assertThat(
+              assignmentRepository.findAllByScopeTypeAndDatasetId(
+                  ScopeType.DATASET, dataSet.getId()))
+          .extracting(a -> a.getRole().getId())
+          .containsExactly(roleA.getId());
+
+      // Step 2: remove role A, add role B in one PATCH (PATCH with [B])
+      patchAssignments(dataSet.getId(), group.getId(), roleB.getId());
+
+      assertThat(
+              assignmentRepository.findAllByScopeTypeAndDatasetId(
+                  ScopeType.DATASET, dataSet.getId()))
+          .extracting(a -> a.getRole().getId())
+          .containsExactly(roleB.getId());
+    }
+
+    @Test
+    @DisplayName("Re-PATCHing the same role is idempotent and preserves the assignment id")
+    void patchSameRoleIsIdempotent() throws Exception {
+      DataSet dataSet = portalData.dataSet();
+      Group group = portalData.group();
+      Role roleA = portalData.role(b -> b.roleType(RoleType.DATA));
+
+      patchAssignments(dataSet.getId(), group.getId(), roleA.getId());
+      List<Assignment> first =
+          assignmentRepository.findAllByScopeTypeAndDatasetId(ScopeType.DATASET, dataSet.getId());
+      assertThat(first).hasSize(1);
+      UUID assignmentId = first.get(0).getId();
+
+      // Patch the identical assignment again — must not duplicate or violate the unique constraint.
+      patchAssignments(dataSet.getId(), group.getId(), roleA.getId());
+      List<Assignment> second =
+          assignmentRepository.findAllByScopeTypeAndDatasetId(ScopeType.DATASET, dataSet.getId());
+
+      assertThat(second).hasSize(1);
+      assertThat(second.get(0).getId()).isEqualTo(assignmentId);
+    }
   }
 
   @Nested

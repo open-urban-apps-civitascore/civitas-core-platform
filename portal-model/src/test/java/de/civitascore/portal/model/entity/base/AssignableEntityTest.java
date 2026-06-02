@@ -93,5 +93,54 @@ class AssignableEntityTest {
       dataSet.setAssignments(Set.of(replacement));
       assertThat(dataSet.getAssignments()).hasSize(1);
     }
+
+    @Test
+    @DisplayName("Should detach a removed assignment from its group's collection (work item 1597)")
+    void shouldDetachStaleAssignmentFromGroup() {
+      DataSet dataSet = dataSetEntity();
+      Group group = groupWithId();
+      Role roleA = roleWithId();
+      Role roleB = roleWithId();
+
+      // Assignment is co-owned by the dataset and the group (bidirectional, both
+      // orphanRemoval=true).
+      Assignment a = createAssignment(group, roleA, dataSet);
+      group.getAssignments().add(a);
+      dataSet.setAssignments(Set.of(a));
+      assertThat(group.getAssignments()).contains(a);
+
+      // Replacing role A with role B must also remove the stale assignment from the group,
+      // otherwise
+      // it stays reachable via Group#assignments and is never orphan-removed.
+      Assignment b = createAssignment(group, roleB, dataSet);
+      dataSet.setAssignments(Set.of(b));
+
+      assertThat(dataSet.getAssignments()).hasSize(1);
+      assertThat(group.getAssignments()).doesNotContain(a);
+    }
+
+    @Test
+    @DisplayName("Replacing a group's assignments detaches stale ones from the scope entity")
+    void shouldDetachStaleAssignmentFromScopeWhenGroupOwns() {
+      Group group = groupWithId();
+      DataSet dataSet = dataSetEntity();
+      Role roleA = roleWithId();
+      Role roleB = roleWithId();
+
+      // Same assignment is held by both owning collections.
+      Assignment a = createAssignment(group, roleA, dataSet);
+      group.getAssignments().add(a);
+      dataSet.getAssignments().add(a);
+
+      // Replace on the group side: must not throw (the group's own collection is mutated while
+      // being
+      // inspected) and must detach the stale assignment from the dataset so it can be
+      // orphan-removed.
+      Assignment b = createAssignment(group, roleB, dataSet);
+      group.setAssignments(Set.of(b));
+
+      assertThat(group.getAssignments()).extracting(Assignment::getRole).containsExactly(roleB);
+      assertThat(dataSet.getAssignments()).doesNotContain(a);
+    }
   }
 }
