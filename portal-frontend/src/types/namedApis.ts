@@ -245,6 +245,20 @@ export const StyleSchema = z.object({
 
 export type Style = z.infer<typeof StyleSchema>
 
+export const StyleFormSchema = z.object({
+  id: z.string(),
+  name: z.string().trim().min(1, 'common.errors.required'),
+  sldContent: z.string().trim().min(1, 'common.errors.required'),
+})
+
+export const StylePayloadSchema = z.object({
+  name: z.string().trim().min(1),
+  sldContent: z.string(),
+})
+
+export type StyleFormData = z.infer<typeof StyleFormSchema>
+export type StyleApiPayload = z.infer<typeof StylePayloadSchema>
+
 // ============================================================================
 // Types for WFS/WMS-API
 // ============================================================================
@@ -254,6 +268,7 @@ export const WfsWmsApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) =>
     type: z.literal(API_TYPE_QUERY.WFS_WMS),
     baseInfo: NamedApiBaseInfoFormSchema({ existingSlugs }),
     layers: z.array(LayerFormSchema),
+    styles: z.array(StyleFormSchema),
   })
 
 export type WfsWmsApiFormData = z.infer<ReturnType<typeof WfsWmsApiFormSchema>>

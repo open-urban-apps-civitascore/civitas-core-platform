@@ -309,7 +309,10 @@
             "styles": {
               "title": "Styles",
               "addStyle": "Add Style",
+              "newStyle": "New Style {index}",
+              "untitledStyle": "Untitled Style {index}",
               "name": "Name",
+
               "sldFile": "SLD file",
               "sldFilePlaceholder": "Select SLD...",
               "styleEditor": "Style editor",
@@ -411,7 +414,12 @@
               "updateLayerSuccess": "Layer has been successfully updated.",
               "saveLayerError": "An error occurred while saving the layer. Please try again.",
               "deleteLayerSuccess": "Layer has been successfully deleted.",
-              "deleteLayerError": "An error occurred while deleting the layer. Please try again."
+              "deleteLayerError": "An error occurred while deleting the layer. Please try again.",
+              "createStyleSuccess": "Style has been successfully created.",
+              "updateStyleSuccess": "Style has been successfully updated.",
+              "saveStyleError": "An error occurred while saving the style. Please try again.",
+              "deleteStyleSuccess": "Style has been successfully deleted.",
+              "deleteStyleError": "An error occurred while deleting the style. Please try again."
             },
             "errors": {
               "name": {

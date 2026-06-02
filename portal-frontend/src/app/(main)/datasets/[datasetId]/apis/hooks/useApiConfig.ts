@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 
 import { useCreateNamedApi, usePatchDataset } from '@/app/services/api/datasets/clientRequests'
 import { useCreateLayer, useUpdateLayer } from '@/app/services/api/datasets/layers/clientRequests'
+import { useCreateStyle, useUpdateStyle } from '@/app/services/api/styles/clientRequests'
 import { useError } from '@/hooks/use-error'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { Dataset } from '@/types/datasets'
@@ -18,12 +19,19 @@ import {
   NamedApi,
   NamedApiPayload,
   StaApiFormData,
+  StyleFormData,
   WfsWmsApiFormData,
 } from '@/types/namedApis'
 import { hasDirtyField } from '@/utils/form'
-import { buildStaPayloadData, buildWfsWmsPayload, mapFormLayerToPayload } from '@/utils/namedApis'
+import {
+  buildStaPayloadData,
+  buildWfsWmsPayload,
+  mapFormLayerToPayload,
+  mapFormStyleToPayload,
+} from '@/utils/namedApis'
 
 type FormData = StaApiFormData | WfsWmsApiFormData
+
 interface UseApiConfigActionsArgs<TFormData extends FormData> {
   form: UseFormReturn<TFormData>
   dataset: Dataset
@@ -64,9 +72,17 @@ export const useApiConfig = <TFormData extends FormData>({
   const updateDataset = usePatchDataset()
   const createLayer = useCreateLayer()
   const updateLayer = useUpdateLayer()
+  const createStyle = useCreateStyle()
+  const updateStyle = useUpdateStyle()
   const { handleFormValidationError } = useError()
   const isLoading =
-    createNamedApi.isPending || updateDataset.isPending || createLayer.isPending || updateLayer.isPending
+    createNamedApi.isPending ||
+    updateDataset.isPending ||
+    createLayer.isPending ||
+    updateLayer.isPending ||
+    createStyle.isPending ||
+    updateStyle.isPending
+
   const isDirty = form.formState.isDirty
   const dirtyFields = form.formState.dirtyFields
 
@@ -139,22 +155,43 @@ export const useApiConfig = <TFormData extends FormData>({
     if (layersToSave.some(l => !isNew(l))) toast.success(t('messages.updateLayerSuccess'))
   }
 
-  const handleSave = async (): Promise<boolean> => {
-    const dirtyLayers = (form.formState.dirtyFields as Partial<Record<keyof WfsWmsApiFormData, unknown>>).layers
-    const layerValues = (form.getValues as () => WfsWmsApiFormData)().layers
-    console.log(
-      '[dirty layer fields]',
-      (dirtyLayers as Record<string, unknown>[] | undefined)?.map((dirty, i) => ({
-        layerName: layerValues?.[i]?.layerName,
-        dirtyFields: dirty,
-      })),
+  const handleSaveStyles = async (data: WfsWmsApiFormData) => {
+    const wfsDirtyFields = dirtyFields as Partial<Record<keyof WfsWmsApiFormData, unknown>>
+    if (!hasDirtyField(wfsDirtyFields.styles)) return
+
+    const isNew = (style: StyleFormData) => style.id.startsWith('new-')
+
+    const isDirtyOrNew = (style: StyleFormData, i: number) =>
+      isNew(style) || hasDirtyField(Array.isArray(wfsDirtyFields.styles) ? wfsDirtyFields.styles[i] : undefined)
+
+    const stylesToSave = data.styles.filter(isDirtyOrNew)
+    if (stylesToSave.length === 0) return
+
+    await Promise.all(
+      stylesToSave.map(async style => {
+        const payload = mapFormStyleToPayload(style)
+        if (isNew(style)) {
+          await createStyle.mutateAsync({ datasetId: dataset.id, style: payload })
+        } else {
+          await updateStyle.mutateAsync({ datasetId: dataset.id, stilId: style.id, style: payload })
+        }
+      }),
     )
+
+    if (stylesToSave.some(isNew)) toast.success(t('messages.createStyleSuccess'))
+    if (stylesToSave.some(s => !isNew(s))) toast.success(t('messages.updateStyleSuccess'))
+  }
+
+  const handleSave = async (): Promise<boolean> => {
     let isSaved = false
     await form.handleSubmit(
       async data => {
         try {
           await handleSaveBaseInfo(data)
-          if (isWfsWmsFormData(data)) await handleSaveLayers(data)
+          if (isWfsWmsFormData(data)) {
+            await handleSaveLayers(data)
+            await handleSaveStyles(data)
+          }
           isSaved = true
         } catch {
           toast.error(t('messages.saveError'))
@@ -164,6 +201,7 @@ export const useApiConfig = <TFormData extends FormData>({
         handleFormValidationError(errors)
       },
     )()
+
     return isSaved
   }
 

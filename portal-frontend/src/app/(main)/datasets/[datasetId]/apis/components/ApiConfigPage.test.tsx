@@ -28,6 +28,12 @@ vi.mock('@/app/services/api/datasets/layers/clientRequests', () => ({
   useUpdateLayer: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
+vi.mock('@/app/services/api/styles/clientRequests', () => ({
+  useCreateStyle: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateStyle: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteStyle: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}))
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace, refresh: mockRefresh }),
   usePathname: () => '/datasets/test-id/apis/existing-slug',

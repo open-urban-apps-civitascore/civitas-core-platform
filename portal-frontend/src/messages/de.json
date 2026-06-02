@@ -308,6 +308,9 @@
             "styles": {
               "title": "Stile",
               "addStyle": "Stil hinzufügen",
+              "newStyle": "Neuer Stil {index}",
+              "untitledStyle": "Unbenannter Stil {index}",
+
               "name": "Name",
               "sldFile": "SLD-Datei",
               "sldFilePlaceholder": "SLD auswählen...",
@@ -410,8 +413,14 @@
               "updateLayerSuccess": "Layer wurde erfolgreich aktualisiert.",
               "saveLayerError": "Beim Speichern des Layers ist ein Fehler aufgetreten. Bitte versuche es erneut.",
               "deleteLayerSuccess": "Layer wurde erfolgreich gelöscht.",
-              "deleteLayerError": "Beim Löschen des Layers ist ein Fehler aufgetreten. Bitte versuche es erneut."
+              "deleteLayerError": "Beim Löschen des Layers ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "createStyleSuccess": "Stil wurde erfolgreich angelegt.",
+              "updateStyleSuccess": "Stil wurde erfolgreich aktualisiert.",
+              "saveStyleError": "Beim Speichern des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "deleteStyleSuccess": "Stil wurde erfolgreich gelöscht.",
+              "deleteStyleError": "Beim Löschen des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut."
             },
+
             "errors": {
               "name": {
                 "required": "Bezeichnung ist erforderlich"

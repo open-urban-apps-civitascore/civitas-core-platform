@@ -2,13 +2,14 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslations } from 'next-intl'
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FieldPath, useFieldArray, useForm, UseFormReturn } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { useGetDatasinks } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { useDeleteLayer, useGetLayers } from '@/app/services/api/datasets/layers/clientRequests'
 import { useGetStyles } from '@/app/services/api/datasets/styles/clientRequests'
+import { useDeleteStyle } from '@/app/services/api/styles/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { Form } from '@/components/ui/form'
 import { UMLClass } from '@/components/uml-modeler/types/uml'
@@ -20,10 +21,11 @@ import {
   LayerFormData,
   NamedApi,
   StaApiFormData,
+  StyleFormData,
   WfsWmsApiFormData,
   WfsWmsApiFormSchema,
 } from '@/types/namedApis'
-import { mapApiLayerToFormData } from '@/utils/namedApis'
+import { mapApiLayerToFormData, mapApiStyleToFormData } from '@/utils/namedApis'
 
 import { useApiConfig } from '../../hooks/useApiConfig'
 import { ApiConfigTab, ApiConfigWrapper } from '../ApiConfigWrapper'
@@ -37,7 +39,7 @@ import {
   mockLayerList,
   mockStyleList,
 } from './mockData'
-import { StylesConfig, StylesConfigHandle } from './StylesConfig'
+import { StylesConfig } from './StylesConfig'
 
 const tabs = [
   { value: 'basicInfo' as ApiConfigTab, label: 'datasets.overview.completion.apis.config.tabs.basicInfo' },
@@ -61,6 +63,12 @@ const defaultLayer: LayerFormData = {
   latLonBoundingBox: null,
   defaultStyleId: '',
   alternativeStyleIds: [],
+}
+
+const defaultStyle: StyleFormData = {
+  id: '',
+  name: '',
+  sldContent: '',
 }
 
 interface WfsWmsApiConfigPageProps {
@@ -92,9 +100,11 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
 
   // TODO: remove mockData once API is working
   const layers = useMemo(() => mapApiLayerToFormData(layersData ? layersData.data : mockLayerList), [layersData])
-  const styles = useMemo(() => stylesData?.data ?? mockStyleList, [stylesData])
+  const apiStyles = useMemo(() => stylesData?.data ?? mockStyleList, [stylesData])
+  const styleFormData = useMemo(() => mapApiStyleToFormData(apiStyles), [apiStyles])
 
   const [selectedLayerIndex, setSelectedLayerIndex] = useState<number | null>(layers.length > 0 ? 0 : null)
+  const [selectedStyleIndex, setSelectedStyleIndex] = useState<number | null>(styleFormData.length > 0 ? 0 : null)
 
   const postgisDatasinks = (datasinksData?.data ?? [mockDatasink, mockDatasink2]).filter(
     datasink => datasink.dataSinkType === DATASINK_TYPES.POSTGIS,
@@ -131,6 +141,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
       persistence: defaults.persistenceValue,
     },
     layers,
+    styles: styleFormData,
   }
 
   const form = useForm<WfsWmsApiFormData>({
@@ -140,14 +151,16 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
   })
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'layers', keyName: '_key' })
-
-  const stylesRef = useRef<StylesConfigHandle>(null)
-  const [hasDirtyStyles, setHasDirtyStyles] = useState(false)
-  const [areStylesValid, setAreStylesValid] = useState(true)
+  const {
+    fields: styleFields,
+    append: appendStyle,
+    remove: removeStyle,
+  } = useFieldArray({ control: form.control, name: 'styles', keyName: '_key' })
 
   useEffect(() => {
     form.reset(wfsWmsDefaults)
     setSelectedLayerIndex(layers.length > 0 ? 0 : null)
+    setSelectedStyleIndex(styleFormData.length > 0 ? 0 : null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existingApi?.id])
 
@@ -157,9 +170,13 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
   const layersValues = form.watch('layers')
   const isLayersValid = formSchema.shape.layers.safeParse(layersValues).success
 
+  const stylesValues = form.watch('styles')
+  const isStylesValid = formSchema.shape.styles.safeParse(stylesValues).success
+
   const completedTabs: ApiConfigTab[] = [
     ...(isBaseInfoValid ? (['basicInfo'] as ApiConfigTab[]) : []),
     ...(isLayersValid ? (['layer'] as ApiConfigTab[]) : []),
+    ...(isStylesValid ? (['styles'] as ApiConfigTab[]) : []),
   ]
 
   const {
@@ -173,7 +190,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     handleExit,
     handleDiscardAndExit,
     handleSaveAndExit,
-    handleSave,
+    handleSubmit,
   } = useApiConfig({
     form,
     dataset,
@@ -181,7 +198,10 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     otherNamedApis,
     initialSlug,
     initialFormData: wfsWmsDefaults,
-    onAfterDiscard: () => setSelectedLayerIndex(layers.length > 0 ? 0 : null),
+    onAfterDiscard: () => {
+      setSelectedLayerIndex(layers.length > 0 ? 0 : null)
+      setSelectedStyleIndex(styleFormData.length > 0 ? 0 : null)
+    },
   })
 
   const handleSelectLayer = (index: number) => {
@@ -214,13 +234,34 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     setSelectedLayerIndex(remaining === 0 ? null : Math.min(selectedLayerIndex, remaining - 1))
   }
 
-  const handleSubmitWithStyles = (e: FormEvent) => {
-    e.preventDefault()
-    void handleSave().then(async isApiSaved => {
-      if (isApiSaved && stylesRef.current) {
-        await stylesRef.current.saveAllStyles()
+  const handleSelectStyle = (index: number) => {
+    setSelectedStyleIndex(index)
+  }
+
+  const handleAddStyle = () => {
+    const newIndex = styleFields.length
+    appendStyle({ ...defaultStyle, id: `new-${crypto.randomUUID()}` })
+    setSelectedStyleIndex(newIndex)
+  }
+
+  const deleteStyle = useDeleteStyle()
+
+  const handleDeleteStyle = async () => {
+    if (selectedStyleIndex === null) return
+    const style = styleFields[selectedStyleIndex]
+    const isNew = style.id.startsWith('new-')
+    if (!isNew) {
+      try {
+        await deleteStyle.mutateAsync({ datasetId: dataset.id, stilId: style.id })
+        toast.success(t('messages.deleteStyleSuccess'))
+      } catch {
+        toast.error(t('messages.deleteStyleError'))
+        throw new Error()
       }
-    })
+    }
+    removeStyle(selectedStyleIndex)
+    const remaining = styleFields.length - 1
+    setSelectedStyleIndex(remaining === 0 ? null : Math.min(selectedStyleIndex, remaining - 1))
   }
 
   const handleTableChange = (datasinkId: string) => {
@@ -245,8 +286,8 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
   return (
     <ApiConfigWrapper
       isReadOnly={isReadOnly}
-      hasUnsavedChanges={form.formState.isDirty || hasDirtyStyles}
-      isFormValid={form.formState.isValid && areStylesValid}
+      hasUnsavedChanges={form.formState.isDirty}
+      isFormValid={form.formState.isValid}
       isLoading={isLoading}
       tabs={tabs}
       selectedTab={selectedTab}
@@ -260,7 +301,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
       onExit={handleExit}
       onDiscard={handleDiscardAndExit}
       onSaveAndExit={handleSaveAndExit}
-      onSubmit={handleSubmitWithStyles}
+      onSubmit={handleSubmit}
     >
       <Form {...form}>
         {selectedTab === 'basicInfo' && (
@@ -280,7 +321,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
           <LayerConfig
             form={form}
             existingLayers={fields}
-            styles={styles}
+            styles={apiStyles}
             postgisDatasinks={postgisDatasinks}
             postGisDatastructures={postgisDatastructures}
             selectedLayerIndex={selectedLayerIndex}
@@ -294,11 +335,14 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
         )}
         {selectedTab === 'styles' && (
           <StylesConfig
-            ref={stylesRef}
-            datasetId={dataset.id}
+            form={form}
+            existingStyles={styleFields}
+            selectedStyleIndex={selectedStyleIndex}
             isReadOnly={isReadOnly}
-            onDirtyChange={setHasDirtyStyles}
-            onValidChange={setAreStylesValid}
+            isDeleteStyleLoading={deleteStyle.isPending}
+            onSelectStyle={handleSelectStyle}
+            onAddStyle={handleAddStyle}
+            onDeleteStyle={handleDeleteStyle}
           />
         )}
       </Form>
