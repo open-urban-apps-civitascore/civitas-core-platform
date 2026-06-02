@@ -10,7 +10,7 @@
  */
 
 import type { NodeProps } from '@xyflow/react'
-import { Database } from 'lucide-react'
+import { Radio } from 'lucide-react'
 
 import type { DataSourceNodeData } from '../../../_types/nodes'
 import { isDataSourceNodeData } from '../../../_types/nodes'
@@ -39,7 +39,7 @@ export const DataSourceNode: React.FC<NodeProps> = ({ data, selected: isSelected
       isSelected={isSelected}
       label={nodeData.label || 'DataSource'}
       sublabel={isConfigured ? nodeData.entityName : undefined}
-      icon={Database}
+      icon={Radio}
     />
   )
 }

@@ -11,7 +11,7 @@ import { PipelineEditorWrapper } from './_components/layout/PipelineEditorWrappe
  */
 const PipelineEditorPage = () => {
   return (
-    <PageContainer headerType="onlyTitle">
+    <PageContainer headerType="withSubTabsOrSubtitle">
       <PipelineEditorWrapper />
     </PageContainer>
   )

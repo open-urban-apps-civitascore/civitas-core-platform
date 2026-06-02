@@ -36,8 +36,6 @@ const NODE_TYPE_TO_TRANSLATION_KEY: Record<PipelineNodeType, string> = {
   start: 'flowStart',
   end: 'flowEnd',
   dataSource: 'dataSource',
-  apiRequest: 'apiRequest',
-  apiResponse: 'apiResponse',
   cron: 'cron',
   frost: 'frostServer',
   geoPersistence: 'geoPersistence',

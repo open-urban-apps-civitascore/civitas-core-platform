@@ -16,8 +16,6 @@ export const PIPELINE_NODE_TYPES = {
   Start: 'start',
   End: 'end',
   // Trigger nodes
-  ApiRequest: 'apiRequest',
-  ApiResponse: 'apiResponse',
   Cron: 'cron',
   // Source nodes
   DataSource: 'dataSource',
@@ -116,7 +114,6 @@ export interface PipelinePayload {
   /** JSON-stringified PipelineStylesPayload — backend stores as opaque string */
   styles: PipelineStylesPayload
   dataSourceIds: string[] // IDs extracted from DataSource nodes
-  apis: string[] // endpoint paths from ApiRequest/ApiResponse nodes
   persistences: number[] // persistence config IDs (Long[] in backend)
   model: object // Pipeline graph serialized in RedPandaConnect syntax
 }

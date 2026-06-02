@@ -27,6 +27,11 @@ services:
       KAFKA_RETRY_MAX_ATTEMPTS: 3
       KAFKA_RETRY_INITIAL_BACKOFF_MS: 1000
       KAFKA_DLQ_TOPIC: de.civitascore.idm.dlq
+      # Flowable saga engine — dedicated database on the portal PostgreSQL
+      # (provisioned by dev-environment/postgres/docker-compose.yml).
+      FLOWABLE_JDBC_URL: jdbc:postgresql://postgres-portal:5432/flowable
+      FLOWABLE_JDBC_USERNAME: admin
+      FLOWABLE_JDBC_PASSWORD: admin
       KEYCLOAK_URL: http://civitas-keycloak:8080
       KEYCLOAK_REALM: master
       KEYCLOAK_USERNAME: admin

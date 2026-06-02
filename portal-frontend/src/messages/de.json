@@ -929,7 +929,8 @@
     }
   },
   "pipelineEditor": {
-    "title": "Pipeline-Editor",
+    "title": "Pipeline Editor",
+    "subtitle": "Definiert, wie Daten ingestiert, transformiert und persistiert werden",
     "canvas": {
       "noPipeline": "Keine Pipeline verfügbar"
     },
@@ -947,8 +948,6 @@
       "start": "Start",
       "end": "Ende",
       "dataSource": "Datenquelle",
-      "apiRequest": "API-Request",
-      "apiResponse": "API-Response",
       "cronTrigger": "CRON-Trigger",
       "frostStorage": "FROST-Server",
       "geoPersistence": "Geo-Persistenz",
@@ -965,20 +964,16 @@
       "transformation": "Transformation"
     },
     "paletteItems": {
-      "flowStart": "Flow Start",
+      "flowStart": "Pipeline Start",
       "flowStartDesc": "Pipeline-Einstiegspunkt. Ausführung beginnt hier.",
-      "flowEnd": "Flow Ende",
+      "flowEnd": "Pipeline Ende",
       "flowEndDesc": "Pipeline-Endpunkt. Ausführung endet hier.",
       "dataSource": "Datenquelle",
-      "dataSourceDesc": "Datenquelle. Wähle eine konfigurierte Datenquelle aus.",
-      "apiRequest": "API-Request",
-      "apiRequestDesc": "REST-API Request. Erstellt Endpunkt, der Daten bereitstellt.",
-      "apiResponse": "API-Response",
-      "apiResponseDesc": "REST-API Response.",
+      "dataSourceDesc": "Datenquelle auswählen",
       "cron": "CRON",
       "cronDesc": "Geplanter Trigger. Führt Pipeline nach Zeitplan aus.",
       "frostServer": "FROST Server",
-      "frostServerDesc": "SensorThings API Persistenz. Daten speichern oder abrufen.",
+      "frostServerDesc": "SensorThings API persistence",
       "geoPersistence": "Geo-Persistenz",
       "geoPersistenceDesc": "WFS/WMS Geo-Daten-Persistenz.",
       "mapping": "Mapping",
@@ -1012,11 +1007,6 @@
       "tags": "Tags",
       "showDataStructure": "Datenstruktur anzeigen",
       "noPermission": "Keine Berechtigung zum Lesen von Datenquellen"
-    },
-    "apiPanel": {
-      "requestDetails": "API-Request-Details",
-      "responseDetails": "API-Response-Details",
-      "apiPath": "API-Pfad"
     },
     "frostPanel": {
       "details": "FROST Server Details",
@@ -1061,7 +1051,6 @@
       "messages": {
         "startNodeRequired": "Pipeline muss mindestens einen Start-Knoten haben",
         "endNodeRequired": "Pipeline muss mindestens einen End-Knoten haben",
-        "apiPairing": "API-Request-Knoten benötigt einen API-Response-Knoten in der Pipeline",
         "nodeNotConfigured": "{label} ist nicht konfiguriert",
         "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein.",
         "orphanNode": "{label} ist mit keinem anderen Knoten verbunden",
@@ -1092,7 +1081,7 @@
     "tabs": {
       "closeTab": "Tab schließen",
       "newPipeline": "Neue Pipeline",
-      "untitledPipeline": "Unbenannte Pipeline"
+      "untitledPipeline": "Pipeline ohne Namen"
     },
     "nodeLabels": {
       "notConfigured": "Nicht konfiguriert"
