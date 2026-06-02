@@ -216,8 +216,8 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
 
   const handleSubmitWithStyles = (e: FormEvent) => {
     e.preventDefault()
-    void handleSave().then(async apiSaved => {
-      if (apiSaved && stylesRef.current) {
+    void handleSave().then(async isApiSaved => {
+      if (isApiSaved && stylesRef.current) {
         await stylesRef.current.saveAllStyles()
       }
     })
