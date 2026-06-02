@@ -142,6 +142,8 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'layers', keyName: '_key' })
 
   const stylesRef = useRef<StylesConfigHandle>(null)
+  const [hasDirtyStyles, setHasDirtyStyles] = useState(false)
+  const [areStylesValid, setAreStylesValid] = useState(true)
 
   useEffect(() => {
     form.reset(wfsWmsDefaults)
@@ -243,8 +245,8 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
   return (
     <ApiConfigWrapper
       isReadOnly={isReadOnly}
-      hasUnsavedChanges={form.formState.isDirty}
-      isFormValid={form.formState.isValid}
+      hasUnsavedChanges={form.formState.isDirty || hasDirtyStyles}
+      isFormValid={form.formState.isValid && areStylesValid}
       isLoading={isLoading}
       tabs={tabs}
       selectedTab={selectedTab}
@@ -291,7 +293,13 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
           />
         )}
         {selectedTab === 'styles' && (
-          <StylesConfig ref={stylesRef} datasetId={dataset.id} isReadOnly={isReadOnly} />
+          <StylesConfig
+            ref={stylesRef}
+            datasetId={dataset.id}
+            isReadOnly={isReadOnly}
+            onDirtyChange={setHasDirtyStyles}
+            onValidChange={setAreStylesValid}
+          />
         )}
       </Form>
     </ApiConfigWrapper>

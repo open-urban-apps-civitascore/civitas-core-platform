@@ -314,6 +314,10 @@
               "sldFilePlaceholder": "Select SLD...",
               "styleEditor": "Style editor",
               "deleteStyle": "Delete Style",
+              "validation": {
+                "nameRequired": "Style name is required",
+                "sldContentRequired": "Style content is required"
+              },
               "noStyles": {
                 "title": "No styles available",
                 "subtitle": "Styles can be created and then assigned to layers of this API"

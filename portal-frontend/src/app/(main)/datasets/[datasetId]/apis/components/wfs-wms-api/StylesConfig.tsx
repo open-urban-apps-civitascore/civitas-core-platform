@@ -2,7 +2,7 @@
 
 import { List, Plus, Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { useCreateStyle, useDeleteStyle, useGetStyles, useUpdateStyle } from '@/app/services/api/styles/clientRequests'
@@ -33,10 +33,12 @@ export interface StylesConfigHandle {
 interface StylesConfigProps {
   datasetId: string
   isReadOnly?: boolean
+  onDirtyChange?: (dirty: boolean) => void
+  onValidChange?: (valid: boolean) => void
 }
 
 export const StylesConfig = React.forwardRef<StylesConfigHandle, StylesConfigProps>(
-  ({ datasetId, isReadOnly = false }, ref) => {
+  ({ datasetId, isReadOnly = false, onDirtyChange, onValidChange }, ref) => {
   const t = useTranslations('datasets.overview.completion.apis.config.styles')
   const isMobile = useIsMobile()
 
@@ -191,6 +193,23 @@ export const StylesConfig = React.forwardRef<StylesConfigHandle, StylesConfigPro
 
   const hasDirtyStyles = draftStyles.some(d => d.isDirty)
 
+  // A dirty style is only valid once both its name and SLD content are filled in.
+  const hasInvalidDirtyStyles = draftStyles.some(
+    d => d.isDirty && (!d.name.trim() || !d.sldContent.trim()),
+  )
+
+  // Communicate dirty state to the parent so the shared Submit button can enable,
+  // mirroring how the Base Info and Layer tabs feed the form's dirty state.
+  useEffect(() => {
+    onDirtyChange?.(hasDirtyStyles)
+  }, [hasDirtyStyles, onDirtyChange])
+
+  // Communicate validity so the parent can keep the Submit button disabled while a
+  // dirty style is missing its mandatory name or editor content.
+  useEffect(() => {
+    onValidChange?.(!hasInvalidDirtyStyles)
+  }, [hasInvalidDirtyStyles, onValidChange])
+
   React.useImperativeHandle(ref, () => ({
     saveAllStyles,
     hasDirtyStyles,
@@ -260,14 +279,20 @@ export const StylesConfig = React.forwardRef<StylesConfigHandle, StylesConfigPro
             {/* Name field */}
             <DetailsFieldContainer className="border-b-0 py-2 pt-6">
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium">{t('name')}</label>
+                <label className="text-sm font-medium">
+                  {t('name')} <span className="text-destructive">*</span>
+                </label>
                 <Input
                   data-testid="styleNameInput"
                   value={selectedStyle.name}
                   onChange={e => updateSelectedStyle('name', e.target.value)}
                   placeholder=""
                   disabled={isReadOnly}
+                  aria-invalid={selectedStyle.isDirty && !selectedStyle.name.trim()}
                 />
+                {selectedStyle.isDirty && !selectedStyle.name.trim() && (
+                  <p className="text-sm text-destructive">{t('validation.nameRequired')}</p>
+                )}
               </div>
             </DetailsFieldContainer>
 
@@ -303,14 +328,20 @@ export const StylesConfig = React.forwardRef<StylesConfigHandle, StylesConfigPro
             {/* Style editor */}
             <DetailsFieldContainer className="border-b-0 py-2 pb-6">
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium">{t('styleEditor')}</label>
+                <label className="text-sm font-medium">
+                  {t('styleEditor')} <span className="text-destructive">*</span>
+                </label>
                 <Textarea
                   data-testid="styleEditorTextArea"
                   className="min-h-[120px] max-h-[300px] overflow-y-auto font-mono text-sm"
                   value={selectedStyle.sldContent}
                   onChange={e => updateSelectedStyle('sldContent', e.target.value)}
                   disabled={isReadOnly}
+                  aria-invalid={selectedStyle.isDirty && !selectedStyle.sldContent.trim()}
                 />
+                {selectedStyle.isDirty && !selectedStyle.sldContent.trim() && (
+                  <p className="text-sm text-destructive">{t('validation.sldContentRequired')}</p>
+                )}
               </div>
             </DetailsFieldContainer>
 
