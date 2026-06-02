@@ -1,12 +1,16 @@
 package de.civitascore.portal.controller;
 
+import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
+import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataSetAssembler;
 import de.civitascore.portal.repository.specification.DataSetSpec;
+import de.civitascore.portal.repository.specification.ScopeFilteringSpecification;
 import de.civitascore.portal.service.DataSetService;
+import de.civitascore.portal.util.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -16,16 +20,20 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -88,6 +96,53 @@ public class DataSetController
   @Override
   protected DataSetAssembler getAssembler() {
     return dataSetAssembler;
+  }
+
+  /**
+   * Lists the named APIs of a dataset (issue #1596, concept #1379). Returns the same {@link
+   * NamedApiOutputDTO} list embedded in {@code GET /datasets/{id}} — including the server-built
+   * {@code previewUrl} — via a dedicated discovery surface. Respects the caller's {@code
+   * X-Allowed-Scope-Ids}: an unknown or out-of-scope dataset yields 404, so route existence is not
+   * leaked.
+   *
+   * <p>Per concept #1379 this is a consumer-facing discovery surface for <b>active, published</b>
+   * APIs: it returns the named APIs only when the dataset is published (lifecycle status {@code
+   * AVAILABLE}). For a {@code DRAFT}/{@code READY} dataset it returns an empty list — draft edits
+   * must not change the public API surface. (Scope is still enforced first: an unknown/out-of-scope
+   * dataset yields 404 regardless of status, so route existence is not leaked.)
+   *
+   * @param id the dataset UUID
+   * @return HTTP 200 with the published dataset's named APIs (empty unless the dataset is AVAILABLE)
+   */
+  @GetMapping("/{id}/apis")
+  @Operation(
+      operationId = "getDataSetApis",
+      summary = "List a dataset's published named APIs",
+      description =
+          "Returns the named APIs of a PUBLISHED dataset (lifecycle status AVAILABLE), including the"
+              + " server-built previewUrl. Per concept #1379 only active published APIs are"
+              + " discoverable: a DRAFT/READY dataset returns an empty list. Respects the caller's"
+              + " X-Allowed-Scope-Ids; unknown or out-of-scope datasets return 404.")
+  @ApiResponse(responseCode = "200", description = "Named APIs returned successfully")
+  @ApiResponse(
+      responseCode = "404",
+      description = "Dataset not found or out of scope",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  public ResponseEntity<List<NamedApiOutputDTO>> getNamedApis(@PathVariable UUID id) {
+    Specification<DataSet> scopedById =
+        applyScopeFilter(ScopeFilteringSpecification.baseEntityById(Set.of(id)));
+    DataSet dataSet =
+        dataSetService
+            .findOne(scopedById)
+            .orElseThrow(() -> new ResourceNotFoundException("DataSet", id));
+    // Only a published (AVAILABLE) dataset exposes active named APIs for consumer discovery (concept
+    // #1379). A DRAFT/READY dataset has no public API surface yet, so return an empty list rather
+    // than leaking not-yet-active (or about-to-change) draft routes.
+    List<NamedApiOutputDTO> namedApis =
+        dataSet.getDataSetStatus() == DataSetStatus.AVAILABLE
+            ? dataSetAssembler.toOutput(dataSet).getNamedApis()
+            : List.of();
+    return ResponseEntity.ok(namedApis);
   }
 
   /**

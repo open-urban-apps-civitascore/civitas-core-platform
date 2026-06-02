@@ -43,6 +43,15 @@ without a second host. If a deployment pipeline was already configured against t
 variant, drop `APISIX_DATA_HOST` / `APISIX_DATA_PUBLIC_URL` and the `data.<host>` DNS record —
 they are no longer read. Only `APISIX_API_HOST` / `APISIX_API_PUBLIC_URL` remain required.
 
+**Per-named-API routes (#1311/#1379).** The `CREATE_ROUTE` saga step does not create a single
+dataset-level route. It creates **one shared upstream per dataset** plus **one route per named API**
+at `/v1/datasets/{datasetId}/{slug}`, each with a deterministic id `NamedApiHelper.derive(datasetId,
+slug)`, and returns a **slug-keyed `routeIds` map** that the portal-backend persists onto each
+`NamedApi`. `UPDATE_ROUTE`/`DELETE_ROUTE`/`RESTORE_ROUTE` iterate that map (DELETE/RESTORE are
+404-idempotent). A command without `namedApis` falls back to a single dataset-level route
+(legacy/edge). The reserved slug `apis` keeps the discovery endpoint `/v1/datasets/{id}/apis` from
+being shadowed.
+
 ## Overview
 
 The APISIX adapter integrates with Apache APISIX API Gateway's Admin API to manage upstream backend services. It consumes CloudEvents from Kafka and translates them into APISIX Admin API calls, enabling automated configuration management for your API Gateway infrastructure.
@@ -107,9 +116,19 @@ The APISIX adapter integrates with Apache APISIX API Gateway's Admin API to mana
 | UPDATE | PUT | `/apisix/admin/routes/{id}` | Update existing route |
 | DELETE | DELETE | `/apisix/admin/routes/{id}` | Delete route |
 
+> **Two provisioning paths.** The tables above describe the **event-driven `ApisixAdapter`**
+> (`AbstractConfigAdapter`), which consumes the CloudEvent topics below and creates routes with a
+> server-assigned id via `POST`. **Dataset routes are provisioned separately** by the
+> **`ApisixSagaHandler`**, which is driven by saga commands (`CREATE_ROUTE`, `UPDATE_ROUTE`,
+> `DELETE_ROUTE`, `RESTORE_ROUTE`) — not by Kafka topics — and uses `PUT /apisix/admin/routes/{id}`
+> with a deterministic id (`NamedApiHelper.derive(datasetId, slug)`), one route per named API at
+> `/v1/datasets/{datasetId}/{slug}`. The deterministic id is what makes CREATE/UPDATE/DELETE
+> idempotent (issue #1368). See `config-adapter/docs/SAGA-DATASET-USE-CASES.md`.
+
 ### Subscribed Topics
 
-The adapter subscribes to backend and route lifecycle events:
+The **event-driven `ApisixAdapter`** subscribes to backend and route lifecycle events. (Dataset
+route provisioning does **not** use these topics — it is saga-command-driven; see the note above.)
 
 **Backend Topics:**
 - `de.civitascore.api.backend.created` - New backend services
@@ -143,8 +162,9 @@ apisix.api.public.url=http://api.localhost:9080
 
 # Gateway-side auth plugin_config_id — required. Private dataset routes (openDataAccess=false)
 # attach this plugin_config so APISIX enforces OIDC/OPA in front of the upstream. The referenced
-# plugin_config must be provisioned in APISIX before any private dataset is created.
-apisix.plugin.config.id=oidc-opa
+# plugin_config must be provisioned in APISIX before any private dataset is created. The dev/CI
+# stack provisions it as plugin_config id `1` (see dev-environment apisix seeding).
+apisix.plugin.config.id=1
 
 # Headers the saga route's proxy-rewrite must strip — optional but typically required in
 # production. Applied to EVERY saga route (public and private alike), because APISIX merges
@@ -192,7 +212,7 @@ APISIX_ADMIN_URL=http://apisix:9180
 APISIX_ADMIN_KEY=your-api-key
 APISIX_API_HOST=api.core.example.org
 APISIX_API_PUBLIC_URL=https://api.core.example.org
-APISIX_PLUGIN_CONFIG_ID=oidc-opa
+APISIX_PLUGIN_CONFIG_ID=1
 APISIX_PROXY_REWRITE_HEADERS_REMOVE=X-Allowed-Scope-Ids
 # Pick ONE FROST upstream auth scheme:
 APISIX_FROST_BASIC_AUTH_USERNAME=frost-admin

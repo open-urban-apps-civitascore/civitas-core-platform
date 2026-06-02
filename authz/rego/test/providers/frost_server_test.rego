@@ -212,3 +212,18 @@ test_path_traversal_rejected if {
 		with data.backends.frost_server.api_host as api_host
 	result == ""
 }
+
+# resource_id must be undefined (not just path_pattern empty) when the request hits a
+# non-API host — scope enforcement reads resource_id, so a leaked value here would scope
+# a request that should never have matched. Fail-closed.
+test_resource_id_wrong_host_undefined if {
+	not frost_server.resource_id with input as frost_request_host("GET", "/v1/datasets/dataset-42", "other.example.test")
+		with data.backends.frost_server.api_host as api_host
+}
+
+# A reserved third segment (e.g. "me") is not a dataset ID — resource_id must be undefined so
+# the request cannot be scoped to a fictitious dataset named after the reserved word.
+test_resource_id_reserved_segment_undefined if {
+	not frost_server.resource_id with input as frost_request_host("GET", "/v1/datasets/me", api_host)
+		with data.backends.frost_server.api_host as api_host
+}

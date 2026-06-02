@@ -91,6 +91,9 @@
     "/v1/datasets/{id}/assignments": {
       "GET": "DATASET_READ"
     },
+    "/v1/datasets/{id}/apis": {
+      "GET": "DATASET_READ"
+    },
     "/v1/datasets/{id}/pipelines": {
       "GET": "DATASET_READ",
       "POST": "DATASET_CREATE"

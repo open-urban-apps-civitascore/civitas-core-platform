@@ -119,13 +119,25 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   protected DataSet postConvertToEntity(DataSet entity, DataSetInputDTO input) {
     List<NamedApiInputDTO> incoming = input.getNamedApis();
     if (incoming != null) {
+      // Validate slug uniqueness up front (before touching the entity): two NamedApi rows with the
+      // same slug would otherwise hit the DB unique constraint as an opaque 500, and the slug is the
+      // per-named-API route key, so duplicates are ambiguous downstream. Fail with a business 400.
+      Set<String> incomingSlugs = new HashSet<>();
+      for (NamedApiInputDTO dto : incoming) {
+        if (!incomingSlugs.add(dto.getSlug())) {
+          throw new InvalidInputException(
+              "namedApis",
+              entity.getId(),
+              "Duplicate named-API slug '"
+                  + dto.getSlug()
+                  + "' — named-API slugs must be unique within a dataset");
+        }
+      }
       Map<String, NamedApi> existingBySlug = new HashMap<>();
       for (NamedApi api : entity.getNamedApis()) {
         existingBySlug.put(api.getSlug(), api);
       }
-      Set<String> incomingSlugs = new HashSet<>();
       for (NamedApiInputDTO dto : incoming) {
-        incomingSlugs.add(dto.getSlug());
         NamedApi existing = existingBySlug.get(dto.getSlug());
         if (existing != null) {
           existing.setName(dto.getName());

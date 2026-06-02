@@ -128,7 +128,15 @@ class DatasetCreateFlowableIT {
 
     ApisixSagaHandler apisixHandler = new ApisixSagaHandler();
     apisixHandler.initialize(
-        mapConfig(Map.of("apisix.admin.url", apisixMockUrl, "apisix.admin.key", "test-key")));
+        mapConfig(
+            Map.of(
+                "apisix.admin.url", apisixMockUrl,
+                "apisix.admin.key", "test-key",
+                // Required since #1368 — the handler fails fast without these.
+                "apisix.api.host", "api.test.local",
+                "apisix.api.public.url", "http://api.test.local",
+                "apisix.plugin.config.id", "test-plugin-config",
+                "apisix.frost.api.key", "test-frost-upstream-key")));
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);

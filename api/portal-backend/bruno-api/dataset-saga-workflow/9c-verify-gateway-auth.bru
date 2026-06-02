@@ -8,7 +8,7 @@ meta {
 }
 
 get {
-  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}/{{sagaSlug}}
   body: none
   auth: none
 }
@@ -22,7 +22,7 @@ tests {
 docs {
   **Saga step 9c of 18** — Verify APISIX gateway enforces authentication on the published-API host.
 
-  Sends an unauthenticated GET request to `api.<host>/v1/datasets/{id}` through the APISIX gateway. The OpenID-Connect plugin applied by the saga must reject the request with 401.
+  Sends an unauthenticated GET request to the per-named-API data route `api.<host>/v1/datasets/{id}/{slug}` through the APISIX gateway. The OpenID-Connect plugin applied by the saga must reject the request with 401.
 
   **Precondition:** `sagaDataSetId` is set; APISIX reachable at `apisixApiUrl` (whose hostname matches the `hosts` filter on the saga-provisioned route); saga has completed and the route exists.
 

@@ -1,0 +1,53 @@
+meta {
+  name: Get token via api-access (public client, no secret)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  grant_type: password
+  client_id: {{apiAccessClientId}}
+  username: {{username}}
+  password: {{password}}
+}
+
+script:post-response {
+  // Make the token available to subsequent Payload-API data-plane calls.
+  if (res.getStatus() === 200 && res.getBody() && res.getBody().access_token) {
+    bru.setVar('apiAccessToken', res.getBody().access_token);
+  }
+}
+
+tests {
+  test("api-access issues a token without a client secret (#1293)", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("response carries an access_token", function() {
+    expect(res.getBody()).to.have.property('access_token');
+  });
+}
+
+docs {
+  **External Payload-API access — credential contract (concept #1293).**
+
+  Protected named-API routes (`/v1/datasets/{id}/{slug}` when the dataset is NOT open data) require a
+  bearer token. Per concept #1293 external API consumers must obtain that token through the static
+  public Keycloak client **`api-access`** — *public client, no secret, Resource Owner Password
+  Credentials (direct access grants) flow* — and NOT through the confidential `portal-frontend`
+  client (whose secret is for the portal UI/management API only).
+
+  > "the platform uses the static Keycloak client `api-access` with public client, no secret, and
+  > password credentials flow." — concept #1293
+
+  This request performs that ROPC exchange against Keycloak and stores the resulting bearer in
+  `apiAccessToken`. A protected data-plane GET then sends `Authorization: Bearer {{apiAccessToken}}`.
+  Note that authorization (which datasets the token's user may read) is still enforced by OPA on the
+  gateway; a valid token only clears the authentication gate.
+}

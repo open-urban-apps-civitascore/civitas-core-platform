@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AppConfig;
+import de.civitascore.configadapter.model.dataset.NamedApiHelper;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -66,6 +67,12 @@ class ApisixSagaHandlerRoutingTest extends AbstractApisixIntegrationTest {
   private static final String FROST_PASS = "frost-pass";
   private static final String STUB_ALIAS = "stub-upstream";
   private static final int STUB_PORT = 8080;
+  // Per-named-API model: one route per slug. These routing tests use a single named API ("data").
+  private static final String SLUG = "data";
+
+  private static String routeId(String datasetId) {
+    return NamedApiHelper.derive(datasetId, SLUG);
+  }
 
   @SuppressWarnings("resource")
   private static final GenericContainer<?> STUB_UPSTREAM;
@@ -120,7 +127,7 @@ class ApisixSagaHandlerRoutingTest extends AbstractApisixIntegrationTest {
     createRouteAndAwaitGateway(datasetId);
 
     HttpResponse<String> response =
-        sendGatewayRequest("/v1/datasets/" + datasetId + "/Things", API_HOST);
+        sendGatewayRequest("/v1/datasets/" + datasetId + "/" + SLUG + "/Things", API_HOST);
 
     assertEquals(
         200,
@@ -181,7 +188,7 @@ class ApisixSagaHandlerRoutingTest extends AbstractApisixIntegrationTest {
     //    FROST path. If the catch-all leaks through, the stub sees the original URL,
     //    which is the #1368 regression.
     HttpResponse<String> response =
-        sendGatewayRequest("/v1/datasets/" + datasetId + "/Things", API_HOST);
+        sendGatewayRequest("/v1/datasets/" + datasetId + "/" + SLUG + "/Things", API_HOST);
 
     assertEquals(200, response.statusCode(), "expected 200 — body: " + response.body());
     JsonNode echoed = objectMapper.readTree(response.body());
@@ -191,6 +198,8 @@ class ApisixSagaHandlerRoutingTest extends AbstractApisixIntegrationTest {
         "saga route must win over /v1/* catch-all via URI specificity — if the catch-all"
             + " leaked, the stub would echo /v1/datasets/"
             + datasetId
+            + "/"
+            + SLUG
             + "/Things (issue #1368 regression)");
   }
 
@@ -200,7 +209,7 @@ class ApisixSagaHandlerRoutingTest extends AbstractApisixIntegrationTest {
     createRouteAndAwaitGateway(datasetId, false);
 
     HttpResponse<String> response =
-        sendGatewayRequest("/v1/datasets/" + datasetId + "/Things", API_HOST);
+        sendGatewayRequest("/v1/datasets/" + datasetId + "/" + SLUG + "/Things", API_HOST);
 
     assertEquals(
         200,
@@ -237,7 +246,7 @@ class ApisixSagaHandlerRoutingTest extends AbstractApisixIntegrationTest {
 
     HttpRequest request =
         HttpRequest.newBuilder()
-            .uri(URI.create(gatewayBaseUrl + "/v1/datasets/" + datasetId + "/Things"))
+            .uri(URI.create(gatewayBaseUrl + "/v1/datasets/" + datasetId + "/" + SLUG + "/Things"))
             .header("Host", API_HOST)
             .header("X-Allowed-Scope-Ids", "malicious-bypass-attempt-*")
             .GET()
@@ -263,7 +272,7 @@ class ApisixSagaHandlerRoutingTest extends AbstractApisixIntegrationTest {
     createRouteAndAwaitGateway(datasetId, true);
 
     HttpResponse<String> response =
-        sendGatewayRequest("/v1/datasets/" + datasetId + "/Things", API_HOST);
+        sendGatewayRequest("/v1/datasets/" + datasetId + "/" + SLUG + "/Things", API_HOST);
 
     assertEquals(200, response.statusCode(), "public route must proxy");
 
@@ -281,7 +290,8 @@ class ApisixSagaHandlerRoutingTest extends AbstractApisixIntegrationTest {
     createRouteAndAwaitGateway(datasetId);
 
     HttpResponse<String> response =
-        sendGatewayRequest("/v1/datasets/" + datasetId + "/Things?$top=1&$skip=2", API_HOST);
+        sendGatewayRequest(
+            "/v1/datasets/" + datasetId + "/" + SLUG + "/Things?$top=1&$skip=2", API_HOST);
 
     assertEquals(200, response.statusCode(), "expected 200 — body: " + response.body());
     JsonNode echoed = objectMapper.readTree(response.body());
@@ -299,6 +309,87 @@ class ApisixSagaHandlerRoutingTest extends AbstractApisixIntegrationTest {
         "2",
         query.get("$skip").asText(),
         "upstream must see original $skip query parameter — got: " + query);
+  }
+
+  @Test
+  void shouldRouteThroughApisixWhenServiceIdConfigured() throws Exception {
+    String datasetId = "svc-" + UUID.randomUUID();
+    String serviceId = "svc-frost-it-" + datasetId;
+
+    // Seed the APISIX Service the saga route will reference — this is the Service OPA reads via
+    // with_service=true (input.service.name → frost_server dispatch). Give it a valid upstream.
+    createServiceDirectly(
+        serviceId,
+        Map.of(
+            "name",
+            "frost-server",
+            "upstream",
+            Map.of("type", "roundrobin", "nodes", Map.of(STUB_ALIAS + ":" + STUB_PORT, 1))));
+
+    // A handler configured WITH apisix.service.id stamps service_id onto every saga route.
+    Map<String, Object> props = new HashMap<>();
+    props.put("apisix.admin.url", adminApiUrl);
+    props.put("apisix.admin.key", ADMIN_API_KEY);
+    props.put("apisix.api.host", API_HOST);
+    props.put("apisix.api.public.url", API_PUBLIC_URL);
+    props.put("apisix.plugin.config.id", "auth-plugin-default");
+    props.put("apisix.proxy.rewrite.headers.remove", "X-Allowed-Scope-Ids");
+    props.put("apisix.frost.basic.auth.username", FROST_USER);
+    props.put("apisix.frost.basic.auth.password", FROST_PASS);
+    props.put("apisix.service.id", serviceId);
+
+    try (ApisixSagaHandler svcHandler = new ApisixSagaHandler()) {
+      svcHandler.initialize(new AppConfig(new MapConfiguration(props)));
+
+      SagaCommandResult result =
+          svcHandler.handle(
+              new SagaCommandMessage(
+                  "EXECUTE_STEP",
+                  "msg-" + datasetId,
+                  "saga-" + datasetId,
+                  "create-route",
+                  "apisix",
+                  "CREATE_ROUTE",
+                  Map.of(
+                      "datasetId",
+                      datasetId,
+                      "upstreamUrl",
+                      "http://" + STUB_ALIAS + ":" + STUB_PORT + "/FROST-Server/v1.1/Projects(1)",
+                      "openDataAccess",
+                      true,
+                      "namedApis",
+                      List.of(Map.of("slug", SLUG, "standard", "STA")))));
+      assertEquals("STEP_COMPLETED", result.type());
+
+      // The provisioned route actually carries the configured service_id...
+      await()
+          .atMost(10, SECONDS)
+          .pollInterval(200, java.util.concurrent.TimeUnit.MILLISECONDS)
+          .ignoreExceptions()
+          .untilAsserted(
+              () -> {
+                JsonNode route = getRouteFromApisix(routeId(datasetId));
+                assertEquals(
+                    serviceId,
+                    route.get("value").get("service_id").asText(),
+                    "saga route must reference the configured APISIX service_id (OPA with_service"
+                        + " path)");
+              });
+
+      // ...and a real request still routes through that service_id-bearing route to the upstream,
+      // proving APISIX accepts the route against a real instance — not just the JSON body shape.
+      HttpResponse<String> response =
+          sendGatewayRequest("/v1/datasets/" + datasetId + "/" + SLUG + "/Things", API_HOST);
+      assertEquals(
+          200,
+          response.statusCode(),
+          "a route carrying service_id must still route through APISIX — body: " + response.body());
+      JsonNode echoed = objectMapper.readTree(response.body());
+      assertEquals(
+          "/FROST-Server/v1.1/Projects(1)/Things",
+          echoed.get("path").asText(),
+          "proxy-rewrite must still map onto the FROST upstream path with service_id present");
+    }
   }
 
   // ─── helpers ────────────────────────────────────────────────────────────
@@ -323,7 +414,9 @@ class ApisixSagaHandlerRoutingTest extends AbstractApisixIntegrationTest {
                 "upstreamUrl",
                 "http://" + STUB_ALIAS + ":" + STUB_PORT + "/FROST-Server/v1.1/Projects(1)",
                 "openDataAccess",
-                openDataAccess));
+                openDataAccess,
+                "namedApis",
+                List.of(Map.of("slug", SLUG, "standard", "STA"))));
     SagaCommandResult result = sagaHandler.handle(command);
     assertEquals("STEP_COMPLETED", result.type());
 
@@ -334,7 +427,7 @@ class ApisixSagaHandlerRoutingTest extends AbstractApisixIntegrationTest {
         .ignoreExceptions()
         .untilAsserted(
             () -> {
-              JsonNode route = getRouteFromApisix(datasetId);
+              JsonNode route = getRouteFromApisix(routeId(datasetId));
               assertTrue(route.has("value"));
             });
   }

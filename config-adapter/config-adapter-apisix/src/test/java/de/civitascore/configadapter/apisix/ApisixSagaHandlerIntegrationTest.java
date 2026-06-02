@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AppConfig;
+import de.civitascore.configadapter.model.dataset.NamedApiHelper;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -44,8 +45,15 @@ class ApisixSagaHandlerIntegrationTest extends AbstractApisixIntegrationTest {
   private static final String FROST_USER = "frost-user";
   private static final String FROST_PASS = "frost-pass";
   private static final String PLUGIN_CONFIG_ID = "auth-plugin-default";
+  // Per-named-API model: the saga provisions one route per slug. These tests use a single named API
+  // ("data"); the route id is the deterministic NamedApiHelper.derive(datasetId, slug).
+  private static final String SLUG = "data";
 
   private ApisixSagaHandler sagaHandler;
+
+  private static String routeId(String datasetId) {
+    return NamedApiHelper.derive(datasetId, SLUG);
+  }
 
   @BeforeEach
   void setUpSagaHandler() throws Exception {
@@ -85,7 +93,7 @@ class ApisixSagaHandlerIntegrationTest extends AbstractApisixIntegrationTest {
     assertEquals(
         API_PUBLIC_URL + "/v1/datasets/" + datasetId, result.resultData().get("publicUrl"));
 
-    JsonNode value = getRouteFromApisix(datasetId).get("value");
+    JsonNode value = getRouteFromApisix(routeId(datasetId)).get("value");
 
     JsonNode hosts = value.get("hosts");
     assertNotNull(hosts, "route must carry hosts array (issue #1368)");
@@ -95,14 +103,14 @@ class ApisixSagaHandlerIntegrationTest extends AbstractApisixIntegrationTest {
 
     List<String> uris = extractUris(value);
     assertTrue(
-        uris.contains("/v1/datasets/" + datasetId),
-        "uris must contain the /v1/datasets/{id} root — got: " + uris);
+        uris.contains("/v1/datasets/" + datasetId + "/" + SLUG),
+        "uris must contain the /v1/datasets/{id}/{slug} root — got: " + uris);
     assertTrue(
-        uris.contains("/v1/datasets/" + datasetId + "/*"),
-        "uris must contain the /v1/datasets/{id}/* wildcard — got: " + uris);
+        uris.contains("/v1/datasets/" + datasetId + "/" + SLUG + "/*"),
+        "uris must contain the /v1/datasets/{id}/{slug}/* wildcard — got: " + uris);
 
     String regex = value.get("plugins").get("proxy-rewrite").get("regex_uri").get(0).asText();
-    assertEquals("^/v1/datasets/" + datasetId + "(/.*)?$", regex);
+    assertEquals("^/v1/datasets/" + datasetId + "/" + SLUG + "(/.*)?$", regex);
   }
 
   @Test
@@ -112,7 +120,7 @@ class ApisixSagaHandlerIntegrationTest extends AbstractApisixIntegrationTest {
     SagaCommandResult result = sagaHandler.handle(createRouteCommand(datasetId, false));
     assertEquals("STEP_COMPLETED", result.type());
 
-    JsonNode value = getRouteFromApisix(datasetId).get("value");
+    JsonNode value = getRouteFromApisix(routeId(datasetId)).get("value");
     assertEquals(
         PLUGIN_CONFIG_ID,
         value.get("plugin_config_id").asText(),
@@ -145,7 +153,7 @@ class ApisixSagaHandlerIntegrationTest extends AbstractApisixIntegrationTest {
     sagaHandler.handle(createRouteCommand(datasetId, true));
 
     JsonNode proxyRewrite =
-        getRouteFromApisix(datasetId).get("value").get("plugins").get("proxy-rewrite");
+        getRouteFromApisix(routeId(datasetId)).get("value").get("plugins").get("proxy-rewrite");
     JsonNode headers = proxyRewrite.get("headers");
     assertNotNull(
         headers,
@@ -163,9 +171,10 @@ class ApisixSagaHandlerIntegrationTest extends AbstractApisixIntegrationTest {
 
     SagaCommandResult result = sagaHandler.handle(updateRouteCommand(datasetId, false));
     assertEquals("STEP_COMPLETED", result.type());
-    assertEquals(true, result.compensationData().get("previousOpenDataAccess"));
+    assertEquals(
+        true, ((Map<?, ?>) result.compensationData().get("previousOpenDataAccess")).get(SLUG));
 
-    JsonNode value = getRouteFromApisix(datasetId).get("value");
+    JsonNode value = getRouteFromApisix(routeId(datasetId)).get("value");
     assertEquals(
         PLUGIN_CONFIG_ID,
         value.get("plugin_config_id").asText(),
@@ -180,7 +189,7 @@ class ApisixSagaHandlerIntegrationTest extends AbstractApisixIntegrationTest {
 
     String regex = proxyRewrite.get("regex_uri").get(0).asText();
     assertEquals(
-        "^/v1/datasets/" + datasetId + "(/.*)?$",
+        "^/v1/datasets/" + datasetId + "/" + SLUG + "(/.*)?$",
         regex,
         "UPDATE must preserve the existing regex_uri (Finding 1 — PATCH would have wiped it)");
   }
@@ -192,9 +201,10 @@ class ApisixSagaHandlerIntegrationTest extends AbstractApisixIntegrationTest {
 
     SagaCommandResult result = sagaHandler.handle(updateRouteCommand(datasetId, true));
     assertEquals("STEP_COMPLETED", result.type());
-    assertEquals(false, result.compensationData().get("previousOpenDataAccess"));
+    assertEquals(
+        false, ((Map<?, ?>) result.compensationData().get("previousOpenDataAccess")).get(SLUG));
 
-    JsonNode value = getRouteFromApisix(datasetId).get("value");
+    JsonNode value = getRouteFromApisix(routeId(datasetId)).get("value");
     assertNull(
         value.get("plugin_config_id"),
         "public-data routes must drop plugin_config_id (Finding 2 — PATCH would have kept it)");
@@ -216,7 +226,7 @@ class ApisixSagaHandlerIntegrationTest extends AbstractApisixIntegrationTest {
         "apisix",
         "UPDATE_ROUTE",
         Map.of(
-            "routeId", datasetId,
+            "routeIds", Map.of(SLUG, routeId(datasetId)),
             "serviceId", datasetId,
             "openDataAccess", openDataAccess));
   }
@@ -235,7 +245,9 @@ class ApisixSagaHandlerIntegrationTest extends AbstractApisixIntegrationTest {
             "upstreamUrl",
             "http://stub-upstream:5678/FROST-Server/v1.1/Projects(1)",
             "openDataAccess",
-            openDataAccess));
+            openDataAccess,
+            "namedApis",
+            List.of(Map.of("slug", SLUG, "standard", "STA"))));
   }
 
   private static List<String> extractUris(JsonNode routeValue) {

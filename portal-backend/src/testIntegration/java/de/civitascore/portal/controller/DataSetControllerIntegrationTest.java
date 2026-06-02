@@ -46,6 +46,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -1642,6 +1644,137 @@ class DataSetControllerIntegrationTest
       assertThat(persisted.getProjectId()).isNull();
       assertThat(persisted.getPublicUrl()).isNull();
       assertThat(persisted.getPendingSagaType()).isNull();
+    }
+  }
+
+  @Nested
+  @DisplayName("GET /datasets/{id}/apis — Named API discovery (#1596)")
+  class GetNamedApisEndpoint {
+
+    private UUID createDatasetWithApis() {
+      DataSetInputDTO input = createValidInput();
+      input.setNamedApis(
+          List.of(
+              namedApi("Traffic", "traffic", ApiStandard.STA, "1.1"),
+              namedApi("Weather", "weather", ApiStandard.STA, null)));
+      ResponseEntity<DataSetOutputDTO> created = performCreate(input);
+      assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      return created.getBody().getId();
+    }
+
+    private void makeAvailable(UUID id) {
+      txTemplate.executeWithoutResult(
+          s -> {
+            DataSet ds = dataSetRepository.findById(id).orElseThrow();
+            ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+            dataSetRepository.save(ds);
+          });
+    }
+
+    @Test
+    @DisplayName(
+        "returns the named APIs with previewUrl for a published (AVAILABLE) in-scope dataset")
+    void shouldReturnNamedApisForAvailableDataset() {
+      UUID id = createDatasetWithApis();
+      makeAvailable(id);
+
+      ResponseEntity<List<NamedApiOutputDTO>> response =
+          exchange(
+              DATASETS_ENDPOINT + "/" + id + "/apis",
+              HttpMethod.GET,
+              createAuthHeadersWithScope(id.toString()),
+              null,
+              new ParameterizedTypeReference<List<NamedApiOutputDTO>>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody())
+          .extracting(NamedApiOutputDTO::getSlug)
+          .containsExactlyInAnyOrder("traffic", "weather");
+      String base = civitasProperties.api().baseUrl() + "/v1/datasets/" + id;
+      assertThat(response.getBody())
+          .allSatisfy(api -> assertThat(api.getPreviewUrl()).isEqualTo(base + "/" + api.getSlug()));
+    }
+
+    @Test
+    @DisplayName(
+        "returns an empty list for a DRAFT dataset — only published APIs are discoverable (#1379)")
+    void shouldReturnEmptyForDraftDataset() {
+      UUID id = createDatasetWithApis(); // DRAFT, carries two named APIs
+
+      ResponseEntity<List<NamedApiOutputDTO>> response =
+          exchange(
+              DATASETS_ENDPOINT + "/" + id + "/apis",
+              HttpMethod.GET,
+              createAuthHeadersWithScope(id.toString()),
+              null,
+              new ParameterizedTypeReference<List<NamedApiOutputDTO>>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody())
+          .as("a DRAFT dataset has no active published APIs — draft edits must not change the"
+              + " public API surface (#1379)")
+          .isEmpty();
+    }
+
+    @Test
+    @DisplayName("returns an empty list when the dataset has no named APIs")
+    void shouldReturnEmptyListWhenNoNamedApis() {
+      UUID id = createTestEntity();
+
+      ResponseEntity<List<NamedApiOutputDTO>> response =
+          exchange(
+              DATASETS_ENDPOINT + "/" + id + "/apis",
+              HttpMethod.GET,
+              createAuthHeadersWithScope(id.toString()),
+              null,
+              new ParameterizedTypeReference<List<NamedApiOutputDTO>>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("returns 404 when the dataset is outside the caller's scope (no leakage)")
+    void shouldReturn404WhenDatasetOutOfScope() {
+      UUID id = createDatasetWithApis();
+      HttpHeaders headers = createAuthHeadersWithScope(UUID.randomUUID().toString());
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              DATASETS_ENDPOINT + "/" + id + "/apis",
+              HttpMethod.GET,
+              new HttpEntity<>(headers),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("returns 404 for an unknown dataset id")
+    void shouldReturn404ForUnknownDataset() {
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              DATASETS_ENDPOINT + "/" + UUID.randomUUID() + "/apis",
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("returns 403 when the X-Allowed-Scope-Ids header is missing")
+    void shouldReturn403WhenScopeHeaderMissing() {
+      UUID id = createDatasetWithApis();
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              DATASETS_ENDPOINT + "/" + id + "/apis",
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeadersWithoutScope()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
   }
 }

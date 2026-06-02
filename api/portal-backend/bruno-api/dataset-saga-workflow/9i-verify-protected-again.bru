@@ -5,18 +5,19 @@ meta {
 }
 
 get {
-  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}/{{sagaSlug}}
   body: none
   auth: none
 }
 
 script:pre-request {
   // The UPDATE saga from 9h re-attaches the auth plugin asynchronously. Poll the data-plane
-  // WITHOUT a token until it returns 401 again (route re-protected), max ~40s.
+  // WITHOUT a token until it returns 401 again (route re-protected), max ~50s (25 attempts × 2s).
   // Bruno's QuickJS axios does not honour a validateStatus function, so it throws on non-2xx;
   // catch the 401 (re-protected) state — that is exactly the status we are polling for.
   const axios = require('axios');
-  const url = `${bru.getEnvVar('apisixApiUrl')}/v1/datasets/${bru.getVar('sagaDataSetId')}`;
+  const slug = bru.getVar('sagaSlug') || 'things';
+  const url = `${bru.getEnvVar('apisixApiUrl')}/v1/datasets/${bru.getVar('sagaDataSetId')}/${slug}`;
   for (let i = 0; i < 25; i++) {
     let status = 0;
     try { status = (await axios.get(url)).status; }

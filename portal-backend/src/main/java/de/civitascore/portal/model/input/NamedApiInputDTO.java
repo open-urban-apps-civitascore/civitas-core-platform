@@ -19,8 +19,8 @@ import lombok.Data;
 @Data
 public class NamedApiInputDTO {
 
-  @NotBlank(message = "Name is required") @Schema(
-      description = "Human-readable display label for this named API.",
+  @NotBlank(message = "Name is required") @Size(max = 255, message = "Name must be at most 255 characters") @Schema(
+      description = "Human-readable display label for this named API. Max 255 characters.",
       example = "Traffic Sensor Readings")
   private String name;
 
@@ -42,8 +42,9 @@ public class NamedApiInputDTO {
       example = "STA")
   private ApiStandard standard;
 
-  @Schema(
-      description = "Optional standard version (e.g. \"1.1\" for STA). Free-form string.",
+  @Size(max = 32, message = "Version must be at most 32 characters") @Schema(
+      description = "Optional standard version (e.g. \"1.1\" for STA). Free-form string, max 32"
+          + " characters.",
       example = "1.1")
   private String version;
 

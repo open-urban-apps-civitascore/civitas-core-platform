@@ -8,7 +8,7 @@ meta {
 }
 
 get {
-  url: {{sagaPublicUrl}}
+  url: {{sagaPublicUrl}}/{{sagaSlug}}
   body: none
   auth: inherit
 }
@@ -38,7 +38,7 @@ tests {
 docs {
   **Saga step 9d of 18** — Verify end-to-end data access using the publicUrl that the saga persisted on the dataset.
 
-  Uses `sagaPublicUrl` (captured from `body.publicUrl` in step 9) directly as the request target, so the test pins the actual contract clients rely on: the URL produced by the adapter (`apisix.api.public.url` + `/v1/datasets/{id}`) must be reachable through the gateway, with its `Host` header matching the saga-provisioned route's `hosts` filter. A silent drift between `APISIX_API_PUBLIC_URL` and `APISIX_API_HOST` would make the persisted URL unusable and this test would 404 (issue #1368).
+  Uses the persisted `sagaPublicUrl` (`body.publicUrl` from step 9) plus the named-API `sagaSlug` as the request target — `{publicUrl}/{slug}` = `apisix.api.public.url` + `/v1/datasets/{id}/{slug}` — the per-NamedApi data-plane route (#1368). This pins the actual client contract: the per-slug URL must be reachable through the gateway with its `Host` header matching the saga-provisioned route's `hosts` filter. A silent drift between `APISIX_API_PUBLIC_URL` and `APISIX_API_HOST`, or a missing per-slug route, would make the URL unusable and this test would 404.
 
   **Precondition:** `sagaPublicUrl` is set by step 9 (saga completed); bearer token is valid; the persisted host resolves to the APISIX gateway.
 

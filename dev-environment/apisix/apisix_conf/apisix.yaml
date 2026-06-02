@@ -105,9 +105,9 @@ plugin_configs:
 #   - /v1/*                              → portal-backend management API catch-all
 #                                           (static, below; host-agnostic — the frontend
 #                                           reaches it on localhost:9080)
-#   - api.<host>/v1/datasets/{id}[/*]    → FROST-Server (created dynamically by the
-#                                           APISIX saga handler into etcd; bound to the
-#                                           API vhost, more specific URI wins over /v1/*)
+#   - api.<host>/v1/datasets/{id}/{slug} → FROST-Server (one route per named API, created
+#                                           dynamically by the APISIX saga handler into etcd;
+#                                           bound to the API vhost, more specific URI wins over /v1/*)
 #
 # For local dev add to /etc/hosts:
 #   127.0.0.1  api.localhost
@@ -116,7 +116,7 @@ plugin_configs:
 routes:
   # Protected management API catch-all - requires valid JWT and OPA authorization.
   # Host-agnostic: the frontend reaches it on localhost; on the API vhost the more
-  # specific dynamic /v1/datasets/{id} FROST routes take precedence.
+  # specific dynamic /v1/datasets/{id}/{slug} per-named-API routes take precedence.
   - id: portal-backend-api
     name: "Portal Backend API (AuthZ)"
     uri: /v1/*

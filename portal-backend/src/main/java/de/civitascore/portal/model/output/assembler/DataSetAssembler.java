@@ -36,7 +36,14 @@ public class DataSetAssembler implements BaseAssembler<DataSet, DataSetOutputDTO
           .ifPresent(user -> dto.setCreatedBy(userMapper.toSummary(user)));
     }
     if (entity.getId() != null) {
-      String datasetUrl = civitasProperties.api().baseUrl() + "/v1/datasets/" + entity.getId();
+      // Prefer the public URL the saga actually provisioned the APISIX route under
+      // (APISIX_API_PUBLIC_URL → dataSet.publicUrl). The backend-local civitas.api.base-url is only
+      // a fallback for datasets that predate the saga (publicUrl still null); using it as the
+      // primary source produces broken preview/discovery links whenever the two configs diverge.
+      String datasetUrl =
+          entity.getPublicUrl() != null
+              ? entity.getPublicUrl()
+              : civitasProperties.api().baseUrl() + "/v1/datasets/" + entity.getId();
       dto.getNamedApis().forEach(api -> api.setPreviewUrl(datasetUrl + "/" + api.getSlug()));
     }
     return dto;

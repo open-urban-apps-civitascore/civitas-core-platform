@@ -28,6 +28,7 @@ import jakarta.ws.rs.client.Invocation;
 import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -105,6 +106,34 @@ class FrostSagaHandlerTest {
         assertEquals("42", result.resultData().get("projectId"));
         assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
         assertEquals("42", result.compensationData().get("projectId"));
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "names the FROST project '{datasetName} ({datasetId})' so same-named datasets stay isolated")
+    void shouldNameProjectUniquelyWithDatasetId() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(201);
+        when(mockResponse.getHeaderString("Location"))
+            .thenReturn("http://frost:8080/v1.1/Projects(42)");
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Entity<Map<String, Object>>> captor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.post(captor.capture())).thenReturn(mockResponse);
+
+        handler.handle(
+            createCommand(
+                "EXECUTE_STEP",
+                "CREATE_PROJECT",
+                Map.of("datasetName", "Foo", "datasetId", "ds-1")));
+
+        Map<String, Object> body = captor.getValue().getEntity();
+        assertEquals(
+            "Foo (ds-1)",
+            body.get("name"),
+            "FROST project name must include datasetId — two datasets with the same display name"
+                + " must get separate FROST projects (P1 data-isolation)");
       }
     }
 
@@ -442,18 +471,36 @@ class FrostSagaHandlerTest {
     }
 
     @Test
-    @DisplayName("returns COMPENSATION_FAILED on compensate error")
-    void shouldReturnCompensationFailureOnError() {
+    @DisplayName("treats 404 as success on compensation — 'project already gone' is the goal state")
+    void shouldTreat404AsSuccessOnCompensation() {
       try (FrostSagaHandler handler = createHandler()) {
         Response mockResponse = mock(Response.class);
         when(mockResponse.getStatus()).thenReturn(404);
         when(mockResponse.readEntity(String.class)).thenReturn("Not Found");
         when(mockBuilder.delete()).thenReturn(mockResponse);
 
-        SagaCommandMessage command =
-            createCommand("COMPENSATE_STEP", "DELETE_PROJECT", Map.of("projectId", "999"));
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("COMPENSATE_STEP", "DELETE_PROJECT", Map.of("projectId", "999")));
 
-        SagaCommandResult result = handler.handle(command);
+        // Idempotent compensation: the project no longer existing IS the desired end state, so a
+        // retried/already-cleaned-up DELETE_PROJECT compensation must not fail the saga rollback.
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+      }
+    }
+
+    @Test
+    @DisplayName("returns COMPENSATION_FAILED on a genuine error (500) during compensation")
+    void shouldReturnCompensationFailureOnGenuineError() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(500);
+        when(mockResponse.readEntity(String.class)).thenReturn("Internal Server Error");
+        when(mockBuilder.delete()).thenReturn(mockResponse);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("COMPENSATE_STEP", "DELETE_PROJECT", Map.of("projectId", "999")));
 
         assertEquals("COMPENSATION_FAILED", result.type());
         assertNotNull(result.error());
@@ -654,7 +701,11 @@ class FrostSagaHandlerTest {
 
   private SagaCommandMessage createCommand(
       String type, String operation, Map<String, Object> payload) {
+    // CREATE_PROJECT / UPDATE_PROJECT require datasetId (it makes the FROST project name globally
+    // unique — P1). Default it here so individual tests only set it when they assert on it.
+    Map<String, Object> effective = new HashMap<>(payload);
+    effective.putIfAbsent("datasetId", "ds-default");
     return new SagaCommandMessage(
-        type, "msg-001", "saga-001", "create-project", "frost", operation, payload);
+        type, "msg-001", "saga-001", "create-project", "frost", operation, effective);
   }
 }

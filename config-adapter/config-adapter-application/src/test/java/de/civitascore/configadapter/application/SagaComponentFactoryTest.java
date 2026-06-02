@@ -9,9 +9,7 @@
  */
 package de.civitascore.configadapter.application;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.civitascore.configadapter.configuration.AppConfig;
 import java.util.Map;
@@ -33,54 +31,22 @@ class SagaComponentFactoryTest {
   class Create {
 
     @Test
-    @DisplayName(
-        "Should return empty commandConsumer when no SagaCommandHandler implementations exist")
-    void noSagaHandlers() {
+    @DisplayName("Should reject the removed legacy custom orchestrator engine")
+    void customEngine_rejected() {
       AppConfig config =
           configWith(
               Map.of(
                   "orchestrator.engine", "custom",
-                  "kafka.bootstrap.servers", "localhost:9092",
-                  "kafka.group.id", "test-group"));
+                  "kafka.bootstrap.servers", "localhost:9092"));
 
-      SagaComponents components = factory.create(config);
-
-      assertNotNull(components);
-      assertTrue(components.commandConsumer().isEmpty());
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> factory.create(config),
+          "The legacy custom orchestrator was removed — 'custom' must be rejected");
     }
 
     @Test
-    @DisplayName("Should not throw when using default bootstrap servers")
-    void defaultBootstrapServers() {
-      AppConfig config =
-          configWith(Map.of("orchestrator.engine", "custom", "kafka.group.id", "test-group"));
-
-      SagaComponents components = factory.create(config);
-
-      assertNotNull(components);
-      assertNotNull(components.orchestrator());
-    }
-
-    @Test
-    @DisplayName("Should return consistent SagaComponents record")
-    void consistentRecord() {
-      AppConfig config =
-          configWith(
-              Map.of(
-                  "orchestrator.engine", "custom",
-                  "kafka.bootstrap.servers", "localhost:9092",
-                  "kafka.group.id", "test-group"));
-
-      SagaComponents components = factory.create(config);
-
-      assertNotNull(components);
-      assertNotNull(components.commandConsumer());
-      assertNotNull(components.orchestrator());
-    }
-
-    @Test
-    @DisplayName(
-        "Should reject unknown orchestrator.engine values instead of silently using custom")
+    @DisplayName("Should reject unknown orchestrator.engine values instead of silently degrading")
     void unknownEngine_failsFast() {
       AppConfig config =
           configWith(
@@ -88,14 +54,11 @@ class SagaComponentFactoryTest {
                   "orchestrator.engine", "flowabel",
                   "kafka.bootstrap.servers", "localhost:9092"));
 
-      assertThrows(
-          IllegalArgumentException.class,
-          () -> factory.create(config),
-          "Unknown orchestrator.engine must be rejected, not silently treated as custom");
+      assertThrows(IllegalArgumentException.class, () -> factory.create(config));
     }
 
     @Test
-    @DisplayName("Should fail-fast when orchestrator.engine=flowable but JDBC config is missing")
+    @DisplayName("Should fail-fast on the (default) flowable engine when JDBC config is missing")
     void flowableWithoutJdbcConfig_failsFast() {
       AppConfig config =
           configWith(

@@ -171,9 +171,10 @@ describe('ApiConfigForm', () => {
       })
     })
 
-    test('blocks the reserved slug "apis"', async () => {
+    // Mirrors the backend blocklist NamedApiAllowedSlugValidator.RESERVED.
+    test.each(['apis', 'api', 'v1', 'admin'])('blocks the reserved slug "%s"', async reservedSlug => {
       render(<Wrapper apiType={API_TYPE_QUERY.SENSORTHINGS} />)
-      await triggerSlugChange('apis')
+      await triggerSlugChange(reservedSlug)
       await waitFor(() => {
         expect(screen.getByTestId('slugFormMessage')).toHaveTextContent('apis.config.errors.slug.reserved')
       })

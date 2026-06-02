@@ -11,21 +11,45 @@ package de.civitascore.configadapter.application;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.civitascore.configadapter.configuration.AppConfig;
 import de.civitascore.configadapter.exception.FatalAdapterException;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for the Application class covering various configuration scenarios. Tests both
  * successful initialization and expected failure cases.
+ *
+ * <p>These tests target consumer / event-handler wiring, not saga bootstrap. The successful cases
+ * inject {@link #NO_SAGA_BOOTSTRAP} so they don't each spin up a real Flowable engine on H2 and
+ * deploy the coded saga processes (~5s per case). The real saga bootstrap is still exercised once
+ * here by {@link #testDefaultConfigurationFile()} (which uses the production no-arg constructor)
+ * and end-to-end by {@code EndToEndIntegrationTest}. The failure cases use the production
+ * constructor on purpose: they throw at the consumer-factory stage, before any saga bootstrap, so
+ * they stay fast.
  */
 class ApplicationTest {
+
+  /** A saga factory that builds no orchestrator, so a test skips the costly Flowable bootstrap. */
+  private static final SagaComponentFactory NO_SAGA_BOOTSTRAP =
+      new SagaComponentFactory() {
+        @Override
+        SagaComponents create(AppConfig config) {
+          return new SagaComponents(Optional.empty());
+        }
+      };
+
+  private static Application applicationWithoutSagaBootstrap(String configFileName)
+      throws FatalAdapterException {
+    return new Application(configFileName, NO_SAGA_BOOTSTRAP);
+  }
 
   @Test
   @DisplayName("Should successfully create application with valid single adapter configuration")
   void testValidSingleAdapterConfiguration() {
     assertDoesNotThrow(
-        () -> new Application("application-valid-single-adapter.properties"),
+        () -> applicationWithoutSagaBootstrap("application-valid-single-adapter.properties"),
         "Application should initialize successfully with valid single adapter configuration");
   }
 
@@ -33,7 +57,7 @@ class ApplicationTest {
   @DisplayName("Should successfully create application with valid multiple adapters configuration")
   void testValidMultipleAdaptersConfiguration() {
     assertDoesNotThrow(
-        () -> new Application("application.properties"),
+        () -> applicationWithoutSagaBootstrap("application.properties"),
         "Application should initialize successfully with valid multiple adapters configuration");
   }
 
@@ -116,7 +140,7 @@ class ApplicationTest {
   @DisplayName("Should successfully create application with separate consumer and publisher")
   void testSeparateConsumerAndPublisherConfiguration() {
     assertDoesNotThrow(
-        () -> new Application("application-separate-consumer-publisher.properties"),
+        () -> applicationWithoutSagaBootstrap("application-separate-consumer-publisher.properties"),
         "Application should initialize successfully with separate consumer and publisher configuration");
   }
 
@@ -155,7 +179,7 @@ class ApplicationTest {
       "Should succeed with warning when event publisher name does not exist (publisher is optional)")
   void testSuccessWithNonExistentEventPublisher() {
     assertDoesNotThrow(
-        () -> new Application("application-nonexistent-publisher.properties"),
+        () -> applicationWithoutSagaBootstrap("application-nonexistent-publisher.properties"),
         "Application should initialize successfully even when publisher is not found (publisher is optional)");
   }
 
@@ -163,7 +187,7 @@ class ApplicationTest {
   @DisplayName("Should successfully create application with consumer only (no publisher)")
   void testConsumerOnlyConfiguration() {
     assertDoesNotThrow(
-        () -> new Application("application-consumer-only.properties"),
+        () -> applicationWithoutSagaBootstrap("application-consumer-only.properties"),
         "Application should initialize successfully with consumer-only configuration");
   }
 }

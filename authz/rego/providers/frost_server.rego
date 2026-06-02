@@ -3,12 +3,14 @@
 #
 # FROST is accessed via APISIX gateway on the public API virtual host (issue #1368):
 #
-#   https://api.<domain>/v1/datasets/{dataset_id}       →  DATASET_READ (STA service root)
-#   https://api.<domain>/v1/datasets/{dataset_id}/...   →  DATASET_READ (STA sub-resources)
+#   https://api.<domain>/v1/datasets/{dataset_id}       →  DATASET_PAYLOAD_READ (STA service root)
+#   https://api.<domain>/v1/datasets/{dataset_id}/...   →  DATASET_PAYLOAD_READ (STA sub-resources)
 #
 # The {dataset_id} is the same dataset ID from portal_backend's PostgreSQL.
 # APISIX proxy-rewrite maps /v1/datasets/{id}/* to the upstream FROST path.
-# OPA only checks that the user has DATASET_READ for that specific dataset.
+# OPA checks that the user has DATASET_PAYLOAD_READ for that specific dataset — reading SensorThings
+# *content* requires payload access, not the broader metadata-level DATASET_READ. (The /apis
+# discovery endpoint is served by portal_backend and is gated separately.)
 #
 # Secondary sanity check: the provider enforces that the request arrived via the
 # configured API gateway host (data.backends.frost_server.api_host). This catches
@@ -104,7 +106,7 @@ default path_pattern := ""
 
 # Match any request path starting with /v1/datasets/{uuid}[/*] ON THE API HOST.
 # All FROST sub-resources (Things, Datastreams, Observations, etc.) map to the
-# same /v1/datasets/{id} pattern — permission is always DATASET_READ.
+# same /v1/datasets/{id} pattern — permission is always DATASET_PAYLOAD_READ (content access).
 #
 # Uses prefix matching instead of genericrestmapper because FROST paths have
 # the dataset ID at position 2 (not at the generic REST position).

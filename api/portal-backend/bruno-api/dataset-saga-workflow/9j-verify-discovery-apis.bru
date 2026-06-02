@@ -1,0 +1,71 @@
+meta {
+  name: 9j. Verify Discovery API (GET /v1/datasets/{id}/apis, #1596)
+  type: http
+  seq: 31
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}/apis
+  body: none
+  auth: inherit
+}
+
+tests {
+  // Discovery endpoint GET /v1/datasets/{id}/apis (#1596, concept #1379) — a portal-backend
+  // management endpoint, reached through the gateway's /v1/* management catch-all. No dedicated
+  // APISIX route is needed: the per-NamedApi route model provisions specific
+  // /v1/datasets/{id}/{slug} routes (no dataset-level wildcard) and `apis` is a reserved slug, so
+  // nothing shadows this path. These assertions catch the three classic discovery mistakes.
+  test("Discovery is not swallowed by a FROST data route (not 404)", function() {
+    expect(res.getStatus()).to.not.equal(404);
+  });
+
+  test("Authorized discovery request succeeds (200, not 403)", function() {
+    // A 403 would mean OPA is missing the /v1/datasets/{id}/apis GET -> DATASET_READ mapping
+    // (authz/rego/data/backends/portal_backend/data.json).
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Returns the named-API list as an array, not a FROST SensorThings document", function() {
+    // FROST's root returns an object with a `value` array; discovery must return the named APIs
+    // as an array — catches a routing collision that reached FROST instead of portal-backend.
+    expect(res.body).to.be.an('array');
+    expect(res.body).to.not.have.property('value');
+  });
+
+  test("Discovery list includes the dataset's named API slug 'things'", function() {
+    const slugs = (res.body || []).map(a => a.slug);
+    expect(slugs).to.include('things');
+  });
+
+  test("Each named API carries a server-built previewUrl", function() {
+    res.body.forEach(function(api) {
+      expect(api.previewUrl).to.be.a('string');
+    });
+  });
+}
+
+docs {
+  **Saga step 9j of 18 — Discovery API (#1596, concept #1379).**
+
+  Lists the dataset's named APIs via `GET /v1/datasets/{id}/apis`. This is a **portal-backend
+  management endpoint** reached through the gateway's `/v1/*` management catch-all → portal-backend.
+  No dedicated higher-priority APISIX route is needed: the per-NamedApi route model provisions
+  specific `/v1/datasets/{id}/{slug}` routes (there is no dataset-level `/v1/datasets/{id}/*`
+  wildcard anymore), and `apis` is a reserved slug, so no named-API data route can shadow this path.
+
+  Guards against the three classic discovery mistakes:
+  1. **Routing collision** — a 404 / FROST-shaped (object with `value`) response would mean a data
+     route swallowed `/apis`.
+  2. **Missing OPA permission** — a 403 would mean `/v1/datasets/{id}/apis` GET is not mapped to
+     `DATASET_READ`.
+  3. **Wrong contract** — must return the named-API array including the known slug `things`, each
+     with a server-built `previewUrl`.
+
+  **Reserved slug:** `apis` is reserved (frontend `RESERVED_SLUGS`, backend
+  `NamedApiAllowedSlugValidator`) so no named API can shadow this path.
+
+  **Precondition:** released dataset with named API `things` (steps 4-9); bearer token has DATASET_READ.
+
+  **Expected:** 200 OK, JSON array of named APIs including slug `things`.
+}

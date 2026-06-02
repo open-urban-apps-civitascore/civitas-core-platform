@@ -46,6 +46,46 @@ test_backend_data_key_conversion if {
 	result == "portal_backend"
 }
 
+# FROST data-plane dispatch (#1368): the per-named-API APISIX route carries
+# service_id=svc-frost-server, whose Service name is "frost-server" (see
+# dev-environment/apisix/seed-routes.sh). With with_service=true APISIX forwards that Service, so
+# OPA reads input.service.name == "frost-server" and routes to the frost_server backend. These
+# tests pin that contract — the route-level service_id is what selects the frost_server policy.
+frost_request(method, path) := {
+	"request": {
+		"method": method,
+		"path": path,
+		"headers": {},
+	},
+	"service": {"name": "frost-server"},
+}
+
+test_backend_frost_server_from_service if {
+	result := resource_mapping.backend with input as frost_request("GET", "/v1/datasets/abc-123/Things")
+	result == "frost-server"
+}
+
+test_backend_data_key_frost_conversion if {
+	# "frost-server" → "frost_server" → data.backends.frost_server
+	result := resource_mapping.backend_data_key with input as frost_request("GET", "/v1/datasets/abc-123/Things")
+	result == "frost_server"
+}
+
+# Without the FROST service (route missing its service_id, or wrong service), the same FROST
+# data-plane path does NOT dispatch to frost_server — proving the service binding is load-bearing.
+test_frost_dataplane_without_service_not_frost if {
+	result := resource_mapping.backend with input as {"request": {"method": "GET", "path": "/v1/datasets/abc-123/Things", "headers": {}}}
+	result == "unknown"
+}
+
+test_frost_dataplane_wrong_service_not_frost if {
+	result := resource_mapping.backend with input as {
+		"request": {"method": "GET", "path": "/v1/datasets/abc-123/Things", "headers": {}},
+		"service": {"name": "portal-backend"},
+	}
+	result != "frost-server"
+}
+
 # =============================================================================
 # PATH PATTERN MATCHING TESTS
 # =============================================================================

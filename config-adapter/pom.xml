@@ -29,7 +29,6 @@
 		<module>config-adapter-apisix</module>
 		<module>config-adapter-examples</module>
 		<module>config-adapter-frost</module>
-		<module>config-adapter-orchestrator</module>
 		<module>config-adapter-redpanda</module>
 		<module>config-adapter-flowable</module>
 	</modules>

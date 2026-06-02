@@ -373,6 +373,31 @@ abstract class AbstractApisixIntegrationTest {
     }
   }
 
+  protected void createServiceDirectly(String serviceId, Map<String, Object> config)
+      throws Exception {
+    String url = adminApiUrl + "/apisix/admin/services/" + serviceId;
+    String json = objectMapper.writeValueAsString(config);
+
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Content-Type", "application/json")
+            .header("X-API-KEY", ADMIN_API_KEY)
+            .PUT(HttpRequest.BodyPublishers.ofString(json))
+            .timeout(Duration.ofSeconds(30))
+            .build();
+
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    if (response.statusCode() < 200 || response.statusCode() >= 300) {
+      throw new RuntimeException(
+          "Failed to create service. Status: "
+              + response.statusCode()
+              + ", Body: "
+              + response.body());
+    }
+  }
+
   protected void createRouteDirectly(String routeId, Map<String, Object> config) throws Exception {
     String url = adminApiUrl + "/apisix/admin/routes/" + routeId;
     String json = objectMapper.writeValueAsString(config);
