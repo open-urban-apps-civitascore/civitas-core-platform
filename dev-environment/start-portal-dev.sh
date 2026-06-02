@@ -491,6 +491,22 @@ if [ "$PG_READY" = false ]; then
     exit 1
 fi
 
+# Ensure the Flowable saga database exists (config-adapter's embedded engine).
+# PostgreSQL has no "CREATE DATABASE IF NOT EXISTS", so guard with a catalog check.
+# Unlike init scripts (docker-entrypoint-initdb.d, which only run on a fresh volume),
+# this runs on every start — so it also provisions the database on existing volumes
+# created before Flowable was introduced. Idempotent, same spirit as Flyway below.
+echo "  Ensuring Flowable database exists..."
+if docker exec civitas-postgres-portal psql -U admin -d portal_backend -tAc \
+    "SELECT 1 FROM pg_database WHERE datname='flowable'" 2>/dev/null | grep -q 1; then
+    echo "  Flowable database already present"
+elif docker exec civitas-postgres-portal psql -U admin -d portal_backend -c \
+    "CREATE DATABASE flowable OWNER admin" >/dev/null 2>&1; then
+    echo "  Flowable database created"
+else
+    echo "  WARNING: Could not create Flowable database (config-adapter may fail to start)"
+fi
+
 echo "  Running database migrations..."
 FLYWAY_MIGRATIONS="$SCRIPT_DIR/../portal-backend/src/main/resources/db/migration"
 if docker run --rm --network civitas-network \
@@ -813,6 +829,10 @@ export KAFKA_GROUP_ID=config-adapter-group
 export KAFKA_RETRY_MAX_ATTEMPTS=3
 export KAFKA_RETRY_INITIAL_BACKOFF_MS=1000
 export KAFKA_DLQ_TOPIC=de.civitascore.idm.dlq
+# Flowable saga engine — dedicated 'flowable' database on the portal PostgreSQL
+export FLOWABLE_JDBC_URL=jdbc:postgresql://localhost:5432/flowable
+export FLOWABLE_JDBC_USERNAME=admin
+export FLOWABLE_JDBC_PASSWORD=admin
 export KEYCLOAK_URL=http://localhost:8080
 export KEYCLOAK_REALM=master
 export KEYCLOAK_USERNAME=admin
@@ -894,6 +914,9 @@ if [ "$config_adapter_option" = "3" ]; then
     echo "Environment variables to set in IDE:"
     echo "  HEALTHCHECK_PORT=8088"
     echo "  KAFKA_BOOTSTRAP_SERVERS=localhost:9092"
+    echo "  FLOWABLE_JDBC_URL=jdbc:postgresql://localhost:5432/flowable"
+    echo "  FLOWABLE_JDBC_USERNAME=admin"
+    echo "  FLOWABLE_JDBC_PASSWORD=admin"
     echo "  KEYCLOAK_URL=http://localhost:8080"
     echo "  KEYCLOAK_REALM=master"
     echo "  KEYCLOAK_USERNAME=admin"

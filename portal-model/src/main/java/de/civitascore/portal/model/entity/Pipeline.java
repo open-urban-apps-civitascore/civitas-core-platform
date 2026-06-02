@@ -12,7 +12,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.Builder;
@@ -54,10 +53,6 @@ public class Pipeline extends NamedEntity {
       inverseJoinColumns = @JoinColumn(name = "data_source_id"))
   @Builder.Default
   private Set<DataSource> dataSources = new HashSet<>();
-
-  /** Array of persistence IDs. Must only contain the Master ID (persistenceId from DataSet). */
-  @Column(name = "persistences", columnDefinition = "bigint[]")
-  private List<Long> persistences;
 
   /** Executable RedpandaConnect configuration in JSON/YAML format. */
   @JdbcTypeCode(SqlTypes.JSON)

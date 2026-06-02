@@ -16,7 +16,6 @@ import { LAYOUT_DIMENSIONS } from '../../_constants/pipelineStyles'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
 import type { PipelineNodeData } from '../../_types/nodes'
 import {
-  isApiNodeData,
   isControlNodeData,
   isCronNodeData,
   isDataSourceNodeData,
@@ -25,7 +24,6 @@ import {
   isMappingNodeData,
 } from '../../_types/nodes'
 import { InspectorHeader } from './components/InspectorHeader'
-import { ApiPanel } from './panels/ApiPanel'
 import { ControlPanel } from './panels/ControlPanel'
 import { CronPanel } from './panels/CronPanel'
 import { DataSourcePanel } from './panels/DataSourcePanel'
@@ -110,9 +108,6 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
     }
     if (isDataSourceNodeData(data)) {
       return <DataSourcePanel data={data} onUpdate={handleNodeUpdate} />
-    }
-    if (isApiNodeData(data)) {
-      return <ApiPanel data={data} />
     }
     if (isCronNodeData(data)) {
       return <CronPanel data={data} onUpdate={handleNodeUpdate} />

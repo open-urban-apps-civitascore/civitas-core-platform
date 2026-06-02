@@ -1010,6 +1010,7 @@
   },
   "pipelineEditor": {
     "title": "Pipeline Editor",
+    "subtitle": "Defines how data is ingested, transformed, and persisted",
     "canvas": {
       "noPipeline": "No pipeline available"
     },
@@ -1027,8 +1028,6 @@
       "start": "Start",
       "end": "End",
       "dataSource": "Data source",
-      "apiRequest": "API Request",
-      "apiResponse": "API Response",
       "cronTrigger": "CRON Trigger",
       "frostStorage": "FROST Server",
       "geoPersistence": "Geo Persistence",
@@ -1045,16 +1044,12 @@
       "transformation": "Transformation"
     },
     "paletteItems": {
-      "flowStart": "Flow Start",
+      "flowStart": "Pipeline Start",
       "flowStartDesc": "Pipeline entry point. Execution starts here.",
-      "flowEnd": "Flow End",
+      "flowEnd": "Pipeline End",
       "flowEndDesc": "Pipeline exit point. Execution ends here.",
       "dataSource": "Data source",
-      "dataSourceDesc": "Data source. Select a configured Data source.",
-      "apiRequest": "API Request",
-      "apiRequestDesc": "REST API request trigger. Creates endpoint that serves data on HTTP request.",
-      "apiResponse": "API Response",
-      "apiResponseDesc": "REST API response. Returns data to client.",
+      "dataSourceDesc": "Select data source.",
       "cron": "CRON",
       "cronDesc": "Scheduled trigger. Executes pipeline on schedule.",
       "frostServer": "FROST Server",
@@ -1092,11 +1087,6 @@
       "tags": "Tags",
       "showDataStructure": "Show Data Structure",
       "noPermission": "No permission to read datasources"
-    },
-    "apiPanel": {
-      "requestDetails": "API Request Details",
-      "responseDetails": "API Response Details",
-      "apiPath": "API Path"
     },
     "frostPanel": {
       "details": "FROST Server Details",
@@ -1141,7 +1131,6 @@
       "messages": {
         "startNodeRequired": "Pipeline must have at least one Start node",
         "endNodeRequired": "Pipeline must have at least one End node",
-        "apiPairing": "API Request node requires an API Response node in the pipeline",
         "nodeNotConfigured": "{label} is not configured",
         "invalidCronExpression": "{label} has an invalid cron expression. Must be a 6-field Quartz syntax.",
         "orphanNode": "{label} is not connected to any other node",

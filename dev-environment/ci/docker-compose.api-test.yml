@@ -17,7 +17,11 @@ services:
   # ── Databases ──────────────────────────────────────────────
 
   postgres-portal:
-    image: postgres:18.1-alpine
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM postgres:18.1-alpine
+        RUN echo "CREATE DATABASE flowable OWNER admin;" > /docker-entrypoint-initdb.d/20-flowable.sql
     environment:
       POSTGRES_DB: portal_backend
       POSTGRES_USER: admin
@@ -381,6 +385,9 @@ services:
       FROST_TOPICS: de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
       NIFI_URL: https://nifi:8443
       NIFI_TOPICS: de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
+      FLOWABLE_JDBC_URL: jdbc:postgresql://postgres-portal:5432/flowable
+      FLOWABLE_JDBC_USERNAME: admin
+      FLOWABLE_JDBC_PASSWORD: admin
     depends_on:
       kafka:
         condition: service_healthy

@@ -26,10 +26,13 @@ public interface PipelineMapper extends DtoMapper<PipelineInputDTO, PipelineOutp
   @Override
   Pipeline toEntity(PipelineInputDTO input);
 
+  @Mapping(target = "dataSetId", source = "dataSet.id")
+  @Mapping(target = "dataSinks", ignore = true)
   @Override
   PipelineOutputDTO toOutput(Pipeline entity);
 
   @Mapping(target = "dataSetId", source = "dataSet.id")
+  @Mapping(target = "dataSinks", ignore = true)
   @Override
   PipelineInputDTO toInput(Pipeline entity);
 

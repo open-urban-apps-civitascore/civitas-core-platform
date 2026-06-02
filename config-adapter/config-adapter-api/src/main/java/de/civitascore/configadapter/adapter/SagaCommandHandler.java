@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.adapter;
 
 import de.civitascore.configadapter.configuration.AdapterConfig;
+import java.util.Map;
 
 /**
  * Handler for saga commands dispatched by the orchestrator. Each adapter module provides an
@@ -49,6 +50,19 @@ public interface SagaCommandHandler extends AutoCloseable {
    * @return the result to publish back to the orchestrator
    */
   SagaCommandResult handle(SagaCommandMessage command);
+
+  /**
+   * Declares incoming-payload field renames this adapter understands. Each entry maps a source
+   * field name to the target field name this adapter expects (e.g. {@code "baseUrl" →
+   * "upstreamUrl"} for APISIX, where FROST upstream produced {@code baseUrl}). Lets adapters
+   * declare their own upstream-field naming differences without leaking adapter-specific knowledge
+   * into the orchestrator. Consumers must not overwrite existing target keys.
+   *
+   * @return map from source field name to target field name; default: empty
+   */
+  default Map<String, String> fieldAliases() {
+    return Map.of();
+  }
 
   @Override
   default void close() {}
