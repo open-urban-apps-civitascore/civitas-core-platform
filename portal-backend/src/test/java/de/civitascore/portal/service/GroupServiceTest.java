@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.idm.GroupConfig;
 import de.civitascore.portal.configuration.EventProperties;
+import de.civitascore.portal.configuration.KeycloakProperties;
 import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
@@ -44,6 +45,9 @@ class GroupServiceTest {
   @Mock private EventProperties eventProperties;
 
   private static final String TARGET_REALM = "test-realm";
+  private static final String AUTH_SERVER_URL = "http://keycloak:8080";
+  private static final KeycloakProperties KEYCLOAK_PROPERTIES =
+      new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM);
 
   private GroupService createService() {
     return new GroupService(
@@ -52,7 +56,7 @@ class GroupServiceTest {
         groupMapper,
         userService,
         assignmentFactory,
-        TARGET_REALM,
+        KEYCLOAK_PROPERTIES,
         eventProperties);
   }
 

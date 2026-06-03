@@ -4,6 +4,7 @@ import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.idm.GroupConfig;
 import de.civitascore.portal.configuration.EventProperties;
+import de.civitascore.portal.configuration.KeycloakProperties;
 import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
@@ -16,7 +17,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,8 +27,7 @@ public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
   private final GroupMapper groupMapper;
   private final UserService userService;
   private final AssignmentFactory assignmentFactory;
-  private final String targetRealm;
-  private final EventProperties eventProperties;
+  private final KeycloakProperties keycloakProperties;
 
   public GroupService(
       ConfigEventPublisherService configEventPublisher,
@@ -36,15 +35,14 @@ public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
       GroupMapper groupMapper,
       UserService userService,
       AssignmentFactory assignmentFactory,
-      @Value("${keycloak.target-realm}") String targetRealm,
+      KeycloakProperties keycloakProperties,
       EventProperties eventProperties) {
     super(configEventPublisher, eventProperties);
     this.groupRepository = groupRepository;
     this.groupMapper = groupMapper;
     this.userService = userService;
     this.assignmentFactory = assignmentFactory;
-    this.targetRealm = targetRealm;
-    this.eventProperties = eventProperties;
+    this.keycloakProperties = keycloakProperties;
   }
 
   @Override
@@ -157,7 +155,7 @@ public class GroupService extends EventPublishingService<Group, GroupInputDTO> {
 
   @Override
   protected String getRealm(Group entity) {
-    return targetRealm;
+    return keycloakProperties.targetRealm();
   }
 
   @Override

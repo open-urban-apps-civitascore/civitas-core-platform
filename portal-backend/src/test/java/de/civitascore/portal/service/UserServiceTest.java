@@ -37,6 +37,10 @@ class UserServiceTest {
   @Mock private GroupRepository groupRepository;
 
   private static final String TARGET_REALM = "test-realm";
+  private static final String AUTH_SERVER_URL = "http://keycloak:8080";
+  private static final KeycloakProperties KEYCLOAK_PROPERTIES =
+      new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM);
+  private static final int CONFIG_ADAPTER_TIMEOUT_SECONDS = 10;
 
   private UserService createService() {
     return new UserService(
@@ -44,8 +48,8 @@ class UserServiceTest {
         userRepository,
         userMapper,
         groupRepository,
-        new KeycloakProperties(TARGET_REALM, "http://keycloak:8080", "test-realm"),
-        new EventProperties(10));
+        KEYCLOAK_PROPERTIES,
+        new EventProperties(CONFIG_ADAPTER_TIMEOUT_SECONDS));
   }
 
   private User userWithId(UUID id) {

@@ -11,6 +11,8 @@ import static org.mockito.Mockito.when;
 import de.civitascore.configadapter.model.ConfigResultEvent;
 import de.civitascore.configadapter.model.Operation;
 import de.civitascore.configadapter.model.idm.GroupConfig;
+import de.civitascore.portal.configuration.EventProperties;
+import de.civitascore.portal.configuration.KeycloakProperties;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.GroupRepository;
@@ -29,7 +31,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("GroupInitializer Tests")
@@ -39,6 +40,12 @@ class GroupInitializerTest {
   @Mock private RoleRepository roleRepository;
   @Mock private AssignmentRepository assignmentRepository;
   @Mock private ConfigEventPublisherService configEventPublisher;
+
+  private static final String TARGET_REALM = "test-realm";
+  private static final String AUTH_SERVER_URL = "http://keycloak:8080";
+  private static final KeycloakProperties KEYCLOAK_PROPERTIES =
+      new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM);
+  private static final int CONFIG_ADAPTER_TIMEOUT_SECONDS = 1;
 
   private GroupInitializer initializer;
 
@@ -50,9 +57,9 @@ class GroupInitializerTest {
             roleRepository,
             assignmentRepository,
             configEventPublisher,
-            Optional.empty());
-    ReflectionTestUtils.setField(initializer, "targetRealm", "test-realm");
-    ReflectionTestUtils.setField(initializer, "configAdapterTimeoutSeconds", 1);
+            Optional.empty(),
+            KEYCLOAK_PROPERTIES,
+            new EventProperties(CONFIG_ADAPTER_TIMEOUT_SECONDS));
   }
 
   private Group group(String name) {

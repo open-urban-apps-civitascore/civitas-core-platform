@@ -2,6 +2,8 @@ package de.civitascore.portal.service.initializer;
 
 import de.civitascore.configadapter.model.ConfigResultEvent;
 import de.civitascore.configadapter.model.idm.GroupConfig;
+import de.civitascore.portal.configuration.EventProperties;
+import de.civitascore.portal.configuration.KeycloakProperties;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
@@ -25,7 +27,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
@@ -66,24 +67,24 @@ public class GroupInitializer {
   private final AssignmentRepository assignmentRepository;
   private final ConfigEventPublisherService configEventPublisher;
   private final Optional<InitProperties> initProperties;
-
-  @Value("${keycloak.target-realm}")
-  private String targetRealm;
-
-  @Value("${event.config-adapter-timeout-seconds:10}")
-  private int configAdapterTimeoutSeconds;
+  private final KeycloakProperties keycloakProperties;
+  private final EventProperties eventProperties;
 
   public GroupInitializer(
       GroupRepository groupRepository,
       RoleRepository roleRepository,
       AssignmentRepository assignmentRepository,
       ConfigEventPublisherService configEventPublisher,
-      Optional<InitProperties> initProperties) {
+      Optional<InitProperties> initProperties,
+      KeycloakProperties keycloakProperties,
+      EventProperties eventProperties) {
     this.groupRepository = groupRepository;
     this.roleRepository = roleRepository;
     this.assignmentRepository = assignmentRepository;
     this.configEventPublisher = configEventPublisher;
     this.initProperties = initProperties;
+    this.keycloakProperties = keycloakProperties;
+    this.eventProperties = eventProperties;
   }
 
   @EventListener(ApplicationReadyEvent.class)
@@ -189,7 +190,7 @@ public class GroupInitializer {
     for (Group group : groupsAtDepth) {
       GroupConfig groupConfig = GroupService.buildGroupConfig(group);
       CompletableFuture<ConfigResultEvent> future =
-          configEventPublisher.publishGroupCreated(targetRealm, groupConfig);
+          configEventPublisher.publishGroupCreated(keycloakProperties.targetRealm(), groupConfig);
       pending.add(new PendingSync(group, future));
     }
 
@@ -203,7 +204,8 @@ public class GroupInitializer {
   private void handleResult(PendingSync entry) {
     Group group = entry.group();
     try {
-      ConfigResultEvent result = entry.future().get(configAdapterTimeoutSeconds, TimeUnit.SECONDS);
+      ConfigResultEvent result =
+          entry.future().get(eventProperties.configAdapterTimeoutSeconds(), TimeUnit.SECONDS);
 
       if (result != null
           && result.status() == ConfigResultEvent.Status.SUCCESS
