@@ -22,6 +22,14 @@ script:post-response {
     const match = res.body.content.find(d => d.name === 'Saga Sensor Data Structure');
     if (match) {
       bru.setVar('sagaDataStructureId', match.id);
+      const existingVersion = match.dataStructureVersions &&
+        match.dataStructureVersions.find(v => v.version === '1.0.0');
+      if (existingVersion) {
+        bru.setVar('sagaDataStructureVersionId', existingVersion.id);
+      } else {
+        // Clear any stale value from a previous run so downstream steps don't reuse a wrong id.
+        bru.setVar('sagaDataStructureVersionId', null);
+      }
     }
   }
 }
@@ -40,5 +48,5 @@ docs {
 
   **Expected Response:** 200 OK (search always returns 200; empty `content` array if not found).
 
-  **Post-condition:** If found, saves `sagaDataStructureId` from matching entry.
+  **Post-condition:** If found, saves `sagaDataStructureId` from the matching entry. Also saves `sagaDataStructureVersionId` if version `1.0.0` already exists — this prevents step 3d from using an undefined version ID when step 3c returns 409 (already exists).
 }

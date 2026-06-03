@@ -66,6 +66,10 @@ public enum AdapterErrorCode {
   REDPANDA_DECRYPTION_ERROR(
       3303, false, "Credential decryption error: %s", "Credential processing failed"),
 
+  GEOSERVER_ERROR(3401, true, "GeoServer error: %s", "Geo service error"),
+  GEOSERVER_RESOURCE_ERROR(
+      3402, false, "GeoServer resource error: %s", "Geo resource operation failed"),
+
   // 9xxx: Unknown/unexpected errors
   UNKNOWN_ERROR(9001, false, "Unexpected error: %s", "Internal error"),
   SERIALIZATION_ERROR(9002, false, "Serialization error: %s", "Data processing error"),
