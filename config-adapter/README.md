@@ -257,25 +257,28 @@ geoserver.postgis.password=secret
 Adapter for managing PostgreSQL/PostGIS table configuration via DDL.
 
 **Key Components:**
-- `PostgisAdapter` - Applies table DDL (CREATE, DELETE) via JDBC against a Postgres/PostGIS database
-- `PostgisDialect` - Renders DDL and classifies `SQLException`s (duplicate / missing / connectivity)
+- `PostgisAdapter` - Routes by payload type and applies DDL via JDBC against a Postgres/PostGIS database
+- `PostgisDialect` - Renders DDL (tables, schemas, roles, grants) and classifies `SQLException`s (duplicate / missing / connectivity)
 - `TableDdlBuilder` - Produces the ordered DDL statement list for a `TableConfig`
+- `GrantReconciler` - Diffs a role's desired vs. current schema grants (used on role UPDATE)
 - `ConnectionProvider` - HikariCP-backed `DataSource` wrapper
 
 **Supported Operations:**
-- CREATE - Create schema (if given), table, and indexes (idempotent: SQLState `42P06`/`42P07` → success)
-- DELETE - Drop table (idempotent: SQLState `42P01`/`3F000` → success)
-- UPDATE - Not yet implemented (returns `UNSUPPORTED_OPERATION`)
+- Table: CREATE / DELETE (idempotent on SQLState `42P07`/`42P06`/`42P01`/`3F000`); UPDATE not yet implemented (`UNSUPPORTED_OPERATION`)
+- Schema: CREATE (optional `AUTHORIZATION` owner) / UPDATE (owner change) / DELETE (`RESTRICT` default, `CASCADE` when `cascade=true`)
+- Role: CREATE / UPDATE / DELETE — login flag, optional `ENC(...)` password (decrypted with `CIVITAS_MASTER_KEY`), embedded schema grants reconciled on UPDATE (idempotent on `42710`/`42704`)
 
 **Subscribed Topics:**
-- `de.civitascore.data.table.created`
-- `de.civitascore.data.table.updated`
-- `de.civitascore.data.table.deleted`
+- `de.civitascore.data.table.created` / `.updated` / `.deleted`
+- `de.civitascore.data.schema.created` / `.updated` / `.deleted`
+- `de.civitascore.data.role.created` / `.updated` / `.deleted`
 
 **Configuration Properties:**
 ```properties
-# Topics to subscribe to
-postgis.topics=de.civitascore.data.table.created,de.civitascore.data.table.updated,de.civitascore.data.table.deleted
+# Topics to subscribe to (tables, schemas, roles)
+postgis.topics=de.civitascore.data.table.created,de.civitascore.data.table.updated,de.civitascore.data.table.deleted,\
+  de.civitascore.data.schema.created,de.civitascore.data.schema.updated,de.civitascore.data.schema.deleted,\
+  de.civitascore.data.role.created,de.civitascore.data.role.updated,de.civitascore.data.role.deleted
 
 # JDBC connection settings (required)
 postgis.jdbc.url=jdbc:postgresql://localhost:5432/civitas
@@ -285,9 +288,11 @@ postgis.jdbc.password=civitas
 # Optional pool tuning (defaults shown)
 postgis.jdbc.maxPoolSize=5
 postgis.jdbc.connectionTimeoutMs=5000
+
+# CIVITAS_MASTER_KEY (env var) — required only to decrypt ENC(...) role passwords
 ```
 
-**Documentation:** For the design rationale (dialect seam, idempotency policy, why no migration tool), see [PostGIS Adapter Design](docs/postgis-adapter-design.md).
+**Documentation:** For the design rationale (dialect seam, idempotency policy, credential handling, why no migration tool), see [PostGIS Adapter Design](docs/postgis-adapter-design.md).
 
 ### 10. config-adapter-examples
 Example adapter implementations for reference and testing.
@@ -1267,13 +1272,19 @@ All topics are defined in `de.civitascore.configadapter.Topics` and validated at
 | `PIPELINE_UPDATED` | `de.civitascore.data.pipeline.updated` |
 | `PIPELINE_DELETED` | `de.civitascore.data.pipeline.deleted` |
 
-#### Table Events (PostGIS)
+#### Table / Schema / Role Events (PostGIS)
 
 | Topic Constant | Topic Value |
 |----------------|-------------|
 | `TABLE_CREATED` | `de.civitascore.data.table.created` |
 | `TABLE_UPDATED` | `de.civitascore.data.table.updated` |
 | `TABLE_DELETED` | `de.civitascore.data.table.deleted` |
+| `SCHEMA_CREATED` | `de.civitascore.data.schema.created` |
+| `SCHEMA_UPDATED` | `de.civitascore.data.schema.updated` |
+| `SCHEMA_DELETED` | `de.civitascore.data.schema.deleted` |
+| `DB_ROLE_CREATED` | `de.civitascore.data.role.created` |
+| `DB_ROLE_UPDATED` | `de.civitascore.data.role.updated` |
+| `DB_ROLE_DELETED` | `de.civitascore.data.role.deleted` |
 
 **Topic Validation:**
 - Topics are validated using `Topics.isValidTopic(String)` method
@@ -1338,7 +1349,7 @@ mvn test
 mvn verify
 ```
 
-Integration tests use Testcontainers for Kafka and Keycloak.
+Integration tests use Testcontainers for Kafka, Keycloak, FROST/PostGIS (used by FROST IT and saga IT), and a dedicated PostgreSQL/PostGIS container for the PostGIS adapter IT (`PostgisAdapterIT`) and end-to-end pipeline test (`PostgisEndToEndIT`).
 
 ### Parallel Test Execution
 

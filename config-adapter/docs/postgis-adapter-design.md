@@ -1,17 +1,18 @@
 # PostGIS Config Adapter — Design Sketch
 
 > **Module**: `config-adapter-postgis`
-> **Scope (first step)**: table create / update / delete via JDBC
-> **Status**: scaffolded — CREATE and DELETE implemented and unit-tested; UPDATE returns `UNSUPPORTED_OPERATION` (deferred). No integration test yet.
+> **Scope**: table, schema, and role (incl. schema-level grants) CRUD via JDBC
+> **Status**: Tables — CREATE/DELETE (UPDATE deferred → `UNSUPPORTED_OPERATION`); Schemas — CREATE/UPDATE/DELETE; Roles — CREATE/UPDATE/DELETE with grant reconciliation. All implemented with unit, integration, and end-to-end tests.
 
 ---
 
 ## 1. Goals
 
 - Apply DDL changes to a PostgreSQL/PostGIS database in response to `ConfigEvent`s.
-- Operations implemented in this scaffold: **table CREATE and DELETE** (UPDATE deferred — see Status above).
-- Keep PostGIS specifics (geometry types, SRID, GIST indexes) isolated from a generic SQL core, so future SQL flavors (MySQL, Oracle, …) can be added by introducing a sibling dialect rather than rewriting the adapter.
+- Resources: **tables** (CREATE/DELETE), **schemas** (CREATE/UPDATE/DELETE), and **roles** (CREATE/UPDATE/DELETE) with embedded schema-level grants.
+- Keep PostGIS specifics (geometry types, SRID, GIST indexes) and all flavor-specific SQL isolated behind a generic `SqlDialect`, so future SQL flavors (MySQL, Oracle, …) can be added by introducing a sibling dialect rather than rewriting the adapter.
 - Idempotency behaviour identical to the existing adapters (FROST, APISIX, Keycloak).
+- Role passwords reuse the project credential convention: encrypted `ENC(...)` values decrypted with `CIVITAS_MASTER_KEY` via `CredentialDecryptor`, exactly as the RedPanda adapter handles datasource credentials.
 
 ---
 
@@ -22,7 +23,11 @@ Single module today; the dialect seam allows graduation to a `config-adapter-sql
 ```
 config-adapter-api/
 └── src/main/java/de/civitascore/configadapter/model/postgis/
-    ├── PostgisConfigValue.java       ← sealed, permits TableConfig (+ future types)
+    ├── PostgisConfigValue.java       ← sealed, permits TableConfig, SchemaConfig, DbRoleConfig
+    ├── SchemaConfig.java             ← class (name, optional owner, cascade flag)
+    ├── DbRoleConfig.java             ← class (name, canLogin, password, attributes, grants)
+    ├── SchemaGrant.java              ← record(schema, privileges, withGrantOption)
+    ├── SchemaPrivilege.java          ← enum: USAGE, CREATE, ALL
     ├── TableConfig.java              ← class (Jackson POJO with setters)
     ├── ColumnConfig.java             ← record(name, type, length, precision, scale,
     │                                            nullable, defaultExpr)
@@ -44,21 +49,23 @@ config-adapter-postgis/                ← module
 │   └── de.civitascore.configadapter.adapter.ConfigAdapter
 │         → de.civitascore.configadapter.postgis.PostgisAdapter
 └── src/main/java/de/civitascore/configadapter/postgis/
-    ├── PostgisAdapter.java           ← extends AbstractConfigAdapter;
-    │                                    SQLState classification lives here
+    ├── PostgisAdapter.java           ← extends AbstractConfigAdapter; routes by payload
+    │                                    type; credential decrypt; SQLState classification
     ├── ConnectionProvider.java       ← HikariDataSource wrapper
     ├── dialect/
-    │   ├── SqlDialect.java           ← seam for future flavors
+    │   ├── SqlDialect.java           ← seam for future flavors (table/schema/role/grant DDL)
     │   └── PostgisDialect.java       ← PostGIS implementation (DDL + isDuplicate/
     │                                    isMissing/isConnectivity)
     └── ddl/
-        └── TableDdlBuilder.java      ← thin wrapper that delegates to the dialect
+        ├── TableDdlBuilder.java      ← thin wrapper that delegates table DDL to the dialect
+        └── GrantReconciler.java      ← pure diff: desired vs. current schema grants
 ```
 
 ### Sealed payload type
 
 ```java
-public sealed interface PostgisConfigValue extends ConfigValue permits TableConfig {
+public sealed interface PostgisConfigValue extends ConfigValue
+    permits TableConfig, SchemaConfig, DbRoleConfig {
   String POSTGIS_RESULT_TYPE = "de.civitascore.data.table.processing.result";
 }
 
@@ -82,16 +89,37 @@ When `geometryColumns` is empty, the generated SQL contains no PostGIS-specific 
 ```java
 public interface SqlDialect {
     String quoteIdent(String ident);
-    String renderColumn(ColumnConfig column);
-    String renderGeometryColumn(GeometryColumnConfig column);
-    String generatedIndexName(TableConfig table, IndexConfig index);
+    // tables
     List<String> createTable(TableConfig table);
     List<String> dropTable(String schema, String name);
-    boolean isDuplicate(SQLException e);       // → idempotent CREATE
-    boolean isMissing(SQLException e);         // → idempotent DELETE
-    boolean isConnectivity(SQLException e);    // → retryable
+    // schemas
+    List<String> createSchema(SchemaConfig schema);
+    List<String> alterSchemaOwner(SchemaConfig schema);
+    List<String> dropSchema(SchemaConfig schema);
+    // roles
+    List<String> createRole(DbRoleConfig role, String decryptedPassword);
+    List<String> alterRole(DbRoleConfig role, String decryptedPassword);
+    List<String> dropRole(DbRoleConfig role);
+    // schema-level grants
+    String grantOnSchema(String role, String schema, List<SchemaPrivilege> privs, boolean grantOption);
+    String revokeOnSchema(String role, String schema, List<SchemaPrivilege> privs);
+    String readSchemaGrantsQuery();            // one ? bind (role) → (schema, privilege) rows
+    // classification
+    boolean isDuplicate(SQLException e);        // → idempotent CREATE (incl. 42710 role exists)
+    boolean isMissing(SQLException e);          // → idempotent DELETE (incl. 42704 role missing)
+    boolean isConnectivity(SQLException e);     // → retryable
 }
 ```
+
+### Schemas, roles, and grants
+
+- **Schema** — CREATE renders `CREATE SCHEMA "x" [AUTHORIZATION "owner"]`; UPDATE renders `ALTER SCHEMA "x" OWNER TO "owner"` (no-op when no owner given); DELETE renders `DROP SCHEMA "x" RESTRICT` (default) or `CASCADE` when `cascade=true` on the payload.
+- **Role** — a database *user* is just a role with `LOGIN`, so one `DbRoleConfig` models both via `canLogin`. CREATE/ALTER render the attribute clause (`LOGIN`/`NOLOGIN`, `SUPERUSER`, `CREATEDB`, `CREATEROLE`, `INHERIT`) and, when a password is present, `PASSWORD '…'`.
+- **Grants** — embedded in `DbRoleConfig.grants` and treated as the desired state. On CREATE every listed grant is issued. On UPDATE the adapter reads the role's current schema privileges (`readSchemaGrantsQuery`), and `GrantReconciler` computes the `GRANT`/`REVOKE` delta — privileges newly present are granted, privileges no longer listed are revoked. `SchemaPrivilege.ALL` expands to `USAGE` + `CREATE` for comparison.
+
+### Credentials
+
+Role passwords follow the project convention (same as the RedPanda adapter). A `password` field may be an `ENC(...)` value; the adapter loads `CIVITAS_MASTER_KEY` via `CryptoKeyLoader.loadAndStretchKeyFromEnv`, then decrypts with `CredentialDecryptor` under the credential context `portal-backend:postgis-role`. If the key is absent and an encrypted password arrives, the event fails fatally (`POSTGIS_ERROR`). Plaintext passwords pass through unchanged. The generated `PASSWORD '…'` literal is redacted from all logs and error messages, and the stretched key is zeroed on `close()`.
 
 ---
 
@@ -108,6 +136,8 @@ Matches the convention established by FROST, APISIX, and Keycloak: do **not** pr
 | CREATE INDEX  | `42P07`  | duplicate_object   | success (idempotent) |
 | DROP TABLE    | `42P01`  | undefined_table    | success (idempotent) |
 | DROP SCHEMA   | `3F000`  | invalid_schema     | success (idempotent) |
+| CREATE ROLE   | `42710`  | duplicate_object   | success (idempotent) |
+| DROP ROLE     | `42704`  | undefined_object   | success (idempotent) |
 | `08xxx`       | —        | connection failure | retryable (2xxx)     |
 | `22xxx`       | —        | data exception     | fatal (1xxx)         |
 | `23xxx`       | —        | integrity viol.    | fatal (1xxx)         |
@@ -120,15 +150,15 @@ Mapping lives inside `PostgisDialect` (via `isDuplicate` / `isMissing` / `isConn
 ## 4. Event Flow
 
 1. `KafkaEventHandler` consumes the CloudEvent → `CloudEventProcessor` deserialises to `ConfigEvent`.
-2. `PostgisAdapter.doProcessConfigEvent()` extracts the `TableConfig` from `event.payload().config().value()`.
-3. `TableDdlBuilder` (constructed with the dialect) produces the ordered DDL list:
-   - CREATE: `buildCreate(table)` → `CREATE SCHEMA …` (if schema is given), `CREATE TABLE …`, then `CREATE INDEX …` (one per `IndexConfig`)
-   - DELETE: `buildDrop(table)` → `DROP TABLE …`
-   - UPDATE: currently rejected with `UNSUPPORTED_OPERATION` (deferred)
+2. `PostgisAdapter.doProcessConfigEvent()` reads `event.payload().config().value()` and routes by type — `TableConfig`, `SchemaConfig`, or `DbRoleConfig` (anything else → `INVALID_PAYLOAD`).
+3. The matching handler produces the ordered DDL list:
+   - Table CREATE → `CREATE SCHEMA …` (if schema given), `CREATE TABLE …`, `CREATE INDEX …`; Table DELETE → `DROP TABLE …`; Table UPDATE → `UNSUPPORTED_OPERATION` (deferred).
+   - Schema CREATE/UPDATE/DELETE → `CREATE`/`ALTER … OWNER TO`/`DROP SCHEMA`.
+   - Role CREATE → `CREATE ROLE …` + `GRANT …`; Role UPDATE → read current grants, then `ALTER ROLE …` + reconciled `GRANT`/`REVOKE`; Role DELETE → `DROP ROLE …`. Encrypted passwords are decrypted first.
 4. Statements are executed inside a single JDBC transaction. Per statement:
    - success → continue
-   - `dialect.isDuplicate` on CREATE → log info, treat as success
-   - `dialect.isMissing` on DELETE → log info, treat as success
+   - `dialect.isDuplicate` on a CREATE-class op → log info, treat as success
+   - `dialect.isMissing` on a DELETE-class op → log info, treat as success
    - other `SQLException` → rollback, propagate to outer catch
 5. Outer catch classifies the failure:
    - `dialect.isConnectivity` → `RetryableAdapterException` (`POSTGIS_CONNECTION_ERROR`)
@@ -142,12 +172,14 @@ Mapping lives inside `PostgisDialect` (via `isDuplicate` / `isMissing` / `isConn
 All overridable via env vars (`.` → `_`, uppercase).
 
 ```
-postgis.topics                    (required — comma-separated list of subscribed topics)
+postgis.topics                    (required — comma-separated list of subscribed topics:
+                                    table.*, schema.*, role.*)
 postgis.jdbc.url                  (required)
 postgis.jdbc.user                 (required)
 postgis.jdbc.password             (default: empty)
 postgis.jdbc.maxPoolSize          (default: 5)
 postgis.jdbc.connectionTimeoutMs  (default: 5000)
+CIVITAS_MASTER_KEY                (env var; required only to decrypt ENC(...) role passwords)
 ```
 
 > The PostGIS extension itself (`CREATE EXTENSION postgis`) is treated as an operator-provisioned prerequisite of the target database, not as part of the adapter's per-event DDL. A `postgis.ddl.createExtensionIfMissing` bootstrap step was considered but deferred — when added, it becomes the only place where `IF NOT EXISTS` is used by the adapter.
@@ -156,15 +188,17 @@ postgis.jdbc.connectionTimeoutMs  (default: 5000)
 
 ## 6. Testing
 
-- **Unit** (`*Test.java`) — implemented (46 tests):
-  - `PostgisDialectTest` — DDL rendering (schema, PK, VARCHAR length, NUMERIC precision/scale, NOT NULL, default expression, geometry+SRID, geometry dimension 3, GIST/BTREE indexes, generated index names) and SQLState classification (`isDuplicate`, `isMissing`, `isConnectivity`).
-  - `PostgisAdapterTest` — mocks `ConnectionProvider`/`Connection`/`Statement`; covers CREATE/DELETE happy paths, duplicate/missing absorption, connectivity → retryable, other SQLState → fatal, rollback on failure, `UPDATE` → `UNSUPPORTED_OPERATION`, wrong payload type → `INVALID_PAYLOAD`, resource cleanup.
-- **Integration** (`*IT.java`) — deferred. Planned: Testcontainers `postgis/postgis:16-3.4`, real `DataSource`, end-to-end CREATE/DROP including:
-  - geometry column with non-default SRID and dimension
-  - GIST index on a geometry column
-  - duplicate-table absorption
-  - missing-table absorption on DROP
-  - connectivity failure → retryable
+- **Unit** (`*Test.java`) — implemented (82 tests):
+  - `PostgisDialectTest` / `PostgisDialectSchemaRoleTest` — DDL rendering for tables (PK, VARCHAR length, NUMERIC precision/scale, NOT NULL, default expression, geometry+SRID, dimension, GIST/BTREE indexes), schemas (authorization, owner change, RESTRICT/CASCADE), roles (login/nologin, password literal escaping, optional attributes), and schema grants/revokes; SQLState classification (`isDuplicate` incl. `42710`, `isMissing` incl. `42704`, `isConnectivity`).
+  - `GrantReconcilerTest` — pure diff: new schema → grant all, removed privilege → revoke, unchanged → no-op, `ALL` expansion, schema dropped from payload → revoke all, `withGrantOption` propagation.
+  - `PostgisAdapterTest` — mocks `ConnectionProvider`/`Connection`/`Statement`(+`PreparedStatement`/`ResultSet`); covers table CREATE/DELETE, schema CREATE/UPDATE/DELETE, role CREATE (plaintext password + grants), encrypted-password-without-key → fatal, duplicate/missing absorption, role UPDATE grant reconciliation, connectivity → retryable, other SQLState → fatal + rollback, `UPDATE` table → `UNSUPPORTED_OPERATION`, wrong payload → `INVALID_PAYLOAD`, resource cleanup.
+- **Integration** (`*IT.java`, via failsafe, `mvn verify`) — implemented:
+  - `PostgisAdapterIT` (16 tests) — real `postgis/postgis:16-3.4-alpine` container shared via the singleton pattern in `AbstractPostgisIT`. Asserts generated DDL is accepted by Postgres and objects physically exist (queried via `information_schema` / `pg_roles` / `has_schema_privilege`). Covers: table CREATE in public + new schema, geometry + SRID + GIST index, duplicate/missing absorption, table DELETE; schema CREATE with owner, DROP `CASCADE`, non-empty `RESTRICT` drop → fatal; role CREATE with login + password + grants, role UPDATE reconcile (revoke removed privilege), role DELETE; invalid DDL → `POSTGIS_DDL_ERROR`; unreachable JDBC → `RetryableAdapterException`.
+  - `PostgisEndToEndIT` (2 tests) — full pipeline: `ConfluentKafkaContainer` + PostGIS container + real `KafkaEventHandler` + real `PostgisAdapter`. Sends a CloudEvent on `de.civitascore.data.table.created` / `.deleted` and asserts (a) a `ConfigResultEvent` is published to the result topic with `SUCCESS` status and matching correlation ID, and (b) the table actually exists / was dropped in the database.
+
+### Connection-pool startup behaviour
+
+`ConnectionProvider` configures HikariCP with `initializationFailTimeout = -1`. The pool is constructed lazily — adapter startup does **not** probe the database. If the DB is unreachable when an event arrives, the connection attempt fails inside `executeDdl`, the `SQLException` is classified by `PostgisDialect.isConnectivity` (`SQLState 08*`), and the event surfaces as a `RetryableAdapterException` — preserving the retry contract instead of crashing the adapter at startup. This mirrors the FROST adapter, which creates its JAX-RS client up front but defers real I/O to event processing.
 
 ---
 

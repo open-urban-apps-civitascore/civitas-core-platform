@@ -68,6 +68,12 @@ public enum AdapterOperation {
   TABLE_CREATE("table creation"),
   TABLE_UPDATE("table update"),
   TABLE_DELETE("table deletion"),
+  SCHEMA_CREATE("schema creation"),
+  SCHEMA_UPDATE("schema update"),
+  SCHEMA_DELETE("schema deletion"),
+  DB_ROLE_CREATE("database role creation"),
+  DB_ROLE_UPDATE("database role update"),
+  DB_ROLE_DELETE("database role deletion"),
 
   // DummyLog operations
   EVENT_PROCESSING("event processing");

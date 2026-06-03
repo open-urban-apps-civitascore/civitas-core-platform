@@ -32,6 +32,9 @@ public final class ConnectionProvider implements AutoCloseable {
     hikariConfig.setMaximumPoolSize(maxPoolSize);
     hikariConfig.setConnectionTimeout(connectionTimeoutMs);
     hikariConfig.setPoolName("postgis-adapter-pool");
+    // Do not fail adapter startup if the DB is temporarily unreachable; surface the failure
+    // when an event is processed instead, so the retry contract can kick in.
+    hikariConfig.setInitializationFailTimeout(-1);
     this.dataSource = new HikariDataSource(hikariConfig);
   }
 

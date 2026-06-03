@@ -11,9 +11,12 @@ package de.civitascore.configadapter.postgis.dialect;
 
 import de.civitascore.configadapter.model.postgis.ColumnConfig;
 import de.civitascore.configadapter.model.postgis.ColumnType;
+import de.civitascore.configadapter.model.postgis.DbRoleConfig;
 import de.civitascore.configadapter.model.postgis.GeometryColumnConfig;
 import de.civitascore.configadapter.model.postgis.GeometryType;
 import de.civitascore.configadapter.model.postgis.IndexConfig;
+import de.civitascore.configadapter.model.postgis.SchemaConfig;
+import de.civitascore.configadapter.model.postgis.SchemaPrivilege;
 import de.civitascore.configadapter.model.postgis.TableConfig;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -37,7 +40,9 @@ public final class PostgisDialect implements SqlDialect {
 
   private static final String SQLSTATE_DUPLICATE_TABLE = "42P07";
   private static final String SQLSTATE_DUPLICATE_SCHEMA = "42P06";
+  private static final String SQLSTATE_DUPLICATE_OBJECT = "42710";
   private static final String SQLSTATE_UNDEFINED_TABLE = "42P01";
+  private static final String SQLSTATE_UNDEFINED_OBJECT = "42704";
   private static final String SQLSTATE_INVALID_SCHEMA = "3F000";
   private static final String SQLSTATE_CLASS_CONNECTION = "08";
 
@@ -104,15 +109,101 @@ public final class PostgisDialect implements SqlDialect {
   }
 
   @Override
+  public List<String> createSchema(SchemaConfig schema) {
+    requireName(schema.getName(), "schema name");
+    String sql = "CREATE SCHEMA " + quoteIdent(schema.getName());
+    if (schema.getOwner() != null && !schema.getOwner().isBlank()) {
+      sql += " AUTHORIZATION " + quoteIdent(schema.getOwner());
+    }
+    return List.of(sql);
+  }
+
+  @Override
+  public List<String> alterSchemaOwner(SchemaConfig schema) {
+    requireName(schema.getName(), "schema name");
+    if (schema.getOwner() == null || schema.getOwner().isBlank()) {
+      return List.of();
+    }
+    return List.of(
+        "ALTER SCHEMA "
+            + quoteIdent(schema.getName())
+            + " OWNER TO "
+            + quoteIdent(schema.getOwner()));
+  }
+
+  @Override
+  public List<String> dropSchema(SchemaConfig schema) {
+    requireName(schema.getName(), "schema name");
+    String mode = schema.isCascade() ? "CASCADE" : "RESTRICT";
+    return List.of("DROP SCHEMA " + quoteIdent(schema.getName()) + " " + mode);
+  }
+
+  @Override
+  public List<String> createRole(DbRoleConfig role, String decryptedPassword) {
+    requireName(role.getName(), "role name");
+    return List.of(
+        "CREATE ROLE " + quoteIdent(role.getName()) + roleOptionsClause(role, decryptedPassword));
+  }
+
+  @Override
+  public List<String> alterRole(DbRoleConfig role, String decryptedPassword) {
+    requireName(role.getName(), "role name");
+    return List.of(
+        "ALTER ROLE " + quoteIdent(role.getName()) + roleOptionsClause(role, decryptedPassword));
+  }
+
+  @Override
+  public List<String> dropRole(DbRoleConfig role) {
+    requireName(role.getName(), "role name");
+    return List.of("DROP ROLE " + quoteIdent(role.getName()));
+  }
+
+  @Override
+  public String grantOnSchema(
+      String roleName, String schema, List<SchemaPrivilege> privileges, boolean withGrantOption) {
+    String sql =
+        "GRANT "
+            + renderPrivileges(privileges)
+            + " ON SCHEMA "
+            + quoteIdent(schema)
+            + " TO "
+            + quoteIdent(roleName);
+    return withGrantOption ? sql + " WITH GRANT OPTION" : sql;
+  }
+
+  @Override
+  public String revokeOnSchema(String roleName, String schema, List<SchemaPrivilege> privileges) {
+    return "REVOKE "
+        + renderPrivileges(privileges)
+        + " ON SCHEMA "
+        + quoteIdent(schema)
+        + " FROM "
+        + quoteIdent(roleName);
+  }
+
+  @Override
+  public String readSchemaGrantsQuery() {
+    return "SELECT n.nspname AS schema_name, acl.privilege_type AS privilege_type "
+        + "FROM pg_namespace n "
+        + "CROSS JOIN LATERAL aclexplode(n.nspacl) AS acl "
+        + "JOIN pg_roles r ON r.oid = acl.grantee "
+        + "WHERE r.rolname = ?";
+  }
+
+  @Override
   public boolean isDuplicate(SQLException e) {
     String state = e == null ? null : e.getSQLState();
-    return SQLSTATE_DUPLICATE_TABLE.equals(state) || SQLSTATE_DUPLICATE_SCHEMA.equals(state);
+    return SQLSTATE_DUPLICATE_TABLE.equals(state)
+        || SQLSTATE_DUPLICATE_SCHEMA.equals(state)
+        || SQLSTATE_DUPLICATE_OBJECT.equals(state);
   }
 
   @Override
   public boolean isMissing(SQLException e) {
     String state = e == null ? null : e.getSQLState();
-    return SQLSTATE_UNDEFINED_TABLE.equals(state) || SQLSTATE_INVALID_SCHEMA.equals(state);
+    return SQLSTATE_UNDEFINED_TABLE.equals(state)
+        || SQLSTATE_INVALID_SCHEMA.equals(state)
+        || SQLSTATE_UNDEFINED_OBJECT.equals(state);
   }
 
   @Override
@@ -160,6 +251,46 @@ public final class PostgisDialect implements SqlDialect {
         + " ("
         + columns
         + ")";
+  }
+
+  private void requireName(String name, String what) {
+    if (name == null || name.isBlank()) {
+      throw new IllegalArgumentException(what + " must not be blank");
+    }
+  }
+
+  /** Renders the trailing {@code WITH LOGIN PASSWORD '…' …} option list for CREATE/ALTER ROLE. */
+  private String roleOptionsClause(DbRoleConfig role, String decryptedPassword) {
+    List<String> options = new ArrayList<>();
+    options.add(role.isCanLogin() ? "LOGIN" : "NOLOGIN");
+    if (role.getSuperuser() != null) {
+      options.add(role.getSuperuser() ? "SUPERUSER" : "NOSUPERUSER");
+    }
+    if (role.getCreateDb() != null) {
+      options.add(role.getCreateDb() ? "CREATEDB" : "NOCREATEDB");
+    }
+    if (role.getCreateRole() != null) {
+      options.add(role.getCreateRole() ? "CREATEROLE" : "NOCREATEROLE");
+    }
+    if (role.getInherit() != null) {
+      options.add(role.getInherit() ? "INHERIT" : "NOINHERIT");
+    }
+    if (decryptedPassword != null && !decryptedPassword.isBlank()) {
+      options.add("PASSWORD " + quoteLiteral(decryptedPassword));
+    }
+    return " WITH " + String.join(" ", options);
+  }
+
+  private String renderPrivileges(List<SchemaPrivilege> privileges) {
+    if (privileges == null || privileges.isEmpty()) {
+      throw new IllegalArgumentException("at least one privilege is required");
+    }
+    return privileges.stream().map(Enum::name).collect(Collectors.joining(", "));
+  }
+
+  /** Quotes a string literal, doubling embedded single quotes. */
+  private String quoteLiteral(String value) {
+    return "'" + value.replace("'", "''") + "'";
   }
 
   private String qualified(String schema, String name) {
