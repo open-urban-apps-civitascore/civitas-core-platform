@@ -247,10 +247,11 @@ class TopicsTest {
   void values_whenCounted_shouldReturn63() {
     // User: 7, Realm: 3, Client: 3, Group: 3, Role: 3, Backend: 3, Route: 3,
     // Thing: 3, Location: 3, Sensor: 3, ObservedProperty: 3, Datastream: 3,
-    // FROST Project: 3, Pipeline: 3, Table: 3 
+    // FROST Project: 3, Pipeline: 3,  
+    // SQL: Table: 3, Schema: 3, DB Role: 3,
     // GeoServer: Workspace: 3, Datastore: 3, FeatureType: 3, Style: 3, Layer: 2 = 14
-    // Total: 63
-    assertEquals(63, Topics.values().length);
+    // Total: 69
+    assertEquals(69, Topics.values().length);
   }
 
   @Test
@@ -277,5 +278,19 @@ class TopicsTest {
     assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.table.created"));
     assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.table.updated"));
     assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.table.deleted"));
+  }
+
+  @Test
+  void allTopics_whenAccessed_shouldContainSchemaTopics() {
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.schema.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.schema.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.schema.deleted"));
+  }
+
+  @Test
+  void allTopics_whenAccessed_shouldContainDbRoleTopics() {
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.role.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.role.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.role.deleted"));
   }
 }

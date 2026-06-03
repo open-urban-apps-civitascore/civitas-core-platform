@@ -20,12 +20,16 @@ import de.civitascore.configadapter.model.ConfigValue;
  * <ul>
  *   <li>{@link TableConfig} - Table configuration including columns, geometry columns, primary key,
  *       and indexes
+ *   <li>{@link SchemaConfig} - Schema configuration (name, optional owner, drop behaviour)
+ *   <li>{@link DbRoleConfig} - Role/user configuration including login flag, password, and embedded
+ *       schema-level grants
  * </ul>
  *
  * <p>Type discrimination is handled at the {@link ConfigValue} level using the {@code resourceType}
  * property in JSON.
  */
-public sealed interface PostgisConfigValue extends ConfigValue permits TableConfig {
+public sealed interface PostgisConfigValue extends ConfigValue
+    permits TableConfig, SchemaConfig, DbRoleConfig {
 
   String POSTGIS_RESULT_TYPE = "de.civitascore.data.table.processing.result";
 }

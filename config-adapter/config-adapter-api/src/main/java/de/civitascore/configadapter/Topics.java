@@ -98,7 +98,17 @@ public enum Topics {
   // --- PostGIS Table Events ---
   TABLE_CREATED("de.civitascore.data.table.created"),
   TABLE_UPDATED("de.civitascore.data.table.updated"),
-  TABLE_DELETED("de.civitascore.data.table.deleted");
+  TABLE_DELETED("de.civitascore.data.table.deleted"),
+
+  // --- PostGIS Schema Events ---
+  SCHEMA_CREATED("de.civitascore.data.schema.created"),
+  SCHEMA_UPDATED("de.civitascore.data.schema.updated"),
+  SCHEMA_DELETED("de.civitascore.data.schema.deleted"),
+
+  // --- PostGIS Role Events (database roles / users) ---
+  DB_ROLE_CREATED("de.civitascore.data.role.created"),
+  DB_ROLE_UPDATED("de.civitascore.data.role.updated"),
+  DB_ROLE_DELETED("de.civitascore.data.role.deleted");
 
   private final String value;
 

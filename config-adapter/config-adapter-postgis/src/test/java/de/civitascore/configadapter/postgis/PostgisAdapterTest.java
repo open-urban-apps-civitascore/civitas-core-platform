@@ -37,9 +37,16 @@ import de.civitascore.configadapter.model.Payload;
 import de.civitascore.configadapter.model.idm.RealmConfig;
 import de.civitascore.configadapter.model.postgis.ColumnConfig;
 import de.civitascore.configadapter.model.postgis.ColumnType;
+import de.civitascore.configadapter.model.postgis.DbRoleConfig;
 import de.civitascore.configadapter.model.postgis.PostgisConfigValue;
+import de.civitascore.configadapter.model.postgis.SchemaConfig;
+import de.civitascore.configadapter.model.postgis.SchemaGrant;
+import de.civitascore.configadapter.model.postgis.SchemaPrivilege;
 import de.civitascore.configadapter.model.postgis.TableConfig;
+import java.lang.reflect.Method;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.OffsetDateTime;
@@ -279,6 +286,166 @@ class PostgisAdapterTest {
     }
   }
 
+  @Nested
+  class SchemaOperations {
+
+    @BeforeEach
+    void initialiseAdapter() {
+      stubBaseConfig();
+      adapter.initialize(mockConfig);
+      adapter.setEventPublisher(mockPublisher);
+    }
+
+    @Test
+    void createSchemaExecutesDdlAndPublishesSuccess() throws Exception {
+      SchemaConfig schema = new SchemaConfig();
+      schema.setName("iot");
+
+      adapter.processConfigEvent(TABLE_CREATED_TOPIC, createEvent(Operation.CREATE, schema));
+
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement).execute(sql.capture());
+      assertTrue(sql.getValue().startsWith("CREATE SCHEMA \"iot\""));
+      verify(mockConnection).commit();
+      verify(mockPublisher).publish(eq(RESULT_TOPIC), any(ConfigResultEvent.class));
+    }
+
+    @Test
+    void updateSchemaChangesOwner() throws Exception {
+      SchemaConfig schema = new SchemaConfig();
+      schema.setName("iot");
+      schema.setOwner("new_owner");
+
+      adapter.processConfigEvent(TABLE_CREATED_TOPIC, createEvent(Operation.UPDATE, schema));
+
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement).execute(sql.capture());
+      assertTrue(sql.getValue().contains("OWNER TO \"new_owner\""));
+    }
+
+    @Test
+    void deleteMissingSchemaIsAbsorbedAsSuccess() throws Exception {
+      SchemaConfig schema = new SchemaConfig();
+      schema.setName("gone");
+      when(mockStatement.execute(anyString()))
+          .thenThrow(new SQLException("no such schema", "3F000"));
+
+      adapter.processConfigEvent(TABLE_CREATED_TOPIC, createEvent(Operation.DELETE, schema));
+
+      verify(mockConnection).commit();
+      verify(mockPublisher).publish(eq(RESULT_TOPIC), any(ConfigResultEvent.class));
+    }
+  }
+
+  @Nested
+  class RoleOperations {
+
+    @BeforeEach
+    void initialiseAdapter() {
+      stubBaseConfig();
+      adapter.initialize(mockConfig);
+      adapter.setEventPublisher(mockPublisher);
+    }
+
+    @Test
+    void createRoleWithPlaintextPasswordExecutesCreateRole() throws Exception {
+      DbRoleConfig role = loginRole("analyst", "plaintext-pw");
+
+      adapter.processConfigEvent(TABLE_CREATED_TOPIC, createEvent(Operation.CREATE, role));
+
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement).execute(sql.capture());
+      assertTrue(sql.getValue().startsWith("CREATE ROLE \"analyst\""));
+      assertTrue(sql.getValue().contains("LOGIN"));
+      verify(mockConnection).commit();
+    }
+
+    @Test
+    void createRoleWithGrantsAlsoExecutesGrant() throws Exception {
+      DbRoleConfig role = loginRole("analyst", null);
+      role.setGrants(List.of(new SchemaGrant("iot", List.of(SchemaPrivilege.USAGE), null)));
+
+      adapter.processConfigEvent(TABLE_CREATED_TOPIC, createEvent(Operation.CREATE, role));
+
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, times(2)).execute(sql.capture());
+      assertTrue(sql.getAllValues().stream().anyMatch(s -> s.startsWith("CREATE ROLE")));
+      assertTrue(
+          sql.getAllValues().stream().anyMatch(s -> s.startsWith("GRANT USAGE ON SCHEMA \"iot\"")));
+    }
+
+    @Test
+    void encryptedPasswordWithoutMasterKeyIsRejected() {
+      DbRoleConfig role = loginRole("analyst", "ENC(c29tZS1lbmNyeXB0ZWQ=)");
+
+      FatalAdapterException thrown =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  adapter.processConfigEvent(
+                      TABLE_CREATED_TOPIC, createEvent(Operation.CREATE, role)));
+
+      assertTrue(thrown.getFullErrorIdentifier().contains("POSTGIS_ERROR"));
+    }
+
+    @Test
+    void duplicateRoleIsAbsorbedAsSuccess() throws Exception {
+      DbRoleConfig role = loginRole("analyst", null);
+      when(mockStatement.execute(anyString())).thenThrow(new SQLException("role exists", "42710"));
+
+      adapter.processConfigEvent(TABLE_CREATED_TOPIC, createEvent(Operation.CREATE, role));
+
+      verify(mockConnection).commit();
+    }
+
+    @Test
+    void deleteMissingRoleIsAbsorbedAsSuccess() throws Exception {
+      DbRoleConfig role = new DbRoleConfig();
+      role.setName("gone");
+      when(mockStatement.execute(anyString())).thenThrow(new SQLException("role missing", "42704"));
+
+      adapter.processConfigEvent(TABLE_CREATED_TOPIC, createEvent(Operation.DELETE, role));
+
+      verify(mockConnection).commit();
+    }
+
+    @Test
+    void updateReconcilesGrantsAgainstCurrentDatabaseState() throws Exception {
+      DbRoleConfig role = loginRole("analyst", null);
+      role.setGrants(List.of(new SchemaGrant("iot", List.of(SchemaPrivilege.USAGE), null)));
+
+      PreparedStatement mockPreparedStatement = mock(PreparedStatement.class);
+      ResultSet mockResultSet = mock(ResultSet.class);
+      when(mockConnection.prepareStatement(anyString())).thenReturn(mockPreparedStatement);
+      when(mockPreparedStatement.executeQuery()).thenReturn(mockResultSet);
+      when(mockResultSet.next()).thenReturn(true, false);
+      when(mockResultSet.getString("schema_name")).thenReturn("iot");
+      when(mockResultSet.getString("privilege_type")).thenReturn("CREATE");
+
+      adapter.processConfigEvent(TABLE_CREATED_TOPIC, createEvent(Operation.UPDATE, role));
+
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, times(3)).execute(sql.capture());
+      List<String> executed = sql.getAllValues();
+      assertTrue(executed.stream().anyMatch(s -> s.startsWith("ALTER ROLE \"analyst\"")));
+      assertTrue(
+          executed.stream().anyMatch(s -> s.startsWith("GRANT USAGE ON SCHEMA \"iot\"")),
+          "missing USAGE should be granted");
+      assertTrue(
+          executed.stream().anyMatch(s -> s.startsWith("REVOKE CREATE ON SCHEMA \"iot\"")),
+          "obsolete CREATE should be revoked");
+      verify(mockConnection).commit();
+    }
+
+    private DbRoleConfig loginRole(String name, String password) {
+      DbRoleConfig role = new DbRoleConfig();
+      role.setName(name);
+      role.setCanLogin(true);
+      role.setPassword(password);
+      return role;
+    }
+  }
+
   @Test
   void connectionIsClosedAfterSuccessfulProcessing() throws Exception {
     stubBaseConfig();
@@ -325,7 +492,7 @@ class PostgisAdapterTest {
 
   private static String callGetResultType(PostgisAdapter adapter) {
     try {
-      var method = PostgisAdapter.class.getDeclaredMethod("getResultType");
+      Method method = PostgisAdapter.class.getDeclaredMethod("getResultType");
       method.setAccessible(true);
       Object result = method.invoke(adapter);
       assertNotNull(result);

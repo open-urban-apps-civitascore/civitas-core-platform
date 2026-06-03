@@ -24,6 +24,8 @@ import de.civitascore.configadapter.model.idm.GroupConfig;
 import de.civitascore.configadapter.model.idm.RealmConfig;
 import de.civitascore.configadapter.model.idm.RoleConfig;
 import de.civitascore.configadapter.model.idm.UserConfig;
+import de.civitascore.configadapter.model.postgis.DbRoleConfig;
+import de.civitascore.configadapter.model.postgis.SchemaConfig;
 import de.civitascore.configadapter.model.postgis.TableConfig;
 import de.civitascore.configadapter.model.redpanda.PipelineConfigValue;
 
@@ -61,5 +63,7 @@ import de.civitascore.configadapter.model.redpanda.PipelineConfigValue;
   @JsonSubTypes.Type(value = LayerConfig.class, name = "geoserver-layer"),
   @JsonSubTypes.Type(value = StyleConfig.class, name = "geoserver-style"),
   @JsonSubTypes.Type(value = TableConfig.class, name = "postgis-table"),
+  @JsonSubTypes.Type(value = SchemaConfig.class, name = "postgis-schema"),
+  @JsonSubTypes.Type(value = DbRoleConfig.class, name = "postgis-role"),
 })
 public interface ConfigValue {}

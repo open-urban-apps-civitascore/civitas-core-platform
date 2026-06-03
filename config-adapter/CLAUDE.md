@@ -52,11 +52,17 @@ config-adapter-api          ← Pure interfaces & models, no impl dependencies
     ├── config-adapter-apisix         ← APISIX Admin API adapter
     ├── config-adapter-redpanda       ← RedPanda Connect Streams API adapter (JAX-RS/Jersey)
     ├── config-adapter-frost          ← FROST SensorThings API adapter (JAX-RS/Jersey)
+<<<<<<< HEAD
     ├── config-adapter-geoserver      ← GeoServer REST API adapter (JAX-RS/Jersey)
     ├── config-adapter-examples       ← DummyLogAdapter (logging reference impl)
     ├── config-adapter-orchestrator   ← Custom saga engine (Kafka-based state machine)
     ├── config-adapter-postgis        ← PostgreSQL/PostGIS DDL adapter (JDBC + HikariCP)
     └── config-adapter-flowable       ← Flowable BPMN saga engine (embedded, PostgreSQL state)
+=======
+    ├── config-adapter-postgis        ← PostgreSQL/PostGIS DDL adapter (tables, schemas, roles+grants; JDBC + HikariCP)
+    ├── config-adapter-flowable       ← Flowable BPMN saga engine (embedded, PostgreSQL state)
+    └── config-adapter-examples       ← DummyLogAdapter (logging reference impl)
+>>>>>>> 027bc3e50 (add schema and grant)
     ↑
 config-adapter-application  ← Bootstrap, ServiceLoader discovery, health checks, shade JAR
 ```
@@ -81,7 +87,7 @@ IdmConfigValue (sealed)     → UserConfig, ClientConfig, RealmConfig, RoleConfi
 ApisixConfigValue           → RouteConfigValue
 FrostConfigValue            (class extending AbstractApiModel with toApiMap())
 GeoServerConfigValue (passthrough container; toApiMap() returns additionalProperties as-is)
-PostgisConfigValue (sealed) → TableConfig
+PostgisConfigValue (sealed) → TableConfig, SchemaConfig, DbRoleConfig
 ```
 
 ### Error Codes
