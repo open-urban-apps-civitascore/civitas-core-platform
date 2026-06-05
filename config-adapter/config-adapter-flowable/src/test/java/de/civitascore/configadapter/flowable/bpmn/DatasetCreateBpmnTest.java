@@ -219,19 +219,19 @@ class DatasetCreateBpmnTest {
 
     assertProcessCompleted(instance.getId());
 
-    assertEquals(
-        List.of(
-            "create-project",
-            "create-route",
-            "create-workspace",
-            "create-datastore",
-            "provision-layers"),
-        FlowableTestSupport.getForwardServiceTaskIds(historyService, instance.getId()));
-
+    // Assert execution order via the handlers' actual invocation order (deterministic). Sorting
+    // HistoricActivityInstances by start time is flaky: sequential synchronous tasks can share a
+    // millisecond timestamp, so workspace/datastore can appear swapped.
     var inOrder = inOrder(frostHandler, apisixHandler, geoserverHandler);
     inOrder.verify(frostHandler).handle(any());
     inOrder.verify(apisixHandler).handle(any());
     inOrder.verify(geoserverHandler, times(3)).handle(any());
+
+    ArgumentCaptor<SagaCommandMessage> geo = ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(geoserverHandler, times(3)).handle(geo.capture());
+    assertEquals(
+        List.of("CREATE_WORKSPACE", "CREATE_DATASTORE", "PROVISION_LAYERS"),
+        geo.getAllValues().stream().map(SagaCommandMessage::operation).toList());
   }
 
   @Test
@@ -244,9 +244,17 @@ class DatasetCreateBpmnTest {
 
     assertProcessCompleted(instance.getId());
 
+    var inOrder = inOrder(frostHandler, apisixHandler, geoserverHandler);
+    inOrder.verify(frostHandler).handle(any());
+    inOrder.verify(apisixHandler).handle(any());
+
+    // Only workspace + datastore run; provision-layers is skipped — so exactly 2 geoserver calls,
+    // in invocation order (deterministic, unlike a HistoricActivityInstance start-time sort).
+    ArgumentCaptor<SagaCommandMessage> geo = ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(geoserverHandler, times(2)).handle(geo.capture());
     assertEquals(
-        List.of("create-project", "create-route", "create-workspace", "create-datastore"),
-        FlowableTestSupport.getForwardServiceTaskIds(historyService, instance.getId()));
+        List.of("CREATE_WORKSPACE", "CREATE_DATASTORE"),
+        geo.getAllValues().stream().map(SagaCommandMessage::operation).toList());
   }
 
   @Test
