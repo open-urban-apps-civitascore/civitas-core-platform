@@ -145,4 +145,78 @@ class FlowableTriggerConsumerHasPipelinesTest {
     verify(runtimeService).startProcessInstanceByKey(anyString(), anyString(), captor.capture());
     assertEquals(Boolean.FALSE, captor.getValue().get("hasPipelines"));
   }
+
+  @Test
+  void deriveHasGeoSink_whenPostgisSinkPresent_setsTrue() throws Exception {
+    byte[] trigger =
+        objectMapper.writeValueAsBytes(
+            Map.of(
+                "sagaType", "DATASET_CREATE",
+                "datasetId", "ds-1",
+                "dataSinks",
+                    List.of(Map.of("dataSinkType", "FROST"), Map.of("dataSinkType", "POSTGIS"))));
+
+    TriggerTestSupport.processTrigger(consumer, trigger);
+
+    assertEquals(Boolean.TRUE, capturedVariables().get("hasGeoSink"));
+  }
+
+  @Test
+  void deriveHasGeoSink_whenOnlyNonGeoSinks_setsFalse() throws Exception {
+    byte[] trigger =
+        objectMapper.writeValueAsBytes(
+            Map.of(
+                "sagaType", "DATASET_CREATE",
+                "datasetId", "ds-1",
+                "dataSinks", List.of(Map.of("dataSinkType", "FROST"))));
+
+    TriggerTestSupport.processTrigger(consumer, trigger);
+
+    assertEquals(Boolean.FALSE, capturedVariables().get("hasGeoSink"));
+  }
+
+  @Test
+  void deriveHasGeoSink_whenNoSinks_setsFalse() throws Exception {
+    byte[] trigger =
+        objectMapper.writeValueAsBytes(Map.of("sagaType", "DATASET_CREATE", "datasetId", "ds-1"));
+
+    TriggerTestSupport.processTrigger(consumer, trigger);
+
+    assertEquals(Boolean.FALSE, capturedVariables().get("hasGeoSink"));
+  }
+
+  @Test
+  void deriveHasLayers_whenLayersPresent_setsTrue() throws Exception {
+    byte[] trigger =
+        objectMapper.writeValueAsBytes(
+            Map.of(
+                "sagaType", "DATASET_CREATE",
+                "datasetId", "ds-1",
+                "layers", List.of(Map.of("layerName", "l-1"))));
+
+    TriggerTestSupport.processTrigger(consumer, trigger);
+
+    assertEquals(Boolean.TRUE, capturedVariables().get("hasLayers"));
+  }
+
+  @Test
+  void deriveHasLayers_whenLayersEmpty_setsFalse() throws Exception {
+    byte[] trigger =
+        objectMapper.writeValueAsBytes(
+            Map.of(
+                "sagaType", "DATASET_CREATE",
+                "datasetId", "ds-1",
+                "layers", List.of()));
+
+    TriggerTestSupport.processTrigger(consumer, trigger);
+
+    assertEquals(Boolean.FALSE, capturedVariables().get("hasLayers"));
+  }
+
+  private Map<String, Object> capturedVariables() {
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+    verify(runtimeService).startProcessInstanceByKey(anyString(), anyString(), captor.capture());
+    return captor.getValue();
+  }
 }

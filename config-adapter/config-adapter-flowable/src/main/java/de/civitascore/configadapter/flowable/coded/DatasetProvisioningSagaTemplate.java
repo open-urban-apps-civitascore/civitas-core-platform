@@ -9,6 +9,8 @@
  */
 package de.civitascore.configadapter.flowable.coded;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import org.flowable.bpmn.model.BpmnModel;
 import org.flowable.bpmn.model.EndEvent;
@@ -18,11 +20,17 @@ import org.flowable.bpmn.model.StartEvent;
 
 /**
  * Shared scaffold for the dataset provisioning sagas (Create and Update). Both share the same
- * activity sequence (FROST → APISIX → optional Redpanda) and the same compensation topology; only
- * the step IDs and adapter operation codes differ. The varying parts are captured in {@link
- * OpVerbs}, the invariant wiring lives here.
+ * activity sequence (FROST → APISIX → conditional GeoServer → conditional Redpanda) and the same
+ * reverse-order compensation chain; only the step IDs and adapter operation codes differ. The
+ * varying parts are captured in {@link OpVerbs}, the invariant wiring lives here.
+ *
+ * <p>The GeoServer branch is gated on {@code hasGeoSink} and is dormant until the saga trigger
+ * carries a {@code POSTGIS} data sink. Create models it fine-grained (workspace → datastore →
+ * conditional layers); Update collapses it to a single {@code UPDATE_WORKSPACE} step.
  */
 final class DatasetProvisioningSagaTemplate {
+
+  private static final String GEOSERVER_ADAPTER = "geoserver";
 
   static final OpVerbs CREATE =
       new OpVerbs(
@@ -33,7 +41,9 @@ final class DatasetProvisioningSagaTemplate {
           "Deploy Pipelines",
           "DEPLOY_PIPELINES",
           "DELETE_PROJECT",
-          "DELETE_ROUTE");
+          "DELETE_ROUTE",
+          true,
+          "DELETE_WORKSPACE");
 
   static final OpVerbs UPDATE =
       new OpVerbs(
@@ -44,7 +54,9 @@ final class DatasetProvisioningSagaTemplate {
           "Update Pipelines",
           "UPDATE_PIPELINES",
           "RESTORE_PROJECT",
-          "RESTORE_ROUTE");
+          "RESTORE_ROUTE",
+          false,
+          "RESTORE_WORKSPACE");
 
   private DatasetProvisioningSagaTemplate() {}
 
@@ -57,7 +69,9 @@ final class DatasetProvisioningSagaTemplate {
       String pipelinesDisplayName,
       String pipelinesForwardOp,
       String frostCompensationOp,
-      String apisixCompensationOp) {
+      String apisixCompensationOp,
+      boolean fineGrainedGeo,
+      String geoCompensationOp) {
     OpVerbs {
       Objects.requireNonNull(stepPrefix, "stepPrefix");
       Objects.requireNonNull(forwardDisplayVerb, "forwardDisplayVerb");
@@ -67,6 +81,7 @@ final class DatasetProvisioningSagaTemplate {
       Objects.requireNonNull(pipelinesForwardOp, "pipelinesForwardOp");
       Objects.requireNonNull(frostCompensationOp, "frostCompensationOp");
       Objects.requireNonNull(apisixCompensationOp, "apisixCompensationOp");
+      Objects.requireNonNull(geoCompensationOp, "geoCompensationOp");
     }
   }
 
@@ -86,41 +101,104 @@ final class DatasetProvisioningSagaTemplate {
             v.forwardDisplayVerb() + " APISIX Route",
             "apisix",
             v.forwardOpSuffix() + "_ROUTE");
+
+    ExclusiveGateway geoGw =
+        saga.exclusiveGateway(ProcessBuilderUtils.GEO_GATEWAY_ID, "Has Geo Sink?");
     ExclusiveGateway pipelineGw =
         saga.exclusiveGateway(ProcessBuilderUtils.PIPELINE_GATEWAY_ID, "Has Pipelines?");
     SagaStepRef redpanda =
         saga.sagaStep(
             v.pipelinesStepId(), v.pipelinesDisplayName(), "redpanda", v.pipelinesForwardOp());
 
-    // Two FROST compensation tasks (after-apisix, after-redpanda) currently delegate to the same
-    // adapter operation but are kept as distinct activities so the two error paths remain visually
-    // separate in the BPMN diagram and can diverge later (e.g. richer rollback for the redpanda
-    // case) without restructuring the flow.
-    ServiceTask compFrostAfterApisix =
-        saga.compensation("compensate-frost-after-apisix", frost, v.frostCompensationOp());
-    ServiceTask compApisixAfterRedpanda =
-        saga.compensation("compensate-apisix-after-redpanda", apisix, v.apisixCompensationOp());
-    ServiceTask compFrostAfterRedpanda =
-        saga.compensation("compensate-frost-after-redpanda", frost, v.frostCompensationOp());
+    // GeoServer branch — fine-grained for Create, a single step for Update.
+    List<SagaStepRef> geoSteps = new ArrayList<>();
+    if (v.fineGrainedGeo()) {
+      geoSteps.add(
+          saga.sagaStep(
+              "create-workspace",
+              "Create GeoServer Workspace",
+              GEOSERVER_ADAPTER,
+              "CREATE_WORKSPACE"));
+      geoSteps.add(
+          saga.sagaStep(
+              "create-datastore",
+              "Create GeoServer Datastore",
+              GEOSERVER_ADAPTER,
+              "CREATE_DATASTORE"));
+      geoSteps.add(
+          saga.sagaStep(
+              "provision-layers",
+              "Provision GeoServer Layers",
+              GEOSERVER_ADAPTER,
+              "PROVISION_LAYERS"));
+    } else {
+      geoSteps.add(
+          saga.sagaStep(
+              "update-workspace",
+              "Update GeoServer Workspace",
+              GEOSERVER_ADAPTER,
+              "UPDATE_WORKSPACE"));
+    }
+    // The compensation undoes the whole GeoServer branch by deleting/restoring the workspace; it
+    // references the first geo step so it reads that step's compensationData (the workspaceName).
+    SagaStepRef geoCompTarget = geoSteps.get(0);
+
+    ServiceTask compGeoserver =
+        saga.compensation("compensate-geoserver", geoCompTarget, v.geoCompensationOp());
+    ServiceTask compApisix =
+        saga.compensation("compensate-apisix", apisix, v.apisixCompensationOp());
+    ServiceTask compFrost = saga.compensation("compensate-frost", frost, v.frostCompensationOp());
 
     ServiceTask publishOk = saga.publishResult(ProcessBuilderUtils.PUBLISH_SUCCESS_ID, "success");
     ServiceTask publishFail = saga.publishResult(ProcessBuilderUtils.PUBLISH_FAILURE_ID, "failure");
     EndEvent end = saga.endEvent("end");
     EndEvent errorEnd = saga.endEvent("error-end", "Saga Failed");
 
-    saga.flow(start, frost.task(), apisix.task(), pipelineGw);
+    // Happy path: frost → apisix → geo-gateway
+    saga.flow(start, frost.task(), apisix.task(), geoGw);
+    wireGeoBranch(saga, v, geoGw, geoSteps, pipelineGw);
     saga.flow(pipelineGw, redpanda.task()).when("${hasPipelines == true}");
     saga.flow(pipelineGw, publishOk).asDefault();
     saga.flow(redpanda.task(), publishOk);
     saga.flow(publishOk, end);
 
+    // Compensation: one reverse chain (geoserver → apisix → frost), entered at the right point.
+    // compensate-geoserver (DELETE/RESTORE_WORKSPACE) is idempotent, so routing the redpanda error
+    // through it is safe even when the GeoServer branch was skipped (hasGeoSink == false).
     saga.errorFlow(frost, publishFail);
-    saga.errorFlow(apisix, compFrostAfterApisix);
-    saga.flow(compFrostAfterApisix, publishFail);
-    saga.errorFlow(redpanda, compApisixAfterRedpanda);
-    saga.flow(compApisixAfterRedpanda, compFrostAfterRedpanda, publishFail);
+    saga.errorFlow(apisix, compFrost);
+    for (SagaStepRef geo : geoSteps) {
+      saga.errorFlow(geo, compGeoserver);
+    }
+    saga.errorFlow(redpanda, compGeoserver);
+    saga.flow(compGeoserver, compApisix, compFrost, publishFail);
     saga.flow(publishFail, errorEnd);
 
     return saga.build();
+  }
+
+  private static void wireGeoBranch(
+      SagaProcessBuilder saga,
+      OpVerbs v,
+      ExclusiveGateway geoGw,
+      List<SagaStepRef> geoSteps,
+      ExclusiveGateway pipelineGw) {
+    // execution.getVariable(...) is null-safe: an absent flag evaluates to false (default flow),
+    // matching the engine's behavior when the trigger carries no geo data.
+    saga.flow(geoGw, geoSteps.get(0).task()).when("${execution.getVariable('hasGeoSink') == true}");
+    saga.flow(geoGw, pipelineGw).asDefault();
+    if (v.fineGrainedGeo()) {
+      ServiceTask workspace = geoSteps.get(0).task();
+      ServiceTask datastore = geoSteps.get(1).task();
+      ServiceTask layers = geoSteps.get(2).task();
+      ExclusiveGateway layersGw =
+          saga.exclusiveGateway(ProcessBuilderUtils.LAYERS_GATEWAY_ID, "Has Layers?");
+      saga.flow(workspace, datastore, layersGw);
+      saga.flow(layersGw, layers).when("${execution.getVariable('hasLayers') == true}");
+      saga.flow(layersGw, pipelineGw).asDefault();
+      saga.flow(layers, pipelineGw);
+    } else {
+      saga.flow(geoSteps.get(0).task(), pipelineGw);
+    }
   }
 }

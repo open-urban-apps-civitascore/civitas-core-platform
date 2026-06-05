@@ -13,6 +13,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -164,6 +165,54 @@ class BpmnVsCodedEquivalenceTest {
       inOrder.verify(apisix).handle(any());
       inOrder.verify(frost).handle(any());
       FlowableTestSupport.assertProcessFinished(engine.getHistoryService(), instance.getId());
+    } finally {
+      engine.close();
+    }
+  }
+
+  @ParameterizedTest(name = "{0}: Dataset Create with geo sink runs GeoServer steps")
+  @MethodSource("approaches")
+  void datasetCreateWithGeoSink(String approach, boolean useBpmn) {
+    SagaCommandHandler frost = FlowableTestSupport.mockHandler("frost");
+    SagaCommandHandler apisix = FlowableTestSupport.mockHandler("apisix");
+    SagaCommandHandler geoserver = FlowableTestSupport.mockHandler("geoserver");
+
+    when(frost.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+        .thenReturn(
+            SagaCommandResult.success(
+                "s",
+                "create-project",
+                Map.of("projectId", "p1", "baseUrl", "http://frost"),
+                Map.of()));
+    when(apisix.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+        .thenReturn(
+            SagaCommandResult.success("s", "create-route", Map.of("routeId", "r1"), Map.of()));
+    when(geoserver.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+        .thenReturn(
+            SagaCommandResult.success(
+                "s", "create-workspace", Map.of("workspaceName", "ds"), Map.of()));
+
+    SagaHandlerRegistry reg = FlowableTestSupport.registry(frost, apisix, geoserver);
+    ProcessEngine engine = createEngine(useBpmn, reg);
+
+    try {
+      Map<String, Object> vars = createVariables(false);
+      vars.put("hasGeoSink", true);
+      vars.put("hasLayers", true);
+      vars.put(
+          "dataSinks",
+          List.of(Map.of("dataSinkType", "POSTGIS", "configuration", Map.of("tableName", "t1"))));
+      vars.put("layers", List.of(Map.of("layerName", "t1", "crs", "EPSG:4326")));
+
+      ProcessInstance instance =
+          engine.getRuntimeService().startProcessInstanceByKey("dataset-create", vars);
+      FlowableTestSupport.executeAllJobs(engine);
+
+      FlowableTestSupport.assertProcessCompleted(engine.getHistoryService(), instance.getId());
+      var inOrder = inOrder(frost, apisix, geoserver);
+      inOrder.verify(frost).handle(any());
+      inOrder.verify(apisix).handle(any());
+      inOrder.verify(geoserver, times(3)).handle(any());
     } finally {
       engine.close();
     }

@@ -40,20 +40,24 @@ class DatasetDeleteBpmnTest {
   private SagaCommandHandler frostHandler;
   private SagaCommandHandler apisixHandler;
   private SagaCommandHandler redpandaHandler;
+  private SagaCommandHandler geoserverHandler;
 
   @BeforeEach
   void setUp() {
     frostHandler = mock(SagaCommandHandler.class);
     apisixHandler = mock(SagaCommandHandler.class);
     redpandaHandler = mock(SagaCommandHandler.class);
+    geoserverHandler = mock(SagaCommandHandler.class);
     when(frostHandler.adapter()).thenReturn("frost");
     when(apisixHandler.adapter()).thenReturn("apisix");
     when(redpandaHandler.adapter()).thenReturn("redpanda");
+    when(geoserverHandler.adapter()).thenReturn("geoserver");
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
     registry.register(apisixHandler);
     registry.register(redpandaHandler);
+    registry.register(geoserverHandler);
 
     processEngine = FlowableTestSupport.createTestEngine(Map.of("sagaHandlerRegistry", registry));
     runtimeService = processEngine.getRuntimeService();
@@ -146,6 +150,31 @@ class DatasetDeleteBpmnTest {
     verify(redpandaHandler).handle(any());
     verify(apisixHandler).handle(any());
     verify(frostHandler).handle(any());
+  }
+
+  @Test
+  void shouldDeleteWorkspaceWhenHasGeoSink() {
+    stubApisixDeleteSuccess();
+    stubFrostDeleteSuccess();
+    when(geoserverHandler.handle(any()))
+        .thenReturn(
+            SagaCommandResult.success("saga-test-123", "delete-workspace", Map.of(), Map.of()));
+
+    Map<String, Object> variables = new HashMap<>();
+    variables.put("sagaId", "saga-test-123");
+    variables.put("datasetId", "ds-456");
+    variables.put("hasPipelines", false);
+    variables.put("hasGeoSink", true);
+    ProcessInstance instance =
+        runtimeService.startProcessInstanceByKey("dataset-delete", variables);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+
+    var inOrder = inOrder(apisixHandler, geoserverHandler, frostHandler);
+    inOrder.verify(apisixHandler).handle(any());
+    inOrder.verify(geoserverHandler).handle(any());
+    inOrder.verify(frostHandler).handle(any());
   }
 
   private ProcessInstance startProcess(boolean hasPipelines) {
