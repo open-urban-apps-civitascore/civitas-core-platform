@@ -106,9 +106,9 @@ class PostgisEndToEndIT extends AbstractPostgisIT {
         "postgis.topics",
         String.join(
             ",",
-            Topics.TABLE_CREATED.toString(),
-            Topics.TABLE_UPDATED.toString(),
-            Topics.TABLE_DELETED.toString()));
+            Topics.SQL_TABLE_CREATED.toString(),
+            Topics.SQL_TABLE_UPDATED.toString(),
+            Topics.SQL_TABLE_DELETED.toString()));
     AppConfig appConfig = new AppConfig(new MapConfiguration(props));
 
     adapter = new PostgisAdapter();
@@ -172,7 +172,9 @@ class PostgisEndToEndIT extends AbstractPostgisIT {
 
     CloudEvent cloudEvent =
         wrapInCloudEvent(buildConfigEvent(table, Operation.DELETE, correlationId));
-    producer.send(new ProducerRecord<>(Topics.TABLE_DELETED.toString(), "key", cloudEvent)).get();
+    producer
+        .send(new ProducerRecord<>(Topics.SQL_TABLE_DELETED.toString(), "key", cloudEvent))
+        .get();
     producer.flush();
 
     CloudEvent resultEvent = waitForResultEvent(correlationId, Duration.ofSeconds(20));
@@ -187,7 +189,9 @@ class PostgisEndToEndIT extends AbstractPostgisIT {
   private void sendCreateEvent(TableConfig table, String correlationId) throws Exception {
     CloudEvent cloudEvent =
         wrapInCloudEvent(buildConfigEvent(table, Operation.CREATE, correlationId));
-    producer.send(new ProducerRecord<>(Topics.TABLE_CREATED.toString(), "key", cloudEvent)).get();
+    producer
+        .send(new ProducerRecord<>(Topics.SQL_TABLE_CREATED.toString(), "key", cloudEvent))
+        .get();
     producer.flush();
   }
 
@@ -232,7 +236,7 @@ class PostgisEndToEndIT extends AbstractPostgisIT {
     return CloudEventBuilder.v1()
         .withId(UUID.randomUUID().toString())
         .withSource(URI.create("postgis.e2e.test"))
-        .withType("de.civitascore.data.table.created")
+        .withType("de.civitascore.data.sql.table.created")
         .withDataContentType(Constants.CONTENT_TYPE_JSON)
         .withData(jsonBytes)
         .build();

@@ -70,10 +70,10 @@ public enum AdapterErrorCode {
   GEOSERVER_RESOURCE_ERROR(
       3402, false, "GeoServer resource error: %s", "Geo resource operation failed"),
 
-  POSTGIS_ERROR(3401, false, "PostGIS error: %s", "Database error"),
-  POSTGIS_DDL_ERROR(3402, false, "PostGIS DDL error: %s", "Table operation failed"),
+  POSTGIS_ERROR(3501, false, "PostGIS error: %s", "Database error"),
+  POSTGIS_DDL_ERROR(3502, false, "PostGIS DDL error: %s", "Table operation failed"),
   POSTGIS_CONNECTION_ERROR(
-      3403, true, "PostGIS connection error: %s", "Database temporarily unavailable"),
+      3503, true, "PostGIS connection error: %s", "Database temporarily unavailable"),
 
   // 9xxx: Unknown/unexpected errors
   UNKNOWN_ERROR(9001, false, "Unexpected error: %s", "Internal error"),

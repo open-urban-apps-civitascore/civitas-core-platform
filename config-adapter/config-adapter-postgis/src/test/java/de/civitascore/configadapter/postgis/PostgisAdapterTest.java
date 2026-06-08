@@ -58,8 +58,8 @@ import org.mockito.ArgumentCaptor;
 
 class PostgisAdapterTest {
 
-  private static final String TABLE_CREATED_TOPIC = "de.civitascore.data.table.created";
-  private static final String TABLE_DELETED_TOPIC = "de.civitascore.data.table.deleted";
+  private static final String TABLE_CREATED_TOPIC = "de.civitascore.data.sql.table.created";
+  private static final String TABLE_DELETED_TOPIC = "de.civitascore.data.sql.table.deleted";
   private static final String RESULT_TOPIC = "test-result-topic";
 
   private PostgisAdapter adapter;

@@ -93,22 +93,22 @@ public enum Topics {
   GEO_STYLE_UPDATED("de.civitascore.geo.style.updated"),
   GEO_STYLE_DELETED("de.civitascore.geo.style.deleted"),
   GEO_LAYER_UPDATED("de.civitascore.geo.layer.updated"),
-  GEO_LAYER_DELETED("de.civitascore.geo.layer.deleted");
+  GEO_LAYER_DELETED("de.civitascore.geo.layer.deleted"),
 
-  // --- PostGIS Table Events ---
-  TABLE_CREATED("de.civitascore.data.table.created"),
-  TABLE_UPDATED("de.civitascore.data.table.updated"),
-  TABLE_DELETED("de.civitascore.data.table.deleted"),
+  // --- SQL Table Events (PostGIS / SQL flavor) ---
+  SQL_TABLE_CREATED("de.civitascore.data.sql.table.created"),
+  SQL_TABLE_UPDATED("de.civitascore.data.sql.table.updated"),
+  SQL_TABLE_DELETED("de.civitascore.data.sql.table.deleted"),
 
-  // --- PostGIS Schema Events ---
-  SCHEMA_CREATED("de.civitascore.data.schema.created"),
-  SCHEMA_UPDATED("de.civitascore.data.schema.updated"),
-  SCHEMA_DELETED("de.civitascore.data.schema.deleted"),
+  // --- SQL Schema Events ---
+  SQL_SCHEMA_CREATED("de.civitascore.data.sql.schema.created"),
+  SQL_SCHEMA_UPDATED("de.civitascore.data.sql.schema.updated"),
+  SQL_SCHEMA_DELETED("de.civitascore.data.sql.schema.deleted"),
 
-  // --- PostGIS Role Events (database roles / users) ---
-  DB_ROLE_CREATED("de.civitascore.data.role.created"),
-  DB_ROLE_UPDATED("de.civitascore.data.role.updated"),
-  DB_ROLE_DELETED("de.civitascore.data.role.deleted");
+  // --- SQL Role Events (database roles / users) ---
+  SQL_ROLE_CREATED("de.civitascore.data.sql.role.created"),
+  SQL_ROLE_UPDATED("de.civitascore.data.sql.role.updated"),
+  SQL_ROLE_DELETED("de.civitascore.data.sql.role.deleted");
 
   private final String value;
 

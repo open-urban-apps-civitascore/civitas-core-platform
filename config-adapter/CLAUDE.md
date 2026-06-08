@@ -52,17 +52,10 @@ config-adapter-api          ← Pure interfaces & models, no impl dependencies
     ├── config-adapter-apisix         ← APISIX Admin API adapter
     ├── config-adapter-redpanda       ← RedPanda Connect Streams API adapter (JAX-RS/Jersey)
     ├── config-adapter-frost          ← FROST SensorThings API adapter (JAX-RS/Jersey)
-<<<<<<< HEAD
     ├── config-adapter-geoserver      ← GeoServer REST API adapter (JAX-RS/Jersey)
-    ├── config-adapter-examples       ← DummyLogAdapter (logging reference impl)
-    ├── config-adapter-orchestrator   ← Custom saga engine (Kafka-based state machine)
-    ├── config-adapter-postgis        ← PostgreSQL/PostGIS DDL adapter (JDBC + HikariCP)
-    └── config-adapter-flowable       ← Flowable BPMN saga engine (embedded, PostgreSQL state)
-=======
-    ├── config-adapter-postgis        ← PostgreSQL/PostGIS DDL adapter (tables, schemas, roles+grants; JDBC + HikariCP)
+    ├── config-adapter-postgis        ← PostgreSQL/PostGIS DDL adapter (tables, schemas, roles+grants; JDBC + HikariCP) + PostgisSagaHandler
     ├── config-adapter-flowable       ← Flowable BPMN saga engine (embedded, PostgreSQL state)
     └── config-adapter-examples       ← DummyLogAdapter (logging reference impl)
->>>>>>> 027bc3e50 (add schema and grant)
     ↑
 config-adapter-application  ← Bootstrap, ServiceLoader discovery, health checks, shade JAR
 ```
@@ -92,7 +85,7 @@ PostgisConfigValue (sealed) → TableConfig, SchemaConfig, DbRoleConfig
 
 ### Error Codes
 
-`AdapterErrorCode` enum: 1xxx = fatal/validation, 2xxx = retryable/connectivity, 3xxx = adapter-specific (30xx Keycloak, 31xx APISIX, 32xx FROST, 33xx RedPanda, 34xx PostGIS), 9xxx = unknown. Each code carries retryable flag, internal log template, and safe external message.
+`AdapterErrorCode` enum: 1xxx = fatal/validation, 2xxx = retryable/connectivity, 3xxx = adapter-specific (30xx Keycloak, 31xx APISIX, 32xx FROST, 33xx RedPanda, 34xx GeoServer, 35xx PostGIS), 9xxx = unknown. Each code carries retryable flag, internal log template, and safe external message.
 
 ## Conventions
 

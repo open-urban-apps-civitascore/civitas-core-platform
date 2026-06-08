@@ -66,7 +66,7 @@ config-adapter-postgis/                ← module
 ```java
 public sealed interface PostgisConfigValue extends ConfigValue
     permits TableConfig, SchemaConfig, DbRoleConfig {
-  String POSTGIS_RESULT_TYPE = "de.civitascore.data.table.processing.result";
+  String POSTGIS_RESULT_TYPE = "de.civitascore.data.sql.table.processing.result";
 }
 
 // TableConfig is a regular Jackson-deserialisable class (POJO with getters/setters),
@@ -194,7 +194,14 @@ CIVITAS_MASTER_KEY                (env var; required only to decrypt ENC(...) ro
   - `PostgisAdapterTest` — mocks `ConnectionProvider`/`Connection`/`Statement`(+`PreparedStatement`/`ResultSet`); covers table CREATE/DELETE, schema CREATE/UPDATE/DELETE, role CREATE (plaintext password + grants), encrypted-password-without-key → fatal, duplicate/missing absorption, role UPDATE grant reconciliation, connectivity → retryable, other SQLState → fatal + rollback, `UPDATE` table → `UNSUPPORTED_OPERATION`, wrong payload → `INVALID_PAYLOAD`, resource cleanup.
 - **Integration** (`*IT.java`, via failsafe, `mvn verify`) — implemented:
   - `PostgisAdapterIT` (16 tests) — real `postgis/postgis:16-3.4-alpine` container shared via the singleton pattern in `AbstractPostgisIT`. Asserts generated DDL is accepted by Postgres and objects physically exist (queried via `information_schema` / `pg_roles` / `has_schema_privilege`). Covers: table CREATE in public + new schema, geometry + SRID + GIST index, duplicate/missing absorption, table DELETE; schema CREATE with owner, DROP `CASCADE`, non-empty `RESTRICT` drop → fatal; role CREATE with login + password + grants, role UPDATE reconcile (revoke removed privilege), role DELETE; invalid DDL → `POSTGIS_DDL_ERROR`; unreachable JDBC → `RetryableAdapterException`.
-  - `PostgisEndToEndIT` (2 tests) — full pipeline: `ConfluentKafkaContainer` + PostGIS container + real `KafkaEventHandler` + real `PostgisAdapter`. Sends a CloudEvent on `de.civitascore.data.table.created` / `.deleted` and asserts (a) a `ConfigResultEvent` is published to the result topic with `SUCCESS` status and matching correlation ID, and (b) the table actually exists / was dropped in the database.
+  - `PostgisSagaHandlerIT` (4 tests) — `PostgisSagaHandler` against the real container: forward op then compensation for table / schema / role+grant, plus idempotent compensation of a missing object.
+  - `PostgisEndToEndIT` (2 tests) — full pipeline: `ConfluentKafkaContainer` + PostGIS container + real `KafkaEventHandler` + real `PostgisAdapter`. Sends a CloudEvent on `de.civitascore.data.sql.table.created` / `.deleted` and asserts (a) a `ConfigResultEvent` is published to the result topic with `SUCCESS` status and matching correlation ID, and (b) the table actually exists / was dropped in the database.
+
+### Saga participation
+
+Alongside the event-driven `PostgisAdapter`, the module provides `PostgisSagaHandler`, a `SagaCommandHandler` (ServiceLoader-registered) discovered by the application's `SagaComponentFactory` and registered in the saga orchestrator's `SagaHandlerRegistry`. It mirrors the FROST / APISIX / RedPanda handlers but executes DDL over JDBC. Because the JAX-RS-oriented `AbstractSagaCommandHandler` would pull a spurious HTTP dependency into this JDBC module, the handler implements `SagaCommandHandler` directly.
+
+Forward/compensation pairs: `CREATE_TABLE`↔`DROP_TABLE`, `CREATE_SCHEMA`↔`DROP_SCHEMA`, `CREATE_ROLE`↔`DROP_ROLE`. The forward command carries the resource definition as a nested map (`tableConfig` / `schemaConfig` / `roleConfig`) including its `resourceType` discriminator — deserialized through the polymorphic `PostgisConfigValue` base, exactly as the config travels in CloudEvents. Each `CREATE_*` returns its identifiers as `compensationData`, which the orchestrator flattens into the compensating `DROP_*`'s payload. CREATE absorbs duplicate-object SQLStates and DROP absorbs missing-object SQLStates, so steps and compensations are retry-safe. The handler reuses `ConnectionProvider`, `PostgisDialect`, `TableDdlBuilder`, `GrantReconciler`, and the same `CredentialDecryptor`-based password handling as the adapter. It is **not** wired into the built-in dataset sagas (which remain FROST → APISIX → RedPanda); it is available to any saga referencing the `postgis` adapter.
 
 ### Connection-pool startup behaviour
 

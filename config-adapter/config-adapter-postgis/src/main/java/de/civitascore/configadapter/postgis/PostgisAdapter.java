@@ -210,11 +210,11 @@ public class PostgisAdapter extends AbstractConfigAdapter {
       throws FatalAdapterException, RetryableAdapterException {
     switch (operation) {
       case CREATE -> {
-        executeDdl(AdapterOperation.TABLE_CREATE, ddlBuilder.buildCreate(table), true, false);
+        executeDdl(AdapterOperation.SQL_TABLE_CREATE, ddlBuilder.buildCreate(table), true, false);
         publishSuccess(event, "Table " + table.qualifiedName() + " created", table.qualifiedName());
       }
       case DELETE -> {
-        executeDdl(AdapterOperation.TABLE_DELETE, ddlBuilder.buildDrop(table), false, true);
+        executeDdl(AdapterOperation.SQL_TABLE_DELETE, ddlBuilder.buildDrop(table), false, true);
         publishSuccess(event, "Table " + table.qualifiedName() + " deleted", table.qualifiedName());
       }
       default -> throw new FatalAdapterException(AdapterErrorCode.UNSUPPORTED_OPERATION, operation);
@@ -227,15 +227,16 @@ public class PostgisAdapter extends AbstractConfigAdapter {
       throws FatalAdapterException, RetryableAdapterException {
     switch (operation) {
       case CREATE -> {
-        executeDdl(AdapterOperation.SCHEMA_CREATE, dialect.createSchema(schema), true, false);
+        executeDdl(AdapterOperation.SQL_SCHEMA_CREATE, dialect.createSchema(schema), true, false);
         publishSuccess(event, "Schema " + schema.getName() + " created", schema.getName());
       }
       case UPDATE -> {
-        executeDdl(AdapterOperation.SCHEMA_UPDATE, dialect.alterSchemaOwner(schema), false, false);
+        executeDdl(
+            AdapterOperation.SQL_SCHEMA_UPDATE, dialect.alterSchemaOwner(schema), false, false);
         publishSuccess(event, "Schema " + schema.getName() + " updated", schema.getName());
       }
       case DELETE -> {
-        executeDdl(AdapterOperation.SCHEMA_DELETE, dialect.dropSchema(schema), false, true);
+        executeDdl(AdapterOperation.SQL_SCHEMA_DELETE, dialect.dropSchema(schema), false, true);
         publishSuccess(event, "Schema " + schema.getName() + " deleted", schema.getName());
       }
       default -> throw new FatalAdapterException(AdapterErrorCode.UNSUPPORTED_OPERATION, operation);
@@ -252,20 +253,20 @@ public class PostgisAdapter extends AbstractConfigAdapter {
         List<String> statements = new ArrayList<>(dialect.createRole(role, password));
         appendGrantStatements(
             statements, role.getName(), GrantReconciler.reconcile(role.getGrants(), Map.of()));
-        executeDdl(AdapterOperation.DB_ROLE_CREATE, statements, true, false);
+        executeDdl(AdapterOperation.SQL_ROLE_CREATE, statements, true, false);
         publishSuccess(event, "Role " + role.getName() + " created", role.getName());
       }
       case UPDATE -> {
         String password = resolvePassword(role.getPassword());
         executeDdl(
-            AdapterOperation.DB_ROLE_UPDATE,
+            AdapterOperation.SQL_ROLE_UPDATE,
             connection -> planRoleUpdate(connection, role, password),
             false,
             false);
         publishSuccess(event, "Role " + role.getName() + " updated", role.getName());
       }
       case DELETE -> {
-        executeDdl(AdapterOperation.DB_ROLE_DELETE, dialect.dropRole(role), false, true);
+        executeDdl(AdapterOperation.SQL_ROLE_DELETE, dialect.dropRole(role), false, true);
         publishSuccess(event, "Role " + role.getName() + " deleted", role.getName());
       }
       default -> throw new FatalAdapterException(AdapterErrorCode.UNSUPPORTED_OPERATION, operation);

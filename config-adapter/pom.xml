@@ -68,8 +68,6 @@
 		<postgresql.version>42.7.11</postgresql.version>
 		<h2.version>2.3.232</h2.version>
 		<cyclonedx-maven-plugin.version>2.9.0</cyclonedx-maven-plugin.version>
-		<postgresql.version>42.7.4</postgresql.version>
-		<hikaricp.version>6.2.1</hikaricp.version>
 	</properties>
 
 	<dependencyManagement>
