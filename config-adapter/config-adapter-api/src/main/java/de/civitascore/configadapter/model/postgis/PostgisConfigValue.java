@@ -31,5 +31,5 @@ import de.civitascore.configadapter.model.ConfigValue;
 public sealed interface PostgisConfigValue extends ConfigValue
     permits TableConfig, SchemaConfig, DbRoleConfig {
 
-  String POSTGIS_RESULT_TYPE = "de.civitascore.data.table.processing.result";
+  String POSTGIS_RESULT_TYPE = "de.civitascore.data.sql.processing.result";
 }

@@ -329,8 +329,8 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   /**
    * Converts a nested config map into the expected {@link PostgisConfigValue} subtype. The map must
-   * carry the {@code resourceType} discriminator (e.g. {@code "postgis-table"}), exactly as the
-   * config travels inside CloudEvents.
+   * carry the {@code resourceType} discriminator (e.g. {@code "sql-table"}), exactly as the config
+   * travels inside CloudEvents.
    */
   private <T extends PostgisConfigValue> T convert(
       SagaCommandMessage command, String key, Class<T> type) {
