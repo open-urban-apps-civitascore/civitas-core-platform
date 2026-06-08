@@ -33,7 +33,7 @@ import java.util.Objects;
  *
  * <pre>{@code
  * {
- *   "resourceType": "postgis-role",
+ *   "resourceType": "sql-role",
  *   "name": "analyst",
  *   "canLogin": true,
  *   "password": "ENC(...)",

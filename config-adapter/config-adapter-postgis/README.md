@@ -95,13 +95,13 @@ All properties are overridable via environment variables (`.` → `_`, uppercase
 
 **Prerequisite:** the PostGIS extension must already be installed in the target database (`CREATE EXTENSION postgis`). The adapter does not install it.
 
-**Role passwords:** the `password` field may be an encrypted `ENC(...)` value following the project credential convention. The adapter decrypts it with the `CIVITAS_MASTER_KEY` master key (see [`CredentialDecryptor`](../config-adapter-api/src/main/java/de/civitascore/configadapter/crypto/CredentialDecryptor.java), credential context `portal-backend:postgis-role`). If `CIVITAS_MASTER_KEY` is unset and an encrypted password arrives, the event fails fatally. Plaintext passwords are accepted as-is. Passwords are never written to logs or error messages (`PASSWORD '…'` literals are redacted).
+**Role passwords:** the `password` field may be an encrypted `ENC(...)` value following the project credential convention. The adapter decrypts it with the `CIVITAS_MASTER_KEY` master key (see [`CredentialDecryptor`](../config-adapter-api/src/main/java/de/civitascore/configadapter/crypto/CredentialDecryptor.java), credential context `portal-backend:sql-role`). If `CIVITAS_MASTER_KEY` is unset and an encrypted password arrives, the event fails fatally. Plaintext passwords are accepted as-is. Passwords are never written to logs or error messages (`PASSWORD '…'` literals are redacted).
 
 **Startup behaviour:** the HikariCP pool is created lazily (`initializationFailTimeout = -1`) — adapter startup does not probe the database. If the DB is unreachable when an event arrives, the failure is reported as a `RetryableAdapterException` rather than crashing the adapter at boot.
 
 ## Event Payload
 
-The payload uses the sealed `PostgisConfigValue` hierarchy, currently with one variant — `TableConfig`. JSON discriminator: `"resourceType": "postgis-table"`.
+The payload uses the sealed `PostgisConfigValue` hierarchy, currently with one variant — `TableConfig`. JSON discriminator: `"resourceType": "sql-table"`.
 
 ```json
 {
@@ -113,7 +113,7 @@ The payload uses the sealed `PostgisConfigValue` hierarchy, currently with one v
     "config": {
       "path": "iot/sensor_readings",
       "value": {
-        "resourceType": "postgis-table",
+        "resourceType": "sql-table",
         "schema": "iot",
         "name": "sensor_readings",
         "columns": [
@@ -148,11 +148,11 @@ CREATE TABLE "iot"."sensor_readings" (
 CREATE INDEX "idx_sensor_readings_location" ON "iot"."sensor_readings" USING GIST ("location");
 ```
 
-### Schema payload (`resourceType: postgis-schema`)
+### Schema payload (`resourceType: sql-schema`)
 
 ```json
 {
-  "resourceType": "postgis-schema",
+  "resourceType": "sql-schema",
   "name": "iot",
   "owner": "iot_admin",
   "cascade": false
@@ -161,11 +161,11 @@ CREATE INDEX "idx_sensor_readings_location" ON "iot"."sensor_readings" USING GIS
 
 `CREATE` → `CREATE SCHEMA "iot" AUTHORIZATION "iot_admin"`; `UPDATE` → `ALTER SCHEMA "iot" OWNER TO "iot_admin"`; `DELETE` → `DROP SCHEMA "iot" RESTRICT` (or `CASCADE` when `cascade=true`).
 
-### Role payload (`resourceType: postgis-role`)
+### Role payload (`resourceType: sql-role`)
 
 ```json
 {
-  "resourceType": "postgis-role",
+  "resourceType": "sql-role",
   "name": "analyst",
   "canLogin": true,
   "password": "ENC(BASE64-AES-GCM-PAYLOAD)",
@@ -214,7 +214,7 @@ Forward operations and their compensations:
 | `CREATE_SCHEMA` | `schemaConfig` (`SchemaConfig`) | `DROP_SCHEMA` | `{schema, cascade?}` |
 | `CREATE_ROLE`   | `roleConfig` (`DbRoleConfig`)   | `DROP_ROLE`   | `{role}` |
 
-- The nested config map must carry its `resourceType` discriminator (`postgis-table` / `postgis-schema` / `postgis-role`), exactly as the config travels inside CloudEvents.
+- The nested config map must carry its `resourceType` discriminator (`sql-table` / `sql-schema` / `sql-role`), exactly as the config travels inside CloudEvents.
 - Each `CREATE_*` returns its identifiers as `compensationData`; the orchestrator flattens them into the payload of the compensating `DROP_*`.
 - `CREATE_*` absorbs duplicate-object SQLStates and `DROP_*` absorbs missing-object SQLStates, so steps and compensations are safe to retry.
 - `DROP_*` can also be used as a forward step; encrypted role passwords are decrypted exactly as in the event path.

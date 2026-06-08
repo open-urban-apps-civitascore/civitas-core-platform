@@ -26,7 +26,7 @@ import java.util.Objects;
  *
  * <pre>{@code
  * {
- *   "resourceType": "postgis-table",
+ *   "resourceType": "sql-table",
  *   "schema": "iot",
  *   "name": "sensor_readings",
  *   "columns": [

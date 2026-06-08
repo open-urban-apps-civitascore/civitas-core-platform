@@ -62,8 +62,8 @@ import de.civitascore.configadapter.model.redpanda.PipelineConfigValue;
   @JsonSubTypes.Type(value = FeatureTypeConfig.class, name = "geoserver-featuretype"),
   @JsonSubTypes.Type(value = LayerConfig.class, name = "geoserver-layer"),
   @JsonSubTypes.Type(value = StyleConfig.class, name = "geoserver-style"),
-  @JsonSubTypes.Type(value = TableConfig.class, name = "postgis-table"),
-  @JsonSubTypes.Type(value = SchemaConfig.class, name = "postgis-schema"),
-  @JsonSubTypes.Type(value = DbRoleConfig.class, name = "postgis-role"),
+  @JsonSubTypes.Type(value = TableConfig.class, name = "sql-table"),
+  @JsonSubTypes.Type(value = SchemaConfig.class, name = "sql-schema"),
+  @JsonSubTypes.Type(value = DbRoleConfig.class, name = "sql-role"),
 })
 public interface ConfigValue {}

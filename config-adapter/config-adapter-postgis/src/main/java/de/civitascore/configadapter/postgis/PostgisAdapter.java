@@ -79,7 +79,7 @@ public class PostgisAdapter extends AbstractConfigAdapter {
   public static final String ADAPTER_NAME = "postgis";
 
   /** Credential context for per-credential key isolation when decrypting role passwords. */
-  public static final String ROLE_CREDENTIAL_CONTEXT = "portal-backend:postgis-role";
+  public static final String ROLE_CREDENTIAL_CONTEXT = "portal-backend:sql-role";
 
   private static final String MASTER_KEY_ENV = "CIVITAS_MASTER_KEY";
 

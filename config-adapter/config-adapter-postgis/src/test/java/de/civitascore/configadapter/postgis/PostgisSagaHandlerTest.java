@@ -77,7 +77,7 @@ class PostgisSagaHandlerTest {
                       "tableConfig",
                       Map.of(
                           "resourceType",
-                          "postgis-table",
+                          "sql-table",
                           "schema",
                           "iot",
                           "name",
@@ -98,7 +98,7 @@ class PostgisSagaHandlerTest {
           handler.handle(
               execute(
                   "CREATE_SCHEMA",
-                  Map.of("schemaConfig", Map.of("resourceType", "postgis-schema", "name", "iot"))));
+                  Map.of("schemaConfig", Map.of("resourceType", "sql-schema", "name", "iot"))));
 
       assertEquals("STEP_COMPLETED", result.type());
       assertEquals("iot", result.compensationData().get("schema"));
@@ -114,7 +114,7 @@ class PostgisSagaHandlerTest {
                       "roleConfig",
                       Map.of(
                           "resourceType",
-                          "postgis-role",
+                          "sql-role",
                           "name",
                           "analyst",
                           "canLogin",
@@ -143,7 +143,7 @@ class PostgisSagaHandlerTest {
                       "roleConfig",
                       Map.of(
                           "resourceType",
-                          "postgis-role",
+                          "sql-role",
                           "name",
                           "analyst",
                           "canLogin",
@@ -163,7 +163,7 @@ class PostgisSagaHandlerTest {
           handler.handle(
               execute(
                   "CREATE_ROLE",
-                  Map.of("roleConfig", Map.of("resourceType", "postgis-role", "name", "analyst"))));
+                  Map.of("roleConfig", Map.of("resourceType", "sql-role", "name", "analyst"))));
 
       assertEquals("STEP_COMPLETED", result.type());
       verify(mockConnection).commit();
@@ -185,7 +185,7 @@ class PostgisSagaHandlerTest {
           handler.handle(
               execute(
                   "CREATE_SCHEMA",
-                  Map.of("schemaConfig", Map.of("resourceType", "postgis-schema", "name", "x"))));
+                  Map.of("schemaConfig", Map.of("resourceType", "sql-schema", "name", "x"))));
 
       assertEquals("STEP_FAILED", result.type());
       verify(mockConnection).rollback();

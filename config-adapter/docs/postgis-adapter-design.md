@@ -66,7 +66,7 @@ config-adapter-postgis/                ← module
 ```java
 public sealed interface PostgisConfigValue extends ConfigValue
     permits TableConfig, SchemaConfig, DbRoleConfig {
-  String POSTGIS_RESULT_TYPE = "de.civitascore.data.sql.table.processing.result";
+  String POSTGIS_RESULT_TYPE = "de.civitascore.data.sql.processing.result";
 }
 
 // TableConfig is a regular Jackson-deserialisable class (POJO with getters/setters),
@@ -119,7 +119,7 @@ public interface SqlDialect {
 
 ### Credentials
 
-Role passwords follow the project convention (same as the RedPanda adapter). A `password` field may be an `ENC(...)` value; the adapter loads `CIVITAS_MASTER_KEY` via `CryptoKeyLoader.loadAndStretchKeyFromEnv`, then decrypts with `CredentialDecryptor` under the credential context `portal-backend:postgis-role`. If the key is absent and an encrypted password arrives, the event fails fatally (`POSTGIS_ERROR`). Plaintext passwords pass through unchanged. The generated `PASSWORD '…'` literal is redacted from all logs and error messages, and the stretched key is zeroed on `close()`.
+Role passwords follow the project convention (same as the RedPanda adapter). A `password` field may be an `ENC(...)` value; the adapter loads `CIVITAS_MASTER_KEY` via `CryptoKeyLoader.loadAndStretchKeyFromEnv`, then decrypts with `CredentialDecryptor` under the credential context `portal-backend:sql-role`. If the key is absent and an encrypted password arrives, the event fails fatally (`POSTGIS_ERROR`). Plaintext passwords pass through unchanged. The generated `PASSWORD '…'` literal is redacted from all logs and error messages, and the stretched key is zeroed on `close()`.
 
 ---
 

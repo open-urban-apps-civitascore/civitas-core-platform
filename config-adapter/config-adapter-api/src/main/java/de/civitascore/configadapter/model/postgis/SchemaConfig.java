@@ -25,7 +25,7 @@ import java.util.Objects;
  *
  * <pre>{@code
  * {
- *   "resourceType": "postgis-schema",
+ *   "resourceType": "sql-schema",
  *   "name": "iot",
  *   "owner": "iot_admin",
  *   "cascade": false

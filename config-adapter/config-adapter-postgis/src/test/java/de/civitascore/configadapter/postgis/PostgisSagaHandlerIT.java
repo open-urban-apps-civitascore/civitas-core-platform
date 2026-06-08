@@ -67,7 +67,7 @@ class PostgisSagaHandlerIT extends AbstractPostgisIT {
                     "tableConfig",
                     Map.of(
                         "resourceType",
-                        "postgis-table",
+                        "sql-table",
                         "name",
                         "saga_widgets_it",
                         "columns",
@@ -91,7 +91,7 @@ class PostgisSagaHandlerIT extends AbstractPostgisIT {
                 "CREATE_SCHEMA",
                 Map.of(
                     "schemaConfig",
-                    Map.of("resourceType", "postgis-schema", "name", "saga_schema_it"))));
+                    Map.of("resourceType", "sql-schema", "name", "saga_schema_it"))));
 
     assertEquals("STEP_COMPLETED", created.type());
     assertTrue(schemaExists("saga_schema_it"));
@@ -115,7 +115,7 @@ class PostgisSagaHandlerIT extends AbstractPostgisIT {
                     "roleConfig",
                     Map.of(
                         "resourceType",
-                        "postgis-role",
+                        "sql-role",
                         "name",
                         "saga_role_it",
                         "grants",
