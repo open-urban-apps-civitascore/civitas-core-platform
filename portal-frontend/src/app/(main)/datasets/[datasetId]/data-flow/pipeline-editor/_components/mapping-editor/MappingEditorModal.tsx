@@ -1,8 +1,10 @@
 'use client'
 
-import type { Edge, IsValidConnection, Node, NodeTypes, OnConnect } from '@xyflow/react'
+import type { Edge, IsValidConnection, Node, NodeTypes, OnConnect, OnConnectEnd, OnConnectStart } from '@xyflow/react'
 import { addEdge, useEdgesState, useNodesState } from '@xyflow/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import type { KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
 import {
@@ -23,7 +25,7 @@ import { MegaNode } from './nodes/MegaNode'
 import { umlDiagramToSchemaTree } from './schema/adapter'
 import { flattenTree } from './schema/fieldTree'
 import { computeStatus } from './status'
-import { concatInputPorts, mappingRegistry } from './transforms'
+import { concatInputPorts, LITERAL_DEFAULT_TYPE, literalOutputPort, mappingRegistry } from './transforms'
 
 export interface SchemaRef {
   datastructureId: string
@@ -122,11 +124,59 @@ export const MappingEditorModal = ({
     return port ? { type: port.type, sub: port.dataType } : null
   }
 
-  const isValidConnection: IsValidConnection = connection => {
-    const from = endpointInfo(connection.source, connection.sourceHandle ?? '')
-    const to = endpointInfo(connection.target, connection.targetHandle ?? '')
-    return !!from && !!to && from.type === to.type
-  }
+  /**
+   * Two ports are compatible when:
+   *  - both have the same portType category (scalar / array / object)
+   *  - AND for scalars: the primitive subtype matches exactly (int↔int, str↔str, …)
+   *    — type conversions must go through an explicit conversion node.
+   * Ports without a declared subtype (e.g. generic transform in/out) are treated
+   * as compatible with any scalar subtype so conversion nodes can be wired freely.
+   */
+  const portsCompatible = useCallback(
+    (from: { type: PortType; sub?: string } | null, to: { type: PortType; sub?: string } | null): boolean => {
+      if (!from || !to) return false
+      if (from.type !== to.type) return false
+      if (from.type === 'scalar' && from.sub && to.sub && from.sub !== to.sub) return false
+      return true
+    },
+    [],
+  )
+
+  const isValidConnection: IsValidConnection = useCallback(
+    connection => {
+      const from = endpointInfo(connection.source, connection.sourceHandle ?? '')
+      const to = endpointInfo(connection.target, connection.targetHandle ?? '')
+      return portsCompatible(from, to)
+    },
+    // endpointInfo reads nodes/sourceFields/targetFields via closure — include them
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [nodes, sourceFields, targetFields, portsCompatible],
+  )
+
+  /** Tracks the source endpoint of an in-progress drag so we can show a toast on failure. */
+  const pendingConnection = useRef<{ nodeId: string; handleId: string } | null>(null)
+
+  const onConnectStart: OnConnectStart = useCallback((_event, params) => {
+    pendingConnection.current = params.nodeId ? { nodeId: params.nodeId, handleId: params.handleId ?? '' } : null
+  }, [])
+
+  const onConnectEnd: OnConnectEnd = useCallback(
+    (_event, connectionState) => {
+      // connectionState.isValid is false when the drag ended on an incompatible handle
+      if (connectionState && !connectionState.isValid && pendingConnection.current) {
+        const from = endpointInfo(pendingConnection.current.nodeId, pendingConnection.current.handleId)
+        // Only show the message when we can identify the source type (not a missed drop into empty space)
+        if (from?.sub) {
+          toast.error(`Types don't match (${from.sub}). Add a conversion function.`)
+        } else if (from) {
+          toast.error(`Types don't match. Add a conversion function.`)
+        }
+      }
+      pendingConnection.current = null
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [nodes, sourceFields, targetFields],
+  )
 
   const growConcat = (nodeId: string, handleId: string) => {
     setNodes(nds =>
@@ -144,17 +194,12 @@ export const MappingEditorModal = ({
   const onConnect: OnConnect = connection => {
     if (!isValidConnection(connection)) return
     const from = endpointInfo(connection.source, connection.sourceHandle ?? '')
-    const to = endpointInfo(connection.target, connection.targetHandle ?? '')
     const isArray = from?.type === 'array'
-    const isCast = from?.type === 'scalar' && to?.type === 'scalar' && !!from.sub && !!to.sub && from.sub !== to.sub
     setEdges(eds => {
       const kept = eds.filter(
         e => !(e.target === connection.target && (e.targetHandle ?? '') === (connection.targetHandle ?? '')),
       )
-      return addEdge(
-        { ...connection, ...(isArray ? { style: ARRAY_EDGE_STYLE } : {}), ...(isCast ? { label: 'cast' } : {}) },
-        kept,
-      )
+      return addEdge({ ...connection, ...(isArray ? { style: ARRAY_EDGE_STYLE } : {}) }, kept)
     })
     growConcat(connection.target, connection.targetHandle ?? '')
   }
@@ -164,7 +209,9 @@ export const MappingEditorModal = ({
     if (!def) return
     const nodeConfig = Object.fromEntries(def.config.map(field => [field.key, field.default ?? '']))
     const id = `${type}-${nextId.current++}`
-    const data: TransformNodeData = { defType: type, config: nodeConfig, inputs: def.inputs, outputs: def.outputs }
+    // For literal nodes: initialize the output port with the default type so connections work on drop.
+    const outputs = type === 'const' ? [literalOutputPort(LITERAL_DEFAULT_TYPE)] : def.outputs
+    const data: TransformNodeData = { defType: type, config: nodeConfig, inputs: def.inputs, outputs }
     setNodes(nds => [...nds, { id, type: 'transform', position, data }])
   }
 
@@ -174,7 +221,14 @@ export const MappingEditorModal = ({
       nds.map(node => {
         if (node.id !== selectedId) return node
         const data = node.data as TransformNodeData
-        return { ...node, data: { ...data, config: { ...data.config, [key]: value } } }
+        const newConfig = { ...data.config, [key]: value }
+        // When the literal node's type changes, update the output port's dataType so
+        // connection validation reflects the chosen type.
+        if (data.defType === 'const' && key === 'type') {
+          const newOutputs = [literalOutputPort(value || LITERAL_DEFAULT_TYPE)]
+          return { ...node, data: { ...data, config: newConfig, outputs: newOutputs } }
+        }
+        return { ...node, data: { ...data, config: newConfig } }
       }),
     )
   }
@@ -218,15 +272,15 @@ export const MappingEditorModal = ({
     onOpenChange(false)
   }
 
-  const { mapped, unmapped, errors } = status.counts
+  const { mapped, unmapped } = status.counts
 
   const toolbar = (
-    <div className="flex items-center gap-3 px-4 py-2">
+    <div className="grid grid-cols-3 items-center px-4 py-2">
       <DialogTitle className="text-base">{name || 'Mapping'}</DialogTitle>
-      <span className="text-xs text-muted-foreground">
-        {mapped} mapped · {unmapped} unmapped · {errors} errors
+      <span className="text-center text-xs text-muted-foreground">
+        {mapped} mapped · {unmapped} unmapped
       </span>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="flex items-center justify-end gap-2">
         <Button size="sm" onClick={handleSave}>
           Save
         </Button>
@@ -237,9 +291,26 @@ export const MappingEditorModal = ({
     </div>
   )
 
+  /**
+   * Prevent Delete/Backspace from bubbling out of the modal to the parent
+   * PipelineCanvas, which would delete the selected pipeline node and close
+   * the modal. The inner CanvasScaffold handles its own deletion via
+   * deleteKeyCode={['Delete','Backspace']}.
+   */
+  const stopDeletePropagation = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.stopPropagation()
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className={FULLSCREEN} aria-describedby={undefined}>
+      <DialogContent
+        showCloseButton={false}
+        className={FULLSCREEN}
+        aria-describedby={undefined}
+        onKeyDown={stopDeletePropagation}
+      >
         <EditorLayout
           toolbar={toolbar}
           palette={<PaletteShell registry={mappingRegistry} title="Transforms" />}
@@ -258,9 +329,12 @@ export const MappingEditorModal = ({
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onConnectStart={onConnectStart}
+            onConnectEnd={onConnectEnd}
             isValidConnection={isValidConnection}
             onDropNode={onDropNode}
             onSelectionChange={setSelectedId}
+            deleteKeyCode={['Delete', 'Backspace']}
           />
         </EditorLayout>
       </DialogContent>

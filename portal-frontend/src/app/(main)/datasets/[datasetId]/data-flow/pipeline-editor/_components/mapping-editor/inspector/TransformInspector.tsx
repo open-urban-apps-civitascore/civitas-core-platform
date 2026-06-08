@@ -22,7 +22,7 @@ const FieldControl = ({ field, value, onChange }: FieldControlProps) => {
         </SelectTrigger>
         <SelectContent>
           {field.options?.map(option => (
-            <SelectItem key={option.value} value={option.value}>
+            <SelectItem key={option.label} value={option.value}>
               {option.label}
             </SelectItem>
           ))}
@@ -36,6 +36,7 @@ const FieldControl = ({ field, value, onChange }: FieldControlProps) => {
       type={field.control === 'number' ? 'number' : 'text'}
       value={value}
       placeholder={field.placeholder}
+      className="w-full"
       onChange={e => onChange(e.target.value)}
     />
   )

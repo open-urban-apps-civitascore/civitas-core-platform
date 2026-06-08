@@ -24,11 +24,19 @@ export interface SchemaTree {
 // Mapping config (spec §13) — the single saved artifact
 // ---------------------------------------------------------------------------
 
-export type ConversionOp = 'intToStr' | 'strToInt' | 'parseInt' | 'parseFloat' | 'strToDate' | 'dateToStr'
+/**
+ * Conversion ops aligned with Apache NiFi RecordPath functions:
+ *  toString  → NiFi toString(field, charset)   — any scalar → string
+ *  toInt     → NiFi type coercion to INT        — str/float → int
+ *  toFloat   → NiFi type coercion to FLOAT      — str/int → float
+ *  toDate    → NiFi toDate(field, format)       — str → date
+ *  format    → NiFi format(field, format)       — date → str
+ */
+export type ConversionOp = 'toString' | 'toInt' | 'toFloat' | 'toDate' | 'format'
 
 export type OpNode =
   | { op: 'copy'; sourcePath: string }
-  | { op: 'const'; value: unknown }
+  | { op: 'const'; value: unknown; valueType?: string }
   | { op: 'concat'; separator?: string; inputs: ValueNode[] }
   | { op: ConversionOp; input: ValueNode; pattern?: string }
 

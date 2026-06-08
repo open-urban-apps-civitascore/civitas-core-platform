@@ -1,10 +1,13 @@
 import type { LucideIcon } from 'lucide-react'
-import { ArrowRightLeft, Binary, Calendar, CalendarClock, Combine, Hash, Network, Type } from 'lucide-react'
+import { Binary, Calendar, CalendarClock, Combine, Hash, Type } from 'lucide-react'
 
 import type { ConfigField, PortDef, TransformDef } from '@/components/node-editor/types'
 import { buildRegistry } from '@/components/node-editor/types'
 
+import { UML_GEOMETRY_TYPES, UML_PRIMITIVE_TYPES } from '@/components/uml-modeler/constants/umlTypes'
+
 import type { ConversionOp, OpNode, ValueNode } from '../_types'
+import { GEOMETRY, PRIMITIVE } from '../schema/adapter'
 
 /** A registry entry: the single source of truth for a node's ports, config and compiled op. */
 export interface MappingTransformDef extends TransformDef {
@@ -22,20 +25,27 @@ export const concatInputPorts = (count: number): PortDef[] =>
 
 const patternField: ConfigField = { key: 'pattern', label: 'Pattern', control: 'text', default: 'yyyy-MM-dd' }
 
+/**
+ * Build a conversion node definition.
+ * @param inLabel  Human-readable label for the input port (e.g. "str/float")
+ * @param inSubtype  The actual primitive subtype for type-matching (undefined = accepts any scalar)
+ * @param outSubtype The actual primitive subtype produced
+ */
 const conversion = (
   type: ConversionOp,
-  inType: string,
-  outType: string,
+  inLabel: string,
+  inSubtype: string | undefined,
+  outSubtype: string,
   icon: LucideIcon,
   config: ConfigField[] = [],
 ): MappingTransformDef => ({
   type,
   category: 'Conversion Functions',
   label: type,
-  description: `${inType} → ${outType}`,
+  description: `${inLabel} → ${outSubtype}`,
   icon,
-  inputs: [scalar('in', inType, inType)],
-  outputs: [scalar('out', outType, outType)],
+  inputs: [scalar('in', inLabel, inSubtype)],
+  outputs: [scalar('out', outSubtype, outSubtype)],
   config,
   op: type,
   toValueNode: (inputs, cfg) => {
@@ -47,34 +57,29 @@ const conversion = (
   opConfig: op => ('pattern' in op && op.pattern != null ? { pattern: op.pattern } : {}),
 })
 
-const copy: MappingTransformDef = {
-  type: 'copy',
-  category: 'RecordPath',
-  label: 'RecordPath',
-  description: 'Pass a field through by its path.',
-  icon: ArrowRightLeft,
-  inputs: [scalar('in', 'in')],
-  outputs: [scalar('out', 'out')],
-  config: [],
-  op: 'copy',
-  toValueNode: inputs => inputs[0] ?? '',
-  opInputs: op => (op.op === 'copy' ? [op.sourcePath] : []),
-  opConfig: () => ({}),
-}
+/**
+ * Dropdown options for the Literal node — derived directly from the UML modeler's
+ * type constants so the two stay in sync automatically.
+ * Each option uses the UML type name as its unique value.
+ */
+export const LITERAL_TYPE_OPTIONS = [
+  ...Object.keys(UML_PRIMITIVE_TYPES),
+  ...Object.keys(UML_GEOMETRY_TYPES),
+].map(name => ({ label: name, value: name }))
 
-const recordPathMapping: MappingTransformDef = {
-  type: 'recordPathMapping',
-  category: 'RecordPath Mapping',
-  label: 'RecordPath Mapping',
-  description: 'Restructure a field tree.',
-  icon: Network,
-  inputs: [{ id: 'in', label: 'in', type: 'object' }],
-  outputs: [{ id: 'out', label: 'out', type: 'object' }],
-  config: [],
-  op: 'copy',
-  toValueNode: inputs => inputs[0] ?? '',
-  opInputs: () => [],
-  opConfig: () => ({}),
+/** Default UML type name for a freshly-dropped Literal node. */
+export const LITERAL_DEFAULT_TYPE = 'String'
+
+/**
+ * Given a UML type name, returns the output PortDef for a literal node.
+ * Reuses adapter.ts's GEOMETRY set and PRIMITIVE map — single source of truth.
+ * Geo types → object port (dataType='geo'); primitives → scalar port with matching subtype.
+ */
+export const literalOutputPort = (umlType: string): PortDef => {
+  if (GEOMETRY.has(umlType)) {
+    return { id: 'out', label: 'value', type: 'object', dataType: 'geo' }
+  }
+  return { id: 'out', label: 'value', type: 'scalar', dataType: PRIMITIVE[umlType] ?? 'str' }
 }
 
 const literal: MappingTransformDef = {
@@ -84,12 +89,27 @@ const literal: MappingTransformDef = {
   description: 'Emit a fixed value.',
   icon: Hash,
   inputs: [],
-  outputs: [scalar('out', 'value')],
-  config: [{ key: 'value', label: 'Value', control: 'text', default: '' }],
+  // Default output port is String (scalar/str); updated dynamically when type is changed.
+  outputs: [literalOutputPort(LITERAL_DEFAULT_TYPE)],
+  config: [
+    {
+      key: 'type',
+      label: 'Type',
+      control: 'select',
+      default: LITERAL_DEFAULT_TYPE,
+      placeholder: 'Select type…',
+      options: LITERAL_TYPE_OPTIONS,
+    },
+    { key: 'value', label: 'Value', control: 'text', default: '' },
+  ],
   op: 'const',
-  toValueNode: (_inputs, cfg) => ({ op: 'const', value: cfg.value ?? '' }),
+  toValueNode: (_inputs, cfg) => ({
+    op: 'const',
+    value: cfg.value ?? '',
+    ...(cfg.type ? { valueType: String(cfg.type) } : {}),
+  }),
   opInputs: () => [],
-  opConfig: op => (op.op === 'const' ? { value: op.value } : {}),
+  opConfig: op => (op.op === 'const' ? { value: op.value, type: op.valueType ?? LITERAL_DEFAULT_TYPE } : {}),
 }
 
 const concat: MappingTransformDef = {
@@ -111,18 +131,31 @@ const concat: MappingTransformDef = {
   opConfig: op => (op.op === 'concat' ? { separator: op.separator ?? '' } : {}),
 }
 
+/**
+ * Conversion nodes aligned with Apache NiFi RecordPath functions.
+ * Each entry maps 1:1 to a NiFi RecordPath function that will be emitted
+ * by the config-adapter when building the NiFi processor configuration.
+ *
+ *  toString  → NiFi toString(field, charset)   — any scalar → string
+ *  toInt     → NiFi type coercion to INT        — str/float → int
+ *  toFloat   → NiFi type coercion to FLOAT      — str/int → float
+ *  toDate    → NiFi toDate(field, format)       — str → date
+ *  format    → NiFi format(field, format)       — date → str
+ */
 const conversions: MappingTransformDef[] = [
-  conversion('intToStr', 'int', 'str', Type),
-  conversion('strToInt', 'str', 'int', Binary),
-  conversion('parseInt', 'str', 'int', Binary),
-  conversion('parseFloat', 'str', 'float', Binary),
-  conversion('strToDate', 'str', 'date', Calendar, [patternField]),
-  conversion('dateToStr', 'date', 'str', CalendarClock, [patternField]),
+  // toString: accepts any scalar (no subtype restriction on input), produces str
+  conversion('toString', 'any scalar', undefined, 'str', Type),
+  // toInt: accepts str or float (no subtype restriction — conversion node wires freely), produces int
+  conversion('toInt', 'str / float', undefined, 'int', Binary),
+  // toFloat: accepts str or int, produces float
+  conversion('toFloat', 'str / int', undefined, 'float', Binary),
+  // toDate: accepts str, produces date
+  conversion('toDate', 'str', 'str', 'date', Calendar, [patternField]),
+  // format: accepts date, produces str
+  conversion('format', 'date', 'date', 'str', CalendarClock, [patternField]),
 ]
 
 export const mappingRegistry = buildRegistry<MappingTransformDef>([
-  copy,
-  recordPathMapping,
   literal,
   concat,
   ...conversions,

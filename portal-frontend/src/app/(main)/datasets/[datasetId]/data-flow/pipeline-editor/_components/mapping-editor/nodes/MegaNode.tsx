@@ -65,13 +65,18 @@ const renderRows = (
     </Fragment>
   ))
 
+const HEADER_CLASS: Record<MegaRole, string> = {
+  source: 'border-b border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-300',
+  target: 'border-b border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold tracking-wide text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
+}
+
 export const MegaNode = ({ data }: NodeProps) => {
   const d = data as MegaNodeData
-  const title = `${d.role === 'source' ? 'SOURCE' : 'TARGET'} · ${d.schemaName}`
+  const title = `${d.role === 'source' ? 'INPUT' : 'OUTPUT'} · ${d.schemaName}`
 
   return (
-    <div className="w-[240px] rounded-md border border-border bg-background shadow-sm">
-      <div className="border-b border-border bg-muted/50 px-2 py-1 text-xs font-semibold tracking-wide">{title}</div>
+    <div className="min-w-[300px] rounded-md border border-border bg-background shadow-sm">
+      <div className={HEADER_CLASS[d.role]}>{title}</div>
       <div className="py-1">{renderRows(d.fields, d.role, 0, d.portStatus)}</div>
     </div>
   )

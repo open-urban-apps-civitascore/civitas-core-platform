@@ -4,7 +4,7 @@ import type { UMLClass, UMLElement, UMLRelationship, UMLType } from '@/component
 
 import type { FieldNode, FieldType, SchemaTree } from '../_types'
 
-const PRIMITIVE: Record<string, FieldType> = {
+export const PRIMITIVE: Record<string, FieldType> = {
   String: 'str',
   Character: 'str',
   Uuid: 'str',
@@ -18,7 +18,7 @@ const PRIMITIVE: Record<string, FieldType> = {
   Date: 'date',
 }
 
-const GEOMETRY = new Set([
+export const GEOMETRY = new Set([
   'Point',
   'LineString',
   'Polygon',

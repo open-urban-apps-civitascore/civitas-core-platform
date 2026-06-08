@@ -63,7 +63,9 @@ export const computeStatus = (
     }
 
     const isCovered = isCoveredByAncestor(path, mappedTargets)
-    targetPortStatus[path] = isCovered ? 'mapped' : 'unmapped'
+    // Use 'unused' (grey) for unconnected target fields — same visual as source side.
+    // The unmapped count is still tracked for the toolbar.
+    targetPortStatus[path] = isCovered ? 'mapped' : 'unused'
     if (isLeaf && isCovered) mapped++
     else if (isLeaf) unmapped++
   })

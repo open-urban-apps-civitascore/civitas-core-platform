@@ -6,7 +6,7 @@ import type { MappingConfig, SchemaTree, ValueNode } from './_types'
 import { isOpNode } from './_types'
 import type { MegaNodeData } from './nodes/MegaNode'
 import { flattenTree } from './schema/fieldTree'
-import { concatInputPorts, mappingRegistry } from './transforms'
+import { concatInputPorts, literalOutputPort, LITERAL_DEFAULT_TYPE, mappingRegistry } from './transforms'
 
 export const SOURCE_NODE_ID = 'source'
 export const TARGET_NODE_ID = 'target'
@@ -80,7 +80,7 @@ const megaNode = (
   id,
   type: 'mega',
   position,
-  draggable: false,
+  deletable: false,
   data: { role, schemaName: tree.name, fields: tree.fields } as MegaNodeData,
 })
 
@@ -98,13 +98,13 @@ export const decompileConfig = (
   let autoRow = 0
   const positionFor = (id: string) => config.positions[id] ?? { x: AUTO_X, y: 40 + autoRow++ * 90 }
 
-  const addEdge = (source: string, sourceHandle: string, target: string, targetHandle: string, isArray: boolean) => {
+  const addEdge = (srcNode: string, srcHandle: string, tgtNode: string, tgtHandle: string, isArray: boolean) => {
     edges.push({
-      id: makeEdgeId(source, sourceHandle, target, targetHandle),
-      source,
-      sourceHandle,
-      target,
-      targetHandle,
+      id: makeEdgeId(srcNode, srcHandle, tgtNode, tgtHandle),
+      source: srcNode,
+      sourceHandle: srcHandle,
+      target: tgtNode,
+      targetHandle: tgtHandle,
       ...(isArray ? { style: ARRAY_EDGE_STYLE } : {}),
     })
   }
@@ -125,7 +125,11 @@ export const decompileConfig = (
     const childVns = def?.opInputs(vn) ?? []
     // concat keeps a spare trailing port so users can add inputs without replacing wires
     const inputs = vn.op === 'concat' ? concatInputPorts(childVns.length + 1) : (def?.inputs ?? [])
-    const outputs = def?.outputs ?? []
+    // For literal (const) nodes: restore the typed output port from the saved valueType (UML name)
+    const outputs =
+      vn.op === 'const'
+        ? [literalOutputPort(vn.valueType ?? LITERAL_DEFAULT_TYPE)]
+        : (def?.outputs ?? [])
 
     nodes.push({
       id: derivedId,

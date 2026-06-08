@@ -135,13 +135,13 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
       </div>
 
       <DatastructureField
-        label="Source datastructure"
+        label="Input datastructure"
         selectedKey={sourceKey}
         name={data.sourceName}
         onSelect={handleSource}
       />
       <DatastructureField
-        label="Target datastructure"
+        label="Output datastructure"
         selectedKey={targetKey}
         name={data.targetName}
         onSelect={handleTarget}
