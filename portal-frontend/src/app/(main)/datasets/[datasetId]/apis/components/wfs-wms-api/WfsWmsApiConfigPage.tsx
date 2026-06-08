@@ -1,6 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQueries } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { FieldPath, useFieldArray, useForm, UseFormReturn } from 'react-hook-form'
@@ -9,11 +10,12 @@ import { toast } from 'sonner'
 import { useGetDatasinks } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { useDeleteLayer, useGetLayers } from '@/app/services/api/datasets/layers/clientRequests'
 import { useGetStyles } from '@/app/services/api/datasets/styles/clientRequests'
+import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { Form } from '@/components/ui/form'
-import { UMLClass } from '@/components/uml-modeler/types/uml'
 import { Dataset } from '@/types/datasets'
 import { DATASINK_TYPES } from '@/types/datasinks'
+import { DatastructureVersion } from '@/types/datastructures'
 import {
   API_TYPE_QUERY,
   DEFAULTS_BY_TYPE,
@@ -23,20 +25,12 @@ import {
   WfsWmsApiFormData,
   WfsWmsApiFormSchema,
 } from '@/types/namedApis'
-import { mapApiLayerToFormData } from '@/utils/namedApis'
+import { getNativeCRSFromDatasink, mapApiLayerToFormData } from '@/utils/namedApis'
 
 import { useApiConfig } from '../../hooks/useApiConfig'
 import { ApiConfigTab, ApiConfigWrapper } from '../ApiConfigWrapper'
 import { BaseInfoForm } from '../base-info/BaseInfoForm'
 import { LayerConfig } from './LayerConfig'
-import {
-  mockDatasink,
-  mockDatasink2,
-  mockDatastructureVersion,
-  mockDatastructureVersion2,
-  mockLayerList,
-  mockStyleList,
-} from './mockData'
 
 const tabs = [
   { value: 'basicInfo' as ApiConfigTab, label: 'datasets.overview.completion.apis.config.tabs.basicInfo' },
@@ -89,37 +83,44 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
   const { data: layersData } = useGetLayers(dataset.id)
   const { data: stylesData } = useGetStyles(dataset.id)
 
-  // TODO: remove mockData once API is working
-  const layers = useMemo(() => mapApiLayerToFormData(layersData ? layersData.data : mockLayerList), [layersData])
-  const styles = useMemo(() => stylesData?.data ?? mockStyleList, [stylesData])
+  const [selectedLayerIndex, setSelectedLayerIndex] = useState<number | null>(null)
 
-  const [selectedLayerIndex, setSelectedLayerIndex] = useState<number | null>(layers.length > 0 ? 0 : null)
-
-  const postgisDatasinks = (datasinksData?.data ?? [mockDatasink, mockDatasink2]).filter(
-    datasink => datasink.dataSinkType === DATASINK_TYPES.POSTGIS,
+  const postgisDatasinks = useMemo(
+    () => (datasinksData?.data || []).filter(datasink => datasink.dataSinkType === DATASINK_TYPES.POSTGIS),
+    [datasinksData],
   )
-  // TODO: enable this request and remove mock data once API is working
-  // const datastructuresToFetch = postgisDatasinks?.map(datasink => ({
-  //   datastructureId: datasink.configuration.dataStructureVersion.dataStructureId,
-  //   versionId: datasink.configuration.dataStructureVersion.id,
-  // }))
+  const datastructuresToFetch = postgisDatasinks?.map(datasink => ({
+    datastructureId: datasink.configuration.dataStructureVersion.dataStructureId,
+    versionId: datasink.configuration.dataStructureVersion.id,
+  }))
 
-  // const postgisDatastructuresResponse = useQueries({
-  //   queries: datastructuresToFetch.map(({ datastructureId, versionId }) => ({
-  //     queryKey: [`datastructures/${datastructureId}/versions`, versionId],
-  //     queryFn: () =>
-  //       apiRequest<DatastructureVersion>({
-  //         endpoint: `/datastructures/${datastructureId}/versions/${versionId}`,
-  //         method: 'GET',
-  //         headers: { 'x-api-request': 'true' },
-  //         errorMessage: 'An error occurred while fetching datastructure versions.',
-  //       }),
-  //   })),
-  // })
-  // const validPostgisDatastructureResponses = postgisDatastructuresResponse.filter(res => !!res.data)
-  // const postgisDatastructures = validPostgisDatastructureResponses.map(datastructure => datastructure.data.data)
+  const postgisDatastructures = useQueries({
+    queries: datastructuresToFetch.map(({ datastructureId, versionId }) => ({
+      queryKey: [`datastructures/${datastructureId}/versions`, versionId],
+      queryFn: () =>
+        apiRequest<DatastructureVersion>({
+          endpoint: `/datastructures/${datastructureId}/versions/${versionId}`,
+          method: 'GET',
+          headers: { 'x-api-request': 'true' },
+          errorMessage: 'An error occurred while fetching datastructure versions.',
+        }),
+    })),
+    combine: results => results.filter(r => !!r.data).map(r => r.data.data),
+  })
 
-  const postgisDatastructures = [mockDatastructureVersion, mockDatastructureVersion2]
+  const layers = useMemo(
+    () =>
+      mapApiLayerToFormData(layersData?.data || []).map(layer => {
+        // setting the nativeLayer here is necessary since in the API response it gets returned as null
+        // TODO: remove this section once this is fixed in the backend
+        if (!layer.nativeCRS && layer.dataSinkId) {
+          const nativeCRS = getNativeCRSFromDatasink(layer.dataSinkId, postgisDatasinks, postgisDatastructures)
+          return { ...layer, nativeCRS }
+        }
+        return layer
+      }),
+    [layersData, postgisDatasinks, postgisDatastructures],
+  )
 
   const wfsWmsDefaults: WfsWmsApiFormData = {
     type: API_TYPE_QUERY.WFS_WMS,
@@ -144,7 +145,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     form.reset(wfsWmsDefaults)
     setSelectedLayerIndex(layers.length > 0 ? 0 : null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [existingApi?.id])
+  }, [existingApi?.id, layers])
 
   const baseInfoValues = form.watch('baseInfo')
   const isBaseInfoValid = formSchema.shape.baseInfo.safeParse(baseInfoValues).success
@@ -214,10 +215,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     form.setValue(`layers.${selectedLayerIndex}.dataSinkId` as FieldPath<WfsWmsApiFormData>, datasinkId, {
       shouldDirty: true,
     })
-    const datasink = postgisDatasinks.find(d => d.id === datasinkId)
-    const datastructure = postgisDatastructures.find(d => d.id === datasink?.configuration.dataStructureVersion.id)
-    const umlClass = datastructure?.styles?.nodes[0].data.element as UMLClass | undefined
-    const nativeCRS = umlClass?.attributes?.find(a => a.meta?.gisInfo?.crs)?.meta?.gisInfo?.crs ?? ''
+    const nativeCRS = getNativeCRSFromDatasink(datasinkId, postgisDatasinks, postgisDatastructures)
     form.setValue(`layers.${selectedLayerIndex}.nativeCRS` as FieldPath<WfsWmsApiFormData>, nativeCRS, {
       shouldDirty: true,
     })
@@ -266,7 +264,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
           <LayerConfig
             form={form}
             existingLayers={fields}
-            styles={styles}
+            styles={stylesData?.data || []}
             postgisDatasinks={postgisDatasinks}
             postGisDatastructures={postgisDatastructures}
             selectedLayerIndex={selectedLayerIndex}

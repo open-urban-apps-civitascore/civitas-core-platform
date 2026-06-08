@@ -1,5 +1,6 @@
 import { List, Plus, Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import proj4 from 'proj4'
 import { useState } from 'react'
 import { FieldPath, UseFormReturn } from 'react-hook-form'
 
@@ -102,6 +103,26 @@ export const LayerConfig = (props: LayerConfigProps) => {
     form.setValue(layerPath('nativeBoundingBox.minY'), String(minY), { shouldDirty: true, shouldValidate: true })
     form.setValue(layerPath('nativeBoundingBox.maxX'), String(maxX), { shouldDirty: true, shouldValidate: true })
     form.setValue(layerPath('nativeBoundingBox.maxY'), String(maxY), { shouldDirty: true, shouldValidate: true })
+
+    calculateLatLonCoordsFromBounds(minX, minY, maxX, maxY)
+  }
+
+  const calculateLatLonCoordsFromBounds = (minX: number, minY: number, maxX: number, maxY: number) => {
+    if (selectedLayerIndex === null) return
+    const crsOption = crsOptions.find(o => o.value === crsWatch)
+    if (!crsOption) return
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) return
+
+    const [lon1, lat1] = proj4(crsOption.proj4def, 'EPSG:4326', [minX, minY])
+    const [lon2, lat2] = proj4(crsOption.proj4def, 'EPSG:4326', [maxX, maxY])
+
+    const opts = { shouldDirty: true, shouldValidate: true }
+    form.setValue(layerPath('latLonBoundingBox.minX'), String(lon1), opts)
+    form.setValue(layerPath('latLonBoundingBox.minY'), String(lat1), opts)
+    form.setValue(layerPath('latLonBoundingBox.maxX'), String(lon2), opts)
+    form.setValue(layerPath('latLonBoundingBox.maxY'), String(lat2), opts)
+    form.setValue(layerPath('latLonBoundingBox.crs'), 'EPSG:4326', opts)
   }
 
   const wideField = { className: 'grid-cols-[minmax(0,270px)_minmax(0,512px)]' }
