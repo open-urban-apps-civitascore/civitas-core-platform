@@ -321,7 +321,7 @@
               "descriptionPlaceholder": ""
             },
             "layer": {
-              "title": "Layer",
+              "sectionTitle": "Layer",
               "addLayer": "Add Layer",
               "deleteLayer": "Delete Layer",
               "untitledLayer": "Untitled Layer {index}",

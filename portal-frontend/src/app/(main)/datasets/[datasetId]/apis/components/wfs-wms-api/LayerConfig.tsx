@@ -291,16 +291,15 @@ export const LayerConfig = (props: LayerConfigProps) => {
                     className="grid-cols-[minmax(0,270px)_minmax(0,512px)]"
                     isDisabled={isReadOnly}
                   />
-                  <div className="grid grid-cols-[minmax(0,270px)_minmax(0,512px)]">
+                  <div className="grid grid-cols-[minmax(0,270px)_minmax(0,512px)] gap-2">
                     <div />
-                    <div className="mt-1">
+                    <div className="mt-2">
                       <Button
                         type="button"
-                        variant="ghost"
                         size="sm"
                         disabled={!crsWatch || isReadOnly}
                         onClick={handleCalculateFromCrs}
-                        className="text-xs h-7 px-2 hover:text-primary hover:bg-transparent"
+                        className="text-xs h-7 px-2"
                       >
                         {t('geometry.calculateFromCrs')}
                       </Button>
