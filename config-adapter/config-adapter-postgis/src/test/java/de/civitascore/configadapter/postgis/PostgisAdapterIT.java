@@ -93,7 +93,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
     table.setPrimaryKey(List.of("id"));
 
     adapter.processConfigEvent(
-        Topics.TABLE_CREATED.toString(), createEvent(Operation.CREATE, table));
+        Topics.SQL_TABLE_CREATED.toString(), createEvent(Operation.CREATE, table));
 
     assertSingleSuccessfulResult();
     assertTrue(
@@ -114,7 +114,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
         List.of(new IndexConfig("idx_places_it_geom", List.of("geom"), false, IndexMethod.GIST)));
 
     adapter.processConfigEvent(
-        Topics.TABLE_CREATED.toString(), createEvent(Operation.CREATE, table));
+        Topics.SQL_TABLE_CREATED.toString(), createEvent(Operation.CREATE, table));
 
     assertSingleSuccessfulResult();
     assertTrue(tableExists(null, "places_it"), "places_it table should exist");
@@ -135,7 +135,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
     table.setPrimaryKey(List.of("id"));
 
     adapter.processConfigEvent(
-        Topics.TABLE_CREATED.toString(), createEvent(Operation.CREATE, table));
+        Topics.SQL_TABLE_CREATED.toString(), createEvent(Operation.CREATE, table));
 
     assertSingleSuccessfulResult();
     assertTrue(
@@ -151,9 +151,9 @@ class PostgisAdapterIT extends AbstractPostgisIT {
         List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false, null)));
 
     adapter.processConfigEvent(
-        Topics.TABLE_CREATED.toString(), createEvent(Operation.CREATE, table));
+        Topics.SQL_TABLE_CREATED.toString(), createEvent(Operation.CREATE, table));
     adapter.processConfigEvent(
-        Topics.TABLE_CREATED.toString(), createEvent(Operation.CREATE, table));
+        Topics.SQL_TABLE_CREATED.toString(), createEvent(Operation.CREATE, table));
 
     List<ConfigResultEvent> results = eventPublisher.published();
     assertEquals(2, results.size());
@@ -169,7 +169,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
     table.setName("to_drop_it");
 
     adapter.processConfigEvent(
-        Topics.TABLE_DELETED.toString(), createEvent(Operation.DELETE, table));
+        Topics.SQL_TABLE_DELETED.toString(), createEvent(Operation.DELETE, table));
 
     assertSingleSuccessfulResult();
     assertFalse(tableExists(null, "to_drop_it"), "to_drop_it should be gone after DELETE");
@@ -181,7 +181,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
     table.setName("never_existed_it");
 
     adapter.processConfigEvent(
-        Topics.TABLE_DELETED.toString(), createEvent(Operation.DELETE, table));
+        Topics.SQL_TABLE_DELETED.toString(), createEvent(Operation.DELETE, table));
 
     assertSingleSuccessfulResult();
   }
@@ -196,7 +196,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
             FatalAdapterException.class,
             () ->
                 adapter.processConfigEvent(
-                    Topics.TABLE_UPDATED.toString(), createEvent(Operation.UPDATE, table)));
+                    Topics.SQL_TABLE_UPDATED.toString(), createEvent(Operation.UPDATE, table)));
 
     assertEquals(AdapterErrorCode.UNSUPPORTED_OPERATION, thrown.getErrorCode());
   }
@@ -216,7 +216,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
             FatalAdapterException.class,
             () ->
                 adapter.processConfigEvent(
-                    Topics.TABLE_CREATED.toString(), createEvent(Operation.CREATE, table)));
+                    Topics.SQL_TABLE_CREATED.toString(), createEvent(Operation.CREATE, table)));
 
     assertEquals(AdapterErrorCode.POSTGIS_DDL_ERROR, thrown.getErrorCode());
     assertFalse(
@@ -233,7 +233,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
     schema.setOwner("schema_owner_it");
 
     adapter.processConfigEvent(
-        Topics.SCHEMA_CREATED.toString(), createEvent(Operation.CREATE, schema, "owned_it"));
+        Topics.SQL_SCHEMA_CREATED.toString(), createEvent(Operation.CREATE, schema, "owned_it"));
 
     assertSingleSuccessfulResult();
     assertTrue(schemaExists("owned_it"), "owned_it schema should exist");
@@ -249,7 +249,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
     schema.setCascade(true);
 
     adapter.processConfigEvent(
-        Topics.SCHEMA_DELETED.toString(), createEvent(Operation.DELETE, schema, "cascade_it"));
+        Topics.SQL_SCHEMA_DELETED.toString(), createEvent(Operation.DELETE, schema, "cascade_it"));
 
     assertSingleSuccessfulResult();
     assertFalse(schemaExists("cascade_it"), "cascade_it schema should be gone");
@@ -266,7 +266,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
         FatalAdapterException.class,
         () ->
             adapter.processConfigEvent(
-                Topics.SCHEMA_DELETED.toString(),
+                Topics.SQL_SCHEMA_DELETED.toString(),
                 createEvent(Operation.DELETE, schema, "restrict_it")));
     assertTrue(schemaExists("restrict_it"), "RESTRICT drop must not remove a non-empty schema");
   }
@@ -279,7 +279,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
     role.setPassword("plaintext-secret");
 
     adapter.processConfigEvent(
-        Topics.DB_ROLE_CREATED.toString(), createEvent(Operation.CREATE, role, "login_it"));
+        Topics.SQL_ROLE_CREATED.toString(), createEvent(Operation.CREATE, role, "login_it"));
 
     assertSingleSuccessfulResult();
     assertTrue(roleExists("login_it"), "login_it role should exist");
@@ -297,7 +297,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
                 "granted_it", List.of(SchemaPrivilege.USAGE, SchemaPrivilege.CREATE), null)));
 
     adapter.processConfigEvent(
-        Topics.DB_ROLE_CREATED.toString(), createEvent(Operation.CREATE, role, "granted_role_it"));
+        Topics.SQL_ROLE_CREATED.toString(), createEvent(Operation.CREATE, role, "granted_role_it"));
 
     assertSingleSuccessfulResult();
     assertTrue(hasSchemaPrivilege("granted_role_it", "granted_it", "USAGE"));
@@ -315,7 +315,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
     role.setGrants(List.of(new SchemaGrant("reconcile_it", List.of(SchemaPrivilege.USAGE), null)));
 
     adapter.processConfigEvent(
-        Topics.DB_ROLE_UPDATED.toString(),
+        Topics.SQL_ROLE_UPDATED.toString(),
         createEvent(Operation.UPDATE, role, "reconcile_role_it"));
 
     assertSingleSuccessfulResult();
@@ -334,7 +334,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
     role.setName("doomed_role_it");
 
     adapter.processConfigEvent(
-        Topics.DB_ROLE_DELETED.toString(), createEvent(Operation.DELETE, role, "doomed_role_it"));
+        Topics.SQL_ROLE_DELETED.toString(), createEvent(Operation.DELETE, role, "doomed_role_it"));
 
     assertSingleSuccessfulResult();
     assertFalse(roleExists("doomed_role_it"), "doomed_role_it should be gone");
@@ -356,7 +356,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
           RetryableAdapterException.class,
           () ->
               offlineAdapter.processConfigEvent(
-                  Topics.TABLE_CREATED.toString(), createEvent(Operation.CREATE, table)));
+                  Topics.SQL_TABLE_CREATED.toString(), createEvent(Operation.CREATE, table)));
     } finally {
       offlineAdapter.close();
     }
@@ -375,15 +375,15 @@ class PostgisAdapterIT extends AbstractPostgisIT {
         "postgis.topics",
         String.join(
             ",",
-            Topics.TABLE_CREATED.toString(),
-            Topics.TABLE_UPDATED.toString(),
-            Topics.TABLE_DELETED.toString(),
-            Topics.SCHEMA_CREATED.toString(),
-            Topics.SCHEMA_UPDATED.toString(),
-            Topics.SCHEMA_DELETED.toString(),
-            Topics.DB_ROLE_CREATED.toString(),
-            Topics.DB_ROLE_UPDATED.toString(),
-            Topics.DB_ROLE_DELETED.toString()));
+            Topics.SQL_TABLE_CREATED.toString(),
+            Topics.SQL_TABLE_UPDATED.toString(),
+            Topics.SQL_TABLE_DELETED.toString(),
+            Topics.SQL_SCHEMA_CREATED.toString(),
+            Topics.SQL_SCHEMA_UPDATED.toString(),
+            Topics.SQL_SCHEMA_DELETED.toString(),
+            Topics.SQL_ROLE_CREATED.toString(),
+            Topics.SQL_ROLE_UPDATED.toString(),
+            Topics.SQL_ROLE_DELETED.toString()));
     AppConfig config = new AppConfig(new MapConfiguration(props));
 
     PostgisAdapter created = new PostgisAdapter();

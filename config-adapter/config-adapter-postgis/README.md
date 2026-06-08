@@ -21,9 +21,9 @@ For the full design rationale (idempotency policy, why no migration tool, future
 ```
 ┌──────────────────────────────────────────────┐
 │   Kafka Topics                               │
-│   - de.civitascore.data.table.*              │
-│   - de.civitascore.data.schema.*             │
-│   - de.civitascore.data.role.*               │
+│   - de.civitascore.data.sql.table.*              │
+│   - de.civitascore.data.sql.schema.*             │
+│   - de.civitascore.data.sql.role.*               │
 └──────────────┬───────────────────────────────┘
                │ CloudEvent → ConfigEvent (Table/Schema/DbRole payload)
                ↓
@@ -63,23 +63,23 @@ Idempotency on conflict (absorbed as success):
 
 | Topic Constant | Topic Value |
 |----------------|-------------|
-| `TABLE_CREATED` | `de.civitascore.data.table.created` |
-| `TABLE_UPDATED` | `de.civitascore.data.table.updated` |
-| `TABLE_DELETED` | `de.civitascore.data.table.deleted` |
-| `SCHEMA_CREATED` | `de.civitascore.data.schema.created` |
-| `SCHEMA_UPDATED` | `de.civitascore.data.schema.updated` |
-| `SCHEMA_DELETED` | `de.civitascore.data.schema.deleted` |
-| `DB_ROLE_CREATED` | `de.civitascore.data.role.created` |
-| `DB_ROLE_UPDATED` | `de.civitascore.data.role.updated` |
-| `DB_ROLE_DELETED` | `de.civitascore.data.role.deleted` |
+| `SQL_TABLE_CREATED` | `de.civitascore.data.sql.table.created` |
+| `SQL_TABLE_UPDATED` | `de.civitascore.data.sql.table.updated` |
+| `SQL_TABLE_DELETED` | `de.civitascore.data.sql.table.deleted` |
+| `SQL_SCHEMA_CREATED` | `de.civitascore.data.sql.schema.created` |
+| `SQL_SCHEMA_UPDATED` | `de.civitascore.data.sql.schema.updated` |
+| `SQL_SCHEMA_DELETED` | `de.civitascore.data.sql.schema.deleted` |
+| `SQL_ROLE_CREATED` | `de.civitascore.data.sql.role.created` |
+| `SQL_ROLE_UPDATED` | `de.civitascore.data.sql.role.updated` |
+| `SQL_ROLE_DELETED` | `de.civitascore.data.sql.role.deleted` |
 
 ## Configuration
 
 ```properties
 # Topics to subscribe to (comma-separated)
-postgis.topics=de.civitascore.data.table.created,de.civitascore.data.table.updated,de.civitascore.data.table.deleted,\
-  de.civitascore.data.schema.created,de.civitascore.data.schema.updated,de.civitascore.data.schema.deleted,\
-  de.civitascore.data.role.created,de.civitascore.data.role.updated,de.civitascore.data.role.deleted
+postgis.topics=de.civitascore.data.sql.table.created,de.civitascore.data.sql.table.updated,de.civitascore.data.sql.table.deleted,\
+  de.civitascore.data.sql.schema.created,de.civitascore.data.sql.schema.updated,de.civitascore.data.sql.schema.deleted,\
+  de.civitascore.data.sql.role.created,de.civitascore.data.sql.role.updated,de.civitascore.data.sql.role.deleted
 
 # JDBC connection (required)
 postgis.jdbc.url=jdbc:postgresql://localhost:5432/civitas
@@ -202,6 +202,25 @@ Schema privileges (`SchemaPrivilege` enum): `USAGE`, `CREATE`, `ALL` (`ALL` expa
 
 All DDL for a single event runs in one JDBC transaction; on failure the transaction is rolled back before the exception propagates.
 
+## Saga Participation
+
+Besides the event-driven `PostgisAdapter`, the module ships a `PostgisSagaHandler` — a `SagaCommandHandler` (ServiceLoader-registered under `META-INF/services/de.civitascore.configadapter.adapter.SagaCommandHandler`) discovered by the application and registered in the saga orchestrator (Flowable or custom). It lets PostGIS participate as a compensable step in any saga, mirroring the FROST / APISIX / RedPanda handlers but executing DDL over JDBC instead of HTTP.
+
+Forward operations and their compensations:
+
+| Forward (`EXECUTE_STEP`) | Payload field (with `resourceType`) | Compensation (`COMPENSATE_STEP`) | Compensation payload |
+|--------------------------|--------------------------------------|----------------------------------|----------------------|
+| `CREATE_TABLE`  | `tableConfig` (`TableConfig`)   | `DROP_TABLE`  | `{schema?, table}` |
+| `CREATE_SCHEMA` | `schemaConfig` (`SchemaConfig`) | `DROP_SCHEMA` | `{schema, cascade?}` |
+| `CREATE_ROLE`   | `roleConfig` (`DbRoleConfig`)   | `DROP_ROLE`   | `{role}` |
+
+- The nested config map must carry its `resourceType` discriminator (`postgis-table` / `postgis-schema` / `postgis-role`), exactly as the config travels inside CloudEvents.
+- Each `CREATE_*` returns its identifiers as `compensationData`; the orchestrator flattens them into the payload of the compensating `DROP_*`.
+- `CREATE_*` absorbs duplicate-object SQLStates and `DROP_*` absorbs missing-object SQLStates, so steps and compensations are safe to retry.
+- `DROP_*` can also be used as a forward step; encrypted role passwords are decrypted exactly as in the event path.
+
+The handler reuses the same `ConnectionProvider`, `PostgisDialect`, `TableDdlBuilder`, and `GrantReconciler` as the adapter. It is not wired into the built-in dataset-create/update/delete sagas (those remain FROST → APISIX → RedPanda) — it is available for any saga that references the `postgis` adapter.
+
 ## Tests
 
 ```bash
@@ -220,8 +239,10 @@ mvn -pl config-adapter-postgis -am verify
 
 **Coverage:**
 
-- **82 unit tests** — dialect DDL rendering (tables, schemas, roles, grants), SQLState classification, grant-reconcile diffing (`GrantReconcilerTest`), and adapter behaviour with mocked JDBC (including credential handling and grant reconciliation).
-- **16 integration tests** (`PostgisAdapterIT`) — real `postgis/postgis:16-3.4-alpine` container. Asserts generated DDL is accepted by Postgres and objects physically exist. Covers table create (geometry + SRID + GIST index), schema create/drop (owner, `CASCADE` vs `RESTRICT`), role create with login + password + grants, role UPDATE grant reconciliation (revoke removed privilege), role delete, idempotency on duplicate/missing, invalid DDL → fatal, unreachable JDBC → retryable.
-- **2 end-to-end tests** (`PostgisEndToEndIT`) — full pipeline through Kafka + `KafkaEventHandler` + adapter + PostGIS, verifying both the result event on the Kafka result topic and the database state.
+- **93 unit tests** — dialect DDL rendering (tables, schemas, roles, grants), SQLState classification, grant-reconcile diffing (`GrantReconcilerTest`), adapter behaviour with mocked JDBC (`PostgisAdapterTest`, incl. credential handling and grant reconciliation), and the saga handler with mocked JDBC (`PostgisSagaHandlerTest` — forward ops, compensations, idempotency, credential failure).
+- **22 integration tests** against a real `postgis/postgis:16-3.4-alpine` container:
+  - `PostgisAdapterIT` (16) — generated DDL accepted by Postgres and objects physically exist: table create (geometry + SRID + GIST index), schema create/drop (owner, `CASCADE` vs `RESTRICT`), role create with login + password + grants, role UPDATE grant reconciliation, role delete, idempotency, invalid DDL → fatal, unreachable JDBC → retryable.
+  - `PostgisSagaHandlerIT` (4) — saga forward op then compensation against the DB (table, schema, role+grant), and idempotent compensation of a missing object.
+  - `PostgisEndToEndIT` (2) — full pipeline through Kafka + `KafkaEventHandler` + adapter + PostGIS, verifying both the result event and the database state.
 
 The PostGIS container is shared across IT classes via the singleton pattern in `AbstractPostgisIT`; Kafka is per-class.

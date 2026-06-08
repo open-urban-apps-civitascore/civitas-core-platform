@@ -269,16 +269,16 @@ Adapter for managing PostgreSQL/PostGIS table configuration via DDL.
 - Role: CREATE / UPDATE / DELETE — login flag, optional `ENC(...)` password (decrypted with `CIVITAS_MASTER_KEY`), embedded schema grants reconciled on UPDATE (idempotent on `42710`/`42704`)
 
 **Subscribed Topics:**
-- `de.civitascore.data.table.created` / `.updated` / `.deleted`
-- `de.civitascore.data.schema.created` / `.updated` / `.deleted`
-- `de.civitascore.data.role.created` / `.updated` / `.deleted`
+- `de.civitascore.data.sql.table.created` / `.updated` / `.deleted`
+- `de.civitascore.data.sql.schema.created` / `.updated` / `.deleted`
+- `de.civitascore.data.sql.role.created` / `.updated` / `.deleted`
 
 **Configuration Properties:**
 ```properties
 # Topics to subscribe to (tables, schemas, roles)
-postgis.topics=de.civitascore.data.table.created,de.civitascore.data.table.updated,de.civitascore.data.table.deleted,\
-  de.civitascore.data.schema.created,de.civitascore.data.schema.updated,de.civitascore.data.schema.deleted,\
-  de.civitascore.data.role.created,de.civitascore.data.role.updated,de.civitascore.data.role.deleted
+postgis.topics=de.civitascore.data.sql.table.created,de.civitascore.data.sql.table.updated,de.civitascore.data.sql.table.deleted,\
+  de.civitascore.data.sql.schema.created,de.civitascore.data.sql.schema.updated,de.civitascore.data.sql.schema.deleted,\
+  de.civitascore.data.sql.role.created,de.civitascore.data.sql.role.updated,de.civitascore.data.sql.role.deleted
 
 # JDBC connection settings (required)
 postgis.jdbc.url=jdbc:postgresql://localhost:5432/civitas
@@ -1154,13 +1154,13 @@ Error codes are categorized by type and severity:
 | 3401 | `GEOSERVER_ERROR` | Yes | GeoServer error: %s | Geo service error |
 | 3402 | `GEOSERVER_RESOURCE_ERROR` | No | GeoServer resource error: %s | Geo resource operation failed |
 
-**PostGIS Adapter (3401-3403):**
+**PostGIS Adapter (3501-3503):**
 
 | Code | Name | Retryable | Internal Log Template | External Message |
 |------|------|-----------|----------------------|------------------|
-| 3401 | `POSTGIS_ERROR` | No | PostGIS error: %s | Database error |
-| 3402 | `POSTGIS_DDL_ERROR` | No | PostGIS DDL error: %s | Table operation failed |
-| 3403 | `POSTGIS_CONNECTION_ERROR` | Yes | PostGIS connection error: %s | Database temporarily unavailable |
+| 3501 | `POSTGIS_ERROR` | No | PostGIS error: %s | Database error |
+| 3502 | `POSTGIS_DDL_ERROR` | No | PostGIS DDL error: %s | Table operation failed |
+| 3503 | `POSTGIS_CONNECTION_ERROR` | Yes | PostGIS connection error: %s | Database temporarily unavailable |
 
 #### 9xxx - Unknown/Unexpected Errors
 
@@ -1276,15 +1276,15 @@ All topics are defined in `de.civitascore.configadapter.Topics` and validated at
 
 | Topic Constant | Topic Value |
 |----------------|-------------|
-| `TABLE_CREATED` | `de.civitascore.data.table.created` |
-| `TABLE_UPDATED` | `de.civitascore.data.table.updated` |
-| `TABLE_DELETED` | `de.civitascore.data.table.deleted` |
-| `SCHEMA_CREATED` | `de.civitascore.data.schema.created` |
-| `SCHEMA_UPDATED` | `de.civitascore.data.schema.updated` |
-| `SCHEMA_DELETED` | `de.civitascore.data.schema.deleted` |
-| `DB_ROLE_CREATED` | `de.civitascore.data.role.created` |
-| `DB_ROLE_UPDATED` | `de.civitascore.data.role.updated` |
-| `DB_ROLE_DELETED` | `de.civitascore.data.role.deleted` |
+| `SQL_TABLE_CREATED` | `de.civitascore.data.sql.table.created` |
+| `SQL_TABLE_UPDATED` | `de.civitascore.data.sql.table.updated` |
+| `SQL_TABLE_DELETED` | `de.civitascore.data.sql.table.deleted` |
+| `SQL_SCHEMA_CREATED` | `de.civitascore.data.sql.schema.created` |
+| `SQL_SCHEMA_UPDATED` | `de.civitascore.data.sql.schema.updated` |
+| `SQL_SCHEMA_DELETED` | `de.civitascore.data.sql.schema.deleted` |
+| `SQL_ROLE_CREATED` | `de.civitascore.data.sql.role.created` |
+| `SQL_ROLE_UPDATED` | `de.civitascore.data.sql.role.updated` |
+| `SQL_ROLE_DELETED` | `de.civitascore.data.sql.role.deleted` |
 
 **Topic Validation:**
 - Topics are validated using `Topics.isValidTopic(String)` method

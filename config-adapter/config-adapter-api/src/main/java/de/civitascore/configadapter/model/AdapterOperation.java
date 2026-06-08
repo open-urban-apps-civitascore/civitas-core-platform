@@ -65,15 +65,15 @@ public enum AdapterOperation {
   GEOSERVER_RESOURCE_DELETE("GeoServer resource deletion"),
 
   // PostGIS / SQL operations
-  TABLE_CREATE("table creation"),
-  TABLE_UPDATE("table update"),
-  TABLE_DELETE("table deletion"),
-  SCHEMA_CREATE("schema creation"),
-  SCHEMA_UPDATE("schema update"),
-  SCHEMA_DELETE("schema deletion"),
-  DB_ROLE_CREATE("database role creation"),
-  DB_ROLE_UPDATE("database role update"),
-  DB_ROLE_DELETE("database role deletion"),
+  SQL_TABLE_CREATE("table creation"),
+  SQL_TABLE_UPDATE("table update"),
+  SQL_TABLE_DELETE("table deletion"),
+  SQL_SCHEMA_CREATE("schema creation"),
+  SQL_SCHEMA_UPDATE("schema update"),
+  SQL_SCHEMA_DELETE("schema deletion"),
+  SQL_ROLE_CREATE("database role creation"),
+  SQL_ROLE_UPDATE("database role update"),
+  SQL_ROLE_DELETE("database role deletion"),
 
   // DummyLog operations
   EVENT_PROCESSING("event processing");
