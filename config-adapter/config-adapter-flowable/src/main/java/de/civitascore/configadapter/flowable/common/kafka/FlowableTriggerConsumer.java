@@ -44,6 +44,7 @@ public class FlowableTriggerConsumer {
   private static final Logger LOG = LoggerFactory.getLogger(FlowableTriggerConsumer.class);
   static final String TRIGGER_TOPIC = "de.civitascore.dataset.saga.trigger";
   private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
+  private static final String DATASINK_TYPE_POSTGIS = "POSTGIS";
 
   private final RuntimeService runtimeService;
   private final HistoryService historyService;
@@ -262,7 +263,7 @@ public class FlowableTriggerConsumer {
         && dataSinks.stream()
             .filter(Map.class::isInstance)
             .map(Map.class::cast)
-            .anyMatch(sink -> "POSTGIS".equals(sink.get("dataSinkType")));
+            .anyMatch(sink -> DATASINK_TYPE_POSTGIS.equals(sink.get("dataSinkType")));
   }
 
   /**
