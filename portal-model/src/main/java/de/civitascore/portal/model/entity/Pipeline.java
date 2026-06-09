@@ -54,10 +54,7 @@ public class Pipeline extends NamedEntity {
   @Builder.Default
   private Set<DataSource> dataSources = new HashSet<>();
 
-  /**
-   * The pipeline definition as built in the editor, stored as an opaque JSON document. The backend
-   * does not interpret its contents; it is persisted and forwarded to the config-adapter as-is.
-   */
+  /** Editor-built pipeline definition (opaque JSON); forwarded to the config-adapter as-is. */
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "model", columnDefinition = "jsonb")
   private Map<String, Object> model;

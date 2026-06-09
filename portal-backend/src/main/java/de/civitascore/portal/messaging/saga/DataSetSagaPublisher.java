@@ -8,7 +8,6 @@ import de.civitascore.portal.configuration.SagaProperties;
 import de.civitascore.portal.model.embedded.PipelineAction;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
-import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.saga.DataSinkPayload;
 import de.civitascore.portal.repository.DataSinkRepository;
@@ -141,10 +140,8 @@ public class DataSetSagaPublisher {
   }
 
   /**
-   * Builds the flat, deduplicated list of datasinks across the dataset's pipelines (mirroring
-   * {@link #buildDatasources}). The pipeline {@code model} references each sink by id only, so the
-   * config-adapter needs these resolved fields — including the referenced data-structure schema
-   * fetched from Model Atlas — to build the engine flow's write target without calling back.
+   * Flat, deduplicated datasinks across the dataset's pipelines (mirrors {@link
+   * #buildDatasources}).
    */
   private List<DataSinkPayload> buildDatasinks(DataSet dataset) {
     if (dataset.getPipelines() == null) {
@@ -160,43 +157,26 @@ public class DataSetSagaPublisher {
   }
 
   private DataSinkPayload toDataSinkPayload(DataSink sink) {
-    Map<String, Object> configuration = sink.getConfiguration();
     return new DataSinkPayload(
         sink.getId().toString(),
         sink.getDataSinkType() != null ? sink.getDataSinkType().name() : null,
-        configuration,
-        resolveDataStructure(configuration));
+        sink.getConfiguration(),
+        resolveDataStructure(sink));
   }
 
   /**
-   * Resolves the {@code dataStructureVersionId} referenced in a sink's configuration to its schema
-   * content via Model Atlas. Returns {@code null} only when no version is referenced (e.g. FROST
-   * sinks). When a version <em>is</em> referenced it must resolve to a non-blank schema — otherwise
-   * an {@link InvalidInputException} is thrown (malformed id, unknown version, or Model Atlas
-   * authoritatively holding no content for it). A Model Atlas <em>outage</em> instead propagates as
-   * an external-system exception (504/502), so a transient dependency failure is not misreported as
-   * invalid client input. Either way the exception propagates out of the saga publish before the
-   * surrounding {@code @Transactional} commits, so a dataset is never released with a sink whose
-   * schema cannot be resolved.
+   * Resolves the sink's referenced data-structure model from Model Atlas. {@code null} when no
+   * version is referenced (e.g. FROST); throws {@link InvalidInputException} if a referenced
+   * version cannot be resolved, failing the publish. The id is already validated at sink save time.
    */
-  private Map<String, Object> resolveDataStructure(Map<String, Object> configuration) {
-    if (configuration == null) {
+  private Map<String, Object> resolveDataStructure(DataSink sink) {
+    var config = sink.getConfiguration();
+    Object raw = config == null ? null : config.get("dataStructureVersionId");
+    if (raw == null) {
       return null;
     }
-    Object dsvIdRaw = configuration.get("dataStructureVersionId");
-    if (dsvIdRaw == null) {
-      return null;
-    }
-    UUID dsvId;
-    try {
-      dsvId = UUID.fromString(dsvIdRaw.toString());
-    } catch (IllegalArgumentException e) {
-      throw new InvalidInputException(
-          "DataSink",
-          "configuration.dataStructureVersionId",
-          "dataStructureVersionId must be a valid UUID, got '" + dsvIdRaw + "'");
-    }
-    DataStructureVersion version =
+    UUID dsvId = UUID.fromString(raw.toString());
+    var version =
         dataStructureVersionRepository
             .findById(dsvId)
             .orElseThrow(
@@ -207,13 +187,13 @@ public class DataSetSagaPublisher {
                         "DataStructureVersion not found: " + dsvId));
     return dataStructureVersionService
         .resolveModelJsonByAtlasUri(version.getModelAtlasUri())
-        .filter(schema -> !schema.isEmpty())
+        .filter(model -> !model.isEmpty())
         .orElseThrow(
             () ->
                 new InvalidInputException(
                     "DataSink",
                     "configuration.dataStructureVersionId",
-                    "Cannot resolve schema from Model Atlas for DataStructureVersion " + dsvId));
+                    "Cannot resolve model from Model Atlas for DataStructureVersion " + dsvId));
   }
 
   private List<DataPipeline> buildPipelines(Set<Pipeline> pipelines, PipelineAction action) {

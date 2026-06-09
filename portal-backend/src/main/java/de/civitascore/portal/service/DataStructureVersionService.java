@@ -88,15 +88,10 @@ public class DataStructureVersionService
   }
 
   /**
-   * Fetches and parses the data-structure model from Model Atlas as JSON, distinguishing "no
-   * content" from "Model Atlas unavailable". Unlike {@link #findModelByAtlasUri} (which returns the
-   * raw XMI), this requests the JSON form and parses it into a JSON object. It does <em>not</em>
-   * swallow external-system failures: a Model Atlas outage propagates as {@link
-   * de.civitascore.portal.util.ExternalSystemTimeoutException} / {@link
-   * ExternalSystemRejectionException} (surfaced as 504/502) instead of being flattened into an
-   * empty result; unparseable content is likewise reported as a 502. Returns empty only when the
-   * URI is blank or Model Atlas returns no content, so callers can treat empty as genuine invalid
-   * input.
+   * Fetches the data-structure model from Model Atlas as parsed JSON. Unlike {@link
+   * #findModelByAtlasUri} (raw XMI), this does not swallow failures: an outage propagates as a
+   * 504/502 external-system exception, unparseable content as a 502. Empty only when the URI is
+   * blank or Model Atlas returns no content.
    *
    * @param modelAtlasUri the Model Atlas namespace URI
    * @return the parsed model JSON, or empty if the URI is blank or no content exists
