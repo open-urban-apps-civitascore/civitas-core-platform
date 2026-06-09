@@ -45,19 +45,6 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     portalData.cleanAll();
   }
 
-  /** Helper method to create a sample styles map for Pipeline. */
-  private Map<String, Object> createSampleStyles() {
-    Map<String, Object> styles = new HashMap<>();
-    styles.put("nodes", List.of(Map.of("id", "1", "type", "input")));
-    styles.put("edges", List.of());
-    Map<String, Object> viewport = new HashMap<>();
-    viewport.put("x", 0);
-    viewport.put("y", 0);
-    viewport.put("zoom", 1);
-    styles.put("viewport", viewport);
-    return styles;
-  }
-
   /** Helper method to create a sample model map for Pipeline. */
   private Map<String, Object> createSampleModel() {
     Map<String, Object> model = new HashMap<>();
@@ -174,7 +161,6 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
         b ->
             b.name(name + "_" + System.currentTimeMillis())
                 .description("Test pipeline for " + name)
-                .styles(createSampleStyles())
                 .dataSources(new HashSet<>(Set.of(ds1, ds2, ds3)))
                 .model(createSampleModel()));
   }

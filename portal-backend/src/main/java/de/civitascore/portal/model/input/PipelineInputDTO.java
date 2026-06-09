@@ -19,7 +19,6 @@ public class PipelineInputDTO extends BaseInputDTO {
 
   private String description;
 
-  private Map<String, Object> styles;
   private Map<String, Object> model;
 
   private Set<UUID> dataSourceIds;

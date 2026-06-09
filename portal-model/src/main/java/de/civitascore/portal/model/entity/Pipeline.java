@@ -23,8 +23,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /**
- * Represents a data ingestion pipeline belonging to a {@link DataSet}. Holds the executable
- * RedpandaConnect configuration and the associated {@link DataSource DataSources}.
+ * Represents a data ingestion pipeline belonging to a {@link DataSet}. Holds the editor-built
+ * pipeline definition and the associated {@link DataSource DataSources}.
  */
 @Entity
 @Table(
@@ -40,11 +40,6 @@ public class Pipeline extends NamedEntity {
   @JoinColumn(name = "dataset_id", nullable = false)
   @NotNull private DataSet dataSet;
 
-  /** React Flow visual layout stored as JSON (nodes/edges/viewport). */
-  @JdbcTypeCode(SqlTypes.JSON)
-  @Column(name = "styles", columnDefinition = "jsonb")
-  private Map<String, Object> styles;
-
   /** Data sources associated with this pipeline. */
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
@@ -54,7 +49,10 @@ public class Pipeline extends NamedEntity {
   @Builder.Default
   private Set<DataSource> dataSources = new HashSet<>();
 
-  /** Executable RedpandaConnect configuration in JSON/YAML format. */
+  /**
+   * The pipeline definition as built in the editor, stored as an opaque JSON document. The backend
+   * does not interpret its contents; it is persisted and forwarded to the config-adapter as-is.
+   */
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "model", columnDefinition = "jsonb")
   private Map<String, Object> model;

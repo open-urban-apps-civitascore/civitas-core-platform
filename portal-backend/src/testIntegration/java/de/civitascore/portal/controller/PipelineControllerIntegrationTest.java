@@ -61,19 +61,6 @@ class PipelineControllerIntegrationTest
     return "/datasets/" + testDataSetId + "/pipelines";
   }
 
-  /** Helper method to create a sample styles map for Pipeline. */
-  private Map<String, Object> createSampleStyles() {
-    Map<String, Object> styles = new HashMap<>();
-    styles.put("nodes", List.of(Map.of("id", "1", "type", "input")));
-    styles.put("edges", List.of());
-    Map<String, Object> viewport = new HashMap<>();
-    viewport.put("x", 0);
-    viewport.put("y", 0);
-    viewport.put("zoom", 1);
-    styles.put("viewport", viewport);
-    return styles;
-  }
-
   /** Helper method to create a sample model map for Pipeline. */
   private Map<String, Object> createSampleModel() {
     Map<String, Object> model = new HashMap<>();
@@ -114,7 +101,6 @@ class PipelineControllerIntegrationTest
     PipelineInputDTO input = new PipelineInputDTO();
     input.setName("test_pipeline_" + System.currentTimeMillis());
     input.setDescription("A test pipeline for integration testing");
-    input.setStyles(createSampleStyles());
     input.setModel(createSampleModel());
     return input;
   }
@@ -132,7 +118,6 @@ class PipelineControllerIntegrationTest
     PipelineInputDTO input = new PipelineInputDTO();
     input.setName("Updated Pipeline");
     input.setDescription("Updated description");
-    input.setStyles(createSampleStyles());
     input.setModel(createSampleModel());
     return input;
   }
@@ -175,7 +160,6 @@ class PipelineControllerIntegrationTest
       assertThat(output.getDescription())
           .as("Description should match input")
           .isEqualTo(input.getDescription());
-      assertThat(output.getStyles()).as("Styles should match input").isEqualTo(input.getStyles());
       assertThat(output.getModel()).as("Model should match input").isEqualTo(input.getModel());
       assertThat(output.getDataSinks()).as("DataSinks should be empty").isEmpty();
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
@@ -786,19 +770,6 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should handle null styles")
-    void shouldHandleNullStyles() {
-      PipelineInputDTO input = createValidInput();
-      input.setStyles(null);
-
-      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getStyles()).isNull();
-    }
-
-    @Test
     @DisplayName("Should handle null model")
     void shouldHandleNullModel() {
       PipelineInputDTO input = createValidInput();
@@ -809,26 +780,6 @@ class PipelineControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getModel()).isNull();
-    }
-
-    @Test
-    @DisplayName("Should handle complex nested JSON in styles")
-    void shouldHandleComplexNestedJsonInStyles() {
-      PipelineInputDTO input = createValidInput();
-      Map<String, Object> complexStyles = new HashMap<>();
-      complexStyles.put(
-          "nodes",
-          List.of(
-              Map.of("id", "1", "type", "input", "position", Map.of("x", 100, "y", 200)),
-              Map.of("id", "2", "type", "output", "position", Map.of("x", 300, "y", 400))));
-      complexStyles.put("edges", List.of(Map.of("source", "1", "target", "2")));
-      input.setStyles(complexStyles);
-
-      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getStyles()).isEqualTo(complexStyles);
     }
 
     @Test
