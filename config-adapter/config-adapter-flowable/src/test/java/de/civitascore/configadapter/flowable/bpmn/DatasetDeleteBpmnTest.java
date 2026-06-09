@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.flowable.bpmn;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -17,6 +18,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.adapter.SagaCommandHandler;
+import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.flowable.FlowableTestSupport;
 import de.civitascore.configadapter.flowable.common.SagaHandlerRegistry;
@@ -30,6 +32,7 @@ import org.flowable.engine.runtime.ProcessInstance;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class DatasetDeleteBpmnTest {
 
@@ -171,10 +174,30 @@ class DatasetDeleteBpmnTest {
 
     assertProcessCompleted(instance.getId());
 
+    // Order: APISIX route → GeoServer workspace → FROST project (Redpanda skipped, no pipelines).
     var inOrder = inOrder(apisixHandler, geoserverHandler, frostHandler);
     inOrder.verify(apisixHandler).handle(any());
     inOrder.verify(geoserverHandler).handle(any());
     inOrder.verify(frostHandler).handle(any());
+    verify(redpandaHandler, never()).handle(any());
+
+    // ...and that each step dispatched the expected delete operation — in particular that the
+    // GeoServer workspace teardown actually happened, for the workspace derived from the dataset.
+    assertEquals("DELETE_ROUTE", captureCommand(apisixHandler).operation());
+
+    SagaCommandMessage geoCommand = captureCommand(geoserverHandler);
+    assertEquals("EXECUTE_STEP", geoCommand.type());
+    assertEquals("DELETE_WORKSPACE", geoCommand.operation());
+    assertEquals("ds-456", geoCommand.payload().get("datasetId"));
+
+    assertEquals("DELETE_PROJECT", captureCommand(frostHandler).operation());
+  }
+
+  /** Captures the single SagaCommandMessage the given handler was invoked with. */
+  private static SagaCommandMessage captureCommand(SagaCommandHandler handler) {
+    ArgumentCaptor<SagaCommandMessage> captor = ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(handler).handle(captor.capture());
+    return captor.getValue();
   }
 
   private ProcessInstance startProcess(boolean hasPipelines) {

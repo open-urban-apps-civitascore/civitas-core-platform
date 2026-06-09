@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.flowable;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.inOrder;
@@ -18,6 +19,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.adapter.SagaCommandHandler;
+import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.flowable.bpmn.BpmnProcessDeployer;
 import de.civitascore.configadapter.flowable.coded.CodedProcessDeployer;
@@ -31,6 +33,7 @@ import org.flowable.engine.runtime.ProcessInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
 
 class BpmnVsCodedEquivalenceTest {
 
@@ -209,10 +212,29 @@ class BpmnVsCodedEquivalenceTest {
       FlowableTestSupport.executeAllJobs(engine);
 
       FlowableTestSupport.assertProcessCompleted(engine.getHistoryService(), instance.getId());
+
+      // Order across adapters: FROST → APISIX → GeoServer (3 geo steps).
       var inOrder = inOrder(frost, apisix, geoserver);
       inOrder.verify(frost).handle(any());
       inOrder.verify(apisix).handle(any());
       inOrder.verify(geoserver, times(3)).handle(any());
+
+      // ...and the exact operations dispatched — BPMN and coded must produce the same sequence,
+      // and the GeoServer branch must run workspace → datastore → layers.
+      ArgumentCaptor<SagaCommandMessage> frostCmd = ArgumentCaptor.forClass(SagaCommandMessage.class);
+      verify(frost).handle(frostCmd.capture());
+      assertEquals("CREATE_PROJECT", frostCmd.getValue().operation());
+
+      ArgumentCaptor<SagaCommandMessage> apisixCmd =
+          ArgumentCaptor.forClass(SagaCommandMessage.class);
+      verify(apisix).handle(apisixCmd.capture());
+      assertEquals("CREATE_ROUTE", apisixCmd.getValue().operation());
+
+      ArgumentCaptor<SagaCommandMessage> geoCmd = ArgumentCaptor.forClass(SagaCommandMessage.class);
+      verify(geoserver, times(3)).handle(geoCmd.capture());
+      assertEquals(
+          List.of("CREATE_WORKSPACE", "CREATE_DATASTORE", "PROVISION_LAYERS"),
+          geoCmd.getAllValues().stream().map(SagaCommandMessage::operation).toList());
     } finally {
       engine.close();
     }
