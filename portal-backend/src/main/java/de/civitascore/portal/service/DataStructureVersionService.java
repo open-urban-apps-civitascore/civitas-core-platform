@@ -40,7 +40,8 @@ public class DataStructureVersionService
     extends BaseService<DataStructureVersion, DataStructureVersionInputDTO> {
 
   private static final String MODEL_ATLAS_OBJECT_ID_FIELD = "objectId";
-  private static final TypeReference<Map<String, Object>> JSON_SCHEMA_TYPE = new TypeReference<>() {};
+  private static final TypeReference<Map<String, Object>> JSON_SCHEMA_TYPE =
+      new TypeReference<>() {};
 
   private final DataSourceRepository dataSourceRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
@@ -91,10 +92,11 @@ public class DataStructureVersionService
    * content" from "Model Atlas unavailable". Unlike {@link #findModelByAtlasUri} (which returns the
    * raw XMI), this requests the schema form and parses it into a JSON object. It does <em>not</em>
    * swallow external-system failures: a Model Atlas outage propagates as {@link
-   * de.civitascore.portal.util.ExternalSystemTimeoutException} / {@link ExternalSystemRejectionException}
-   * (surfaced as 504/502) instead of being flattened into an empty result; unparseable content is
-   * likewise reported as a 502. Returns empty only when the URI is blank or Model Atlas
-   * authoritatively returns no content, so callers can treat empty as genuine invalid input.
+   * de.civitascore.portal.util.ExternalSystemTimeoutException} / {@link
+   * ExternalSystemRejectionException} (surfaced as 504/502) instead of being flattened into an
+   * empty result; unparseable content is likewise reported as a 502. Returns empty only when the
+   * URI is blank or Model Atlas authoritatively returns no content, so callers can treat empty as
+   * genuine invalid input.
    *
    * @param modelAtlasUri the Model Atlas namespace URI
    * @return the parsed JSON Schema, or empty if the URI is blank or no content exists

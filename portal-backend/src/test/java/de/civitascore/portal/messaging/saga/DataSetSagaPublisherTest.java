@@ -158,7 +158,8 @@ class DataSetSagaPublisherTest {
       when(dataStructureVersionService.resolveJsonSchemaByAtlasUri("atlas://dsv/" + dsvId))
           .thenReturn(
               Optional.of(
-                  Map.of("type", "object", "properties", Map.of("name", Map.of("type", "string")))));
+                  Map.of(
+                      "type", "object", "properties", Map.of("name", Map.of("type", "string")))));
 
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
       when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
