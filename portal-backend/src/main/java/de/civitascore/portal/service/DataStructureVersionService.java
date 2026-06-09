@@ -13,6 +13,7 @@ import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,6 +24,7 @@ import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -38,6 +40,7 @@ public class DataStructureVersionService
     extends BaseService<DataStructureVersion, DataStructureVersionInputDTO> {
 
   private static final String MODEL_ATLAS_OBJECT_ID_FIELD = "objectId";
+  private static final TypeReference<Map<String, Object>> JSON_SCHEMA_TYPE = new TypeReference<>() {};
 
   private final DataSourceRepository dataSourceRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
@@ -84,23 +87,33 @@ public class DataStructureVersionService
   }
 
   /**
-   * Resolves a model from Model Atlas by its URI, distinguishing "no content" from "Model Atlas
-   * unavailable". Unlike {@link #findModelByAtlasUri}, this does <em>not</em> swallow
-   * external-system failures: a Model Atlas outage propagates as {@link
-   * de.civitascore.portal.util.ExternalSystemTimeoutException} / {@link
-   * de.civitascore.portal.util.ExternalSystemRejectionException} (surfaced as 504/502) instead of
-   * being flattened into an empty result. Returns empty only when the URI is blank or Model Atlas
-   * authoritatively returns no content — so callers can treat empty as genuine invalid input rather
-   * than misreporting an infrastructure failure as a client error.
+   * Fetches and parses the JSON Schema for a model from Model Atlas by its URI, distinguishing "no
+   * content" from "Model Atlas unavailable". Unlike {@link #findModelByAtlasUri} (which returns the
+   * raw XMI), this requests the schema form and parses it into a JSON object. It does <em>not</em>
+   * swallow external-system failures: a Model Atlas outage propagates as {@link
+   * de.civitascore.portal.util.ExternalSystemTimeoutException} / {@link ExternalSystemRejectionException}
+   * (surfaced as 504/502) instead of being flattened into an empty result; unparseable content is
+   * likewise reported as a 502. Returns empty only when the URI is blank or Model Atlas
+   * authoritatively returns no content, so callers can treat empty as genuine invalid input.
    *
    * @param modelAtlasUri the Model Atlas namespace URI
-   * @return the model content, or empty if the URI is blank or no content exists
+   * @return the parsed JSON Schema, or empty if the URI is blank or no content exists
    */
-  public Optional<String> resolveModelByAtlasUri(String modelAtlasUri) {
+  public Optional<Map<String, Object>> resolveJsonSchemaByAtlasUri(String modelAtlasUri) {
     if (StringUtils.isBlank(modelAtlasUri)) {
       return Optional.empty();
     }
-    return Optional.ofNullable(modelService.downloadModel(modelAtlasUri, "application/xml"));
+    // Schema form, not the XMI returned by findModelByAtlasUri.
+    String schema = modelService.downloadModel(modelAtlasUri, "application/json+schema");
+    if (StringUtils.isBlank(schema)) {
+      return Optional.empty();
+    }
+    try {
+      return Optional.of(objectMapper.readValue(schema, JSON_SCHEMA_TYPE));
+    } catch (JacksonException e) {
+      throw new ExternalSystemRejectionException(
+          "Model Atlas returned an unparseable JSON schema for " + modelAtlasUri, e);
+    }
   }
 
   /**

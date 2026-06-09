@@ -155,8 +155,10 @@ class DataSetSagaPublisherTest {
 
       when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
       when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
-      when(dataStructureVersionService.resolveModelByAtlasUri("atlas://dsv/" + dsvId))
-          .thenReturn(Optional.of("<schema/>"));
+      when(dataStructureVersionService.resolveJsonSchemaByAtlasUri("atlas://dsv/" + dsvId))
+          .thenReturn(
+              Optional.of(
+                  Map.of("type", "object", "properties", Map.of("name", Map.of("type", "string")))));
 
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
       when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
@@ -175,7 +177,9 @@ class DataSetSagaPublisherTest {
       assertThat(ds.get("type").asString()).isEqualTo("POSTGIS");
       assertThat(ds.get("configuration").get("tableName").asString())
           .isEqualTo("sensor_observations");
-      assertThat(ds.get("dataStructure").asString()).isEqualTo("<schema/>");
+      assertThat(ds.get("dataStructure").get("type").asString()).isEqualTo("object");
+      assertThat(ds.get("dataStructure").get("properties").get("name").get("type").asString())
+          .isEqualTo("string");
     }
 
     @Test

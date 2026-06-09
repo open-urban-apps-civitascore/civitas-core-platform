@@ -179,7 +179,7 @@ public class DataSetSagaPublisher {
    * surrounding {@code @Transactional} commits, so a dataset is never released with a sink whose
    * schema cannot be resolved.
    */
-  private String resolveDataStructure(Map<String, Object> configuration) {
+  private Map<String, Object> resolveDataStructure(Map<String, Object> configuration) {
     if (configuration == null) {
       return null;
     }
@@ -206,8 +206,8 @@ public class DataSetSagaPublisher {
                         "configuration.dataStructureVersionId",
                         "DataStructureVersion not found: " + dsvId));
     return dataStructureVersionService
-        .resolveModelByAtlasUri(version.getModelAtlasUri())
-        .filter(schema -> !schema.isBlank())
+        .resolveJsonSchemaByAtlasUri(version.getModelAtlasUri())
+        .filter(schema -> !schema.isEmpty())
         .orElseThrow(
             () ->
                 new InvalidInputException(
