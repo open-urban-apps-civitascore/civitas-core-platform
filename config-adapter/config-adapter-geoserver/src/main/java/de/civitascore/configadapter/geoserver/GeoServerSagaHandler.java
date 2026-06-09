@@ -300,8 +300,8 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   /**
    * Iterates the command's datasinks, provisioning a feature type for each {@code POSTGIS} sink.
-   * Other sink types are skipped (handled by their own adapters). When {@code upsert} is true
-   * an existing feature type is updated (used by {@code UPDATE_WORKSPACE}); otherwise an existing
+   * Other sink types are skipped (handled by their own adapters). When {@code upsert} is true an
+   * existing feature type is updated (used by {@code UPDATE_WORKSPACE}); otherwise an existing
    * feature type is left unchanged (idempotent {@code PROVISION_WORKSPACE}).
    */
   @SuppressWarnings("unchecked")

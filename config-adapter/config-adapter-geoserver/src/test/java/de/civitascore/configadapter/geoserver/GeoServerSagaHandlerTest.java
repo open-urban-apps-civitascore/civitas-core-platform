@@ -529,8 +529,7 @@ class GeoServerSagaHandlerTest {
         "workspaceName",
         "myws",
         "datasinks",
-        List.of(
-            Map.of("type", "POSTGIS", "configuration", Map.of("tableName", tableName))));
+        List.of(Map.of("type", "POSTGIS", "configuration", Map.of("tableName", tableName))));
   }
 
   /** Mocks a 200 {@code featuretypes.json} response listing the given feature type names. */
