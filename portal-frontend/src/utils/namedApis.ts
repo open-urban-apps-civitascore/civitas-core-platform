@@ -75,11 +75,13 @@ const computeLatLonBoundingBox = (
 }
 
 export const mapFormLayerToPayload = (layers: LayerFormData[]): LayerApiPayload[] =>
-  layers.map(layer => ({
+  layers.map(({ id: _id, ...layer }) => ({
     ...layer,
     defaultStyleId: layer.defaultStyleId && layer.defaultStyleId !== 'none' ? layer.defaultStyleId : null,
-    nativeBoundingBox: toBoundingBoxPayload(layer.nativeBoundingBox),
-    latLonBoundingBox: toBoundingBoxPayload(computeLatLonBoundingBox(layer.nativeBoundingBox, layer.crs)),
+    nativeBoundingBox: layer.bboxAutoCalculate ? null : toBoundingBoxPayload(layer.nativeBoundingBox),
+    latLonBoundingBox: layer.bboxAutoCalculate
+      ? null
+      : toBoundingBoxPayload(computeLatLonBoundingBox(layer.nativeBoundingBox, layer.crs)),
   }))
 
 export const buildStaPayloadData = (data: StaApiFormData): NamedApiPayload => ({
@@ -100,6 +102,6 @@ export const getNativeCRSFromDatasink = (
 ): string => {
   const datasink = postgisDatasinks.find(d => d.id === datasinkId)
   const datastructure = postgisDatastructures.find(d => d.id === datasink?.configuration.dataStructureVersion.id)
-  const umlClass = datastructure?.styles?.nodes[0].data.element as UMLClass | undefined
+  const umlClass = datastructure?.styles?.nodes?.[0]?.data?.element as UMLClass | undefined
   return umlClass?.attributes?.find(a => a.meta?.gisInfo?.crs)?.meta?.gisInfo?.crs ?? ''
 }

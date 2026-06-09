@@ -12,6 +12,7 @@ import { useDeleteLayer, useGetLayers } from '@/app/services/api/datasets/layers
 import { useGetStyles } from '@/app/services/api/datasets/styles/clientRequests'
 import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { ContentCard } from '@/components/content-card/ContentCard'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { Form } from '@/components/ui/form'
 import { Dataset } from '@/types/datasets'
 import { DATASINK_TYPES } from '@/types/datasinks'
@@ -79,8 +80,8 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
   const formSchema = useMemo(() => WfsWmsApiFormSchema({ existingSlugs }), [existingSlugs])
   const initialSlug = existingApi?.slug ?? defaults.defaultSlug
 
-  const { data: datasinksData } = useGetDatasinks(dataset.id)
-  const { data: layersData } = useGetLayers(dataset.id)
+  const { data: datasinksData, isPending: isDatasinksLoading } = useGetDatasinks(dataset.id)
+  const { data: layersData, isPending: isLayersLoading } = useGetLayers(dataset.id)
   const { data: stylesData } = useGetStyles(dataset.id)
 
   const [selectedLayerIndex, setSelectedLayerIndex] = useState<number | null>(null)
@@ -94,7 +95,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     versionId: datasink.configuration.dataStructureVersion.id,
   }))
 
-  const postgisDatastructures = useQueries({
+  const postgisDatastructureQueries = useQueries({
     queries: datastructuresToFetch.map(({ datastructureId, versionId }) => ({
       queryKey: [`datastructures/${datastructureId}/versions`, versionId],
       queryFn: () =>
@@ -105,8 +106,13 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
           errorMessage: 'An error occurred while fetching datastructure versions.',
         }),
     })),
-    combine: results => results.filter(r => !!r.data).map(r => r.data.data),
+    combine: results => ({
+      data: results.filter(r => !!r.data).map(r => r.data.data),
+      isPending: results.some(r => r.isPending),
+    }),
   })
+  const postgisDatastructures = postgisDatastructureQueries.data
+  const isDataLoading = isLayersLoading || isDatasinksLoading || postgisDatastructureQueries.isPending
 
   const layers = useMemo(
     () =>
@@ -246,44 +252,48 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
       onSaveAndExit={handleSaveAndExit}
       onSubmit={handleSubmit}
     >
-      <Form {...form}>
-        {selectedTab === 'basicInfo' && (
-          <ContentCard>
-            <BaseInfoForm
-              form={form as unknown as UseFormReturn<StaApiFormData>}
-              apiType={apiType}
+      {isDataLoading ? (
+        <LoadingSpinner />
+      ) : (
+        <Form {...form}>
+          {selectedTab === 'basicInfo' && (
+            <ContentCard>
+              <BaseInfoForm
+                form={form as unknown as UseFormReturn<StaApiFormData>}
+                apiType={apiType}
+                isReadOnly={isReadOnly}
+                datasetId={dataset.id}
+                typeLabel={typeLabel}
+                urlPreviewSlug={urlPreviewSlug}
+                onSlugBlur={handleSlugBlur}
+              />
+            </ContentCard>
+          )}
+          {selectedTab === 'layer' && (
+            <LayerConfig
+              form={form}
+              existingLayers={fields}
+              styles={stylesData?.data || []}
+              postgisDatasinks={postgisDatasinks}
+              postGisDatastructures={postgisDatastructures}
+              selectedLayerIndex={selectedLayerIndex}
               isReadOnly={isReadOnly}
-              datasetId={dataset.id}
-              typeLabel={typeLabel}
-              urlPreviewSlug={urlPreviewSlug}
-              onSlugBlur={handleSlugBlur}
+              isDeleteLayerLoading={deleteLayer.isPending}
+              onSelectLayer={handleSelectLayer}
+              onAddLayer={handleAddLayer}
+              onDeleteLayer={handleDeleteLayer}
+              onTableChange={handleTableChange}
             />
-          </ContentCard>
-        )}
-        {selectedTab === 'layer' && (
-          <LayerConfig
-            form={form}
-            existingLayers={fields}
-            styles={stylesData?.data || []}
-            postgisDatasinks={postgisDatasinks}
-            postGisDatastructures={postgisDatastructures}
-            selectedLayerIndex={selectedLayerIndex}
-            isReadOnly={isReadOnly}
-            isDeleteLayerLoading={deleteLayer.isPending}
-            onSelectLayer={handleSelectLayer}
-            onAddLayer={handleAddLayer}
-            onDeleteLayer={handleDeleteLayer}
-            onTableChange={handleTableChange}
-          />
-        )}
-        {selectedTab === 'styles' && (
-          <ContentCard>
-            <div data-testid={`tabPlaceholder-${selectedTab}`} className="py-12 text-center text-muted-foreground">
-              {t('tabs.placeholder')}
-            </div>
-          </ContentCard>
-        )}
-      </Form>
+          )}
+          {selectedTab === 'styles' && (
+            <ContentCard>
+              <div data-testid={`tabPlaceholder-${selectedTab}`} className="py-12 text-center text-muted-foreground">
+                {t('tabs.placeholder')}
+              </div>
+            </ContentCard>
+          )}
+        </Form>
+      )}
     </ApiConfigWrapper>
   )
 }

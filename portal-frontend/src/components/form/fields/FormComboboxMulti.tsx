@@ -63,6 +63,7 @@ export const FormComboboxMulti = <T extends FieldValues>(props: FormComboboxMult
           <div>
             <FormControl>
               <ComboboxMultiSelect
+                id={id}
                 items={items}
                 value={field.value ?? []}
                 placeholder={disabled ? undefined : placeholder}

@@ -343,7 +343,7 @@
               },
               "geometry": {
                 "sectionTitle": "Geometrie",
-                "geometryField": "Geometriefield",
+                "geometryField": "Geometriefeld",
                 "geometryFieldPlaceHolder": "Geometriefeld auswählen ...",
                 "nativeCrs": "Natives Koordinatenreferenzsystem (CRS)",
                 "definedCrs": "Angegebenes Koordinatenreferenzsystem (CRS)",
