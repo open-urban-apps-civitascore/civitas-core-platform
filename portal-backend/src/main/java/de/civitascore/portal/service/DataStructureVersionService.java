@@ -84,6 +84,26 @@ public class DataStructureVersionService
   }
 
   /**
+   * Resolves a model from Model Atlas by its URI, distinguishing "no content" from "Model Atlas
+   * unavailable". Unlike {@link #findModelByAtlasUri}, this does <em>not</em> swallow
+   * external-system failures: a Model Atlas outage propagates as {@link
+   * de.civitascore.portal.util.ExternalSystemTimeoutException} / {@link
+   * de.civitascore.portal.util.ExternalSystemRejectionException} (surfaced as 504/502) instead of
+   * being flattened into an empty result. Returns empty only when the URI is blank or Model Atlas
+   * authoritatively returns no content — so callers can treat empty as genuine invalid input rather
+   * than misreporting an infrastructure failure as a client error.
+   *
+   * @param modelAtlasUri the Model Atlas namespace URI
+   * @return the model content, or empty if the URI is blank or no content exists
+   */
+  public Optional<String> resolveModelByAtlasUri(String modelAtlasUri) {
+    if (StringUtils.isBlank(modelAtlasUri)) {
+      return Optional.empty();
+    }
+    return Optional.ofNullable(modelService.downloadModel(modelAtlasUri, "application/xml"));
+  }
+
+  /**
    * Resolves and sets the parent data structure relationship after DTO-to-entity conversion.
    *
    * @param entity the data structure version entity

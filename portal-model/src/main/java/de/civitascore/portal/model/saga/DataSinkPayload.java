@@ -17,7 +17,9 @@ import java.util.Map;
  *       for {@code FROST}).
  *   <li>{@code dataStructure} — the resolved schema content for the referenced data-structure
  *       version, as currently served by Model Atlas (XML for now, JSON schema later). {@code null}
- *       when no version is referenced or it cannot be resolved.
+ *       only when the sink references no data-structure version (e.g. FROST sinks). If a version
+ *       <em>is</em> referenced but its schema cannot be resolved, the saga publish fails rather
+ *       than emitting a null schema here.
  * </ul>
  */
 public record DataSinkPayload(

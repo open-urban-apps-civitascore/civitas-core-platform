@@ -34,9 +34,9 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Publishes dataset saga trigger messages to Kafka for the config-adapter orchestrator. Supports
- * create, update, and delete saga triggers that provision or tear down FROST, APISIX, and Redpanda
- * infrastructure. Sends synchronously to ensure Kafka acceptance before the database transaction
- * commits.
+ * create, update, and delete saga triggers that provision or tear down FROST, APISIX, and
+ * pipeline-engine infrastructure. Sends synchronously to ensure Kafka acceptance before the
+ * database transaction commits.
  */
 @Slf4j
 @Service
@@ -172,9 +172,12 @@ public class DataSetSagaPublisher {
    * Resolves the {@code dataStructureVersionId} referenced in a sink's configuration to its schema
    * content via Model Atlas. Returns {@code null} only when no version is referenced (e.g. FROST
    * sinks). When a version <em>is</em> referenced it must resolve to a non-blank schema — otherwise
-   * an {@link InvalidInputException} is thrown, which propagates out of the saga publish before the
-   * release transaction commits, so a dataset is never released with a sink whose schema cannot be
-   * resolved.
+   * an {@link InvalidInputException} is thrown (malformed id, unknown version, or Model Atlas
+   * authoritatively holding no content for it). A Model Atlas <em>outage</em> instead propagates as
+   * an external-system exception (504/502), so a transient dependency failure is not misreported as
+   * invalid client input. Either way the exception propagates out of the saga publish before the
+   * surrounding {@code @Transactional} commits, so a dataset is never released with a sink whose
+   * schema cannot be resolved.
    */
   private String resolveDataStructure(Map<String, Object> configuration) {
     if (configuration == null) {
@@ -203,7 +206,7 @@ public class DataSetSagaPublisher {
                         "configuration.dataStructureVersionId",
                         "DataStructureVersion not found: " + dsvId));
     return dataStructureVersionService
-        .findModelByAtlasUri(version.getModelAtlasUri())
+        .resolveModelByAtlasUri(version.getModelAtlasUri())
         .filter(schema -> !schema.isBlank())
         .orElseThrow(
             () ->

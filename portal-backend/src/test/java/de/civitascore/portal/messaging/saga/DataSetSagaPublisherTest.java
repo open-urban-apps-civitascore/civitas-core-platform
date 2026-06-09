@@ -155,7 +155,7 @@ class DataSetSagaPublisherTest {
 
       when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
       when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
-      when(dataStructureVersionService.findModelByAtlasUri("atlas://dsv/" + dsvId))
+      when(dataStructureVersionService.resolveModelByAtlasUri("atlas://dsv/" + dsvId))
           .thenReturn(Optional.of("<schema/>"));
 
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
