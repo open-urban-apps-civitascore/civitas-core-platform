@@ -19,9 +19,74 @@ body:json {
   {
     "name": "Traffic Data Pipeline",
     "description": "Updated pipeline description",
-    "styles": {},
-    "model": {},
-    "dataSourceIds": []
+    "dataSourceIds": [],
+    "model": {
+      "$schema": "https://civitasconnect.digital/core-dataset/v1",
+      "id": "traffic-data-pipeline",
+      "dataStructures": {
+        "TrafficReading": {
+          "type": "object",
+          "properties": { "sensorId": { "type": "string" }, "count": { "type": "integer" } }
+        },
+        "TrafficObservation": {
+          "type": "object",
+          "properties": {
+            "station_id": { "type": "string" },
+            "vehicle_count": { "type": "integer" },
+            "status": { "type": "string" }
+          }
+        }
+      },
+      "mappings": [
+        {
+          "id": "reading-to-observation",
+          "label": "Traffic reading → observation",
+          "source": "TrafficReading",
+          "target": "TrafficObservation",
+          "fields": {
+            "station_id": { "op": "copy", "sourcePath": "$.sensorId" },
+            "vehicle_count": { "op": "copy", "sourcePath": "$.count" },
+            "status": { "op": "const", "value": "active" }
+          }
+        }
+      ],
+      "dataSources": [
+        {
+          "id": "traffic-mqtt",
+          "label": "Traffic MQTT broker",
+          "connectionType": "mqtt",
+          "dataStructure": "TrafficReading",
+          "brokerUrl": "tcp://mosquitto:1883",
+          "topic": "traffic/+/count"
+        }
+      ],
+      "dataSinks": [
+        {
+          "id": "traffic-frost",
+          "label": "FROST Things endpoint",
+          "connectionType": "http",
+          "dataStructure": "TrafficObservation",
+          "url": "${FROST_BASE}/Things",
+          "method": "POST",
+          "contentType": "application/json"
+        }
+      ],
+      "pipelines": [
+        {
+          "id": "traffic-pipeline",
+          "label": "MQTT → mapping → FROST",
+          "nodes": [
+            { "id": "n-source", "kind": "source", "sourceRef": "traffic-mqtt", "x-ui-position": { "x": 0, "y": 0 } },
+            { "id": "n-mapping", "kind": "mapping", "mappingRef": "reading-to-observation", "x-ui-position": { "x": 320, "y": 0 } },
+            { "id": "n-sink", "kind": "sink", "sinkRef": "traffic-frost", "x-ui-position": { "x": 640, "y": 0 } }
+          ],
+          "edges": [
+            { "id": "e-source-mapping", "source": "n-source", "target": "n-mapping" },
+            { "id": "e-mapping-sink", "source": "n-mapping", "target": "n-sink" }
+          ]
+        }
+      ]
+    }
   }
 }
 

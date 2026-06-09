@@ -22,24 +22,65 @@ body:json {
     "name": "Saga Test Pipeline",
     "description": "Pipeline for saga workflow test",
     "dataSourceIds": ["{{sagaDataSourceId}}"],
-    "styles": {},
     "model": {
-      "input": {
-        "generate": {
-          "interval": "1s",
-          "count": 1,
-          "mapping": "root = {\"name\": \"Test Sensor\", \"description\": \"test\"}"
+      "$schema": "https://civitasconnect.digital/core-dataset/v1",
+      "id": "saga-test-pipeline",
+      "dataStructures": {
+        "SensorMessage": {
+          "type": "object",
+          "properties": { "name": { "type": "string" }, "description": { "type": "string" } }
+        },
+        "Thing": {
+          "type": "object",
+          "properties": { "name": { "type": "string" }, "description": { "type": "string" } }
         }
       },
-      "output": {
-        "http_client": {
-          "url": "${FROST_BASE}/Things",
-          "verb": "POST",
-          "headers": {
-            "Content-Type": "application/json"
+      "mappings": [
+        {
+          "id": "message-to-thing",
+          "label": "Sensor message → Thing",
+          "source": "SensorMessage",
+          "target": "Thing",
+          "fields": {
+            "name": { "op": "const", "value": "Test Sensor" },
+            "description": { "op": "const", "value": "test" }
           }
         }
-      }
+      ],
+      "dataSources": [
+        {
+          "id": "{{sagaDataSourceId}}",
+          "label": "Saga MQTT datasource",
+          "connectionType": "mqtt",
+          "dataStructure": "SensorMessage"
+        }
+      ],
+      "dataSinks": [
+        {
+          "id": "saga-frost",
+          "label": "FROST Things endpoint",
+          "connectionType": "http",
+          "dataStructure": "Thing",
+          "url": "${FROST_BASE}/Things",
+          "method": "POST",
+          "contentType": "application/json"
+        }
+      ],
+      "pipelines": [
+        {
+          "id": "saga-pipeline",
+          "label": "MQTT → mapping → FROST",
+          "nodes": [
+            { "id": "n-source", "kind": "source", "sourceRef": "{{sagaDataSourceId}}", "x-ui-position": { "x": 0, "y": 0 } },
+            { "id": "n-mapping", "kind": "mapping", "mappingRef": "message-to-thing", "x-ui-position": { "x": 320, "y": 0 } },
+            { "id": "n-sink", "kind": "sink", "sinkRef": "saga-frost", "x-ui-position": { "x": 640, "y": 0 } }
+          ],
+          "edges": [
+            { "id": "e-source-mapping", "source": "n-source", "target": "n-mapping" },
+            { "id": "e-mapping-sink", "source": "n-mapping", "target": "n-sink" }
+          ]
+        }
+      ]
     }
   }
 }
@@ -61,7 +102,7 @@ tests {
 docs {
   **Saga step 5 of 20** — Prerequisites: DataSource released (step 4b), DataSet created (step 4).
 
-  Creates a Redpanda Connect pipeline ("Saga Test Pipeline") attached to the dataset. The pipeline consumes from the MQTT datasource (`sagaDataSourceId`) and posts to FROST. The datasource must be in AVAILABLE status (released in step 4b) before it can be linked. When the dataset is released, the saga deploys this pipeline to Redpanda Connect.
+  Creates a pipeline ("Saga Test Pipeline") attached to the dataset, modelled as a CORE intermediate-representation document (`model`). The pipeline consumes from the MQTT datasource (`sagaDataSourceId`) and posts to FROST. The datasource must be in AVAILABLE status (released in step 4b) before it can be linked. When the dataset is released, the saga deploys this pipeline to the pipeline engine.
 
   **Expected Response:** 201 Created, body contains `id`. 409 if the pipeline already existed (idempotent).
 
@@ -73,5 +114,5 @@ docs {
   |---|---|
   | Backend | Pipeline record created in `portal_backend` DB linked to the dataset |
   | Config Adapter | — |
-  | Redpanda Connect | Pipeline is deployed only after the DATASET_CREATE saga runs (step 8) |
+  | Pipeline engine | Pipeline is deployed only after the DATASET_CREATE saga runs (step 8) |
 }
