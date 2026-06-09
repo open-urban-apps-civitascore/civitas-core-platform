@@ -5,6 +5,7 @@ import type { PortType } from '@/components/node-editor/types'
 
 import type { FieldNode } from './_types'
 import { SOURCE_NODE_ID, TARGET_NODE_ID } from './compile'
+import { resolveCoveredLeaf } from './schema/fieldTree'
 
 export interface MappingCounts {
   mapped: number
@@ -20,12 +21,33 @@ export interface MappingStatus {
 
 export type EndpointInfo = (nodeId: string, handleId: string) => { type: PortType; sub?: string } | null
 
-const isCoveredByAncestor = (path: string, mapped: Set<string>): boolean => {
-  for (const ancestor of mapped) {
-    if (path === ancestor) return true
-    if (path.startsWith(ancestor) && (path[ancestor.length] === '.' || path[ancestor.length] === '[')) return true
+/** True when `path` is a descendant of `ancestor` in the JSONPath hierarchy. */
+const isDescendantOf = (path: string, ancestor: string): boolean =>
+  path !== ancestor && path.startsWith(ancestor) && (path[ancestor.length] === '.' || path[ancestor.length] === '[')
+
+/**
+ * Finds the connected ancestor object that covers `path` (the longest connected
+ * target prefix), if any.
+ */
+const findCoveringAncestor = (path: string, connectedTargets: string[]): string | undefined =>
+  connectedTargets.filter(ancestor => isDescendantOf(path, ancestor)).sort((a, b) => b.length - a.length)[0]
+
+/** Strips the last JSONPath segment, e.g. "$.a.b[].c" → "$.a.b[]". */
+const parentPath = (path: string): string => path.replace(/(\.[^.[]+|\[\])$/, '')
+
+/** Builds the chain of field names from a covering ancestor down to a leaf. */
+const relativeNameChain = (ancestorPath: string, leafPath: string, targetFields: Map<string, FieldNode>): string[] => {
+  const names: string[] = []
+  let current = leafPath
+  while (current !== ancestorPath && current.length > 0) {
+    const field = targetFields.get(current)
+    if (!field) break
+    names.unshift(field.name)
+    const next = parentPath(current)
+    if (next === current) break
+    current = next
   }
-  return false
+  return names
 }
 
 /** Per-port state (§12) plus toolbar counts derived from the current edges. */
@@ -43,16 +65,22 @@ export const computeStatus = (
     sourcePortStatus[path] = consumed.has(path) ? 'consumed' : 'unused'
   })
 
-  const mappedTargets = new Set(edges.filter(e => e.target === TARGET_NODE_ID).map(e => e.targetHandle ?? ''))
+  // Connected target paths and, for direct source→target edges, the source field they map to.
+  const targetEdges = edges.filter(e => e.target === TARGET_NODE_ID)
+  const connectedTargets = targetEdges.map(e => e.targetHandle ?? '')
+  const sourcePathByTarget = new Map(
+    targetEdges.filter(e => e.source === SOURCE_NODE_ID).map(e => [e.targetHandle ?? '', e.sourceHandle ?? '']),
+  )
 
   let mapped = 0
   let unmapped = 0
   let errors = 0
 
   targetFields.forEach((field, path) => {
-    const edge = edges.find(e => e.target === TARGET_NODE_ID && (e.targetHandle ?? '') === path)
+    const edge = targetEdges.find(e => (e.targetHandle ?? '') === path)
     const isLeaf = !field.children?.length
 
+    // Directly connected target port.
     if (edge) {
       const src = endpointInfo(edge.source, edge.sourceHandle ?? '')
       const isMismatch = !!src && src.type !== field.portType
@@ -62,12 +90,30 @@ export const computeStatus = (
       return
     }
 
-    const isCovered = isCoveredByAncestor(path, mappedTargets)
-    // Use 'unused' (grey) for unconnected target fields — same visual as source side.
-    // The unmapped count is still tracked for the toolbar.
-    targetPortStatus[path] = isCovered ? 'mapped' : 'unused'
-    if (isLeaf && isCovered) mapped++
-    else if (isLeaf) unmapped++
+    // Covered by a connected ancestor object: only auto-map when an exact-name,
+    // matching-type source counterpart exists. Otherwise the field stays unmapped.
+    const ancestorPath = findCoveringAncestor(path, connectedTargets)
+    const ancestorSourcePath = ancestorPath ? sourcePathByTarget.get(ancestorPath) : undefined
+    const ancestorSource = ancestorSourcePath ? sourceFields.get(ancestorSourcePath) : undefined
+
+    if (ancestorPath && ancestorSource) {
+      const names = relativeNameChain(ancestorPath, path, targetFields)
+      const counterpart = resolveCoveredLeaf(ancestorSource, names)
+      if (counterpart && counterpart.type === field.type) {
+        targetPortStatus[path] = 'mapped'
+        if (isLeaf) mapped++
+        return
+      }
+      if (counterpart) {
+        // Same-name field exists but the type differs.
+        targetPortStatus[path] = 'mismatch'
+        if (isLeaf) errors++
+        return
+      }
+    }
+
+    targetPortStatus[path] = 'unused'
+    if (isLeaf) unmapped++
   })
 
   return { sourcePortStatus, targetPortStatus, counts: { mapped, unmapped, errors } }

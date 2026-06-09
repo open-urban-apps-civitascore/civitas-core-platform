@@ -67,8 +67,10 @@ const renderRows = (
   ))
 
 const HEADER_CLASS: Record<MegaRole, string> = {
-  source: 'border-b border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-300',
-  target: 'border-b border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold tracking-wide text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
+  source:
+    'border-b border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-300',
+  target:
+    'border-b border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold tracking-wide text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
 }
 
 export const MegaNode = ({ data }: NodeProps) => {

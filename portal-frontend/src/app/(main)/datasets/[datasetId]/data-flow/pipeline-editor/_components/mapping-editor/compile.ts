@@ -3,10 +3,10 @@ import type { Edge, Node } from '@xyflow/react'
 import type { TransformNodeData } from '@/components/node-editor/types'
 
 import type { MappingConfig, SchemaTree, ValueNode } from './_types'
-import { isOpNode } from './_types'
+import { ARRAY_EDGE_STYLE, isOpNode } from './_types'
 import type { MegaNodeData } from './nodes/MegaNode'
 import { flattenTree } from './schema/fieldTree'
-import { concatInputPorts, literalOutputPort, LITERAL_DEFAULT_TYPE, mappingRegistry } from './transforms'
+import { concatInputPorts, LITERAL_DEFAULT_TYPE, literalOutputPort, mappingRegistry } from './transforms'
 
 export const SOURCE_NODE_ID = 'source'
 export const TARGET_NODE_ID = 'target'
@@ -14,8 +14,6 @@ export const TARGET_NODE_ID = 'target'
 const SOURCE_POS = { x: 0, y: 0 }
 const TARGET_POS = { x: 760, y: 0 }
 const AUTO_X = 380
-
-const ARRAY_EDGE_STYLE = { strokeWidth: 3, stroke: '#7c3aed' }
 
 const makeEdgeId = (source: string, sourceHandle: string, target: string, targetHandle: string): string =>
   `${source}:${sourceHandle}->${target}:${targetHandle}`
@@ -126,10 +124,7 @@ export const decompileConfig = (
     // concat keeps a spare trailing port so users can add inputs without replacing wires
     const inputs = vn.op === 'concat' ? concatInputPorts(childVns.length + 1) : (def?.inputs ?? [])
     // For literal (const) nodes: restore the typed output port from the saved valueType (UML name)
-    const outputs =
-      vn.op === 'const'
-        ? [literalOutputPort(vn.valueType ?? LITERAL_DEFAULT_TYPE)]
-        : (def?.outputs ?? [])
+    const outputs = vn.op === 'const' ? [literalOutputPort(vn.valueType ?? LITERAL_DEFAULT_TYPE)] : (def?.outputs ?? [])
 
     nodes.push({
       id: derivedId,

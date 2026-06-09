@@ -3,7 +3,6 @@ import { Binary, Calendar, CalendarClock, Combine, Hash, Type } from 'lucide-rea
 
 import type { ConfigField, PortDef, TransformDef } from '@/components/node-editor/types'
 import { buildRegistry } from '@/components/node-editor/types'
-
 import { UML_GEOMETRY_TYPES, UML_PRIMITIVE_TYPES } from '@/components/uml-modeler/constants/umlTypes'
 
 import type { ConversionOp, OpNode, ValueNode } from '../_types'
@@ -67,10 +66,9 @@ const conversion = (
  * type constants so the two stay in sync automatically.
  * Each option uses the UML type name as its unique value.
  */
-export const LITERAL_TYPE_OPTIONS = [
-  ...Object.keys(UML_PRIMITIVE_TYPES),
-  ...Object.keys(UML_GEOMETRY_TYPES),
-].map(name => ({ label: name, value: name }))
+export const LITERAL_TYPE_OPTIONS = [...Object.keys(UML_PRIMITIVE_TYPES), ...Object.keys(UML_GEOMETRY_TYPES)].map(
+  name => ({ label: name, value: name }),
+)
 
 /** Default UML type name for a freshly-dropped Literal node. */
 export const LITERAL_DEFAULT_TYPE = 'String'
@@ -144,15 +142,7 @@ const concat: MappingTransformDef = {
 }
 
 /**
- * Conversion nodes aligned with Apache NiFi RecordPath functions.
- * Each entry maps 1:1 to a NiFi RecordPath function that will be emitted
- * by the config-adapter when building the NiFi processor configuration.
- *
- *  toString  → NiFi toString(field, charset)   — any scalar → string
- *  toInt     → NiFi type coercion to INT        — str/float → int
- *  toFloat   → NiFi type coercion to FLOAT      — str/int → float
- *  toDate    → NiFi toDate(field, format)       — str → date
- *  format    → NiFi format(field, format)       — date → str
+ * Conversion nodes
  */
 const conversions: MappingTransformDef[] = [
   // toString: accepts any scalar (no subtype restriction on input), produces str
@@ -172,8 +162,4 @@ const conversions: MappingTransformDef[] = [
   ]),
 ]
 
-export const mappingRegistry = buildRegistry<MappingTransformDef>([
-  literal,
-  concat,
-  ...conversions,
-])
+export const mappingRegistry = buildRegistry<MappingTransformDef>([literal, concat, ...conversions])

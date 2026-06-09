@@ -2,9 +2,9 @@
 
 import type { Edge, IsValidConnection, Node, NodeTypes, OnConnect, OnConnectEnd, OnConnectStart } from '@xyflow/react'
 import { addEdge, useEdgesState, useNodesState } from '@xyflow/react'
+import { useTranslations } from 'next-intl'
 import type { KeyboardEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 
 import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
@@ -21,14 +21,15 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
 import type { MappingConfig } from './_types'
+import { ARRAY_EDGE_STYLE } from './_types'
 import { compileCanvas, decompileConfig, SOURCE_NODE_ID, TARGET_NODE_ID } from './compile'
 import { TransformInspector } from './inspector/TransformInspector'
 import { MegaNode } from './nodes/MegaNode'
 import { umlDiagramToSchemaTree } from './schema/adapter'
-import { flattenTree } from './schema/fieldTree'
+import { flattenTree, objectFieldsCompatible } from './schema/fieldTree'
 import { computeStatus } from './status'
-import { concatInputPorts, LITERAL_DEFAULT_TYPE, literalOutputPort, mappingRegistry } from './transforms'
 import type { MappingTransformDef } from './transforms'
+import { concatInputPorts, LITERAL_DEFAULT_TYPE, literalOutputPort, mappingRegistry } from './transforms'
 
 export interface SchemaRef {
   datastructureId: string
@@ -49,8 +50,6 @@ interface MappingEditorModalProps {
 
 const FULLSCREEN =
   'flex h-screen w-screen max-w-none flex-col overflow-hidden rounded-none border-0 p-0 gap-0 top-0 left-0 translate-x-0 translate-y-0 sm:max-w-none'
-
-const ARRAY_EDGE_STYLE = { strokeWidth: 3, stroke: '#7c3aed' }
 
 export const MappingEditorModal = ({
   open,
@@ -153,8 +152,6 @@ export const MappingEditorModal = ({
    *  - both have the same portType category (scalar / array / object)
    *  - AND for scalars: the primitive subtype matches exactly (int↔int, str↔str, …)
    *    — type conversions must go through an explicit conversion node.
-   * Ports without a declared subtype (e.g. generic transform in/out) are treated
-   * as compatible with any scalar subtype so conversion nodes can be wired freely.
    */
   const portsCompatible = useCallback(
     (from: { type: PortType; sub?: string } | null, to: { type: PortType; sub?: string } | null): boolean => {
@@ -170,7 +167,19 @@ export const MappingEditorModal = ({
     connection => {
       const from = endpointInfo(connection.source, connection.sourceHandle ?? '')
       const to = endpointInfo(connection.target, connection.targetHandle ?? '')
-      return portsCompatible(from, to)
+      if (!portsCompatible(from, to)) return false
+      // Object/array source→target links auto-map their children, so the two
+      // subtrees must line up by exact field name + matching type.
+      if (
+        connection.source === SOURCE_NODE_ID &&
+        connection.target === TARGET_NODE_ID &&
+        (from?.type === 'object' || from?.type === 'array')
+      ) {
+        const sourceField = sourceFields.get(connection.sourceHandle ?? '')
+        const targetField = targetFields.get(connection.targetHandle ?? '')
+        if (sourceField && targetField) return objectFieldsCompatible(sourceField, targetField)
+      }
+      return true
     },
     // endpointInfo reads nodes/sourceFields/targetFields via closure — include them
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -286,8 +295,6 @@ export const MappingEditorModal = ({
 
   const handleSave = () => {
     const { fields, positions } = compileCanvas(nodes, edges)
-    // TODO: confirm exact URN segment layout with schema owner.
-    // Current placeholder format: urn:core:datastructure:<datastructureId>:<versionId>
     onSave({
       $schema: 'https://civitasconnect.digital/core/mapping/v1',
       source: `urn:core:datastructure:${source.datastructureId}:${source.versionId}`,
@@ -303,9 +310,7 @@ export const MappingEditorModal = ({
   const toolbar = (
     <div className="grid grid-cols-3 items-center px-4 py-2">
       <DialogTitle className="text-base">{name || t('toolbar.title')}</DialogTitle>
-      <span className="text-center text-xs text-muted-foreground">
-        {t('toolbar.status', { mapped, unmapped })}
-      </span>
+      <span className="text-center text-xs text-muted-foreground">{t('toolbar.status', { mapped, unmapped })}</span>
       <div className="flex items-center justify-end gap-2">
         <Button size="sm" onClick={handleSave}>
           {tCommon('actions.submit')}
@@ -319,9 +324,7 @@ export const MappingEditorModal = ({
 
   /**
    * Prevent Delete/Backspace from bubbling out of the modal to the parent
-   * PipelineCanvas, which would delete the selected pipeline node and close
-   * the modal. The inner CanvasScaffold handles its own deletion via
-   * deleteKeyCode={['Delete','Backspace']}.
+   * PipelineCanvas.
    */
   const stopDeletePropagation = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Delete' || e.key === 'Backspace') {

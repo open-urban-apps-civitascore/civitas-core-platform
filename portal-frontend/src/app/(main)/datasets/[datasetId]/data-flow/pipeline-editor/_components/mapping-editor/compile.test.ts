@@ -22,7 +22,7 @@ const targetTree: SchemaTree = {
   ],
 }
 
-const intToStr = mappingRegistry.byType.intToStr
+const toString = mappingRegistry.byType.toString
 const concat = mappingRegistry.byType.concat
 
 const nodes: Node[] = [
@@ -32,7 +32,7 @@ const nodes: Node[] = [
     id: 'i',
     type: 'transform',
     position: { x: 300, y: 40 },
-    data: { defType: 'intToStr', config: {}, inputs: intToStr.inputs, outputs: intToStr.outputs },
+    data: { defType: 'toString', config: {}, inputs: toString.inputs, outputs: toString.outputs },
   },
   {
     id: 'c',
@@ -51,15 +51,15 @@ const edges: Edge[] = [
 ]
 
 describe('mapping editor compile', () => {
-  it('compiles a direct copy and a chained concat(intToStr)', () => {
+  it('compiles a direct copy and a chained concat(toString)', () => {
     const { fields, positions } = compileCanvas(nodes, edges)
     expect(fields['$.title']).toBe('$.name')
     expect(fields['$.fullCode']).toEqual({
       op: 'concat',
       separator: '-',
-      inputs: [{ op: 'intToStr', input: '$.id' }, '$.suffix'],
+      inputs: [{ op: 'toString', input: '$.id' }, '$.suffix'],
     })
-    expect(Object.keys(positions).sort()).toEqual(['$.fullCode#concat', '$.fullCode#concat.0#intToStr'])
+    expect(Object.keys(positions).sort()).toEqual(['$.fullCode#concat', '$.fullCode#concat.0#toString'])
   })
 
   it('round-trips: compile → decompile → compile is stable', () => {

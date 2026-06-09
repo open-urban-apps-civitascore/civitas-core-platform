@@ -1,5 +1,8 @@
 import type { PortType } from '@/components/node-editor/types'
 
+/** Visual style applied to edges that carry array (one-to-many) values. */
+export const ARRAY_EDGE_STYLE = { strokeWidth: 3, stroke: 'hsl(var(--primary))' }
+
 // ---------------------------------------------------------------------------
 // Field tree (produced by the schema adapter, consumed by the MegaNodes)
 // ---------------------------------------------------------------------------

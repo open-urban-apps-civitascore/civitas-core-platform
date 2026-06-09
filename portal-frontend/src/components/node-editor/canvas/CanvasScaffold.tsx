@@ -66,7 +66,7 @@ const CanvasInner = (props: CanvasScaffoldProps) => {
 
   return (
     // tabIndex makes the div focusable so onKeyDown fires after clicking inside the canvas
-    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+
     <div className="h-full w-full" onDrop={onDrop} onDragOver={onDragOver} onKeyDown={onDeleteSelected} tabIndex={-1}>
       <ReactFlow
         nodes={props.nodes}
