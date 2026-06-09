@@ -247,6 +247,12 @@
                     <version>${project.version}</version>
                     <scope>runtime</scope>
                 </dependency>
+                <dependency>
+                    <groupId>de.civitas-core</groupId>
+                    <artifactId>config-adapter-geoserver</artifactId>
+                    <version>${project.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
             </dependencies>
         </profile>
     </profiles>

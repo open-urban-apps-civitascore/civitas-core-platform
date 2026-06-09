@@ -1,0 +1,22 @@
+meta {
+  name: 00a Get Root Process Group
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{nifiBaseUrl}}/nifi-api/process-groups/root
+  auth: inherit
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setVar('rootPgId', res.body.id);
+  }
+}
+
+tests {
+  test("rootPgId saved", function() {
+    expect(bru.getVar('rootPgId')).to.be.a('string');
+  });
+}

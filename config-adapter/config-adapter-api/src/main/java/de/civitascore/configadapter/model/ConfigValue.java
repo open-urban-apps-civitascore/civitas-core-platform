@@ -14,6 +14,11 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import de.civitascore.configadapter.model.apisix.ApisixConfigValue;
 import de.civitascore.configadapter.model.apisix.RouteConfigValue;
 import de.civitascore.configadapter.model.frost.FrostConfigValue;
+import de.civitascore.configadapter.model.geoserver.DataStoreConfig;
+import de.civitascore.configadapter.model.geoserver.FeatureTypeConfig;
+import de.civitascore.configadapter.model.geoserver.LayerConfig;
+import de.civitascore.configadapter.model.geoserver.StyleConfig;
+import de.civitascore.configadapter.model.geoserver.WorkspaceConfig;
 import de.civitascore.configadapter.model.idm.ClientConfig;
 import de.civitascore.configadapter.model.idm.GroupConfig;
 import de.civitascore.configadapter.model.idm.RealmConfig;
@@ -49,5 +54,10 @@ import de.civitascore.configadapter.model.redpanda.PipelineConfigValue;
   @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-datastream"),
   @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-project"),
   @JsonSubTypes.Type(value = PipelineConfigValue.class, name = "redpanda-pipeline"),
+  @JsonSubTypes.Type(value = WorkspaceConfig.class, name = "geoserver-workspace"),
+  @JsonSubTypes.Type(value = DataStoreConfig.class, name = "geoserver-datastore"),
+  @JsonSubTypes.Type(value = FeatureTypeConfig.class, name = "geoserver-featuretype"),
+  @JsonSubTypes.Type(value = LayerConfig.class, name = "geoserver-layer"),
+  @JsonSubTypes.Type(value = StyleConfig.class, name = "geoserver-style"),
 })
 public interface ConfigValue {}
