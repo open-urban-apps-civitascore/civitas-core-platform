@@ -4,6 +4,7 @@ import type { Edge, IsValidConnection, Node, NodeTypes, OnConnect, OnConnectEnd,
 import { addEdge, useEdgesState, useNodesState } from '@xyflow/react'
 import type { KeyboardEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 
 import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
@@ -15,6 +16,7 @@ import {
   PaletteShell,
 } from '@/components/node-editor'
 import type { PortType, TransformNodeData } from '@/components/node-editor/types'
+import { buildRegistry } from '@/components/node-editor/types'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
@@ -26,6 +28,7 @@ import { umlDiagramToSchemaTree } from './schema/adapter'
 import { flattenTree } from './schema/fieldTree'
 import { computeStatus } from './status'
 import { concatInputPorts, LITERAL_DEFAULT_TYPE, literalOutputPort, mappingRegistry } from './transforms'
+import type { MappingTransformDef } from './transforms'
 
 export interface SchemaRef {
   datastructureId: string
@@ -58,9 +61,30 @@ export const MappingEditorModal = ({
   config,
   onSave,
 }: MappingEditorModalProps) => {
+  const t = useTranslations('pipelineEditor.mappingEditor')
+  const tCommon = useTranslations('common')
+
+  /**
+   * Build a translated copy of the registry so PaletteShell renders
+   * localised category names and descriptions instead of raw i18n keys.
+   */
+  const translatedRegistry = useMemo(() => {
+    const translatedDefs = mappingRegistry.list.map((def: MappingTransformDef) => ({
+      ...def,
+      category: t(def.category as Parameters<typeof t>[0]),
+      description: def.description ? t(def.description as Parameters<typeof t>[0]) : def.description,
+      config: def.config.map(field => ({
+        ...field,
+        label: t(field.label as Parameters<typeof t>[0]),
+        ...(field.placeholder ? { placeholder: t(field.placeholder as Parameters<typeof t>[0]) } : {}),
+      })),
+    }))
+    return buildRegistry<MappingTransformDef>(translatedDefs)
+  }, [t])
+
   const nodeTypes: NodeTypes = useMemo(
-    () => ({ transform: createTransformNodeType(mappingRegistry), mega: MegaNode }),
-    [],
+    () => ({ transform: createTransformNodeType(translatedRegistry), mega: MegaNode }),
+    [translatedRegistry],
   )
 
   const sourceQuery = useGetDatastructureVersion({
@@ -167,15 +191,15 @@ export const MappingEditorModal = ({
         const from = endpointInfo(pendingConnection.current.nodeId, pendingConnection.current.handleId)
         // Only show the message when we can identify the source type (not a missed drop into empty space)
         if (from?.sub) {
-          toast.error(`Types don't match (${from.sub}). Add a conversion function.`)
+          toast.error(t('errors.typeMismatchWithType', { type: from.sub }))
         } else if (from) {
-          toast.error(`Types don't match. Add a conversion function.`)
+          toast.error(t('errors.typeMismatch'))
         }
       }
       pendingConnection.current = null
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [nodes, sourceFields, targetFields],
+    [nodes, sourceFields, targetFields, t],
   )
 
   const growConcat = (nodeId: string, handleId: string) => {
@@ -257,7 +281,8 @@ export const MappingEditorModal = ({
 
   const selectedNode = nodes.find(n => n.id === selectedId)
   const selectedData = selectedNode?.type === 'transform' ? (selectedNode.data as TransformNodeData) : undefined
-  const selectedDef = selectedData ? mappingRegistry.byType[selectedData.defType] : undefined
+  // Look up the def from the translated registry so the inspector receives translated labels
+  const selectedDef = selectedData ? translatedRegistry.byType[selectedData.defType] : undefined
 
   const handleSave = () => {
     const { fields, positions } = compileCanvas(nodes, edges)
@@ -277,16 +302,16 @@ export const MappingEditorModal = ({
 
   const toolbar = (
     <div className="grid grid-cols-3 items-center px-4 py-2">
-      <DialogTitle className="text-base">{name || 'Mapping'}</DialogTitle>
+      <DialogTitle className="text-base">{name || t('toolbar.title')}</DialogTitle>
       <span className="text-center text-xs text-muted-foreground">
-        {mapped} mapped · {unmapped} unmapped
+        {t('toolbar.status', { mapped, unmapped })}
       </span>
       <div className="flex items-center justify-end gap-2">
         <Button size="sm" onClick={handleSave}>
-          Save
+          {tCommon('actions.submit')}
         </Button>
         <Button size="sm" variant="outline" onClick={() => onOpenChange(false)}>
-          Close
+          {tCommon('actions.close')}
         </Button>
       </div>
     </div>
@@ -314,9 +339,13 @@ export const MappingEditorModal = ({
       >
         <EditorLayout
           toolbar={toolbar}
-          palette={<PaletteShell registry={mappingRegistry} title="Transforms" />}
+          palette={<PaletteShell registry={translatedRegistry} title={t('palette.title')} />}
           inspector={
-            <InspectorShell title="Inspector" isEmpty={!selectedDef} emptyMessage="Select a transform to edit it">
+            <InspectorShell
+              title={t('inspector.title')}
+              isEmpty={!selectedDef}
+              emptyMessage={t('inspector.emptyMessage')}
+            >
               {selectedDef && selectedData && (
                 <TransformInspector def={selectedDef} config={selectedData.config} onChange={updateConfig} />
               )}

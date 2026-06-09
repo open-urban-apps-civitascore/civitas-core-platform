@@ -1,6 +1,7 @@
 'use client'
 
 import type { NodeProps } from '@xyflow/react'
+import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 import { Fragment } from 'react'
 
@@ -71,8 +72,9 @@ const HEADER_CLASS: Record<MegaRole, string> = {
 }
 
 export const MegaNode = ({ data }: NodeProps) => {
+  const t = useTranslations('pipelineEditor.mappingEditor.node')
   const d = data as MegaNodeData
-  const title = `${d.role === 'source' ? 'INPUT' : 'OUTPUT'} · ${d.schemaName}`
+  const title = `${d.role === 'source' ? t('input') : t('output')} · ${d.schemaName}`
 
   return (
     <div className="min-w-[300px] rounded-md border border-border bg-background shadow-sm">

@@ -7,6 +7,7 @@
  * selectors. Opens the fullscreen Schema-as-MegaNode editor when all are set.
  */
 
+import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 
 import { DataModelImportModal } from '@/app/(main)/datasources/[datasourceId]/components/datastructure-tab/DataModelImportModal'
@@ -33,13 +34,14 @@ interface SchemaSelection {
 
 interface DatastructureFieldProps {
   label: string
+  placeholder: string
   selectedKey: string | null
   name?: string
   onSelect: (selection: SchemaSelection) => void
 }
 
 /** Datastructure-version picker reusing DataModelImportModal, resolving the schema name. */
-const DatastructureField = ({ label, selectedKey, name, onSelect }: DatastructureFieldProps) => {
+const DatastructureField = ({ label, placeholder, selectedKey, name, onSelect }: DatastructureFieldProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
   const parsed = useMemo(() => (pendingKey ? parseCompositeKey(pendingKey) : null), [pendingKey])
@@ -67,7 +69,7 @@ const DatastructureField = ({ label, selectedKey, name, onSelect }: Datastructur
     <div className="space-y-2">
       <Label>{label}</Label>
       <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setIsOpen(true)}>
-        <span className="truncate">{name || 'Select datastructure…'}</span>
+        <span className="truncate">{name || placeholder}</span>
       </Button>
       <DataModelImportModal
         open={isOpen}
@@ -86,6 +88,7 @@ interface MappingPanelProps {
 }
 
 export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
+  const t = useTranslations('pipelineEditor.mappingPanel')
   const [isEditorOpen, setIsEditorOpen] = useState(false)
 
   const sourceKey =
@@ -120,25 +123,27 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
   return (
     <div className="space-y-4 p-4">
       <div className="space-y-2">
-        <Label htmlFor="mappingName">Name</Label>
-        <Input id="mappingName" value={data.label} onChange={handleName} placeholder="Mapping name" />
+        <Label htmlFor="mappingName">{t('name')}</Label>
+        <Input id="mappingName" value={data.label} onChange={handleName} placeholder={t('namePlaceholder')} />
       </div>
 
       <DatastructureField
-        label="Input datastructure"
+        label={t('inputDatastructure')}
+        placeholder={t('selectDatastructure')}
         selectedKey={sourceKey}
         name={data.sourceName}
         onSelect={handleSource}
       />
       <DatastructureField
-        label="Output datastructure"
+        label={t('outputDatastructure')}
+        placeholder={t('selectDatastructure')}
         selectedKey={targetKey}
         name={data.targetName}
         onSelect={handleTarget}
       />
 
       <Button className="w-full" disabled={!canOpen} onClick={() => setIsEditorOpen(true)}>
-        Open mapping editor
+        {t('openMappingEditor')}
       </Button>
 
       {canOpen && (

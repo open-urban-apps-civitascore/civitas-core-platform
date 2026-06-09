@@ -1032,7 +1032,13 @@
       "loadingEditor": "Editor wird geladen...",
       "status": "Status",
       "mappingConfigured": "Mapping konfiguriert",
-      "noMappingDefined": "Kein Mapping definiert"
+      "noMappingDefined": "Kein Mapping definiert",
+      "name": "Name",
+      "namePlaceholder": "Mapping-Name",
+      "selectDatastructure": "Datenstruktur auswählen…",
+      "inputDatastructure": "Eingangs-Datenstruktur",
+      "outputDatastructure": "Ausgangs-Datenstruktur",
+      "openMappingEditor": "Mapping-Editor öffnen"
     },
     "entitySelector": {
       "selectEntity": "Entität auswählen...",
@@ -1086,7 +1092,81 @@
     "nodeLabels": {
       "notConfigured": "Nicht konfiguriert"
     },
-    "lines": "{count, plural, one {# Zeile} other {# Zeilen}}"
+    "lines": "{count, plural, one {# Zeile} other {# Zeilen}}",
+    "mappingEditor": {
+      "toolbar": {
+        "title": "Mapping",
+        "status": "{mapped} zugeordnet · {unmapped} nicht zugeordnet"
+      },
+      "palette": {
+        "title": "Transformationen"
+      },
+      "inspector": {
+        "title": "Inspektor",
+        "emptyMessage": "Transformation auswählen, um sie zu bearbeiten",
+        "noConfig": "Keine Konfiguration."
+      },
+      "node": {
+        "input": "EINGANG",
+        "output": "AUSGANG"
+      },
+      "errors": {
+        "typeMismatchWithType": "Typen stimmen nicht überein ({type}). Konvertierungsfunktion hinzufügen.",
+        "typeMismatch": "Typen stimmen nicht überein. Konvertierungsfunktion hinzufügen."
+      },
+      "categories": {
+        "literal": "Literal",
+        "recordPathFunctions": "RecordPath-Funktionen",
+        "conversionFunctions": "Konvertierungsfunktionen"
+      },
+      "transforms": {
+        "literal": {
+          "description": "Festen Wert ausgeben.",
+          "fields": {
+            "type": {
+              "label": "Typ",
+              "placeholder": "Typ auswählen…"
+            },
+            "value": {
+              "label": "Wert"
+            }
+          }
+        },
+        "concat": {
+          "description": "Zwei oder mehr Werte verketten.",
+          "fields": {
+            "separator": {
+              "label": "Trennzeichen"
+            }
+          }
+        },
+        "toString": {
+          "description": "beliebiger Skalar → str"
+        },
+        "toInt": {
+          "description": "str / float → int"
+        },
+        "toFloat": {
+          "description": "str / int → float"
+        },
+        "toDate": {
+          "description": "str → date",
+          "fields": {
+            "pattern": {
+              "label": "Muster"
+            }
+          }
+        },
+        "format": {
+          "description": "date → str",
+          "fields": {
+            "pattern": {
+              "label": "Muster"
+            }
+          }
+        }
+      }
+    }
   },
   "umlModeler": {
     "closeTabModal": {

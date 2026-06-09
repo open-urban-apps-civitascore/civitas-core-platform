@@ -23,7 +23,12 @@ const scalar = (id: string, label: string, dataType?: string): PortDef => ({ id,
 export const concatInputPorts = (count: number): PortDef[] =>
   Array.from({ length: Math.max(2, count) }, (_, i) => scalar(`in${i}`, `value ${i + 1}`))
 
-const patternField: ConfigField = { key: 'pattern', label: 'Pattern', control: 'text', default: 'yyyy-MM-dd' }
+const patternField: ConfigField = {
+  key: 'pattern',
+  label: 'transforms.toDate.fields.pattern.label',
+  control: 'text',
+  default: 'yyyy-MM-dd',
+}
 
 /**
  * Build a conversion node definition.
@@ -40,9 +45,9 @@ const conversion = (
   config: ConfigField[] = [],
 ): MappingTransformDef => ({
   type,
-  category: 'Conversion Functions',
+  category: 'categories.conversionFunctions',
   label: type,
-  description: `${inLabel} → ${outSubtype}`,
+  description: `transforms.${type}.description`,
   icon,
   inputs: [scalar('in', inLabel, inSubtype)],
   outputs: [scalar('out', outSubtype, outSubtype)],
@@ -84,9 +89,9 @@ export const literalOutputPort = (umlType: string): PortDef => {
 
 const literal: MappingTransformDef = {
   type: 'const',
-  category: 'Literal',
+  category: 'categories.literal',
   label: 'Literal',
-  description: 'Emit a fixed value.',
+  description: 'transforms.literal.description',
   icon: Hash,
   inputs: [],
   // Default output port is String (scalar/str); updated dynamically when type is changed.
@@ -94,13 +99,13 @@ const literal: MappingTransformDef = {
   config: [
     {
       key: 'type',
-      label: 'Type',
+      label: 'transforms.literal.fields.type.label',
       control: 'select',
       default: LITERAL_DEFAULT_TYPE,
-      placeholder: 'Select type…',
+      placeholder: 'transforms.literal.fields.type.placeholder',
       options: LITERAL_TYPE_OPTIONS,
     },
-    { key: 'value', label: 'Value', control: 'text', default: '' },
+    { key: 'value', label: 'transforms.literal.fields.value.label', control: 'text', default: '' },
   ],
   op: 'const',
   toValueNode: (_inputs, cfg) => ({
@@ -114,13 +119,20 @@ const literal: MappingTransformDef = {
 
 const concat: MappingTransformDef = {
   type: 'concat',
-  category: 'RecordPath Functions',
+  category: 'categories.recordPathFunctions',
   label: 'stringConcat',
-  description: 'Concatenate two or more values.',
+  description: 'transforms.concat.description',
   icon: Combine,
   inputs: concatInputPorts(2),
   outputs: [scalar('out', 'out', 'str')],
-  config: [{ key: 'separator', label: 'Separator', control: 'text', default: '' }],
+  config: [
+    {
+      key: 'separator',
+      label: 'transforms.concat.fields.separator.label',
+      control: 'text',
+      default: '',
+    },
+  ],
   op: 'concat',
   toValueNode: (inputs, cfg) => ({
     op: 'concat',
@@ -151,8 +163,13 @@ const conversions: MappingTransformDef[] = [
   conversion('toFloat', 'str / int', undefined, 'float', Binary),
   // toDate: accepts str, produces date
   conversion('toDate', 'str', 'str', 'date', Calendar, [patternField]),
-  // format: accepts date, produces str
-  conversion('format', 'date', 'date', 'str', CalendarClock, [patternField]),
+  // format: accepts date, produces str — reuse patternField but with the format-specific translation key
+  conversion('format', 'date', 'date', 'str', CalendarClock, [
+    {
+      ...patternField,
+      label: 'transforms.format.fields.pattern.label',
+    },
+  ]),
 ]
 
 export const mappingRegistry = buildRegistry<MappingTransformDef>([

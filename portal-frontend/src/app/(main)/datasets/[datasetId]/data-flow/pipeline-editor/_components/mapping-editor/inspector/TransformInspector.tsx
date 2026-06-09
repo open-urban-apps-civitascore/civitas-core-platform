@@ -1,5 +1,7 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
+
 import type { ConfigField } from '@/components/node-editor/types'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -50,6 +52,8 @@ interface TransformInspectorProps {
 
 /** Inspector body rendered entirely from the selected node's registry entry. */
 export const TransformInspector = ({ def, config, onChange }: TransformInspectorProps) => {
+  const t = useTranslations('pipelineEditor.mappingEditor.inspector')
+
   if (!def) return null
 
   return (
@@ -70,7 +74,7 @@ export const TransformInspector = ({ def, config, onChange }: TransformInspector
         </div>
       ))}
 
-      {def.config.length === 0 && <p className="text-xs text-muted-foreground">No configuration.</p>}
+      {def.config.length === 0 && <p className="text-xs text-muted-foreground">{t('noConfig')}</p>}
     </div>
   )
 }

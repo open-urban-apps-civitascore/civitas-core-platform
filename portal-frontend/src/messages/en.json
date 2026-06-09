@@ -1046,7 +1046,13 @@
       "loadingEditor": "Loading editor...",
       "status": "Status",
       "mappingConfigured": "Mapping configured",
-      "noMappingDefined": "No mapping defined"
+      "noMappingDefined": "No mapping defined",
+      "name": "Name",
+      "namePlaceholder": "Mapping name",
+      "selectDatastructure": "Select datastructure…",
+      "inputDatastructure": "Input datastructure",
+      "outputDatastructure": "Output datastructure",
+      "openMappingEditor": "Open mapping editor"
     },
     "entitySelector": {
       "selectEntity": "Select an entity...",
@@ -1100,7 +1106,81 @@
     "nodeLabels": {
       "notConfigured": "Not configured"
     },
-    "lines": "{count, plural, one {# line} other {# lines}}"
+    "lines": "{count, plural, one {# line} other {# lines}}",
+    "mappingEditor": {
+      "toolbar": {
+        "title": "Mapping",
+        "status": "{mapped} mapped · {unmapped} unmapped"
+      },
+      "palette": {
+        "title": "Transforms"
+      },
+      "inspector": {
+        "title": "Inspector",
+        "emptyMessage": "Select a transform to edit it",
+        "noConfig": "No configuration."
+      },
+      "node": {
+        "input": "INPUT",
+        "output": "OUTPUT"
+      },
+      "errors": {
+        "typeMismatchWithType": "Types don't match ({type}). Add a conversion function.",
+        "typeMismatch": "Types don't match. Add a conversion function."
+      },
+      "categories": {
+        "literal": "Literal",
+        "recordPathFunctions": "RecordPath Functions",
+        "conversionFunctions": "Conversion Functions"
+      },
+      "transforms": {
+        "literal": {
+          "description": "Emit a fixed value.",
+          "fields": {
+            "type": {
+              "label": "Type",
+              "placeholder": "Select type…"
+            },
+            "value": {
+              "label": "Value"
+            }
+          }
+        },
+        "concat": {
+          "description": "Concatenate two or more values.",
+          "fields": {
+            "separator": {
+              "label": "Separator"
+            }
+          }
+        },
+        "toString": {
+          "description": "any scalar → str"
+        },
+        "toInt": {
+          "description": "str / float → int"
+        },
+        "toFloat": {
+          "description": "str / int → float"
+        },
+        "toDate": {
+          "description": "str → date",
+          "fields": {
+            "pattern": {
+              "label": "Pattern"
+            }
+          }
+        },
+        "format": {
+          "description": "date → str",
+          "fields": {
+            "pattern": {
+              "label": "Pattern"
+            }
+          }
+        }
+      }
+    }
   },
   "umlModeler": {
     "closeTabModal": {
