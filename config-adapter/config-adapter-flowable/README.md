@@ -119,6 +119,14 @@ derive to `false` and the GeoServer branch is skipped — the existing FROST →
 is unchanged. Activating GeoServer end-to-end requires a separate backend change to serialize the
 `POSTGIS` `DataSink` and `Layer` entities into the trigger.
 
+**This applies to DELETE too.** The GeoServer teardown (`DELETE_WORKSPACE`) is gated on the same
+derived `hasGeoSink`, so the **`DATASET_DELETE` trigger must also carry the `POSTGIS` `dataSinks`**
+for the workspace to be removed — symmetric with create/update. A delete trigger without `dataSinks`
+skips the teardown (so the workspace would not be removed). Gating it this way (rather than always
+deleting) keeps deployments **without** a GeoServer adapter from failing every delete and avoids a
+spurious `DELETE …?recurse=true` on non-geo datasets. The end-to-end derivation for delete is
+covered by `DatasetDeleteTriggerTest` (realistic trigger through `FlowableTriggerConsumer`).
+
 > Vocabulary note: the GeoServer concept doc uses a `GEO_PERSISTENCE` sink type, but the
 > config-adapter targets the `portal-model` vocabulary (`DataSinkType.POSTGIS` + a separate `Layer`
 > entity). The concept doc should be reconciled to the `POSTGIS` naming.
