@@ -65,10 +65,9 @@ describe('mapping editor compile', () => {
   it('round-trips: compile → decompile → compile is stable', () => {
     const compiled = compileCanvas(nodes, edges)
     const config: MappingConfig = {
-      sourceDatastructureId: 'a',
-      sourceVersionId: 'b',
-      targetDatastructureId: 'c',
-      targetVersionId: 'd',
+      $schema: 'https://civitasconnect.digital/core/mapping/v1',
+      source: 'urn:core:datastructure:a:b',
+      target: 'urn:core:datastructure:c:d',
       ...compiled,
     }
     const built = decompileConfig(config, sourceTree, targetTree)

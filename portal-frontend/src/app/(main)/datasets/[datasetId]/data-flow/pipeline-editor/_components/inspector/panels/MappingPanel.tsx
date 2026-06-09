@@ -104,11 +104,6 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
       sourceDatastructureId: sel.datastructureId,
       sourceVersionId: sel.versionId,
       sourceName: sel.name,
-      mappingConfig: {
-        ...data.mappingConfig,
-        sourceDatastructureId: sel.datastructureId,
-        sourceVersionId: sel.versionId,
-      },
       configured: Boolean(data.label.trim() && targetKey),
     })
 
@@ -117,11 +112,6 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
       targetDatastructureId: sel.datastructureId,
       targetVersionId: sel.versionId,
       targetName: sel.name,
-      mappingConfig: {
-        ...data.mappingConfig,
-        targetDatastructureId: sel.datastructureId,
-        targetVersionId: sel.versionId,
-      },
       configured: Boolean(data.label.trim() && sourceKey),
     })
 

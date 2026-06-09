@@ -261,11 +261,12 @@ export const MappingEditorModal = ({
 
   const handleSave = () => {
     const { fields, positions } = compileCanvas(nodes, edges)
+    // TODO: confirm exact URN segment layout with schema owner.
+    // Current placeholder format: urn:core:datastructure:<datastructureId>:<versionId>
     onSave({
-      sourceDatastructureId: source.datastructureId,
-      sourceVersionId: source.versionId,
-      targetDatastructureId: target.datastructureId,
-      targetVersionId: target.versionId,
+      $schema: 'https://civitasconnect.digital/core/mapping/v1',
+      source: `urn:core:datastructure:${source.datastructureId}:${source.versionId}`,
+      target: `urn:core:datastructure:${target.datastructureId}:${target.versionId}`,
       fields,
       positions,
     })
