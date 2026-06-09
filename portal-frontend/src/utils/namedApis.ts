@@ -28,12 +28,13 @@ export function toBoundingBoxPayload(bbox: LayerFormData['nativeBoundingBox'] | 
   return { ...bbox, minX: Number(bbox.minX), minY: Number(bbox.minY), maxX: Number(bbox.maxX), maxY: Number(bbox.maxY) }
 }
 
-export const toBoundingBoxFormData = (bbox: BoundingBox) => ({
+export const toBoundingBoxFormData = (bbox: BoundingBox | null) => ({
   ...bbox,
-  minX: String(bbox.minX),
-  minY: String(bbox.minY),
-  maxX: String(bbox.maxX),
-  maxY: String(bbox.maxY),
+  minX: String(bbox?.minX ?? ''),
+  minY: String(bbox?.minY ?? ''),
+  maxX: String(bbox?.maxX ?? ''),
+  maxY: String(bbox?.maxY ?? ''),
+  crs: bbox?.crs ?? '',
 })
 
 export const mapApiLayerToFormData = (layers: Layer[]): LayerFormData[] =>
@@ -55,10 +56,12 @@ export const mapApiLayerToFormData = (layers: Layer[]): LayerFormData[] =>
     alternativeStyleIds: layer.alternativeStyleIds,
   }))
 
+// The Lat/Lon Bbox refers to the CRS 'EPSG:4326' and is used in the GetCapabilities Geoserver request
+// This function transferes the values from the native bbox to lat/lon coordinates
 const computeLatLonBoundingBox = (
   nativeBoundingBox: LayerFormData['nativeBoundingBox'],
   crs: string,
-): LayerFormData['latLonBoundingBox'] => {
+): LayerFormData['latLonBoundingBox'] | null => {
   const crsOption = crsOptions.find(o => o.value === crs)
   if (!crsOption) return null
   const minX = Number(nativeBoundingBox.minX)
@@ -72,11 +75,13 @@ const computeLatLonBoundingBox = (
 }
 
 export const mapFormLayerToPayload = (layers: LayerFormData[]): LayerApiPayload[] =>
-  layers.map(layer => ({
+  layers.map(({ id: _id, ...layer }) => ({
     ...layer,
     defaultStyleId: layer.defaultStyleId && layer.defaultStyleId !== 'none' ? layer.defaultStyleId : null,
-    nativeBoundingBox: toBoundingBoxPayload(layer.nativeBoundingBox),
-    latLonBoundingBox: toBoundingBoxPayload(computeLatLonBoundingBox(layer.nativeBoundingBox, layer.crs)),
+    nativeBoundingBox: layer.bboxAutoCalculate ? null : toBoundingBoxPayload(layer.nativeBoundingBox),
+    latLonBoundingBox: layer.bboxAutoCalculate
+      ? null
+      : toBoundingBoxPayload(computeLatLonBoundingBox(layer.nativeBoundingBox, layer.crs)),
   }))
 
 export const buildStaPayloadData = (data: StaApiFormData): NamedApiPayload => ({
@@ -97,6 +102,6 @@ export const getNativeCRSFromDatasink = (
 ): string => {
   const datasink = postgisDatasinks.find(d => d.id === datasinkId)
   const datastructure = postgisDatastructures.find(d => d.id === datasink?.configuration.dataStructureVersion.id)
-  const umlClass = datastructure?.styles?.nodes[0].data.element as UMLClass | undefined
+  const umlClass = datastructure?.styles?.nodes?.[0]?.data?.element as UMLClass | undefined
   return umlClass?.attributes?.find(a => a.meta?.gisInfo?.crs)?.meta?.gisInfo?.crs ?? ''
 }

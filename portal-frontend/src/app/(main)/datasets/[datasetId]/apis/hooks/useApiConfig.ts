@@ -86,7 +86,7 @@ export const useApiConfig = <TFormData extends FormData>({
   )
 
   const handleSaveBaseInfo = async (data: TFormData) => {
-    if (!hasDirtyField(dirtyFields.baseInfo)) return
+    if (!isCreate && !hasDirtyField(dirtyFields.baseInfo)) return
     const newApi = buildPayloadData(data)
     if (isCreate) {
       await createNamedApi.mutateAsync({
