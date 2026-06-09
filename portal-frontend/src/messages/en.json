@@ -1134,7 +1134,8 @@
         "nodeNotConfigured": "{label} is not configured",
         "invalidCronExpression": "{label} has an invalid cron expression. Must be a 6-field Quartz syntax.",
         "orphanNode": "{label} is not connected to any other node",
-        "minimumFunctionalNodes": "Pipeline must have at least one functional node between Start and End"
+        "minimumFunctionalNodes": "Pipeline must have at least one functional node between Start and End",
+        "duplicateTableName": "Two Geo Persistence tables must not have the same name"
       }
     },
     "toolbar": {

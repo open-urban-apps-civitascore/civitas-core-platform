@@ -6,7 +6,7 @@
  *
  */
 
-import { isCronNodeData } from '../_types/nodes'
+import { isCronNodeData, isGeoPersistenceNodeData } from '../_types/nodes'
 import { type Pipeline, PIPELINE_NODE_TYPES } from '../_types/pipeline'
 
 // ============================================================================
@@ -312,6 +312,36 @@ const validateOrphanNodes: ValidationRule = {
   },
 }
 
+const validateUniqueGeoPersistenceTableNames: ValidationRule = {
+  id: 'unique-geo-persistence-table-names',
+  name: 'Unique Geo Persistence Table Names',
+  description: 'No two GeoPersistence nodes within a pipeline may have the same table name',
+  validate: (pipeline: Pipeline) => {
+    const errors: PipelineValidationError[] = []
+    const seen = new Map<string, string>()
+
+    pipeline.nodes.forEach(node => {
+      if (!isGeoPersistenceNodeData(node.data)) return
+      const tableName = node.data.tableName.trim()
+      if (!tableName) return
+
+      if (seen.has(tableName)) {
+        errors.push({
+          id: crypto.randomUUID(),
+          type: 'node',
+          elementId: node.id,
+          messageKey: 'validation.messages.duplicateTableName',
+          severity: 'error',
+        })
+      } else {
+        seen.set(tableName, node.id)
+      }
+    })
+
+    return { errors, warnings: [] }
+  },
+}
+
 // ============================================================================
 // All Validation Rules
 // ============================================================================
@@ -327,6 +357,7 @@ export const VALIDATION_RULES: ValidationRule[] = [
   validateNodeConfiguration,
   validateCronExpression,
   validateOrphanNodes,
+  validateUniqueGeoPersistenceTableNames,
 ]
 
 // ============================================================================

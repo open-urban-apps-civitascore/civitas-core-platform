@@ -23,3 +23,20 @@ export type Datasink = {
   createdAt: string
   modifiedAt: string
 }
+
+export type PostgisPipelineDatasink = {
+  id: string | null
+  dataSinkType: typeof DATASINK_TYPES.POSTGIS
+  configuration: {
+    tableName: string
+    dataStructureVersionId: string
+  }
+}
+
+export type FrostPipelineDatasink = {
+  id: string | null
+  dataSinkType: typeof DATASINK_TYPES.FROST
+  configuration: Record<string, never>
+}
+
+export type PipelineDatasink = PostgisPipelineDatasink | FrostPipelineDatasink
