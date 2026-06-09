@@ -49,9 +49,9 @@ const defaultLayer: LayerFormData = {
   geometryColumnRef: '',
   nativeCRS: '',
   crs: '',
-  bboxAutoCalculate: false as const,
+  bboxAutoCalculate: false,
   nativeBoundingBox: { minX: '', minY: '', maxX: '', maxY: '', crs: '' },
-  latLonBoundingBox: null,
+  latLonBoundingBox: { minX: '', minY: '', maxX: '', maxY: '', crs: 'EPSG:4326' },
   defaultStyleId: '',
   alternativeStyleIds: [],
 }

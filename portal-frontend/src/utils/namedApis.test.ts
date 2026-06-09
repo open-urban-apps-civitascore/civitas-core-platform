@@ -20,7 +20,7 @@ const makeLayer = (overrides: Partial<LayerFormData> = {}): LayerFormData => ({
   crs: 'EPSG:4326',
   bboxAutoCalculate: false,
   nativeBoundingBox: { minX: '-180', minY: '-90', maxX: '180', maxY: '90', crs: 'EPSG:4326' },
-  latLonBoundingBox: null,
+  latLonBoundingBox: { minX: '-180', minY: '-90', maxX: '180', maxY: '90', crs: 'EPSG:4326' },
   defaultStyleId: null,
   alternativeStyleIds: [],
   ...overrides,
@@ -105,6 +105,12 @@ describe('mapFormLayerToPayload', () => {
         nativeBoundingBox: { minX: 'not-a-number', minY: '-90', maxX: '180', maxY: '90', crs: 'EPSG:4326' },
       }),
     ])
+    expect(result.latLonBoundingBox).toBeNull()
+  })
+
+  it('sets nativeBoundingBox and latLonBoundingBox to null when bboxAutoCalculate is true', () => {
+    const [result] = mapFormLayerToPayload([makeLayer({ bboxAutoCalculate: true })])
+    expect(result.nativeBoundingBox).toBeNull()
     expect(result.latLonBoundingBox).toBeNull()
   })
 

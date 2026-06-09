@@ -28,12 +28,13 @@ export function toBoundingBoxPayload(bbox: LayerFormData['nativeBoundingBox'] | 
   return { ...bbox, minX: Number(bbox.minX), minY: Number(bbox.minY), maxX: Number(bbox.maxX), maxY: Number(bbox.maxY) }
 }
 
-export const toBoundingBoxFormData = (bbox: BoundingBox) => ({
+export const toBoundingBoxFormData = (bbox: BoundingBox | null) => ({
   ...bbox,
-  minX: String(bbox.minX),
-  minY: String(bbox.minY),
-  maxX: String(bbox.maxX),
-  maxY: String(bbox.maxY),
+  minX: String(bbox?.minX ?? ''),
+  minY: String(bbox?.minY ?? ''),
+  maxX: String(bbox?.maxX ?? ''),
+  maxY: String(bbox?.maxY ?? ''),
+  crs: bbox?.crs ?? '',
 })
 
 export const mapApiLayerToFormData = (layers: Layer[]): LayerFormData[] =>
@@ -60,7 +61,7 @@ export const mapApiLayerToFormData = (layers: Layer[]): LayerFormData[] =>
 const computeLatLonBoundingBox = (
   nativeBoundingBox: LayerFormData['nativeBoundingBox'],
   crs: string,
-): LayerFormData['latLonBoundingBox'] => {
+): LayerFormData['latLonBoundingBox'] | null => {
   const crsOption = crsOptions.find(o => o.value === crs)
   if (!crsOption) return null
   const minX = Number(nativeBoundingBox.minX)
