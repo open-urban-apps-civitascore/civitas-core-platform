@@ -17,8 +17,8 @@ import java.util.Map;
  *       for {@code FROST}).
  *   <li>{@code dataStructure} — the referenced data-structure version's model, as served by Model
  *       Atlas in JSON form, carried as a JSON object. {@code null} only when the sink references no
- *       data-structure version (e.g. FROST sinks). If a version <em>is</em> referenced but its model
- *       cannot be resolved, the saga publish fails rather than emitting a null value here.
+ *       data-structure version (e.g. FROST sinks). If a version <em>is</em> referenced but its
+ *       model cannot be resolved, the saga publish fails rather than emitting a null value here.
  * </ul>
  */
 public record DataSinkPayload(

@@ -40,6 +40,11 @@ public class Pipeline extends NamedEntity {
   @JoinColumn(name = "dataset_id", nullable = false)
   @NotNull private DataSet dataSet;
 
+  /** React Flow visual layout stored as JSON (nodes/edges/viewport). */
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "styles", columnDefinition = "jsonb")
+  private Map<String, Object> styles;
+
   /** Data sources associated with this pipeline. */
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
