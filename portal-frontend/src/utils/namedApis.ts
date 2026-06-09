@@ -52,6 +52,7 @@ export const mapApiLayerToFormData = (layers: Layer[]): LayerFormData[] =>
     bboxAutoCalculate: false,
     nativeBoundingBox: toBoundingBoxFormData(layer.nativeBoundingBox),
     latLonBoundingBox: toBoundingBoxFormData(layer.latLonBoundingBox),
+    keywords: layer.keywords,
     defaultStyleId: layer.defaultStyleId || '',
     alternativeStyleIds: layer.alternativeStyleIds,
   }))
@@ -75,7 +76,7 @@ const computeLatLonBoundingBox = (
 }
 
 export const mapFormLayerToPayload = (layers: LayerFormData[]): LayerApiPayload[] =>
-  layers.map(({ id: _id, ...layer }) => ({
+  layers.map(({ id: _id, nativeCRS: _nativeCRS, ...layer }) => ({
     ...layer,
     defaultStyleId: layer.defaultStyleId && layer.defaultStyleId !== 'none' ? layer.defaultStyleId : null,
     nativeBoundingBox: layer.bboxAutoCalculate ? null : toBoundingBoxPayload(layer.nativeBoundingBox),

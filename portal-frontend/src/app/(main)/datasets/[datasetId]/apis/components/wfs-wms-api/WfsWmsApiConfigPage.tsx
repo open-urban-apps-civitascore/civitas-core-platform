@@ -44,6 +44,7 @@ const defaultLayer: LayerFormData = {
   title: '',
   layerName: '',
   description: '',
+  keywords: [],
   dataSinkId: '',
   attribute: [],
   cqlFilter: '',
