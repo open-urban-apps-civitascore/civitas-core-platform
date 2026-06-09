@@ -183,7 +183,10 @@ class FlowableTriggerConsumerHasPipelinesTest {
         Arguments.of(null, false));
   }
 
-  /** Builds a minimal DATASET_CREATE trigger, including {@code field} only when {@code value} is set. */
+  /**
+   * Builds a minimal DATASET_CREATE trigger, including {@code field} only when {@code value} is
+   * set.
+   */
   private byte[] triggerWith(String field, Object value) throws Exception {
     Map<String, Object> payload = new HashMap<>();
     payload.put("sagaType", "DATASET_CREATE");

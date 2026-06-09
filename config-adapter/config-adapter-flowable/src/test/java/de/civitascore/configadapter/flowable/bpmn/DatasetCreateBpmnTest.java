@@ -168,6 +168,9 @@ class DatasetCreateBpmnTest {
             .findFirst()
             .orElseThrow();
     assertEquals("DELETE_PROJECT", frostCompensation.operation());
+
+    // hasGeoSink=false → the pipeline-failure compensation must skip GeoServer entirely.
+    verify(geoserverHandler, never()).handle(any());
   }
 
   @Test
@@ -255,6 +258,28 @@ class DatasetCreateBpmnTest {
     assertEquals(
         List.of("CREATE_WORKSPACE", "CREATE_DATASTORE"),
         geo.getAllValues().stream().map(SagaCommandMessage::operation).toList());
+  }
+
+  @Test
+  void shouldCompensateGeoServerWhenRedpandaFailsWithGeoSink() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+    stubRedpandaFailure("Pipeline deployment failed");
+    stubApisixCompensationSuccess();
+    stubFrostCompensationSuccess();
+
+    ProcessInstance instance = startProcessWithGeo(true, true, true);
+    executeAllJobs();
+
+    assertProcessFinished(instance.getId());
+
+    // GeoServer ran (hasGeoSink), so the pipeline failure must compensate it: 3 forward steps
+    // (workspace, datastore, layers) followed by the DELETE_WORKSPACE compensation.
+    ArgumentCaptor<SagaCommandMessage> captor = ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(geoserverHandler, times(4)).handle(captor.capture());
+    SagaCommandMessage compensation = captor.getAllValues().get(3);
+    assertEquals("COMPENSATE_STEP", compensation.type());
+    assertEquals("DELETE_WORKSPACE", compensation.operation());
   }
 
   @Test

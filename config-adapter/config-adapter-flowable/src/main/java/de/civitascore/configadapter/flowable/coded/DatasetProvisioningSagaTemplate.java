@@ -31,6 +31,8 @@ import org.flowable.bpmn.model.StartEvent;
 final class DatasetProvisioningSagaTemplate {
 
   private static final String GEOSERVER_ADAPTER = "geoserver";
+  private static final String HAS_GEO_SINK_CONDITION =
+      "${execution.getVariable('hasGeoSink') == true}";
 
   static final OpVerbs CREATE =
       new OpVerbs(
@@ -163,14 +165,19 @@ final class DatasetProvisioningSagaTemplate {
     saga.flow(publishOk, end);
 
     // Compensation: one reverse chain (geoserver → apisix → frost), entered at the right point.
-    // compensate-geoserver (DELETE/RESTORE_WORKSPACE) is idempotent, so routing the redpanda error
-    // through it is safe even when the GeoServer branch was skipped (hasGeoSink == false).
     saga.errorFlow(frost, publishFail);
     saga.errorFlow(apisix, compFrost);
+    // A GeoServer step only runs when hasGeoSink, so its failure always compensates the workspace.
     for (SagaStepRef geo : geoSteps) {
       saga.errorFlow(geo, compGeoserver);
     }
-    saga.errorFlow(redpanda, compGeoserver);
+    // A pipeline failure compensates the GeoServer branch only if it actually ran (hasGeoSink);
+    // otherwise it skips straight to the APISIX/FROST compensation — no spurious DELETE_WORKSPACE.
+    ExclusiveGateway redpandaCompGw =
+        saga.exclusiveGateway("redpanda-comp-gateway", "Compensate GeoServer?");
+    saga.errorFlow(redpanda, redpandaCompGw);
+    saga.flow(redpandaCompGw, compGeoserver).when(HAS_GEO_SINK_CONDITION);
+    saga.flow(redpandaCompGw, compApisix).asDefault();
     saga.flow(compGeoserver, compApisix, compFrost, publishFail);
     saga.flow(publishFail, errorEnd);
 
@@ -185,7 +192,7 @@ final class DatasetProvisioningSagaTemplate {
       ExclusiveGateway pipelineGw) {
     // execution.getVariable(...) is null-safe: an absent flag evaluates to false (default flow),
     // matching the engine's behavior when the trigger carries no geo data.
-    saga.flow(geoGw, geoSteps.get(0).task()).when("${execution.getVariable('hasGeoSink') == true}");
+    saga.flow(geoGw, geoSteps.get(0).task()).when(HAS_GEO_SINK_CONDITION);
     saga.flow(geoGw, pipelineGw).asDefault();
     if (v.fineGrainedGeo()) {
       ServiceTask workspace = geoSteps.get(0).task();

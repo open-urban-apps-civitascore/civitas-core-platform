@@ -101,6 +101,11 @@
       <outgoing>flow-redpanda-error</outgoing>
       <errorEventDefinition id="ErrorEventDefinition_3" errorRef="stepFailedError"/>
     </boundaryEvent>
+    <exclusiveGateway id="redpanda-comp-gateway" name="Compensate GeoServer?" default="flow-redpanda-comp-apisix">
+      <incoming>flow-redpanda-error</incoming>
+      <outgoing>flow-redpanda-comp-geo</outgoing>
+      <outgoing>flow-redpanda-comp-apisix</outgoing>
+    </exclusiveGateway>
     <serviceTask id="compensate-geoserver" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate" name="Compensate: Delete GeoServer Workspace">
       <extensionElements>
         <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="geoserver"/>
@@ -110,7 +115,7 @@
       <incoming>flow-workspace-error</incoming>
       <incoming>flow-datastore-error</incoming>
       <incoming>flow-layers-error</incoming>
-      <incoming>flow-redpanda-error</incoming>
+      <incoming>flow-redpanda-comp-geo</incoming>
       <outgoing>flow-comp-geoserver-apisix</outgoing>
     </serviceTask>
     <serviceTask id="compensate-apisix" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate" name="Compensate: Delete APISIX Route">
@@ -120,6 +125,7 @@
         <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="create-route"/>
       </extensionElements>
       <incoming>flow-comp-geoserver-apisix</incoming>
+      <incoming>flow-redpanda-comp-apisix</incoming>
       <outgoing>flow-comp-apisix-frost</outgoing>
     </serviceTask>
     <serviceTask id="compensate-frost" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate" name="Compensate: Delete FROST Project">
@@ -179,7 +185,11 @@
     <sequenceFlow id="flow-workspace-error" sourceRef="workspace-error" targetRef="compensate-geoserver"/>
     <sequenceFlow id="flow-datastore-error" sourceRef="datastore-error" targetRef="compensate-geoserver"/>
     <sequenceFlow id="flow-layers-error" sourceRef="layers-error" targetRef="compensate-geoserver"/>
-    <sequenceFlow id="flow-redpanda-error" sourceRef="redpanda-error" targetRef="compensate-geoserver"/>
+    <sequenceFlow id="flow-redpanda-error" sourceRef="redpanda-error" targetRef="redpanda-comp-gateway"/>
+    <sequenceFlow id="flow-redpanda-comp-geo" sourceRef="redpanda-comp-gateway" targetRef="compensate-geoserver">
+      <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_4">${execution.getVariable('hasGeoSink') == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-redpanda-comp-apisix" sourceRef="redpanda-comp-gateway" targetRef="compensate-apisix"/>
     <sequenceFlow id="flow-comp-geoserver-apisix" sourceRef="compensate-geoserver" targetRef="compensate-apisix"/>
     <sequenceFlow id="flow-comp-apisix-frost" sourceRef="compensate-apisix" targetRef="compensate-frost"/>
     <sequenceFlow id="flow-comp-frost-fail" sourceRef="compensate-frost" targetRef="publish-failure"/>
@@ -188,303 +198,320 @@
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_Process_1" bpmnElement="dataset-create">
       <bpmndi:BPMNShape id="BPMNShape_StartEvent_1" bpmnElement="start">
-        <dc:Bounds height="36.0" width="36.0" x="50.0" y="157.0"/>
+        <dc:Bounds height="36.0" width="36.0" x="50.0" y="407.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_1" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="14.0" width="25.0" x="55.0" y="193.0"/>
+          <dc:Bounds height="14.0" width="25.0" x="55.0" y="443.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ServiceTask_1" bpmnElement="create-project">
-        <dc:Bounds height="50.0" width="110.0" x="136.0" y="150.0"/>
+        <dc:Bounds height="50.0" width="110.0" x="136.0" y="400.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_2" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="28.0" width="89.0" x="146.0" y="161.0"/>
+          <dc:Bounds height="28.0" width="89.0" x="146.0" y="411.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ServiceTask_2" bpmnElement="create-route">
-        <dc:Bounds height="50.0" width="110.0" x="296.0" y="150.0"/>
+        <dc:Bounds height="50.0" width="110.0" x="296.0" y="400.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_3" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="28.0" width="87.0" x="307.0" y="161.0"/>
+          <dc:Bounds height="28.0" width="87.0" x="307.0" y="411.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ExclusiveGateway_1" bpmnElement="geo-gateway" isMarkerVisible="true">
-        <dc:Bounds height="50.0" width="50.0" x="456.0" y="150.0"/>
+        <dc:Bounds height="50.0" width="50.0" x="442.0" y="400.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_4" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="28.0" width="57.0" x="453.0" y="200.0"/>
+          <dc:Bounds height="28.0" width="57.0" x="439.0" y="450.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ServiceTask_3" bpmnElement="create-workspace">
-        <dc:Bounds height="50.0" width="110.0" x="620.0" y="150.0"/>
+        <dc:Bounds height="50.0" width="110.0" x="557.0" y="400.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_5" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="28.0" width="108.0" x="621.0" y="161.0"/>
+          <dc:Bounds height="28.0" width="108.0" x="558.0" y="411.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ServiceTask_4" bpmnElement="create-datastore">
-        <dc:Bounds height="50.0" width="110.0" x="781.0" y="150.0"/>
+        <dc:Bounds height="50.0" width="110.0" x="716.0" y="400.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_6" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="28.0" width="108.0" x="782.0" y="161.0"/>
+          <dc:Bounds height="28.0" width="108.0" x="717.0" y="411.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ExclusiveGateway_2" bpmnElement="layers-gateway" isMarkerVisible="true">
-        <dc:Bounds height="50.0" width="50.0" x="941.0" y="150.0"/>
+        <dc:Bounds height="50.0" width="50.0" x="876.0" y="400.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_7" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="14.0" width="69.0" x="932.0" y="200.0"/>
+          <dc:Bounds height="14.0" width="69.0" x="867.0" y="450.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ServiceTask_5" bpmnElement="provision-layers">
-        <dc:Bounds height="50.0" width="110.0" x="1041.0" y="150.0"/>
+        <dc:Bounds height="50.0" width="110.0" x="1016.0" y="400.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_8" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="28.0" width="83.0" x="1054.0" y="161.0"/>
+          <dc:Bounds height="28.0" width="83.0" x="1029.0" y="411.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ExclusiveGateway_3" bpmnElement="pipeline-gateway" isMarkerVisible="true">
-        <dc:Bounds height="50.0" width="50.0" x="1310.0" y="150.0"/>
+        <dc:Bounds height="50.0" width="50.0" x="1230.0" y="400.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_9" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="28.0" width="54.0" x="1308.0" y="200.0"/>
+          <dc:Bounds height="28.0" width="54.0" x="1228.0" y="450.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ServiceTask_6" bpmnElement="deploy-pipelines">
-        <dc:Bounds height="50.0" width="110.0" x="1393.0" y="150.0"/>
+        <dc:Bounds height="50.0" width="110.0" x="1309.0" y="400.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_10" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="14.0" width="93.0" x="1401.0" y="168.0"/>
+          <dc:Bounds height="14.0" width="93.0" x="1317.0" y="418.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ServiceTask_7" bpmnElement="compensate-geoserver">
-        <dc:Bounds height="50.0" width="110.0" x="619.0" y="360.0"/>
+        <dc:Bounds height="50.0" width="110.0" x="716.0" y="570.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_11" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="42.0" width="110.0" x="619.0" y="364.0"/>
+          <dc:Bounds height="42.0" width="110.0" x="716.0" y="574.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ServiceTask_8" bpmnElement="compensate-apisix">
-        <dc:Bounds height="50.0" width="110.0" x="446.0" y="360.0"/>
+        <dc:Bounds height="50.0" width="110.0" x="471.0" y="570.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_12" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="42.0" width="86.0" x="458.0" y="364.0"/>
+          <dc:Bounds height="42.0" width="86.0" x="483.0" y="574.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ServiceTask_9" bpmnElement="compensate-frost">
-        <dc:Bounds height="50.0" width="110.0" x="295.0" y="360.0"/>
+        <dc:Bounds height="50.0" width="110.0" x="295.0" y="570.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_13" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="42.0" width="88.0" x="306.0" y="364.0"/>
+          <dc:Bounds height="42.0" width="88.0" x="306.0" y="574.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ServiceTask_10" bpmnElement="publish-success">
-        <dc:Bounds height="50.0" width="110.0" x="1550.0" y="150.0"/>
+        <dc:Bounds height="50.0" width="110.0" x="1460.0" y="400.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_14" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="28.0" width="99.0" x="1555.0" y="161.0"/>
+          <dc:Bounds height="28.0" width="99.0" x="1465.0" y="411.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ServiceTask_11" bpmnElement="publish-failure">
-        <dc:Bounds height="50.0" width="110.0" x="135.0" y="360.0"/>
+        <dc:Bounds height="50.0" width="110.0" x="135.0" y="570.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_15" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="28.0" width="91.0" x="144.0" y="371.0"/>
+          <dc:Bounds height="28.0" width="91.0" x="144.0" y="581.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_EndEvent_1" bpmnElement="end">
-        <dc:Bounds height="36.0" width="36.0" x="1587.0" y="240.0"/>
+        <dc:Bounds height="36.0" width="36.0" x="1497.0" y="510.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_16" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="28.0" width="60.0" x="1575.0" y="276.0"/>
+          <dc:Bounds height="28.0" width="60.0" x="1485.0" y="546.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_EndEvent_2" bpmnElement="error-end">
-        <dc:Bounds height="36.0" width="36.0" x="172.0" y="480.0"/>
+        <dc:Bounds height="36.0" width="36.0" x="173.0" y="670.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_17" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="14.0" width="66.0" x="157.0" y="516.0"/>
+          <dc:Bounds height="14.0" width="66.0" x="158.0" y="706.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_ExclusiveGateway_4" bpmnElement="redpanda-comp-gateway" isMarkerVisible="true">
+        <dc:Bounds height="50.0" width="50.0" x="746.0" y="663.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_48" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="76.0" x="733.0" y="713.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_1" bpmnElement="frost-error">
-        <dc:Bounds height="36.0" width="36.0" x="172.0" y="182.0"/>
+        <dc:Bounds height="36.0" width="36.0" x="172.0" y="432.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_42" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="14.0" width="62.0" x="159.0" y="218.0"/>
+          <dc:Bounds height="14.0" width="62.0" x="159.0" y="468.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_2" bpmnElement="apisix-error">
-        <dc:Bounds height="36.0" width="36.0" x="332.0" y="182.0"/>
+        <dc:Bounds height="36.0" width="36.0" x="332.0" y="432.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_43" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="14.0" width="62.0" x="319.0" y="218.0"/>
+          <dc:Bounds height="14.0" width="62.0" x="319.0" y="468.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_4" bpmnElement="datastore-error">
-        <dc:Bounds height="36.0" width="36.0" x="817.0" y="182.0"/>
+        <dc:Bounds height="36.0" width="36.0" x="753.0" y="432.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_45" labelStyle="BPMNLabelStyle_1">
           <dc:Bounds height="14.0" width="62.0" x="804.0" y="218.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_5" bpmnElement="layers-error">
-        <dc:Bounds height="36.0" width="36.0" x="1077.0" y="182.0"/>
-        <bpmndi:BPMNLabel id="BPMNLabel_46" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="14.0" width="62.0" x="1064.0" y="218.0"/>
+      <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_3" bpmnElement="workspace-error">
+        <dc:Bounds height="36.0" width="36.0" x="594.0" y="432.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_44" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="14.0" width="62.0" x="581.0" y="468.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_3" bpmnElement="workspace-error">
-        <dc:Bounds height="36.0" width="36.0" x="656.0" y="182.0"/>
-        <bpmndi:BPMNLabel id="BPMNLabel_44" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="14.0" width="62.0" x="643.0" y="218.0"/>
+      <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_5" bpmnElement="layers-error">
+        <dc:Bounds height="36.0" width="36.0" x="1053.0" y="432.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_46" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="14.0" width="62.0" x="1040.0" y="468.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_6" bpmnElement="redpanda-error">
-        <dc:Bounds height="36.0" width="36.0" x="1429.0" y="182.0"/>
+        <dc:Bounds height="36.0" width="36.0" x="1345.0" y="432.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_47" labelStyle="BPMNLabelStyle_1">
-          <dc:Bounds height="14.0" width="62.0" x="1416.0" y="218.0"/>
+          <dc:Bounds height="14.0" width="62.0" x="1332.0" y="468.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_1" bpmnElement="flow-start" sourceElement="BPMNShape_StartEvent_1" targetElement="BPMNShape_ServiceTask_1">
-        <di:waypoint xsi:type="dc:Point" x="86.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="111.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="136.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="86.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="111.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="136.0" y="425.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_18"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_2" bpmnElement="flow-frost-apisix" sourceElement="BPMNShape_ServiceTask_1" targetElement="BPMNShape_ServiceTask_2">
-        <di:waypoint xsi:type="dc:Point" x="246.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="271.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="296.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="246.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="271.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="296.0" y="425.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_19"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_3" bpmnElement="flow-frost-error" sourceElement="BPMNShape_BoundaryEvent_1" targetElement="BPMNShape_ServiceTask_11">
-        <di:waypoint xsi:type="dc:Point" x="190.0" y="218.0"/>
-        <di:waypoint xsi:type="dc:Point" x="190.0" y="289.0"/>
-        <di:waypoint xsi:type="dc:Point" x="190.0" y="360.0"/>
+        <di:waypoint xsi:type="dc:Point" x="190.0" y="468.0"/>
+        <di:waypoint xsi:type="dc:Point" x="190.0" y="519.0"/>
+        <di:waypoint xsi:type="dc:Point" x="190.0" y="570.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_20"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_4" bpmnElement="flow-apisix-geo" sourceElement="BPMNShape_ServiceTask_2" targetElement="BPMNShape_ExclusiveGateway_1">
-        <di:waypoint xsi:type="dc:Point" x="406.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="431.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="456.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="406.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="424.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="442.0" y="425.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_21"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_5" bpmnElement="flow-apisix-error" sourceElement="BPMNShape_BoundaryEvent_2" targetElement="BPMNShape_ServiceTask_9">
-        <di:waypoint xsi:type="dc:Point" x="350.0" y="218.0"/>
-        <di:waypoint xsi:type="dc:Point" x="350.0" y="289.0"/>
-        <di:waypoint xsi:type="dc:Point" x="350.0" y="360.0"/>
+        <di:waypoint xsi:type="dc:Point" x="350.0" y="468.0"/>
+        <di:waypoint xsi:type="dc:Point" x="350.0" y="519.0"/>
+        <di:waypoint xsi:type="dc:Point" x="350.0" y="570.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_22"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_6" bpmnElement="flow-geo-workspace" sourceElement="BPMNShape_ExclusiveGateway_1" targetElement="BPMNShape_ServiceTask_3">
-        <di:waypoint xsi:type="dc:Point" x="506.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="563.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="620.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="492.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="524.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="557.0" y="425.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_23">
-          <dc:Bounds height="14.0" width="19.0" x="554.0" y="176.0"/>
+          <dc:Bounds height="14.0" width="19.0" x="516.0" y="426.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_7" bpmnElement="flow-geo-skip" sourceElement="BPMNShape_ExclusiveGateway_1" targetElement="BPMNShape_ExclusiveGateway_3">
-        <di:waypoint xsi:type="dc:Point" x="481.0" y="150.0"/>
-        <di:waypoint xsi:type="dc:Point" x="481.0" y="59.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1335.0" y="59.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1335.0" y="150.0"/>
+        <di:waypoint xsi:type="dc:Point" x="467.0" y="400.0"/>
+        <di:waypoint xsi:type="dc:Point" x="467.0" y="359.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1255.0" y="359.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1255.0" y="400.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_24">
-          <dc:Bounds height="14.0" width="14.0" x="902.0" y="60.0"/>
+          <dc:Bounds height="14.0" width="14.0" x="855.0" y="360.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_8" bpmnElement="flow-workspace-datastore" sourceElement="BPMNShape_ServiceTask_3" targetElement="BPMNShape_ServiceTask_4">
-        <di:waypoint xsi:type="dc:Point" x="730.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="755.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="781.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="667.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="691.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="716.0" y="425.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_25"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_9" bpmnElement="flow-workspace-error" sourceElement="BPMNShape_BoundaryEvent_3" targetElement="BPMNShape_ServiceTask_7">
-        <di:waypoint xsi:type="dc:Point" x="674.0" y="218.0"/>
-        <di:waypoint xsi:type="dc:Point" x="674.0" y="289.0"/>
-        <di:waypoint xsi:type="dc:Point" x="674.0" y="360.0"/>
+        <di:waypoint xsi:type="dc:Point" x="612.0" y="468.0"/>
+        <di:waypoint xsi:type="dc:Point" x="612.0" y="512.0"/>
+        <di:waypoint xsi:type="dc:Point" x="752.0" y="512.0"/>
+        <di:waypoint xsi:type="dc:Point" x="752.0" y="570.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_26"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_10" bpmnElement="flow-datastore-layers-gateway" sourceElement="BPMNShape_ServiceTask_4" targetElement="BPMNShape_ExclusiveGateway_2">
-        <di:waypoint xsi:type="dc:Point" x="891.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="916.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="941.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="826.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="864.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="876.0" y="425.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_27"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_11" bpmnElement="flow-datastore-error" sourceElement="BPMNShape_BoundaryEvent_4" targetElement="BPMNShape_ServiceTask_7">
-        <di:waypoint xsi:type="dc:Point" x="835.0" y="218.0"/>
-        <di:waypoint xsi:type="dc:Point" x="835.0" y="372.0"/>
-        <di:waypoint xsi:type="dc:Point" x="729.0" y="372.0"/>
+        <di:waypoint xsi:type="dc:Point" x="771.0" y="468.0"/>
+        <di:waypoint xsi:type="dc:Point" x="771.0" y="559.0"/>
+        <di:waypoint xsi:type="dc:Point" x="771.0" y="570.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_28"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_12" bpmnElement="flow-layers-provision" sourceElement="BPMNShape_ExclusiveGateway_2" targetElement="BPMNShape_ServiceTask_5">
-        <di:waypoint xsi:type="dc:Point" x="991.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1016.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1041.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="926.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="971.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1016.0" y="425.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_29">
-          <dc:Bounds height="14.0" width="19.0" x="1007.0" y="176.0"/>
+          <dc:Bounds height="14.0" width="19.0" x="962.0" y="426.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_13" bpmnElement="flow-layers-skip" sourceElement="BPMNShape_ExclusiveGateway_2" targetElement="BPMNShape_ExclusiveGateway_3">
-        <di:waypoint xsi:type="dc:Point" x="966.0" y="150.0"/>
-        <di:waypoint xsi:type="dc:Point" x="966.0" y="123.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1270.0" y="123.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1270.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1310.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="901.0" y="400.0"/>
+        <di:waypoint xsi:type="dc:Point" x="901.0" y="390.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1187.0" y="390.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1187.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1230.0" y="425.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_30">
-          <dc:Bounds height="14.0" width="14.0" x="1145.0" y="124.0"/>
+          <dc:Bounds height="14.0" width="14.0" x="1072.0" y="391.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_14" bpmnElement="flow-layers-pipeline" sourceElement="BPMNShape_ServiceTask_5" targetElement="BPMNShape_ExclusiveGateway_3">
-        <di:waypoint xsi:type="dc:Point" x="1151.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1230.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1310.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1126.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1178.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1230.0" y="425.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_31"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_15" bpmnElement="flow-layers-error" sourceElement="BPMNShape_BoundaryEvent_5" targetElement="BPMNShape_ServiceTask_7">
-        <di:waypoint xsi:type="dc:Point" x="1095.0" y="218.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1095.0" y="384.0"/>
-        <di:waypoint xsi:type="dc:Point" x="729.0" y="384.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1071.0" y="468.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1071.0" y="586.0"/>
+        <di:waypoint xsi:type="dc:Point" x="826.0" y="586.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_32"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_16" bpmnElement="flow-gateway-redpanda" sourceElement="BPMNShape_ExclusiveGateway_3" targetElement="BPMNShape_ServiceTask_6">
-        <di:waypoint xsi:type="dc:Point" x="1360.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1376.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1393.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1280.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1294.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1309.0" y="425.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_33">
-          <dc:Bounds height="14.0" width="19.0" x="1368.0" y="176.0"/>
+          <dc:Bounds height="14.0" width="19.0" x="1286.0" y="426.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_17" bpmnElement="flow-gateway-skip" sourceElement="BPMNShape_ExclusiveGateway_3" targetElement="BPMNShape_ServiceTask_10">
-        <di:waypoint xsi:type="dc:Point" x="1335.0" y="150.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1335.0" y="46.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1605.0" y="46.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1605.0" y="150.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1255.0" y="400.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1255.0" y="347.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1515.0" y="347.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1515.0" y="400.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_34">
-          <dc:Bounds height="14.0" width="14.0" x="1464.0" y="47.0"/>
+          <dc:Bounds height="14.0" width="14.0" x="1379.0" y="348.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_18" bpmnElement="flow-redpanda-success" sourceElement="BPMNShape_ServiceTask_6" targetElement="BPMNShape_ServiceTask_10">
-        <di:waypoint xsi:type="dc:Point" x="1503.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1526.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1550.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1419.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1439.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1460.0" y="425.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_35"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_19" bpmnElement="flow-redpanda-error" sourceElement="BPMNShape_BoundaryEvent_6" targetElement="BPMNShape_ServiceTask_7">
-        <di:waypoint xsi:type="dc:Point" x="1447.0" y="218.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1447.0" y="420.0"/>
-        <di:waypoint xsi:type="dc:Point" x="674.0" y="420.0"/>
-        <di:waypoint xsi:type="dc:Point" x="674.0" y="410.0"/>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_19" bpmnElement="flow-redpanda-error" sourceElement="BPMNShape_BoundaryEvent_6" targetElement="BPMNShape_ExclusiveGateway_4">
+        <di:waypoint xsi:type="dc:Point" x="1363.0" y="468.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1363.0" y="688.0"/>
+        <di:waypoint xsi:type="dc:Point" x="796.0" y="688.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_36"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_20" bpmnElement="flow-comp-geoserver-apisix" sourceElement="BPMNShape_ServiceTask_7" targetElement="BPMNShape_ServiceTask_8">
-        <di:waypoint xsi:type="dc:Point" x="619.0" y="385.0"/>
-        <di:waypoint xsi:type="dc:Point" x="588.0" y="385.0"/>
-        <di:waypoint xsi:type="dc:Point" x="556.0" y="385.0"/>
+        <di:waypoint xsi:type="dc:Point" x="716.0" y="595.0"/>
+        <di:waypoint xsi:type="dc:Point" x="581.0" y="595.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_37"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_21" bpmnElement="flow-comp-apisix-frost" sourceElement="BPMNShape_ServiceTask_8" targetElement="BPMNShape_ServiceTask_9">
-        <di:waypoint xsi:type="dc:Point" x="446.0" y="385.0"/>
-        <di:waypoint xsi:type="dc:Point" x="426.0" y="385.0"/>
-        <di:waypoint xsi:type="dc:Point" x="405.0" y="385.0"/>
+        <di:waypoint xsi:type="dc:Point" x="471.0" y="595.0"/>
+        <di:waypoint xsi:type="dc:Point" x="438.0" y="595.0"/>
+        <di:waypoint xsi:type="dc:Point" x="405.0" y="595.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_38"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_22" bpmnElement="flow-comp-frost-fail" sourceElement="BPMNShape_ServiceTask_9" targetElement="BPMNShape_ServiceTask_11">
-        <di:waypoint xsi:type="dc:Point" x="295.0" y="385.0"/>
-        <di:waypoint xsi:type="dc:Point" x="270.0" y="385.0"/>
-        <di:waypoint xsi:type="dc:Point" x="245.0" y="385.0"/>
+        <di:waypoint xsi:type="dc:Point" x="295.0" y="595.0"/>
+        <di:waypoint xsi:type="dc:Point" x="270.0" y="595.0"/>
+        <di:waypoint xsi:type="dc:Point" x="245.0" y="595.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_39"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_23" bpmnElement="flow-publish-success-end" sourceElement="BPMNShape_ServiceTask_10" targetElement="BPMNShape_EndEvent_1">
-        <di:waypoint xsi:type="dc:Point" x="1605.0" y="200.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1605.0" y="220.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1605.0" y="240.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1515.0" y="450.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1515.0" y="480.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1515.0" y="510.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_40"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_24" bpmnElement="flow-publish-failure-end" sourceElement="BPMNShape_ServiceTask_11" targetElement="BPMNShape_EndEvent_2">
-        <di:waypoint xsi:type="dc:Point" x="190.0" y="410.0"/>
-        <di:waypoint xsi:type="dc:Point" x="190.0" y="445.0"/>
-        <di:waypoint xsi:type="dc:Point" x="190.0" y="480.0"/>
+        <di:waypoint xsi:type="dc:Point" x="190.0" y="620.0"/>
+        <di:waypoint xsi:type="dc:Point" x="190.0" y="645.0"/>
+        <di:waypoint xsi:type="dc:Point" x="191.0" y="670.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_41"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_25" bpmnElement="flow-redpanda-comp-geo" sourceElement="BPMNShape_ExclusiveGateway_4" targetElement="BPMNShape_ServiceTask_7">
+        <di:waypoint xsi:type="dc:Point" x="771.0" y="663.0"/>
+        <di:waypoint xsi:type="dc:Point" x="771.0" y="642.0"/>
+        <di:waypoint xsi:type="dc:Point" x="771.0" y="620.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_49"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_26" bpmnElement="flow-redpanda-comp-apisix" sourceElement="BPMNShape_ExclusiveGateway_4" targetElement="BPMNShape_ServiceTask_8">
+        <di:waypoint xsi:type="dc:Point" x="746.0" y="688.0"/>
+        <di:waypoint xsi:type="dc:Point" x="526.0" y="688.0"/>
+        <di:waypoint xsi:type="dc:Point" x="526.0" y="620.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_50"/>
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
     <bpmndi:BPMNLabelStyle id="BPMNLabelStyle_1">

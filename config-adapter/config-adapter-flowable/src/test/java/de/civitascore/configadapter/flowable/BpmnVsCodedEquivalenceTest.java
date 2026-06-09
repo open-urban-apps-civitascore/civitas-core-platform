@@ -221,7 +221,8 @@ class BpmnVsCodedEquivalenceTest {
 
       // ...and the exact operations dispatched — BPMN and coded must produce the same sequence,
       // and the GeoServer branch must run workspace → datastore → layers.
-      ArgumentCaptor<SagaCommandMessage> frostCmd = ArgumentCaptor.forClass(SagaCommandMessage.class);
+      ArgumentCaptor<SagaCommandMessage> frostCmd =
+          ArgumentCaptor.forClass(SagaCommandMessage.class);
       verify(frost).handle(frostCmd.capture());
       assertEquals("CREATE_PROJECT", frostCmd.getValue().operation());
 
