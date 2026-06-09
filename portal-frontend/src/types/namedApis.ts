@@ -150,7 +150,7 @@ const LayerBaseSchema = z.object({
   layerName: z.string(),
   title: z.string(),
   description: z.string().optional(),
-  keywords: z.array(z.string()).optional(),
+  keywords: z.array(z.string()),
   attribute: z.array(z.string()),
   geometryColumnRef: z.string(),
   cqlFilter: z.string().nullable(),
@@ -165,18 +165,19 @@ export const LayerSchema = LayerBaseSchema.extend({
   geometryType: z.string(),
   nativeCRS: z.string(),
   bboxAutoCalculate: z.boolean(),
-  nativeBoundingBox: BoundingBoxResponseSchema,
-  latLonBoundingBox: BoundingBoxResponseSchema,
+  nativeBoundingBox: BoundingBoxResponseSchema.nullable(),
+  latLonBoundingBox: BoundingBoxResponseSchema.nullable(),
   createdAt: z.string(),
   modifiedAt: z.string(),
 })
 
 const boundingBoxCoord = z
   .string()
+  .trim()
   .refine(v => v !== '', { message: 'common.errors.required' })
   .refine(v => Number.isFinite(Number(v)), { message: 'common.errors.invalidNumber' })
 
-export const BoundingBoxSchema = z.object({
+export const BoundingBoxStrictSchema = z.object({
   minX: boundingBoxCoord,
   minY: boundingBoxCoord,
   maxX: boundingBoxCoord,
@@ -184,33 +185,52 @@ export const BoundingBoxSchema = z.object({
   crs: z.string(),
 })
 
-export const LayerFormSchema = z.object({
-  id: z.string(),
-  title: z.string().trim().min(1, 'common.errors.required'),
-  layerName: z.string().trim().min(1, 'common.errors.required'),
-  description: z
-    .string()
-    .trim()
-    .max(NAMED_API_DESCRIPTION_MAX_LENGTH, 'datasets.overview.completion.apis.config.errors.description.tooLong')
-    .optional()
-    .or(z.literal('')),
-  dataSinkId: z.string().min(1, 'common.errors.required'),
-  attribute: z.array(z.string()).min(1, 'common.errors.required'),
-  cqlFilter: z.string().trim(),
-  geometryColumnRef: z.string().min(1, 'common.errors.required'),
-  nativeCRS: z.string().min(1, 'common.errors.required'),
-  crs: z.string().min(1, 'common.errors.required'),
-  bboxAutoCalculate: z.literal(false),
-  nativeBoundingBox: BoundingBoxSchema,
-  latLonBoundingBox: BoundingBoxSchema.nullable(),
-  defaultStyleId: z.string().nullable(),
-  alternativeStyleIds: z.array(z.string()),
+const BoundingBoxFormFieldsSchema = z.object({
+  minX: z.string(),
+  minY: z.string(),
+  maxX: z.string(),
+  maxY: z.string(),
+  crs: z.string(),
 })
+
+export const LayerFormSchema = z
+  .object({
+    id: z.string(),
+    title: z.string().trim().min(1, 'common.errors.required'),
+    layerName: z.string().trim().min(1, 'common.errors.required'),
+    description: z
+      .string()
+      .trim()
+      .max(NAMED_API_DESCRIPTION_MAX_LENGTH, 'datasets.overview.completion.apis.config.errors.description.tooLong')
+      .optional()
+      .or(z.literal('')),
+    keywords: z.array(z.string()),
+    dataSinkId: z.string().min(1, 'common.errors.required'),
+    attribute: z.array(z.string()).min(1, 'common.errors.required'),
+    cqlFilter: z.string().trim(),
+    geometryColumnRef: z.string().min(1, 'common.errors.required'),
+    nativeCRS: z.string().min(1, 'common.errors.required'),
+    crs: z.string().min(1, 'common.errors.required'),
+    bboxAutoCalculate: z.boolean(),
+    nativeBoundingBox: BoundingBoxFormFieldsSchema,
+    latLonBoundingBox: BoundingBoxFormFieldsSchema,
+    defaultStyleId: z.string().nullable(),
+    alternativeStyleIds: z.array(z.string()),
+  })
+  .superRefine((data, ctx) => {
+    if (data.bboxAutoCalculate) return
+    const result = BoundingBoxStrictSchema.safeParse(data.nativeBoundingBox)
+    if (!result.success) {
+      result.error.issues.forEach(issue => {
+        ctx.addIssue({ code: 'custom', message: issue.message, path: ['nativeBoundingBox', ...issue.path] })
+      })
+    }
+  })
 
 export const LayerPayloadSchema = LayerBaseSchema.extend({
   defaultStyleId: z.uuid().optional().nullable(),
-  bboxAutoCalculate: z.literal(false).default(false),
-  nativeBoundingBox: BoundingBoxPayloadSchema,
+  bboxAutoCalculate: z.boolean(),
+  nativeBoundingBox: BoundingBoxPayloadSchema.nullable(),
   latLonBoundingBox: BoundingBoxPayloadSchema.nullable(),
 })
 

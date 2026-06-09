@@ -2,10 +2,62 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 
-import { API_TYPE_QUERY, LayerFormData, WfsWmsApiFormData } from '@/types/namedApis'
+import { STATUS_TYPES } from '@/types/common'
+import { Datasink, DATASINK_TYPES } from '@/types/datasinks'
+import { DATASTRUCTURE_VERSION_SOURCE, DatastructureVersion } from '@/types/datastructures'
+import { API_TYPE_QUERY, LayerFormData, Style, WfsWmsApiFormData } from '@/types/namedApis'
 
 import { LayerConfig } from './LayerConfig'
-import { mockDatasink, mockDatastructureVersion, mockStyleList } from './mockData'
+
+const mockStyleList: Style[] = [
+  {
+    id: '00000000-0000-0000-0000-000000000020',
+    datasetId: '00000000-0000-0000-0000-000000000002',
+    name: 'Style 1',
+    sldContent: '<?xml version="1.0"?><StyledLayerDescriptor></StyledLayerDescriptor>',
+    inUse: true,
+    createdAt: '2026-01-01T00:00:00',
+    modifiedAt: '2026-01-01T00:00:00',
+  },
+]
+
+const mockDatasink: Datasink = {
+  id: '00000000-0000-0000-0000-000000000003',
+  datasetId: '00000000-0000-0000-0000-000000000002',
+  pipelineId: '00000000-0000-0000-0000-000000000004',
+  dataSinkType: DATASINK_TYPES.POSTGIS,
+  configuration: {
+    tableName: 'table_1',
+    dataStructureVersion: {
+      id: '00000000-0000-0000-0000-000000000010',
+      version: '1.0.0',
+      description: null,
+      dataStructureVersionStatus: STATUS_TYPES.AVAILABLE,
+      dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
+      dataStructureId: '00000000-0000-0000-0000-000000000011',
+      createdAt: '2026-01-01T00:00:00',
+      modifiedAt: '2026-01-01T00:00:00',
+    },
+  },
+  createdAt: '2026-01-01T00:00:00',
+  modifiedAt: '2026-01-01T00:00:00',
+}
+
+const mockDatastructureVersion: DatastructureVersion = {
+  id: '00000000-0000-0000-0000-000000000010',
+  version: '1.0.0',
+  description: null,
+  dataStructureVersionStatus: STATUS_TYPES.AVAILABLE,
+  dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
+  modelAtlasUri: null,
+  modelName: null,
+  model: null,
+  styles: null,
+  inUse: true,
+  dataStructure: { id: '00000000-0000-0000-0000-000000000011', name: 'Structure 1' },
+  createdAt: '2026-01-01T00:00:00',
+  modifiedAt: '2026-01-01T00:00:00',
+}
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
@@ -22,6 +74,7 @@ const makeLayer = (overrides: Partial<LayerFormData> = {}): LayerFormData => ({
   title: 'Test Layer',
   layerName: 'test_layer',
   description: '',
+  keywords: [],
   dataSinkId: '00000000-0000-0000-0000-000000000003',
   attribute: ['attr1'],
   cqlFilter: '',
@@ -30,7 +83,7 @@ const makeLayer = (overrides: Partial<LayerFormData> = {}): LayerFormData => ({
   crs: 'EPSG:4326',
   bboxAutoCalculate: false,
   nativeBoundingBox: { minX: '5.8', minY: '47.2', maxX: '15.0', maxY: '55.0', crs: 'EPSG:25832' },
-  latLonBoundingBox: null,
+  latLonBoundingBox: { minX: '5.8', minY: '47.2', maxX: '15.0', maxY: '55.0', crs: 'EPSG:25832' },
   defaultStyleId: null,
   alternativeStyleIds: [],
   ...overrides,

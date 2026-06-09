@@ -375,7 +375,7 @@
               },
               "geometry": {
                 "sectionTitle": "Geometrie",
-                "geometryField": "Geometriefield",
+                "geometryField": "Geometriefeld",
                 "geometryFieldPlaceHolder": "Geometriefeld auswählen ...",
                 "nativeCrs": "Natives Koordinatenreferenzsystem (CRS)",
                 "definedCrs": "Angegebenes Koordinatenreferenzsystem (CRS)",
@@ -1159,7 +1159,8 @@
         "nodeNotConfigured": "{label} ist nicht konfiguriert",
         "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein.",
         "orphanNode": "{label} ist mit keinem anderen Knoten verbunden",
-        "minimumFunctionalNodes": "Pipeline muss mindestens einen funktionalen Knoten zwischen Start und Ende haben"
+        "minimumFunctionalNodes": "Pipeline muss mindestens einen funktionalen Knoten zwischen Start und Ende haben",
+        "duplicateTableName": "Zwei Geo-Persistenz-Speicher dürfen nicht den gleichen Namen haben"
       }
     },
     "toolbar": {
