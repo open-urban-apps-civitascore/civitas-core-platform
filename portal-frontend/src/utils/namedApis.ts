@@ -55,6 +55,8 @@ export const mapApiLayerToFormData = (layers: Layer[]): LayerFormData[] =>
     alternativeStyleIds: layer.alternativeStyleIds,
   }))
 
+// The Lat/Lon Bbox refers to the CRS 'EPSG:4326' and is used in the GetCapabilities Geoserver request
+// This function transferes the values from the native bbox to lat/lon coordinates
 const computeLatLonBoundingBox = (
   nativeBoundingBox: LayerFormData['nativeBoundingBox'],
   crs: string,
