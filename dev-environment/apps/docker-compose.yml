@@ -43,8 +43,17 @@ services:
       APISIX_ADMIN_URL: http://apisix:9180
       APISIX_ADMIN_KEY: edd1c9f034335f136f87ad84b625c8f1
       APISIX_GATEWAY_URL: http://apisix:9080
+      # Required (issue #1368). api.localhost needs an /etc/hosts entry on the host.
+      APISIX_API_HOST: api.localhost
+      APISIX_API_PUBLIC_URL: http://api.localhost:9080
       APISIX_PLUGIN_CONFIG_ID: "1"
       APISIX_SERVICE_ID: svc-frost-server
+      # Headers the saga's route-level proxy-rewrite must strip in lieu of plugin_config 1
+      # (Route-over-PluginConfig precedence overrides plugin_config's proxy-rewrite).
+      APISIX_PROXY_REWRITE_HEADERS_REMOVE: X-Allowed-Scope-Ids
+      # FROST upstream auth APISIX injects when proxying private dataset routes.
+      APISIX_FROST_API_KEY: dev-frost-api-key
+      APISIX_FROST_API_KEY_HEADER: X-API-Key
       APISIX_TOPICS: de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted
       FROST_URL: http://civitas-frost:8080/FROST-Server/v1.1
       FROST_PUBLIC_URL: http://civitas-frost:8080/FROST-Server/v1.1

@@ -406,6 +406,9 @@ services:
       FLOWABLE_JDBC_USERNAME: admin
       FLOWABLE_JDBC_PASSWORD: admin
     depends_on:
+      # Flowable's JDBC URL targets postgres-portal — wait until it is healthy before boot.
+      postgres-portal:
+        condition: service_healthy
       kafka:
         condition: service_healthy
       keycloak:
