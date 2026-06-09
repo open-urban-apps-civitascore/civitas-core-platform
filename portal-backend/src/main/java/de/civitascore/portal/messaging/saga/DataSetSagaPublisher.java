@@ -5,6 +5,7 @@ import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.model.dataset.NamedApi;
 import de.civitascore.portal.configuration.SagaProperties;
+import de.civitascore.portal.model.datasink.PostgisConfiguration;
 import de.civitascore.portal.model.embedded.PipelineAction;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
@@ -170,12 +171,16 @@ public class DataSetSagaPublisher {
    * version cannot be resolved, failing the publish. The id is already validated at sink save time.
    */
   private Map<String, Object> resolveDataStructure(DataSink sink) {
-    var config = sink.getConfiguration();
-    Object raw = config == null ? null : config.get("dataStructureVersionId");
-    if (raw == null) {
+    if (sink.getConfiguration() == null) {
       return null;
     }
-    UUID dsvId = UUID.fromString(raw.toString());
+    UUID dsvId =
+        objectMapper
+            .convertValue(sink.getConfiguration(), PostgisConfiguration.class)
+            .getDataStructureVersionId();
+    if (dsvId == null) {
+      return null; // e.g. FROST sink — no data-structure version
+    }
     var version =
         dataStructureVersionRepository
             .findById(dsvId)
