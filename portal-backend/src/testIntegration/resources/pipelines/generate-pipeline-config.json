@@ -1,19 +1,58 @@
 {
-  "input": {
-    "generate": {
-      "interval": "1s",
-      "count": 1,
-      "mapping": "root = {\"name\": \"Test Sensor\", \"description\": \"test\"}"
-    }
-  },
-  "output": {
-    "http_client": {
-      "url": "${FROST_BASE}/Things",
-      "verb": "POST",
-      "headers": {
-        "Content-Type": "application/json"
+  "$schema": "https://civitasconnect.digital/core-dataset/v1",
+  "id": "ds-generate-frost",
+  "title": "Synthetic generator to FROST",
+  "description": "Emit a constant Thing on a timer and post it to FROST. Test fixture: no real datasource — the start node stands in for the periodic trigger; constants are written by the mapping.",
+  "dataStructures": {
+    "Trigger": {
+      "type": "object",
+      "properties": {}
+    },
+    "Thing": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" }
       }
     }
-  }
+  },
+  "mappings": [
+    {
+      "id": "constant-thing",
+      "label": "Constant Thing",
+      "source": "Trigger",
+      "target": "Thing",
+      "fields": {
+        "name": { "op": "const", "value": "Test Sensor" },
+        "description": { "op": "const", "value": "test" }
+      }
+    }
+  ],
+  "dataSources": [],
+  "dataSinks": [
+    {
+      "id": "frost-sink",
+      "label": "FROST Things endpoint",
+      "connectionType": "http",
+      "dataStructure": "Thing",
+      "url": "${FROST_BASE}/Things",
+      "method": "POST",
+      "contentType": "application/json"
+    }
+  ],
+  "pipelines": [
+    {
+      "id": "generate-to-frost",
+      "label": "generate → FROST",
+      "nodes": [
+        { "id": "n-start", "kind": "start", "label": "Tick (1s)", "x-ui-position": { "x": 0, "y": 0 } },
+        { "id": "n-mapping", "kind": "mapping", "mappingRef": "constant-thing", "x-ui-position": { "x": 320, "y": 0 } },
+        { "id": "n-sink", "kind": "sink", "sinkRef": "frost-sink", "x-ui-position": { "x": 640, "y": 0 } }
+      ],
+      "edges": [
+        { "id": "e-start-mapping", "source": "n-start", "target": "n-mapping" },
+        { "id": "e-mapping-sink", "source": "n-mapping", "target": "n-sink" }
+      ]
+    }
+  ]
 }
-

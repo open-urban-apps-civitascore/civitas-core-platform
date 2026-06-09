@@ -8,14 +8,22 @@ import static org.mockito.Mockito.when;
 import de.civitascore.portal.configuration.SagaProperties;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.ConnectorType;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.service.DataStructureVersionService;
+import de.civitascore.portal.util.InvalidInputException;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -39,6 +47,9 @@ import tools.jackson.databind.json.JsonMapper;
 class DataSetSagaPublisherTest {
 
   @Mock private KafkaTemplate<String, String> kafkaTemplate;
+  @Mock private DataSinkRepository dataSinkRepository;
+  @Mock private DataStructureVersionRepository dataStructureVersionRepository;
+  @Mock private DataStructureVersionService dataStructureVersionService;
 
   private DataSetSagaPublisher publisher;
 
@@ -46,7 +57,12 @@ class DataSetSagaPublisherTest {
   void setUp() {
     publisher =
         new DataSetSagaPublisher(
-            kafkaTemplate, new JsonMapper(), new SagaProperties("test.saga.trigger", 5));
+            kafkaTemplate,
+            new JsonMapper(),
+            new SagaProperties("test.saga.trigger", 5),
+            dataSinkRepository,
+            dataStructureVersionRepository,
+            dataStructureVersionService);
   }
 
   private DataSource dataSource(UUID id, ConnectorType type) {
@@ -99,6 +115,109 @@ class DataSetSagaPublisherTest {
       assertThat(datasources).isNotNull();
       assertThat(datasources.size()).as("Shared datasource should appear only once").isEqualTo(1);
       assertThat(datasources.get(0).get("id").asString()).isEqualTo(dsId.toString());
+    }
+  }
+
+  @Nested
+  @DisplayName("buildDatasinks() schema resolution")
+  class BuildDatasinksTests {
+
+    private DataSink postgisSink(UUID id, UUID dsvId, String tableName) {
+      DataSink sink = new DataSink();
+      sink.setId(id);
+      sink.setDataSinkType(DataSinkType.POSTGIS);
+      Map<String, Object> cfg = new HashMap<>();
+      cfg.put("tableName", tableName);
+      cfg.put("dataStructureVersionId", dsvId.toString());
+      sink.setConfiguration(cfg);
+      return sink;
+    }
+
+    private DataSet datasetWithPipeline(Pipeline pipeline) {
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setPipelines(Set.of(pipeline));
+      return dataSet;
+    }
+
+    @Test
+    @DisplayName("resolves the referenced DSV schema from Model Atlas and carries it on the sink")
+    void resolvesSchemaFromModelAtlas() throws Exception {
+      UUID dsvId = UUID.randomUUID();
+      UUID sinkId = UUID.randomUUID();
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      DataSink sink = postgisSink(sinkId, dsvId, "sensor_observations");
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setModelAtlasUri("atlas://dsv/" + dsvId);
+
+      when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
+      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
+      when(dataStructureVersionService.findModelByAtlasUri("atlas://dsv/" + dsvId))
+          .thenReturn(Optional.of("<schema/>"));
+
+      ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
+      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
+          .thenReturn(
+              CompletableFuture.completedFuture(
+                  new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
+
+      publisher.publishCreateRequested(datasetWithPipeline(pipeline));
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var datasinks = payload.get("datasinks");
+      assertThat(datasinks).isNotNull();
+      assertThat(datasinks.size()).isEqualTo(1);
+      var ds = datasinks.get(0);
+      assertThat(ds.get("id").asString()).isEqualTo(sinkId.toString());
+      assertThat(ds.get("type").asString()).isEqualTo("POSTGIS");
+      assertThat(ds.get("configuration").get("tableName").asString())
+          .isEqualTo("sensor_observations");
+      assertThat(ds.get("dataStructure").asString()).isEqualTo("<schema/>");
+    }
+
+    @Test
+    @DisplayName("fails the publish when a referenced DSV cannot be resolved")
+    void failsWhenSchemaUnresolved() {
+      UUID dsvId = UUID.randomUUID();
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      DataSink sink = postgisSink(UUID.randomUUID(), dsvId, "sensor_observations");
+
+      when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
+      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.empty());
+
+      DataSet dataSet = datasetWithPipeline(pipeline);
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class);
+    }
+
+    @Test
+    @DisplayName("FROST sink without a DSV reference carries a null dataStructure, no failure")
+    void frostSinkHasNoSchema() throws Exception {
+      UUID sinkId = UUID.randomUUID();
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      DataSink sink = new DataSink();
+      sink.setId(sinkId);
+      sink.setDataSinkType(DataSinkType.FROST);
+
+      when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
+
+      ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
+      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
+          .thenReturn(
+              CompletableFuture.completedFuture(
+                  new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
+
+      publisher.publishCreateRequested(datasetWithPipeline(pipeline));
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var ds = payload.get("datasinks").get(0);
+      assertThat(ds.get("type").asString()).isEqualTo("FROST");
+      assertThat(ds.get("dataStructure").isNull())
+          .as("FROST sink carries a null dataStructure")
+          .isTrue();
     }
   }
 

@@ -1,22 +1,71 @@
 {
-  "input": {
-    "label": "${PLACEHOLDER}"
-  },
-  "pipeline": {
-    "processors": [
-      {
-        "mapping": "root.name = this.sensor_name\nroot.description = this.sensor_description"
+  "$schema": "https://civitasconnect.digital/core-dataset/v1",
+  "id": "ds-sql-frost",
+  "title": "SQL to FROST",
+  "description": "Read rows from a database source, map them to the FROST Thing shape, and post them.",
+  "dataStructures": {
+    "SensorRow": {
+      "type": "object",
+      "properties": {
+        "sensor_name": { "type": "string" },
+        "sensor_description": { "type": "string" }
       }
-    ]
-  },
-  "output": {
-    "http_client": {
-      "url": "${FROST_BASE}/Things",
-      "verb": "POST",
-      "headers": {
-        "Content-Type": "application/json"
+    },
+    "Thing": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" }
       }
     }
-  }
+  },
+  "mappings": [
+    {
+      "id": "sql-row-to-thing",
+      "label": "Sensor row → Thing",
+      "source": "SensorRow",
+      "target": "Thing",
+      "fields": {
+        "name": { "op": "copy", "sourcePath": "$.sensor_name" },
+        "description": { "op": "copy", "sourcePath": "$.sensor_description" }
+      }
+    }
+  ],
+  "dataSources": [
+    {
+      "id": "sql-source",
+      "label": "Sensor database",
+      "connectionType": "database",
+      "dataStructure": "SensorRow",
+      "jdbcUrl": "jdbc:postgresql://datasource-db:5432/testdb",
+      "lookupTable": "sensors",
+      "lookupKey": "sensor_name"
+    }
+  ],
+  "dataSinks": [
+    {
+      "id": "frost-sink",
+      "label": "FROST Things endpoint",
+      "connectionType": "http",
+      "dataStructure": "Thing",
+      "url": "${FROST_BASE}/Things",
+      "method": "POST",
+      "contentType": "application/json"
+    }
+  ],
+  "pipelines": [
+    {
+      "id": "sql-to-frost",
+      "label": "SQL → mapping → FROST",
+      "nodes": [
+        { "id": "n-source", "kind": "source", "sourceRef": "sql-source", "x-ui-position": { "x": 0, "y": 0 } },
+        { "id": "n-mapping", "kind": "mapping", "mappingRef": "sql-row-to-thing", "x-ui-position": { "x": 320, "y": 0 } },
+        { "id": "n-sink", "kind": "sink", "sinkRef": "frost-sink", "x-ui-position": { "x": 640, "y": 0 } }
+      ],
+      "edges": [
+        { "id": "e-source-mapping", "source": "n-source", "target": "n-mapping" },
+        { "id": "e-mapping-sink", "source": "n-mapping", "target": "n-sink" }
+      ]
+    }
+  ]
 }
-
