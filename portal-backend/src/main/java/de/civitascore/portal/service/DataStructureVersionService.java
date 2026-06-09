@@ -40,7 +40,7 @@ public class DataStructureVersionService
     extends BaseService<DataStructureVersion, DataStructureVersionInputDTO> {
 
   private static final String MODEL_ATLAS_OBJECT_ID_FIELD = "objectId";
-  private static final TypeReference<Map<String, Object>> JSON_SCHEMA_TYPE =
+  private static final TypeReference<Map<String, Object>> MODEL_JSON_TYPE =
       new TypeReference<>() {};
 
   private final DataSourceRepository dataSourceRepository;
@@ -88,33 +88,33 @@ public class DataStructureVersionService
   }
 
   /**
-   * Fetches and parses the JSON Schema for a model from Model Atlas by its URI, distinguishing "no
+   * Fetches and parses the data-structure model from Model Atlas as JSON, distinguishing "no
    * content" from "Model Atlas unavailable". Unlike {@link #findModelByAtlasUri} (which returns the
-   * raw XMI), this requests the schema form and parses it into a JSON object. It does <em>not</em>
+   * raw XMI), this requests the JSON form and parses it into a JSON object. It does <em>not</em>
    * swallow external-system failures: a Model Atlas outage propagates as {@link
    * de.civitascore.portal.util.ExternalSystemTimeoutException} / {@link
    * ExternalSystemRejectionException} (surfaced as 504/502) instead of being flattened into an
    * empty result; unparseable content is likewise reported as a 502. Returns empty only when the
-   * URI is blank or Model Atlas authoritatively returns no content, so callers can treat empty as
-   * genuine invalid input.
+   * URI is blank or Model Atlas returns no content, so callers can treat empty as genuine invalid
+   * input.
    *
    * @param modelAtlasUri the Model Atlas namespace URI
-   * @return the parsed JSON Schema, or empty if the URI is blank or no content exists
+   * @return the parsed model JSON, or empty if the URI is blank or no content exists
    */
-  public Optional<Map<String, Object>> resolveJsonSchemaByAtlasUri(String modelAtlasUri) {
+  public Optional<Map<String, Object>> resolveModelJsonByAtlasUri(String modelAtlasUri) {
     if (StringUtils.isBlank(modelAtlasUri)) {
       return Optional.empty();
     }
-    // Schema form, not the XMI returned by findModelByAtlasUri.
-    String schema = modelService.downloadModel(modelAtlasUri, "application/schema+json");
-    if (StringUtils.isBlank(schema)) {
+    // JSON form of the model, not the XMI returned by findModelByAtlasUri.
+    String json = modelService.downloadModel(modelAtlasUri, "application/json");
+    if (StringUtils.isBlank(json)) {
       return Optional.empty();
     }
     try {
-      return Optional.of(objectMapper.readValue(schema, JSON_SCHEMA_TYPE));
+      return Optional.of(objectMapper.readValue(json, MODEL_JSON_TYPE));
     } catch (JacksonException e) {
       throw new ExternalSystemRejectionException(
-          "Model Atlas returned an unparseable JSON schema for " + modelAtlasUri, e);
+          "Model Atlas returned unparseable model JSON for " + modelAtlasUri, e);
     }
   }
 

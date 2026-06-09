@@ -15,11 +15,10 @@ import java.util.Map;
  *   <li>{@code configuration} — the type-specific settings stored on the {@code DataSink} entity
  *       (for {@code POSTGIS}: {@code tableName} and {@code dataStructureVersionId}; empty/absent
  *       for {@code FROST}).
- *   <li>{@code dataStructure} — the resolved JSON Schema for the referenced data-structure version,
- *       as served by Model Atlas, carried as a JSON object. {@code null} only when the sink
- *       references no data-structure version (e.g. FROST sinks). If a version <em>is</em>
- *       referenced but its schema cannot be resolved, the saga publish fails rather than emitting a
- *       null schema here.
+ *   <li>{@code dataStructure} — the referenced data-structure version's model, as served by Model
+ *       Atlas in JSON form, carried as a JSON object. {@code null} only when the sink references no
+ *       data-structure version (e.g. FROST sinks). If a version <em>is</em> referenced but its model
+ *       cannot be resolved, the saga publish fails rather than emitting a null value here.
  * </ul>
  */
 public record DataSinkPayload(

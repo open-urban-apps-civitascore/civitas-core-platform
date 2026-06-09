@@ -143,7 +143,8 @@ class DataSetSagaPublisherTest {
     }
 
     @Test
-    @DisplayName("resolves the referenced DSV schema from Model Atlas and carries it on the sink")
+    @DisplayName(
+        "resolves the referenced DSV model JSON from Model Atlas and carries it on the sink")
     void resolvesSchemaFromModelAtlas() throws Exception {
       UUID dsvId = UUID.randomUUID();
       UUID sinkId = UUID.randomUUID();
@@ -155,11 +156,14 @@ class DataSetSagaPublisherTest {
 
       when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
       when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
-      when(dataStructureVersionService.resolveJsonSchemaByAtlasUri("atlas://dsv/" + dsvId))
+      when(dataStructureVersionService.resolveModelJsonByAtlasUri("atlas://dsv/" + dsvId))
           .thenReturn(
               Optional.of(
                   Map.of(
-                      "type", "object", "properties", Map.of("name", Map.of("type", "string")))));
+                      "eClass",
+                      "http://www.eclipse.org/emf/2002/Ecore#//EPackage",
+                      "name",
+                      "Observation")));
 
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
       when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
@@ -178,9 +182,8 @@ class DataSetSagaPublisherTest {
       assertThat(ds.get("type").asString()).isEqualTo("POSTGIS");
       assertThat(ds.get("configuration").get("tableName").asString())
           .isEqualTo("sensor_observations");
-      assertThat(ds.get("dataStructure").get("type").asString()).isEqualTo("object");
-      assertThat(ds.get("dataStructure").get("properties").get("name").get("type").asString())
-          .isEqualTo("string");
+      assertThat(ds.get("dataStructure").get("name").asString()).isEqualTo("Observation");
+      assertThat(ds.get("dataStructure").get("eClass").asString()).contains("EPackage");
     }
 
     @Test

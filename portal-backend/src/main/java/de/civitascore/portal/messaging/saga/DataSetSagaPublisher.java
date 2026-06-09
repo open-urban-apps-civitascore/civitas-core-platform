@@ -206,7 +206,7 @@ public class DataSetSagaPublisher {
                         "configuration.dataStructureVersionId",
                         "DataStructureVersion not found: " + dsvId));
     return dataStructureVersionService
-        .resolveJsonSchemaByAtlasUri(version.getModelAtlasUri())
+        .resolveModelJsonByAtlasUri(version.getModelAtlasUri())
         .filter(schema -> !schema.isEmpty())
         .orElseThrow(
             () ->
