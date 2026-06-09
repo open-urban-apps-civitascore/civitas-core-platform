@@ -106,7 +106,7 @@ public class DataStructureVersionService
       return Optional.empty();
     }
     // Schema form, not the XMI returned by findModelByAtlasUri.
-    String schema = modelService.downloadModel(modelAtlasUri, "application/json+schema");
+    String schema = modelService.downloadModel(modelAtlasUri, "application/schema+json");
     if (StringUtils.isBlank(schema)) {
       return Optional.empty();
     }
