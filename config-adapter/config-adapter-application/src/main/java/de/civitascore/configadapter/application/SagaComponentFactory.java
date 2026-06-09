@@ -59,8 +59,16 @@ class SagaComponentFactory {
           e.addSuppressed(closeEx);
         }
       }
+      // Surface the ACTUAL cause in the message — not just a blanket "check flowable.jdbc".
+      // A dropped required handler (e.g. apisix missing apisix.api.host) fails here via
+      // validateRequiredHandlers BEFORE the datasource is even built, so pointing operators at the
+      // database would send them down the wrong path (issue #1368 debugging trap).
       throw new IllegalStateException(
-          "Flowable orchestrator initialization failed. Check flowable.jdbc.* configuration.", e);
+          "Saga orchestrator initialization failed: "
+              + e.getMessage()
+              + " — if this is a database connectivity error, verify the flowable.jdbc.*"
+              + " configuration.",
+          e);
     }
     logger.info("FlowableSagaOrchestrator initialized successfully");
     return SagaComponents.flowable(flowable);
