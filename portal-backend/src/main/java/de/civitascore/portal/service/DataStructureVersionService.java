@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.encoder.Encode;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -67,24 +68,28 @@ public class DataStructureVersionService
     return DataStructureVersion.class.getSimpleName();
   }
 
+  /** Downloads model content from Model Atlas by its URI. Empty if the URI is blank. */
+  private Optional<String> download(String modelAtlasUri, String acceptType) {
+    return StringUtils.isBlank(modelAtlasUri)
+        ? Optional.empty()
+        : Optional.ofNullable(modelService.downloadModel(modelAtlasUri, acceptType));
+  }
+
   /**
-   * Downloads a model from Model Atlas by its URI. Returns empty if the URI is blank or the
-   * download fails.
+   * Downloads the raw XMI model from Model Atlas. Lenient: swallows failures and returns empty
+   * (used as a retrievability check), so callers cannot distinguish "no model" from "Model Atlas
+   * down".
    *
    * @param modelAtlasUri the Model Atlas namespace URI
    * @return the model XML content, or empty if unavailable
    */
   public Optional<String> findModelByAtlasUri(String modelAtlasUri) {
-    if (StringUtils.isNotBlank(modelAtlasUri)) {
-      try {
-        String modelContent = modelService.downloadModel(modelAtlasUri, "application/xml");
-        return Optional.ofNullable(modelContent);
-      } catch (RuntimeException e) {
-        // error has already been logged in ModelRestClientRequestService, so just return empty here
-        return Optional.empty();
-      }
+    try {
+      return download(modelAtlasUri, MediaType.APPLICATION_XML_VALUE);
+    } catch (RuntimeException e) {
+      // error has already been logged in ModelRestClientRequestService, so just return empty here
+      return Optional.empty();
     }
-    return Optional.empty();
   }
 
   /**
@@ -97,16 +102,14 @@ public class DataStructureVersionService
    * @return the parsed model JSON, or empty if the URI is blank or no content exists
    */
   public Optional<Map<String, Object>> resolveModelJsonByAtlasUri(String modelAtlasUri) {
-    if (StringUtils.isBlank(modelAtlasUri)) {
-      return Optional.empty();
-    }
-    // JSON form of the model, not the XMI returned by findModelByAtlasUri.
-    String json = modelService.downloadModel(modelAtlasUri, "application/json");
-    if (StringUtils.isBlank(json)) {
-      return Optional.empty();
-    }
+    return download(modelAtlasUri, MediaType.APPLICATION_JSON_VALUE)
+        .filter(json -> !json.isBlank())
+        .map(json -> parseModelJson(json, modelAtlasUri));
+  }
+
+  private Map<String, Object> parseModelJson(String json, String modelAtlasUri) {
     try {
-      return Optional.of(objectMapper.readValue(json, MODEL_JSON_TYPE));
+      return objectMapper.readValue(json, MODEL_JSON_TYPE);
     } catch (JacksonException e) {
       throw new ExternalSystemRejectionException(
           "Model Atlas returned unparseable model JSON for " + modelAtlasUri, e);
