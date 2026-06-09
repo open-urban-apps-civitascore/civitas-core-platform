@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
+import { useGetDatasinks } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { NamedApi } from '@/types/namedApis'
 
 import { ApiList } from './ApiList'
@@ -16,6 +17,12 @@ vi.mock('@/components/guarded-link/GuardedLink', () => ({
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
+}))
+
+vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
+  useGetDatasinks: vi.fn().mockReturnValue({
+    data: { data: [{ id: 'sink-1', dataSinkType: 'POSTGIS' }] },
+  }),
 }))
 
 const makeApi = (overrides: Partial<NamedApi> = {}): NamedApi => ({
@@ -86,6 +93,15 @@ describe('ApiList', () => {
 
     it('WFS/WMS item is disabled when a WFS/WMS api already exists', async () => {
       renderComponent({ apis: [makeApi({ standard: 'WFS' })] })
+      await userEvent.click(screen.getByText('addButton'))
+      const item = screen.getByText('wfsWms').closest('[role="menuitem"]')
+      expect(item).toHaveAttribute('data-disabled')
+      expect(screen.getByText('wfsWms').closest('a')).toBeNull()
+    })
+
+    it('WFS/WMS item is disabled when there are no PostGIS datasinks', async () => {
+      vi.mocked(useGetDatasinks).mockReturnValueOnce({ data: { data: [] } } as never)
+      renderComponent()
       await userEvent.click(screen.getByText('addButton'))
       const item = screen.getByText('wfsWms').closest('[role="menuitem"]')
       expect(item).toHaveAttribute('data-disabled')

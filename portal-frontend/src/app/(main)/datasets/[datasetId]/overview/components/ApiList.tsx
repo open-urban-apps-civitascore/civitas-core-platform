@@ -29,7 +29,6 @@ export const ApiList = ({ datasetId, apis, canEdit, isOpenDataAccess }: ApiListP
   const postgisDatasinks =
     datasinksData?.data.filter(datasink => datasink.dataSinkType === DATASINK_TYPES.POSTGIS) || []
   const hasPostgisDatasinks = postgisDatasinks.length > 0
-  console.log('postgisDatasinks', postgisDatasinks)
 
   const canCreateWfsWmsApi = !hasWfsWms && hasPostgisDatasinks
 

@@ -1,6 +1,9 @@
 import proj4 from 'proj4'
 
+import { UMLClass } from '@/components/uml-modeler/types/uml'
 import { crsOptions } from '@/const/crs'
+import { Datasink } from '@/types/datasinks'
+import { DatastructureVersion } from '@/types/datastructures'
 import {
   ApiStandard,
   BoundingBox,
@@ -13,8 +16,6 @@ import {
   StaApiFormData,
   WfsWmsApiFormData,
 } from '@/types/namedApis'
-import { Datasink } from '@/types/datasinks'
-import { DatastructureVersion } from '@/types/datastructures'
 
 export const hasApiType = (apis: NamedApi[], apiType: ApiStandard): boolean =>
   apis.some(api => api.standard === apiType)
