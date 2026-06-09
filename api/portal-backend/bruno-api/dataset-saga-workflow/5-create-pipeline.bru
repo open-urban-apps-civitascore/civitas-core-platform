@@ -23,63 +23,59 @@ body:json {
     "description": "Pipeline for saga workflow test",
     "dataSourceIds": ["{{sagaDataSourceId}}"],
     "model": {
-      "$schema": "https://civitasconnect.digital/core-dataset/v1",
-      "id": "saga-test-pipeline",
-      "dataStructures": {
-        "SensorMessage": {
-          "type": "object",
-          "properties": { "name": { "type": "string" }, "description": { "type": "string" } }
-        },
-        "Thing": {
-          "type": "object",
-          "properties": { "name": { "type": "string" }, "description": { "type": "string" } }
-        }
+      "viewport": { "x": 0, "y": 0, "zoom": 1 },
+      "nodePositions": {
+        "22222222-2222-4000-8000-000000000001": { "x": 360, "y": -40 },
+        "22222222-2222-4000-8000-000000000002": { "x": 320, "y": 100 },
+        "22222222-2222-4000-8000-000000000003": { "x": 740, "y": 80 }
       },
-      "mappings": [
+      "nodes": [
         {
-          "id": "message-to-thing",
-          "label": "Sensor message → Thing",
-          "source": "SensorMessage",
-          "target": "Thing",
-          "fields": {
-            "name": { "op": "const", "value": "Test Sensor" },
-            "description": { "op": "const", "value": "test" }
-          }
+          "id": "22222222-2222-4000-8000-000000000001",
+          "type": "start",
+          "position": { "x": 360, "y": -40 },
+          "data": { "nodeType": "start", "label": "Start", "configured": true, "description": "Entry point of the pipeline. Execution begins here." },
+          "measured": { "width": 32, "height": 32 }
+        },
+        {
+          "id": "22222222-2222-4000-8000-000000000002",
+          "type": "mapping",
+          "position": { "x": 320, "y": 100 },
+          "data": {
+            "label": "Mapping",
+            "configured": true,
+            "mappingConfig": {
+              "$schema": "https://civitasconnect.digital/core/mapping/v1",
+              "source": "urn:core:datastructure:8cc31216-5417-4d0a-abea-dde0659ce00d:501b78f7-f076-46e2-b5cb-748267a75e24",
+              "target": "urn:core:datastructure:08e34478-8aa3-42a5-9431-d805e209ceec:c10bbb60-d1bc-4c73-be81-2270b906837c",
+              "fields": {
+                "$.name": "$.name",
+                "$.description": "$.description"
+              },
+              "positions": {}
+            },
+            "sourceDatastructureId": "8cc31216-5417-4d0a-abea-dde0659ce00d",
+            "sourceVersionId": "501b78f7-f076-46e2-b5cb-748267a75e24",
+            "sourceName": "SensorMessage",
+            "targetDatastructureId": "08e34478-8aa3-42a5-9431-d805e209ceec",
+            "targetVersionId": "c10bbb60-d1bc-4c73-be81-2270b906837c",
+            "targetName": "Thing"
+          },
+          "measured": { "width": 160, "height": 66 },
+          "selected": false,
+          "dragging": false
+        },
+        {
+          "id": "22222222-2222-4000-8000-000000000003",
+          "type": "end",
+          "position": { "x": 740, "y": 80 },
+          "data": { "nodeType": "end", "label": "End", "configured": true, "description": "Exit point of the pipeline. Execution completes here." },
+          "measured": { "width": 32, "height": 32 }
         }
       ],
-      "dataSources": [
-        {
-          "id": "{{sagaDataSourceId}}",
-          "label": "Saga MQTT datasource",
-          "connectionType": "mqtt",
-          "dataStructure": "SensorMessage"
-        }
-      ],
-      "dataSinks": [
-        {
-          "id": "saga-frost",
-          "label": "FROST Things endpoint",
-          "connectionType": "http",
-          "dataStructure": "Thing",
-          "url": "${FROST_BASE}/Things",
-          "method": "POST",
-          "contentType": "application/json"
-        }
-      ],
-      "pipelines": [
-        {
-          "id": "saga-pipeline",
-          "label": "MQTT → mapping → FROST",
-          "nodes": [
-            { "id": "n-source", "kind": "source", "sourceRef": "{{sagaDataSourceId}}", "x-ui-position": { "x": 0, "y": 0 } },
-            { "id": "n-mapping", "kind": "mapping", "mappingRef": "message-to-thing", "x-ui-position": { "x": 320, "y": 0 } },
-            { "id": "n-sink", "kind": "sink", "sinkRef": "saga-frost", "x-ui-position": { "x": 640, "y": 0 } }
-          ],
-          "edges": [
-            { "id": "e-source-mapping", "source": "n-source", "target": "n-mapping" },
-            { "id": "e-mapping-sink", "source": "n-mapping", "target": "n-sink" }
-          ]
-        }
+      "edges": [
+        { "id": "22222222-2222-4000-8000-0000000000e1", "source": "22222222-2222-4000-8000-000000000001", "target": "22222222-2222-4000-8000-000000000002", "type": "smoothstep", "data": { "label": "" } },
+        { "id": "22222222-2222-4000-8000-0000000000e2", "source": "22222222-2222-4000-8000-000000000002", "target": "22222222-2222-4000-8000-000000000003", "type": "smoothstep", "data": { "label": "" } }
       ]
     }
   }

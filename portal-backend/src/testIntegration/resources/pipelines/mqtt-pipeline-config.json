@@ -1,51 +1,42 @@
 {
-  "$schema": "https://civitasconnect.digital/core-dataset/v1",
-  "id": "ds-mqtt-frost",
-  "title": "MQTT to FROST",
-  "description": "Subscribe to an MQTT topic and post each reading to FROST unchanged.",
-  "dataStructures": {
-    "SensorReading": {
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "description": { "type": "string" }
-      }
-    }
+  "viewport": { "x": 0, "y": 0, "zoom": 1 },
+  "nodePositions": {
+    "1a2b3c4d-0001-4000-8000-000000000001": { "x": 320, "y": 0 },
+    "1a2b3c4d-0002-4000-8000-000000000002": { "x": 640, "y": 0 }
   },
-  "mappings": [],
-  "dataSources": [
+  "nodes": [
     {
-      "id": "mqtt-source",
-      "label": "Sensor MQTT broker",
-      "connectionType": "mqtt",
-      "dataStructure": "SensorReading",
-      "brokerUrl": "tcp://mosquitto:1883",
-      "topic": "sensors/+/temp",
-      "qos": 0
+      "id": "1a2b3c4d-0001-4000-8000-000000000001",
+      "type": "start",
+      "position": { "x": 320, "y": 0 },
+      "data": {
+        "nodeType": "start",
+        "label": "Start",
+        "configured": true,
+        "description": "Entry point of the pipeline. Execution begins here."
+      },
+      "measured": { "width": 32, "height": 32 }
+    },
+    {
+      "id": "1a2b3c4d-0002-4000-8000-000000000002",
+      "type": "end",
+      "position": { "x": 640, "y": 0 },
+      "data": {
+        "nodeType": "end",
+        "label": "End",
+        "configured": true,
+        "description": "Exit point of the pipeline. Execution completes here."
+      },
+      "measured": { "width": 32, "height": 32 }
     }
   ],
-  "dataSinks": [
+  "edges": [
     {
-      "id": "frost-sink",
-      "label": "FROST Things endpoint",
-      "connectionType": "http",
-      "dataStructure": "SensorReading",
-      "url": "${FROST_BASE}/Things",
-      "method": "POST",
-      "contentType": "application/json"
-    }
-  ],
-  "pipelines": [
-    {
-      "id": "mqtt-to-frost",
-      "label": "MQTT → FROST",
-      "nodes": [
-        { "id": "n-source", "kind": "source", "sourceRef": "mqtt-source", "x-ui-position": { "x": 0, "y": 0 } },
-        { "id": "n-sink", "kind": "sink", "sinkRef": "frost-sink", "x-ui-position": { "x": 320, "y": 0 } }
-      ],
-      "edges": [
-        { "id": "e-source-sink", "source": "n-source", "target": "n-sink" }
-      ]
+      "id": "1a2b3c4d-00ed-4000-8000-0000000000e1",
+      "source": "1a2b3c4d-0001-4000-8000-000000000001",
+      "target": "1a2b3c4d-0002-4000-8000-000000000002",
+      "type": "smoothstep",
+      "data": { "label": "" }
     }
   ]
 }
