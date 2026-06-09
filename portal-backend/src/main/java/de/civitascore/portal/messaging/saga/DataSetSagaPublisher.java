@@ -162,9 +162,7 @@ public class DataSetSagaPublisher {
       return null;
     }
     return dataset.getNamedApis().stream()
-        .map(
-            api ->
-                new NamedApi(api.getSlug(), api.getStandard().name(), api.getVersion()))
+        .map(api -> new NamedApi(api.getSlug(), api.getStandard().name(), api.getVersion()))
         .toList();
   }
 
@@ -179,8 +177,8 @@ public class DataSetSagaPublisher {
    * <ul>
    *   <li>{@code null} / field omitted — no existing routes; the CREATE saga provisions one route
    *       per named API from scratch.
-   *   <li>Non-empty map — one entry per named-API route the dataset already owns, keyed by slug.
-   *       It is 1:1 with {@code namedApis} because named APIs are immutable once the dataset is
+   *   <li>Non-empty map — one entry per named-API route the dataset already owns, keyed by slug. It
+   *       is 1:1 with {@code namedApis} because named APIs are immutable once the dataset is
    *       released (#1379/#1384): the APISIX handler iterates this map to UPDATE (re-apply auth) or
    *       DELETE/RESTORE each route — it does NOT add routes for new slugs. New named APIs are only
    *       ever provisioned by a fresh CREATE saga (unrelease → edit in DRAFT → re-release).

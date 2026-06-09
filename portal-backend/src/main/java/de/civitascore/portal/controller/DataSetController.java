@@ -112,7 +112,8 @@ public class DataSetController
    * dataset yields 404 regardless of status, so route existence is not leaked.)
    *
    * @param id the dataset UUID
-   * @return HTTP 200 with the published dataset's named APIs (empty unless the dataset is AVAILABLE)
+   * @return HTTP 200 with the published dataset's named APIs (empty unless the dataset is
+   *     AVAILABLE)
    */
   @GetMapping("/{id}/apis")
   @Operation(
@@ -135,7 +136,8 @@ public class DataSetController
         dataSetService
             .findOne(scopedById)
             .orElseThrow(() -> new ResourceNotFoundException("DataSet", id));
-    // Only a published (AVAILABLE) dataset exposes active named APIs for consumer discovery (concept
+    // Only a published (AVAILABLE) dataset exposes active named APIs for consumer discovery
+    // (concept
     // #1379). A DRAFT/READY dataset has no public API surface yet, so return an empty list rather
     // than leaking not-yet-active (or about-to-change) draft routes.
     List<NamedApiOutputDTO> namedApis =

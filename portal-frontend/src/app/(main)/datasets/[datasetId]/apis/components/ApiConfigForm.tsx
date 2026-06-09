@@ -17,8 +17,8 @@ import {
   API_TYPE_QUERY,
   ApiTypeQuery,
   NAMED_API_DESCRIPTION_MAX_LENGTH,
-  namedApiPathPrefix,
   NamedApiFormData,
+  namedApiPathPrefix,
   PERSISTENCE_OPTIONS,
   SLUG_MAX_LENGTH,
 } from '@/types/namedApis'

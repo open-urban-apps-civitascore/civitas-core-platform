@@ -1708,8 +1708,9 @@ class DataSetControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody())
-          .as("a DRAFT dataset has no active published APIs — draft edits must not change the"
-              + " public API surface (#1379)")
+          .as(
+              "a DRAFT dataset has no active published APIs — draft edits must not change the"
+                  + " public API surface (#1379)")
           .isEmpty();
     }
 

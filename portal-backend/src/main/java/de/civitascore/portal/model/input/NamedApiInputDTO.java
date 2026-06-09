@@ -43,8 +43,9 @@ public class NamedApiInputDTO {
   private ApiStandard standard;
 
   @Size(max = 32, message = "Version must be at most 32 characters") @Schema(
-      description = "Optional standard version (e.g. \"1.1\" for STA). Free-form string, max 32"
-          + " characters.",
+      description =
+          "Optional standard version (e.g. \"1.1\" for STA). Free-form string, max 32"
+              + " characters.",
       example = "1.1")
   private String version;
 

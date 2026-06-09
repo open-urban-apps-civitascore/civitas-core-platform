@@ -120,7 +120,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     List<NamedApiInputDTO> incoming = input.getNamedApis();
     if (incoming != null) {
       // Validate slug uniqueness up front (before touching the entity): two NamedApi rows with the
-      // same slug would otherwise hit the DB unique constraint as an opaque 500, and the slug is the
+      // same slug would otherwise hit the DB unique constraint as an opaque 500, and the slug is
+      // the
       // per-named-API route key, so duplicates are ambiguous downstream. Fail with a business 400.
       Set<String> incomingSlugs = new HashSet<>();
       for (NamedApiInputDTO dto : incoming) {
