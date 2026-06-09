@@ -314,8 +314,9 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
-    void treatsMissingSnapshotAsEmptyAndUpdatesSuccessfully() {
+    void provisionsWorkspaceAndDatastoreWhenMissingThenPublishesLayers() {
       try (GeoServerSagaHandler handler = createHandler()) {
+        // Workspace not provisioned yet → the feature-types snapshot read returns 404 (empty).
         Response notFound = mock(Response.class);
         when(notFound.getStatus()).thenReturn(404);
         when(mockBuilder.get()).thenReturn(notFound);
@@ -330,6 +331,32 @@ class GeoServerSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertNull(result.error());
+        // UPDATE must create the workspace + datastore (not just the feature type) when they don't
+        // exist yet — otherwise the feature-type POST would 404 on first-time geo provisioning.
+        verify(mockBuilder, times(3)).post(any(Entity.class));
+      }
+    }
+
+    @Test
+    void returnsFailureWhenWorkspaceProvisioningFailsOnUpdate() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response notFound = mock(Response.class);
+        when(notFound.getStatus()).thenReturn(404);
+        when(mockBuilder.get()).thenReturn(notFound);
+        // The workspace POST fails (not 201/409) → UPDATE must fail, not silently skip
+        // provisioning.
+        Response error = mock(Response.class);
+        when(error.getStatus()).thenReturn(500);
+        when(error.readEntity(String.class)).thenReturn("Internal Server Error");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(error);
+
+        SagaCommandMessage command =
+            createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
       }
     }
 

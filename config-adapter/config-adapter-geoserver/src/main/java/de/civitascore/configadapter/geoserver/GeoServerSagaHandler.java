@@ -39,8 +39,9 @@ import org.owasp.encoder.Encode;
  *   <li>{@code CREATE_DATASTORE} — creates the PostGIS datastore inside the workspace (idempotent)
  *   <li>{@code PROVISION_LAYERS} — publishes a feature type per {@code layers} entry (idempotent)
  *   <li>{@code PROVISION_WORKSPACE} — coarse alias that runs the three create steps in one call
- *   <li>{@code UPDATE_WORKSPACE} — upserts feature types from {@code layers}; captures current
- *       state for compensation
+ *   <li>{@code UPDATE_WORKSPACE} — idempotently ensures the workspace and PostGIS datastore exist
+ *       (UPDATE may be the first time geo is provisioned for a dataset), then upserts feature types
+ *       from {@code layers}; captures current state for compensation
  *   <li>{@code DELETE_WORKSPACE} — deletes the workspace recursively (compensation for the create
  *       steps and the teardown step in the delete saga)
  *   <li>{@code RESTORE_WORKSPACE} — restores the previous feature type state (compensation for
@@ -208,9 +209,16 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     String workspaceName = resolveWorkspaceName(command);
     String datastoreName = datastoreName(workspaceName);
 
-    // Read current feature types for compensation
+    // Read current feature types for compensation (empty if the workspace isn't provisioned yet).
     List<Map<String, Object>> currentFeatureTypes =
         readCurrentFeatureTypes(workspaceName, datastoreName);
+
+    // Ensure the workspace and PostGIS datastore exist before publishing feature types. UPDATE may
+    // be the first time geo is provisioned for a dataset (e.g. a geo sink added on a later update),
+    // in which case neither exists yet and a plain feature-type POST would 404. Both creates are
+    // idempotent (HTTP 409 = already exists).
+    createWorkspace(workspaceName);
+    createDatastore(workspaceName, datastoreName);
 
     // Create or update feature types from the new layers
     processLayers(command, workspaceName, datastoreName, true);
