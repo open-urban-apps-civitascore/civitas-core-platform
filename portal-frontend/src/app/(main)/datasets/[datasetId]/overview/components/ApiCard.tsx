@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { ApiStandard, NamedApi, NamedApiInput, namedApiPathPrefix } from '@/types/namedApis'
+import { ApiStandard, NamedApi, NamedApiPayload, namedApiPathPrefix } from '@/types/namedApis'
 
 const STANDARD_ICONS: Record<ApiStandard, ComponentType<{ className?: string }>> = {
   STA: Timer,
@@ -56,7 +56,7 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, isOpenDataAcces
   }
 
   const handleConfirmDelete = async () => {
-    const remainingInputs: NamedApiInput[] = existingApis
+    const remainingInputs: NamedApiPayload[] = existingApis
       .filter(a => a.slug !== api.slug)
       .map(a => ({
         name: a.name,
@@ -125,20 +125,41 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, isOpenDataAcces
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {canEdit && (
-                <DropdownMenuItem onClick={goToEdit} data-testid={`apiCardMenuEdit-${api.slug}`}>
+                <DropdownMenuItem
+                  onClick={e => {
+                    e.stopPropagation()
+                    goToEdit()
+                  }}
+                  data-testid={`apiCardMenuEdit-${api.slug}`}
+                >
                   {t('actions.edit')}
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onClick={goToView} data-testid={`apiCardMenuView-${api.slug}`}>
+              <DropdownMenuItem
+                onClick={e => {
+                  e.stopPropagation()
+                  goToView()
+                }}
+                data-testid={`apiCardMenuView-${api.slug}`}
+              >
                 {t('actions.view')}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleCopyPath} data-testid={`apiCardMenuCopy-${api.slug}`}>
+              <DropdownMenuItem
+                onClick={e => {
+                  e.stopPropagation()
+                  handleCopyPath()
+                }}
+                data-testid={`apiCardMenuCopy-${api.slug}`}
+              >
                 {t('actions.copyPath')}
               </DropdownMenuItem>
               {canEdit && (
                 <DropdownMenuItem
                   variant="destructive"
-                  onClick={() => setIsDeleteOpen(true)}
+                  onClick={e => {
+                    e.stopPropagation()
+                    setIsDeleteOpen(true)
+                  }}
                   data-testid={`apiCardMenuDelete-${api.slug}`}
                 >
                   {t('actions.delete')}

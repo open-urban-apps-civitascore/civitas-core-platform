@@ -1,10 +1,9 @@
 import { Plus } from 'lucide-react'
 import React, { HTMLAttributes } from 'react'
 
+import { ContentCard } from '@/components/content-card/ContentCard'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-
-import { ContentCard } from '../content-card/ContentCard'
-import { Button } from '../ui/button'
 
 interface NoDataPageProps extends HTMLAttributes<HTMLDivElement> {
   title: string

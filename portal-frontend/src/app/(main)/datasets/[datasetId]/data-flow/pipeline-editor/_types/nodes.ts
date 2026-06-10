@@ -95,6 +95,7 @@ export interface DataSourceNodeData extends BasePipelineNodeData {
  */
 export interface FrostNodeData extends BasePipelineNodeData {
   entityType: typeof ENTITY_TYPES.Frost
+  entityId?: string
   /** Fixed FROST server display name */
   serverName: string
   /** Fixed FROST server URL */
@@ -110,6 +111,7 @@ export interface FrostNodeData extends BasePipelineNodeData {
  */
 export interface GeoPersistenceNodeData extends BasePipelineNodeData {
   entityType: typeof ENTITY_TYPES.Persistence
+  entityId?: string
   /** Table name for geo data storage */
   tableName: string
   /** ID of the selected data structure version */

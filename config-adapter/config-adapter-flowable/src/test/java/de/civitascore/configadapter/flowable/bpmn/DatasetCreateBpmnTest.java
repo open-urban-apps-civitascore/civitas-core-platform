@@ -45,17 +45,21 @@ class DatasetCreateBpmnTest {
   private SagaCommandHandler frostHandler;
   private SagaCommandHandler apisixHandler;
   private SagaCommandHandler redpandaHandler;
+  private SagaCommandHandler geoserverHandler;
 
   @BeforeEach
   void setUp() {
     frostHandler = FlowableTestSupport.mockHandler("frost");
     apisixHandler = FlowableTestSupport.mockHandler("apisix");
     redpandaHandler = FlowableTestSupport.mockHandler("redpanda");
+    geoserverHandler = FlowableTestSupport.mockHandler("geoserver");
+    stubGeoserverSuccess();
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
     registry.register(apisixHandler);
     registry.register(redpandaHandler);
+    registry.register(geoserverHandler);
 
     processEngine = FlowableTestSupport.createTestEngine(Map.of("sagaHandlerRegistry", registry));
     runtimeService = processEngine.getRuntimeService();
@@ -164,6 +168,9 @@ class DatasetCreateBpmnTest {
             .findFirst()
             .orElseThrow();
     assertEquals("DELETE_PROJECT", frostCompensation.operation());
+
+    // hasGeoSink=false → the pipeline-failure compensation must skip GeoServer entirely.
+    verify(geoserverHandler, never()).handle(any());
   }
 
   @Test
@@ -205,16 +212,140 @@ class DatasetCreateBpmnTest {
         "FROST baseUrl should be mapped to targetUrl for Redpanda");
   }
 
+  @Test
+  void shouldRunGeoServerStepsWhenHasGeoSink() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+
+    ProcessInstance instance = startProcessWithGeo(false, true, true);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+
+    // Assert execution order via the handlers' actual invocation order (deterministic). Sorting
+    // HistoricActivityInstances by start time is flaky: sequential synchronous tasks can share a
+    // millisecond timestamp, so workspace/datastore can appear swapped.
+    var inOrder = inOrder(frostHandler, apisixHandler, geoserverHandler);
+    inOrder.verify(frostHandler).handle(any());
+    inOrder.verify(apisixHandler).handle(any());
+    inOrder.verify(geoserverHandler, times(3)).handle(any());
+
+    ArgumentCaptor<SagaCommandMessage> geo = ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(geoserverHandler, times(3)).handle(geo.capture());
+    assertEquals(
+        List.of("CREATE_WORKSPACE", "CREATE_DATASTORE", "PROVISION_LAYERS"),
+        geo.getAllValues().stream().map(SagaCommandMessage::operation).toList());
+  }
+
+  @Test
+  void shouldSkipLayerProvisioningWhenNoLayers() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+
+    ProcessInstance instance = startProcessWithGeo(false, true, false);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+
+    var inOrder = inOrder(frostHandler, apisixHandler, geoserverHandler);
+    inOrder.verify(frostHandler).handle(any());
+    inOrder.verify(apisixHandler).handle(any());
+
+    // Only workspace + datastore run; provision-layers is skipped — so exactly 2 geoserver calls,
+    // in invocation order (deterministic, unlike a HistoricActivityInstance start-time sort).
+    ArgumentCaptor<SagaCommandMessage> geo = ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(geoserverHandler, times(2)).handle(geo.capture());
+    assertEquals(
+        List.of("CREATE_WORKSPACE", "CREATE_DATASTORE"),
+        geo.getAllValues().stream().map(SagaCommandMessage::operation).toList());
+  }
+
+  @Test
+  void shouldCompensateGeoServerWhenRedpandaFailsWithGeoSink() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+    stubRedpandaFailure("Pipeline deployment failed");
+    stubApisixCompensationSuccess();
+    stubFrostCompensationSuccess();
+
+    ProcessInstance instance = startProcessWithGeo(true, true, true);
+    executeAllJobs();
+
+    assertProcessFinished(instance.getId());
+
+    // GeoServer ran (hasGeoSink), so the pipeline failure must compensate it: 3 forward steps
+    // (workspace, datastore, layers) followed by the DELETE_WORKSPACE compensation.
+    ArgumentCaptor<SagaCommandMessage> captor = ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(geoserverHandler, times(4)).handle(captor.capture());
+    SagaCommandMessage compensation = captor.getAllValues().get(3);
+    assertEquals("COMPENSATE_STEP", compensation.type());
+    assertEquals("DELETE_WORKSPACE", compensation.operation());
+  }
+
+  @Test
+  void shouldDeleteWorkspaceWhenGeoServerStepFails() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+    stubFrostCompensationSuccess();
+    stubApisixCompensationSuccess();
+    stubGeoserverDatastoreFailure();
+
+    ProcessInstance instance = startProcessWithGeo(false, true, true);
+    executeAllJobs();
+
+    assertProcessFinished(instance.getId());
+
+    // create-workspace (execute) + create-datastore (execute, fails) + compensate
+    // (DELETE_WORKSPACE)
+    ArgumentCaptor<SagaCommandMessage> captor = ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(geoserverHandler, times(3)).handle(captor.capture());
+    SagaCommandMessage geoCompensation =
+        captor.getAllValues().stream()
+            .filter(c -> "COMPENSATE_STEP".equals(c.type()))
+            .findFirst()
+            .orElseThrow();
+    assertEquals("DELETE_WORKSPACE", geoCompensation.operation());
+
+    SagaCommandMessage apisixCompensation = captureCompensation(apisixHandler);
+    assertEquals("DELETE_ROUTE", apisixCompensation.operation());
+    SagaCommandMessage frostCompensation = captureCompensation(frostHandler);
+    assertEquals("DELETE_PROJECT", frostCompensation.operation());
+  }
+
+  private SagaCommandMessage captureCompensation(SagaCommandHandler handler) {
+    ArgumentCaptor<SagaCommandMessage> captor = ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(handler, times(2)).handle(captor.capture());
+    return captor.getAllValues().stream()
+        .filter(c -> "COMPENSATE_STEP".equals(c.type()))
+        .findFirst()
+        .orElseThrow();
+  }
+
   private ProcessInstance startProcess(boolean hasPipelines) {
+    return startProcessWithGeo(hasPipelines, false, false);
+  }
+
+  private ProcessInstance startProcessWithGeo(
+      boolean hasPipelines, boolean hasGeoSink, boolean hasLayers) {
     Map<String, Object> variables = new HashMap<>();
     variables.put("sagaId", "saga-test-123");
     variables.put("datasetId", "ds-456");
     variables.put("datasetName", "Test Dataset");
     variables.put("description", "A test dataset");
     variables.put("hasPipelines", hasPipelines);
+    variables.put("hasGeoSink", hasGeoSink);
+    variables.put("hasLayers", hasLayers);
     if (hasPipelines) {
       variables.put("dataPipelines", List.of(Map.of("id", "p-1", "data", "{}")));
       variables.put("datasources", List.of(Map.of("id", "src-1", "type", "postgresql")));
+    }
+    if (hasGeoSink) {
+      variables.put(
+          "dataSinks",
+          List.of(Map.of("dataSinkType", "POSTGIS", "configuration", Map.of("tableName", "t1"))));
+    }
+    if (hasLayers) {
+      variables.put("layers", List.of(Map.of("layerName", "t1", "crs", "EPSG:4326")));
     }
     return runtimeService.startProcessInstanceByKey("dataset-create", variables);
   }
@@ -279,5 +410,29 @@ class DatasetCreateBpmnTest {
   private void stubApisixCompensationSuccess() {
     when(apisixHandler.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "create-route"));
+  }
+
+  private void stubGeoserverSuccess() {
+    when(geoserverHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+        .thenReturn(
+            SagaCommandResult.success(
+                "saga-test-123",
+                "create-workspace",
+                Map.of("workspaceName", "ds_456"),
+                Map.of("workspaceName", "ds_456")));
+    when(geoserverHandler.handle(
+            argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
+        .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "create-workspace"));
+  }
+
+  private void stubGeoserverDatastoreFailure() {
+    when(geoserverHandler.handle(
+            argThat(
+                cmd ->
+                    cmd != null
+                        && "EXECUTE_STEP".equals(cmd.type())
+                        && "CREATE_DATASTORE".equals(cmd.operation()))))
+        .thenReturn(
+            SagaCommandResult.failure("saga-test-123", "create-datastore", "datastore failed"));
   }
 }

@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 import { AssignmentScopedInputSchema } from './assignments'
 import { ItemType, MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, STATUS_TYPES, WithId } from './common'
-import { NamedApiInputSchema, NamedApiSchema } from './namedApis'
+import { NamedApiPayloadSchema, NamedApiSchema } from './namedApis'
 
 export const DATASET_STATUS_TYPES = {
   [STATUS_TYPES.DRAFT]: 'DRAFT',
@@ -50,7 +50,7 @@ export const DatasetBaseInputSchema = z.object({
   description: z.string(),
   openDataAccess: z.boolean(),
   assignments: AssignmentScopedInputSchema.array(),
-  namedApis: z.array(NamedApiInputSchema).optional(),
+  namedApis: z.array(NamedApiPayloadSchema).optional(),
 })
 
 // ---------- API Create ----------

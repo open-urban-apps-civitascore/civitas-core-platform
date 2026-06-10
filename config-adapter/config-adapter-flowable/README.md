@@ -71,15 +71,65 @@ If the PostgreSQL volume already exists from before this split, recreate it: `do
 
 ## Saga Workflows
 
-### Dataset Create (FROST → APISIX → Redpanda)
-- Sequential execution, conditional Redpanda step (skipped if no pipelines)
-- On failure: reverse-order compensation (DELETE operations)
+### Dataset Create (FROST → APISIX → conditional GeoServer → conditional Redpanda)
+- Sequential execution
+- Conditional GeoServer branch (`hasGeoSink`): `CREATE_WORKSPACE` → `CREATE_DATASTORE` →
+  conditional `PROVISION_LAYERS` (`hasLayers`)
+- Conditional Redpanda step (`hasPipelines`)
+- On failure: reverse-order compensation (DELETE operations); the GeoServer branch is undone by a
+  single idempotent `DELETE_WORKSPACE` (recursive)
 
-### Dataset Update (FROST → APISIX → Redpanda)
-- Same structure as Create, with UPDATE/RESTORE operations
+### Dataset Update (FROST → APISIX → conditional GeoServer → conditional Redpanda)
+- Same structure as Create; the GeoServer branch is a single `UPDATE_WORKSPACE` step, compensated by
+  `RESTORE_WORKSPACE`
 
-### Dataset Delete (Redpanda → APISIX → FROST)
+### Dataset Delete (Redpanda → APISIX → conditional GeoServer → FROST)
 - Reverse order, best-effort: continues on failure, no compensation
+- Conditional GeoServer teardown (`hasGeoSink`): `DELETE_WORKSPACE` (recursive), after the APISIX
+  route is removed
+
+### GeoServer branch — conditional and currently dormant
+
+The GeoServer steps run only when the saga trigger carries geo data. Two flags are **derived** from
+the trigger payload by `FlowableTriggerConsumer` (never trusted from the payload):
+
+| Flag | Derived when |
+|------|--------------|
+| `hasGeoSink` | `dataSinks` contains a sink with `dataSinkType == "POSTGIS"` |
+| `hasLayers` | `layers` is a non-empty list |
+
+Expected trigger payload shape the GeoServer handler consumes (to be emitted by the backend in a
+follow-up — see below):
+
+```jsonc
+{
+  "dataSinks": [
+    { "id": "...", "dataSinkType": "POSTGIS",
+      "configuration": { "tableName": "...", "dataStructureVersionId": "..." } }
+  ],
+  "layers": [
+    { "layerName": "...", "nativeName": "...", "crs": "EPSG:4326" }
+  ]
+}
+```
+
+**Dormant today:** the backend's saga trigger (`SagaTrigger` / `DataSetSagaPublisher` in
+`portal-backend`) does **not yet emit** `dataSinks` or `layers`, so `hasGeoSink`/`hasLayers` always
+derive to `false` and the GeoServer branch is skipped — the existing FROST → APISIX → Redpanda flow
+is unchanged. Activating GeoServer end-to-end requires a separate backend change to serialize the
+`POSTGIS` `DataSink` and `Layer` entities into the trigger.
+
+**This applies to DELETE too.** The GeoServer teardown (`DELETE_WORKSPACE`) is gated on the same
+derived `hasGeoSink`, so the **`DATASET_DELETE` trigger must also carry the `POSTGIS` `dataSinks`**
+for the workspace to be removed — symmetric with create/update. A delete trigger without `dataSinks`
+skips the teardown (so the workspace would not be removed). Gating it this way (rather than always
+deleting) keeps deployments **without** a GeoServer adapter from failing every delete and avoids a
+spurious `DELETE …?recurse=true` on non-geo datasets. The end-to-end derivation for delete is
+covered by `DatasetDeleteTriggerTest` (realistic trigger through `FlowableTriggerConsumer`).
+
+> Vocabulary note: the GeoServer concept doc uses a `GEO_PERSISTENCE` sink type, but the
+> config-adapter targets the `portal-model` vocabulary (`DataSinkType.POSTGIS` + a separate `Layer`
+> entity). The concept doc should be reconciled to the `POSTGIS` naming.
 
 ### Adapter handlers: required vs optional
 
@@ -95,6 +145,11 @@ and `nifi` once it exists) is **conditional**: it runs only when a trigger carri
 This keeps the engine runnable during the RedPanda → NiFi migration, while the pipeline adapter may
 be temporarily absent. Both the BPMN and coded variants share this behavior (enforced by the
 equivalence tests).
+
+The **geoserver** adapter is conditional in the same way: its steps run only when a trigger carries a
+`POSTGIS` data sink (`hasGeoSink`), so it is **not** in `REQUIRED_HANDLERS` and a deployment without
+it still boots. Its compensation (`DELETE_WORKSPACE`) is idempotent and 404-tolerant, so the
+reverse-compensation chain stays safe whether or not the GeoServer branch actually ran.
 
 ## Architecture
 

@@ -17,14 +17,14 @@ import {
   API_TYPE_QUERY,
   ApiTypeQuery,
   NAMED_API_DESCRIPTION_MAX_LENGTH,
-  NamedApiFormData,
   namedApiPathPrefix,
   PERSISTENCE_OPTIONS,
   SLUG_MAX_LENGTH,
+  StaApiFormData,
 } from '@/types/namedApis'
 
-interface ApiConfigFormProps {
-  form: UseFormReturn<NamedApiFormData>
+interface BaseInfoFormProps {
+  form: UseFormReturn<StaApiFormData>
   apiType: ApiTypeQuery
   isReadOnly: boolean
   datasetId: string
@@ -33,7 +33,7 @@ interface ApiConfigFormProps {
   onSlugBlur: (event: FocusEvent<HTMLInputElement>) => void
 }
 
-export const ApiConfigForm = (props: ApiConfigFormProps) => {
+export const BaseInfoForm = (props: BaseInfoFormProps) => {
   const { form, apiType, isReadOnly, datasetId, typeLabel, urlPreviewSlug, onSlugBlur } = props
   const t = useTranslations('datasets.overview.completion.apis.config')
   const isMobile = useIsMobile()
@@ -51,12 +51,12 @@ export const ApiConfigForm = (props: ApiConfigFormProps) => {
   return (
     <div className="flex flex-col">
       <DetailsFieldContainer className="pt-0 pb-3">
-        <SubHeader title={t('form.sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
+        <SubHeader title={t('baseInfo.sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
       </DetailsFieldContainer>
 
       <DetailsFieldContainer>
         <div className={cn(gridClass)}>
-          <span className="text-sm leading-none font-medium">{t('form.type')}</span>
+          <span className="text-sm leading-none font-medium">{t('baseInfo.type')}</span>
           <span data-testid="apiTypeReadOnly" className={readOnlyValueClass}>
             {typeLabel}
           </span>
@@ -67,10 +67,10 @@ export const ApiConfigForm = (props: ApiConfigFormProps) => {
         {isWfsWms ? (
           <FormSelect
             id="apiPersistence"
-            label={t('form.persistence')}
+            label={t('baseInfo.persistence')}
             options={persistenceOptions.map(o => ({ value: o.value, label: o.label }))}
             form={form}
-            name="persistence"
+            name="baseInfo.persistence"
             disabled={isReadOnly}
             required
             formItemProps={formItemProps}
@@ -78,8 +78,8 @@ export const ApiConfigForm = (props: ApiConfigFormProps) => {
         ) : (
           <div className={cn(gridClass)}>
             <div>
-              <span className="text-sm leading-none font-medium">{t('form.persistence')}</span>
-              <p className="text-sm text-muted-foreground mt-1">{t('form.persistenceHint')}</p>
+              <span className="text-sm leading-none font-medium">{t('baseInfo.persistence')}</span>
+              <p className="text-sm text-muted-foreground mt-1">{t('baseInfo.persistenceHint')}</p>
             </div>
             <span data-testid="apiPersistenceReadOnly" className={readOnlyValueClass}>
               {PERSISTENCE_OPTIONS.FROST.label}
@@ -91,11 +91,11 @@ export const ApiConfigForm = (props: ApiConfigFormProps) => {
       <DetailsFieldContainer>
         <FormField
           control={form.control}
-          name="slug"
+          name="baseInfo.slug"
           render={({ field, fieldState }) => (
             <FormItem className={cn(gridClass)}>
               <FormLabel htmlFor="apiSlug">
-                {t('form.slug')}
+                {t('baseInfo.slug')}
                 <span className="text-red-500 ml-1">*</span>
               </FormLabel>
               <div>
@@ -112,7 +112,7 @@ export const ApiConfigForm = (props: ApiConfigFormProps) => {
                     }}
                     maxLength={SLUG_MAX_LENGTH}
                     disabled={isReadOnly}
-                    aria-invalid={fieldState.isTouched && !!form.formState.errors.slug}
+                    aria-invalid={fieldState.isTouched && !!form.formState.errors.baseInfo?.slug}
                   />
                 </FormControl>
                 {fieldState.isTouched && <FormMessage data-testid="slugFormMessage" className="mt-2" />}
@@ -124,7 +124,7 @@ export const ApiConfigForm = (props: ApiConfigFormProps) => {
 
       <DetailsFieldContainer>
         <div className={cn(gridClass)}>
-          <span className="text-sm leading-none font-medium">{t('form.urlPreview')}</span>
+          <span className="text-sm leading-none font-medium">{t('baseInfo.urlPreview')}</span>
           <span data-testid="apiUrlPreview" className={cn(readOnlyValueClass, 'break-all')}>
             {namedApiPathPrefix(datasetId)}
             <strong>{urlPreviewSlug}</strong>
@@ -136,9 +136,9 @@ export const ApiConfigForm = (props: ApiConfigFormProps) => {
         <TextField
           id="apiName"
           form={form}
-          label={t('form.name')}
-          name="name"
-          placeholder={t('form.name')}
+          label={t('baseInfo.name')}
+          name="baseInfo.name"
+          placeholder={t('baseInfo.name')}
           disabled={isReadOnly}
           required
           formItemProps={formItemProps}
@@ -149,11 +149,11 @@ export const ApiConfigForm = (props: ApiConfigFormProps) => {
         <FormTextArea
           id="apiDescription"
           form={form}
-          label={t('form.description')}
-          name="description"
-          placeholder={t('form.descriptionPlaceholder')}
+          label={t('baseInfo.description')}
+          name="baseInfo.description"
+          placeholder={t('baseInfo.descriptionPlaceholder')}
           disabled={isReadOnly}
-          hint={t('form.descriptionHint')}
+          hint={t('baseInfo.descriptionHint')}
           maxLength={NAMED_API_DESCRIPTION_MAX_LENGTH}
           hasCharacterCount
           className="min-h-[100px] resize-none"

@@ -17,8 +17,11 @@ import org.flowable.bpmn.model.StartEvent;
 
 /**
  * Builds the Dataset Delete saga process programmatically. Reverse order (Redpanda → APISIX →
- * FROST), best-effort: on failure, continue to next step. No compensation. Produces equivalent
- * behavior to {@code dataset-delete.bpmn}.
+ * conditional GeoServer → FROST), best-effort: on failure, continue to next step. No compensation.
+ * Produces equivalent behavior to {@code dataset-delete.bpmn}.
+ *
+ * <p>The GeoServer teardown ({@code DELETE_WORKSPACE}, recursive) is gated on {@code hasGeoSink}
+ * and runs after the APISIX route is removed, matching the documented DELETE_WORKSPACE order.
  */
 public final class DatasetDeleteProcessBuilder {
 
@@ -35,6 +38,11 @@ public final class DatasetDeleteProcessBuilder {
         saga.sagaStep("delete-pipelines", "Delete Pipelines", "redpanda", "DELETE_PIPELINES");
     SagaStepRef apisix =
         saga.sagaStep("delete-route", "Delete APISIX Route", "apisix", "DELETE_ROUTE");
+    ExclusiveGateway geoGw =
+        saga.exclusiveGateway(ProcessBuilderUtils.GEO_GATEWAY_ID, "Has Geo Sink?");
+    SagaStepRef geoserver =
+        saga.sagaStep(
+            "delete-workspace", "Delete GeoServer Workspace", "geoserver", "DELETE_WORKSPACE");
     SagaStepRef frost =
         saga.sagaStep("delete-project", "Delete FROST Project", "frost", "DELETE_PROJECT");
 
@@ -49,7 +57,11 @@ public final class DatasetDeleteProcessBuilder {
     saga.flow(start, pipelineGw);
     saga.flow(pipelineGw, redpanda.task()).when("${hasPipelines == true}");
     saga.flow(pipelineGw, apisix.task()).asDefault();
-    saga.flow(redpanda.task(), apisix.task(), frost.task(), resultGw);
+    saga.flow(redpanda.task(), apisix.task(), geoGw);
+    saga.flow(geoGw, geoserver.task()).when("${execution.getVariable('hasGeoSink') == true}");
+    saga.flow(geoGw, frost.task()).asDefault();
+    saga.flow(geoserver.task(), frost.task());
+    saga.flow(frost.task(), resultGw);
     saga.flow(resultGw, publishFail).when("${execution.getVariable('sagaError') != null}");
     saga.flow(resultGw, publishOk).asDefault();
     saga.flow(publishOk, end);
@@ -57,7 +69,8 @@ public final class DatasetDeleteProcessBuilder {
 
     // Best-effort: error on any step continues to the next
     saga.errorFlow(redpanda, apisix.task());
-    saga.errorFlow(apisix, frost.task());
+    saga.errorFlow(apisix, geoGw);
+    saga.errorFlow(geoserver, frost.task());
     saga.errorFlow(frost, resultGw);
 
     return saga.build();
