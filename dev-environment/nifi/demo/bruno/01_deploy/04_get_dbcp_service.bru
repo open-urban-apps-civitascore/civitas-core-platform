@@ -1,0 +1,46 @@
+meta {
+  name: 04 Find DBCP Controller Service
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{nifiBaseUrl}}/nifi-api/flow/process-groups/{{demoPgId}}/controller-services
+  auth: inherit
+}
+
+
+script:pre-request {
+  // Reset before lookup — never leak a stale id from a previous run.
+  bru.setVar('dbcpServiceId', null);
+  bru.setVar('dbcpRevision', null);
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const dbcp = res.body.controllerServices.find(
+      c => c.component.type === 'org.apache.nifi.dbcp.DBCPConnectionPool'
+    );
+    if (dbcp) {
+      bru.setVar('dbcpServiceId', dbcp.id);
+      bru.setVar('dbcpRevision', dbcp.revision.version);
+    } else {
+      console.log('No DBCPConnectionPool in this PG. Aborting chain.');
+      bru.setNextRequest(null);
+    }
+  }
+}
+
+tests {
+  test("Status 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  test("DBCP service found", function() {
+    expect(bru.getVar('dbcpServiceId')).to.be.a('string');
+  });
+}
+
+docs {
+  Finds the uploaded `PostGISConnectionPool` and saves its id + current
+  revision version so step 05 can update it.
+}

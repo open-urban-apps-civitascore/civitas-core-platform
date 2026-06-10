@@ -9,5 +9,8 @@ package de.civitascore.portal.model.embedded;
  */
 public enum PermissionSource {
   /** Internal permissions defined within the application */
-  INTERNAL
+  INTERNAL,
+
+  /** Permissions sourced from the dashboard engine */
+  DATASET_DASHBOARD
 }

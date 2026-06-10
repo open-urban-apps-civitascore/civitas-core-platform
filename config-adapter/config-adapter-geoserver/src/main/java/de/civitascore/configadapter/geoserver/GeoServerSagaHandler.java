@@ -62,8 +62,12 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   private static final Pattern WORKSPACE_NAME_PATTERN = Pattern.compile("[a-z0-9_]+");
   private static final Pattern FEATURE_TYPE_NAME_PATTERN = Pattern.compile("[A-Za-z0-9_-]+");
 
-  /** Only datasinks of this type are provisioned as GeoServer feature types. */
-  private static final String DATASINK_TYPE_GEO_PERSISTENCE = "GEO_PERSISTENCE";
+  /**
+   * Only datasinks of this type are provisioned as GeoServer feature types. Matches the {@code
+   * DataSinkType.POSTGIS} value the portal-backend emits in the saga trigger payload — a
+   * PostGIS-backed sink is what GeoServer can publish as a WMS/WFS feature type.
+   */
+  private static final String DATASINK_TYPE_POSTGIS = "POSTGIS";
 
   private static final String DEFAULT_PROJECTION_POLICY = "REPROJECT_TO_DECLARED";
 
@@ -295,9 +299,9 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   // ============== HELPERS ==============
 
   /**
-   * Iterates the command's datasinks, provisioning a feature type for each {@code GEO_PERSISTENCE}
-   * sink. Other sink types are skipped (handled by their own adapters). When {@code upsert} is true
-   * an existing feature type is updated (used by {@code UPDATE_WORKSPACE}); otherwise an existing
+   * Iterates the command's datasinks, provisioning a feature type for each {@code POSTGIS} sink.
+   * Other sink types are skipped (handled by their own adapters). When {@code upsert} is true an
+   * existing feature type is updated (used by {@code UPDATE_WORKSPACE}); otherwise an existing
    * feature type is left unchanged (idempotent {@code PROVISION_WORKSPACE}).
    */
   @SuppressWarnings("unchecked")
@@ -306,7 +310,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     List<Map<String, Object>> datasinks =
         (List<Map<String, Object>>) command.payload().getOrDefault("datasinks", List.of());
     for (Map<String, Object> sink : datasinks) {
-      if (!DATASINK_TYPE_GEO_PERSISTENCE.equals(sink.get("type"))) {
+      if (!DATASINK_TYPE_POSTGIS.equals(sink.get("type"))) {
         continue;
       }
       Map<String, Object> configuration =
@@ -315,7 +319,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       if (tableName == null || tableName.isBlank()) {
         log.warn(
             "Skipping {} datasink without a tableName for workspace {} (saga {})",
-            DATASINK_TYPE_GEO_PERSISTENCE,
+            DATASINK_TYPE_POSTGIS,
             Encode.forJava(workspaceName),
             Encode.forJava(command.sagaId()));
         continue;

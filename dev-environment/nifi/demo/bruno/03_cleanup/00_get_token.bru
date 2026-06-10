@@ -1,0 +1,28 @@
+meta {
+  name: 00 Get NiFi Access Token
+  type: http
+  seq: 0
+}
+
+post {
+  url: {{nifiBaseUrl}}/nifi-api/access/token
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  username: {{nifiUser}}
+  password: {{nifiPassword}}
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setEnvVar('nifiToken', res.body);
+  }
+}
+
+tests {
+  test("Token captured", function() {
+    expect(bru.getEnvVar('nifiToken')).to.be.a('string');
+  });
+}

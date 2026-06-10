@@ -24,7 +24,7 @@ import {
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
-import { buildPipelinePayload } from '../../_services/payloadBuilderService'
+import { buildPipelinePayload, syncDatasinkIds } from '../../_services/payloadBuilderService'
 import {
   createEmptyPipeline,
   getPipelineStats,
@@ -401,19 +401,29 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
           const payload = buildPipelinePayload(session.pipeline)
           const pipelineId = session.pipeline.id
 
+          let savedPipeline: Pipeline
           if (pipelineId) {
-            await updatePipelineMutation.mutateAsync({ pipelineId, data: payload })
-            sessionManager.markSessionClean(session.id)
+            const response = await updatePipelineMutation.mutateAsync({ pipelineId, data: payload })
+            savedPipeline = session.pipeline
+            const { pipeline: synced, hasChanges } = syncDatasinkIds(savedPipeline, response.data.dataSinks ?? [])
+            if (hasChanges) {
+              await updatePipelineMutation.mutateAsync({ pipelineId, data: buildPipelinePayload(synced) })
+              savedPipeline = synced
+            }
           } else {
             const response = await createPipelineMutation.mutateAsync(payload)
-            const updatedPipeline: Pipeline = {
-              ...session.pipeline,
-              id: response.data.id,
-              isDirty: false,
+            savedPipeline = { ...session.pipeline, id: response.data.id }
+            const { pipeline: synced, hasChanges } = syncDatasinkIds(savedPipeline, response.data.dataSinks ?? [])
+            if (hasChanges) {
+              await updatePipelineMutation.mutateAsync({
+                pipelineId: response.data.id,
+                data: buildPipelinePayload(synced),
+              })
+              savedPipeline = synced
             }
-            sessionManager.updateSessionPipeline(session.id, updatedPipeline)
-            sessionManager.markSessionClean(session.id)
           }
+          sessionManager.updateSessionPipeline(session.id, { ...savedPipeline, isDirty: false })
+          sessionManager.markSessionClean(session.id)
           toast.success(t('header.saveSucces'))
         } catch {
           saveFailedNames.push(session.name)
