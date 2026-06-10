@@ -273,9 +273,20 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   private SagaCommandResult handleRestoreWorkspace(SagaCommandMessage command) {
     String workspaceName = resolveWorkspaceName(command);
     String datastoreName = datastoreName(workspaceName);
-    List<Map<String, Object>> previousFeatureTypes =
-        (List<Map<String, Object>>)
-            command.payload().getOrDefault("previousFeatureTypes", List.of());
+
+    Object snapshot = command.payload().get("previousFeatureTypes");
+    if (snapshot == null) {
+      // No snapshot was captured — the UPDATE step failed before storing its compensation data, so
+      // we don't know which feature types pre-existed. Skip restore rather than treat a missing
+      // snapshot as "the workspace was empty" and delete pre-existing feature types.
+      log.warn(
+          "RESTORE_WORKSPACE: no previousFeatureTypes snapshot for workspace {} (saga {}); skipping"
+              + " restore",
+          Encode.forJava(workspaceName),
+          Encode.forJava(command.sagaId()));
+      return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
+    }
+    List<Map<String, Object>> previousFeatureTypes = (List<Map<String, Object>>) snapshot;
 
     Set<String> previousNames =
         previousFeatureTypes.stream()

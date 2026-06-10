@@ -644,6 +644,22 @@ class GeoServerSagaHandlerTest {
   class RestoreWorkspace {
 
     @Test
+    void skipsRestoreWhenNoSnapshotPresent() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // No previousFeatureTypes key: the UPDATE step failed before storing compensation data.
+        // Restore must skip — not treat the missing snapshot as "empty" and delete existing types.
+        SagaCommandMessage command =
+            createCommand("COMPENSATE_STEP", "RESTORE_WORKSPACE", Map.of("workspaceName", "myws"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        verify(mockBuilder, times(0)).get();
+        verify(mockBuilder, times(0)).delete();
+      }
+    }
+
+    @Test
     void restoresPreviousFeatureTypesSuccessfully() {
       try (GeoServerSagaHandler handler = createHandler()) {
         // Snapshot matches the previous state — nothing new to delete, only restore via PUT.
