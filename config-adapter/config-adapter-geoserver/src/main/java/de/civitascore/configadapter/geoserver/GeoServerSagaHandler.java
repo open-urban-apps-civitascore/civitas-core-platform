@@ -358,14 +358,12 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
    * true an existing feature type is updated (used by {@code UPDATE_WORKSPACE}); otherwise an
    * existing feature type is left unchanged (idempotent provisioning).
    */
-  @SuppressWarnings("unchecked")
   private void processLayers(
       SagaCommandMessage command, String workspaceName, String datastoreName, boolean upsert) {
-    List<Map<String, Object>> layers =
-        (List<Map<String, Object>>) command.payload().getOrDefault("layers", List.of());
+    List<Map<String, Object>> layers = mapList(command, "layers");
     String defaultNativeName = firstSinkTableName(command);
     for (Map<String, Object> layer : layers) {
-      String layerName = (String) layer.get("layerName");
+      String layerName = stringValue(layer, "layerName");
       if (layerName == null || layerName.isBlank()) {
         // Fail rather than skip: a requested layer with no name can't be published, and silently
         // skipping would report the step COMPLETED while the layer is missing. Consistent with the
@@ -373,12 +371,15 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
         throw new IllegalArgumentException("layer is missing the required field: layerName");
       }
       requireSafeName(layerName, "layerName");
-      String nativeName = (String) layer.get("nativeName");
+      String nativeName = stringValue(layer, "nativeName");
       if (nativeName == null || nativeName.isBlank()) {
         nativeName = defaultNativeName != null ? defaultNativeName : layerName;
       }
       requireSafeName(nativeName, "nativeName");
-      String crs = (String) layer.getOrDefault("crs", DEFAULT_CRS);
+      String crs = stringValue(layer, "crs");
+      if (crs == null || crs.isBlank()) {
+        crs = DEFAULT_CRS;
+      }
       if (upsert) {
         upsertFeatureType(workspaceName, datastoreName, layerName, nativeName, crs);
       } else {
@@ -388,21 +389,60 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /** Returns the {@code tableName} of the first {@code POSTGIS} data sink, or {@code null}. */
-  @SuppressWarnings("unchecked")
   private static String firstSinkTableName(SagaCommandMessage command) {
-    List<Map<String, Object>> dataSinks =
-        (List<Map<String, Object>>) command.payload().getOrDefault("dataSinks", List.of());
-    for (Map<String, Object> sink : dataSinks) {
+    for (Map<String, Object> sink : mapList(command, "dataSinks")) {
       if (!DATASINK_TYPE_POSTGIS.equals(sink.get("dataSinkType"))) {
         continue;
       }
-      Map<String, Object> configuration =
-          (Map<String, Object>) sink.getOrDefault("configuration", Map.of());
+      Map<String, Object> configuration = mapValue(sink, "configuration");
       if (configuration.get("tableName") instanceof String tableName && !tableName.isBlank()) {
         return tableName;
       }
     }
     return null;
+  }
+
+  // ── Payload type guards ─────────────────────────────────────────────────────
+  // The trigger payload is untyped JSON, so guard structure/field types and fail with a clean
+  // validation error instead of letting a ClassCastException escape on malformed input.
+
+  /** Reads a payload list of objects; missing key → empty list. */
+  @SuppressWarnings("unchecked")
+  private static List<Map<String, Object>> mapList(SagaCommandMessage command, String key) {
+    Object value = command.payload().getOrDefault(key, List.of());
+    if (!(value instanceof List<?> list)) {
+      throw new IllegalArgumentException(key + " must be a list, got " + typeName(value));
+    }
+    for (Object element : list) {
+      if (!(element instanceof Map)) {
+        throw new IllegalArgumentException(
+            key + " entries must be objects, got " + typeName(element));
+      }
+    }
+    return (List<Map<String, Object>>) value;
+  }
+
+  /** Reads an optional nested string field, rejecting a non-string value. */
+  private static String stringValue(Map<String, Object> source, String field) {
+    Object value = source.get(field);
+    if (value == null || value instanceof String) {
+      return (String) value;
+    }
+    throw new IllegalArgumentException(field + " must be a string, got " + typeName(value));
+  }
+
+  /** Reads a nested object field (missing → empty), rejecting a non-object value. */
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> mapValue(Map<String, Object> source, String field) {
+    Object value = source.getOrDefault(field, Map.of());
+    if (!(value instanceof Map)) {
+      throw new IllegalArgumentException(field + " must be an object, got " + typeName(value));
+    }
+    return (Map<String, Object>) value;
+  }
+
+  private static String typeName(Object value) {
+    return value == null ? "null" : value.getClass().getSimpleName();
   }
 
   /**

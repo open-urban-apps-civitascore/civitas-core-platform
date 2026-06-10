@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -153,6 +154,56 @@ class GeoServerSagaHandlerTest {
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
         verify(mockBuilder, times(0)).post(any(Entity.class));
+      }
+    }
+
+    @Test
+    void failsCleanlyWhenLayersElementIsNotAnObject() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of("datasetId", "ds-abc", "layers", List.of(123))));
+
+        assertEquals("STEP_FAILED", result.type());
+        // A clean validation error, not a leaked ClassCastException.
+        assertTrue(result.error().contains("must be"), result.error());
+      }
+    }
+
+    @Test
+    void failsCleanlyWhenLayerNameIsNotAString() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of("datasetId", "ds-abc", "layers", List.of(Map.of("layerName", 123)))));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertTrue(result.error().contains("must be a string"), result.error());
+      }
+    }
+
+    @Test
+    void failsCleanlyWhenDataSinkElementIsNotAnObject() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId", "ds-abc",
+                        "layers", List.of(Map.of("layerName", "t1")),
+                        "dataSinks", List.of("not-an-object"))));
+
+        assertEquals("STEP_FAILED", result.type());
+        // The dataSinks list is also type-guarded (read via firstSinkTableName) — clean error.
+        assertTrue(result.error().contains("must be"), result.error());
       }
     }
   }
