@@ -1,7 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    "gitlab>civitas-connect/civitas-core/renovate-integration//renovate.json#main"
   ],
   "baseBranches": ["develop"],
   "labels": ["v::2", "dependencies"],
