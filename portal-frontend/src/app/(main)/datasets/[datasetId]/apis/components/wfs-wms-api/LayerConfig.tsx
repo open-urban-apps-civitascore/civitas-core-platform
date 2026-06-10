@@ -20,14 +20,13 @@ import { crsOptions } from '@/const/crs'
 import { cn } from '@/lib/utils'
 import { Datasink } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
-import { LayerFormData, Style, WfsWmsApiFormData } from '@/types/namedApis'
+import { Style, WfsWmsApiFormData } from '@/types/namedApis'
 import { getEmptyLabelIndex, isNewItem } from '@/utils/common'
 
 import { BoundingBoxConfig } from './BoundingBoxConfig'
 
 interface LayerConfigProps {
   form: UseFormReturn<WfsWmsApiFormData>
-  existingLayers: LayerFormData[]
   styles: Style[]
   postgisDatasinks: Datasink[]
   postGisDatastructures: DatastructureVersion[]
@@ -52,7 +51,6 @@ const toAttributeOptions = (umlClass: UMLClass | undefined) =>
 export const LayerConfig = (props: LayerConfigProps) => {
   const {
     form,
-    existingLayers,
     styles,
     postgisDatasinks,
     postGisDatastructures,

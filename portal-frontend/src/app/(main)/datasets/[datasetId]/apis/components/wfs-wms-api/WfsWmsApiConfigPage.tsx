@@ -334,7 +334,6 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
           {selectedTab === 'layer' && (
             <LayerConfig
               form={form}
-              existingLayers={layerFields}
               styles={apiStyles}
               postgisDatasinks={postgisDatasinks}
               postGisDatastructures={postgisDatastructures}
