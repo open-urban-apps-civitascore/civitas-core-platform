@@ -30,7 +30,7 @@ class PermissionInitializerIntegrationTest extends BaseKeycloakIntegrationTest {
       "Should persist DATASET_DASHBOARD_READ as a DATA permission sourced from DASHBOARD on startup")
   void shouldPersistDashboardRead() {
     Permission dashboardRead =
-        permissionRepository.findByName(PermissionName.DATASET_DASHBOARD_READ.name()).orElseThrow();
+        findByNameAndSource(PermissionName.DATASET_DASHBOARD_READ, PermissionSource.DASHBOARD);
 
     assertThat(dashboardRead.getPermissionType()).isEqualTo(PermissionType.DATA);
     assertThat(dashboardRead.getCategory()).isEqualTo(PermissionCategory.DATA);
@@ -42,12 +42,24 @@ class PermissionInitializerIntegrationTest extends BaseKeycloakIntegrationTest {
       "Should persist DATASET_DASHBOARD_WRITE as a DATA permission sourced from DASHBOARD on startup")
   void shouldPersistDashboardWrite() {
     Permission dashboardWrite =
-        permissionRepository
-            .findByName(PermissionName.DATASET_DASHBOARD_WRITE.name())
-            .orElseThrow();
+        findByNameAndSource(PermissionName.DATASET_DASHBOARD_WRITE, PermissionSource.DASHBOARD);
 
     assertThat(dashboardWrite.getPermissionType()).isEqualTo(PermissionType.DATA);
     assertThat(dashboardWrite.getCategory()).isEqualTo(PermissionCategory.DATA);
     assertThat(dashboardWrite.getSource()).isEqualTo(PermissionSource.DASHBOARD);
+  }
+
+  /**
+   * Resolves a seeded permission by its full {@code (name, source)} identity. The repository only
+   * exposes {@code findByName}, but permission identity is the name/source pair, so the same name
+   * can legitimately coexist under different sources; this helper pins the assertion to the exact
+   * row under test.
+   */
+  private Permission findByNameAndSource(PermissionName name, PermissionSource source) {
+    return permissionRepository.findAll().stream()
+        .filter(permission -> permission.getName().equals(name.name()))
+        .filter(permission -> permission.getSource() == source)
+        .findFirst()
+        .orElseThrow();
   }
 }
