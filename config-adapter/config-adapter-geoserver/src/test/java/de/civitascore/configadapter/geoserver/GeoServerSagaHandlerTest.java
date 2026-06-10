@@ -114,6 +114,27 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
+    void updatesDatastoreWhenAlreadyExists() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // Datastore already exists (409) → its connection parameters are refreshed via PUT rather
+        // than reporting success with stale config.
+        Response conflict = mock(Response.class);
+        when(conflict.getStatus()).thenReturn(409);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict);
+        Response updated = mock(Response.class);
+        when(updated.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(updated);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "CREATE_DATASTORE", Map.of("datasetId", "ds-abc")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        verify(mockBuilder).put(any(Entity.class));
+      }
+    }
+
+    @Test
     void provisionLayersStepPublishesOneFeatureTypePerLayer() {
       try (GeoServerSagaHandler handler = createHandler()) {
         Response created = mock(Response.class);
@@ -428,8 +449,9 @@ class GeoServerSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
-        // Existing feature type (409 on POST) must be updated via PUT, not silently ignored.
-        verify(mockBuilder).put(any(Entity.class));
+        // Both the existing datastore and the existing feature type return 409 on POST and must be
+        // updated via PUT (not silently ignored), so the workspace converges to the desired config.
+        verify(mockBuilder, times(2)).put(any(Entity.class));
       }
     }
 

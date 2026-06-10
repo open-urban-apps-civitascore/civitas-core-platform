@@ -334,20 +334,37 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Creates the PostGIS datastore idempotently: HTTP 409 (already exists) is treated as success.
+   * Creates the PostGIS datastore, or updates it via PUT if it already exists (HTTP 409). A plain
+   * POST returns 409 for an existing datastore and would otherwise leave its connection parameters
+   * untouched — so a re-provision or update against changed config (e.g. PostGIS host/credentials)
+   * would report success while keeping stale data. Updating on 409 converges it to the desired
+   * state.
    */
   private void createDatastore(String workspaceName, String datastoreName) {
     Map<String, Object> datastoreBody = buildDatastoreBody(datastoreName);
-    try (Response response =
+    try (Response createResponse =
         auth.apply(
                 client()
                     .target(serverUrl)
                     .path("/rest/workspaces/" + workspaceName + "/datastores")
                     .request(MediaType.APPLICATION_JSON))
             .post(Entity.json(datastoreBody))) {
-      if (response.getStatus() != 201 && response.getStatus() != 409) {
-        checkResponse(response, "CREATE_DATASTORE/" + datastoreName);
+      if (createResponse.getStatus() == 201) {
+        return;
       }
+      if (createResponse.getStatus() != 409) {
+        checkResponse(createResponse, "CREATE_DATASTORE/" + datastoreName);
+        return;
+      }
+    }
+    try (Response updateResponse =
+        auth.apply(
+                client()
+                    .target(serverUrl)
+                    .path("/rest/workspaces/" + workspaceName + "/datastores/" + datastoreName)
+                    .request(MediaType.APPLICATION_JSON))
+            .put(Entity.json(datastoreBody))) {
+      checkResponse(updateResponse, "CREATE_DATASTORE/update/" + datastoreName);
     }
   }
 
