@@ -41,6 +41,11 @@ export const DatasetApiResponseSchema = z.object({
   pipelines: z.array(z.object({ id: z.string(), name: z.string() })),
   namedApis: z.array(NamedApiSchema).optional(),
   datapool: DatapoolItemSchema.nullable(),
+  visualizations: z
+    .array(
+      z.object({ id: z.string(), name: z.string(), description: z.string().optional(), type: z.enum(['dashboard']) }),
+    )
+    .optional(),
 })
 
 export type Dataset = z.infer<typeof DatasetApiResponseSchema>

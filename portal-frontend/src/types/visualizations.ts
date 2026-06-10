@@ -9,6 +9,13 @@ export type VisualizationTypeQuery = (typeof VISUALIZATION_TYPE_QUERY)[keyof typ
 export const isVisualizationTypeQuery = (value: unknown): value is VisualizationTypeQuery =>
   value === VISUALIZATION_TYPE_QUERY.DASHBOARD
 
+export interface Visualization {
+  id: string
+  name: string
+  description?: string
+  type: VisualizationTypeQuery
+}
+
 export const VISUALIZATION_DESCRIPTION_MAX_LENGTH = 150
 
 export const visualizationFormSchema = z.object({

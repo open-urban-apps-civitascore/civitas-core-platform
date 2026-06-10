@@ -467,9 +467,26 @@
         "visualizations": {
           "title": "Visualizations",
           "empty": "No visualizations available yet",
+          "noDescription": "No description available",
           "addButton": "Add Visualization",
           "dashboard": "Dashboard",
           "dashboardSubtitle": "Diagrams",
+          "card": {
+            "actions": {
+              "edit": "Edit",
+              "view": "View",
+              "delete": "Delete"
+            },
+            "deleteConfirm": {
+              "title": "Delete Visualization",
+              "description": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
+              "confirm": "Delete"
+            },
+            "messages": {
+              "deleteSuccess": "Visualization deleted successfully",
+              "deleteError": "An error occurred while deleting. Please try again."
+            }
+          },
           "config": {
             "title": {
               "dashboard": "New Dashboard"
@@ -478,6 +495,7 @@
               "dashboard": "Dashboard"
             },
             "protectedBadge": "Protected",
+            "protectedBadgeTooltip": "Access to this Dashboard is restricted and requires appropriate permissions.",
             "openDataBadge": "Open Data",
             "tabs": {
               "basicInfo": "Basic Information"

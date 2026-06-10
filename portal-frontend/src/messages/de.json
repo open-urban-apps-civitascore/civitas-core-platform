@@ -467,9 +467,26 @@
         "visualizations": {
           "title": "Visualisierungen",
           "empty": "Noch keine Visualisierungen vorhanden",
+          "noDescription": "Keine Beschreibung vorhanden",
           "addButton": "Visualisierung hinzufügen",
           "dashboard": "Dashboard",
           "dashboardSubtitle": "Diagramme",
+          "card": {
+            "actions": {
+              "edit": "Bearbeiten",
+              "view": "Anzeigen",
+              "delete": "Löschen"
+            },
+            "deleteConfirm": {
+              "title": "Visualisierung löschen",
+              "description": "Bist du sicher, dass du \"{name}\" löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.",
+              "confirm": "Löschen"
+            },
+            "messages": {
+              "deleteSuccess": "Visualisierung erfolgreich gelöscht",
+              "deleteError": "Beim Löschen ist ein Fehler aufgetreten. Bitte versuche es erneut."
+            }
+          },
           "config": {
             "title": {
               "dashboard": "Neues Dashboard"
@@ -478,6 +495,7 @@
               "dashboard": "Dashboard"
             },
             "protectedBadge": "Geschützt",
+            "protectedBadgeTooltip": "Der Zugriff auf diese Dashboard ist eingeschränkt und erfordert entsprechende Berechtigungen.",
             "openDataBadge": "Open Data",
             "tabs": {
               "basicInfo": "Basisinformationen"

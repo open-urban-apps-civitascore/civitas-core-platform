@@ -337,7 +337,14 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       showSeparator: true,
       isCompleted: false,
       buttons: [],
-      content: <VisualizationList datasetId={dataset.id} />,
+      content: (
+        <VisualizationList
+          datasetId={dataset.id}
+          visualizations={dataset.visualizations ?? []}
+          canEdit={canUpdate}
+          isOpenDataAccess={dataset.openDataAccess}
+        />
+      ),
     },
     {
       title: t('overview.completion.accessManagement.title'),
