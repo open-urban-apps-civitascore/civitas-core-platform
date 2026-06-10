@@ -49,5 +49,7 @@ export FLOWABLE_JDBC_PASSWORD=flowable
 export GEOSERVER_ADMIN_PASSWORD=geoserver
 export GEOSERVER_POSTGIS_PASSWORD=geo
 export POSTGIS_JDBC_PASSWORD=civitas
+# This dev default is injected here for local runs only; real deployments supply their own
+# value (or an ENC(...) value decrypted with CIVITAS_MASTER_KEY).
 
 java -jar config-adapter-application/target/config-adapter-application-1.1.0.jar
