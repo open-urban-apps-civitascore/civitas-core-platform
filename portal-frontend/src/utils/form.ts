@@ -1,3 +1,10 @@
+// Recursively checks for a true value, because RHF can produce empty nested objects for unchanged fields.
+export const hasDirtyField = (val: unknown): boolean => {
+  if (val === true) return true
+  if (val && typeof val === 'object') return Object.values(val).some(hasDirtyField)
+  return false
+}
+
 export const pickDirtyValues = <T>(values: T, dirtyFields: Record<string, unknown>): Partial<T> => {
   const result: Partial<T> = {}
 

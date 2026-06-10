@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Dataset } from '@/types/datasets'
-import { API_TYPE_QUERY, NamedApi, NamedApiFormData } from '@/types/namedApis'
+import { API_TYPE_QUERY, NamedApi, StaApiFormData } from '@/types/namedApis'
 
 import { ApiConfigPage } from './ApiConfigPage'
 
@@ -23,6 +23,11 @@ vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   useCreateNamedApi: () => ({ mutateAsync: mockCreateNamedApi, isPending: false }),
 }))
 
+vi.mock('@/app/services/api/datasets/layers/clientRequests', () => ({
+  useCreateLayer: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateLayer: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}))
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace, refresh: mockRefresh }),
   usePathname: () => '/datasets/test-id/apis/existing-slug',
@@ -37,11 +42,11 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
 
-vi.mock('./ApiConfigForm', () => ({
-  ApiConfigForm: ({ form }: { form: UseFormReturn<NamedApiFormData> }) => (
+vi.mock('./base-info/BaseInfoForm', () => ({
+  BaseInfoForm: ({ form }: { form: UseFormReturn<StaApiFormData> }) => (
     <div>
-      <input data-testid="nameInput" {...form.register('name')} />
-      <input data-testid="slugInput" {...form.register('slug')} />
+      <input data-testid="nameInput" {...form.register('baseInfo.name')} />
+      <input data-testid="slugInput" {...form.register('baseInfo.slug')} />
     </div>
   ),
 }))
@@ -236,6 +241,7 @@ describe('ApiConfigPage', () => {
       mockGetSearchParam.mockReturnValue('edit')
       const existingApi = makeExistingApi()
       renderComponent({ existingApi })
+      await userEvent.type(screen.getByTestId('nameInput'), ' Updated')
       fireEvent.submit(screen.getByTestId('apiConfigForm'))
 
       await waitFor(() => {
@@ -252,6 +258,7 @@ describe('ApiConfigPage', () => {
     it('calls router.refresh and switches to view mode after successful update', async () => {
       mockGetSearchParam.mockReturnValue('edit')
       renderComponent({ existingApi: makeExistingApi() })
+      await userEvent.type(screen.getByTestId('nameInput'), ' Updated')
       fireEvent.submit(screen.getByTestId('apiConfigForm'))
 
       await waitFor(() => {
@@ -282,6 +289,7 @@ describe('ApiConfigPage', () => {
       const existingApi = makeExistingApi()
       const dataset = makeDataset({ namedApis: [existingApi, otherApi] })
       renderComponent({ existingApi, dataset })
+      await userEvent.type(screen.getByTestId('nameInput'), ' Updated')
       fireEvent.submit(screen.getByTestId('apiConfigForm'))
 
       await waitFor(() => {

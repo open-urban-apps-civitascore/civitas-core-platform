@@ -306,7 +306,7 @@
               "styles": "Styles",
               "placeholder": "Content will follow in a later step."
             },
-            "form": {
+            "baseInfo": {
               "sectionTitle": "Basic Information",
               "type": "Type",
               "persistence": "Persistence",
@@ -320,10 +320,69 @@
               "descriptionHint": "max. 150 characters, optional",
               "descriptionPlaceholder": ""
             },
+            "layer": {
+              "sectionTitle": "Layer",
+              "addLayer": "Add Layer",
+              "deleteLayer": "Delete Layer",
+              "untitledLayer": "Untitled Layer {index}",
+              "newLayer": "New Layer {index}",
+              "baseInfo": {
+                "sectionTitle": "Base Information",
+                "title": "Title",
+                "technicalName": "Technical Name",
+                "technicalNameHint": "for URL",
+                "description": "Description"
+              },
+              "dataSelection": {
+                "sectionTitle": "Data Selection",
+                "table": "Table",
+                "tablePlaceHolder": "Select Table ...",
+                "attributes": "Attributes",
+                "attributesPlaceHolder": "Select Attributes ...",
+                "filter": "Define Filters",
+                "filterHint": "with CQL, e. g. attribute='value'"
+              },
+              "geometry": {
+                "sectionTitle": "Geometry",
+                "geometryField": "Geometry Field",
+                "geometryFieldPlaceHolder": "Select Geometry Field ...",
+                "nativeCrs": "Native Coordinate Reference System (CRS)",
+                "definedCrs": "Defined Coordinate Reference System (CRS)",
+                "crsPlaceHolder": "Select CRS ...",
+                "boundingBox": "Bounding Box",
+                "calculateFromCrs": "Calculate from CRS bounds",
+                "calculateFromData": "Calculate from Data"
+              },
+              "style": {
+                "sectionTitle": "Layer-Style",
+                "standardStyle": "Standard Style",
+                "default": "Standard (Geoserver default)",
+                "alternativeStyles": "Alternative Styles",
+                "alternativeStylesPlaceHolder": "Select Alternative Styles ...",
+                "addAlternativeStyle": "Add an alternative style"
+              },
+              "deleteConfirm": {
+                "title": "Really delete layer?",
+                "description": "This change has the following effects:",
+                "impact1": "The layer will no longer be available",
+                "impact2": "The display in connected services will change",
+                "impact3": "External applications may be affected if they use this layer",
+                "confirm": "Delete Layer"
+              },
+              "noData": {
+                "title": "No Layers available",
+                "description": "Layers define the provided data and their presentation"
+              }
+            },
             "messages": {
               "createSuccess": "API has been successfully created.",
               "updateSuccess": "API has been successfully updated.",
-              "saveError": "An error occurred while saving the API. Please try again."
+              "saveError": "An error occurred while saving the API. Please try again.",
+              "createLayerSuccess": "Layer has been successfully created.",
+              "updateLayerSuccess": "Layer has been successfully updated.",
+              "saveLayerError": "An error occurred while saving the layer. Please try again.",
+              "deleteLayerSuccess": "Layer has been successfully deleted.",
+              "deleteLayerError": "An error occurred while deleting the layer. Please try again."
             },
             "errors": {
               "name": {
@@ -383,7 +442,12 @@
       "subheader": "Personal details and general information.",
       "id": "ID",
       "displayName": "Name",
-      "title": { "title": "Title", "mr": "Mr", "ms": "Ms", "other": "No Specification" },
+      "title": {
+        "title": "Title",
+        "mr": "Mr",
+        "ms": "Ms",
+        "other": "No Specification"
+      },
       "firstName": "First Name",
       "lastName": "Last Name",
       "role": "System Role",
@@ -487,7 +551,10 @@
       "baseInfo": "Base Information",
       "name": "Name",
       "description": "Description",
-      "contact": { "label": "Contact Person", "placeholder": "Search by name or email" }
+      "contact": {
+        "label": "Contact Person",
+        "placeholder": "Search by name or email"
+      }
     },
     "roles": {
       "scopeTabs": {
@@ -858,7 +925,6 @@
     "subtitle": "All Data sources available in our tenant.",
     "newDatasource": "Create Data structure",
     "newVersion": "Create version",
-
     "tableHeaders": {
       "name": "Name",
       "description": "Description",
@@ -1068,7 +1134,8 @@
         "nodeNotConfigured": "{label} is not configured",
         "invalidCronExpression": "{label} has an invalid cron expression. Must be a 6-field Quartz syntax.",
         "orphanNode": "{label} is not connected to any other node",
-        "minimumFunctionalNodes": "Pipeline must have at least one functional node between Start and End"
+        "minimumFunctionalNodes": "Pipeline must have at least one functional node between Start and End",
+        "duplicateTableName": "Two Geo Persistence tables must not have the same name"
       }
     },
     "toolbar": {

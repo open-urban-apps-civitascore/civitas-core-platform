@@ -7,7 +7,7 @@ import { translatePermissionName } from '@/app/(main)/permissions/utils/translat
 import { useGetPermissions } from '@/app/services/api/permissions/clientRequests'
 import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
-import { NoDataPage } from '@/components/no-data-page/NoDataPage'
+import { NoDataPage } from '@/components/no-data/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { Permission, PermissionItem } from '@/types/permissions'
 import { ROLE_TYPES, RoleType } from '@/types/roles'

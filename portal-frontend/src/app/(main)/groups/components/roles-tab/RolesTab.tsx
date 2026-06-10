@@ -8,7 +8,7 @@ import { UseFormReturn } from 'react-hook-form'
 
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
-import { NoDataPage } from '@/components/no-data-page/NoDataPage'
+import { NoDataPage } from '@/components/no-data/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
