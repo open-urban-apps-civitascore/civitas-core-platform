@@ -139,12 +139,10 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
-    void provisionLayersSkipsLayersWithoutName() {
+    void failsWhenLayerMissingLayerName() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        Response created = mock(Response.class);
-        when(created.getStatus()).thenReturn(201);
-        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
-
+        // A requested layer without a layerName can't be published — the step must fail rather than
+        // silently skip it and report success.
         SagaCommandResult result =
             handler.handle(
                 createCommand(
@@ -152,7 +150,8 @@ class GeoServerSagaHandlerTest {
                     "PROVISION_LAYERS",
                     Map.of("datasetId", "ds-abc", "layers", List.of(Map.of("crs", "EPSG:4326")))));
 
-        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
         verify(mockBuilder, times(0)).post(any(Entity.class));
       }
     }

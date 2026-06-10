@@ -367,11 +367,10 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     for (Map<String, Object> layer : layers) {
       String layerName = (String) layer.get("layerName");
       if (layerName == null || layerName.isBlank()) {
-        log.warn(
-            "Skipping layer without a layerName for workspace {} (saga {})",
-            Encode.forJava(workspaceName),
-            Encode.forJava(command.sagaId()));
-        continue;
+        // Fail rather than skip: a requested layer with no name can't be published, and silently
+        // skipping would report the step COMPLETED while the layer is missing. Consistent with the
+        // hard-fail on an invalid name below.
+        throw new IllegalArgumentException("layer is missing the required field: layerName");
       }
       requireSafeName(layerName, "layerName");
       String nativeName = (String) layer.get("nativeName");
