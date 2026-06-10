@@ -27,26 +27,30 @@ class PermissionInitializerIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @Test
   @DisplayName(
-      "Should persist DATASET_DASHBOARD_READ as a DATA permission sourced from DASHBOARD on startup")
+      "Should persist DATASET_DASHBOARD_READ as a DATA permission sourced from DATASET_DASHBOARD on"
+          + " startup")
   void shouldPersistDashboardRead() {
     Permission dashboardRead =
-        findByNameAndSource(PermissionName.DATASET_DASHBOARD_READ, PermissionSource.DASHBOARD);
+        findByNameAndSource(
+            PermissionName.DATASET_DASHBOARD_READ, PermissionSource.DATASET_DASHBOARD);
 
     assertThat(dashboardRead.getPermissionType()).isEqualTo(PermissionType.DATA);
     assertThat(dashboardRead.getCategory()).isEqualTo(PermissionCategory.DATA);
-    assertThat(dashboardRead.getSource()).isEqualTo(PermissionSource.DASHBOARD);
+    assertThat(dashboardRead.getSource()).isEqualTo(PermissionSource.DATASET_DASHBOARD);
   }
 
   @Test
   @DisplayName(
-      "Should persist DATASET_DASHBOARD_WRITE as a DATA permission sourced from DASHBOARD on startup")
+      "Should persist DATASET_DASHBOARD_WRITE as a DATA permission sourced from DATASET_DASHBOARD on"
+          + " startup")
   void shouldPersistDashboardWrite() {
     Permission dashboardWrite =
-        findByNameAndSource(PermissionName.DATASET_DASHBOARD_WRITE, PermissionSource.DASHBOARD);
+        findByNameAndSource(
+            PermissionName.DATASET_DASHBOARD_WRITE, PermissionSource.DATASET_DASHBOARD);
 
     assertThat(dashboardWrite.getPermissionType()).isEqualTo(PermissionType.DATA);
     assertThat(dashboardWrite.getCategory()).isEqualTo(PermissionCategory.DATA);
-    assertThat(dashboardWrite.getSource()).isEqualTo(PermissionSource.DASHBOARD);
+    assertThat(dashboardWrite.getSource()).isEqualTo(PermissionSource.DATASET_DASHBOARD);
   }
 
   /**

@@ -29,7 +29,7 @@ class PermissionNameTest {
 
       assertThat(permission.getPermissionType()).isEqualTo(PermissionType.DATA);
       assertThat(permission.getCategory()).isEqualTo(PermissionCategory.DATA);
-      assertThat(permission.getSource()).isEqualTo(PermissionSource.DASHBOARD);
+      assertThat(permission.getSource()).isEqualTo(PermissionSource.DATASET_DASHBOARD);
     }
 
     @Test
@@ -39,7 +39,7 @@ class PermissionNameTest {
 
       assertThat(permission.getPermissionType()).isEqualTo(PermissionType.DATA);
       assertThat(permission.getCategory()).isEqualTo(PermissionCategory.DATA);
-      assertThat(permission.getSource()).isEqualTo(PermissionSource.DASHBOARD);
+      assertThat(permission.getSource()).isEqualTo(PermissionSource.DATASET_DASHBOARD);
     }
 
     @Test

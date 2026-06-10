@@ -61,8 +61,10 @@ public enum PermissionName implements GrantedAuthority {
   DATASET_PAYLOAD_UPDATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASET_PAYLOAD_DELETE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
 
-  DATASET_DASHBOARD_READ(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.DASHBOARD),
-  DATASET_DASHBOARD_WRITE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.DASHBOARD),
+  DATASET_DASHBOARD_READ(
+      PermissionType.DATA, PermissionCategory.DATA, PermissionSource.DATASET_DASHBOARD),
+  DATASET_DASHBOARD_WRITE(
+      PermissionType.DATA, PermissionCategory.DATA, PermissionSource.DATASET_DASHBOARD),
 
   DATASOURCE_CREATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASOURCE_READ(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),

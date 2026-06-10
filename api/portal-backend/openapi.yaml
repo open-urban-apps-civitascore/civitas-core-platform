@@ -5378,7 +5378,7 @@ paths:
           type: string
           enum:
           - INTERNAL
-          - DASHBOARD
+          - DATASET_DASHBOARD
       responses:
         "200":
           description: OK

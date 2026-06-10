@@ -118,14 +118,15 @@ class PermissionInitializerTest {
     // when
     permissionInitializer.initialize();
 
-    // then - DATASET_DASHBOARD_READ with source DASHBOARD is still created despite the name match
+    // then - DATASET_DASHBOARD_READ with source DATASET_DASHBOARD is still created despite the name
+    // match
     verify(permissionRepository).saveAll(permissionsCaptor.capture());
     List<Permission> created = permissionsCaptor.getValue();
 
     assertThat(created)
         .filteredOn(p -> p.getName().equals(PermissionName.DATASET_DASHBOARD_READ.name()))
         .singleElement()
-        .satisfies(p -> assertThat(p.getSource()).isEqualTo(PermissionSource.DASHBOARD));
+        .satisfies(p -> assertThat(p.getSource()).isEqualTo(PermissionSource.DATASET_DASHBOARD));
   }
 
   @Test
@@ -152,7 +153,7 @@ class PermissionInitializerTest {
 
       assertThat(seeded.getPermissionType()).isEqualTo(PermissionType.DATA);
       assertThat(seeded.getCategory()).isEqualTo(PermissionCategory.DATA);
-      assertThat(seeded.getSource()).isEqualTo(PermissionSource.DASHBOARD);
+      assertThat(seeded.getSource()).isEqualTo(PermissionSource.DATASET_DASHBOARD);
     }
   }
 

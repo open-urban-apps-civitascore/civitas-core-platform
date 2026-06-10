@@ -11,10 +11,6 @@ public enum PermissionSource {
   /** Internal permissions defined within the application */
   INTERNAL,
 
-  /**
-   * Permissions sourced from the dashboard engine. These abstract the dashboard engine's native
-   * rights down to a small managed set rather than mirroring them one-to-one. The concrete engine
-   * is an implementation detail and may change without affecting this permission model.
-   */
-  DASHBOARD
+  /** Permissions sourced from the dashboard engine */
+  DATASET_DASHBOARD
 }
