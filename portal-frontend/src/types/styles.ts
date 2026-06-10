@@ -1,13 +1,13 @@
 import { z } from 'zod'
 
-export const StilInputSchema = z.object({
+export const StyleInputSchema = z.object({
   name: z.string().trim().min(1, 'common.errors.required'),
   sldContent: z.string().min(1, 'common.errors.required'),
 })
 
-export type StilInput = z.infer<typeof StilInputSchema>
+export type StyleInput = z.infer<typeof StyleInputSchema>
 
-export const StilSchema = z.object({
+export const StyleSchema = z.object({
   id: z.string(),
   datasetId: z.string(),
   name: z.string(),
@@ -17,4 +17,15 @@ export const StilSchema = z.object({
   modifiedAt: z.string(),
 })
 
-export type Stil = z.infer<typeof StilSchema>
+export type Style = z.infer<typeof StyleSchema>
+
+export type UpdateStyleInput = {
+  datasetId: string
+  stilId: string
+  style: StyleInput
+}
+
+export type DeleteStyleInput = {
+  datasetId: string
+  stilId: string
+}

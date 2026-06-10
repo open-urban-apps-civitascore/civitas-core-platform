@@ -7,18 +7,18 @@ import { FieldPath, UseFormReturn } from 'react-hook-form'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
+import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { NoDataCard } from '@/components/no-data/no-data-card/NoDataCard'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
+import { SidebarList } from '@/components/sidebar-list/SidebarList'
 import { Button } from '@/components/ui/button'
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { FormItem, FormLabel } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { StyleFormData, WfsWmsApiFormData } from '@/types/namedApis'
-
-import { StyleSidebar } from './StyleSidebar'
+import { getEmptyLabelIndex, isNewItem } from '@/utils/common'
 
 interface StylesConfigProps {
   form: UseFormReturn<WfsWmsApiFormData>
@@ -87,6 +87,16 @@ export const StylesConfig = (props: StylesConfigProps) => {
     e.target.value = ''
   }
 
+  const styleLabels = allStyles.map(style => style.name)
+  const sidebarListStyles = allStyles.map((style, index) => {
+    const fallbackKey = isNewItem(style) ? 'newStyle' : 'untitledStyle'
+    const untitledIndex = !style.name ? getEmptyLabelIndex(styleLabels, index) : 0
+    return {
+      label: style.name,
+      value: style.id,
+      displayTitle: style.name || t(fallbackKey, { index: untitledIndex }),
+    }
+  })
   return (
     <>
       {existingStyles.length === 0 ? (
@@ -112,12 +122,14 @@ export const StylesConfig = (props: StylesConfigProps) => {
             <SubHeader title={t('title')} titleClassName="text-2xl leading-none font-bold" />
           </DetailsFieldContainer>
           <div className="flex gap-6">
-            <StyleSidebar
-              existingStyles={allStyles}
-              selectedStyleIndex={selectedStyleIndex}
+            <SidebarList
+              items={sidebarListStyles}
+              selectedItemIndex={selectedStyleIndex}
               isReadOnly={isReadOnly}
-              onSelectStyle={onSelectStyle}
-              onAddStyle={onAddStyle}
+              addButtonLabel={t('addStyle')}
+              addButtonTestId="sidebarAddStyleButton"
+              onSelectItem={onSelectStyle}
+              onAddItem={onAddStyle}
             />
             {selectedStyleIndex !== null && (
               <div className="flex-1 flex flex-col">
@@ -161,30 +173,14 @@ export const StylesConfig = (props: StylesConfigProps) => {
                     </div>
                   </FormItem>
                 </DetailsFieldContainer>
-
                 <DetailsFieldContainer className="border-b-0 py-2 pb-6">
-                  <FormField
-                    control={form.control}
+                  <FormTextArea
+                    form={form}
+                    label={t('styleEditor')}
                     name={stylePath('sldContent')}
-                    render={({ field }) => (
-                      <FormItem className={cn('grid', wideField.className)}>
-                        <FormLabel>
-                          {t('styleEditor')} <span className="text-destructive">*</span>
-                        </FormLabel>
-                        <div>
-                          <FormControl>
-                            <Textarea
-                              data-testid="styleEditorTextArea"
-                              className="min-h-[120px] max-h-[300px] overflow-y-auto font-mono text-sm"
-                              disabled={isReadOnly}
-                              {...field}
-                              value={(field.value as string) ?? ''}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </div>
-                      </FormItem>
-                    )}
+                    placeholder=""
+                    className="min-h-[120px] max-h-[300px] overflow-y-auto font-mono text-sm"
+                    required
                   />
                 </DetailsFieldContainer>
 
