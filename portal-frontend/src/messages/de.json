@@ -201,7 +201,8 @@
     "datastructures": "Datenstrukturen",
     "access-management": "Zugriffsmanagement",
     "apis": "APIs",
-    "datapools": "Datenpools"
+    "datapools": "Datenpools",
+    "visualizations": "Visualisierungen"
   },
   "datasets": {
     "title": "Datensätze",
@@ -462,6 +463,13 @@
               }
             }
           }
+        },
+        "visualizations": {
+          "title": "Visualisierungen",
+          "empty": "Noch keine Visualisierungen vorhanden",
+          "addButton": "Visualisierung hinzufügen",
+          "dashboard": "Dashboard",
+          "dashboardSubtitle": "Diagramme"
         }
       }
     },
