@@ -367,7 +367,7 @@
               "persistencePlaceholder": "Persistenz auswählen",
               "slug": "Slug",
               "urlPreview": "URL-Vorschau",
-              "name": "Bezeichnung",
+              "name": "Titel",
               "nameHint": "Beschreibt, welche Daten diese API bereitstellt.",
               "description": "Beschreibung",
               "descriptionHint": "max. 150 Zeichen, optional",
