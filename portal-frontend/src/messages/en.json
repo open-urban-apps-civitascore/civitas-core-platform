@@ -415,6 +415,7 @@
               "saveLayerError": "An error occurred while saving the layer. Please try again.",
               "deleteLayerSuccess": "Layer has been successfully deleted.",
               "deleteLayerError": "An error occurred while deleting the layer. Please try again.",
+              "layerNameExists": "For the selected table a layer with the name \"{name}\" already exists.",
               "createStyleSuccess": "Style has been successfully created.",
               "updateStyleSuccess": "Style has been successfully updated.",
               "saveStyleError": "An error occurred while saving the style. Please try again.",

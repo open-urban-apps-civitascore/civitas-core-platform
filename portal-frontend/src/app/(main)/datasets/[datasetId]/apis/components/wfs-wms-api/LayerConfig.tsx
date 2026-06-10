@@ -123,6 +123,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
   const umlClass = getUmlClass(postGisDatastructures, currentDatastructureVersion?.id)
   const attributeOptions = toAttributeOptions(umlClass)
 
+  const layerErrors = form.formState.errors.layers
   const layerLabels = allLayers.map(layer => layer.title)
   const sidebarListLayers = allLayers.map((layer, index) => {
     const fallbackKey = isNewItem(layer) ? 'newLayer' : 'untitledLayer'
@@ -131,6 +132,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
       label: layer.title,
       value: layer.id,
       displayTitle: layer.title || t(fallbackKey, { index: untitledIndex }),
+      hasError: !!layerErrors?.[index],
     }
   })
 

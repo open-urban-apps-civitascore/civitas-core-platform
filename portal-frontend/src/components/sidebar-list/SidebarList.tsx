@@ -5,6 +5,7 @@ export type SidebarListItem = {
   label: string
   value: string
   displayTitle: string
+  hasError?: boolean
 }
 interface SidebarListProps {
   items: SidebarListItem[]
@@ -36,6 +37,7 @@ export const SidebarList = ({
               className={cn(
                 'w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm hover:bg-accent',
                 selectedItemIndex === index && 'bg-muted font-medium',
+                item.hasError && 'text-destructive',
               )}
             >
               {item.displayTitle}

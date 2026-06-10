@@ -414,6 +414,7 @@
               "saveLayerError": "Beim Speichern des Layers ist ein Fehler aufgetreten. Bitte versuche es erneut.",
               "deleteLayerSuccess": "Layer wurde erfolgreich gelöscht.",
               "deleteLayerError": "Beim Löschen des Layers ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "layerNameExists": "Für die gewählte Tabelle existiert bereits ein Layer mit dem Namen \"{name}\".",
               "createStyleSuccess": "Stil wurde erfolgreich angelegt.",
               "updateStyleSuccess": "Stil wurde erfolgreich aktualisiert.",
               "saveStyleError": "Beim Speichern des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",

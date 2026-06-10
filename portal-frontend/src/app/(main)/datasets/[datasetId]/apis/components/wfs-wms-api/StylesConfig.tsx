@@ -87,6 +87,7 @@ export const StylesConfig = (props: StylesConfigProps) => {
     e.target.value = ''
   }
 
+  const styleErrors = form.formState.errors.styles
   const styleLabels = allStyles.map(style => style.name)
   const sidebarListStyles = allStyles.map((style, index) => {
     const fallbackKey = isNewItem(style) ? 'newStyle' : 'untitledStyle'
@@ -95,6 +96,7 @@ export const StylesConfig = (props: StylesConfigProps) => {
       label: style.name,
       value: style.id,
       displayTitle: style.name || t(fallbackKey, { index: untitledIndex }),
+      hasError: !!styleErrors?.[index],
     }
   })
   return (

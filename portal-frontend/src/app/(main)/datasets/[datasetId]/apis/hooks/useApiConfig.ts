@@ -3,12 +3,12 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { FocusEvent, FormEvent, useCallback, useState } from 'react'
-import { UseFormReturn } from 'react-hook-form'
+import { Path, UseFormReturn } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { useCreateNamedApi, usePatchDataset } from '@/app/services/api/datasets/clientRequests'
 import { useCreateLayer, useUpdateLayer } from '@/app/services/api/datasets/layers/clientRequests'
-import { useCreateStyle, useUpdateStyle } from '@/app/services/api/styles/clientRequests'
+import { useCreateStyle, useUpdateStyle } from '@/app/services/api/datasets/styles/clientRequests'
 import { useError } from '@/hooks/use-error'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { Dataset } from '@/types/datasets'
@@ -22,6 +22,7 @@ import {
   StyleFormData,
   WfsWmsApiFormData,
 } from '@/types/namedApis'
+import { isLayerNameError, LayerSaveError } from '@/utils/errors'
 import { hasDirtyField } from '@/utils/form'
 import {
   buildStaPayloadData,
@@ -62,7 +63,6 @@ export const useApiConfig = <TFormData extends FormData>({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-
   const isCreate = !existingApi
   const [isReadOnly, setIsReadOnly] = useState(isCreate ? false : searchParams.get('mode') !== 'edit')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
@@ -143,10 +143,14 @@ export const useApiConfig = <TFormData extends FormData>({
     const payloads: LayerApiPayload[] = mapFormLayerToPayload(layersToSave)
     await Promise.all(
       layersToSave.map(async (layer, i) => {
-        if (isNew(layer)) {
-          await createLayer.mutateAsync({ datasetId: dataset.id, data: payloads[i] })
-        } else {
-          await updateLayer.mutateAsync({ datasetId: dataset.id, layerId: layer.id, data: payloads[i] })
+        try {
+          if (isNew(layer)) {
+            await createLayer.mutateAsync({ datasetId: dataset.id, data: payloads[i] })
+          } else {
+            await updateLayer.mutateAsync({ datasetId: dataset.id, layerId: layer.id, data: payloads[i] })
+          }
+        } catch (error) {
+          throw new LayerSaveError(error, data.layers.indexOf(layer))
         }
       }),
     )
@@ -182,6 +186,15 @@ export const useApiConfig = <TFormData extends FormData>({
     if (stylesToSave.some(s => !isNew(s))) toast.success(t('messages.updateStyleSuccess'))
   }
 
+  const handleLayerNameError = (error: LayerSaveError) => {
+    const layerName = (form.getValues(`layers.${error.layerIndex}.layerName` as Path<TFormData>) as string) ?? ''
+    toast.error(t('messages.layerNameExists', { name: layerName }))
+    form.setError(`layers.${error.layerIndex}.layerName` as Path<TFormData>, {
+      type: 'manual',
+      message: t('messages.layerNameExists', { name: layerName }),
+    })
+  }
+
   const handleSave = async (): Promise<boolean> => {
     let isSaved = false
     await form.handleSubmit(
@@ -193,8 +206,12 @@ export const useApiConfig = <TFormData extends FormData>({
             await handleSaveStyles(data)
           }
           isSaved = true
-        } catch {
-          toast.error(t('messages.saveError'))
+        } catch (error) {
+          if (error instanceof LayerSaveError && isLayerNameError(error.originalError)) {
+            handleLayerNameError(error)
+          } else {
+            toast.error(t('messages.saveError'))
+          }
         }
       },
       errors => {
