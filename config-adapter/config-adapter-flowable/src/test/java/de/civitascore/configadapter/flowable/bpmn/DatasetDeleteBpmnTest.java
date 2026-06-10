@@ -40,20 +40,24 @@ class DatasetDeleteBpmnTest {
   private SagaCommandHandler frostHandler;
   private SagaCommandHandler apisixHandler;
   private SagaCommandHandler redpandaHandler;
+  private SagaCommandHandler geoserverHandler;
 
   @BeforeEach
   void setUp() {
     frostHandler = mock(SagaCommandHandler.class);
     apisixHandler = mock(SagaCommandHandler.class);
     redpandaHandler = mock(SagaCommandHandler.class);
+    geoserverHandler = mock(SagaCommandHandler.class);
     when(frostHandler.adapter()).thenReturn("frost");
     when(apisixHandler.adapter()).thenReturn("apisix");
     when(redpandaHandler.adapter()).thenReturn("redpanda");
+    when(geoserverHandler.adapter()).thenReturn("geoserver");
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
     registry.register(apisixHandler);
     registry.register(redpandaHandler);
+    registry.register(geoserverHandler);
 
     processEngine = FlowableTestSupport.createTestEngine(Map.of("sagaHandlerRegistry", registry));
     runtimeService = processEngine.getRuntimeService();
@@ -147,6 +151,9 @@ class DatasetDeleteBpmnTest {
     verify(apisixHandler).handle(any());
     verify(frostHandler).handle(any());
   }
+
+  // GeoServer teardown on delete (hasGeoSink derived from a realistic trigger, not a preset
+  // variable) is covered end-to-end through FlowableTriggerConsumer in DatasetDeleteTriggerTest.
 
   private ProcessInstance startProcess(boolean hasPipelines) {
     Map<String, Object> variables = new HashMap<>();

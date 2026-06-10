@@ -17,8 +17,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.history.HistoricProcessInstanceQuery;
@@ -27,6 +29,9 @@ import org.flowable.engine.runtime.ProcessInstanceQuery;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -144,5 +149,58 @@ class FlowableTriggerConsumerHasPipelinesTest {
     ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
     verify(runtimeService).startProcessInstanceByKey(anyString(), anyString(), captor.capture());
     assertEquals(Boolean.FALSE, captor.getValue().get("hasPipelines"));
+  }
+
+  @ParameterizedTest(name = "hasGeoSink={1} when dataSinks={0}")
+  @MethodSource("geoSinkCases")
+  void deriveHasGeoSink(Object dataSinks, boolean expected) throws Exception {
+    TriggerTestSupport.processTrigger(consumer, triggerWith("dataSinks", dataSinks));
+
+    assertEquals(expected, capturedVariables().get("hasGeoSink"));
+  }
+
+  static Stream<Arguments> geoSinkCases() {
+    return Stream.of(
+        Arguments.of(
+            List.of(Map.of("dataSinkType", "FROST"), Map.of("dataSinkType", "POSTGIS")), true),
+        Arguments.of(List.of(Map.of("dataSinkType", "FROST")), false),
+        Arguments.of(List.of(), false),
+        Arguments.of(null, false));
+  }
+
+  @ParameterizedTest(name = "hasLayers={1} when layers={0}")
+  @MethodSource("layersCases")
+  void deriveHasLayers(Object layers, boolean expected) throws Exception {
+    TriggerTestSupport.processTrigger(consumer, triggerWith("layers", layers));
+
+    assertEquals(expected, capturedVariables().get("hasLayers"));
+  }
+
+  static Stream<Arguments> layersCases() {
+    return Stream.of(
+        Arguments.of(List.of(Map.of("layerName", "l-1")), true),
+        Arguments.of(List.of(), false),
+        Arguments.of(null, false));
+  }
+
+  /**
+   * Builds a minimal DATASET_CREATE trigger, including {@code field} only when {@code value} is
+   * set.
+   */
+  private byte[] triggerWith(String field, Object value) throws Exception {
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("sagaType", "DATASET_CREATE");
+    payload.put("datasetId", "ds-1");
+    if (value != null) {
+      payload.put(field, value);
+    }
+    return objectMapper.writeValueAsBytes(payload);
+  }
+
+  private Map<String, Object> capturedVariables() {
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+    verify(runtimeService).startProcessInstanceByKey(anyString(), anyString(), captor.capture());
+    return captor.getValue();
   }
 }
