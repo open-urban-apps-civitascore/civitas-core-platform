@@ -33,10 +33,10 @@ export const compileCanvas = (nodes: Node[], edges: Edge[]): Pick<MappingConfig,
   const resolve = (nodeId: string, handleId: string, derivedId: string): ValueNode => {
     if (nodeId === SOURCE_NODE_ID) return handleId
     const node = byId.get(nodeId)
-    if (!node) return ''
+    if (!node) throw new Error(`Compilation error: node ${nodeId} not found in canvas`)
     const data = node.data as TransformNodeData
     const def = mappingRegistry.byType[data.defType]
-    if (!def) return ''
+    if (!def) throw new Error(`Compilation error: transform type ${data.defType} not found in registry`)
     positions[derivedId] = node.position
     const ports = data.inputs ?? def.inputs
     const inputs: ValueNode[] = []

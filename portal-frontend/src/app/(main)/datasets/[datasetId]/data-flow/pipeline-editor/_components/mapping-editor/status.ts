@@ -83,8 +83,16 @@ export const computeStatus = (
     // Directly connected target port.
     if (edge) {
       const src = endpointInfo(edge.source, edge.sourceHandle ?? '')
-      const isMismatch = !!src && src.type !== field.portType
+      // Port category mismatch (scalar vs object/array), OR — for scalar ports
+      // (which now include geometries as first-class types) — a concrete subtype
+      // mismatch such as Point vs Polygon. The source's `sub` carries the concrete
+      // field type, so comparing it to the target's `type` catches it directly.
+      const hasCategoryMismatch = !!src && src.type !== field.portType
+      const hasSubtypeMismatch = !!src && field.portType === 'scalar' && !!src.sub && src.sub !== field.type
+      const isMismatch = hasCategoryMismatch || hasSubtypeMismatch
+
       targetPortStatus[path] = isMismatch ? 'mismatch' : 'mapped'
+
       if (isLeaf && isMismatch) errors++
       else if (isLeaf) mapped++
       return
@@ -99,6 +107,8 @@ export const computeStatus = (
     if (ancestorPath && ancestorSource) {
       const names = relativeNameChain(ancestorPath, path, targetFields)
       const counterpart = resolveCoveredLeaf(ancestorSource, names)
+      // Geometries are first-class types (Point, Polygon, …), so exact-type equality
+      // already enforces Point↔Point and rejects Point↔Polygon.
       if (counterpart && counterpart.type === field.type) {
         targetPortStatus[path] = 'mapped'
         if (isLeaf) mapped++

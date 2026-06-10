@@ -2,7 +2,7 @@ import type { PortType } from '@/components/node-editor/types'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import type { UMLClass, UMLElement, UMLRelationship, UMLType } from '@/components/uml-modeler/types/uml'
 
-import type { FieldNode, FieldType, SchemaTree } from '../_types'
+import type { FieldNode, FieldType, GeometryType, SchemaTree } from '../_types'
 
 export const PRIMITIVE: Record<string, FieldType> = {
   String: 'str',
@@ -18,7 +18,7 @@ export const PRIMITIVE: Record<string, FieldType> = {
   Date: 'date',
 }
 
-export const GEOMETRY = new Set([
+export const GEOMETRY = new Set<GeometryType>([
   'Point',
   'LineString',
   'Polygon',
@@ -28,10 +28,15 @@ export const GEOMETRY = new Set([
   'GeometryCollection',
 ])
 
+/** Type guard: is the given UML type name one of the concrete geometry types? */
+const isGeometry = (type: string): type is GeometryType => (GEOMETRY as Set<string>).has(type)
+
 const STRUCTURAL = new Set<UMLRelationship['type']>(['association', 'aggregation', 'composition'])
 
+// Geometries are scalar-like: a Point port matches another Point port the same way
+// int matches int, so they render as scalar handles rather than object handles.
 const portTypeFor = (type: FieldType): PortType =>
-  type === 'array' ? 'array' : type === 'object' || type === 'geo' ? 'object' : 'scalar'
+  type === 'array' ? 'array' : type === 'object' ? 'object' : 'scalar'
 
 const isMany = (multiplicity?: string): boolean => !!multiplicity && multiplicity.includes('*')
 
@@ -39,8 +44,10 @@ const hasAttributes = (el: UMLElement): el is UMLClass => el.type === 'class' ||
 
 const lowerFirst = (value: string): string => value.charAt(0).toLowerCase() + value.slice(1)
 
+// Geometries map to their concrete type name (Point, Polygon, …) so Point vs Polygon
+// mismatches are caught by exact-type matching; other primitives map via PRIMITIVE.
 const scalarType = (type: UMLType): FieldType => {
-  if (typeof type === 'string') return GEOMETRY.has(type) ? 'geo' : (PRIMITIVE[type] ?? 'str')
+  if (typeof type === 'string') return isGeometry(type) ? type : (PRIMITIVE[type] ?? 'str')
   return 'str'
 }
 

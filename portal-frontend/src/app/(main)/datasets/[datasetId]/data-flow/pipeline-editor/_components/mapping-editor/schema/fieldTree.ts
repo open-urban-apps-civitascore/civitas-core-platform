@@ -20,6 +20,8 @@ export const flattenTree = (tree: SchemaTree): Map<string, FieldNode> => {
  * sense when the nested field names line up exactly, so name equality is required.
  */
 export const objectFieldsCompatible = (source: FieldNode, target: FieldNode): boolean => {
+  // Exact-type equality also covers geometries, which are first-class types now
+  // (Point, Polygon, …), so a Point can't structurally auto-map onto a Polygon.
   if (source.type !== target.type) return false
 
   const targetChildren = target.children ?? []

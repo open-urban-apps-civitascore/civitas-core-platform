@@ -7,7 +7,21 @@ export const ARRAY_EDGE_STYLE = { strokeWidth: 3, stroke: 'hsl(var(--primary))' 
 // Field tree (produced by the schema adapter, consumed by the MegaNodes)
 // ---------------------------------------------------------------------------
 
-export type FieldType = 'str' | 'int' | 'float' | 'bool' | 'date' | 'geo' | 'array' | 'object'
+/**
+ * Concrete geometry types are first-class field types (alongside the scalar
+ * primitives) so Point vs Polygon mismatches are caught by the same exact-subtype
+ * matching used for int↔int / str↔str.
+ */
+export type GeometryType =
+  | 'Point'
+  | 'LineString'
+  | 'Polygon'
+  | 'MultiPoint'
+  | 'MultiLineString'
+  | 'MultiPolygon'
+  | 'GeometryCollection'
+
+export type FieldType = 'str' | 'int' | 'float' | 'bool' | 'date' | GeometryType | 'array' | 'object'
 
 export interface FieldNode {
   /** JSONPath, e.g. "$.klassen[].name" */

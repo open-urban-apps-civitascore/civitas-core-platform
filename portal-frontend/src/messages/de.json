@@ -15,6 +15,7 @@
     "form": "Formular",
     "actions": {
       "submit": "Speichern",
+      "apply": "Übernehmen",
       "cancel": "Abbrechen",
       "close": "Schließen",
       "delete": "Löschen",

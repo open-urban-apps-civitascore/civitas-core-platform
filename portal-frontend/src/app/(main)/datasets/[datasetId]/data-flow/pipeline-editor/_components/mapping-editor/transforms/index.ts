@@ -76,18 +76,19 @@ export const LITERAL_DEFAULT_TYPE = 'String'
 /**
  * Given a UML type name, returns the output PortDef for a literal node.
  * Reuses adapter.ts's GEOMETRY set and PRIMITIVE map — single source of truth.
- * Geo types → object port (dataType='geo'); primitives → scalar port with matching subtype.
+ * Geometries are scalar-like first-class types: their `dataType` is the concrete
+ * geometry name (e.g. 'Point') so Point vs Polygon is matched exactly like int↔int;
+ * other primitives → scalar port with the matching subtype.
  */
 export const literalOutputPort = (umlType: string): PortDef => {
-  if (GEOMETRY.has(umlType)) {
-    return { id: 'out', label: 'value', type: 'object', dataType: 'geo' }
-  }
-  return { id: 'out', label: 'value', type: 'scalar', dataType: PRIMITIVE[umlType] ?? 'str' }
+  const dataType = (GEOMETRY as Set<string>).has(umlType) ? umlType : (PRIMITIVE[umlType] ?? 'str')
+  return { id: 'out', label: 'value', type: 'scalar', dataType }
 }
 
 const literal: MappingTransformDef = {
   type: 'const',
   category: 'categories.literal',
+
   label: 'Literal',
   description: 'transforms.literal.description',
   icon: Hash,

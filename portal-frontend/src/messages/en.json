@@ -15,6 +15,7 @@
     "form": "Form",
     "actions": {
       "submit": "Save",
+      "apply": "Apply",
       "close": "Close",
       "cancel": "Cancel",
       "delete": "Delete",

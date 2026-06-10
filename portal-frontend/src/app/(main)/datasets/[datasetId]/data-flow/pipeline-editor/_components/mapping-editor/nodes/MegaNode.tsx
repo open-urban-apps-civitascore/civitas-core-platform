@@ -28,6 +28,7 @@ interface RowProps {
 
 const Row = ({ field, role, depth, status }: RowProps) => {
   const pad = 8 + depth * 12
+  // `field.type` already carries the concrete type, incl. geometries (Point, Polygon, …).
   const typeBadge = <span className="text-[10px] uppercase text-muted-foreground">{field.type}</span>
 
   if (role === 'target') {

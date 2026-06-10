@@ -132,12 +132,17 @@ export const MappingEditorModal = ({
   const endpointInfo = (nodeId: string, handleId: string): { type: PortType; sub?: string } | null => {
     if (nodeId === SOURCE_NODE_ID) {
       const field = sourceFields.get(handleId)
-      return field ? { type: field.portType, sub: field.type } : null
+      if (!field) return null
+      // `sub` is the concrete field type (incl. geometry names like 'Point') so the
+      // scalar subtype check matches Point↔Point and blocks Point↔Polygon.
+      return { type: field.portType, sub: field.type }
     }
     if (nodeId === TARGET_NODE_ID) {
       const field = targetFields.get(handleId)
-      return field ? { type: field.portType, sub: field.type } : null
+      if (!field) return null
+      return { type: field.portType, sub: field.type }
     }
+
     const node = nodes.find(n => n.id === nodeId)
     if (!node) return null
     const data = node.data as TransformNodeData
@@ -150,8 +155,10 @@ export const MappingEditorModal = ({
   /**
    * Two ports are compatible when:
    *  - both have the same portType category (scalar / array / object)
-   *  - AND for scalars: the primitive subtype matches exactly (int↔int, str↔str, …)
-   *    — type conversions must go through an explicit conversion node.
+   *  - AND for scalars: the subtype matches exactly (int↔int, str↔str, Point↔Point, …)
+   *    — type conversions must go through an explicit conversion node, and geometries
+   *    (first-class scalar-like types) only connect to the same geometry kind, so
+   *    Point↔Polygon is blocked automatically.
    */
   const portsCompatible = useCallback(
     (from: { type: PortType; sub?: string } | null, to: { type: PortType; sub?: string } | null): boolean => {
@@ -313,7 +320,7 @@ export const MappingEditorModal = ({
       <span className="text-center text-xs text-muted-foreground">{t('toolbar.status', { mapped, unmapped })}</span>
       <div className="flex items-center justify-end gap-2">
         <Button size="sm" onClick={handleSave}>
-          {tCommon('actions.submit')}
+          {tCommon('actions.apply')}
         </Button>
         <Button size="sm" variant="outline" onClick={() => onOpenChange(false)}>
           {tCommon('actions.close')}
