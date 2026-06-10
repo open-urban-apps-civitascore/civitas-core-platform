@@ -50,9 +50,11 @@ import org.owasp.encoder.Encode;
  *
  * <p>Input contract (process variables forwarded from the saga trigger): {@code datasetId} (the
  * workspace name is derived from it), an optional {@code dataSinks} list whose {@code POSTGIS}
- * sinks carry {@code configuration.tableName} (used as the default native table for layers), and a
- * {@code layers} list of {@code {layerName, nativeName?, crs?}} describing the feature types to
- * publish. Connection parameters for the PostGIS datastore are read from adapter config: {@code
+ * sinks carry {@code configuration.tableName}, and a {@code layers} list of {@code {layerName,
+ * nativeName?, crs?}} describing the feature types to publish. A layer's native PostGIS table is
+ * its {@code nativeName}; if omitted it defaults to the single {@code POSTGIS} sink table (or the
+ * layer name when no sink is given), and {@code nativeName} is required when multiple table sinks
+ * exist. Connection parameters for the PostGIS datastore are read from adapter config: {@code
  * geoserver.postgis.host}, {@code .port}, {@code .database}, {@code .schema}, {@code .user}, {@code
  * .password}.
  */
@@ -378,7 +380,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   private void processLayers(
       SagaCommandMessage command, String workspaceName, String datastoreName, boolean upsert) {
     List<Map<String, Object>> layers = mapList(command, "layers");
-    String defaultNativeName = firstSinkTableName(command);
+    List<String> sinkTables = sinkTableNames(command);
     for (Map<String, Object> layer : layers) {
       String layerName = stringValue(layer, "layerName");
       if (layerName == null || layerName.isBlank()) {
@@ -388,10 +390,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
         throw new IllegalArgumentException("layer is missing the required field: layerName");
       }
       requireSafeName(layerName, "layerName");
-      String nativeName = stringValue(layer, "nativeName");
-      if (nativeName == null || nativeName.isBlank()) {
-        nativeName = defaultNativeName != null ? defaultNativeName : layerName;
-      }
+      String nativeName = resolveNativeName(layer, layerName, sinkTables);
       requireSafeName(nativeName, "nativeName");
       String crs = stringValue(layer, "crs");
       if (crs == null || crs.isBlank()) {
@@ -405,18 +404,48 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     }
   }
 
-  /** Returns the {@code tableName} of the first {@code POSTGIS} data sink, or {@code null}. */
-  private static String firstSinkTableName(SagaCommandMessage command) {
+  /**
+   * Resolves the native PostGIS table for a layer: the layer's explicit {@code nativeName}; else
+   * the dataset's single {@code POSTGIS} sink table when there is exactly one; else the layer name
+   * when no table sink is provided. Fails when multiple distinct table sinks exist and the layer
+   * doesn't say which one — otherwise every nativeName-less layer would silently collapse onto the
+   * first table and the other tables would never be published.
+   */
+  private static String resolveNativeName(
+      Map<String, Object> layer, String layerName, List<String> sinkTables) {
+    String explicit = stringValue(layer, "nativeName");
+    if (explicit != null && !explicit.isBlank()) {
+      return explicit;
+    }
+    if (sinkTables.size() == 1) {
+      return sinkTables.get(0);
+    }
+    if (sinkTables.isEmpty()) {
+      return layerName;
+    }
+    throw new IllegalArgumentException(
+        "layer '"
+            + layerName
+            + "' must specify nativeName: the native table cannot be inferred from "
+            + sinkTables.size()
+            + " POSTGIS data sinks");
+  }
+
+  /** Distinct {@code tableName}s across the {@code POSTGIS} data sinks, in encounter order. */
+  private static List<String> sinkTableNames(SagaCommandMessage command) {
+    List<String> tables = new ArrayList<>();
     for (Map<String, Object> sink : mapList(command, "dataSinks")) {
       if (!DATASINK_TYPE_POSTGIS.equals(sink.get("dataSinkType"))) {
         continue;
       }
       Map<String, Object> configuration = mapValue(sink, "configuration");
-      if (configuration.get("tableName") instanceof String tableName && !tableName.isBlank()) {
-        return tableName;
+      if (configuration.get("tableName") instanceof String tableName
+          && !tableName.isBlank()
+          && !tables.contains(tableName)) {
+        tables.add(tableName);
       }
     }
-    return null;
+    return tables;
   }
 
   // ── Payload type guards ─────────────────────────────────────────────────────

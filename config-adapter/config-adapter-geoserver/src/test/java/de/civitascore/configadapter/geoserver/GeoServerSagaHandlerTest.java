@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class GeoServerSagaHandlerTest {
 
@@ -175,6 +176,77 @@ class GeoServerSagaHandlerTest {
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
         verify(mockBuilder, times(0)).post(any(Entity.class));
+      }
+    }
+
+    @Test
+    void usesSingleSinkTableAsNativeNameWhenLayerOmitsIt() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "dataSinks",
+                        List.of(
+                            Map.of(
+                                "dataSinkType",
+                                "POSTGIS",
+                                "configuration",
+                                Map.of("tableName", "traffic"))),
+                        "layers",
+                        List.of(Map.of("layerName", "roads")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // A layer without nativeName resolves to the single sink table, not its own layer name.
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder).post(captor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> featureType =
+            (Map<String, Object>)
+                ((Map<String, Object>) captor.getValue().getEntity()).get("featureType");
+        assertEquals("roads", featureType.get("name"));
+        assertEquals("traffic", featureType.get("nativeName"));
+      }
+    }
+
+    @Test
+    void failsWhenNativeNameAmbiguousAcrossMultipleSinks() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // Two table sinks and a layer without nativeName → can't infer the table → fail (don't
+        // silently collapse onto the first table and drop the second).
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "dataSinks",
+                        List.of(
+                            Map.of(
+                                "dataSinkType",
+                                "POSTGIS",
+                                "configuration",
+                                Map.of("tableName", "t1")),
+                            Map.of(
+                                "dataSinkType",
+                                "POSTGIS",
+                                "configuration",
+                                Map.of("tableName", "t2"))),
+                        "layers",
+                        List.of(Map.of("layerName", "roads")))));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertTrue(result.error().contains("nativeName"), result.error());
       }
     }
 
