@@ -156,6 +156,10 @@ test-config-adapter:
   script:
     - cd config-adapter
     - mvn $MAVEN_CLI_OPTS test -Drevision=$CONFIG_ADAPTER_VERSION -T 2
+    # Failsafe integration tests (*IT.java) — same explicit-goals pattern as backend.yml so
+    # package/spotless/spotbugs don't re-run here. Currently the Flowable saga IT
+    # (Testcontainers: PostGIS + FROST) via the dind service above.
+    - mvn $MAVEN_CLI_OPTS test-compile failsafe:integration-test failsafe:verify -Drevision=$CONFIG_ADAPTER_VERSION
     # Aggregate coverage from all modules
     - |
       awk -F, \
@@ -170,9 +174,12 @@ test-config-adapter:
     expire_in: 1 month
     paths:
       - config-adapter/*/target/surefire-reports/
+      - config-adapter/*/target/failsafe-reports/
       - config-adapter/*/target/site/jacoco/
     reports:
-      junit: config-adapter/*/target/surefire-reports/TEST-*.xml
+      junit:
+        - config-adapter/*/target/surefire-reports/TEST-*.xml
+        - config-adapter/*/target/failsafe-reports/TEST-*.xml
       coverage_report:
         coverage_format: jacoco
         path: config-adapter/*/target/site/jacoco/jacoco.xml

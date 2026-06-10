@@ -5,6 +5,7 @@ import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.model.dataset.NamedApi;
 import de.civitascore.configadapter.model.saga.SagaType;
+import de.civitascore.portal.model.saga.DataSinkPayload;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -45,6 +46,7 @@ public sealed interface SagaTrigger
       String description,
       boolean openDataAccess,
       List<Datasource> datasources,
+      List<DataSinkPayload> datasinks,
       List<DataPipeline> dataPipelines,
       List<NamedApi> namedApis)
       implements SagaTrigger {
@@ -63,6 +65,7 @@ public sealed interface SagaTrigger
         String description,
         boolean openDataAccess,
         List<Datasource> datasources,
+        List<DataSinkPayload> datasinks,
         List<DataPipeline> dataPipelines,
         List<NamedApi> namedApis) {
       return new DatasetCreate(
@@ -72,6 +75,7 @@ public sealed interface SagaTrigger
           description,
           openDataAccess,
           datasources,
+          datasinks,
           dataPipelines,
           namedApis);
     }
@@ -89,6 +93,7 @@ public sealed interface SagaTrigger
       String serviceId,
       List<String> pipelineIds,
       List<Datasource> datasources,
+      List<DataSinkPayload> datasinks,
       List<DataPipeline> dataPipelines,
       List<NamedApi> namedApis)
       implements SagaTrigger {
@@ -111,6 +116,7 @@ public sealed interface SagaTrigger
         String serviceId,
         List<String> pipelineIds,
         List<Datasource> datasources,
+        List<DataSinkPayload> datasinks,
         List<DataPipeline> dataPipelines,
         List<NamedApi> namedApis) {
       return new DatasetUpdate(
@@ -124,6 +130,7 @@ public sealed interface SagaTrigger
           serviceId,
           pipelineIds,
           datasources,
+          datasinks,
           dataPipelines,
           namedApis);
     }

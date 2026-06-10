@@ -444,7 +444,7 @@ de.civitascore.dataset.geoserver.result
   "datasetName": "Traffic Counts Dataset",
   "datasinks": [
     {
-      "type": "GEO_PERSISTENCE",
+      "type": "POSTGIS",
       "configuration": {
         "tableName": "traffic_counts",
         "primaryKey": "id",
@@ -460,7 +460,7 @@ de.civitascore.dataset.geoserver.result
 `PROVISION_WORKSPACE` derives the workspace name from `datasetId` via `toWorkspaceName()`:
 lowercases and replaces all non-alphanumeric/non-underscore characters with `_`.
 
-Only datasinks with `"type": "GEO_PERSISTENCE"` are provisioned as feature types; other sink types
+Only datasinks with `"type": "POSTGIS"` are provisioned as feature types; other sink types
 are skipped. From each sink's `configuration`, only `tableName`, `crs`, and `projectionPolicy`
 (default `REPROJECT_TO_DECLARED`) are forwarded — fields such as `primaryKey` and `geometryColumn`
 are derived by GeoServer from the PostGIS table and intentionally not sent. `UPDATE_WORKSPACE`

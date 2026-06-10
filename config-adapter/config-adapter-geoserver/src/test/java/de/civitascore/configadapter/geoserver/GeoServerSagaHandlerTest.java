@@ -98,7 +98,7 @@ class GeoServerSagaHandlerTest {
                     List.of(
                         Map.of(
                             "type",
-                            "GEO_PERSISTENCE",
+                            "POSTGIS",
                             "configuration",
                             Map.of(
                                 "tableName", "traffic_counts",
@@ -140,7 +140,7 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
-    void skipsDatasinksThatAreNotGeoPersistence() {
+    void skipsDatasinksThatAreNotPostgis() {
       try (GeoServerSagaHandler handler = createHandler()) {
         Response created = mock(Response.class);
         when(created.getStatus()).thenReturn(201);
@@ -164,7 +164,7 @@ class GeoServerSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
-        // Only workspace + datastore are created; a non-GEO_PERSISTENCE sink yields no feature
+        // Only workspace + datastore are created; a non-POSTGIS sink yields no feature
         // type.
         verify(mockBuilder, times(2)).post(any(Entity.class));
       }
@@ -523,14 +523,13 @@ class GeoServerSagaHandlerTest {
         type, "msg-001", "saga-001", "provision-workspace", "geoserver", operation, payload);
   }
 
-  /** UPDATE_WORKSPACE payload with a single GEO_PERSISTENCE datasink for the given table. */
+  /** UPDATE_WORKSPACE payload with a single POSTGIS datasink for the given table. */
   private static Map<String, Object> updatePayload(String tableName) {
     return Map.of(
         "workspaceName",
         "myws",
         "datasinks",
-        List.of(
-            Map.of("type", "GEO_PERSISTENCE", "configuration", Map.of("tableName", tableName))));
+        List.of(Map.of("type", "POSTGIS", "configuration", Map.of("tableName", tableName))));
   }
 
   /** Mocks a 200 {@code featuretypes.json} response listing the given feature type names. */

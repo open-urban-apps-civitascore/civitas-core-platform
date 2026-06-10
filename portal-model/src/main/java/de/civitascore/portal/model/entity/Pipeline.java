@@ -23,8 +23,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /**
- * Represents a data ingestion pipeline belonging to a {@link DataSet}. Holds the executable
- * RedpandaConnect configuration and the associated {@link DataSource DataSources}.
+ * Represents a data ingestion pipeline belonging to a {@link DataSet}. Holds the editor-built
+ * pipeline definition and the associated {@link DataSource DataSources}.
  */
 @Entity
 @Table(
@@ -54,7 +54,7 @@ public class Pipeline extends NamedEntity {
   @Builder.Default
   private Set<DataSource> dataSources = new HashSet<>();
 
-  /** Executable RedpandaConnect configuration in JSON/YAML format. */
+  /** Editor-built pipeline definition (opaque JSON); forwarded to the config-adapter as-is. */
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "model", columnDefinition = "jsonb")
   private Map<String, Object> model;

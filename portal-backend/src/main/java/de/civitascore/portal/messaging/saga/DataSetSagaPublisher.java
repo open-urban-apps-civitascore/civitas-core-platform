@@ -4,9 +4,16 @@ import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.model.dataset.NamedApi;
 import de.civitascore.portal.configuration.SagaProperties;
+import de.civitascore.portal.model.datasink.PostgisConfiguration;
 import de.civitascore.portal.model.embedded.PipelineAction;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.saga.DataSinkPayload;
+import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.service.DataStructureVersionService;
+import de.civitascore.portal.util.InvalidInputException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -26,9 +33,9 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Publishes dataset saga trigger messages to Kafka for the config-adapter orchestrator. Supports
- * create, update, and delete saga triggers that provision or tear down FROST, APISIX, and Redpanda
- * infrastructure. Sends synchronously to ensure Kafka acceptance before the database transaction
- * commits.
+ * create, update, and delete saga triggers that provision or tear down FROST, APISIX, and
+ * pipeline-engine infrastructure. Sends synchronously to ensure Kafka acceptance before the
+ * database transaction commits.
  */
 @Slf4j
 @Service
@@ -37,14 +44,23 @@ public class DataSetSagaPublisher {
   private final KafkaTemplate<String, String> eventKafkaTemplate;
   private final ObjectMapper objectMapper;
   private final SagaProperties sagaProperties;
+  private final DataSinkRepository dataSinkRepository;
+  private final DataStructureVersionRepository dataStructureVersionRepository;
+  private final DataStructureVersionService dataStructureVersionService;
 
   public DataSetSagaPublisher(
       KafkaTemplate<String, String> eventKafkaTemplate,
       ObjectMapper objectMapper,
-      SagaProperties sagaProperties) {
+      SagaProperties sagaProperties,
+      DataSinkRepository dataSinkRepository,
+      DataStructureVersionRepository dataStructureVersionRepository,
+      DataStructureVersionService dataStructureVersionService) {
     this.eventKafkaTemplate = eventKafkaTemplate;
     this.objectMapper = objectMapper;
     this.sagaProperties = sagaProperties;
+    this.dataSinkRepository = dataSinkRepository;
+    this.dataStructureVersionRepository = dataStructureVersionRepository;
+    this.dataStructureVersionService = dataStructureVersionService;
   }
 
   /**
@@ -61,6 +77,7 @@ public class DataSetSagaPublisher {
             dataset.getDescription(),
             dataset.getOpenDataAccess(),
             buildDatasources(dataset),
+            buildDatasinks(dataset),
             buildPipelines(dataset.getPipelines(), PipelineAction.ADD),
             buildNamedApis(dataset));
     sendTrigger(trigger);
@@ -83,6 +100,7 @@ public class DataSetSagaPublisher {
             dataset.getServiceId(),
             dataset.getPipelineIds(),
             buildDatasources(dataset),
+            buildDatasinks(dataset),
             buildPipelineDiff(previousPipelines, dataset.getPipelines()),
             buildNamedApis(dataset));
     sendTrigger(trigger);
@@ -125,6 +143,67 @@ public class DataSetSagaPublisher {
               return datasource;
             })
         .toList();
+  }
+
+  /**
+   * Flat, deduplicated datasinks across the dataset's pipelines (mirrors {@link
+   * #buildDatasources}).
+   */
+  private List<DataSinkPayload> buildDatasinks(DataSet dataset) {
+    if (dataset.getPipelines() == null) {
+      return List.of();
+    }
+
+    Set<UUID> seen = new HashSet<>();
+    return dataset.getPipelines().stream()
+        .flatMap(p -> dataSinkRepository.findByPipelineId(p.getId()).stream())
+        .filter(sink -> seen.add(sink.getId()))
+        .map(this::toDataSinkPayload)
+        .toList();
+  }
+
+  private DataSinkPayload toDataSinkPayload(DataSink sink) {
+    return new DataSinkPayload(
+        sink.getId().toString(),
+        sink.getDataSinkType() != null ? sink.getDataSinkType().name() : null,
+        sink.getConfiguration(),
+        resolveDataStructure(sink));
+  }
+
+  /**
+   * Resolves the sink's referenced data-structure model from Model Atlas. {@code null} when no
+   * version is referenced (e.g. FROST); throws {@link InvalidInputException} if a referenced
+   * version cannot be resolved, failing the publish. The id is already validated at sink save time.
+   */
+  private Map<String, Object> resolveDataStructure(DataSink sink) {
+    if (sink.getConfiguration() == null) {
+      return null;
+    }
+    UUID dsvId =
+        objectMapper
+            .convertValue(sink.getConfiguration(), PostgisConfiguration.class)
+            .getDataStructureVersionId();
+    if (dsvId == null) {
+      return null; // e.g. FROST sink — no data-structure version
+    }
+    var version =
+        dataStructureVersionRepository
+            .findById(dsvId)
+            .orElseThrow(
+                () ->
+                    new InvalidInputException(
+                        "DataSink",
+                        "configuration.dataStructureVersionId",
+                        "DataStructureVersion not found: " + dsvId));
+    return dataStructureVersionService
+        .resolveModelJsonByAtlasUri(version.getModelAtlasUri())
+        .filter(model -> !model.isEmpty())
+        .orElseThrow(
+            () ->
+                new InvalidInputException(
+                    "DataSink",
+                    "configuration.dataStructureVersionId",
+                    "Cannot resolve model from Model Atlas for DataStructureVersion " + dsvId));
   }
 
   private List<DataPipeline> buildPipelines(Set<Pipeline> pipelines, PipelineAction action) {
