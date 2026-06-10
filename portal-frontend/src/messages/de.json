@@ -469,7 +469,32 @@
           "empty": "Noch keine Visualisierungen vorhanden",
           "addButton": "Visualisierung hinzufügen",
           "dashboard": "Dashboard",
-          "dashboardSubtitle": "Diagramme"
+          "dashboardSubtitle": "Diagramme",
+          "config": {
+            "title": {
+              "dashboard": "Neues Dashboard"
+            },
+            "type": {
+              "dashboard": "Dashboard"
+            },
+            "protectedBadge": "Geschützt",
+            "openDataBadge": "Open Data",
+            "tabs": {
+              "basicInfo": "Basisinformationen"
+            },
+            "form": {
+              "sectionTitle": "Basisinformationen",
+              "type": "Typ",
+              "title": "Titel",
+              "titlePlaceholder": "",
+              "description": "Beschreibung",
+              "descriptionHint": "max. 150 Zeichen, optional",
+              "descriptionPlaceholder": "Optionale Beschreibung, falls später benötigt."
+            },
+            "messages": {
+              "saveError": "Beim Speichern ist ein Fehler aufgetreten. Bitte versuche es erneut."
+            }
+          }
         }
       }
     },
