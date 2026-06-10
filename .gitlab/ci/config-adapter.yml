@@ -139,7 +139,6 @@ test-config-adapter:
   services:
     - name: docker:27-dind
       alias: docker
-      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
     DOCKER_HOST: tcp://docker:2375
@@ -274,7 +273,6 @@ build-config-adapter-image:
       optional: true
   services:
     - name: docker:27-dind
-      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
