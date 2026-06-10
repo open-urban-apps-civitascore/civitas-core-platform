@@ -152,7 +152,6 @@ build-frontend-image:
     - job: test-frontend
   services:
     - name: docker:27-dind
-      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
