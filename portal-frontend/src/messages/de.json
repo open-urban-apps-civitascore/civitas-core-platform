@@ -306,6 +306,38 @@
               "styles": "Stile",
               "placeholder": "Inhalte folgen in einem späteren Schritt."
             },
+            "styles": {
+              "title": "Stile",
+              "addStyle": "Stil hinzufügen",
+              "newStyle": "Neuer Stil {index}",
+              "untitledStyle": "Unbenannter Stil {index}",
+
+              "name": "Name",
+              "sldFile": "SLD-Datei",
+              "sldFilePlaceholder": "SLD auswählen...",
+              "styleEditor": "Stil-Editor",
+              "deleteStyle": "Stil löschen",
+              "validation": {
+                "nameRequired": "Stilname ist erforderlich",
+                "sldContentRequired": "Stilinhalt ist erforderlich"
+              },
+              "noStyles": {
+                "title": "Keine Stile vorhanden",
+                "subtitle": "Stile können erstellt und anschließend den Layern dieser API zugeordnet werden"
+              },
+              "deleteModal": {
+                "title": "Stil wirklich löschen?",
+                "description": "Diese Änderung hat folgende Auswirkungen:\n• Der Stil steht nicht mehr zur Verfügung\n• Layer, die diesen Stil verwenden, verlieren ihre aktuelle Darstellung\n• Die Darstellung kann sich in verbundenen Diensten (z. B. WMS) ändern"
+              },
+              "messages": {
+                "deleteSuccess": "Stil wurde erfolgreich gelöscht.",
+                "deleteError": "Beim Löschen des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+                "createSuccess": "Stil wurde erfolgreich erstellt.",
+                "updateSuccess": "Stil wurde erfolgreich aktualisiert.",
+                "saveError": "Beim Speichern des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+                "saveSuccess": "Stile wurden erfolgreich gespeichert."
+              }
+            },
             "baseInfo": {
               "sectionTitle": "Basisinformationen",
               "type": "Typ",
@@ -382,8 +414,15 @@
               "updateLayerSuccess": "Layer wurde erfolgreich aktualisiert.",
               "saveLayerError": "Beim Speichern des Layers ist ein Fehler aufgetreten. Bitte versuche es erneut.",
               "deleteLayerSuccess": "Layer wurde erfolgreich gelöscht.",
-              "deleteLayerError": "Beim Löschen des Layers ist ein Fehler aufgetreten. Bitte versuche es erneut."
+              "deleteLayerError": "Beim Löschen des Layers ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "layerNameExists": "Für die gewählte Tabelle existiert bereits ein Layer mit dem Namen \"{name}\".",
+              "createStyleSuccess": "Stil wurde erfolgreich angelegt.",
+              "updateStyleSuccess": "Stil wurde erfolgreich aktualisiert.",
+              "saveStyleError": "Beim Speichern des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "deleteStyleSuccess": "Stil wurde erfolgreich gelöscht.",
+              "deleteStyleError": "Beim Löschen des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut."
             },
+
             "errors": {
               "name": {
                 "required": "Bezeichnung ist erforderlich"

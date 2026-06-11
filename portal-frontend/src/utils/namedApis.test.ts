@@ -12,6 +12,7 @@ const makeLayer = (overrides: Partial<LayerFormData> = {}): LayerFormData => ({
   title: 'Layer 1',
   layerName: 'layer_1',
   description: '',
+  keywords: [],
   dataSinkId: '00000000-0000-0000-0000-000000000002',
   attribute: ['geom'],
   cqlFilter: '',

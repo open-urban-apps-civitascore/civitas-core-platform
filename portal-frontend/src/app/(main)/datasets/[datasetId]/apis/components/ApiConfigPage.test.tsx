@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { UseFormReturn } from 'react-hook-form'
@@ -26,6 +27,12 @@ vi.mock('@/app/services/api/datasets/clientRequests', () => ({
 vi.mock('@/app/services/api/datasets/layers/clientRequests', () => ({
   useCreateLayer: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateLayer: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}))
+
+vi.mock('@/app/services/api/styles/clientRequests', () => ({
+  useCreateStyle: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateStyle: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteStyle: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -99,13 +106,17 @@ interface RenderProps {
   existingApi?: NamedApi
 }
 
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
 const renderComponent = ({ dataset, apiType, existingApi }: RenderProps = {}) =>
   render(
-    <ApiConfigPage
-      dataset={dataset ?? makeDataset()}
-      apiType={apiType ?? API_TYPE_QUERY.SENSORTHINGS}
-      existingApi={existingApi}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <ApiConfigPage
+        dataset={dataset ?? makeDataset()}
+        apiType={apiType ?? API_TYPE_QUERY.SENSORTHINGS}
+        existingApi={existingApi}
+      />
+    </QueryClientProvider>,
   )
 
 // --- tests ---

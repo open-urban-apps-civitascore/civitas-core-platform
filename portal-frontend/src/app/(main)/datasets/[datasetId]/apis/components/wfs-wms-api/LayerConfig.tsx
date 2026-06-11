@@ -11,6 +11,7 @@ import { TextField } from '@/components/form/fields/TextField'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { NoDataCard } from '@/components/no-data/no-data-card/NoDataCard'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
+import { SidebarList } from '@/components/sidebar-list/SidebarList'
 import { Button } from '@/components/ui/button'
 import { FormItem, FormLabel } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -19,14 +20,13 @@ import { crsOptions } from '@/const/crs'
 import { cn } from '@/lib/utils'
 import { Datasink } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
-import { LayerFormData, Style, WfsWmsApiFormData } from '@/types/namedApis'
+import { Style, WfsWmsApiFormData } from '@/types/namedApis'
+import { getEmptyLabelIndex, isNewItem } from '@/utils/common'
 
 import { BoundingBoxConfig } from './BoundingBoxConfig'
-import { LayerSidebar } from './LayerSidebar'
 
 interface LayerConfigProps {
   form: UseFormReturn<WfsWmsApiFormData>
-  existingLayers: LayerFormData[]
   styles: Style[]
   postgisDatasinks: Datasink[]
   postGisDatastructures: DatastructureVersion[]
@@ -51,7 +51,6 @@ const toAttributeOptions = (umlClass: UMLClass | undefined) =>
 export const LayerConfig = (props: LayerConfigProps) => {
   const {
     form,
-    existingLayers,
     styles,
     postgisDatasinks,
     postGisDatastructures,
@@ -122,9 +121,22 @@ export const LayerConfig = (props: LayerConfigProps) => {
   const umlClass = getUmlClass(postGisDatastructures, currentDatastructureVersion?.id)
   const attributeOptions = toAttributeOptions(umlClass)
 
+  const layerErrors = form.formState.errors.layers
+  const layerLabels = allLayers.map(layer => layer.title)
+  const sidebarListLayers = allLayers.map((layer, index) => {
+    const fallbackKey = isNewItem(layer) ? 'newLayer' : 'untitledLayer'
+    const untitledIndex = !layer.title ? getEmptyLabelIndex(layerLabels, index) : 0
+    return {
+      label: layer.title,
+      value: layer.id,
+      displayTitle: layer.title || t(fallbackKey, { index: untitledIndex }),
+      hasError: !!layerErrors?.[index],
+    }
+  })
+
   return (
     <>
-      {existingLayers.length === 0 ? (
+      {allLayers.length === 0 ? (
         <>
           {!isReadOnly && (
             <div className="flex justify-end mb-3">
@@ -144,27 +156,17 @@ export const LayerConfig = (props: LayerConfigProps) => {
       ) : (
         <ContentCard>
           <DetailsFieldContainer className="pt-0 pb-3">
-            <SubHeader
-              title={t('sectionTitle')}
-              titleClassName="text-2xl leading-none font-bold"
-              customElement={
-                !isReadOnly &&
-                !selectedLayer?.id.startsWith('new-') && (
-                  <Button type="button" onClick={onAddLayer}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t('addLayer')}
-                  </Button>
-                )
-              }
-            />
+            <SubHeader title={t('sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
           </DetailsFieldContainer>
           <div className="flex gap-6">
-            <LayerSidebar
-              existingLayers={existingLayers}
-              selectedLayerIndex={selectedLayerIndex}
+            <SidebarList
+              items={sidebarListLayers}
+              selectedItemIndex={selectedLayerIndex}
               isReadOnly={isReadOnly}
-              onSelectLayer={onSelectLayer}
-              onAddLayer={onAddLayer}
+              addButtonLabel={t('addLayer')}
+              addButtonTestId="sidebarAddLayerButton"
+              onSelectItem={onSelectLayer}
+              onAddItem={onAddLayer}
             />
             {selectedLayerIndex !== null && (
               <div className="flex flex-col">

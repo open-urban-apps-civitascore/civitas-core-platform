@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 
 import { STATUS_TYPES } from '@/types/common'
@@ -259,79 +258,6 @@ describe('LayerConfig', () => {
       await waitFor(() => {
         expect(screen.queryByTestId('exitWarningModal')).not.toBeInTheDocument()
       })
-    })
-  })
-
-  describe('Layer sidebar', () => {
-    it('adds a new layer to the sidebar when add layer is clicked', () => {
-      const StatefulWrapper = () => {
-        const [layers, setLayers] = useState([makeLayer()])
-        return (
-          <Wrapper
-            layers={layers}
-            selectedLayerIndex={0}
-            onAddLayer={() =>
-              setLayers(prev => [...prev, makeLayer({ id: 'new-1', title: '', layerName: '', dataSinkId: '' })])
-            }
-          />
-        )
-      }
-      render(<StatefulWrapper />)
-
-      expect(screen.getAllByRole('listitem')).toHaveLength(1)
-      fireEvent.click(screen.getByTestId('sidebarAddLayerButton'))
-      expect(screen.getAllByRole('listitem')).toHaveLength(2)
-    })
-
-    it('removes a layer from the sidebar after deleting it', async () => {
-      const StatefulWrapper = () => {
-        const [layers, setLayers] = useState([
-          makeLayer({ id: '00000000-0000-0000-0000-000000000001', title: 'Layer 1' }),
-          makeLayer({ id: '00000000-0000-0000-0000-000000000002', title: 'Layer 2' }),
-        ])
-        const [selectedLayerIndex, setSelectedLayerIndex] = useState<number | null>(0)
-        return (
-          <Wrapper
-            layers={layers}
-            selectedLayerIndex={selectedLayerIndex}
-            onSelectLayer={setSelectedLayerIndex}
-            onDeleteLayer={async () => {
-              setLayers(prev => prev.filter((_, i) => i !== selectedLayerIndex))
-              setSelectedLayerIndex(null)
-            }}
-          />
-        )
-      }
-      render(<StatefulWrapper />)
-
-      expect(screen.getAllByRole('listitem')).toHaveLength(2)
-      fireEvent.click(screen.getByRole('button', { name: /deleteLayer/i }))
-      fireEvent.click(screen.getByTestId('confirmButton'))
-      await waitFor(() => {
-        expect(screen.getAllByRole('listitem')).toHaveLength(1)
-      })
-    })
-
-    it('calls onSelectLayer with the index of the clicked layer', () => {
-      const onSelectLayer = vi.fn()
-      const layers = [
-        makeLayer({ id: '00000000-0000-0000-0000-000000000001', title: 'Layer 1' }),
-        makeLayer({ id: '00000000-0000-0000-0000-000000000002', title: 'Layer 2' }),
-      ]
-      const layer2Index = layers.findIndex(l => l.title === 'Layer 2')
-      render(<Wrapper layers={layers} selectedLayerIndex={0} onSelectLayer={onSelectLayer} />)
-      fireEvent.click(screen.getByRole('button', { name: 'Layer 2' }))
-      expect(onSelectLayer).toHaveBeenCalledWith(layer2Index)
-    })
-
-    it('shows "newLayer" translation key as fallback title for a new layer without a title', () => {
-      render(<Wrapper layers={[makeLayer({ id: 'new-1', title: '' })]} selectedLayerIndex={0} />)
-      expect(screen.getByRole('button', { name: 'newLayer' })).toBeInTheDocument()
-    })
-
-    it('shows "untitledLayer" translation key as fallback title for an existing layer without a title', () => {
-      render(<Wrapper layers={[makeLayer({ title: '' })]} selectedLayerIndex={0} />)
-      expect(screen.getByRole('button', { name: 'untitledLayer' })).toBeInTheDocument()
     })
   })
 

@@ -1,0 +1,51 @@
+meta {
+  name: Contract SQL — validation: invalid connectorType enum
+  type: http
+  seq: 38
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+body:json {
+  {
+    "name": "contract_sql_invalid",
+    "description": "x",
+    "connectorType": "NONSENSE",
+    "configuration": {},
+    "dataStructureVersionId": null
+  }
+}
+
+tests {
+  test("Status is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Error body matches the MALFORMED_REQUEST contract", function() {
+    expect(res.body.type).to.equal("urn:civitas:error:MALFORMED_REQUEST");
+    expect(res.body.title).to.equal("Bad Request");
+    expect(res.body.status).to.equal(400);
+    expect(res.body.detail).to.equal("Request body is missing or malformed");
+  });
+}
+
+docs {
+  Pins the error response for POSTing an unknown `connectorType` enum value.
+
+  Spring's Jackson deserializer fails to bind `"NONSENSE"` to the
+  `ConnectorType` enum, raising `HttpMessageNotReadableException`. The
+  `GlobalExceptionHandler.handleHttpMessageNotReadable` handler maps this to
+  the `urn:civitas:error:MALFORMED_REQUEST` Problem Detail, distinct from
+  the `urn:civitas:error:INVALID_INPUT` shape used by application-level
+  validation (cf. `sql-validation-missing-connector-type.bru`).
+
+  Note: the malformed-body handler currently does not set `instance` on the
+  Problem Detail — only `type`, `title`, `status`, `detail` are asserted here.
+}

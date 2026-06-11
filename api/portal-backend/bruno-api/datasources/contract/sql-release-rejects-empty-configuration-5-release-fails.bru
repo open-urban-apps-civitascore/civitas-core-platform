@@ -1,0 +1,66 @@
+meta {
+  name: Contract SQL — release rejects empty config (5/6 release fails)
+  type: http
+  seq: 43
+}
+
+post {
+  url: {{baseUrl}}/datasources/{{contractSqlReleaseEmptyId}}/release
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+tests {
+  test("Status is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Problem Detail type is INVALID_INPUT", function() {
+    expect(res.body.type).to.equal("urn:civitas:error:INVALID_INPUT");
+  });
+  test("Problem Detail title is Bad Request", function() {
+    expect(res.body.title).to.equal("Bad Request");
+  });
+  test("Problem Detail status is 400", function() {
+    expect(res.body.status).to.equal(400);
+  });
+  test("Detail names the OnRelease validation failures for SQL", function() {
+    // POSTing `configuration: {}` produces a configuration that materializes
+    // default null values for the SQL connector schema. Release then triggers
+    // the @NotBlank(groups = OnRelease.class) violations on the required
+    // fields (driver, dsn, table, columns). The detail message concatenates
+    // them with "; ". Pin the OnRelease-group invocation by name-checking
+    // the required SQL fields the user must fill in before releasing.
+    expect(res.body.detail).to.match(/Invalid configuration/);
+    expect(res.body.detail).to.match(/'driver'/);
+    expect(res.body.detail).to.match(/'dsn'/);
+    expect(res.body.detail).to.match(/'table'/);
+    expect(res.body.detail).to.match(/'columns'/);
+  });
+}
+
+docs {
+  Pins the release-time half of the deferred-validation contract for SQL.
+
+  An empty `configuration: {}` is accepted on DRAFT (the deferred-validation
+  contract — see `sql-empty-config-accepted-1-create.bru`). On release, the
+  configuration's `@NotBlank(groups = OnRelease.class)` constraints on
+  `driver`, `dsn`, `table`, `columns` fire and the request fails with HTTP
+  400 / `urn:civitas:error:INVALID_INPUT`, raised from
+  `DataSourceService.validateConfiguration` via
+  `DataSourceService.validateRelease`.
+
+  Note: empty `configuration: {}` doesn't reach the
+  "Configuration is required for releasing" branch because the connector
+  handler materializes defaults during create — so by the time release
+  runs, `config.isEmpty()` is false and the deeper field-level validators
+  fire instead. This is the more interesting branch to pin anyway: it
+  exercises the actual `OnRelease` validation group, not just the null/
+  empty guard.
+
+  If either half changes during the refactor, both this file and
+  `sql-empty-config-accepted-*` need to be revisited together.
+}

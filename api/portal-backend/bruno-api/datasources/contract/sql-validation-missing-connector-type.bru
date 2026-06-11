@@ -1,0 +1,46 @@
+meta {
+  name: Contract SQL — validation: missing connectorType
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+body:json {
+  {
+    "name": "contract_sql_invalid",
+    "description": "x",
+    "configuration": {
+      "driver": "postgres",
+      "dsn": "postgres://example:5432/db"
+    },
+    "dataStructureVersionId": null
+  }
+}
+
+tests {
+  test("Status is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Error body matches the INVALID_INPUT contract", function() {
+    expect(res.body.type).to.equal("urn:civitas:error:INVALID_INPUT");
+    expect(res.body.title).to.equal("Bad Request");
+    expect(res.body.status).to.equal(400);
+    expect(res.body.detail).to.equal("Cannot set configuration without a connector type");
+    expect(res.body.instance).to.equal("/v1/datasources");
+  });
+}
+
+docs {
+  Pins the error response shape for POSTing a configuration without a
+  connector type. The detail message and the `urn:civitas:error:INVALID_INPUT`
+  type are part of the public contract.
+}

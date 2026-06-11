@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class GeoServerSagaHandlerTest {
 
@@ -73,6 +75,233 @@ class GeoServerSagaHandlerTest {
   }
 
   @Nested
+  class FineGrainedSteps {
+
+    @Test
+    void createWorkspaceStepReturnsWorkspaceEndpoints() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "CREATE_WORKSPACE", Map.of("datasetId", "ds-abc")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("ds_abc", result.resultData().get("workspaceName"));
+        assertNotNull(result.resultData().get("wfsUrl"));
+        assertEquals("ds_abc", result.compensationData().get("workspaceName"));
+        verify(mockBuilder, times(1)).post(any(Entity.class));
+      }
+    }
+
+    @Test
+    void createDatastoreStepDerivesDatastoreName() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "CREATE_DATASTORE", Map.of("datasetId", "ds-abc")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("ds_abc_postgis", result.resultData().get("datastoreName"));
+        assertEquals("ds_abc", result.compensationData().get("workspaceName"));
+        verify(mockBuilder, times(1)).post(any(Entity.class));
+      }
+    }
+
+    @Test
+    void updatesDatastoreWhenAlreadyExists() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // Datastore already exists (409) → its connection parameters are refreshed via PUT rather
+        // than reporting success with stale config.
+        Response conflict = mock(Response.class);
+        when(conflict.getStatus()).thenReturn(409);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict);
+        Response updated = mock(Response.class);
+        when(updated.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(updated);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "CREATE_DATASTORE", Map.of("datasetId", "ds-abc")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        verify(mockBuilder).put(any(Entity.class));
+      }
+    }
+
+    @Test
+    void provisionLayersStepPublishesOneFeatureTypePerLayer() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "layers",
+                        List.of(
+                            Map.of("layerName", "traffic_counts", "crs", "EPSG:4326"),
+                            Map.of("layerName", "speed_limits", "crs", "EPSG:25832")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("ds_abc", result.resultData().get("workspaceName"));
+        verify(mockBuilder, times(2)).post(any(Entity.class));
+      }
+    }
+
+    @Test
+    void failsWhenLayerMissingLayerName() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // A requested layer without a layerName can't be published — the step must fail rather than
+        // silently skip it and report success.
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of("datasetId", "ds-abc", "layers", List.of(Map.of("crs", "EPSG:4326")))));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+        verify(mockBuilder, times(0)).post(any(Entity.class));
+      }
+    }
+
+    @Test
+    void usesSingleSinkTableAsNativeNameWhenLayerOmitsIt() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "dataSinks",
+                        List.of(
+                            Map.of(
+                                "dataSinkType",
+                                "POSTGIS",
+                                "configuration",
+                                Map.of("tableName", "traffic"))),
+                        "layers",
+                        List.of(Map.of("layerName", "roads")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // A layer without nativeName resolves to the single sink table, not its own layer name.
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder).post(captor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> featureType =
+            (Map<String, Object>)
+                ((Map<String, Object>) captor.getValue().getEntity()).get("featureType");
+        assertEquals("roads", featureType.get("name"));
+        assertEquals("traffic", featureType.get("nativeName"));
+      }
+    }
+
+    @Test
+    void failsWhenNativeNameAmbiguousAcrossMultipleSinks() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // Two table sinks and a layer without nativeName → can't infer the table → fail (don't
+        // silently collapse onto the first table and drop the second).
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "dataSinks",
+                        List.of(
+                            Map.of(
+                                "dataSinkType",
+                                "POSTGIS",
+                                "configuration",
+                                Map.of("tableName", "t1")),
+                            Map.of(
+                                "dataSinkType",
+                                "POSTGIS",
+                                "configuration",
+                                Map.of("tableName", "t2"))),
+                        "layers",
+                        List.of(Map.of("layerName", "roads")))));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertTrue(result.error().contains("nativeName"), result.error());
+      }
+    }
+
+    @Test
+    void failsCleanlyWhenLayersElementIsNotAnObject() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of("datasetId", "ds-abc", "layers", List.of(123))));
+
+        assertEquals("STEP_FAILED", result.type());
+        // A clean validation error, not a leaked ClassCastException.
+        assertTrue(result.error().contains("must be"), result.error());
+      }
+    }
+
+    @Test
+    void failsCleanlyWhenLayerNameIsNotAString() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of("datasetId", "ds-abc", "layers", List.of(Map.of("layerName", 123)))));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertTrue(result.error().contains("must be a string"), result.error());
+      }
+    }
+
+    @Test
+    void failsCleanlyWhenDataSinkElementIsNotAnObject() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId", "ds-abc",
+                        "layers", List.of(Map.of("layerName", "t1")),
+                        "dataSinks", List.of("not-an-object"))));
+
+        assertEquals("STEP_FAILED", result.type());
+        // The dataSinks list is also type-guarded (read via firstSinkTableName) — clean error.
+        assertTrue(result.error().contains("must be"), result.error());
+      }
+    }
+  }
+
+  @Nested
   class ProvisionWorkspace {
 
     @Test
@@ -102,7 +331,9 @@ class GeoServerSagaHandlerTest {
                             "configuration",
                             Map.of(
                                 "tableName", "traffic_counts",
-                                "crs", "EPSG:4326")))));
+                                "crs", "EPSG:4326"))),
+                    "layers",
+                    List.of(Map.of("layerName", "traffic_counts", "crs", "EPSG:4326"))));
 
         SagaCommandResult result = handler.handle(command);
 
@@ -131,7 +362,7 @@ class GeoServerSagaHandlerTest {
             createCommand(
                 "EXECUTE_STEP",
                 "PROVISION_WORKSPACE",
-                Map.of("datasetId", "ds-existing", "datasinks", List.of()));
+                Map.of("datasetId", "ds-existing", "layers", List.of()));
 
         SagaCommandResult result = handler.handle(command);
 
@@ -140,7 +371,7 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
-    void skipsDatasinksThatAreNotPostgis() {
+    void createsWorkspaceAndDatastoreButNoFeatureTypesWhenNoLayers() {
       try (GeoServerSagaHandler handler = createHandler()) {
         Response created = mock(Response.class);
         when(created.getStatus()).thenReturn(201);
@@ -150,22 +381,12 @@ class GeoServerSagaHandlerTest {
             createCommand(
                 "EXECUTE_STEP",
                 "PROVISION_WORKSPACE",
-                Map.of(
-                    "datasetId",
-                    "ds-skip",
-                    "datasinks",
-                    List.of(
-                        Map.of(
-                            "type",
-                            "SOME_OTHER_SINK",
-                            "configuration",
-                            Map.of("tableName", "ignored")))));
+                Map.of("datasetId", "ds-skip", "layers", List.of()));
 
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
-        // Only workspace + datastore are created; a non-POSTGIS sink yields no feature
-        // type.
+        // Only workspace + datastore are created when there are no layers to publish.
         verify(mockBuilder, times(2)).post(any(Entity.class));
       }
     }
@@ -182,7 +403,7 @@ class GeoServerSagaHandlerTest {
             createCommand(
                 "EXECUTE_STEP",
                 "PROVISION_WORKSPACE",
-                Map.of("datasetId", "ds-fail", "datasinks", List.of()));
+                Map.of("datasetId", "ds-fail", "layers", List.of()));
 
         SagaCommandResult result = handler.handle(command);
 
@@ -201,7 +422,7 @@ class GeoServerSagaHandlerTest {
             createCommand(
                 "EXECUTE_STEP",
                 "PROVISION_WORKSPACE",
-                Map.of("datasetId", "ds-net", "datasinks", List.of()));
+                Map.of("datasetId", "ds-net", "layers", List.of()));
 
         SagaCommandResult result = handler.handle(command);
 
@@ -226,7 +447,7 @@ class GeoServerSagaHandlerTest {
             createCommand(
                 "EXECUTE_STEP",
                 "UPDATE_WORKSPACE",
-                Map.of("workspaceName", "myws", "datasinks", List.of()));
+                Map.of("workspaceName", "myws", "layers", List.of()));
 
         SagaCommandResult result = handler.handle(command);
 
@@ -236,8 +457,9 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
-    void treatsMissingSnapshotAsEmptyAndUpdatesSuccessfully() {
+    void provisionsWorkspaceAndDatastoreWhenMissingThenPublishesLayers() {
       try (GeoServerSagaHandler handler = createHandler()) {
+        // Workspace not provisioned yet → the feature-types snapshot read returns 404 (empty).
         Response notFound = mock(Response.class);
         when(notFound.getStatus()).thenReturn(404);
         when(mockBuilder.get()).thenReturn(notFound);
@@ -252,6 +474,32 @@ class GeoServerSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertNull(result.error());
+        // UPDATE must create the workspace + datastore (not just the feature type) when they don't
+        // exist yet — otherwise the feature-type POST would 404 on first-time geo provisioning.
+        verify(mockBuilder, times(3)).post(any(Entity.class));
+      }
+    }
+
+    @Test
+    void returnsFailureWhenWorkspaceProvisioningFailsOnUpdate() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response notFound = mock(Response.class);
+        when(notFound.getStatus()).thenReturn(404);
+        when(mockBuilder.get()).thenReturn(notFound);
+        // The workspace POST fails (not 201/409) → UPDATE must fail, not silently skip
+        // provisioning.
+        Response error = mock(Response.class);
+        when(error.getStatus()).thenReturn(500);
+        when(error.readEntity(String.class)).thenReturn("Internal Server Error");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(error);
+
+        SagaCommandMessage command =
+            createCommand("EXECUTE_STEP", "UPDATE_WORKSPACE", updatePayload("t1"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
       }
     }
 
@@ -273,8 +521,9 @@ class GeoServerSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
-        // Existing feature type (409 on POST) must be updated via PUT, not silently ignored.
-        verify(mockBuilder).put(any(Entity.class));
+        // Both the existing datastore and the existing feature type return 409 on POST and must be
+        // updated via PUT (not silently ignored), so the workspace converges to the desired config.
+        verify(mockBuilder, times(2)).put(any(Entity.class));
       }
     }
 
@@ -319,6 +568,24 @@ class GeoServerSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertNull(result.error());
+      }
+    }
+
+    @Test
+    void derivesWorkspaceFromDatasetIdWhenNotGiven() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response deleteResponse = mock(Response.class);
+        when(deleteResponse.getStatus()).thenReturn(404);
+        when(mockBuilder.delete()).thenReturn(deleteResponse);
+
+        // No explicit workspaceName: a 404 (nothing to delete) is idempotent success. This is the
+        // path taken when the delete saga's compensate step runs but no GeoServer state exists.
+        SagaCommandMessage command =
+            createCommand("COMPENSATE_STEP", "DELETE_WORKSPACE", Map.of("datasetId", "ds-gone"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
       }
     }
 
@@ -375,6 +642,22 @@ class GeoServerSagaHandlerTest {
 
   @Nested
   class RestoreWorkspace {
+
+    @Test
+    void skipsRestoreWhenNoSnapshotPresent() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // No previousFeatureTypes key: the UPDATE step failed before storing compensation data.
+        // Restore must skip — not treat the missing snapshot as "empty" and delete existing types.
+        SagaCommandMessage command =
+            createCommand("COMPENSATE_STEP", "RESTORE_WORKSPACE", Map.of("workspaceName", "myws"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        verify(mockBuilder, times(0)).get();
+        verify(mockBuilder, times(0)).delete();
+      }
+    }
 
     @Test
     void restoresPreviousFeatureTypesSuccessfully() {
@@ -523,13 +806,15 @@ class GeoServerSagaHandlerTest {
         type, "msg-001", "saga-001", "provision-workspace", "geoserver", operation, payload);
   }
 
-  /** UPDATE_WORKSPACE payload with a single POSTGIS datasink for the given table. */
-  private static Map<String, Object> updatePayload(String tableName) {
+  /** UPDATE_WORKSPACE payload with a single layer for the given feature type / table. */
+  private static Map<String, Object> updatePayload(String layerName) {
     return Map.of(
         "workspaceName",
         "myws",
         "datasinks",
-        List.of(Map.of("type", "POSTGIS", "configuration", Map.of("tableName", tableName))));
+        List.of(Map.of("type", "POSTGIS", "configuration", Map.of("tableName", layerName))),
+        "layers",
+        List.of(Map.of("layerName", layerName, "crs", "EPSG:4326")));
   }
 
   /** Mocks a 200 {@code featuretypes.json} response listing the given feature type names. */
