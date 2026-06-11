@@ -179,6 +179,7 @@ class BpmnVsCodedEquivalenceTest {
     SagaCommandHandler frost = FlowableTestSupport.mockHandler("frost");
     SagaCommandHandler apisix = FlowableTestSupport.mockHandler("apisix");
     SagaCommandHandler geoserver = FlowableTestSupport.mockHandler("geoserver");
+    SagaCommandHandler postgis = FlowableTestSupport.mockHandler("postgis");
 
     when(frost.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(
@@ -190,12 +191,14 @@ class BpmnVsCodedEquivalenceTest {
     when(apisix.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(
             SagaCommandResult.success("s", "create-route", Map.of("routeId", "r1"), Map.of()));
+    when(postgis.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+        .thenReturn(SagaCommandResult.success("s", "provision-sink", Map.of(), Map.of()));
     when(geoserver.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(
             SagaCommandResult.success(
                 "s", "create-workspace", Map.of("workspaceName", "ds"), Map.of()));
 
-    SagaHandlerRegistry reg = FlowableTestSupport.registry(frost, apisix, geoserver);
+    SagaHandlerRegistry reg = FlowableTestSupport.registry(frost, apisix, geoserver, postgis);
     ProcessEngine engine = createEngine(useBpmn, reg);
 
     try {
@@ -213,10 +216,11 @@ class BpmnVsCodedEquivalenceTest {
 
       FlowableTestSupport.assertProcessCompleted(engine.getHistoryService(), instance.getId());
 
-      // Order across adapters: FROST → APISIX → GeoServer (3 geo steps).
-      var inOrder = inOrder(frost, apisix, geoserver);
+      // Order across adapters: FROST → APISIX → PostGIS sink → GeoServer (3 geo steps).
+      var inOrder = inOrder(frost, apisix, postgis, geoserver);
       inOrder.verify(frost).handle(any());
       inOrder.verify(apisix).handle(any());
+      inOrder.verify(postgis).handle(any());
       inOrder.verify(geoserver, times(3)).handle(any());
 
       // ...and the exact operations dispatched — BPMN and coded must produce the same sequence,

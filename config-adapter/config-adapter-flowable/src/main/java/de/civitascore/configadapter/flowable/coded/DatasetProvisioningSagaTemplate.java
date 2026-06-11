@@ -31,6 +31,7 @@ import org.flowable.bpmn.model.StartEvent;
 final class DatasetProvisioningSagaTemplate {
 
   private static final String GEOSERVER_ADAPTER = "geoserver";
+  private static final String POSTGIS_ADAPTER = "postgis";
   private static final String HAS_GEO_SINK_CONDITION =
       "${execution.getVariable('hasGeoSink') == true}";
 
@@ -112,9 +113,14 @@ final class DatasetProvisioningSagaTemplate {
         saga.sagaStep(
             v.pipelinesStepId(), v.pipelinesDisplayName(), "redpanda", v.pipelinesForwardOp());
 
-    // GeoServer branch — fine-grained for Create, a single step for Update.
+    // SQL sink provisioning (Create only): the PostGIS table the GeoServer datastore reads must
+    // exist before the workspace/datastore/layers steps, so it runs first in the geo branch.
+    SagaStepRef sqlSink = null;
     List<SagaStepRef> geoSteps = new ArrayList<>();
     if (v.fineGrainedGeo()) {
+      sqlSink =
+          saga.sagaStep(
+              "provision-sink", "Provision PostGIS Sink", POSTGIS_ADAPTER, "PROVISION_SINK");
       geoSteps.add(
           saga.sagaStep(
               "create-workspace",
@@ -147,6 +153,9 @@ final class DatasetProvisioningSagaTemplate {
 
     ServiceTask compGeoserver =
         saga.compensation("compensate-geoserver", geoCompTarget, v.geoCompensationOp());
+    // SQL sink compensation drops the table/role created by PROVISION_SINK (Create only).
+    ServiceTask compSql =
+        sqlSink == null ? null : saga.compensation("compensate-sink", sqlSink, "DEPROVISION_SINK");
     ServiceTask compApisix =
         saga.compensation("compensate-apisix", apisix, v.apisixCompensationOp());
     ServiceTask compFrost = saga.compensation("compensate-frost", frost, v.frostCompensationOp());
@@ -158,15 +167,21 @@ final class DatasetProvisioningSagaTemplate {
 
     // Happy path: frost → apisix → geo-gateway
     saga.flow(start, frost.task(), apisix.task(), geoGw);
-    wireGeoBranch(saga, v, geoGw, geoSteps, pipelineGw);
+    wireGeoBranch(saga, v, geoGw, sqlSink, geoSteps, pipelineGw);
     saga.flow(pipelineGw, redpanda.task()).when("${hasPipelines == true}");
     saga.flow(pipelineGw, publishOk).asDefault();
     saga.flow(redpanda.task(), publishOk);
     saga.flow(publishOk, end);
 
-    // Compensation: one reverse chain (geoserver → apisix → frost), entered at the right point.
+    // Compensation: one reverse chain (geoserver → sink → apisix → frost), entered at the right
+    // point. The SQL sink compensation sits between geoserver and apisix (Create only).
     saga.errorFlow(frost, publishFail);
     saga.errorFlow(apisix, compFrost);
+    if (sqlSink != null) {
+      // PROVISION_SINK is transactional: on failure nothing was committed, so there is no sink or
+      // GeoServer state to undo — go straight to the APISIX/FROST rollback.
+      saga.errorFlow(sqlSink, compApisix);
+    }
     // A GeoServer step only runs when hasGeoSink, so its failure always compensates the workspace.
     for (SagaStepRef geo : geoSteps) {
       saga.errorFlow(geo, compGeoserver);
@@ -178,7 +193,11 @@ final class DatasetProvisioningSagaTemplate {
     saga.errorFlow(redpanda, redpandaCompGw);
     saga.flow(redpandaCompGw, compGeoserver).when(HAS_GEO_SINK_CONDITION);
     saga.flow(redpandaCompGw, compApisix).asDefault();
-    saga.flow(compGeoserver, compApisix, compFrost, publishFail);
+    if (compSql != null) {
+      saga.flow(compGeoserver, compSql, compApisix, compFrost, publishFail);
+    } else {
+      saga.flow(compGeoserver, compApisix, compFrost, publishFail);
+    }
     saga.flow(publishFail, errorEnd);
 
     return saga.build();
@@ -188,23 +207,27 @@ final class DatasetProvisioningSagaTemplate {
       SagaProcessBuilder saga,
       OpVerbs v,
       ExclusiveGateway geoGw,
+      SagaStepRef sqlSink,
       List<SagaStepRef> geoSteps,
       ExclusiveGateway pipelineGw) {
     // execution.getVariable(...) is null-safe: an absent flag evaluates to false (default flow),
     // matching the engine's behavior when the trigger carries no geo data.
-    saga.flow(geoGw, geoSteps.get(0).task()).when(HAS_GEO_SINK_CONDITION);
     saga.flow(geoGw, pipelineGw).asDefault();
     if (v.fineGrainedGeo()) {
+      // geo-gateway → provision-sink → workspace → datastore → [hasLayers] layers → pipelines
+      saga.flow(geoGw, sqlSink.task()).when(HAS_GEO_SINK_CONDITION);
       ServiceTask workspace = geoSteps.get(0).task();
       ServiceTask datastore = geoSteps.get(1).task();
       ServiceTask layers = geoSteps.get(2).task();
       ExclusiveGateway layersGw =
           saga.exclusiveGateway(ProcessBuilderUtils.LAYERS_GATEWAY_ID, "Has Layers?");
+      saga.flow(sqlSink.task(), workspace);
       saga.flow(workspace, datastore, layersGw);
       saga.flow(layersGw, layers).when("${execution.getVariable('hasLayers') == true}");
       saga.flow(layersGw, pipelineGw).asDefault();
       saga.flow(layers, pipelineGw);
     } else {
+      saga.flow(geoGw, geoSteps.get(0).task()).when(HAS_GEO_SINK_CONDITION);
       saga.flow(geoSteps.get(0).task(), pipelineGw);
     }
   }
