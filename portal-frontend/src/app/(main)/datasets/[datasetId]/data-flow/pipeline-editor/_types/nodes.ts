@@ -1,3 +1,4 @@
+import { emptyMappingConfig, type MappingConfig } from '../_components/mapping-editor/_types'
 import type { PipelineNodeType } from './pipeline'
 import { PIPELINE_NODE_TYPES } from './pipeline'
 
@@ -143,12 +144,18 @@ export interface CronNodeData extends BasePipelineNodeData {
 
 /**
  * Data for Mapping nodes.
- * Contains Bloblang mapping code.
+ * Holds the source/target schema references and the compiled mapping config (spec §13).
  *
  */
 export interface MappingNodeData extends BasePipelineNodeData {
-  /** Bloblang mapping code */
-  mappingCode: string
+  sourceDatastructureId?: string
+  sourceVersionId?: string
+  sourceName?: string
+  targetDatastructureId?: string
+  targetVersionId?: string
+  targetName?: string
+  /** The single saved artifact produced by the mapping editor. */
+  mappingConfig: MappingConfig
 }
 
 // ============================================================================
@@ -176,7 +183,7 @@ export type PipelineNodeData =
  * Type guard to check if node data is for a control node (Start/End).
  */
 export const isControlNodeData = (data: PipelineNodeData): data is ControlNodeData => {
-  return 'description' in data && !('entityType' in data) && !('cronExpression' in data) && !('mappingCode' in data)
+  return 'description' in data && !('entityType' in data) && !('cronExpression' in data) && !('mappingConfig' in data)
 }
 
 /**
@@ -218,7 +225,7 @@ export const isCronNodeData = (data: PipelineNodeData): data is CronNodeData => 
  * Type guard to check if node data is for a Mapping node.
  */
 export const isMappingNodeData = (data: PipelineNodeData): data is MappingNodeData => {
-  return 'mappingCode' in data
+  return 'mappingConfig' in data
 }
 
 // ============================================================================
@@ -277,8 +284,8 @@ export const createDefaultNodeData = (nodeType: PipelineNodeType): PipelineNodeD
     case PIPELINE_NODE_TYPES.Mapping:
       return {
         label: 'Mapping',
-        configured: false, // Needs mapping code
-        mappingCode: '',
+        configured: false, // Needs name + source + target
+        mappingConfig: emptyMappingConfig(),
       }
     default:
       throw new Error(`Unknown node type: ${nodeType}`)

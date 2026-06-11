@@ -59,12 +59,10 @@ const buildDataSourceInput = (node: PipelineNode): object | null => {
 }
 
 /**
- * Builds a bloblang processor from a Mapping node's code.
- *
- * The mapping code is taken verbatim from the Monaco editor content.
+ * Builds a mapping processor from a Mapping node's compiled config (spec §13).
  *
  * @example
- * // Returns: { bloblang: "root = content().string()..." }
+ * // Returns: { mapping: { fields: { "$.title": "$.name" }, ... } }
  */
 const buildMappingProcessor = (node: PipelineNode): object | null => {
   if (!isMappingNodeData(node.data)) return null
@@ -72,7 +70,7 @@ const buildMappingProcessor = (node: PipelineNode): object | null => {
   const data = node.data as MappingNodeData
 
   return {
-    bloblang: data.mappingCode,
+    mapping: data.mappingConfig,
   }
 }
 
