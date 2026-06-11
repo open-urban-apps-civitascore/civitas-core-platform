@@ -14,6 +14,9 @@ import {
   NamedApi,
   NamedApiPayload,
   StaApiFormData,
+  Style,
+  StyleApiPayload,
+  StyleFormData,
   WfsWmsApiFormData,
 } from '@/types/namedApis'
 
@@ -21,6 +24,7 @@ export const hasApiType = (apis: NamedApi[], apiType: ApiStandard): boolean =>
   apis.some(api => api.standard === apiType)
 
 type BoundingBoxPayload = { minX: number; minY: number; maxX: number; maxY: number; crs: string }
+
 export function toBoundingBoxPayload(bbox: LayerFormData['nativeBoundingBox']): BoundingBoxPayload
 export function toBoundingBoxPayload(bbox: LayerFormData['nativeBoundingBox'] | null): BoundingBoxPayload | null
 export function toBoundingBoxPayload(bbox: LayerFormData['nativeBoundingBox'] | null): BoundingBoxPayload | null {
@@ -106,3 +110,14 @@ export const getNativeCRSFromDatasink = (
   const umlClass = datastructure?.styles?.nodes?.[0]?.data?.element as UMLClass | undefined
   return umlClass?.attributes?.find(a => a.meta?.gisInfo?.crs)?.meta?.gisInfo?.crs ?? ''
 }
+export const mapApiStyleToFormData = (styles: Style[]): StyleFormData[] =>
+  styles.map(style => ({
+    id: style.id,
+    name: style.name,
+    sldContent: style.sldContent,
+  }))
+
+export const mapFormStyleToPayload = (style: StyleFormData): StyleApiPayload => ({
+  name: style.name.trim(),
+  sldContent: style.sldContent,
+})

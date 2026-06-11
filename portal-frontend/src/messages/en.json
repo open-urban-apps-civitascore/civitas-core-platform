@@ -306,6 +306,38 @@
               "styles": "Styles",
               "placeholder": "Content will follow in a later step."
             },
+            "styles": {
+              "title": "Styles",
+              "addStyle": "Add Style",
+              "newStyle": "New Style {index}",
+              "untitledStyle": "Untitled Style {index}",
+              "name": "Name",
+
+              "sldFile": "SLD file",
+              "sldFilePlaceholder": "Select SLD...",
+              "styleEditor": "Style editor",
+              "deleteStyle": "Delete Style",
+              "validation": {
+                "nameRequired": "Style name is required",
+                "sldContentRequired": "Style content is required"
+              },
+              "noStyles": {
+                "title": "No styles available",
+                "subtitle": "Styles can be created and then assigned to layers of this API"
+              },
+              "deleteModal": {
+                "title": "Really delete style?",
+                "description": "This change has the following effects:\n• The style will no longer be available\n• Layers using this style will lose their current rendering\n• The rendering in connected services (e.g. WMS) may change"
+              },
+              "messages": {
+                "deleteSuccess": "Style has been successfully deleted.",
+                "deleteError": "An error occurred while deleting the style. Please try again.",
+                "createSuccess": "Style has been successfully created.",
+                "updateSuccess": "Style has been successfully updated.",
+                "saveError": "An error occurred while saving the style. Please try again.",
+                "saveSuccess": "Styles saved successfully."
+              }
+            },
             "baseInfo": {
               "sectionTitle": "Basic Information",
               "type": "Type",
@@ -382,7 +414,13 @@
               "updateLayerSuccess": "Layer has been successfully updated.",
               "saveLayerError": "An error occurred while saving the layer. Please try again.",
               "deleteLayerSuccess": "Layer has been successfully deleted.",
-              "deleteLayerError": "An error occurred while deleting the layer. Please try again."
+              "deleteLayerError": "An error occurred while deleting the layer. Please try again.",
+              "layerNameExists": "For the selected table a layer with the name \"{name}\" already exists.",
+              "createStyleSuccess": "Style has been successfully created.",
+              "updateStyleSuccess": "Style has been successfully updated.",
+              "saveStyleError": "An error occurred while saving the style. Please try again.",
+              "deleteStyleSuccess": "Style has been successfully deleted.",
+              "deleteStyleError": "An error occurred while deleting the style. Please try again."
             },
             "errors": {
               "name": {

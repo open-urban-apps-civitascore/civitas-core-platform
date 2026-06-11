@@ -14,6 +14,7 @@ import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { PipelineBasicInfo } from '@/types/datasets'
+import { DATASINK_TYPES } from '@/types/datasinks'
 
 const getPipelineBadges = (dto: PipelineOutputDTO, datasourceConnectors: Map<string, string>): string[] => {
   const nodes = dto.styles?.nodes ?? []
@@ -30,7 +31,10 @@ const getPipelineBadges = (dto: PipelineOutputDTO, datasourceConnectors: Map<str
 
   const badges = Array.from(connectors)
   if (nodes.some(node => node.type === PIPELINE_NODE_TYPES.Frost)) {
-    badges.push('FROST')
+    badges.push(DATASINK_TYPES.FROST)
+  }
+  if (nodes.some(node => node.type === PIPELINE_NODE_TYPES.GeoPersistence)) {
+    badges.push(DATASINK_TYPES.POSTGIS)
   }
 
   return badges

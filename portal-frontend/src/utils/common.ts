@@ -1,5 +1,7 @@
 import z from 'zod'
 
+import { WithId } from '@/types/common'
+
 export const enumFromConst = <T extends Record<string, string>>(obj: T) =>
   z.enum(Object.values(obj) as [T[keyof T], ...T[keyof T][]])
 
@@ -20,3 +22,8 @@ export const getRequestEndpoint = <TValue>(endpointFn: (value: TValue) => string
 
   return endpointFn(value)
 }
+
+export const isNewItem = <T extends WithId>(item: T) => item.id?.startsWith('new-') ?? false
+
+export const getEmptyLabelIndex = (allLabels: string[], currentIndex: number) =>
+  allLabels.slice(0, currentIndex + 1).filter(label => !label).length

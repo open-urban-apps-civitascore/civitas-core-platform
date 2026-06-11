@@ -3,11 +3,12 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { FocusEvent, FormEvent, useCallback, useState } from 'react'
-import { UseFormReturn } from 'react-hook-form'
+import { Path, UseFormReturn } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { useCreateNamedApi, usePatchDataset } from '@/app/services/api/datasets/clientRequests'
 import { useCreateLayer, useUpdateLayer } from '@/app/services/api/datasets/layers/clientRequests'
+import { useCreateStyle, useUpdateStyle } from '@/app/services/api/datasets/styles/clientRequests'
 import { useError } from '@/hooks/use-error'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { Dataset } from '@/types/datasets'
@@ -18,12 +19,20 @@ import {
   NamedApi,
   NamedApiPayload,
   StaApiFormData,
+  StyleFormData,
   WfsWmsApiFormData,
 } from '@/types/namedApis'
+import { isLayerNameError, LayerSaveError } from '@/utils/errors'
 import { hasDirtyField } from '@/utils/form'
-import { buildStaPayloadData, buildWfsWmsPayload, mapFormLayerToPayload } from '@/utils/namedApis'
+import {
+  buildStaPayloadData,
+  buildWfsWmsPayload,
+  mapFormLayerToPayload,
+  mapFormStyleToPayload,
+} from '@/utils/namedApis'
 
 type FormData = StaApiFormData | WfsWmsApiFormData
+
 interface UseApiConfigActionsArgs<TFormData extends FormData> {
   form: UseFormReturn<TFormData>
   dataset: Dataset
@@ -54,7 +63,6 @@ export const useApiConfig = <TFormData extends FormData>({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-
   const isCreate = !existingApi
   const [isReadOnly, setIsReadOnly] = useState(isCreate ? false : searchParams.get('mode') !== 'edit')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
@@ -64,9 +72,17 @@ export const useApiConfig = <TFormData extends FormData>({
   const updateDataset = usePatchDataset()
   const createLayer = useCreateLayer()
   const updateLayer = useUpdateLayer()
+  const createStyle = useCreateStyle()
+  const updateStyle = useUpdateStyle()
   const { handleFormValidationError } = useError()
   const isLoading =
-    createNamedApi.isPending || updateDataset.isPending || createLayer.isPending || updateLayer.isPending
+    createNamedApi.isPending ||
+    updateDataset.isPending ||
+    createLayer.isPending ||
+    updateLayer.isPending ||
+    createStyle.isPending ||
+    updateStyle.isPending
+
   const isDirty = form.formState.isDirty
   const dirtyFields = form.formState.dirtyFields
 
@@ -127,10 +143,14 @@ export const useApiConfig = <TFormData extends FormData>({
     const payloads: LayerApiPayload[] = mapFormLayerToPayload(layersToSave)
     await Promise.all(
       layersToSave.map(async (layer, i) => {
-        if (isNew(layer)) {
-          await createLayer.mutateAsync({ datasetId: dataset.id, data: payloads[i] })
-        } else {
-          await updateLayer.mutateAsync({ datasetId: dataset.id, layerId: layer.id, data: payloads[i] })
+        try {
+          if (isNew(layer)) {
+            await createLayer.mutateAsync({ datasetId: dataset.id, data: payloads[i] })
+          } else {
+            await updateLayer.mutateAsync({ datasetId: dataset.id, layerId: layer.id, data: payloads[i] })
+          }
+        } catch (error) {
+          throw new LayerSaveError(error, data.layers.indexOf(layer))
         }
       }),
     )
@@ -139,22 +159,66 @@ export const useApiConfig = <TFormData extends FormData>({
     if (layersToSave.some(l => !isNew(l))) toast.success(t('messages.updateLayerSuccess'))
   }
 
+  const handleSaveStyles = async (data: WfsWmsApiFormData) => {
+    const wfsDirtyFields = dirtyFields as Partial<Record<keyof WfsWmsApiFormData, unknown>>
+    if (!hasDirtyField(wfsDirtyFields.styles)) return
+
+    const isNew = (style: StyleFormData) => style.id.startsWith('new-')
+
+    const isDirtyOrNew = (style: StyleFormData, i: number) =>
+      isNew(style) || hasDirtyField(Array.isArray(wfsDirtyFields.styles) ? wfsDirtyFields.styles[i] : undefined)
+
+    const stylesToSave = data.styles.filter(isDirtyOrNew)
+    if (stylesToSave.length === 0) return
+
+    await Promise.all(
+      stylesToSave.map(async style => {
+        const payload = mapFormStyleToPayload(style)
+        if (isNew(style)) {
+          await createStyle.mutateAsync({ datasetId: dataset.id, style: payload })
+        } else {
+          await updateStyle.mutateAsync({ datasetId: dataset.id, stilId: style.id, style: payload })
+        }
+      }),
+    )
+
+    if (stylesToSave.some(isNew)) toast.success(t('messages.createStyleSuccess'))
+    if (stylesToSave.some(s => !isNew(s))) toast.success(t('messages.updateStyleSuccess'))
+  }
+
+  const handleLayerNameError = (error: LayerSaveError) => {
+    const layerName = (form.getValues(`layers.${error.layerIndex}.layerName` as Path<TFormData>) as string) ?? ''
+    toast.error(t('messages.layerNameExists', { name: layerName }))
+    form.setError(`layers.${error.layerIndex}.layerName` as Path<TFormData>, {
+      type: 'manual',
+      message: t('messages.layerNameExists', { name: layerName }),
+    })
+  }
+
   const handleSave = async (): Promise<boolean> => {
     let isSaved = false
     await form.handleSubmit(
       async data => {
         try {
           await handleSaveBaseInfo(data)
-          if (isWfsWmsFormData(data)) await handleSaveLayers(data)
+          if (isWfsWmsFormData(data)) {
+            await handleSaveLayers(data)
+            await handleSaveStyles(data)
+          }
           isSaved = true
-        } catch {
-          toast.error(t('messages.saveError'))
+        } catch (error) {
+          if (error instanceof LayerSaveError && isLayerNameError(error.originalError)) {
+            handleLayerNameError(error)
+          } else {
+            toast.error(t('messages.saveError'))
+          }
         }
       },
       errors => {
         handleFormValidationError(errors)
       },
     )()
+
     return isSaved
   }
 
