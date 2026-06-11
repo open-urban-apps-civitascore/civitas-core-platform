@@ -1,0 +1,46 @@
+meta {
+  name: Contract MQTT — release rejects empty config (4/6 create DS)
+  type: http
+  seq: 48
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+body:json {
+  {
+    "name": "contract_mqtt_release_empty",
+    "description": "Pins that release rejects empty configuration on MQTT",
+    "connectorType": "MQTT",
+    "configuration": {},
+    "dataStructureVersionId": "{{contractMqttReleaseEmptyDsvId}}"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('contractMqttReleaseEmptyId', res.body.id);
+  }
+}
+
+tests {
+  test("DataSource created in DRAFT with empty configuration (201)", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Status is DRAFT", function() {
+    expect(res.body.dataSourceStatus).to.equal("DRAFT");
+  });
+}
+
+docs {
+  Creates an MQTT DataSource with `configuration: {}` (the deferred-validation
+  contract permits this on DRAFT). Step 3 attempts to release it and pins
+  the rejection contract.
+}

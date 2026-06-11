@@ -1,0 +1,47 @@
+meta {
+  name: Contract SQL — release rejects empty config (3/6 release setup DS)
+  type: http
+  seq: 41
+}
+
+post {
+  url: {{baseUrl}}/datastructures/{{setupDataStructureId}}/release
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+tests {
+  test("Setup DataStructure released or already released", function() {
+    const status = res.getStatus();
+    // 200=released now, 400=already released by an earlier chain in the same run
+    expect(status === 200 || status === 400).to.be.true;
+    if (status === 400) {
+      expect(res.body.type).to.equal("urn:civitas:error:INVALID_INPUT");
+      expect(res.body.title).to.equal("Bad Request");
+      expect(res.body.detail).to.match(/already released|in DRAFT/i);
+    }
+  });
+}
+
+docs {
+  Releases the setup DataStructure so its children DSVs can be linked to
+  DataSources. `DataSourceService.validateDataStructureVersionLinkable`
+  requires both the DSV and its parent DataStructure to be in AVAILABLE
+  status.
+
+  Tolerates 400 because: (a) this same DataStructure is shared across
+  every chain in the contract folder, and the MQTT chain runs after this
+  one — so on its run the DataStructure will already be AVAILABLE; and
+  (b) repeated CI runs without a fresh DB state would see the same.
+
+  Side effect: leaves the setup DataStructure in AVAILABLE for the rest
+  of the test run. Verified safe: `datastructures/*` tests create their
+  own DataStructure via `create-data-structure.bru` (overwriting
+  `dataStructureId`); they don't act on `setupDataStructureId`. The
+  `zz-teardown/04-delete-datastructure` step tolerates the resulting
+  400 ("not in DRAFT state") on its assertion.
+}
