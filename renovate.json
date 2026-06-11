@@ -27,6 +27,7 @@
     {
       "description": "Backend dependencies (Spring Boot)",
       "matchFileNames": ["portal-backend/**"],
+      "dependencyDashboardApproval": false,
       "commitMessagePrefix": "chore(backend):",
       "reviewers": ["franklex", "fm41", "jonasfrz", "lukas.wydra"],
       "reviewersSampleSize": 1,
@@ -57,7 +58,8 @@
       "description": "Group Spring Boot dependencies",
       "matchPackagePatterns": ["^org\\.springframework"],
       "groupName": "Spring Boot dependencies",
-      "matchFileNames": ["portal-backend/**", "config-adapter/**"]
+      "matchFileNames": ["portal-backend/**", "config-adapter/**"],
+      "dependencyDashboardApproval": false
     },
     {
       "description": "Group React ecosystem",
