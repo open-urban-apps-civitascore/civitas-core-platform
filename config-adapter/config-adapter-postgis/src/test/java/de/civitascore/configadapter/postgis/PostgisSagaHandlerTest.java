@@ -228,6 +228,123 @@ class PostgisSagaHandlerTest {
     }
   }
 
+  @Nested
+  class SinkProvisioning {
+
+    @Test
+    void provisionSinkCreatesSchemaTableAndRole() throws Exception {
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", postgisSinkTrigger()));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeast(3)).execute(sql.capture());
+      List<String> executed = sql.getAllValues();
+      assertTrue(executed.stream().anyMatch(s -> s.startsWith("CREATE SCHEMA \"ds_42\"")));
+      assertTrue(
+          executed.stream()
+              .anyMatch(s -> s.startsWith("CREATE TABLE \"ds_42\".\"sensor_readings\"")));
+      assertTrue(executed.stream().anyMatch(s -> s.startsWith("CREATE ROLE \"ds_42_geo\"")));
+      assertTrue(executed.stream().anyMatch(s -> s.startsWith("GRANT USAGE ON SCHEMA \"ds_42\"")));
+      verify(mockConnection).commit();
+    }
+
+    @Test
+    void provisionSinkReturnsProvisionedSinksAsCompensationData() {
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", postgisSinkTrigger()));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      assertTrue(result.compensationData().containsKey("provisionedSinks"));
+    }
+
+    @Test
+    void provisionSinkWithoutColumnsFails() {
+      Map<String, Object> trigger =
+          Map.of(
+              "dataSinks",
+              List.of(
+                  Map.of(
+                      "dataSinkType",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of("schema", "ds_42", "tableName", "no_cols"))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_FAILED", result.type());
+      assertTrue(result.error().contains("at least one column"));
+    }
+
+    @Test
+    void provisionSinkWithoutPostgisSinkFails() {
+      Map<String, Object> trigger =
+          Map.of("dataSinks", List.of(Map.of("dataSinkType", "KAFKA", "configuration", Map.of())));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_FAILED", result.type());
+      assertTrue(result.error().contains("at least one POSTGIS data sink"));
+    }
+
+    @Test
+    void deprovisionSinkDropsRoleAndTableButNotSchema() throws Exception {
+      SagaCommandResult result =
+          handler.handle(compensate("DEPROVISION_SINK", postgisSinkTrigger()));
+
+      assertEquals("COMPENSATION_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      List<String> executed = sql.getAllValues();
+      assertTrue(executed.stream().anyMatch(s -> s.startsWith("DROP ROLE \"ds_42_geo\"")));
+      assertTrue(
+          executed.stream()
+              .anyMatch(s -> s.startsWith("DROP TABLE \"ds_42\".\"sensor_readings\"")));
+      assertTrue(executed.stream().noneMatch(s -> s.startsWith("DROP SCHEMA")));
+      verify(mockConnection).commit();
+    }
+
+    @Test
+    void deprovisionSinkAbsorbsMissingObjects() throws Exception {
+      when(mockStatement.execute(anyString()))
+          .thenThrow(new SQLException("undefined table", "42P01"));
+
+      SagaCommandResult result = handler.handle(execute("DEPROVISION_SINK", postgisSinkTrigger()));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      verify(mockConnection).commit();
+    }
+
+    private Map<String, Object> postgisSinkTrigger() {
+      return Map.of(
+          "datasetId",
+          "ds-42",
+          "dataSinks",
+          List.of(
+              Map.of(
+                  "dataSinkType",
+                  "POSTGIS",
+                  "configuration",
+                  Map.of(
+                      "schema",
+                      "ds_42",
+                      "tableName",
+                      "sensor_readings",
+                      "columns",
+                      List.of(Map.of("name", "id", "type", "BIGINT", "nullable", false)),
+                      "geometryColumns",
+                      List.of(Map.of("name", "geom", "geometryType", "POINT", "srid", 4326)),
+                      "primaryKey",
+                      List.of("id"),
+                      "readRole",
+                      Map.of(
+                          "name",
+                          "ds_42_geo",
+                          "canLogin",
+                          true,
+                          "privileges",
+                          List.of("USAGE"))))));
+    }
+  }
+
   private static SagaCommandMessage execute(String operation, Map<String, Object> payload) {
     return new SagaCommandMessage(
         "EXECUTE_STEP", "msg-1", "saga-1", "step-1", "postgis", operation, payload);

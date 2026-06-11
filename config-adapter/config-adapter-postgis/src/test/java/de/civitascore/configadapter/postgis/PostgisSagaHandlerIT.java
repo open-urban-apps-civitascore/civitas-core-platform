@@ -144,6 +144,54 @@ class PostgisSagaHandlerIT extends AbstractPostgisIT {
     assertEquals("COMPENSATION_COMPLETED", compensated.type());
   }
 
+  @Test
+  void provisionSinkCreatesObjectsThenDeprovisionRemovesTableAndRole() throws Exception {
+    Map<String, Object> trigger = postgisSinkTrigger();
+
+    SagaCommandResult provisioned = handler.handle(execute("PROVISION_SINK", trigger));
+    assertEquals("STEP_COMPLETED", provisioned.type());
+    assertTrue(schemaExists("sink_it"), "schema should be created");
+    assertTrue(tableExists("sink_it", "observations"), "table should be created");
+    assertTrue(roleExists("sink_it_geo"), "read role should be created");
+    assertTrue(
+        hasSchemaPrivilege("sink_it_geo", "sink_it", "USAGE"),
+        "read role should hold USAGE on the schema");
+
+    // GeoServer's read role must be able to use the schema before we can drop it cleanly.
+    executeSql("REVOKE ALL ON SCHEMA \"sink_it\" FROM \"sink_it_geo\"");
+
+    SagaCommandResult deprovisioned = handler.handle(compensate("DEPROVISION_SINK", trigger));
+    assertEquals("COMPENSATION_COMPLETED", deprovisioned.type());
+    assertFalse(tableExists("sink_it", "observations"), "table should be dropped");
+    assertFalse(roleExists("sink_it_geo"), "read role should be dropped");
+    assertTrue(schemaExists("sink_it"), "schema is intentionally left in place (may be shared)");
+  }
+
+  private static Map<String, Object> postgisSinkTrigger() {
+    return Map.of(
+        "datasetId",
+        "ds-sink-it",
+        "dataSinks",
+        List.of(
+            Map.of(
+                "dataSinkType",
+                "POSTGIS",
+                "configuration",
+                Map.of(
+                    "schema",
+                    "sink_it",
+                    "tableName",
+                    "observations",
+                    "columns",
+                    List.of(Map.of("name", "id", "type", "BIGINT", "nullable", false)),
+                    "geometryColumns",
+                    List.of(Map.of("name", "geom", "geometryType", "POINT", "srid", 4326)),
+                    "primaryKey",
+                    List.of("id"),
+                    "readRole",
+                    Map.of("name", "sink_it_geo", "privileges", List.of("USAGE"))))));
+  }
+
   // --- Helpers ---
 
   private static SagaCommandMessage execute(String operation, Map<String, Object> payload) {

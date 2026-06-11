@@ -219,7 +219,26 @@ Forward operations and their compensations:
 - `CREATE_*` absorbs duplicate-object SQLStates and `DROP_*` absorbs missing-object SQLStates, so steps and compensations are safe to retry.
 - `DROP_*` can also be used as a forward step; encrypted role passwords are decrypted exactly as in the event path.
 
-The handler reuses the same `ConnectionProvider`, `PostgisDialect`, `TableDdlBuilder`, and `GrantReconciler` as the adapter. It is not wired into the built-in dataset-create/update/delete sagas (those remain FROST → APISIX → RedPanda) — it is available for any saga that references the `postgis` adapter.
+The handler reuses the same `ConnectionProvider`, `PostgisDialect`, `TableDdlBuilder`, and `GrantReconciler` as the adapter.
+
+### Dataset-saga sink provisioning (`PROVISION_SINK` / `DEPROVISION_SINK`)
+
+Beyond the generic resource ops, the handler is a **step in the dataset sagas**. When the dataset trigger carries a `POSTGIS` data sink (`hasGeoSink`), the CREATE saga runs `PROVISION_SINK` **before** GeoServer registers its datastore — GeoServer publishes feature types from a PostGIS table, and that table must exist first. `PROVISION_SINK` reads each `dataSinks[POSTGIS].configuration` and creates the schema (optional), table, and a GeoServer read role + grant, all in one transaction (idempotent). `DEPROVISION_SINK` (DELETE saga / CREATE compensation) drops the table and role; the schema is left (it may be shared).
+
+Required `dataSinks[POSTGIS].configuration` shape (the portal-backend must emit columns/geometry so the table can be created):
+
+```json
+{ "dataSinkType": "POSTGIS",
+  "configuration": {
+    "schema": "ds_42", "owner": "ds_42_admin",
+    "tableName": "sensor_readings",
+    "columns": [ {"name": "id", "type": "BIGINT", "nullable": false} ],
+    "geometryColumns": [ {"name": "geom", "geometryType": "POINT", "srid": 4326} ],
+    "primaryKey": ["id"],
+    "readRole": {"name": "ds_42_geo", "privileges": ["USAGE"]} } }
+```
+
+Saga placement — CREATE: `… APISIX → [hasGeoSink] PROVISION_SINK → GeoServer workspace → datastore → layers → …`; DELETE: `… GeoServer DELETE_WORKSPACE → DEPROVISION_SINK → FROST`. UPDATE does not re-provision the sink.
 
 ## Tests
 

@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.postgis;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.adapter.SagaCommandHandler;
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
@@ -16,10 +17,14 @@ import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.crypto.CredentialDecryptor;
 import de.civitascore.configadapter.crypto.CryptoKeyLoader;
+import de.civitascore.configadapter.model.postgis.ColumnConfig;
 import de.civitascore.configadapter.model.postgis.DbRoleConfig;
+import de.civitascore.configadapter.model.postgis.GeometryColumnConfig;
+import de.civitascore.configadapter.model.postgis.IndexConfig;
 import de.civitascore.configadapter.model.postgis.PostgisConfigValue;
 import de.civitascore.configadapter.model.postgis.SchemaConfig;
 import de.civitascore.configadapter.model.postgis.SchemaGrant;
+import de.civitascore.configadapter.model.postgis.SchemaPrivilege;
 import de.civitascore.configadapter.model.postgis.TableConfig;
 import de.civitascore.configadapter.postgis.ddl.GrantReconciler;
 import de.civitascore.configadapter.postgis.ddl.GrantReconciler.GrantReconcilePlan;
@@ -30,9 +35,11 @@ import de.civitascore.configadapter.postgis.dialect.SqlDialect;
 import java.security.GeneralSecurityException;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Savepoint;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -45,7 +52,10 @@ import org.slf4j.LoggerFactory;
  * DDL over JDBC instead of HTTP. Discovered via {@link java.util.ServiceLoader} and registered in
  * the saga orchestrator's handler registry.
  *
- * <p>Forward operations and their compensations:
+ * <p>Two families of operations:
+ *
+ * <p><b>1. Generic resource operations</b> (nested config payload under {@code tableConfig} /
+ * {@code schemaConfig} / {@code roleConfig}, each carrying its {@code resourceType} discriminator):
  *
  * <ul>
  *   <li>{@code CREATE_TABLE} ↔ {@code DROP_TABLE}
@@ -53,11 +63,32 @@ import org.slf4j.LoggerFactory;
  *   <li>{@code CREATE_ROLE} ↔ {@code DROP_ROLE}
  * </ul>
  *
- * <p>The forward {@code CREATE_*} commands carry the resource definition as a nested map under
- * {@code tableConfig} / {@code schemaConfig} / {@code roleConfig}; each returns the identifiers it
- * created as {@code compensationData}, which the orchestrator flattens back into the payload of the
- * compensating {@code DROP_*} command. CREATE is idempotent (duplicate-object SQLStates absorbed);
- * DROP is idempotent (missing-object SQLStates absorbed), so compensations are safe to retry.
+ * <p><b>2. Dataset-saga sink provisioning</b> — {@code PROVISION_SINK} ↔ {@code DEPROVISION_SINK}.
+ * These read the dataset trigger directly (no nested config) and provision the PostGIS objects a
+ * GeoServer datastore publishes from. For every {@code POSTGIS} entry in the trigger's {@code
+ * dataSinks}, the {@code configuration} carries the table definition:
+ *
+ * <pre>{@code
+ * { "dataSinkType": "POSTGIS",
+ *   "configuration": {
+ *     "schema": "ds_42",                 // optional; created (idempotent) if present
+ *     "owner": "ds_42_admin",            // optional schema owner
+ *     "tableName": "sensor_readings",    // required; the table GeoServer reads
+ *     "columns": [ {name,type,...} ],    // required (>=1 column or geometryColumn)
+ *     "geometryColumns": [ {name,geometryType,srid,...} ],
+ *     "primaryKey": ["id"],
+ *     "indexes": [ {...} ],
+ *     "readRole": { "name":"ds_42_geo", "canLogin":true,
+ *                   "password":"ENC(...)", "privileges":["USAGE"] } } }  // optional GeoServer role
+ * }</pre>
+ *
+ * {@code PROVISION_SINK} creates schema (if given), table, and read role + grants for each sink in
+ * one transaction; {@code DEPROVISION_SINK} drops the table and role (schemas are left, as they may
+ * be shared). Both re-derive their targets from {@code dataSinks}, so the
+ * compensation/forward-delete paths are symmetric.
+ *
+ * <p>CREATE/PROVISION are idempotent (duplicate-object SQLStates absorbed); DROP/DEPROVISION are
+ * idempotent (missing-object SQLStates absorbed), so steps and compensations are safe to retry.
  *
  * <p>Role passwords may be encrypted {@code ENC(...)} values, decrypted with {@code
  * CIVITAS_MASTER_KEY} exactly as in {@link PostgisAdapter}. Plaintext passwords are never logged.
@@ -71,6 +102,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   private static final String MASTER_KEY_ENV = "CIVITAS_MASTER_KEY";
 
   private static final String COMPENSATE_TYPE = "COMPENSATE_STEP";
+  private static final String DATASINK_TYPE_POSTGIS = "POSTGIS";
 
   private static final String JDBC_URL_KEY = "postgis.jdbc.url";
   private static final String JDBC_USER_KEY = "postgis.jdbc.user";
@@ -84,7 +116,8 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   private static final Pattern PASSWORD_LITERAL =
       Pattern.compile("(?i)(PASSWORD\\s+)'(?:[^']|'')*'");
 
-  private final ObjectMapper objectMapper = new ObjectMapper();
+  private final ObjectMapper objectMapper =
+      new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
   private ConnectionProvider connectionProvider;
   private SqlDialect dialect;
@@ -148,6 +181,8 @@ public class PostgisSagaHandler implements SagaCommandHandler {
         case "DROP_SCHEMA" -> dropSchema(command, compensation);
         case "CREATE_ROLE" -> createRole(command);
         case "DROP_ROLE" -> dropRole(command, compensation);
+        case "PROVISION_SINK" -> provisionSink(command);
+        case "DEPROVISION_SINK" -> deprovisionSink(command, compensation);
         default -> unknownOperation(command, compensation);
       };
     } catch (Exception e) {
@@ -210,6 +245,54 @@ public class PostgisSagaHandler implements SagaCommandHandler {
     return SagaCommandResult.success(command.sagaId(), command.stepId(), identifiers, identifiers);
   }
 
+  // ─── Dataset-saga sink provisioning ─────────────────────────────────────────
+
+  private SagaCommandResult provisionSink(SagaCommandMessage command) throws SQLException {
+    List<SinkSpec> sinks = parseSinks(command);
+    List<String> statements = new ArrayList<>();
+    List<Map<String, Object>> provisioned = new ArrayList<>();
+    for (SinkSpec sink : sinks) {
+      // buildCreate already emits CREATE SCHEMA for the table's schema; only the owner (if any)
+      // needs a separate ALTER SCHEMA … OWNER TO.
+      statements.addAll(ddlBuilder.buildCreate(sink.table()));
+      if (sink.schema() != null) {
+        statements.addAll(dialect.alterSchemaOwner(sink.schema()));
+      }
+      if (sink.role() != null) {
+        String password = resolvePassword(sink.role().getPassword());
+        statements.addAll(dialect.createRole(sink.role(), password));
+        appendGrantStatements(statements, sink.role().getName(), sink.role().getGrants());
+      }
+      provisioned.add(sink.identifiers());
+    }
+    runDdl(statements, true, false);
+
+    logger.info(
+        "PostGIS sink(s) provisioned: {}, saga={}",
+        Encode.forJava(String.valueOf(provisioned)),
+        Encode.forJava(command.sagaId()));
+    Map<String, Object> data = Map.of("provisionedSinks", provisioned);
+    return SagaCommandResult.success(command.sagaId(), command.stepId(), data, data);
+  }
+
+  private SagaCommandResult deprovisionSink(SagaCommandMessage command, boolean compensation)
+      throws SQLException {
+    List<SinkSpec> sinks = parseSinks(command);
+    List<String> statements = new ArrayList<>();
+    for (SinkSpec sink : sinks) {
+      if (sink.role() != null) {
+        statements.addAll(dialect.dropRole(sink.role()));
+      }
+      statements.addAll(dialect.dropTable(sink.table().getSchema(), sink.table().getName()));
+      // The schema is intentionally left in place: it may be shared across datasets. The table and
+      // read role are the per-dataset artifacts this step removes.
+    }
+    runDdl(statements, false, true);
+
+    logger.info("PostGIS sink(s) deprovisioned, saga={}", Encode.forJava(command.sagaId()));
+    return done(command, compensation);
+  }
+
   // ─── Drop operations (also serve as compensations) ──────────────────────────
 
   private SagaCommandResult dropTable(SagaCommandMessage command, boolean compensation)
@@ -257,7 +340,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       connection.setAutoCommit(false);
       try (Statement stmt = connection.createStatement()) {
         for (String sql : statements) {
-          executeOne(stmt, sql, absorbDuplicate, absorbMissing);
+          executeOne(connection, stmt, sql, absorbDuplicate, absorbMissing);
         }
         connection.commit();
       } catch (SQLException | RuntimeException e) {
@@ -267,26 +350,35 @@ public class PostgisSagaHandler implements SagaCommandHandler {
     }
   }
 
+  /**
+   * Executes one DDL statement, wrapped in a savepoint. An absorbed duplicate/missing object rolls
+   * back to the savepoint rather than the whole transaction: PostgreSQL aborts the entire
+   * transaction on any error, so without the savepoint the following statements in a
+   * multi-statement step (schema → table → role) would fail with "current transaction is aborted".
+   * The savepoint keeps the idempotency-by-absorption contract working inside one transaction.
+   */
   private void executeOne(
-      Statement stmt, String sql, boolean absorbDuplicate, boolean absorbMissing)
+      Connection connection,
+      Statement stmt,
+      String sql,
+      boolean absorbDuplicate,
+      boolean absorbMissing)
       throws SQLException {
+    Savepoint savepoint = connection.setSavepoint();
     try {
       logger.debug("Executing DDL: {}", Encode.forJava(redact(sql)));
       stmt.execute(sql);
+      connection.releaseSavepoint(savepoint);
     } catch (SQLException e) {
-      if (absorbDuplicate && dialect.isDuplicate(e)) {
-        logger.info(
-            "PostGIS object already exists (SQLState {}), treating as success (idempotent)",
-            Encode.forJava(String.valueOf(e.getSQLState())));
-        return;
+      boolean absorb =
+          (absorbDuplicate && dialect.isDuplicate(e)) || (absorbMissing && dialect.isMissing(e));
+      if (!absorb) {
+        throw e;
       }
-      if (absorbMissing && dialect.isMissing(e)) {
-        logger.info(
-            "PostGIS object not found (SQLState {}), treating as success (idempotent)",
-            Encode.forJava(String.valueOf(e.getSQLState())));
-        return;
-      }
-      throw e;
+      connection.rollback(savepoint);
+      logger.info(
+          "PostGIS object already in desired state (SQLState {}), treating as success (idempotent)",
+          Encode.forJava(String.valueOf(e.getSQLState())));
     }
   }
 
@@ -351,6 +443,137 @@ public class PostgisSagaHandler implements SagaCommandHandler {
               + type.getSimpleName());
     }
     return type.cast(config);
+  }
+
+  /** One PostGIS data sink resolved into the objects to provision/drop. */
+  private record SinkSpec(SchemaConfig schema, TableConfig table, DbRoleConfig role) {
+    Map<String, Object> identifiers() {
+      Map<String, Object> id = new LinkedHashMap<>();
+      if (table.getSchema() != null && !table.getSchema().isBlank()) {
+        id.put("schema", table.getSchema());
+      }
+      id.put("table", table.getName());
+      if (role != null) {
+        id.put("role", role.getName());
+      }
+      return id;
+    }
+  }
+
+  /**
+   * Parses the trigger's {@code dataSinks} into per-sink specs. See the class javadoc for the
+   * {@code POSTGIS} sink {@code configuration} shape. Used identically by {@code PROVISION_SINK}
+   * and {@code DEPROVISION_SINK} so the forward and rollback paths stay symmetric.
+   */
+  private List<SinkSpec> parseSinks(SagaCommandMessage command) {
+    List<SinkSpec> specs = new ArrayList<>();
+    for (Map<String, Object> sink : mapList(command.payload(), "dataSinks")) {
+      if (!DATASINK_TYPE_POSTGIS.equals(sink.get("dataSinkType"))) {
+        continue;
+      }
+      Map<String, Object> config = mapValue(sink, "configuration");
+      String tableName = stringValue(config, "tableName");
+      if (tableName == null || tableName.isBlank()) {
+        throw new IllegalArgumentException("POSTGIS data sink is missing configuration.tableName");
+      }
+      String schemaName = stringValue(config, "schema");
+
+      SchemaConfig schema = null;
+      if (schemaName != null && !schemaName.isBlank()) {
+        schema = new SchemaConfig();
+        schema.setName(schemaName);
+        schema.setOwner(stringValue(config, "owner"));
+      }
+
+      TableConfig table = new TableConfig();
+      table.setSchema(schemaName);
+      table.setName(tableName);
+      table.setColumns(convertList(config.get("columns"), ColumnConfig.class));
+      table.setGeometryColumns(
+          convertList(config.get("geometryColumns"), GeometryColumnConfig.class));
+      table.setPrimaryKey(stringList(config.get("primaryKey")));
+      table.setIndexes(convertList(config.get("indexes"), IndexConfig.class));
+      if (table.getColumns().isEmpty() && table.getGeometryColumns().isEmpty()) {
+        throw new IllegalArgumentException(
+            "POSTGIS data sink '" + tableName + "' configuration must define at least one column");
+      }
+
+      specs.add(new SinkSpec(schema, table, parseReadRole(config, schemaName)));
+    }
+    if (specs.isEmpty()) {
+      throw new IllegalArgumentException(
+          command.operation() + " requires at least one POSTGIS data sink in the payload");
+    }
+    return specs;
+  }
+
+  private DbRoleConfig parseReadRole(Map<String, Object> config, String schemaName) {
+    if (!(config.get("readRole") instanceof Map<?, ?> roleMap)) {
+      return null;
+    }
+    @SuppressWarnings("unchecked")
+    Map<String, Object> roleConfig = (Map<String, Object>) roleMap;
+    String name = stringValue(roleConfig, "name");
+    if (name == null || name.isBlank()) {
+      throw new IllegalArgumentException("POSTGIS sink readRole is missing 'name'");
+    }
+    DbRoleConfig role = new DbRoleConfig();
+    role.setName(name);
+    role.setCanLogin(Boolean.TRUE.equals(roleConfig.get("canLogin")));
+    role.setPassword(stringValue(roleConfig, "password"));
+    if (schemaName != null && !schemaName.isBlank()) {
+      role.setGrants(
+          List.of(
+              new SchemaGrant(schemaName, parsePrivileges(roleConfig.get("privileges")), null)));
+    }
+    return role;
+  }
+
+  private static List<SchemaPrivilege> parsePrivileges(Object raw) {
+    if (raw instanceof List<?> list && !list.isEmpty()) {
+      List<SchemaPrivilege> privileges = new ArrayList<>();
+      for (Object value : list) {
+        privileges.add(SchemaPrivilege.valueOf(String.valueOf(value).toUpperCase()));
+      }
+      return privileges;
+    }
+    return List.of(SchemaPrivilege.USAGE);
+  }
+
+  private <T> List<T> convertList(Object raw, Class<T> elementType) {
+    if (!(raw instanceof List<?> list) || list.isEmpty()) {
+      return List.of();
+    }
+    return objectMapper.convertValue(
+        list, objectMapper.getTypeFactory().constructCollectionType(List.class, elementType));
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<String> stringList(Object raw) {
+    return raw instanceof List<?> list ? (List<String>) list : null;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<Map<String, Object>> mapList(Map<String, Object> payload, String key) {
+    if (!(payload.get(key) instanceof List<?> list)) {
+      return List.of();
+    }
+    List<Map<String, Object>> result = new ArrayList<>();
+    for (Object item : list) {
+      if (item instanceof Map<?, ?> map) {
+        result.add((Map<String, Object>) map);
+      }
+    }
+    return result;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> mapValue(Map<String, Object> parent, String key) {
+    return parent.get(key) instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
+  }
+
+  private static String stringValue(Map<String, Object> map, String key) {
+    return map.get(key) instanceof String s ? s : null;
   }
 
   private static String requireString(SagaCommandMessage command, String key) {
