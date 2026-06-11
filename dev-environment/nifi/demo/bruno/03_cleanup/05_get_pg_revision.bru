@@ -1,0 +1,28 @@
+meta {
+  name: 03 Get PG Revision (for DELETE)
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{nifiBaseUrl}}/nifi-api/process-groups/{{demoPgId}}
+  auth: inherit
+}
+
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setVar('demoPgRevision', res.body.revision.version);
+  }
+}
+
+tests {
+  test("Revision saved", function() {
+    expect(bru.getVar('demoPgRevision')).to.not.be.undefined;
+  });
+}
+
+docs {
+  Fetches the current PG revision version — required as a query param on
+  the DELETE in step 04.
+}

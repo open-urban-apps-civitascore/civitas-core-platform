@@ -1,0 +1,21 @@
+meta {
+  name: Contract MQTT — update changes arrays (4/4 cleanup)
+  type: http
+  seq: 24
+}
+
+delete {
+  url: {{baseUrl}}/datasources/{{contractMqttUpdateId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+tests {
+  test("Status is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}

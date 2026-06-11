@@ -321,6 +321,12 @@
                         <!-- Transitively pulled compile-scope by oauth2-resource-server;
                              only direct use is JWTParser in UserMeIntegrationTest -->
                         <ignoredNonTestScopedDependency>com.nimbusds:nimbus-jose-jwt</ignoredNonTestScopedDependency>
+                        <!-- Transitively pulled compile-scope by spring-boot-starter-data-jpa;
+                             only direct use is JdbcTemplate in DataSourceContractIntegrationTest -->
+                        <ignoredNonTestScopedDependency>org.springframework:spring-jdbc</ignoredNonTestScopedDependency>
+                        <!-- Compile-scope for app boot (auto-migration on startup);
+                             additionally used directly only by DiscriminatorBackfillMigrationIntegrationTest -->
+                        <ignoredNonTestScopedDependency>org.flywaydb:flyway-core</ignoredNonTestScopedDependency>
                         <!-- Transitively pulled test-only -->
                         <ignoredUsedUndeclaredDependency>ch.qos.logback:*</ignoredUsedUndeclaredDependency>
                     </ignoredNonTestScopedDependencies>
@@ -359,6 +365,14 @@
                         <!-- Transitively pulled, used directly only in tests; versions
                              managed by upstream BOMs (springframework) -->
                         <ignoredUsedUndeclaredDependency>ch.qos.logback:*</ignoredUsedUndeclaredDependency>
+                        <!-- Transitively pulled by spring-boot-starter-test;
+                             used directly only by Phase 1 contract tests (#1391) -->
+                        <ignoredUsedUndeclaredDependency>com.jayway.jsonpath:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>org.skyscreamer:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>com.vaadin.external.google:*</ignoredUsedUndeclaredDependency>
+                        <!-- Pulled compile-scope for app boot; additionally used directly
+                             only by DiscriminatorBackfillMigrationIntegrationTest (Phase 1 of #1391) -->
+                        <ignoredUsedUndeclaredDependency>org.flywaydb:flyway-core</ignoredUsedUndeclaredDependency>
                     </ignoredUsedUndeclaredDependencies>
                 </configuration>
                 <executions>

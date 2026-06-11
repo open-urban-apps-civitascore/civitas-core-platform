@@ -22,24 +22,61 @@ body:json {
     "name": "Saga Test Pipeline",
     "description": "Pipeline for saga workflow test",
     "dataSourceIds": ["{{sagaDataSourceId}}"],
-    "styles": {},
     "model": {
-      "input": {
-        "generate": {
-          "interval": "1s",
-          "count": 1,
-          "mapping": "root = {\"name\": \"Test Sensor\", \"description\": \"test\"}"
-        }
+      "viewport": { "x": 0, "y": 0, "zoom": 1 },
+      "nodePositions": {
+        "22222222-2222-4000-8000-000000000001": { "x": 360, "y": -40 },
+        "22222222-2222-4000-8000-000000000002": { "x": 320, "y": 100 },
+        "22222222-2222-4000-8000-000000000003": { "x": 740, "y": 80 }
       },
-      "output": {
-        "http_client": {
-          "url": "${FROST_BASE}/Things",
-          "verb": "POST",
-          "headers": {
-            "Content-Type": "application/json"
-          }
+      "nodes": [
+        {
+          "id": "22222222-2222-4000-8000-000000000001",
+          "type": "start",
+          "position": { "x": 360, "y": -40 },
+          "data": { "nodeType": "start", "label": "Start", "configured": true, "description": "Entry point of the pipeline. Execution begins here." },
+          "measured": { "width": 32, "height": 32 }
+        },
+        {
+          "id": "22222222-2222-4000-8000-000000000002",
+          "type": "mapping",
+          "position": { "x": 320, "y": 100 },
+          "data": {
+            "label": "Mapping",
+            "configured": true,
+            "mappingConfig": {
+              "$schema": "https://civitasconnect.digital/core/mapping/v1",
+              "source": "urn:core:datastructure:8cc31216-5417-4d0a-abea-dde0659ce00d:501b78f7-f076-46e2-b5cb-748267a75e24",
+              "target": "urn:core:datastructure:08e34478-8aa3-42a5-9431-d805e209ceec:c10bbb60-d1bc-4c73-be81-2270b906837c",
+              "fields": {
+                "$.name": "$.name",
+                "$.description": "$.description"
+              },
+              "positions": {}
+            },
+            "sourceDatastructureId": "8cc31216-5417-4d0a-abea-dde0659ce00d",
+            "sourceVersionId": "501b78f7-f076-46e2-b5cb-748267a75e24",
+            "sourceName": "SensorMessage",
+            "targetDatastructureId": "08e34478-8aa3-42a5-9431-d805e209ceec",
+            "targetVersionId": "c10bbb60-d1bc-4c73-be81-2270b906837c",
+            "targetName": "Thing"
+          },
+          "measured": { "width": 160, "height": 66 },
+          "selected": false,
+          "dragging": false
+        },
+        {
+          "id": "22222222-2222-4000-8000-000000000003",
+          "type": "end",
+          "position": { "x": 740, "y": 80 },
+          "data": { "nodeType": "end", "label": "End", "configured": true, "description": "Exit point of the pipeline. Execution completes here." },
+          "measured": { "width": 32, "height": 32 }
         }
-      }
+      ],
+      "edges": [
+        { "id": "22222222-2222-4000-8000-0000000000e1", "source": "22222222-2222-4000-8000-000000000001", "target": "22222222-2222-4000-8000-000000000002", "type": "smoothstep", "data": { "label": "" } },
+        { "id": "22222222-2222-4000-8000-0000000000e2", "source": "22222222-2222-4000-8000-000000000002", "target": "22222222-2222-4000-8000-000000000003", "type": "smoothstep", "data": { "label": "" } }
+      ]
     }
   }
 }
@@ -61,7 +98,7 @@ tests {
 docs {
   **Saga step 5 of 20** — Prerequisites: DataSource released (step 4b), DataSet created (step 4).
 
-  Creates a Redpanda Connect pipeline ("Saga Test Pipeline") attached to the dataset. The pipeline consumes from the MQTT datasource (`sagaDataSourceId`) and posts to FROST. The datasource must be in AVAILABLE status (released in step 4b) before it can be linked. When the dataset is released, the saga deploys this pipeline to Redpanda Connect.
+  Creates a pipeline ("Saga Test Pipeline") attached to the dataset, modelled as a CORE intermediate-representation document (`model`). The pipeline consumes from the MQTT datasource (`sagaDataSourceId`) and posts to FROST. The datasource must be in AVAILABLE status (released in step 4b) before it can be linked. When the dataset is released, the saga deploys this pipeline to the pipeline engine.
 
   **Expected Response:** 201 Created, body contains `id`. 409 if the pipeline already existed (idempotent).
 
@@ -73,5 +110,5 @@ docs {
   |---|---|
   | Backend | Pipeline record created in `portal_backend` DB linked to the dataset |
   | Config Adapter | — |
-  | Redpanda Connect | Pipeline is deployed only after the DATASET_CREATE saga runs (step 8) |
+  | Pipeline engine | Pipeline is deployed only after the DATASET_CREATE saga runs (step 8) |
 }

@@ -1,0 +1,32 @@
+meta {
+  name: 01 Check Processors Running and Valid
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{nifiBaseUrl}}/nifi-api/process-groups/{{demoPgId}}/processors
+  auth: inherit
+}
+
+
+tests {
+  test("Status 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  test("All four processors RUNNING and VALID", function() {
+    const procs = res.body.processors;
+    expect(procs).to.have.lengthOf(4);
+    for (const p of procs) {
+      const c = p.component;
+      expect(c.state, c.name + ' state').to.equal('RUNNING');
+      expect(c.validationStatus, c.name + ' validation').to.equal('VALID');
+    }
+  });
+}
+
+docs {
+  Spot-check: all four processors (ConsumeMQTT, ConvertRecord, mapping,
+  PutDatabaseRecord) should be RUNNING and VALID. If any is INVALID, inspect
+  its `validationErrors`.
+}

@@ -1,0 +1,37 @@
+meta {
+  name: 07 Start Process Group
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{nifiBaseUrl}}/nifi-api/flow/process-groups/{{demoPgId}}
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "id": "{{demoPgId}}",
+    "state": "RUNNING",
+    "disconnectedNodeAcknowledged": false
+  }
+}
+
+tests {
+  test("Status 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  test("State RUNNING", function() {
+    expect(res.body.state).to.equal('RUNNING');
+  });
+}
+
+docs {
+  Starts all four processors in the demo PG. ConsumeMQTT subscribes to
+  `sensors/+/temp` on the Mosquitto broker; the flow waits for messages.
+
+  Publish a test message via `mosquitto_pub` (see README) and verify by
+  selecting from `sensor_observations` in PostGIS.
+}

@@ -1,0 +1,27 @@
+meta {
+  name: Contract MQTT — patch partial (3/4 read-back)
+  type: http
+  seq: 27
+}
+
+get {
+  url: {{baseUrl}}/datasources/{{contractMqttPatchId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Patched description persisted; configuration untouched", function() {
+    expect(res.body.description).to.equal("contract — MQTT patched");
+    expect(res.body.configuration.urls).to.deep.equal(["tcp://broker:1883"]);
+    expect(res.body.configuration.topics).to.deep.equal(["sensor/data"]);
+    expect(res.body.configuration.qos).to.equal(1);
+  });
+}

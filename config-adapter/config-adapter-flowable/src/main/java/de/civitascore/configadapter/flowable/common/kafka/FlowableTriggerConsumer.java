@@ -44,6 +44,7 @@ public class FlowableTriggerConsumer {
   private static final Logger LOG = LoggerFactory.getLogger(FlowableTriggerConsumer.class);
   static final String TRIGGER_TOPIC = "de.civitascore.dataset.saga.trigger";
   private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
+  private static final String DATASINK_TYPE_POSTGIS = "POSTGIS";
 
   private final RuntimeService runtimeService;
   private final HistoryService historyService;
@@ -215,8 +216,10 @@ public class FlowableTriggerConsumer {
     Map<String, Object> variables = new HashMap<>(trigger);
     variables.remove("sagaType");
     variables.computeIfAbsent("sagaId", k -> UUID.randomUUID().toString());
-    // Always derive — never trust external payload for this control flag
+    // Always derive — never trust external payload for these control flags
     variables.put("hasPipelines", deriveHasPipelines(trigger));
+    variables.put("hasGeoSink", deriveHasGeoSink(trigger));
+    variables.put("hasLayers", deriveHasLayers(trigger));
 
     ProcessInstance instance =
         runtimeService.startProcessInstanceByKey(processKey, businessKey, variables);
@@ -248,5 +251,26 @@ public class FlowableTriggerConsumer {
     }
     Object pipelineIds = trigger.get("pipelineIds");
     return pipelineIds instanceof List<?> idList && !idList.isEmpty();
+  }
+
+  /**
+   * Derives the hasGeoSink flag from the trigger payload: true if {@code dataSinks} contains a sink
+   * of type {@code POSTGIS} (the sink type that GeoServer publishes via a PostGIS datastore). Gates
+   * the conditional GeoServer branch of the dataset sagas.
+   */
+  private static boolean deriveHasGeoSink(Map<String, Object> trigger) {
+    return trigger.get("dataSinks") instanceof List<?> dataSinks
+        && dataSinks.stream()
+            .filter(Map.class::isInstance)
+            .map(Map.class::cast)
+            .anyMatch(sink -> DATASINK_TYPE_POSTGIS.equals(sink.get("dataSinkType")));
+  }
+
+  /**
+   * Derives the hasLayers flag from the trigger payload: true if {@code layers} is a non-empty
+   * list. Gates the conditional layer-provisioning step within the GeoServer branch.
+   */
+  private static boolean deriveHasLayers(Map<String, Object> trigger) {
+    return trigger.get("layers") instanceof List<?> layers && !layers.isEmpty();
   }
 }

@@ -1,0 +1,30 @@
+meta {
+  name: 02 Check No Error Bulletins
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{nifiBaseUrl}}/nifi-api/flow/bulletin-board?groupId={{demoPgId}}
+  auth: inherit
+}
+
+
+tests {
+  test("Status 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  test("No ERROR bulletins", function() {
+    const bulletins = res.body.bulletinBoard.bulletins || [];
+    const errs = bulletins.filter(b => b.bulletin && b.bulletin.level === 'ERROR');
+    if (errs.length > 0) {
+      console.log('Errors found:', JSON.stringify(errs, null, 2));
+    }
+    expect(errs).to.have.lengthOf(0);
+  });
+}
+
+docs {
+  Polls the bulletin board for ERROR-level messages from the demo PG. Run
+  this after publishing test MQTT messages — failed inserts surface here.
+}

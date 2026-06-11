@@ -1,7 +1,7 @@
 services:
   model-atlas:
     container_name: model-atlas
-    image: eclipsefennec/model.atlas:snapshot
+    image: eclipsefennec/model.atlas:apicurio-0.0.1
     ports:
       - "8086:8080"
     networks:

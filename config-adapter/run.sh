@@ -37,4 +37,16 @@ echo "Starting the Keycloak Config Adapter..."
 
 export HEALTHCHECK_PORT=8089
 export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+
+# ─── Dev-only credentials ────────────────────────────────────────────────────
+# Credentials are NOT baked into the image / application.properties (security guideline).
+# These dev defaults are injected here for local runs only; real deployments supply their
+# own values (or ENC(...) values decrypted with CIVITAS_MASTER_KEY).
+export KEYCLOAK_PASSWORD=admin
+export APISIX_ADMIN_KEY=edd1c9f034335f136f87ad84b625c8f1
+export FROST_API_KEY=dev-frost-api-key
+export FLOWABLE_JDBC_PASSWORD=flowable
+export GEOSERVER_ADMIN_PASSWORD=geoserver
+export GEOSERVER_POSTGIS_PASSWORD=geo
+
 java -jar config-adapter-application/target/config-adapter-application-1.1.0.jar

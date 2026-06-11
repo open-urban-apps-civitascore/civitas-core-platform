@@ -244,10 +244,31 @@ class TopicsTest {
   }
 
   @Test
-  void values_whenCounted_shouldReturn46() {
+  void values_whenCounted_shouldReturn60() {
     // User: 7, Realm: 3, Client: 3, Group: 3, Role: 3, Backend: 3, Route: 3,
     // Thing: 3, Location: 3, Sensor: 3, ObservedProperty: 3, Datastream: 3,
     // FROST Project: 3, Pipeline: 3 = 46
-    assertEquals(46, Topics.values().length);
+    // GeoServer: Workspace: 3, Datastore: 3, FeatureType: 3, Style: 3, Layer: 2 = 14
+    // Total: 60
+    assertEquals(60, Topics.values().length);
+  }
+
+  @Test
+  void getValue_whenGeoServerTopics_shouldReturnCorrectValues() {
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.workspace.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.workspace.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.workspace.deleted"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.datastore.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.datastore.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.datastore.deleted"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.featuretype.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.featuretype.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.featuretype.deleted"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.style.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.style.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.style.deleted"));
+    // Layer has no 'created' topic: GeoServer publishes layers implicitly with their feature type.
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.layer.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.geo.layer.deleted"));
   }
 }

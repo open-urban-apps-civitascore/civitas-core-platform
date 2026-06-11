@@ -36,6 +36,8 @@ final class ProcessBuilderUtils {
   static final String ERROR_CODE = "STEP_FAILED";
 
   static final String PIPELINE_GATEWAY_ID = "pipeline-gateway";
+  static final String GEO_GATEWAY_ID = "geo-gateway";
+  static final String LAYERS_GATEWAY_ID = "layers-gateway";
   static final String PUBLISH_SUCCESS_ID = "publish-success";
   static final String PUBLISH_FAILURE_ID = "publish-failure";
   static final String RESULT_GATEWAY_ID = "result-gateway";

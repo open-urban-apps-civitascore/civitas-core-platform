@@ -1,0 +1,27 @@
+meta {
+  name: Contract MQTT — update changes arrays (3/4 read-back)
+  type: http
+  seq: 23
+}
+
+get {
+  url: {{baseUrl}}/datasources/{{contractMqttUpdateId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Updated state persisted", function() {
+    expect(res.body.description).to.equal("contract — MQTT updated");
+    expect(res.body.configuration.topics).to.deep.equal(["sensor/data", "sensor/heartbeat"]);
+    expect(res.body.configuration.urls).to.deep.equal(["tcp://broker:1883"]);
+    expect(res.body.configuration.qos).to.equal(1);
+  });
+}

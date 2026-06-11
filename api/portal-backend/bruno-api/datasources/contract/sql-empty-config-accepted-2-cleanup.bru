@@ -1,0 +1,21 @@
+meta {
+  name: Contract SQL — empty configuration accepted (2/2 cleanup)
+  type: http
+  seq: 17
+}
+
+delete {
+  url: {{baseUrl}}/datasources/{{contractSqlEmptyConfigId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+tests {
+  test("Status is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}

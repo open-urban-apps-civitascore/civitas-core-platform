@@ -1,0 +1,45 @@
+meta {
+  name: Contract SQL — delete + 404 (1/3 create)
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+body:json {
+  {
+    "name": "contract_sql_delete",
+    "description": "contract — SQL",
+    "connectorType": "SQL",
+    "configuration": {
+      "driver": "postgres",
+      "dsn": "postgres://example:5432/db",
+      "user": "alice",
+      "password": "s3cret",
+      "table": "events",
+      "columns": ["*"]
+    },
+    "dataStructureVersionId": null
+  }
+}
+
+script:post-response {
+  if (!res.body || !res.body.id) {
+    throw new Error("Expected create response to include non-empty 'id'");
+  }
+  bru.setVar('contractSqlDeleteId', res.body.id);
+}
+
+tests {
+  test("Status is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
