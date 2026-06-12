@@ -35,6 +35,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -399,6 +400,44 @@ class DataStructureVersionServiceTest {
           dataStructureVersionService.findModelByAtlasUri("http://example.com/model/1.0.0");
 
       assertThat(result).isEmpty();
+    }
+  }
+
+  @Nested
+  @DisplayName("resolveJsonSchemaByAtlasUri")
+  class ResolveJsonSchemaByAtlasUriTests {
+
+    @Test
+    @DisplayName("Fetches the schema with Accept application/schema+json and returns it parsed")
+    void resolvesSchemaWithSchemaJsonAcceptHeader() {
+      String uri = "http://example.com/model/1.0.0";
+      String schemaJson = "{\"title\":\"Observation\"}";
+      Map<String, Object> parsed = Map.of("title", "Observation");
+      when(modelService.downloadModel(uri, "application/schema+json")).thenReturn(schemaJson);
+      when(objectMapper.<Map<String, Object>>readValue(eq(schemaJson), any(TypeReference.class)))
+          .thenReturn(parsed);
+
+      Optional<Map<String, Object>> result =
+          dataStructureVersionService.resolveJsonSchemaByAtlasUri(uri);
+
+      assertThat(result).isPresent().contains(parsed);
+      verify(modelService).downloadModel(uri, "application/schema+json");
+    }
+
+    @Test
+    @DisplayName("Returns empty when modelAtlasUri is blank, without calling Model Atlas")
+    void returnsEmptyWhenUriBlank() {
+      assertThat(dataStructureVersionService.resolveJsonSchemaByAtlasUri("  ")).isEmpty();
+      verify(modelService, never()).downloadModel(any(), any());
+    }
+
+    @Test
+    @DisplayName("Returns empty when Model Atlas returns no content")
+    void returnsEmptyWhenNoContent() {
+      String uri = "http://example.com/model/1.0.0";
+      when(modelService.downloadModel(uri, "application/schema+json")).thenReturn("");
+
+      assertThat(dataStructureVersionService.resolveJsonSchemaByAtlasUri(uri)).isEmpty();
     }
   }
 
