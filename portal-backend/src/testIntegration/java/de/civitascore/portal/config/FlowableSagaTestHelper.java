@@ -85,7 +85,14 @@ public class FlowableSagaTestHelper implements AutoCloseable {
 
     ApisixSagaHandler apisixHandler = new ApisixSagaHandler();
     apisixHandler.initialize(
-        mapConfig(Map.of("apisix.admin.url", apisixMockUrl, "apisix.admin.key", "test-admin-key")));
+        mapConfig(
+            Map.of(
+                "apisix.admin.url", apisixMockUrl,
+                "apisix.admin.key", "test-admin-key",
+                "apisix.api.host", "api.civitas.test",
+                "apisix.api.public.url", "https://api.civitas.test",
+                "apisix.plugin.config.id", "auth-plugin-default",
+                "apisix.frost.api.key", "test-api-key")));
 
     postgisHandler = new PostgisSagaHandler();
     postgisHandler.initialize(
