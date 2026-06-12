@@ -61,6 +61,10 @@ services:
       GEOSERVER_POSTGIS_DB: geoserver
       GEOSERVER_POSTGIS_USER: geoserver
       GEOSERVER_POSTGIS_PASSWORD: changeme-generate-a-strong-password
+      # PostGIS adapter DDL connection — same database the GeoServer datastore reads
+      POSTGIS_JDBC_URL: jdbc:postgresql://postgres-geoserver:5432/geoserver
+      POSTGIS_JDBC_USER: geoserver
+      POSTGIS_JDBC_PASSWORD: changeme-generate-a-strong-password
     networks:
       - civitas-network
     healthcheck:

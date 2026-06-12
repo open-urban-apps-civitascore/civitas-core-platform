@@ -275,6 +275,50 @@ class PostgisSagaHandlerTest {
     }
 
     @Test
+    void provisionSinkDerivesColumnsFromDataStructureWhenNoneConfigured() throws Exception {
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of("tableName", "sensor_observations"),
+                      "dataStructure",
+                      Map.of(
+                          "$id",
+                          "urn:core:datastructure:08e34478",
+                          "title",
+                          "Observation",
+                          "definitions",
+                          Map.of(
+                              "Observation",
+                              Map.of(
+                                  "type",
+                                  "object",
+                                  "properties",
+                                  Map.of(
+                                      "station_id", Map.of("type", "string"),
+                                      "temperature", Map.of("type", "string")),
+                                  "required",
+                                  List.of("station_id", "temperature")))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      String createTable =
+          sql.getAllValues().stream()
+              .filter(s -> s.startsWith("CREATE TABLE"))
+              .findFirst()
+              .orElseThrow();
+      assertTrue(createTable.contains("\"station_id\" TEXT NOT NULL"));
+      assertTrue(createTable.contains("\"temperature\" TEXT NOT NULL"));
+    }
+
+    @Test
     void provisionSinkWithoutPostgisSinkFails() {
       Map<String, Object> trigger =
           Map.of("datasinks", List.of(Map.of("type", "KAFKA", "configuration", Map.of())));

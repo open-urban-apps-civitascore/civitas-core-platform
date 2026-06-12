@@ -862,6 +862,10 @@ export GEOSERVER_POSTGIS_PORT=5434
 export GEOSERVER_POSTGIS_DB=geoserver
 export GEOSERVER_POSTGIS_USER=geoserver
 export GEOSERVER_POSTGIS_PASSWORD=geoserver
+# PostGIS adapter DDL connection — must point at the same database the GeoServer datastore reads
+export POSTGIS_JDBC_URL=jdbc:postgresql://localhost:5434/geoserver
+export POSTGIS_JDBC_USER=geoserver
+export POSTGIS_JDBC_PASSWORD=geoserver
 
 java -jar "$CONFIG_ADAPTER_JAR"
 exec bash
@@ -939,6 +943,9 @@ if [ "$config_adapter_option" = "3" ]; then
     echo "  GEOSERVER_POSTGIS_DB=geoserver"
     echo "  GEOSERVER_POSTGIS_USER=geoserver"
     echo "  GEOSERVER_POSTGIS_PASSWORD=geoserver"
+    echo "  POSTGIS_JDBC_URL=jdbc:postgresql://localhost:5434/geoserver"
+    echo "  POSTGIS_JDBC_USER=geoserver"
+    echo "  POSTGIS_JDBC_PASSWORD=geoserver"
     echo
 fi
 

@@ -225,7 +225,7 @@ The handler reuses the same `ConnectionProvider`, `PostgisDialect`, `TableDdlBui
 
 Beyond the generic resource ops, the handler is a **step in the dataset sagas**. When the dataset trigger carries a `POSTGIS` data sink (`hasGeoSink`), the CREATE saga runs `PROVISION_SINK` **before** GeoServer registers its datastore — GeoServer publishes feature types from a PostGIS table, and that table must exist first. `PROVISION_SINK` reads each `datasinks[POSTGIS].configuration` and creates the schema (optional), table, and a GeoServer read role + grant, all in one transaction (idempotent). `DEPROVISION_SINK` (DELETE saga / CREATE compensation) drops the table and role; the schema is left (it may be shared).
 
-Required `datasinks[POSTGIS].configuration` shape (the portal-backend must emit columns/geometry so the table can be created):
+`datasinks[POSTGIS]` shape — `configuration.columns` is an optional explicit override; when absent, columns are derived from the sink's `dataStructure` (the JSON Schema the backend resolves from Model Atlas at publish time):
 
 ```json
 { "type": "POSTGIS",
@@ -235,8 +235,28 @@ Required `datasinks[POSTGIS].configuration` shape (the portal-backend must emit 
     "columns": [ {"name": "id", "type": "BIGINT", "nullable": false} ],
     "geometryColumns": [ {"name": "geom", "geometryType": "POINT", "srid": 4326} ],
     "primaryKey": ["id"],
-    "readRole": {"name": "ds_42_geo", "privileges": ["USAGE"]} } }
+    "readRole": {"name": "ds_42_geo", "privileges": ["USAGE"]} },
+  "dataStructure": { "$id": "urn:core:datastructure:…", "title": "Observation",
+    "definitions": { "Observation": { "type": "object", "properties": { "..." : {} } } } } }
 ```
+
+#### Column derivation from `dataStructure`
+
+`DataStructureTableMapper` reads the root `properties` or the schema's property-carrying `definitions` entry (inlined referenced types have no properties and are skipped); `required` properties become `NOT NULL`.
+
+| JSON Schema type | Column type |
+|---|---|
+| `integer` | `BIGINT` |
+| `number` | `DOUBLE_PRECISION` |
+| `boolean` | `BOOLEAN` |
+| `string(date-time)` | `TIMESTAMPTZ` |
+| `string(date)` / `string(time)` / `string(uuid)` | `DATE` / `TIME` / `UUID` |
+| `object`, `array` | `JSONB` |
+| `$ref` ending in a geometry type name (`…/Point`, `…/MultiPolygon`, …) | geometry column, SRID 4326 |
+| other `$ref` (nested object) | `JSONB` |
+| `string`, unknown | `TEXT` |
+
+The geometry `$ref` form is what the schema generator emits once the geometry type packages resolve in Model Atlas; until then geometry properties arrive as plain `string` and degrade to `TEXT`. Explicit `configuration.geometryColumns` are excluded from derivation. A schema without usable properties fails the step with an actionable error.
 
 Saga placement — CREATE: `… APISIX → [hasGeoSink] PROVISION_SINK → GeoServer workspace → datastore → layers → …`; DELETE: `… GeoServer DELETE_WORKSPACE → DEPROVISION_SINK → FROST`. UPDATE does not re-provision the sink.
 

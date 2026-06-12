@@ -279,6 +279,18 @@
             <version>${config-adapter.version}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>de.civitas-core</groupId>
+            <artifactId>config-adapter-flowable</artifactId>
+            <version>${config-adapter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>de.civitas-core</groupId>
+            <artifactId>config-adapter-postgis</artifactId>
+            <version>${config-adapter.version}</version>
+            <scope>test</scope>
+        </dependency>
 
         <!-- Testcontainers Kafka for saga E2E tests (real broker, not EmbeddedKafka) -->
         <dependency>

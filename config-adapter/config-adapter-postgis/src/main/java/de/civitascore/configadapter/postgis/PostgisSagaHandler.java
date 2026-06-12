@@ -26,6 +26,7 @@ import de.civitascore.configadapter.model.postgis.SchemaConfig;
 import de.civitascore.configadapter.model.postgis.SchemaGrant;
 import de.civitascore.configadapter.model.postgis.SchemaPrivilege;
 import de.civitascore.configadapter.model.postgis.TableConfig;
+import de.civitascore.configadapter.postgis.ddl.DataStructureTableMapper;
 import de.civitascore.configadapter.postgis.ddl.GrantReconciler;
 import de.civitascore.configadapter.postgis.ddl.GrantReconciler.GrantReconcilePlan;
 import de.civitascore.configadapter.postgis.ddl.GrantReconciler.SchemaRevoke;
@@ -39,9 +40,11 @@ import java.sql.Savepoint;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
@@ -74,17 +77,22 @@ import org.slf4j.LoggerFactory;
  *     "schema": "ds_42",                 // optional; created (idempotent) if present
  *     "owner": "ds_42_admin",            // optional schema owner
  *     "tableName": "sensor_readings",    // required; the table GeoServer reads
- *     "columns": [ {name,type,...} ],    // required (>=1 column or geometryColumn)
+ *     "columns": [ {name,type,...} ],    // optional explicit override (see below)
  *     "geometryColumns": [ {name,geometryType,srid,...} ],
  *     "primaryKey": ["id"],
  *     "indexes": [ {...} ],
  *     "readRole": { "name":"ds_42_geo", "canLogin":true,
- *                   "password":"ENC(...)", "privileges":["USAGE"] } } }  // optional GeoServer role
+ *                   "password":"ENC(...)", "privileges":["USAGE"] } },  // optional GeoServer role
+ *   "dataStructure": { ... } }           // resolved JSON Schema from Model Atlas
  * }</pre>
  *
- * {@code PROVISION_SINK} creates schema (if given), table, and read role + grants for each sink in
- * one transaction; {@code DEPROVISION_SINK} drops the table and role (schemas are left, as they may
- * be shared). Both re-derive their targets from {@code datasinks}, so the
+ * <p>Columns come from explicit {@code configuration.columns} when present, otherwise derived from
+ * {@code dataStructure} via {@link DataStructureTableMapper}; at least one column or geometry
+ * column must result.
+ *
+ * <p>{@code PROVISION_SINK} creates schema (if given), table, and read role + grants for each sink
+ * in one transaction; {@code DEPROVISION_SINK} drops the table and role (schemas are left, as they
+ * may be shared). Both re-derive their targets from {@code datasinks}, so the
  * compensation/forward-delete paths are symmetric.
  *
  * <p>CREATE/PROVISION are idempotent (duplicate-object SQLStates absorbed); DROP/DEPROVISION are
@@ -485,12 +493,30 @@ public class PostgisSagaHandler implements SagaCommandHandler {
         schema.setOwner(stringValue(config, "owner"));
       }
 
+      List<GeometryColumnConfig> geometryColumns =
+          convertList(config.get("geometryColumns"), GeometryColumnConfig.class);
+      List<ColumnConfig> columns = convertList(config.get("columns"), ColumnConfig.class);
+      if (columns.isEmpty() && sink.get("dataStructure") instanceof Map<?, ?> model) {
+        Set<String> geometryNames = new HashSet<>();
+        for (GeometryColumnConfig geometry : geometryColumns) {
+          geometryNames.add(geometry.name());
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> dataStructure = (Map<String, Object>) model;
+        DataStructureTableMapper.TableColumns derived =
+            DataStructureTableMapper.deriveColumns(dataStructure, geometryNames);
+        columns = derived.columns();
+        if (!derived.geometryColumns().isEmpty()) {
+          geometryColumns = new ArrayList<>(geometryColumns);
+          geometryColumns.addAll(derived.geometryColumns());
+        }
+      }
+
       TableConfig table = new TableConfig();
       table.setSchema(schemaName);
       table.setName(tableName);
-      table.setColumns(convertList(config.get("columns"), ColumnConfig.class));
-      table.setGeometryColumns(
-          convertList(config.get("geometryColumns"), GeometryColumnConfig.class));
+      table.setColumns(columns);
+      table.setGeometryColumns(geometryColumns);
       table.setPrimaryKey(stringList(config.get("primaryKey")));
       table.setIndexes(convertList(config.get("indexes"), IndexConfig.class));
       if (table.getColumns().isEmpty() && table.getGeometryColumns().isEmpty()) {
