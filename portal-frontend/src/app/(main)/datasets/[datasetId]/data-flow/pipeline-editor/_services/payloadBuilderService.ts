@@ -10,10 +10,10 @@
  * - RedPandaConnect model from the graph
  */
 
-import { DATASINK_TYPES, type PipelineDatasink } from '@/types/datasinks'
+import { DATASINK_TYPES, type DataSinkPayload } from '@/types/datasinks'
 
 import type { DataSourceNodeData } from '../_types/nodes'
-import { isDataSourceNodeData, isGeoPersistenceNodeData } from '../_types/nodes'
+import { isDataSourceNodeData, isFrostNodeData, isGeoPersistenceNodeData } from '../_types/nodes'
 import type { Pipeline, PipelinePayload, PipelineStylesPayload } from '../_types/pipeline'
 import { buildRedPandaConnectModel } from './modelBuilderService'
 
@@ -38,7 +38,7 @@ export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
   const dataSourceIds: string[] = pipeline.nodes
     .filter(n => isDataSourceNodeData(n.data) && n.data.entityId != null)
     .map(n => (n.data as DataSourceNodeData).entityId as string)
-  const dataSinks: PipelineDatasink[] = pipeline.nodes.flatMap<PipelineDatasink>(n => {
+  const dataSinks: DataSinkPayload[] = pipeline.nodes.flatMap<DataSinkPayload>(n => {
     if (isGeoPersistenceNodeData(n.data) && n.data.dataStructureVersionId != null) {
       return [
         {
@@ -75,7 +75,7 @@ export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
  */
 export const syncDatasinkIds = (
   pipeline: Pipeline,
-  responseDatasinks: PipelineDatasink[],
+  responseDatasinks: DataSinkPayload[],
 ): { pipeline: Pipeline; hasChanges: boolean } => {
   let hasChanges = false
 
@@ -96,5 +96,103 @@ export const syncDatasinkIds = (
   return {
     pipeline: hasChanges ? { ...pipeline, nodes: updatedNodes } : pipeline,
     hasChanges,
+  }
+}
+
+// ============================================================================
+// Datasink Payload Extraction & Change Detection
+// ============================================================================
+
+/**
+ * Represents an extracted datasink payload tied to a specific pipeline node.
+ */
+export interface DatasinkNodePayload {
+  /** The pipeline node ID this datasink belongs to */
+  nodeId: string
+  /** The existing backend datasink ID, or null for new datasinks */
+  entityId: string | null
+  /** The payload ready for POST/PUT to the datasinks API */
+  payload: DataSinkPayload
+}
+
+/**
+ * Extracts datasink payloads from all datasink nodes in the pipeline.
+ * Returns an array of payloads with their associated node IDs and entity IDs.
+ */
+export const buildDatasinkPayloads = (pipeline: Pipeline): DatasinkNodePayload[] => {
+  return pipeline.nodes.flatMap<DatasinkNodePayload>(node => {
+    if (isGeoPersistenceNodeData(node.data) && node.data.dataStructureVersionId != null) {
+      return [
+        {
+          nodeId: node.id,
+          entityId: node.data.entityId ?? null,
+          payload: {
+            id: node.data.entityId ?? null,
+            dataSinkType: DATASINK_TYPES.POSTGIS,
+            configuration: {
+              tableName: node.data.tableName,
+              dataStructureVersionId: node.data.dataStructureVersionId.split('/')[1],
+            },
+          },
+        },
+      ]
+    }
+    if (isFrostNodeData(node.data)) {
+      return [
+        {
+          nodeId: node.id,
+          entityId: node.data.entityId ?? null,
+          payload: {
+            id: node.data.entityId ?? null,
+            dataSinkType: DATASINK_TYPES.FROST,
+            configuration: {} as Record<string, never>,
+          },
+        },
+      ]
+    }
+    return []
+  })
+}
+
+/**
+ * Snapshot type for change detection: maps nodeId → JSON-stringified payload (without `id` field).
+ */
+export type DatasinkSnapshot = Record<string, string>
+
+/**
+ * Creates a snapshot of the current datasink payloads for later change detection.
+ * The snapshot stores a JSON string of the payload configuration (excluding `id`)
+ * keyed by pipeline node ID.
+ */
+export const createDatasinkSnapshot = (pipeline: Pipeline): DatasinkSnapshot => {
+  const payloads = buildDatasinkPayloads(pipeline)
+  const snapshot: DatasinkSnapshot = {}
+  for (const { nodeId, payload } of payloads) {
+    // Compare only dataSinkType + configuration, not the mutable `id`
+    const { id: _id, ...comparable } = payload
+    snapshot[nodeId] = JSON.stringify(comparable)
+  }
+  return snapshot
+}
+
+/**
+ * Checks whether a single datasink payload has changed compared to the saved snapshot.
+ * Returns true if the datasink is new (not in snapshot) or its configuration differs.
+ */
+export const hasDatasinkChanged = (nodeId: string, payload: DataSinkPayload, snapshot: DatasinkSnapshot): boolean => {
+  const savedJson = snapshot[nodeId]
+  if (!savedJson) return true // new node, not in snapshot
+
+  const { id: _id, ...comparable } = payload
+  return JSON.stringify(comparable) !== savedJson
+}
+
+/**
+ * Updates a single node's entityId in the pipeline. Returns the updated pipeline.
+ */
+export const updateNodeEntityId = (pipeline: Pipeline, nodeId: string, entityId: string): Pipeline => {
+  return {
+    ...pipeline,
+    nodes: pipeline.nodes.map(node => (node.id === nodeId ? { ...node, data: { ...node.data, entityId } } : node)),
   }
 }

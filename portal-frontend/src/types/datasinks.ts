@@ -24,7 +24,7 @@ export type Datasink = {
   modifiedAt: string
 }
 
-export type PostgisPipelineDatasink = {
+export type PostgisDataSinkPayload = {
   id: string | null
   dataSinkType: typeof DATASINK_TYPES.POSTGIS
   configuration: {
@@ -33,10 +33,14 @@ export type PostgisPipelineDatasink = {
   }
 }
 
-export type FrostPipelineDatasink = {
+export type FrostDataSinkPayload = {
   id: string | null
   dataSinkType: typeof DATASINK_TYPES.FROST
   configuration: Record<string, never>
 }
 
-export type PipelineDatasink = PostgisPipelineDatasink | FrostPipelineDatasink
+export type DataSinkPayload = PostgisDataSinkPayload | FrostDataSinkPayload
+
+export type CreateDatasinkInput = { datasetId: string; data: DataSinkPayload }
+
+export type UpdateDatasinkInput = { datasetId: string; datasinkId: string; data: DataSinkPayload }

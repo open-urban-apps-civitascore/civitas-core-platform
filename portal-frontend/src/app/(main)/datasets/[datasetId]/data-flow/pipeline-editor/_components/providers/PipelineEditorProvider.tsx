@@ -15,6 +15,7 @@ import { useTranslations } from 'next-intl'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
+import { useCreateDataSink, useUpdateDataSink } from '@/app/services/api/datasets/datasinks/clientRequests'
 import {
   useCreatePipeline,
   useDeletePipeline,
@@ -24,7 +25,14 @@ import {
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
-import { buildPipelinePayload, syncDatasinkIds } from '../../_services/payloadBuilderService'
+import {
+  buildDatasinkPayloads,
+  buildPipelinePayload,
+  createDatasinkSnapshot,
+  type DatasinkSnapshot,
+  hasDatasinkChanged,
+  updateNodeEntityId,
+} from '../../_services/payloadBuilderService'
 import {
   createEmptyPipeline,
   getPipelineStats,
@@ -85,6 +93,11 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const createPipelineMutation = useCreatePipeline(datasetId)
   const updatePipelineMutation = useUpdatePipeline(datasetId)
   const deletePipelineMutation = useDeletePipeline(datasetId)
+  const createDatasinkMutation = useCreateDataSink()
+  const updateDatasinkMutation = useUpdateDataSink()
+
+  // ===== Datasink snapshot for change detection =====
+  const datasinkSnapshotsRef = useRef<Record<string, DatasinkSnapshot>>({})
 
   // ===== Load pipelines from backend on mount =====
   useEffect(() => {
@@ -108,6 +121,11 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
     // Load all sessions into the session manager
     sessionManager.loadSessions(sessions, activeSessionId)
+
+    // Create initial datasink snapshots for change detection
+    for (const session of sessions) {
+      datasinkSnapshotsRef.current[session.id] = createDatasinkSnapshot(session.pipeline)
+    }
   }, [pipelinesQuery.data, sessionManager, requestedPipelineId])
 
   // ===== Validation State =====
@@ -398,32 +416,35 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       // Serialize saves to avoid concurrent mutation state issues
       for (const session of dirtySessions) {
         try {
-          const payload = buildPipelinePayload(session.pipeline)
-          const pipelineId = session.pipeline.id
+          let currentPipeline = session.pipeline
+          const snapshot = datasinkSnapshotsRef.current[session.id] ?? {}
 
-          let savedPipeline: Pipeline
-          if (pipelineId) {
-            const response = await updatePipelineMutation.mutateAsync({ pipelineId, data: payload })
-            savedPipeline = session.pipeline
-            const { pipeline: synced, hasChanges } = syncDatasinkIds(savedPipeline, response.data.dataSinks ?? [])
-            if (hasChanges) {
-              await updatePipelineMutation.mutateAsync({ pipelineId, data: buildPipelinePayload(synced) })
-              savedPipeline = synced
-            }
-          } else {
-            const response = await createPipelineMutation.mutateAsync(payload)
-            savedPipeline = { ...session.pipeline, id: response.data.id }
-            const { pipeline: synced, hasChanges } = syncDatasinkIds(savedPipeline, response.data.dataSinks ?? [])
-            if (hasChanges) {
-              await updatePipelineMutation.mutateAsync({
-                pipelineId: response.data.id,
-                data: buildPipelinePayload(synced),
-              })
-              savedPipeline = synced
+          // Step 1: Save datasinks first (create new / update changed)
+          const datasinkPayloads = buildDatasinkPayloads(currentPipeline)
+          for (const { nodeId, entityId, payload } of datasinkPayloads) {
+            if (!entityId) {
+              const response = await createDatasinkMutation.mutateAsync({ datasetId, data: payload })
+              currentPipeline = updateNodeEntityId(currentPipeline, nodeId, response.data.id)
+            } else if (hasDatasinkChanged(nodeId, payload, snapshot)) {
+              await updateDatasinkMutation.mutateAsync({ datasetId, datasinkId: entityId, data: payload })
             }
           }
-          sessionManager.updateSessionPipeline(session.id, { ...savedPipeline, isDirty: false })
+
+          // Step 2: Save pipeline (with updated entityIds from step 1)
+          const pipelinePayload = buildPipelinePayload(currentPipeline)
+          const pipelineId = currentPipeline.id
+
+          if (pipelineId) {
+            await updatePipelineMutation.mutateAsync({ pipelineId, data: pipelinePayload })
+          } else {
+            const response = await createPipelineMutation.mutateAsync(pipelinePayload)
+            currentPipeline = { ...currentPipeline, id: response.data.id }
+          }
+
+          // Step 3: Update session state and snapshot
+          sessionManager.updateSessionPipeline(session.id, { ...currentPipeline, isDirty: false })
           sessionManager.markSessionClean(session.id)
+          datasinkSnapshotsRef.current[session.id] = createDatasinkSnapshot(currentPipeline)
           toast.success(t('header.saveSucces'))
         } catch {
           saveFailedNames.push(session.name)
@@ -439,7 +460,16 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     } finally {
       setIsSavingAll(false)
     }
-  }, [isSavingAll, sessionManager, createPipelineMutation, updatePipelineMutation, t])
+  }, [
+    isSavingAll,
+    sessionManager,
+    createPipelineMutation,
+    updatePipelineMutation,
+    createDatasinkMutation,
+    updateDatasinkMutation,
+    datasetId,
+    t,
+  ])
 
   useRegisterUnsavedChanges(hasAnyDirtySession, saveAllPipelines)
 

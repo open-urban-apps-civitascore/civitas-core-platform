@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
 
 import { apiRequest, type ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { GetListInput } from '@/types/common'
-import { Datasink } from '@/types/datasinks'
+import { CreateDatasinkInput, Datasink, UpdateDatasinkInput } from '@/types/datasinks'
 
 const key = 'datasinks'
 
@@ -19,3 +20,37 @@ export const useGetDatasinks = (datasetId: string, { params, isEnabled }: GetLis
       }),
     enabled: isEnabled,
   })
+
+export const useCreateDataSink = () => {
+  const queryClient = useQueryClient()
+  return useMutation<ApiServiceResponse<Datasink>, AxiosError, CreateDatasinkInput>({
+    mutationFn: ({ datasetId, data }) =>
+      apiRequest<Datasink>({
+        method: 'POST',
+        endpoint: `/datasets/${datasetId}/datasinks`,
+        headers: { 'x-api-request': 'true' },
+        data,
+        errorMessage: 'An error occurred while creating the datasink.',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [key] })
+    },
+  })
+}
+
+export const useUpdateDataSink = () => {
+  const queryClient = useQueryClient()
+  return useMutation<ApiServiceResponse<Datasink>, AxiosError, UpdateDatasinkInput>({
+    mutationFn: ({ datasetId, datasinkId, data }) =>
+      apiRequest<Datasink>({
+        method: 'PUT',
+        endpoint: `/datasets/${datasetId}/datasinks/${datasinkId}`,
+        headers: { 'x-api-request': 'true' },
+        data,
+        errorMessage: 'An error occurred while updating the datasink.',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [key] })
+    },
+  })
+}
