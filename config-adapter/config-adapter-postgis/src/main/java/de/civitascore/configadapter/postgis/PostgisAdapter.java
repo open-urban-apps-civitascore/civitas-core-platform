@@ -24,7 +24,7 @@ import de.civitascore.configadapter.model.postgis.PostgisConfigValue;
 import de.civitascore.configadapter.model.postgis.SchemaConfig;
 import de.civitascore.configadapter.model.postgis.SchemaPrivilege;
 import de.civitascore.configadapter.model.postgis.TableConfig;
-import de.civitascore.configadapter.postgis.PostgisDdlSupport.StatementPlanner;
+import de.civitascore.configadapter.postgis.SqlDdlSupport.StatementPlanner;
 import de.civitascore.configadapter.postgis.ddl.GrantReconciler;
 import de.civitascore.configadapter.postgis.ddl.GrantReconciler.GrantReconcilePlan;
 import de.civitascore.configadapter.postgis.dialect.SqlDialect;
@@ -72,7 +72,7 @@ public class PostgisAdapter extends AbstractConfigAdapter {
   /** Credential context for per-credential key isolation when decrypting role passwords. */
   public static final String ROLE_CREDENTIAL_CONTEXT = "portal-backend:sql-role";
 
-  private final PostgisDdlSupport ddl = new PostgisDdlSupport();
+  private final SqlDdlSupport ddl = new SqlDdlSupport();
 
   @Override
   public String getName() {
@@ -293,12 +293,12 @@ public class PostgisAdapter extends AbstractConfigAdapter {
             AdapterErrorCode.POSTGIS_CONNECTION_ERROR,
             e,
             ADAPTER_NAME,
-            PostgisDdlSupport.redact(e.getMessage()));
+            SqlDdlSupport.redact(e.getMessage()));
       }
       throw new FatalAdapterException(
           AdapterErrorCode.POSTGIS_DDL_ERROR,
           e,
-          operation.getDescription() + " failed: " + PostgisDdlSupport.redact(e.getMessage()));
+          operation.getDescription() + " failed: " + SqlDdlSupport.redact(e.getMessage()));
     }
   }
 

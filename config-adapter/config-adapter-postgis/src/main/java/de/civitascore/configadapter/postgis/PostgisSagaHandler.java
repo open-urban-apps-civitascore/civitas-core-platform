@@ -100,7 +100,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   private final ObjectMapper objectMapper =
       new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-  private final PostgisDdlSupport ddl = new PostgisDdlSupport();
+  private final SqlDdlSupport ddl = new SqlDdlSupport();
 
   /** No-arg constructor for ServiceLoader discovery. Call {@link #initialize} before use. */
   public PostgisSagaHandler() {}
@@ -142,7 +142,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
         default -> unknownOperation(command, compensation);
       };
     } catch (Exception e) {
-      String error = command.operation() + " failed: " + PostgisDdlSupport.redact(e.getMessage());
+      String error = command.operation() + " failed: " + SqlDdlSupport.redact(e.getMessage());
       logger.error(
           "PostGIS {} failed for saga {}",
           Encode.forJava(command.operation()),

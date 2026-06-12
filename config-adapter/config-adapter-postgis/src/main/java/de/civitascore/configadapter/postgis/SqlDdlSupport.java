@@ -37,9 +37,9 @@ import org.slf4j.LoggerFactory;
  * and {@code PASSWORD '…'} redaction. The two front classes keep only their event/saga-specific
  * dispatch and error wrapping.
  */
-final class PostgisDdlSupport implements AutoCloseable {
+final class SqlDdlSupport implements AutoCloseable {
 
-  private static final Logger logger = LoggerFactory.getLogger(PostgisDdlSupport.class);
+  private static final Logger logger = LoggerFactory.getLogger(SqlDdlSupport.class);
 
   static final String MASTER_KEY_ENV = "CIVITAS_MASTER_KEY";
 
