@@ -41,7 +41,8 @@ public class DataStructureVersionService
     extends BaseService<DataStructureVersion, DataStructureVersionInputDTO> {
 
   private static final String MODEL_ATLAS_OBJECT_ID_FIELD = "objectId";
-  private static final TypeReference<Map<String, Object>> MODEL_JSON_TYPE =
+  private static final String APPLICATION_SCHEMA_JSON_VALUE = "application/schema+json";
+  private static final TypeReference<Map<String, Object>> JSON_SCHEMA_TYPE =
       new TypeReference<>() {};
 
   private final DataSourceRepository dataSourceRepository;
@@ -93,26 +94,26 @@ public class DataStructureVersionService
   }
 
   /**
-   * Fetches the data-structure model from Model Atlas as parsed JSON. Unlike {@link
-   * #findModelByAtlasUri} (raw XMI), this does not swallow failures: an outage propagates as a
-   * 504/502 external-system exception, unparseable content as a 502. Empty only when the URI is
-   * blank or Model Atlas returns no content.
+   * Fetches the data-structure version's JSON Schema from Model Atlas ({@code
+   * application/schema+json}). Unlike {@link #findModelByAtlasUri} (raw XMI), this does not swallow
+   * failures: an outage propagates as a 504/502 external-system exception, unparseable content as a
+   * 502. Empty only when the URI is blank or Model Atlas returns no content.
    *
    * @param modelAtlasUri the Model Atlas namespace URI
-   * @return the parsed model JSON, or empty if the URI is blank or no content exists
+   * @return the parsed JSON Schema, or empty if the URI is blank or no content exists
    */
-  public Optional<Map<String, Object>> resolveModelJsonByAtlasUri(String modelAtlasUri) {
-    return download(modelAtlasUri, MediaType.APPLICATION_JSON_VALUE)
+  public Optional<Map<String, Object>> resolveJsonSchemaByAtlasUri(String modelAtlasUri) {
+    return download(modelAtlasUri, APPLICATION_SCHEMA_JSON_VALUE)
         .filter(json -> !json.isBlank())
-        .map(json -> parseModelJson(json, modelAtlasUri));
+        .map(json -> parseJsonSchema(json, modelAtlasUri));
   }
 
-  private Map<String, Object> parseModelJson(String json, String modelAtlasUri) {
+  private Map<String, Object> parseJsonSchema(String json, String modelAtlasUri) {
     try {
-      return objectMapper.readValue(json, MODEL_JSON_TYPE);
+      return objectMapper.readValue(json, JSON_SCHEMA_TYPE);
     } catch (JacksonException e) {
       throw new ExternalSystemRejectionException(
-          "Model Atlas returned unparseable model JSON for " + modelAtlasUri, e);
+          "Model Atlas returned an unparseable JSON Schema for " + modelAtlasUri, e);
     }
   }
 

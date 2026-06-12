@@ -166,8 +166,8 @@ public class DataSetSagaPublisher {
   }
 
   /**
-   * Resolves the sink's referenced data-structure model from Model Atlas. {@code null} when no
-   * version is referenced (e.g. FROST); throws {@link InvalidInputException} if a referenced
+   * Resolves the sink's referenced data-structure JSON Schema from Model Atlas. {@code null} when
+   * no version is referenced (e.g. FROST); throws {@link InvalidInputException} if a referenced
    * version cannot be resolved, failing the publish. The id is already validated at sink save time.
    */
   private Map<String, Object> resolveDataStructure(DataSink sink) {
@@ -191,14 +191,15 @@ public class DataSetSagaPublisher {
                         "configuration.dataStructureVersionId",
                         "DataStructureVersion not found: " + dsvId));
     return dataStructureVersionService
-        .resolveModelJsonByAtlasUri(version.getModelAtlasUri())
-        .filter(model -> !model.isEmpty())
+        .resolveJsonSchemaByAtlasUri(version.getModelAtlasUri())
+        .filter(schema -> !schema.isEmpty())
         .orElseThrow(
             () ->
                 new InvalidInputException(
                     "DataSink",
                     "configuration.dataStructureVersionId",
-                    "Cannot resolve model from Model Atlas for DataStructureVersion " + dsvId));
+                    "Cannot resolve JSON Schema from Model Atlas for DataStructureVersion "
+                        + dsvId));
   }
 
   private List<DataPipeline> buildPipelines(Set<Pipeline> pipelines, PipelineAction action) {

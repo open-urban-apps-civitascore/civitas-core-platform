@@ -144,7 +144,7 @@ class DataSetSagaPublisherTest {
 
     @Test
     @DisplayName(
-        "resolves the referenced DSV model JSON from Model Atlas and carries it on the sink")
+        "resolves the referenced DSV JSON Schema from Model Atlas and carries it on the sink")
     void resolvesSchemaFromModelAtlas() throws Exception {
       UUID dsvId = UUID.randomUUID();
       UUID sinkId = UUID.randomUUID();
@@ -156,14 +156,16 @@ class DataSetSagaPublisherTest {
 
       when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
       when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
-      when(dataStructureVersionService.resolveModelJsonByAtlasUri("atlas://dsv/" + dsvId))
+      when(dataStructureVersionService.resolveJsonSchemaByAtlasUri("atlas://dsv/" + dsvId))
           .thenReturn(
               Optional.of(
                   Map.of(
-                      "eClass",
-                      "http://www.eclipse.org/emf/2002/Ecore#//EPackage",
-                      "name",
-                      "Observation")));
+                      "$id",
+                      "urn:core:datastructure:" + dsvId,
+                      "title",
+                      "Observation",
+                      "definitions",
+                      Map.of("Observation", Map.of("type", "object")))));
 
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
       when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
@@ -182,8 +184,8 @@ class DataSetSagaPublisherTest {
       assertThat(ds.get("type").asString()).isEqualTo("POSTGIS");
       assertThat(ds.get("configuration").get("tableName").asString())
           .isEqualTo("sensor_observations");
-      assertThat(ds.get("dataStructure").get("name").asString()).isEqualTo("Observation");
-      assertThat(ds.get("dataStructure").get("eClass").asString()).contains("EPackage");
+      assertThat(ds.get("dataStructure").get("title").asString()).isEqualTo("Observation");
+      assertThat(ds.get("dataStructure").get("definitions").has("Observation")).isTrue();
     }
 
     @Test
