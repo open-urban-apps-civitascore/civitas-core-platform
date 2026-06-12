@@ -413,15 +413,10 @@ class ApisixSagaHandlerTest {
             result.error().contains("WFS") || result.error().contains("GeoServer"),
             "error should name the unsupported standard / GeoServer gap");
 
-        // No route was provisioned for the WFS slug (the shared upstream may have been created then
-        // cleaned up, but never a route).
-        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-        verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
-        assertFalse(
-            pathCaptor
-                .getAllValues()
-                .contains("/apisix/admin/routes/" + NamedApiHelper.derive("ds-001", "map")),
-            "no gateway route for a non-routable WFS named API");
+        // Standards are validated BEFORE provisioning, so neither a route nor the shared upstream
+        // is ever created — no gateway state, no cleanup needed.
+        verify(mockBuilder, never()).put(any(Entity.class));
+        verify(mockBuilder, never()).delete();
       }
     }
 
@@ -1143,6 +1138,245 @@ class ApisixSagaHandlerTest {
   }
 
   @Nested
+  @DisplayName("Open-data method gate + routeIds drift handling (MR !547 findings 1, 2, 5)")
+  class MethodGateAndDriftHandling {
+
+    private static final List<String> OPEN_DATA_METHODS = List.of("GET", "HEAD", "OPTIONS");
+
+    private void stubPutCreated() {
+      Response mockResponse = mock(Response.class);
+      when(mockResponse.getStatus()).thenReturn(201);
+      when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+    }
+
+    private SagaCommandMessage createRouteCommand(boolean openDataAccess) {
+      return createCommand(
+          "EXECUTE_STEP",
+          "CREATE_ROUTE",
+          Map.of(
+              "datasetId",
+              "ds-001",
+              "upstreamUrl",
+              "http://frost:8080/FROST-Server/v1.1/Projects(1)",
+              "openDataAccess",
+              openDataAccess,
+              "namedApis",
+              List.of(Map.of("slug", "data", "standard", "STA"))));
+    }
+
+    private Map<String, Object> captureRouteBody(int expectedPuts) {
+      @SuppressWarnings("unchecked")
+      ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
+          ArgumentCaptor.forClass(Entity.class);
+      verify(mockBuilder, times(expectedPuts)).put(entityCaptor.capture());
+      return entityCaptor.getValue().getEntity();
+    }
+
+    @Test
+    @DisplayName("open-data routes restrict methods to GET/HEAD/OPTIONS (no OPA on the route)")
+    void shouldRestrictMethodsOnOpenDataRoute() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        stubPutCreated();
+
+        handler.handle(createRouteCommand(true));
+
+        // Without plugin_config_id (no OIDC/OPA), the method gate is the only thing keeping
+        // anonymous writes away from FROST — "open" means anonymous READ (finding 1).
+        assertEquals(OPEN_DATA_METHODS, captureRouteBody(2).get("methods"));
+      }
+    }
+
+    @Test
+    @DisplayName("protected routes carry no methods filter (OPA gates per request)")
+    void shouldNotRestrictMethodsOnProtectedRoute() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        stubPutCreated();
+
+        handler.handle(createRouteCommand(false));
+
+        assertFalse(captureRouteBody(2).containsKey("methods"));
+      }
+    }
+
+    @Test
+    @DisplayName("UPDATE toggle protected→open adds the method gate to the existing route")
+    void shouldAddMethodGateWhenTogglingToOpen() {
+      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
+        Response getResp = mock(Response.class);
+        when(getResp.getStatus()).thenReturn(200);
+        when(getResp.readEntity(Map.class))
+            .thenAnswer(
+                inv -> {
+                  Map<String, Object> value = new HashMap<>();
+                  value.put("uri", "/v1/datasets/ds-001/data");
+                  value.put("plugin_config_id", "auth-plugin-1");
+                  Map<String, Object> envelope = new HashMap<>();
+                  envelope.put("value", value);
+                  return envelope;
+                });
+        when(mockBuilder.get()).thenReturn(getResp);
+        stubPutCreated();
+
+        handler.handle(
+            createCommand(
+                "EXECUTE_STEP",
+                "UPDATE_ROUTE",
+                Map.of(
+                    "routeIds",
+                    Map.of("data", "rid-data"),
+                    "serviceId",
+                    "ds-001",
+                    "openDataAccess",
+                    true)));
+
+        assertEquals(OPEN_DATA_METHODS, captureRouteBody(1).get("methods"));
+      }
+    }
+
+    @Test
+    @DisplayName("UPDATE toggle open→protected removes the method gate (OPA takes over)")
+    void shouldRemoveMethodGateWhenTogglingToProtected() {
+      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
+        Response getResp = mock(Response.class);
+        when(getResp.getStatus()).thenReturn(200);
+        when(getResp.readEntity(Map.class))
+            .thenAnswer(
+                inv -> {
+                  Map<String, Object> value = new HashMap<>();
+                  value.put("uri", "/v1/datasets/ds-001/data");
+                  value.put("methods", new ArrayList<>(OPEN_DATA_METHODS));
+                  Map<String, Object> envelope = new HashMap<>();
+                  envelope.put("value", value);
+                  return envelope;
+                });
+        when(mockBuilder.get()).thenReturn(getResp);
+        stubPutCreated();
+
+        handler.handle(
+            createCommand(
+                "EXECUTE_STEP",
+                "UPDATE_ROUTE",
+                Map.of(
+                    "routeIds",
+                    Map.of("data", "rid-data"),
+                    "serviceId",
+                    "ds-001",
+                    "openDataAccess",
+                    false)));
+
+        Map<String, Object> body = captureRouteBody(1);
+        assertFalse(
+            body.containsKey("methods"),
+            "protected routes must not keep a stale read-only gate — OPA decides per request");
+        assertEquals("auth-plugin-1", body.get("plugin_config_id"));
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "UPDATE fails loud when a named API has no persisted routeId (no silent no-op, finding 2)")
+    void shouldFailUpdateWhenNamedApiHasNoRouteId() {
+      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("routeIds", Map.of());
+        payload.put("serviceId", "ds-001");
+        payload.put("openDataAccess", false);
+        payload.put("namedApis", List.of(Map.of("slug", "data", "standard", "STA")));
+
+        SagaCommandResult result =
+            handler.handle(
+                new SagaCommandMessage(
+                    "EXECUTE_STEP",
+                    "m",
+                    "saga-001",
+                    "update-route",
+                    "apisix",
+                    "UPDATE_ROUTE",
+                    payload));
+
+        // A protect-toggle must never report success without acting: an empty/stale routeIds map
+        // with live named APIs is drift, not a no-op — the dataset could silently stay public.
+        assertEquals("STEP_FAILED", result.type());
+        assertTrue(result.error().contains("data"), "error should name the drifted slug");
+        verify(mockBuilder, never()).get();
+        verify(mockBuilder, never()).put(any(Entity.class));
+      }
+    }
+
+    @Test
+    @DisplayName("UPDATE without namedApis and without routeIds stays a clean no-op")
+    void shouldNoOpUpdateWithoutNamedApisAndRouteIds() {
+      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("routeIds", Map.of());
+        payload.put("serviceId", "ds-001");
+        payload.put("openDataAccess", true);
+
+        SagaCommandResult result =
+            handler.handle(
+                new SagaCommandMessage(
+                    "EXECUTE_STEP",
+                    "m",
+                    "saga-001",
+                    "update-route",
+                    "apisix",
+                    "UPDATE_ROUTE",
+                    payload));
+
+        // A dataset without named APIs has no data-plane routes — nothing to update, by design.
+        assertEquals("STEP_COMPLETED", result.type());
+        verify(mockBuilder, never()).get();
+        verify(mockBuilder, never()).put(any(Entity.class));
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "DELETE derives the deterministic routeId for slugs missing from the map (finding 5)")
+    void shouldDeleteDerivedRouteIdForSlugWithoutPersistedId() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(ok);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("routeIds", Map.of("traffic", "rid-traffic"));
+        payload.put("serviceId", "ds-001");
+        // 'weather' lost its persisted routeId (drift) but may still have a live gateway route
+        // under the deterministic id — teardown must not leave it behind.
+        payload.put(
+            "namedApis",
+            List.of(
+                Map.of("slug", "traffic", "standard", "STA"),
+                Map.of("slug", "weather", "standard", "STA")));
+
+        SagaCommandResult result =
+            handler.handle(
+                new SagaCommandMessage(
+                    "EXECUTE_STEP",
+                    "m",
+                    "saga-001",
+                    "delete-route",
+                    "apisix",
+                    "DELETE_ROUTE",
+                    payload));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // Persisted route + derived route + shared upstream.
+        verify(mockBuilder, times(3)).delete();
+        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
+        List<String> paths = pathCaptor.getAllValues();
+        assertTrue(paths.contains("/apisix/admin/routes/rid-traffic"));
+        assertTrue(
+            paths.contains("/apisix/admin/routes/" + NamedApiHelper.derive("ds-001", "weather")),
+            "the drifted slug's route must be deleted under its derived deterministic id");
+        assertTrue(paths.contains("/apisix/admin/upstreams/ds-001"));
+      }
+    }
+  }
+
+  @Nested
   @DisplayName("CREATE_ROUTE pins API host")
   class CreateRouteHostPinning {
 
@@ -1273,7 +1507,8 @@ class ApisixSagaHandlerTest {
     }
 
     @Test
-    @DisplayName("does not inject Basic Auth header when openDataAccess=true")
+    @DisplayName(
+        "does not inject Basic Auth header when openDataAccess=true (but keeps the default strip)")
     void shouldNotInjectAuthHeaderForPublicProject() {
       try (ApisixSagaHandler handler = createHandler()) {
         stubPutCreated();
@@ -1281,7 +1516,15 @@ class ApisixSagaHandlerTest {
         handler.handle(createRouteCommand(true));
 
         Map<String, Object> proxyRewrite = captureProxyRewrite();
-        assertFalse(proxyRewrite.containsKey("headers"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> headers = (Map<String, Object>) proxyRewrite.get("headers");
+        assertNotNull(
+            headers,
+            "even without configured headers.remove, the hard-coded trust-header strip applies"
+                + " (MR !547 finding 3 — secure-by-default)");
+        assertFalse(
+            headers.containsKey("set"), "public routes must NOT carry FROST upstream credentials");
+        assertEquals(List.of("X-Allowed-Scope-Ids"), headers.get("remove"));
       }
     }
 
@@ -1439,7 +1682,14 @@ class ApisixSagaHandlerTest {
         Map<String, Object> plugins = (Map<String, Object>) body.get("plugins");
         @SuppressWarnings("unchecked")
         Map<String, Object> proxyRewrite = (Map<String, Object>) plugins.get("proxy-rewrite");
-        assertFalse(proxyRewrite.containsKey("headers"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> headers = (Map<String, Object>) proxyRewrite.get("headers");
+        assertFalse(
+            headers.containsKey("set"), "the FROST credential must be removed on the public flip");
+        assertEquals(
+            List.of("X-Allowed-Scope-Ids"),
+            headers.get("remove"),
+            "the hard-coded trust-header strip stays in place on public routes");
       }
     }
 

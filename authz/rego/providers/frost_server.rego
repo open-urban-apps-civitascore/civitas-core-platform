@@ -41,33 +41,38 @@ endpoints := {} if {
 # HOST MATCHING (sanity check for issue #1368)
 # =============================================================================
 
-# Configured API host (lowercase). Empty if unconfigured → fail-closed.
-default api_host := ""
-
-api_host := lower(data.backends.frost_server.api_host) if {
-	data.backends.frost_server.api_host
-}
-
-# Incoming request's Host header (lowercase, port stripped, empty if missing).
-# APISIX does host matching on the name only (ignoring the port), so we normalise
-# the header the same way — otherwise clients that send `api.example.test:9080`
-# while `api_host` is configured without a port would be denied.
+# Shared normalisation for host comparison: lowercase, port stripped. APISIX does
+# host matching on the name only (ignoring the port), so BOTH sides — the incoming
+# Host header and the configured api_host — are normalised identically. Otherwise a
+# port on either side (client sends `api.example.test:9080`, or an operator
+# configures `api_host: api.example.test:9080`) would make the comparison fail and
+# deny ALL FROST payload requests (fail-closed total outage).
 #
 # Handles two cases:
 #   - IPv6 bracketed literals: `[::1]:9080` → `[::1]`
 #     (cannot split on `:` because colons appear inside the address)
 #   - Everything else: split on `:` and take the first component.
-default request_host := ""
-
-request_host := lower(substring(raw, 0, indexof(raw, "]") + 1)) if {
-	raw := input.request.headers.host
+host_without_port(raw) := lower(substring(raw, 0, indexof(raw, "]") + 1)) if {
 	startswith(raw, "[")
 	indexof(raw, "]") > 0
 }
 
-request_host := lower(split(raw, ":")[0]) if {
-	raw := input.request.headers.host
+host_without_port(raw) := lower(split(raw, ":")[0]) if {
 	not startswith(raw, "[")
+}
+
+# Configured API host (normalised). Empty if unconfigured → fail-closed.
+default api_host := ""
+
+api_host := host_without_port(data.backends.frost_server.api_host) if {
+	data.backends.frost_server.api_host
+}
+
+# Incoming request's Host header (normalised, empty if missing).
+default request_host := ""
+
+request_host := host_without_port(input.request.headers.host) if {
+	input.request.headers.host
 }
 
 # True when the request targets the configured API host.

@@ -132,6 +132,35 @@ test_path_pattern_host_with_port_and_mixed_case_accepted if {
 	result == "/v1/datasets/{id}"
 }
 
+# The CONFIGURED api_host must be normalised the same way as the request host
+# (MR !547 finding 7): an operator configuring `api_host` WITH a port must not
+# cause a fail-closed total outage — both sides strip the port before comparing.
+test_path_pattern_configured_api_host_with_port_accepted if {
+	result := frost_server.path_pattern with input as frost_request_host("GET", "/v1/datasets/abc-123", "api.example.test")
+		with data.backends.frost_server.api_host as "api.example.test:9080"
+	result == "/v1/datasets/{id}"
+}
+
+test_path_pattern_configured_api_host_with_port_and_mixed_case_accepted if {
+	result := frost_server.path_pattern with input as frost_request_host("GET", "/v1/datasets/abc-123", "api.example.test:443")
+		with data.backends.frost_server.api_host as "Api.Example.Test:9080"
+	result == "/v1/datasets/{id}"
+}
+
+# A configured IPv6 api_host with port must normalise like the request side.
+test_path_pattern_configured_ipv6_api_host_with_port_accepted if {
+	result := frost_server.path_pattern with input as frost_request_host("GET", "/v1/datasets/abc-123", "[::1]")
+		with data.backends.frost_server.api_host as "[::1]:9080"
+	result == "/v1/datasets/{id}"
+}
+
+# Port-stripping must not let a WRONG configured host match (sanity check).
+test_path_pattern_configured_api_host_with_port_wrong_host_rejected if {
+	result := frost_server.path_pattern with input as frost_request_host("GET", "/v1/datasets/abc-123", "api.example.test")
+		with data.backends.frost_server.api_host as "other.example.test:9080"
+	result == ""
+}
+
 # Bracketed IPv6 literals with a port must be parsed correctly (review F3).
 test_path_pattern_ipv6_literal_with_port_accepted if {
 	result := frost_server.path_pattern with input as frost_request_host("GET", "/v1/datasets/abc-123", "[::1]:9080")

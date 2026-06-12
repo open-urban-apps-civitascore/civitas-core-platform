@@ -41,6 +41,10 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
 
   private static final String ADAPTER_NAME = "frost";
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/v1.1";
+  private static final String KEY_PROJECT_ID = "projectId";
+  private static final String KEY_NAME = "name";
+  private static final String KEY_DESCRIPTION = "description";
+  private static final String KEY_PUBLIC = "public";
 
   private String serverUrl;
   private String publicUrl;
@@ -87,18 +91,28 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     return datasetName + " (" + datasetId + ")";
   }
 
+  /** FROST entity path of a project, e.g. {@code Projects(42)}. */
+  private static String projectPath(String projectId) {
+    return "Projects(" + projectId + ")";
+  }
+
+  /** Public base URL of a project, reported back to the portal as the dataset payload root. */
+  private String projectBaseUrl(String projectId) {
+    return publicUrl + "/" + projectPath(projectId);
+  }
+
   private SagaCommandResult handleCreateProject(SagaCommandMessage command) {
     String datasetName = requireString(command, "datasetName");
     String datasetId = requireString(command, "datasetId");
-    String description = (String) command.payload().getOrDefault("description", "");
+    String description = (String) command.payload().getOrDefault(KEY_DESCRIPTION, "");
     boolean openDataAccess =
         Boolean.TRUE.equals(command.payload().getOrDefault("openDataAccess", false));
 
     String projectName = frostProjectName(datasetName, datasetId);
     Map<String, Object> body = new HashMap<>();
-    body.put("name", projectName);
-    body.put("description", description);
-    body.put("public", openDataAccess);
+    body.put(KEY_NAME, projectName);
+    body.put(KEY_DESCRIPTION, description);
+    body.put(KEY_PUBLIC, openDataAccess);
 
     try (Response response =
         authStrategy
@@ -108,7 +122,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       // FROST returns HTTP 500 with "Failed to store data." on UNIQUE constraint violations
       // (duplicate project name) instead of the expected HTTP 409 Conflict.
       // Fall back to a name lookup so CREATE_PROJECT is idempotent.
-      if (response.getStatus() == 500) {
+      if (response.getStatus() == Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
         String responseBody = response.readEntity(String.class);
         if (responseBody != null
             && responseBody.contains(FrostAdapter.ERROR_FAILED_TO_STORE_DATA)) {
@@ -133,10 +147,10 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       checkResponse(response, "CREATE_PROJECT");
 
       String projectId = FrostUtils.extractIdFromLocation(response.getHeaderString("Location"));
-      String baseUrl = publicUrl + "/Projects(" + projectId + ")";
+      String baseUrl = projectBaseUrl(projectId);
 
-      Map<String, Object> resultData = Map.of("projectId", projectId, "baseUrl", baseUrl);
-      Map<String, Object> compensationData = Map.of("projectId", projectId);
+      Map<String, Object> resultData = Map.of(KEY_PROJECT_ID, projectId, "baseUrl", baseUrl);
+      Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId);
 
       log.info(
           "FROST project created: projectId={}, saga={}",
@@ -177,10 +191,10 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       }
 
       String projectId = String.valueOf(projects.get(0).get("@iot.id"));
-      String baseUrl = publicUrl + "/Projects(" + projectId + ")";
+      String baseUrl = projectBaseUrl(projectId);
 
-      Map<String, Object> resultData = Map.of("projectId", projectId, "baseUrl", baseUrl);
-      Map<String, Object> compensationData = Map.of("projectId", projectId);
+      Map<String, Object> resultData = Map.of(KEY_PROJECT_ID, projectId, "baseUrl", baseUrl);
+      Map<String, Object> compensationData = Map.of(KEY_PROJECT_ID, projectId);
 
       // Recovery from an HTTP 500 by binding to a PRE-EXISTING project matched by the unique name
       // "{datasetName} ({datasetId})". Because the name carries the globally-unique datasetId, this
@@ -199,10 +213,10 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleUpdateProject(SagaCommandMessage command) {
-    String projectId = requireString(command, "projectId");
+    String projectId = requireString(command, KEY_PROJECT_ID);
     String datasetName = requireString(command, "datasetName");
     String datasetId = requireString(command, "datasetId");
-    String description = (String) command.payload().getOrDefault("description", "");
+    String description = (String) command.payload().getOrDefault(KEY_DESCRIPTION, "");
     boolean openDataAccess =
         Boolean.TRUE.equals(command.payload().getOrDefault("openDataAccess", false));
 
@@ -215,41 +229,57 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
             .apply(
                 client()
                     .target(serverUrl)
-                    .path("Projects(" + projectId + ")")
+                    .path(projectPath(projectId))
                     .request(MediaType.APPLICATION_JSON))
             .get()) {
       checkResponse(getResponse, "GET project for UPDATE_PROJECT");
       @SuppressWarnings("unchecked")
       Map<String, Object> currentProject = getResponse.readEntity(Map.class);
-      previousName = (String) currentProject.getOrDefault("name", "");
-      previousDescription = (String) currentProject.getOrDefault("description", "");
-      previousPublic = Boolean.TRUE.equals(currentProject.getOrDefault("public", false));
+      previousName = (String) currentProject.getOrDefault(KEY_NAME, "");
+      previousDescription = (String) currentProject.getOrDefault(KEY_DESCRIPTION, "");
+      previousPublic = Boolean.TRUE.equals(currentProject.getOrDefault(KEY_PUBLIC, false));
     }
 
-    Map<String, Object> body = new HashMap<>();
-    body.put("name", frostProjectName(datasetName, datasetId));
-    body.put("description", description);
-    body.put("public", openDataAccess);
+    Map<String, Object> body =
+        Map.of(
+            KEY_NAME, frostProjectName(datasetName, datasetId),
+            KEY_DESCRIPTION, description,
+            KEY_PUBLIC, openDataAccess);
 
     try (Response response =
         authStrategy
             .apply(
                 client()
                     .target(serverUrl)
-                    .path("Projects(" + projectId + ")")
+                    .path(projectPath(projectId))
                     .request(MediaType.APPLICATION_JSON))
             .method("PATCH", Entity.json(body))) {
 
       checkResponse(response, "UPDATE_PROJECT");
 
-      String baseUrl = publicUrl + "/Projects(" + projectId + ")";
-      Map<String, Object> resultData = Map.of("projectId", projectId, "baseUrl", baseUrl);
+      String baseUrl = projectBaseUrl(projectId);
+      Map<String, Object> resultData = Map.of(KEY_PROJECT_ID, projectId, "baseUrl", baseUrl);
       Map<String, Object> compensationData =
-          Map.of(
-              "projectId", projectId,
-              "previousName", previousName,
-              "previousDescription", previousDescription,
-              "previousPublic", previousPublic);
+          new HashMap<>(
+              Map.of(
+                  KEY_PROJECT_ID,
+                  projectId,
+                  "previousDescription",
+                  previousDescription,
+                  "previousPublic",
+                  previousPublic));
+      if (previousName.isBlank()) {
+        // FROST returned no usable name (unexpected). Capturing "" would make a later
+        // RESTORE_PROJECT blank the project name and break the unique-name duplicate-recovery
+        // lookup — omit the field so compensation leaves the name as-is (MR !547 finding 6).
+        log.warn(
+            "UPDATE_PROJECT: FROST returned no name for project {} — compensation will keep the"
+                + " then-current name instead of restoring. saga={}",
+            Encode.forJava(projectId),
+            Encode.forJava(command.sagaId()));
+      } else {
+        compensationData.put("previousName", previousName);
+      }
 
       log.info(
           "FROST project updated: projectId={}, saga={}",
@@ -262,7 +292,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleDeleteProject(SagaCommandMessage command) {
-    String projectId = requireString(command, "projectId");
+    String projectId = requireString(command, KEY_PROJECT_ID);
     boolean compensating = "COMPENSATE_STEP".equals(command.type());
 
     try (Response response =
@@ -270,7 +300,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
             .apply(
                 client()
                     .target(serverUrl)
-                    .path("Projects(" + projectId + ")")
+                    .path(projectPath(projectId))
                     .request(MediaType.APPLICATION_JSON))
             .delete()) {
 
@@ -301,18 +331,29 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleRestoreProject(SagaCommandMessage command) {
-    String projectId = requireString(command, "projectId");
-    String previousName = requireString(command, "previousName");
+    String projectId = requireString(command, KEY_PROJECT_ID);
+    Object previousName = command.payload().get("previousName");
     String previousDescription = (String) command.payload().getOrDefault("previousDescription", "");
 
     Map<String, Object> body = new HashMap<>();
-    body.put("name", previousName);
-    body.put("description", previousDescription);
+    // Only restore the name when the UPDATE saga captured a usable one. PATCHing "" would blank
+    // the project identity and break the unique-name duplicate-recovery lookup; leaving the field
+    // unset preserves the current value via PATCH semantics (same guard as previousPublic below).
+    if (previousName instanceof String name && !name.isBlank()) {
+      body.put(KEY_NAME, name);
+    } else {
+      log.info(
+          "RESTORE_PROJECT: previousName not captured — leaving the FROST project name unchanged"
+              + " for projectId={}, saga={}",
+          Encode.forJava(projectId),
+          Encode.forJava(command.sagaId()));
+    }
+    body.put(KEY_DESCRIPTION, previousDescription);
     // Only restore previousPublic when the UPDATE saga captured it (older sagas may
     // predate this field — leaving it unset preserves the current value via PATCH semantics).
     Object previousPublic = command.payload().get("previousPublic");
     if (previousPublic != null) {
-      body.put("public", Boolean.TRUE.equals(previousPublic));
+      body.put(KEY_PUBLIC, Boolean.TRUE.equals(previousPublic));
     } else {
       // Privacy-relevant edge: without a captured previousPublic (e.g. an in-flight saga across a
       // deploy) the FROST project's public flag is left as-is rather than reverted. Surface it so
@@ -330,7 +371,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
             .apply(
                 client()
                     .target(serverUrl)
-                    .path("Projects(" + projectId + ")")
+                    .path(projectPath(projectId))
                     .request(MediaType.APPLICATION_JSON))
             .method("PATCH", Entity.json(body))) {
 

@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.frost;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -361,6 +362,37 @@ class FrostSagaHandlerTest {
     }
 
     @Test
+    @DisplayName("omits previousName from compensationData when FROST returns no name")
+    void shouldOmitPreviousNameWhenFrostReturnsNone() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response getResponse = mock(Response.class);
+        when(getResponse.getStatus()).thenReturn(200);
+        // FROST body without a "name" — capturing "" would arm a later RESTORE to blank the name.
+        when(getResponse.readEntity(Map.class))
+            .thenReturn(Map.of("description", "Old Description"));
+        when(mockBuilder.get()).thenReturn(getResponse);
+
+        Response patchResponse = mock(Response.class);
+        when(patchResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.method(eq("PATCH"), any(Entity.class))).thenReturn(patchResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "UPDATE_PROJECT",
+                Map.of(
+                    "projectId", "42", "datasetName", "Updated Dataset", "description", "Updated"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertFalse(
+            result.compensationData().containsKey("previousName"),
+            "a blank captured name must be omitted so RESTORE_PROJECT keeps the current name");
+      }
+    }
+
+    @Test
     @DisplayName("uses publicUrl in baseUrl when configured differently from serverUrl")
     void shouldUsePublicUrlInBaseUrl() {
       try (FrostSagaHandler handler = createHandlerWithPublicUrl("http://public-frost:80/v1.1")) {
@@ -533,6 +565,61 @@ class FrostSagaHandlerTest {
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
         assertEquals("saga-001", result.sagaId());
+      }
+    }
+
+    @Test
+    @DisplayName("omits name from body when previousName missing (no blanking, MR !547 finding 6)")
+    void shouldOmitNameWhenPreviousNameMissing() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(200);
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_PROJECT",
+                Map.of("projectId", "42", "previousDescription", "Old Description"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        // PATCHing name="" would blank the project identity and break the unique-name
+        // duplicate-recovery lookup — the field must be left out so FROST keeps the current name.
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        assertNull(body.get("name"));
+      }
+    }
+
+    @Test
+    @DisplayName("treats a blank previousName like a missing one (legacy \"\" capture)")
+    void shouldOmitNameWhenPreviousNameBlank() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(200);
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_PROJECT",
+                Map.of(
+                    "projectId", "42",
+                    "previousName", "",
+                    "previousDescription", "Old Description"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        assertNull(body.get("name"));
       }
     }
 
