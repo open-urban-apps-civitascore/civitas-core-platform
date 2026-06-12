@@ -31,7 +31,7 @@ import org.springframework.http.ResponseEntity;
 
 @DisplayName("DataSink Controller Integration Tests")
 class DataSinkControllerIntegrationTest
-    extends BaseReadOnlyControllerIntegrationTest<DataSinkInputDTO, DataSinkOutputDTO> {
+    extends BaseControllerIntegrationTest<DataSinkInputDTO, DataSinkOutputDTO> {
 
   @Autowired protected PortalTestDataFactory portalData;
   @Autowired private DataSetRepository dataSetRepository;
@@ -55,24 +55,12 @@ class DataSinkControllerIntegrationTest
     return "/datasets/" + testDataSetId + "/datasinks";
   }
 
-  /** Creates a DataSink directly via the repository since the controller is read-only. */
-  @Override
-  protected UUID createTestEntity() {
-    ensureTestData();
-    Pipeline pipeline = pipelineRepository.findById(testPipelineId).orElseThrow();
-    DataSink sink = new DataSink();
-    sink.setPipeline(pipeline);
-    sink.setDataSinkType(DataSinkType.FROST);
-    return dataSinkRepository.save(sink).getId();
-  }
-
   @Override
   protected DataSinkInputDTO createValidInput() {
     ensureTestData();
     DataSinkInputDTO input = new DataSinkInputDTO();
     input.setDataSinkType(DataSinkType.FROST);
     input.setConfiguration(Map.of());
-    input.setPipelineId(testPipelineId);
     return input;
   }
 
@@ -81,7 +69,6 @@ class DataSinkControllerIntegrationTest
     ensureTestData();
     DataSinkInputDTO input = new DataSinkInputDTO();
     input.setConfiguration(Map.of());
-    input.setPipelineId(testPipelineId);
     return input;
   }
 
@@ -112,58 +99,6 @@ class DataSinkControllerIntegrationTest
     testPipelineId = null;
   }
 
-  // ── Write endpoints return 405 ────────────────────────────────────────────
-
-  @Nested
-  @DisplayName("Write endpoints are not exposed")
-  class WriteEndpointsReturn405 {
-
-    @Test
-    @DisplayName("POST returns 405")
-    void postReturns405() {
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              getEndpointPath(), HttpMethod.POST, createAuthHeaders(), createValidInput());
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
-    }
-
-    @Test
-    @DisplayName("PUT returns 405")
-    void putReturns405() {
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              getEndpointPath() + "/" + UUID.randomUUID(),
-              HttpMethod.PUT,
-              createAuthHeaders(),
-              createValidInput());
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
-    }
-
-    @Test
-    @DisplayName("PATCH returns 405")
-    void patchReturns405() {
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              getEndpointPath() + "/" + UUID.randomUUID(),
-              HttpMethod.PATCH,
-              createAuthHeaders(),
-              Map.of());
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
-    }
-
-    @Test
-    @DisplayName("DELETE returns 405")
-    void deleteReturns405() {
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              getEndpointPath() + "/" + UUID.randomUUID(),
-              HttpMethod.DELETE,
-              createAuthHeaders(),
-              null);
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
-    }
-  }
-
   // ── Read tests ────────────────────────────────────────────────────────────
 
   @Nested
@@ -183,7 +118,8 @@ class DataSinkControllerIntegrationTest
       assertThat(body.getId()).isEqualTo(id);
       assertThat(body.getDataSinkType()).isEqualTo(DataSinkType.FROST);
       assertThat(body.getDataSetId()).isEqualTo(testDataSetId);
-      assertThat(body.getPipelineId()).isEqualTo(testPipelineId);
+      assertThat(body.getPipelineId()).isNull();
+      assertThat(body.isInUse()).isFalse();
     }
 
     @Test
@@ -230,9 +166,9 @@ class DataSinkControllerIntegrationTest
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
 
-      Pipeline pipeline = pipelineRepository.findById(testPipelineId).orElseThrow();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
       DataSink sink = new DataSink();
-      sink.setPipeline(pipeline);
+      sink.setDataSet(dataSet);
       sink.setDataSinkType(DataSinkType.POSTGIS);
       sink.setConfiguration(
           Map.of("tableName", "sensor_data", "dataStructureVersionId", dsv.getId().toString()));
@@ -244,6 +180,235 @@ class DataSinkControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
       assertThat(response.getBody().getDataSetId()).isEqualTo(testDataSetId);
+    }
+
+    @Test
+    @DisplayName("Should report inUse=true when the DataSink is linked to a pipeline")
+    void shouldReportInUseWhenLinkedToPipeline() {
+      ensureTestData();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      Pipeline pipeline = pipelineRepository.findById(testPipelineId).orElseThrow();
+      DataSink sink = new DataSink();
+      sink.setDataSet(dataSet);
+      sink.setPipeline(pipeline);
+      sink.setDataSinkType(DataSinkType.FROST);
+      UUID id = dataSinkRepository.save(sink).getId();
+
+      ResponseEntity<DataSinkOutputDTO> response = performGetById(id);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().isInUse()).isTrue();
+      assertThat(response.getBody().getPipelineId()).isEqualTo(testPipelineId);
+    }
+  }
+
+  // ── Write tests ───────────────────────────────────────────────────────────
+
+  @Nested
+  @DisplayName("Create DataSink Tests")
+  class CreateDataSinkTests {
+
+    @Test
+    @DisplayName("POST creates a FROST DataSink scoped to the parent dataset")
+    void postCreatesFrostDataSink() {
+      ResponseEntity<DataSinkOutputDTO> response = performCreate(createValidInput());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody()).isNotNull();
+      DataSinkOutputDTO body = response.getBody();
+      assertThat(body.getId()).isNotNull();
+      assertThat(body.getDataSinkType()).isEqualTo(DataSinkType.FROST);
+      assertThat(body.getDataSetId()).isEqualTo(testDataSetId);
+      assertThat(body.getPipelineId()).isNull();
+      assertThat(body.isInUse()).isFalse();
+      assertThat(dataSinkRepository.findById(body.getId()))
+          .isPresent()
+          .get()
+          .satisfies(s -> assertThat(s.getDataSet().getId()).isEqualTo(testDataSetId));
+    }
+
+    @Test
+    @DisplayName("POST creates a POSTGIS DataSink with a resolved DSV summary")
+    void postCreatesPostgisDataSink() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSinkType(DataSinkType.POSTGIS);
+      input.setConfiguration(
+          Map.of("tableName", "sensor_data", "dataStructureVersionId", dsv.getId().toString()));
+
+      ResponseEntity<DataSinkOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
+      assertThat(response.getBody().getDataSetId()).isEqualTo(testDataSetId);
+    }
+
+    @Test
+    @DisplayName("POST returns 400 when FROST configuration is non-empty")
+    void postRejectsFrostWithNonEmptyConfiguration() {
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSinkType(DataSinkType.FROST);
+      input.setConfiguration(Map.of("unexpected", "value"));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("POST returns 400 when POSTGIS configuration is missing tableName")
+    void postRejectsPostgisWithoutTableName() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSinkType(DataSinkType.POSTGIS);
+      input.setConfiguration(Map.of("dataStructureVersionId", dsv.getId().toString()));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("POST returns 400 when POSTGIS dataStructureVersionId does not resolve")
+    void postRejectsPostgisWithUnknownDsv() {
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSinkType(DataSinkType.POSTGIS);
+      input.setConfiguration(
+          Map.of(
+              "tableName", "sensor_data", "dataStructureVersionId", UUID.randomUUID().toString()));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Nested
+  @DisplayName("Update DataSink Tests")
+  class UpdateDataSinkTests {
+
+    @Test
+    @DisplayName("PUT replaces an existing DataSink")
+    void putReplacesDataSink() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      UUID id = createTestEntity();
+
+      DataSinkInputDTO updateInput = new DataSinkInputDTO();
+      updateInput.setDataSinkType(DataSinkType.POSTGIS);
+      updateInput.setConfiguration(
+          Map.of("tableName", "updated_table", "dataStructureVersionId", dsv.getId().toString()));
+
+      ResponseEntity<DataSinkOutputDTO> response = performUpdate(id, updateInput);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
+      assertThat(dataSinkRepository.findById(id))
+          .isPresent()
+          .get()
+          .satisfies(s -> assertThat(s.getDataSinkType()).isEqualTo(DataSinkType.POSTGIS));
+    }
+
+    @Test
+    @DisplayName("PUT returns 404 when updating a DataSink from a different dataset")
+    void putReturns404ForCrossDatasetUpdate() {
+      UUID sinkId = createTestEntity();
+      DataSet otherDataSet = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              "/datasets/" + otherDataSet.getId() + "/datasinks/" + sinkId,
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              createUpdateInput());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("PUT returns 400 when configuration is invalid for the type")
+    void putRejectsInvalidConfiguration() {
+      UUID id = createTestEntity();
+
+      DataSinkInputDTO invalidUpdate = new DataSinkInputDTO();
+      invalidUpdate.setDataSinkType(DataSinkType.FROST);
+      invalidUpdate.setConfiguration(Map.of("unexpected", "value"));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id, HttpMethod.PUT, createAuthHeaders(), invalidUpdate);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Nested
+  @DisplayName("Delete DataSink Tests")
+  class DeleteDataSinkTests {
+
+    @Test
+    @DisplayName("DELETE removes a free DataSink")
+    void deleteRemovesFreeDataSink() {
+      UUID id = createTestEntity();
+
+      ResponseEntity<Void> response = performDelete(id);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+      assertThat(dataSinkRepository.findById(id)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("DELETE returns 404 when DataSink belongs to a different dataset")
+    void deleteReturns404ForCrossDataset() {
+      UUID sinkId = createTestEntity();
+      DataSet otherDataSet = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              "/datasets/" + otherDataSet.getId() + "/datasinks/" + sinkId,
+              HttpMethod.DELETE,
+              createAuthHeaders(),
+              null);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+      assertThat(dataSinkRepository.findById(sinkId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("DELETE returns 409 when a Layer references the DataSink")
+    void deleteReturns409WhenLayerReferencesDataSink() {
+      ensureTestData();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      Pipeline pipeline = pipelineRepository.findById(testPipelineId).orElseThrow();
+      DataSink sink = portalData.dataSink(dataSet, pipeline);
+      portalData.layer(dataSet, sink);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + sink.getId(), HttpMethod.DELETE, createAuthHeaders(), null);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(dataSinkRepository.findById(sink.getId())).isPresent();
     }
   }
 }

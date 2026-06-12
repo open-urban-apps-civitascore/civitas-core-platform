@@ -10,7 +10,6 @@ import de.civitascore.portal.mapper.LayerMapper;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.Layer;
-import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.input.LayerInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
@@ -108,11 +107,9 @@ class LayerServiceTest {
       UUID dataSinkId = UUID.randomUUID();
       DataSet ds = dataSet(dataSetId);
 
-      Pipeline pipeline = new Pipeline();
-      pipeline.setDataSet(ds);
       DataSink dataSink = new DataSink();
       dataSink.setId(dataSinkId);
-      dataSink.setPipeline(pipeline);
+      dataSink.setDataSet(ds);
 
       LayerInputDTO input = baseInput(dataSetId, dataSinkId);
       Layer entity = new Layer();
@@ -170,11 +167,9 @@ class LayerServiceTest {
       DataSet ds = dataSet(dataSetId);
 
       DataSet otherDataSet = dataSet(UUID.randomUUID());
-      Pipeline pipeline = new Pipeline();
-      pipeline.setDataSet(otherDataSet);
       DataSink dataSink = new DataSink();
       dataSink.setId(dataSinkId);
-      dataSink.setPipeline(pipeline);
+      dataSink.setDataSet(otherDataSet);
 
       Layer entity = new Layer();
       when(layerMapper.toEntity(any())).thenReturn(entity);
@@ -195,11 +190,9 @@ class LayerServiceTest {
       UUID unknownStyleId = UUID.randomUUID();
       DataSet ds = dataSet(dataSetId);
 
-      Pipeline pipeline = new Pipeline();
-      pipeline.setDataSet(ds);
       DataSink dataSink = new DataSink();
       dataSink.setId(dataSinkId);
-      dataSink.setPipeline(pipeline);
+      dataSink.setDataSet(ds);
 
       Style knownStyle = new Style();
       knownStyle.setId(knownStyleId);
@@ -255,11 +248,9 @@ class LayerServiceTest {
       UUID dataSinkId = UUID.randomUUID();
       DataSet ds = dataSet(dataSetId);
 
-      Pipeline pipeline = new Pipeline();
-      pipeline.setDataSet(ds);
       DataSink dataSink = new DataSink();
       dataSink.setId(dataSinkId);
-      dataSink.setPipeline(pipeline);
+      dataSink.setDataSet(ds);
 
       LayerInputDTO input = baseInput(dataSetId, dataSinkId);
       Layer entity = new Layer();
@@ -288,11 +279,9 @@ class LayerServiceTest {
       UUID dataSinkId = UUID.randomUUID();
       DataSet ds = dataSet(dataSetId);
 
-      Pipeline pipeline = new Pipeline();
-      pipeline.setDataSet(ds);
       DataSink dataSink = new DataSink();
       dataSink.setId(dataSinkId);
-      dataSink.setPipeline(pipeline);
+      dataSink.setDataSet(ds);
 
       Layer existingLayer = new Layer();
       existingLayer.setId(layerId);
@@ -333,11 +322,9 @@ class LayerServiceTest {
       UUID styleId = UUID.randomUUID();
       DataSet ds = dataSet(dataSetId);
 
-      Pipeline pipeline = new Pipeline();
-      pipeline.setDataSet(ds);
       DataSink dataSink = new DataSink();
       dataSink.setId(dataSinkId);
-      dataSink.setPipeline(pipeline);
+      dataSink.setDataSet(ds);
 
       Style style = new Style();
       style.setId(styleId);
@@ -367,11 +354,9 @@ class LayerServiceTest {
       UUID styleId = UUID.randomUUID();
       DataSet ds = dataSet(dataSetId);
 
-      Pipeline pipeline = new Pipeline();
-      pipeline.setDataSet(ds);
       DataSink dataSink = new DataSink();
       dataSink.setId(dataSinkId);
-      dataSink.setPipeline(pipeline);
+      dataSink.setDataSet(ds);
 
       Style style = new Style();
       style.setId(styleId);
