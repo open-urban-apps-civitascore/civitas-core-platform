@@ -186,6 +186,22 @@ class GeoDataSetSagaIntegrationTest extends AbstractSagaIntegrationTest {
     verifier.verifyFrostProjectExists(completed.getProjectId());
   }
 
+  private static void assertGeometryColumn(String table, String column) throws SQLException {
+    String sql =
+        "SELECT udt_name, is_nullable FROM information_schema.columns"
+            + " WHERE table_schema = 'public' AND table_name = ? AND column_name = ?";
+    try (Connection connection = DriverManager.getConnection(sinkDb.getJdbcUrl(), "geo", "geo");
+        var statement = connection.prepareStatement(sql)) {
+      statement.setString(1, table);
+      statement.setString(2, column);
+      try (ResultSet rs = statement.executeQuery()) {
+        assertThat(rs.next()).as("column %s.%s should exist", table, column).isTrue();
+        assertThat(rs.getString("udt_name")).isEqualTo("geometry");
+        assertThat(rs.getString("is_nullable")).isEqualTo("NO");
+      }
+    }
+  }
+
   private static void assertColumn(String table, String column, String dataType, boolean nullable)
       throws SQLException {
     String sql =
