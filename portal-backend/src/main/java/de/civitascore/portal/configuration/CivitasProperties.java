@@ -24,10 +24,11 @@ public record CivitasProperties(
   /**
    * Data-plane API configuration.
    *
-   * @param baseUrl the data-plane base URL used to build public preview URLs in the form {@code
-   *     {baseUrl}/v1/datasets/{datasetId}/{slug}}. Fully-qualified HTTPS URL with no path and no
-   *     trailing slash — e.g. {@code https://api.example.com} or {@code
-   *     https://api.example.com:8443}.
+   * @param baseUrl fallback data-plane base URL for building public preview URLs in the form {@code
+   *     {baseUrl}/v1/datasets/{datasetId}/{slug}}, used only when a dataset has no saga-provisioned
+   *     {@code publicUrl} yet (the authoritative base is APISIX_API_PUBLIC_URL, surfaced via {@code
+   *     DataSet.publicUrl}). Fully-qualified HTTPS URL with no path and no trailing slash — e.g.
+   *     {@code https://api.example.com} or {@code https://api.example.com:8443}.
    */
   public record Api(
       @NotBlank @URL(

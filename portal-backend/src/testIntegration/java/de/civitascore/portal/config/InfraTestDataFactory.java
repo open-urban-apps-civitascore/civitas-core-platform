@@ -38,7 +38,7 @@ public class InfraTestDataFactory {
 
   /**
    * Must match application-test-integration.yml ({@code civitas.master-key}). Package-visible so
-   * {@link SagaOrchestratorTestHelper} can pass it to the config-adapter via adapter config.
+   * integration helpers can pass it to the config-adapter via adapter config.
    */
   static final String TEST_MASTER_KEY_HEX =
       "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";

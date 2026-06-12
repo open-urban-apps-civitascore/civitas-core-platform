@@ -327,8 +327,7 @@
                         <!-- Used at runtime by Spring Security autoconfig; main code uses
                              only the .oauth2ResourceServer().jwt() DSL, no direct imports -->
                         <ignoredNonTestScopedDependency>org.springframework.boot:spring-boot-security-oauth2-resource-server</ignoredNonTestScopedDependency>
-                        <!-- KafkaSagaCommandConsumer is test-only, but main code imports
-                             cloudevents-kafka transitively from event-handler-kafka -->
+                        <!-- event-handler-kafka declared for transitive cloudevents-kafka serialization; no direct main-code usage -->
                         <ignoredNonTestScopedDependency>de.civitas-core:event-handler-kafka</ignoredNonTestScopedDependency>
                         <!-- Transitively pulled compile-scope by oauth2-resource-server;
                              only direct use is JWTParser in UserMeIntegrationTest -->

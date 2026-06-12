@@ -1065,7 +1065,7 @@ When an event fails all retry attempts or encounters a fatal error, it is sent t
 
 #### Saga Consumer Retry Behavior
 
-The saga consumers (`SagaResultConsumer`, `SagaTriggerConsumer`, `KafkaSagaCommandConsumer`) use the same retry algorithm via `ConsumerRecordRetry`. Permanent errors (e.g., malformed JSON → `IOException`) are skipped immediately. Transient errors (e.g., engine/publish failures → `RuntimeException`) are retried with exponential backoff up to 3 attempts. After max retries, the record is skipped and committed. All saga consumers use **per-record commits** (not batch commits) to ensure a single poison-pill record cannot block the consumer. The saga timeout mechanism handles recovery by triggering compensation. No DLQ is used for saga consumers.
+The saga consumers (`SagaResultConsumer`, `SagaTriggerConsumer`) use the same retry algorithm via `ConsumerRecordRetry`. (The legacy custom-orchestrator `KafkaSagaCommandConsumer` has been removed — Flowable is now the sole saga engine.) Permanent errors (e.g., malformed JSON → `IOException`) are skipped immediately. Transient errors (e.g., engine/publish failures → `RuntimeException`) are retried with exponential backoff up to 3 attempts. After max retries, the record is skipped and committed. All saga consumers use **per-record commits** (not batch commits) to ensure a single poison-pill record cannot block the consumer. The saga timeout mechanism handles recovery by triggering compensation. No DLQ is used for saga consumers.
 
 #### Failure Result Event
 

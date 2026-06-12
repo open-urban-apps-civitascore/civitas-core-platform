@@ -7,8 +7,15 @@ export const NAMED_API_DESCRIPTION_MAX_LENGTH = 150
 // no leading/trailing dash. Single-character slugs allowed.
 export const SLUG_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/
 
-// Slugs that would collide with sibling routes under /datasets/{id}/...
-export const RESERVED_SLUGS = ['apis'] as const
+// Slugs that would collide with reserved platform path segments (e.g. the management endpoint
+// /datasets/{id}/apis and the /v1 data-plane prefix). Mirrors the backend blocklist —
+// NamedApiAllowedSlugValidator.RESERVED — which is the authoritative source; keep the two in sync.
+export const RESERVED_SLUGS = ['apis', 'api', 'v1', 'admin'] as const
+
+// Public data-plane path prefix for a dataset's named APIs. The gateway serves them at
+// /v1/datasets/{datasetId}/{slug} (issue #1368). Single source of truth so the scheme
+// can't drift across the UI (URL preview, copy-to-clipboard); the caller appends the slug.
+export const namedApiPathPrefix = (datasetId: string) => `/v1/datasets/${datasetId}/`
 
 export const API_STANDARDS = {
   WFS: 'WFS',

@@ -47,15 +47,14 @@ config-adapter-api          ← Pure interfaces & models, no impl dependencies
     ↑
     ├── config-adapter-configuration  ← AppConfig (Commons Configuration2), env var support
     ├── event-handler-kafka           ← KafkaEventHandler (consumer + publisher), virtual threads
-    ├── config-adapter-orchestrator   ← Saga orchestrator engine + Kafka integration
     ├── config-adapter-keycloak       ← Keycloak Admin Client REST adapter
     ├── config-adapter-apisix         ← APISIX Admin API adapter
     ├── config-adapter-redpanda       ← RedPanda Connect Streams API adapter (JAX-RS/Jersey)
     ├── config-adapter-frost          ← FROST SensorThings API adapter (JAX-RS/Jersey)
     ├── config-adapter-geoserver      ← GeoServer REST API adapter (JAX-RS/Jersey)
+    ├── config-adapter-examples       ← DummyLogAdapter (logging reference impl)
     ├── config-adapter-postgis        ← PostgreSQL/PostGIS DDL adapter (tables, schemas, roles+grants; JDBC + HikariCP) + PostgisSagaHandler
-    ├── config-adapter-flowable       ← Flowable BPMN saga engine (embedded, PostgreSQL state)
-    └── config-adapter-examples       ← DummyLogAdapter (logging reference impl)
+    └── config-adapter-flowable       ← Flowable saga engine (embedded, PostgreSQL state; coded by default, BPMN optional). Sole saga orchestrator — the legacy custom config-adapter-orchestrator has been removed.
     ↑
 config-adapter-application  ← Bootstrap, ServiceLoader discovery, health checks, shade JAR
 ```

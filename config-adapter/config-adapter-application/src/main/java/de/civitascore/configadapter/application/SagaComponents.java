@@ -10,25 +10,19 @@
 package de.civitascore.configadapter.application;
 
 import de.civitascore.configadapter.flowable.common.FlowableSagaOrchestrator;
-import de.civitascore.event.handler.kafka.KafkaSagaCommandConsumer;
 import java.util.Optional;
 
 /**
- * Holds the saga orchestration components created during application bootstrap. Supports either the
- * custom orchestrator (with OrchestratorPair + KafkaSagaCommandConsumer) or the Flowable
- * orchestrator.
+ * Holds the saga orchestration components created during application bootstrap. The saga engine is
+ * the Flowable orchestrator (the legacy custom orchestrator has been removed). In production {@link
+ * SagaComponentFactory#create} always supplies a Flowable orchestrator (or fails fast); the {@code
+ * Optional} exists so the construction-only bootstrap tests can inject an empty value to skip the
+ * costly engine bootstrap (see {@code ApplicationTest}), and so {@link Application#run} degrades
+ * gracefully if no orchestrator is wired.
  */
-record SagaComponents(
-    Optional<KafkaSagaCommandConsumer> commandConsumer,
-    Optional<OrchestratorPair> orchestrator,
-    Optional<FlowableSagaOrchestrator> flowableOrchestrator) {
-
-  SagaComponents(
-      Optional<KafkaSagaCommandConsumer> commandConsumer, Optional<OrchestratorPair> orchestrator) {
-    this(commandConsumer, orchestrator, Optional.empty());
-  }
+record SagaComponents(Optional<FlowableSagaOrchestrator> flowableOrchestrator) {
 
   static SagaComponents flowable(FlowableSagaOrchestrator flowable) {
-    return new SagaComponents(Optional.empty(), Optional.empty(), Optional.of(flowable));
+    return new SagaComponents(Optional.of(flowable));
   }
 }

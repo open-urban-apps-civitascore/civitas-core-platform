@@ -354,6 +354,29 @@ class DataSetServiceTest {
     }
 
     @Test
+    @DisplayName("rejects duplicate named-API slugs with a business 400 (not a DB 500)")
+    void rejectsDuplicateNamedApiSlugs() {
+      // Two named APIs sharing a slug must be rejected up front; otherwise both reach the DB unique
+      // constraint as an opaque 500 (and the slug is the per-named-API route key).
+      DataSet entity = new DataSet();
+      NamedApiInputDTO first = new NamedApiInputDTO();
+      first.setName("Traffic A");
+      first.setSlug("traffic");
+      first.setStandard(ApiStandard.STA);
+      NamedApiInputDTO duplicate = new NamedApiInputDTO();
+      duplicate.setName("Traffic B");
+      duplicate.setSlug("traffic");
+      duplicate.setStandard(ApiStandard.STA);
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(List.of(first, duplicate));
+
+      assertThatThrownBy(() -> createService().postConvertToEntity(entity, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("Duplicate named-API slug")
+          .hasMessageContaining("traffic");
+    }
+
+    @Test
     @DisplayName("rejects an empty namedApis list too (the field is forbidden, not just changes)")
     void rejectsEmptyNamedApisListOnReleased() {
       UUID id = UUID.randomUUID();

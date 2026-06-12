@@ -30,7 +30,6 @@
 		<module>config-adapter-examples</module>
 		<module>config-adapter-frost</module>
 		<module>config-adapter-geoserver</module>
-		<module>config-adapter-orchestrator</module>
 		<module>config-adapter-redpanda</module>
 		<module>config-adapter-flowable</module>
 		<module>config-adapter-postgis</module>

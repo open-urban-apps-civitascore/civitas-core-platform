@@ -37,6 +37,15 @@ dev-environment/
 
 **Optional:**
 * jq (for dev-mode scripts)
+* `/etc/hosts` entry for the API gateway virtual host (issue #1368):
+
+  ```
+  127.0.0.1  api.localhost
+  ```
+
+  Chrome/Firefox resolve `*.localhost` automatically, but `curl`, the JDK HTTP client, and Bruno's CLI need this entry. All APISIX routes are served under `api.localhost`:
+  * `api.localhost/v1/*` — portal-backend catch-all (static)
+  * `api.localhost/v1/datasets/{id}/*` — FROST proxy (created dynamically by the APISIX saga; the more specific URI wins)
 
 Supported platforms: **Linux**, **macOS** (including Apple Silicon / ARM), and **Windows** (WSL / Git Bash).
 

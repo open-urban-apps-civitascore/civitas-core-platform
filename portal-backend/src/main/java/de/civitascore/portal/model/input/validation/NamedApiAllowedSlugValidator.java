@@ -14,8 +14,8 @@ import java.util.regex.Pattern;
  * /v1/datasets/{id}/...}. Per concept #1384 + discovery endpoint in #1379:
  *
  * <ul>
- *   <li>{@code apis} — collides with the planned {@code GET /v1/datasets/{id}/apis} discovery
- *       endpoint
+ *   <li>{@code apis} — collides with the {@code GET /v1/datasets/{id}/apis} discovery endpoint
+ *       (implemented per #1596)
  *   <li>{@code api}, {@code v1}, {@code admin} — conservative reserves for future platform
  *       endpoints; refine with the team before lifting
  * </ul>

@@ -44,6 +44,13 @@ export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 # own values (or ENC(...) values decrypted with CIVITAS_MASTER_KEY).
 export KEYCLOAK_PASSWORD=admin
 export APISIX_ADMIN_KEY=edd1c9f034335f136f87ad84b625c8f1
+# Dev-only public API host (issue #1368). Required — the APISIX saga handler fails fast when
+# unset. Values mirror dev-environment/start-portal-dev.sh; api.localhost needs a matching
+# /etc/hosts entry: 127.0.0.1 api.localhost
+export APISIX_API_HOST=api.localhost
+export APISIX_API_PUBLIC_URL=http://api.localhost:9080
+export APISIX_PLUGIN_CONFIG_ID=1
+export APISIX_FROST_API_KEY=dev-frost-api-key
 export FROST_API_KEY=dev-frost-api-key
 export FLOWABLE_JDBC_PASSWORD=flowable
 export GEOSERVER_ADMIN_PASSWORD=geoserver
