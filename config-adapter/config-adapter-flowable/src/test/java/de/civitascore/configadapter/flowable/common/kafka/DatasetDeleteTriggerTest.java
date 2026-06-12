@@ -37,9 +37,9 @@ import org.mockito.ArgumentCaptor;
  * conditional GeoServer teardown are tested together from a realistic trigger payload — not from a
  * preset process variable.
  *
- * <p>Because the teardown is gated on {@code hasGeoSink} (derived from {@code dataSinks}), the
+ * <p>Because the teardown is gated on {@code hasGeoSink} (derived from {@code datasinks}), the
  * delete trigger must carry the geo sink for the workspace to be removed. A delete trigger without
- * {@code dataSinks} (today's backend payload) therefore skips the GeoServer step — the backend must
+ * {@code datasinks} (today's backend payload) therefore skips the GeoServer step — the backend must
  * include the geo sink in the delete trigger, symmetric with create/update, for teardown to run.
  */
 class DatasetDeleteTriggerTest {
@@ -79,7 +79,7 @@ class DatasetDeleteTriggerTest {
 
   @Test
   void deleteWithoutDataSinksSkipsGeoServerTeardown() throws Exception {
-    // Mirrors today's backend DatasetDelete payload: no dataSinks → hasGeoSink derives false.
+    // Mirrors today's backend DatasetDelete payload: no datasinks → hasGeoSink derives false.
     TriggerTestSupport.processTrigger(consumer, deleteTrigger(false));
     FlowableTestSupport.executeAllJobs(engine);
 
@@ -111,7 +111,7 @@ class DatasetDeleteTriggerTest {
                 "serviceId", "svc-1",
                 "pipelineIds", List.of()));
     if (withGeoSink) {
-      trigger.put("dataSinks", List.of(Map.of("dataSinkType", "POSTGIS")));
+      trigger.put("datasinks", List.of(Map.of("type", "POSTGIS")));
     }
     return objectMapper.writeValueAsBytes(trigger);
   }

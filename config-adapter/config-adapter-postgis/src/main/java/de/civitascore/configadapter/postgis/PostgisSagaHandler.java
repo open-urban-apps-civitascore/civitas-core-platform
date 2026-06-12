@@ -66,10 +66,10 @@ import org.slf4j.LoggerFactory;
  * <p><b>2. Dataset-saga sink provisioning</b> — {@code PROVISION_SINK} ↔ {@code DEPROVISION_SINK}.
  * These read the dataset trigger directly (no nested config) and provision the PostGIS objects a
  * GeoServer datastore publishes from. For every {@code POSTGIS} entry in the trigger's {@code
- * dataSinks}, the {@code configuration} carries the table definition:
+ * datasinks}, the {@code configuration} carries the table definition:
  *
  * <pre>{@code
- * { "dataSinkType": "POSTGIS",
+ * { "type": "POSTGIS",
  *   "configuration": {
  *     "schema": "ds_42",                 // optional; created (idempotent) if present
  *     "owner": "ds_42_admin",            // optional schema owner
@@ -84,7 +84,7 @@ import org.slf4j.LoggerFactory;
  *
  * {@code PROVISION_SINK} creates schema (if given), table, and read role + grants for each sink in
  * one transaction; {@code DEPROVISION_SINK} drops the table and role (schemas are left, as they may
- * be shared). Both re-derive their targets from {@code dataSinks}, so the
+ * be shared). Both re-derive their targets from {@code datasinks}, so the
  * compensation/forward-delete paths are symmetric.
  *
  * <p>CREATE/PROVISION are idempotent (duplicate-object SQLStates absorbed); DROP/DEPROVISION are
@@ -461,14 +461,14 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   }
 
   /**
-   * Parses the trigger's {@code dataSinks} into per-sink specs. See the class javadoc for the
+   * Parses the trigger's {@code datasinks} into per-sink specs. See the class javadoc for the
    * {@code POSTGIS} sink {@code configuration} shape. Used identically by {@code PROVISION_SINK}
    * and {@code DEPROVISION_SINK} so the forward and rollback paths stay symmetric.
    */
   private List<SinkSpec> parseSinks(SagaCommandMessage command) {
     List<SinkSpec> specs = new ArrayList<>();
-    for (Map<String, Object> sink : mapList(command.payload(), "dataSinks")) {
-      if (!DATASINK_TYPE_POSTGIS.equals(sink.get("dataSinkType"))) {
+    for (Map<String, Object> sink : mapList(command.payload(), "datasinks")) {
+      if (!DATASINK_TYPE_POSTGIS.equals(sink.get("type"))) {
         continue;
       }
       Map<String, Object> config = mapValue(sink, "configuration");

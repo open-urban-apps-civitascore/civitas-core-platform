@@ -260,10 +260,10 @@ class PostgisSagaHandlerTest {
     void provisionSinkWithoutColumnsFails() {
       Map<String, Object> trigger =
           Map.of(
-              "dataSinks",
+              "datasinks",
               List.of(
                   Map.of(
-                      "dataSinkType",
+                      "type",
                       "POSTGIS",
                       "configuration",
                       Map.of("schema", "ds_42", "tableName", "no_cols"))));
@@ -277,7 +277,7 @@ class PostgisSagaHandlerTest {
     @Test
     void provisionSinkWithoutPostgisSinkFails() {
       Map<String, Object> trigger =
-          Map.of("dataSinks", List.of(Map.of("dataSinkType", "KAFKA", "configuration", Map.of())));
+          Map.of("datasinks", List.of(Map.of("type", "KAFKA", "configuration", Map.of())));
 
       SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
 
@@ -317,10 +317,10 @@ class PostgisSagaHandlerTest {
       return Map.of(
           "datasetId",
           "ds-42",
-          "dataSinks",
+          "datasinks",
           List.of(
               Map.of(
-                  "dataSinkType",
+                  "type",
                   "POSTGIS",
                   "configuration",
                   Map.of(

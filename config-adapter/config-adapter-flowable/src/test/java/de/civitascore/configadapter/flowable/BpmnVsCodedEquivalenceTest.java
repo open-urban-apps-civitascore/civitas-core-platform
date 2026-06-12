@@ -206,8 +206,8 @@ class BpmnVsCodedEquivalenceTest {
       vars.put("hasGeoSink", true);
       vars.put("hasLayers", true);
       vars.put(
-          "dataSinks",
-          List.of(Map.of("dataSinkType", "POSTGIS", "configuration", Map.of("tableName", "t1"))));
+          "datasinks",
+          List.of(Map.of("type", "POSTGIS", "configuration", Map.of("tableName", "t1"))));
       vars.put("layers", List.of(Map.of("layerName", "t1", "crs", "EPSG:4326")));
 
       ProcessInstance instance =

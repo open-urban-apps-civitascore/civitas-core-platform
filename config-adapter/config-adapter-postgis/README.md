@@ -223,12 +223,12 @@ The handler reuses the same `ConnectionProvider`, `PostgisDialect`, `TableDdlBui
 
 ### Dataset-saga sink provisioning (`PROVISION_SINK` / `DEPROVISION_SINK`)
 
-Beyond the generic resource ops, the handler is a **step in the dataset sagas**. When the dataset trigger carries a `POSTGIS` data sink (`hasGeoSink`), the CREATE saga runs `PROVISION_SINK` **before** GeoServer registers its datastore — GeoServer publishes feature types from a PostGIS table, and that table must exist first. `PROVISION_SINK` reads each `dataSinks[POSTGIS].configuration` and creates the schema (optional), table, and a GeoServer read role + grant, all in one transaction (idempotent). `DEPROVISION_SINK` (DELETE saga / CREATE compensation) drops the table and role; the schema is left (it may be shared).
+Beyond the generic resource ops, the handler is a **step in the dataset sagas**. When the dataset trigger carries a `POSTGIS` data sink (`hasGeoSink`), the CREATE saga runs `PROVISION_SINK` **before** GeoServer registers its datastore — GeoServer publishes feature types from a PostGIS table, and that table must exist first. `PROVISION_SINK` reads each `datasinks[POSTGIS].configuration` and creates the schema (optional), table, and a GeoServer read role + grant, all in one transaction (idempotent). `DEPROVISION_SINK` (DELETE saga / CREATE compensation) drops the table and role; the schema is left (it may be shared).
 
-Required `dataSinks[POSTGIS].configuration` shape (the portal-backend must emit columns/geometry so the table can be created):
+Required `datasinks[POSTGIS].configuration` shape (the portal-backend must emit columns/geometry so the table can be created):
 
 ```json
-{ "dataSinkType": "POSTGIS",
+{ "type": "POSTGIS",
   "configuration": {
     "schema": "ds_42", "owner": "ds_42_admin",
     "tableName": "sensor_readings",

@@ -171,10 +171,10 @@ class PostgisSagaHandlerIT extends AbstractPostgisIT {
     return Map.of(
         "datasetId",
         "ds-sink-it",
-        "dataSinks",
+        "datasinks",
         List.of(
             Map.of(
-                "dataSinkType",
+                "type",
                 "POSTGIS",
                 "configuration",
                 Map.of(

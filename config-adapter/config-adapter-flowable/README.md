@@ -95,7 +95,7 @@ the trigger payload by `FlowableTriggerConsumer` (never trusted from the payload
 
 | Flag | Derived when |
 |------|--------------|
-| `hasGeoSink` | `dataSinks` contains a sink with `dataSinkType == "POSTGIS"` |
+| `hasGeoSink` | `datasinks` contains a sink with `type == "POSTGIS"` |
 | `hasLayers` | `layers` is a non-empty list |
 
 Expected trigger payload shape the GeoServer handler consumes (to be emitted by the backend in a
@@ -103,8 +103,8 @@ follow-up — see below):
 
 ```jsonc
 {
-  "dataSinks": [
-    { "id": "...", "dataSinkType": "POSTGIS",
+  "datasinks": [
+    { "id": "...", "type": "POSTGIS",
       "configuration": { "tableName": "...", "dataStructureVersionId": "..." } }
   ],
   "layers": [
@@ -114,14 +114,14 @@ follow-up — see below):
 ```
 
 **Dormant today:** the backend's saga trigger (`SagaTrigger` / `DataSetSagaPublisher` in
-`portal-backend`) does **not yet emit** `dataSinks` or `layers`, so `hasGeoSink`/`hasLayers` always
+`portal-backend`) does **not yet emit** `datasinks` or `layers`, so `hasGeoSink`/`hasLayers` always
 derive to `false` and the GeoServer branch is skipped — the existing FROST → APISIX → Redpanda flow
 is unchanged. Activating GeoServer end-to-end requires a separate backend change to serialize the
 `POSTGIS` `DataSink` and `Layer` entities into the trigger.
 
 **This applies to DELETE too.** The GeoServer teardown (`DELETE_WORKSPACE`) is gated on the same
-derived `hasGeoSink`, so the **`DATASET_DELETE` trigger must also carry the `POSTGIS` `dataSinks`**
-for the workspace to be removed — symmetric with create/update. A delete trigger without `dataSinks`
+derived `hasGeoSink`, so the **`DATASET_DELETE` trigger must also carry the `POSTGIS` `datasinks`**
+for the workspace to be removed — symmetric with create/update. A delete trigger without `datasinks`
 skips the teardown (so the workspace would not be removed). Gating it this way (rather than always
 deleting) keeps deployments **without** a GeoServer adapter from failing every delete and avoids a
 spurious `DELETE …?recurse=true` on non-geo datasets. The end-to-end derivation for delete is

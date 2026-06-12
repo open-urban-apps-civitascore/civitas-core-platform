@@ -45,11 +45,9 @@
       </extensionElements>
       <incoming>flow-geo-sink</incoming>
       <outgoing>flow-sink-workspace</outgoing>
-      <outgoing>SequenceFlow_1</outgoing>
     </serviceTask>
     <boundaryEvent id="provision-sink-error" name="Step Failed" attachedToRef="provision-sink">
       <outgoing>flow-sink-error</outgoing>
-      <outgoing>SequenceFlow_3</outgoing>
       <errorEventDefinition id="ErrorEventDefinition_7" errorRef="stepFailedError"/>
     </boundaryEvent>
     <serviceTask id="create-workspace" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Create GeoServer Workspace">
@@ -59,7 +57,6 @@
         <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="create-workspace"/>
       </extensionElements>
       <incoming>flow-sink-workspace</incoming>
-      <incoming>SequenceFlow_1</incoming>
       <outgoing>flow-workspace-datastore</outgoing>
     </serviceTask>
     <boundaryEvent id="workspace-error" name="Step Failed" attachedToRef="create-workspace">
@@ -141,9 +138,7 @@
         <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="provision-sink"/>
       </extensionElements>
       <incoming>flow-comp-geoserver-sink</incoming>
-      <incoming>SequenceFlow_3</incoming>
       <outgoing>flow-comp-sink-apisix</outgoing>
-      <outgoing>SequenceFlow_2</outgoing>
     </serviceTask>
     <serviceTask id="compensate-apisix" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate" name="Compensate: Delete APISIX Route">
       <extensionElements>
@@ -154,7 +149,6 @@
       <incoming>flow-comp-sink-apisix</incoming>
       <incoming>flow-redpanda-comp-apisix</incoming>
       <incoming>flow-sink-error</incoming>
-      <incoming>SequenceFlow_2</incoming>
       <outgoing>flow-comp-apisix-frost</outgoing>
     </serviceTask>
     <serviceTask id="compensate-frost" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate" name="Compensate: Delete FROST Project">
@@ -226,9 +220,6 @@
     <sequenceFlow id="flow-comp-apisix-frost" sourceRef="compensate-apisix" targetRef="compensate-frost"/>
     <sequenceFlow id="flow-comp-frost-fail" sourceRef="compensate-frost" targetRef="publish-failure"/>
     <sequenceFlow id="flow-publish-failure-end" sourceRef="publish-failure" targetRef="error-end"/>
-    <sequenceFlow id="SequenceFlow_1" sourceRef="provision-sink" targetRef="create-workspace"/>
-    <sequenceFlow id="SequenceFlow_2" sourceRef="compensate-sink" targetRef="compensate-apisix"/>
-    <sequenceFlow id="SequenceFlow_3" sourceRef="provision-sink-error" targetRef="compensate-sink"/>
   </process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_Process_1" bpmnElement="dataset-create">
@@ -568,25 +559,6 @@
         <di:waypoint xsi:type="dc:Point" x="526.0" y="688.0"/>
         <di:waypoint xsi:type="dc:Point" x="526.0" y="620.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_50"/>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_27" bpmnElement="SequenceFlow_1" sourceElement="BPMNShape_provision_sink" targetElement="BPMNShape_ServiceTask_3">
-        <di:waypoint xsi:type="dc:Point" x="678.0" y="425.0"/>
-        <di:waypoint xsi:type="dc:Point" x="704.0" y="425.0"/>
-        <di:waypoint xsi:type="dc:Point" x="730.0" y="425.0"/>
-        <bpmndi:BPMNLabel id="BPMNLabel_54"/>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_28" bpmnElement="SequenceFlow_2" sourceElement="BPMNShape_compensate_sink" targetElement="BPMNShape_ServiceTask_8">
-        <di:waypoint xsi:type="dc:Point" x="658.0" y="595.0"/>
-        <di:waypoint xsi:type="dc:Point" x="620.0" y="595.0"/>
-        <di:waypoint xsi:type="dc:Point" x="581.0" y="595.0"/>
-        <bpmndi:BPMNLabel id="BPMNLabel_55"/>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_29" bpmnElement="SequenceFlow_3" sourceElement="BPMNShape_provision_sink_error" targetElement="BPMNShape_compensate_sink">
-        <di:waypoint xsi:type="dc:Point" x="623.0" y="468.0"/>
-        <di:waypoint xsi:type="dc:Point" x="623.0" y="541.0"/>
-        <di:waypoint xsi:type="dc:Point" x="713.0" y="541.0"/>
-        <di:waypoint xsi:type="dc:Point" x="713.0" y="570.0"/>
-        <bpmndi:BPMNLabel id="BPMNLabel_56"/>
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
     <bpmndi:BPMNLabelStyle id="BPMNLabelStyle_1">
