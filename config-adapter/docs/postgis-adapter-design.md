@@ -20,7 +20,7 @@
 
 Single module today; the dialect seam allows graduation to a `config-adapter-sql-base` + `config-adapter-postgis` pair the day a second flavor lands.
 
-```
+```text
 config-adapter-api/
 └── src/main/java/de/civitascore/configadapter/model/postgis/
     ├── PostgisConfigValue.java       ← sealed, permits TableConfig, SchemaConfig, DbRoleConfig
@@ -169,7 +169,7 @@ Mapping lives inside `PostgisDialect` (via `isDuplicate` / `isMissing` / `isConn
 
 All overridable via env vars (`.` → `_`, uppercase).
 
-```
+```properties
 postgis.topics                    (required — comma-separated list of subscribed topics:
                                     table.*, schema.*, role.*)
 postgis.jdbc.url                  (required)
@@ -239,7 +239,7 @@ A schema-migration tool was considered as the DDL execution layer. **Decision: n
 
 ### Why it was rejected
 
-1. **Model mismatch.** Migration tools are built for *versioned application-schema evolution* baked at build time, not *event-driven adhoc DDL* arriving from Kafka at runtime. The strengths of these tools (resumable migrations, baseline + diff, build-time validation) do not apply.
+1. **Model mismatch.** Migration tools are built for *versioned application-schema evolution* baked at build time, not *event-driven ad hoc DDL* arriving from Kafka at runtime. The strengths of these tools (resumable migrations, baseline + diff, build-time validation) do not apply.
 2. **Ordering friction.** Flyway expects monotonically increasing migration versions. Out-of-order events would require `outOfOrder=true`, which silently disables the validation that justifies using Flyway in the first place.
 3. **Idempotency is already cheap.** SQLState absorption is ~10 lines inside the dialect, matches the FROST/APISIX/Keycloak convention exactly, and keeps idempotency a property of the adapter rather than of an external history table.
 4. **Audit-log argument is weak in this codebase.** Result events on the Kafka result topic already provide the audit trail. A second source of truth (the migration history table) adds drift risk.

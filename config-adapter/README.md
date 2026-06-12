@@ -1362,7 +1362,7 @@ This works because the module tests are independent and Testcontainers uses rand
 
 ### Building the Fat JAR
 
-Adapter plugins (APISIX, FROST, RedPanda, PostGIS, Examples) are only included in the fat JAR via the `dist` profile:
+Adapter plugins (APISIX, FROST, RedPanda, GeoServer, PostGIS, Examples) are only included in the fat JAR via the `dist` profile:
 
 ```bash
 mvn package -Pdist

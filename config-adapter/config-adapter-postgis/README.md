@@ -18,7 +18,7 @@ For the full design rationale (idempotency policy, why no migration tool, future
 
 ## Architecture
 
-```
+```text
 ┌──────────────────────────────────────────────┐
 │   Kafka Topics                               │
 │   - de.civitascore.data.sql.table.*              │
