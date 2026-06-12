@@ -14,8 +14,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Incoming saga command message dispatched by the orchestrator. Deserialized from the flat JSON
- * structure produced by {@code KafkaSagaActionDispatcher}.
+ * Incoming saga command message dispatched by the saga orchestrator (the Flowable engine in the
+ * config-adapter). Deserialized from the flat JSON structure the orchestrator emits per step.
  *
  * <p>The orchestrator flattens all payload fields into the top-level JSON object alongside the
  * envelope fields ({@code type}, {@code messageId}, {@code stepId}, {@code adapter}, {@code

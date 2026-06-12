@@ -43,7 +43,7 @@
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <apache-jena.version>5.6.0</apache-jena.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
-        <config-adapter.version>1.0.2-MR-465-SNAPSHOT</config-adapter.version>
+        <config-adapter.version>1.0.2-MR-547-SNAPSHOT</config-adapter.version>
         <portal-model.version>1.0.0</portal-model.version>
     </properties>
 
@@ -254,39 +254,6 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Config adapter - Saga orchestrator + adapters for E2E saga integration tests -->
-        <dependency>
-            <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-orchestrator</artifactId>
-            <version>${config-adapter.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-frost</artifactId>
-            <version>${config-adapter.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-apisix</artifactId>
-            <version>${config-adapter.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-redpanda</artifactId>
-            <version>${config-adapter.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Testcontainers Kafka for saga E2E tests (real broker, not EmbeddedKafka) -->
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers-kafka</artifactId>
-            <scope>test</scope>
-        </dependency>
-
     </dependencies>
 
     <build>
@@ -315,8 +282,7 @@
                         <!-- Used at runtime by Spring Security autoconfig; main code uses
                              only the .oauth2ResourceServer().jwt() DSL, no direct imports -->
                         <ignoredNonTestScopedDependency>org.springframework.boot:spring-boot-security-oauth2-resource-server</ignoredNonTestScopedDependency>
-                        <!-- KafkaSagaCommandConsumer is test-only, but main code imports
-                             cloudevents-kafka transitively from event-handler-kafka -->
+                        <!-- event-handler-kafka declared for transitive cloudevents-kafka serialization; no direct main-code usage -->
                         <ignoredNonTestScopedDependency>de.civitas-core:event-handler-kafka</ignoredNonTestScopedDependency>
                         <!-- Transitively pulled compile-scope by oauth2-resource-server;
                              only direct use is JWTParser in UserMeIntegrationTest -->

@@ -1,0 +1,30 @@
+# LOCAL-ONLY override (do NOT commit) — re-enables the redpanda pipeline adapter so the
+# dataset-saga-workflow Bruno lifecycle (the requires-nifi-tagged per-slug route guards) can
+# complete end-to-end. The nifi pipeline adapter is not yet implemented in the config-adapter,
+# so without a pipeline handler a dataset never reaches AVAILABLE and the route guards are
+# unreachable. This restores the working pre-568d52bc ("replaces redpanda with nifi") setup.
+services:
+  redpanda-connect:
+    image: redpandadata/connect:4
+    command: ["streams"]
+    environment:
+      FROST_BASE: http://civitas-frost:8080/FROST-Server/v1.1
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:4195/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  config-adapter:
+    environment:
+      ADAPTERS: keycloak,apisix,frost,redpanda
+      REDPANDA_URL: http://redpanda-connect:4195
+      REDPANDA_TOPICS: de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
+    depends_on:
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      redpanda-connect:
+        condition: service_healthy

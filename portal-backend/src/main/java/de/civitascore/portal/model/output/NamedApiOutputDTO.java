@@ -40,8 +40,11 @@ public class NamedApiOutputDTO {
   @Schema(
       description =
           "Predicted public URL once the dataset reaches AVAILABLE: "
-              + "{civitas.api.base-url}/v1/datasets/{datasetId}/{slug}. Server-populated;"
-              + " absent before the dataset is persisted.",
+              + "{publicUrl}/{slug}, where publicUrl is the base the saga provisioned the APISIX"
+              + " route under (APISIX_API_PUBLIC_URL). Falls back to"
+              + " {civitas.api.base-url}/v1/datasets/{datasetId}/{slug} for datasets provisioned"
+              + " before the saga set publicUrl. Server-populated; absent before the dataset is"
+              + " persisted.",
       accessMode = Schema.AccessMode.READ_ONLY,
       example =
           "https://api.core.civitasconnect.digital/v1/datasets/b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a/traffic")

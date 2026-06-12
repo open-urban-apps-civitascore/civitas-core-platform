@@ -198,4 +198,33 @@ describe('ApiCard', () => {
       })
     })
   })
+
+  describe('Public API URL (/v1 scheme)', () => {
+    const mockWriteText = vi.fn()
+
+    beforeEach(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: mockWriteText },
+        configurable: true,
+      })
+    })
+
+    it('displays the API path with the /v1 data-plane scheme', () => {
+      renderComponent()
+      // The gateway serves named APIs at /v1/datasets/{id}/{slug} (issue #1368).
+      expect(screen.getByTestId('apiCard-my-api')).toHaveTextContent('/v1/datasets/dataset-123/my-api')
+    })
+
+    it('copies the backend-provided previewUrl verbatim when present', async () => {
+      renderComponent({ api: makeApi({ previewUrl: 'https://api.example.com/v1/datasets/dataset-123/my-api' }) })
+      await userEvent.click(screen.getByRole('button', { name: 'Copy API path' }))
+      expect(mockWriteText).toHaveBeenCalledWith('https://api.example.com/v1/datasets/dataset-123/my-api')
+    })
+
+    it('falls back to the /v1 path (not the pre-#1368 /datasets scheme) when previewUrl is missing', async () => {
+      renderComponent({ api: makeApi({ previewUrl: undefined }) })
+      await userEvent.click(screen.getByRole('button', { name: 'Copy API path' }))
+      expect(mockWriteText).toHaveBeenCalledWith(expect.stringContaining('/v1/datasets/dataset-123/my-api'))
+    })
+  })
 })

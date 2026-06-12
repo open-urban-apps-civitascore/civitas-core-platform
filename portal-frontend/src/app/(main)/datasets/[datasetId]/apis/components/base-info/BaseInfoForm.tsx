@@ -17,6 +17,7 @@ import {
   API_TYPE_QUERY,
   ApiTypeQuery,
   NAMED_API_DESCRIPTION_MAX_LENGTH,
+  namedApiPathPrefix,
   PERSISTENCE_OPTIONS,
   SLUG_MAX_LENGTH,
   StaApiFormData,
@@ -125,7 +126,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
         <div className={cn(gridClass)}>
           <span className="text-sm leading-none font-medium">{t('baseInfo.urlPreview')}</span>
           <span data-testid="apiUrlPreview" className={cn(readOnlyValueClass, 'break-all')}>
-            {`/datasets/${datasetId}/`}
+            {namedApiPathPrefix(datasetId)}
             <strong>{urlPreviewSlug}</strong>
           </span>
         </div>

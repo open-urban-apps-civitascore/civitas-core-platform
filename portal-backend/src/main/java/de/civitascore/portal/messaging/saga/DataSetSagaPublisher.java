@@ -1,6 +1,5 @@
 package de.civitascore.portal.messaging.saga;
 
-import de.civitascore.configadapter.model.dataset.ApiStandard;
 import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.model.dataset.NamedApi;
@@ -64,7 +63,12 @@ public class DataSetSagaPublisher {
     this.dataStructureVersionService = dataStructureVersionService;
   }
 
-  /** Publishes a {@code DATASET_CREATE} saga trigger. See {@link SagaTrigger} for the contract. */
+  /**
+   * Publishes a {@code DATASET_CREATE} saga trigger. See {@link SagaTrigger} for the contract. The
+   * dataset's {@code openDataAccess} flag is propagated downstream: FROST sets it as the project's
+   * {@code public} flag (anonymous read access) and APISIX attaches the auth plugin only for
+   * protected datasets.
+   */
   public void publishCreateRequested(DataSet dataset) {
     var trigger =
         SagaTrigger.DatasetCreate.of(
@@ -81,7 +85,8 @@ public class DataSetSagaPublisher {
 
   /**
    * Publishes a {@code DATASET_UPDATE} saga trigger with a pipeline diff against {@code
-   * previousPipelines}.
+   * previousPipelines}. Toggling {@code openDataAccess} re-applies the FROST {@code public} flag
+   * and the APISIX auth-plugin attachment.
    */
   public void publishUpdateRequested(DataSet dataset, Set<Pipeline> previousPipelines) {
     var trigger =
@@ -237,10 +242,7 @@ public class DataSetSagaPublisher {
       return null;
     }
     return dataset.getNamedApis().stream()
-        .map(
-            api ->
-                new NamedApi(
-                    api.getSlug(), ApiStandard.valueOf(api.getStandard().name()), api.getVersion()))
+        .map(api -> new NamedApi(api.getSlug(), api.getStandard().name(), api.getVersion()))
         .toList();
   }
 
@@ -253,12 +255,13 @@ public class DataSetSagaPublisher {
    * <p><b>Contract with the orchestrator:</b>
    *
    * <ul>
-   *   <li>{@code null} / field omitted — no existing routes; orchestrator provisions all namedApis
-   *       from scratch.
-   *   <li>Non-empty map — keyed by slug for each route the orchestrator already owns; slugs absent
-   *       from the map (but present in {@code namedApis}) are treated as new and provisioned. Slugs
-   *       present here but absent from {@code namedApis} are torn down on DELETE / left alone on
-   *       UPDATE.
+   *   <li>{@code null} / field omitted — no existing routes; the CREATE saga provisions one route
+   *       per named API from scratch.
+   *   <li>Non-empty map — one entry per named-API route the dataset already owns, keyed by slug. It
+   *       is 1:1 with {@code namedApis} because named APIs are immutable once the dataset is
+   *       released (#1379/#1384): the APISIX handler iterates this map to UPDATE (re-apply auth) or
+   *       DELETE/RESTORE each route — it does NOT add routes for new slugs. New named APIs are only
+   *       ever provisioned by a fresh CREATE saga (unrelease → edit in DRAFT → re-release).
    * </ul>
    */
   private Map<String, String> buildRouteIds(DataSet dataset) {

@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 @FunctionalInterface
 interface FrostAuthStrategy {
 
-  Logger log = LoggerFactory.getLogger(FrostAuthStrategy.class);
+  Logger LOG = LoggerFactory.getLogger(FrostAuthStrategy.class);
 
   String DEFAULT_API_KEY_HEADER = "X-API-Key";
 
@@ -71,20 +71,24 @@ interface FrostAuthStrategy {
   }
 
   /**
-   * Factory that selects the appropriate strategy based on the provided configuration. Prefers
-   * Basic Auth when a username is configured; falls back to API key otherwise.
+   * The four FROST auth settings as read from configuration. Groups the values so factory
+   * signatures stay readable; all fields may be {@code null} when unconfigured.
+   */
+  record Credentials(
+      String basicAuthUsername, String basicAuthPassword, String apiKeyHeader, String apiKey) {}
+
+  /**
+   * Factory that selects the appropriate strategy for the given credentials. Prefers Basic Auth
+   * when a username is configured; falls back to API key otherwise.
    *
-   * @param basicAuthUsername the Basic Auth username (may be {@code null})
-   * @param basicAuthPassword the Basic Auth password (may be {@code null})
-   * @param apiKeyHeader the header name for API key authentication
-   * @param apiKey the API key value
+   * @param credentials the configured FROST auth settings
    * @return the selected authentication strategy
    * @throws IllegalArgumentException if neither Basic Auth username nor API key is configured
    */
-  static FrostAuthStrategy create(
-      String basicAuthUsername, String basicAuthPassword, String apiKeyHeader, String apiKey) {
-    boolean hasBasicAuth = basicAuthUsername != null && !basicAuthUsername.isBlank();
-    boolean hasApiKey = apiKey != null && !apiKey.isBlank();
+  static FrostAuthStrategy create(Credentials credentials) {
+    boolean hasBasicAuth =
+        credentials.basicAuthUsername() != null && !credentials.basicAuthUsername().isBlank();
+    boolean hasApiKey = credentials.apiKey() != null && !credentials.apiKey().isBlank();
 
     if (!hasBasicAuth && !hasApiKey) {
       throw new IllegalArgumentException(
@@ -93,11 +97,11 @@ interface FrostAuthStrategy {
 
     if (hasBasicAuth) {
       if (hasApiKey) {
-        log.warn("Both Basic Auth and API Key configured — using Basic Auth");
+        LOG.warn("Both Basic Auth and API Key configured — using Basic Auth");
       }
-      return basicAuth(basicAuthUsername, basicAuthPassword);
+      return basicAuth(credentials.basicAuthUsername(), credentials.basicAuthPassword());
     }
-    return apiKey(apiKeyHeader, apiKey);
+    return apiKey(credentials.apiKeyHeader(), credentials.apiKey());
   }
 
   /**
@@ -113,10 +117,11 @@ interface FrostAuthStrategy {
    */
   static FrostAuthStrategy fromConfig(AdapterConfig config, String adapterName) {
     String prefix = adapterName + ".";
-    String apiKey = config.getProperty(prefix + "api.key");
-    String apiKeyHeader = config.getProperty(prefix + "api.key.header", DEFAULT_API_KEY_HEADER);
-    String basicAuthUsername = config.getProperty(prefix + "basic.auth.username");
-    String basicAuthPassword = config.getProperty(prefix + "basic.auth.password");
-    return create(basicAuthUsername, basicAuthPassword, apiKeyHeader, apiKey);
+    return create(
+        new Credentials(
+            config.getProperty(prefix + "basic.auth.username"),
+            config.getProperty(prefix + "basic.auth.password"),
+            config.getProperty(prefix + "api.key.header", DEFAULT_API_KEY_HEADER),
+            config.getProperty(prefix + "api.key")));
   }
 }

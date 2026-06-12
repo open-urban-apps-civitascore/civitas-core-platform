@@ -12,8 +12,8 @@ import java.util.Objects;
 
 /**
  * Typed saga trigger payloads sent to the orchestrator topic. Each record carries {@code sagaType}
- * as an explicit field so Jackson serializes it into the flat JSON that the orchestrator's {@code
- * SagaTriggerConsumer} expects ({@code SagaType.valueOf(sagaTypeStr)}).
+ * as an explicit field so Jackson serializes it into the flat JSON that the saga orchestrator (the
+ * config-adapter service) consumes and resolves via {@code SagaType.valueOf(sagaTypeStr)}.
  *
  * <p>The three permitted subtypes map 1:1 to {@link SagaType} variants. Construct via the static
  * {@code of(...)} factories; the canonical constructors enforce that the supplied {@code sagaType}
@@ -25,9 +25,8 @@ import java.util.Objects;
  * <p>{@code routeIds} is keyed by named-API slug so per-route infrastructure state is addressable
  * independently.
  *
- * <p>{@code NON_NULL} is required because the orchestrator's {@code SagaPayloadBuilder}
- * deserializes the JSON into {@code Map<String, Object>} and calls {@code Map.copyOf()}, which
- * rejects null values.
+ * <p>{@code NON_NULL} is required because the saga orchestrator deserializes the JSON into {@code
+ * Map<String, Object>} and calls {@code Map.copyOf()}, which rejects null values.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public sealed interface SagaTrigger

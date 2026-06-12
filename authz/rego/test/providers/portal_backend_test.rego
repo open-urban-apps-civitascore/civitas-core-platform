@@ -71,6 +71,11 @@ test_path_pattern_4_segment_assignments if {
 	result == "/v1/datasets/{id}/assignments"
 }
 
+test_path_pattern_4_segment_apis if {
+	result := portal_backend.path_pattern with input as portal_request("GET", "/v1/datasets/abc-123/apis")
+	result == "/v1/datasets/{id}/apis"
+}
+
 test_path_pattern_4_segment_pipelines if {
 	result := portal_backend.path_pattern with input as portal_request("GET", "/v1/datasets/abc-123/pipelines")
 	result == "/v1/datasets/{id}/pipelines"

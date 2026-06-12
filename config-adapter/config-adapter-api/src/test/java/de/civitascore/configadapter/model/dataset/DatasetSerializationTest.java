@@ -142,13 +142,13 @@ class DatasetSerializationTest {
 
     NamedApi traffic = dataset.namedApis().get(0);
     assertEquals("traffic", traffic.slug());
-    assertEquals(ApiStandard.STA, traffic.standard());
+    assertEquals("STA", traffic.standard());
     assertEquals("1.1", traffic.version());
 
     // Second fixture entry exercises a non-STA standard and an absent (null) version.
     NamedApi boundaries = dataset.namedApis().get(1);
     assertEquals("boundaries", boundaries.slug());
-    assertEquals(ApiStandard.WFS, boundaries.standard());
+    assertEquals("WFS", boundaries.standard());
     assertNull(boundaries.version());
   }
 
@@ -174,8 +174,31 @@ class DatasetSerializationTest {
     NamedApi api = objectMapper.readValue(json, NamedApi.class);
 
     assertEquals("traffic", api.slug());
-    assertEquals(ApiStandard.STA, api.standard());
+    assertEquals("STA", api.standard());
     assertEquals("1.1", api.version());
+  }
+
+  /**
+   * #1309: {@code standard} is a String, so a value outside the current controlled vocabulary must
+   * deserialize cleanly (an adapter can then ignore or diagnose it) instead of failing the whole
+   * event — the forward-compatibility property that a Java enum would break.
+   */
+  @Test
+  void shouldDeserializeUnknownStandardValueForForwardCompatibility() throws Exception {
+    String json =
+        """
+        {
+          "slug": "coverage",
+          "standard": "COVERAGE",
+          "version": null
+        }
+        """;
+
+    NamedApi api = objectMapper.readValue(json, NamedApi.class);
+
+    assertEquals("coverage", api.slug());
+    assertEquals("COVERAGE", api.standard());
+    assertNull(api.version());
   }
 
   @Test

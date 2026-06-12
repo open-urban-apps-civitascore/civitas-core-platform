@@ -1,7 +1,7 @@
 meta {
   name: 15. Cleanup - Delete Pipeline
   type: http
-  seq: 31
+  seq: 38
   tags: [
     requires-nifi
   ]
@@ -29,7 +29,7 @@ tests {
 docs {
   **Saga step 15 of 18** — Delete the pipeline (cleanup).
 
-  Removes the Redpanda Connect pipeline created in step 5. The DATASET_DELETE saga (step 11) must have completed before this step, ensuring the pipeline was already undeployed from Redpanda Connect.
+  Removes the pipeline created in step 5. The DATASET_DELETE saga (step 11) must have completed before this step, ensuring the pipeline was already undeployed from the pipeline engine.
 
   **Expected Response:** 204 No Content. 404 if already deleted. 400 if `sagaPipelineId` is not set (first run, pipeline was never created).
 
@@ -38,5 +38,5 @@ docs {
   | Layer | Effect |
   |---|---|
   | Backend | Pipeline record removed from `portal_backend` DB |
-  | Redpanda Connect | Pipeline already undeployed by the DATASET_DELETE saga |
+  | Pipeline engine | Pipeline already undeployed by the DATASET_DELETE saga |
 }

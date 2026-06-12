@@ -157,13 +157,15 @@ The config adapters are **stateless** — they do not store resource IDs from pr
 ```
 Backend stores implicit knowledge from create response
   ↓
-dataset.create.completed → properties: [{projectId}, {routeId}, {serviceId}, {pipelineIds}]
+dataset.create.completed → properties: [{projectId}, {routeIds}, {serviceId}, {pipelineIds}]
   ↓
 Backend persists these alongside the dataset
   ↓
 dataset.update.requested → includes properties[] from create response
 dataset.delete.requested → includes properties[] from create response
 ```
+
+> **Route model (authoritative):** APISIX provisions **one route per named API** at `/v1/datasets/{datasetId}/{slug}`, and the APISIX `properties` entry is a **slug-keyed `routeIds` map** (`{slug: routeId}`), not a single flat `routeId`. See the contract tables below and [Section 12.2](#122-apisix-adapter) for the binding detail. For brevity, some inline JSON snippets and sequence diagrams further down still show a single illustrative `routeId`/route to keep the **saga flow** (FROST → APISIX → Redpanda, compensation) readable — those illustrate the flow, not the route cardinality.
 
 Resource IDs from the config adapters are stored in a **`properties[]` array** — separated from the dataset definition. This makes the boundary between dataset data and infrastructure state explicit:
 
@@ -205,9 +207,11 @@ Resource IDs from the config adapters are stored in a **`properties[]` array** �
 | Property | Source | Used by |
 |----------|--------|---------|
 | `projectId` | FROST adapter (create response) | FROST adapter (update/delete) |
-| `routeId` | APISIX adapter (create response) | APISIX adapter (update/delete) |
+| `routeIds` | APISIX adapter (create response) — **slug-keyed map** `{slug: routeId}`, one entry per named API | APISIX adapter (update/delete) |
 | `serviceId` | APISIX adapter (create response) | APISIX adapter (update/delete) |
 | `pipelineIds` | Redpanda adapter (create response) | Redpanda adapter (update/delete) |
+
+> **Naming note**: the saga payload field `serviceId` (camelCase) is the id of the shared per-dataset APISIX **upstream** — it equals the `datasetId`. Do not confuse it with APISIX's own route-level configuration field `service_id` (snake_case), which references an APISIX *Service* object. These are unrelated: the payload `serviceId` keys the upstream (for teardown), while the route-level `service_id` selects a Service. When the adapter is configured with `apisix.service.id`, **every** provisioned route additionally carries that `service_id` (snake_case) — and that binding is exactly what OPA's authorization relies on: with `with_service: true`, APISIX forwards the referenced Service to OPA, which reads `input.service.name` to dispatch to the `frost_server` policy. When `apisix.service.id` is unset, routes carry no `service_id` and bind to the backend only via `upstream_id`.
 
 > **Design rationale**: This approach keeps adapters completely stateless — they receive everything they need in the command event and do not need to maintain their own `datasetId → resourceId` mappings. The trade-off is that the backend must persist and forward the `properties[]`. This is consistent with the principle that the backend is the system of record for dataset state.
 
@@ -216,12 +220,12 @@ Resource IDs from the config adapters are stored in a **`properties[]` array** �
 | Step | Adapter | Condition | Input (from orchestrator) | Output (result) | Compensation Data |
 |------|---------|-----------|--------------------------|-----------------|-------------------|
 | 1 | FROST | always | `datasetName`, `description` | `projectId`, `baseUrl` | `{projectId}` |
-| 2 | APISIX | always | `datasetId`, `upstreamUrl` (= baseUrl from step 1), `openDataAccess` | `routeId`, `serviceId` | `{routeId, serviceId}` |
+| 2 | APISIX | always | `datasetId`, `namedApis[]` (slugs), `upstreamUrl` (= baseUrl from step 1), `openDataAccess` | `routeIds` (slug→routeId map), `serviceId` | `{routeIds, serviceId}` |
 | 3 | Redpanda | **only if `dataPipelines[]` is non-empty** | `dataPipelines[]` (full list), `datasources[]`, `targetUrl` (= baseUrl from step 1) | `pipelineIds[]` | `{pipelineIds[]}` |
 
 **FROST Adapter** — Creates an isolated FROST project per dataset, producing `projectId` and `baseUrl`. The `baseUrl` is the key output: it becomes the APISIX upstream URL and the Redpanda `${FROST_BASE}` placeholder value. → Details: [Section 12.1](#121-frost-adapter)
 
-**APISIX Adapter** — Creates a route + service per dataset. Controls authentication via `openDataAccess`: sets or omits a reference to the centralized Plugin Config (OIDC + OPA). The `data.id` from the event becomes the route URI segment (`/api/dataspace/{id}/*`). → Details: [Section 12.2](#122-apisix-adapter)
+**APISIX Adapter** — Creates one shared dataset upstream plus **one route per named API** (slug-keyed `routeIds`), each at `/v1/datasets/{datasetId}/{slug}`. Controls authentication per route via `openDataAccess`: sets or omits a reference to the centralized Plugin Config (OIDC + OPA). → Details: [Section 12.2](#122-apisix-adapter)
 
 **Redpanda Adapter** — Deploys pipelines via the Redpanda Connect Streams API. Pipeline IDs are client-provided (`dataPipelines[].id`). The adapter resolves placeholders (`${DATASOURCE[n]}`, `${FROST_BASE}`) from `datasources[]` and the FROST base URL before deploying. On `dataset.update`, pipelines can carry mixed actions (`ADD`, `UPDATE`, `DELETE`). → Details: [Section 12.3](#123-redpanda-adapter)
 
@@ -243,7 +247,7 @@ Key aspects of the event structure:
 | Step | Adapter | Condition | Input (from orchestrator) | Output (result) | Compensation Data |
 |------|---------|-----------|--------------------------|-----------------|-------------------|
 | 1 | FROST | always | `projectId` (from `properties[]`), `datasetName`, `description` | `projectId`, `baseUrl` | `{previousName, previousDescription}` |
-| 2 | APISIX | always | `routeId`, `serviceId` (from `properties[]`), `upstreamUrl`, `openDataAccess` | `routeId` | `{previousOpenDataAccess}` |
+| 2 | APISIX | always | `routeIds` (slug→routeId map, from `properties[]`), `serviceId`, `namedApis[]`, `openDataAccess` | `routeIds` | `{routeIds, serviceId, previousOpenDataAccess (per slug)}` |
 | 3 | Redpanda | **only if `dataPipelines[]` is non-empty** | `pipelineIds` (from `properties[]`), `dataPipelines[]` (full list), `datasources[]`, `targetUrl` | `pipelineIds[]` | `{previousPipelineIds[], previousConfig}` |
 
 Each adapter receives its **resource IDs via `properties[]`** (originally returned by `dataset.create.completed`) so it knows which resources to update. Adapters save their **previous state** before applying changes. Compensation restores that state.
@@ -255,7 +259,7 @@ Each adapter receives its **resource IDs via `properties[]`** (originally return
 | Step | Adapter | Condition | Input (from orchestrator) | Output (result) |
 |------|---------|-----------|--------------------------|-----------------|
 | 1 | Redpanda | **only if `pipelineIds` is non-empty** | `pipelineIds` (from `properties[]`) | `status: SUCCESS` |
-| 2 | APISIX | always | `routeId`, `serviceId` (from `properties[]`) | `status: SUCCESS` |
+| 2 | APISIX | always | `routeIds` (slug→routeId map, from `properties[]`), `serviceId` | `status: SUCCESS` |
 | 3 | FROST | always | `projectId` (from `properties[]`) | `status: SUCCESS` |
 
 Each adapter receives its **resource IDs via `properties[]`** (originally returned by `dataset.create.completed`). No cross-step data dependencies for delete — each adapter deletes its own resources directly by ID.
@@ -590,7 +594,7 @@ The backend **must persist** `properties[]` — the entries are required for fut
 }
 ```
 
-The backend **must update** `pipelineIds` in `properties[]` (reflects added/removed pipelines). Other properties (`projectId`, `routeId`, `serviceId`) remain unchanged.
+The backend **must update** `pipelineIds` in `properties[]` (reflects added/removed pipelines). Other properties (`projectId`, `routeIds`, `serviceId`) remain unchanged.
 
 **`dataset.delete.completed`**:
 
@@ -1564,10 +1568,11 @@ The `baseUrl` is the key output — it becomes the upstream URL for the APISIX r
 
 **Concept: Route + Service + Plugin Config**
 
-The APISIX adapter manages **two resources** per dataset:
+The APISIX adapter manages these resources per dataset:
 
 1. **Service**: Defines the upstream (backend) target. One service per backend type (e.g. `svc-frost-server`). Shared across datasets using the same backend.
-2. **Route**: Maps an external URL path to a service. One route per dataset.
+2. **Upstream**: One per dataset (the dataset's FROST project), shared by all of the dataset's routes.
+3. **Route**: Maps an external URL path to a service. **One route per named API** (per concept #1311/#1379), not one per dataset. Each `NamedApi` slug gets its own route at `/v1/datasets/{datasetId}/{slug}` with a deterministic id `NamedApiHelper.derive(datasetId, slug)`. The CREATE_ROUTE step fans out over the dataset's `namedApis` and returns a **slug-keyed `routeIds` map** (`{slug: routeId}`); UPDATE/DELETE/RESTORE iterate that map. The portal-backend persists each route id onto the matching `NamedApi` entity. (A dataset with no named APIs falls back to a single dataset-level route — a legacy/edge path the production saga does not hit.)
 
 Auth/AuthZ is **not** configured per route. Instead, a centralized **Plugin Config (id: `1`)** contains all auth plugins. The adapter controls authentication by referencing or omitting this Plugin Config:
 
@@ -1593,21 +1598,24 @@ Protected (openDataAccess: false):          Public (openDataAccess: true):
 - **`opa`**: Authorization via OPA with `with_service: true` — OPA uses the service name to look up permissions
 - **`request-id`**: Adds a trace ID to every request
 
+**Per-NamedApi route model (#1311/#1379):** the adapter provisions **one shared upstream per dataset** (keyed by `datasetId`, pointing at the dataset's FROST project) plus **one route per named API**. Each named API's route is bound to the path `/v1/datasets/{datasetId}/{slug}` with a deterministic id `NamedApiHelper.derive(datasetId, slug)` (a name-based UUID of `datasetId + "/" + slug`). The result is a **slug-keyed `routeIds` map** (`{slug: routeId}`) that the portal-backend persists onto each `NamedApi` entity. `apis` is a reserved slug so the discovery endpoint `/v1/datasets/{id}/apis` is never shadowed. (A command without `namedApis` falls back to a single dataset-level route at `/v1/datasets/{id}` — a legacy/edge path the production saga does not hit.)
+
 **Operations:**
 
 | Operation | What the adapter does | `openDataAccess` effect |
 |-----------|----------------------|------------------------|
-| `CREATE_ROUTE` | Create APISIX service (if not exists) + route with `uri: /api/dataspace/{datasetId}/*` | `false`: set `plugin_config_id: 1`; `true`: omit it |
-| `UPDATE_ROUTE` | Update route config | `false→true`: remove `plugin_config_id`; `true→false`: add `plugin_config_id: 1` |
-| `DELETE_ROUTE` | Delete route (+ service if no other routes use it) | n/a |
+| `CREATE_ROUTE` | Create the shared dataset upstream + one route per `namedApis` slug at `/v1/datasets/{id}/{slug}` (id = `derive(id, slug)`); returns slug-keyed `routeIds` | `false`: set `plugin_config_id: 1` on each route; `true`: omit it |
+| `UPDATE_ROUTE` | Iterate the slug-keyed `routeIds`; GET → mutate → PUT each route | `false→true`: remove `plugin_config_id`; `true→false`: add `plugin_config_id: 1` (per route) |
+| `DELETE_ROUTE` | Delete each route in `routeIds`, then the shared upstream | n/a |
 
-**Route JSON examples:**
+**Route JSON examples** (named API `traffic` on dataset `ds-001`):
 
 Protected (`openDataAccess: false`):
 ```json
 {
-    "name": "Dataset ds-001",
-    "uri": "/api/dataspace/ds-001/*",
+    "uris": ["/v1/datasets/ds-001/traffic", "/v1/datasets/ds-001/traffic/*"],
+    "hosts": ["api.localhost"],
+    "upstream_id": "ds-001",
     "service_id": "svc-frost-server",
     "plugin_config_id": 1
 }
@@ -1616,32 +1624,37 @@ Protected (`openDataAccess: false`):
 Public (`openDataAccess: true`):
 ```json
 {
-    "name": "Dataset ds-001",
-    "uri": "/api/dataspace/ds-001/*",
-    "service_id": "svc-frost-server"
+    "uris": ["/v1/datasets/ds-001/traffic", "/v1/datasets/ds-001/traffic/*"],
+    "hosts": ["api.localhost"],
+    "upstream_id": "ds-001",
+    "service_id": "frost-server"
 }
 ```
 
-**Dataset ID as URL segment**: The `data.id` from the event becomes the URI path segment. Example: dataset `b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a` → route URI `/api/dataspace/b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a/*`.
+> Per-named-API saga routes bind to the dataset's backend via `upstream_id`. The `service_id` shown above is present **only when `apisix.service.id` is configured** — it references the APISIX *Service* whose name OPA reads (`input.service.name`) to select the `frost_server` policy (see the naming note above); omit it and the OPA `frost_server` dispatch does not engage. A protected route additionally references `plugin_config_id`; a public route omits both the plugin_config and the upstream-auth header. (`buildRouteBody` also sets `status: 1` and the `proxy-rewrite`/`regex_uri` rewrite, omitted here to keep the auth contrast clear.)
+
+**Path scheme**: each named API is reachable at `apisix.api.public.url` + `/v1/datasets/{datasetId}/{slug}` (pinned to the configured API virtual host `apisix.api.host`). Example: dataset `b7c8b5d4-…` with slug `traffic` → `/v1/datasets/b7c8b5d4-…/traffic`.
 
 **Service naming convention**: The adapter creates APISIX services with a name like `"frost-server"`. OPA identifies the backend via `input.service.name` and converts dashes to underscores for its data file lookup (`frost-server` → `frost_server`).
+
+**Future — WFS/WMS via GeoServer (not yet implemented):** each named API carries a `standard` (`STA`/`WFS`/`WMS`). Today every saga route binds to the dataset's FROST-project upstream, so only `STA` (SensorThings) is routable; `CREATE_ROUTE` therefore **fails fast** for a non-STA standard (`ApisixSagaHandler#isRoutableStandard`) rather than provisioning a FROST route behind a WFS/WMS public URL. WFS/WMS support plugs into that seam: select the upstream (a shared **GeoServer** upstream from `geoserver.url`) and the proxy-rewrite path **by `standard`**, plus add a `geoserver` APISIX Service + an OPA `geoserver` provider mapping (analogous to `frost_server`). The `standard` is already transported per slug in the saga payload and decoded into `RoutePayload.standardBySlug`.
 
 **Implicit knowledge produced:**
 
 | Field | Example | Used by |
 |-------|---------|---------|
-| `routeId` | `"r-456"` | Orchestrator (for compensation), Backend (for reference) |
-| `serviceId` | `"svc-frost-server"` | Orchestrator (for compensation) |
-| `publicUrl` | `"https://api.civitas.local/api/dataspace/b7c8b5d4-.../v1.1"` | Backend (for display to user) |
+| `routeIds` | `{"traffic": "a1b2…", "weather": "c3d4…"}` (slug → derived routeId) | Orchestrator (per-slug compensation), Backend (persisted onto each `NamedApi`) |
+| `serviceId` | `"ds-001"` (the shared dataset upstream id) | Orchestrator (for compensation / upstream teardown) |
+| `publicUrl` | `"https://api.localhost:9080/v1/datasets/ds-001"` (dataset base; per-API URLs append the slug) | Backend (each `NamedApi.previewUrl` is built as base + `/{slug}`) |
 
 **Compensation:**
 
 | Saga Type | Compensation Action |
 |-----------|-------------------|
-| Create failed | `DELETE_ROUTE` — removes route (and service if unused) |
-| Update failed | `RESTORE_ROUTE` — restores previous `plugin_config_id` state (add or remove `openDataAccess` accordingly) |
+| Create failed | `DELETE_ROUTE` (orchestrator) — plus the handler best-effort removes any routes + the upstream it already created in the failed step, so no partial state is orphaned |
+| Update failed | `RESTORE_ROUTE` — restores each slug route to the previous open/protected state captured per slug in `previousOpenDataAccess` |
 
-**Idempotency:** Delete returns success if route is already gone. Create checks for existing route by `datasetId` before creating.
+**Idempotency:** route ids/upstream id are deterministic, so PUTs are idempotent on retry. `DELETE_ROUTE`/`RESTORE_ROUTE` tolerate an already-absent route (404) so compensation re-runs are safe; a forward delete that finds none of its target routes logs a wholesale-miss warning (possible id mismatch).
 
 See also: [Issue #936](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/issues/936), [APISIX Handoff](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/blob/8b6d06385256318ac8ece741a4f52b7d73af6d4a/docs/claude/handoff/TEAM1-APISIX-CONFIG-ADAPTER.md)
 

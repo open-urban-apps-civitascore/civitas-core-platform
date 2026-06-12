@@ -32,7 +32,7 @@ docs {
 
   1. **FROST Server** — creates a Project for the dataset
   2. **APISIX Gateway** — creates upstream + one route per named API (with OpenID-Connect auth plugin)
-  3. **Redpanda Connect** — deploys any attached pipelines
+  3. **Pipeline engine** — deploys any attached pipelines
 
   On success, infrastructure references (`projectId`, per-namedApi `routeId`, `serviceId`, `publicUrl`, `pipelineIds`) are stored on the dataset. On failure, compensation runs in reverse order and the dataset reverts to `READY`.
 
@@ -49,8 +49,8 @@ docs {
   | System | Expected Change |
   |---|---|
   | Backend | DataSet status → `AVAILABLE`; `pendingSagaType` set to `CREATE` until saga completes |
-  | Config Adapter (Orchestrator) | Receives saga trigger; orchestrates FROST → APISIX → Redpanda steps |
+  | Config Adapter (Orchestrator) | Receives saga trigger; orchestrates FROST → APISIX → pipeline-engine steps |
   | FROST Server | New Project created; verify at FROST API `/Projects` |
   | APISIX Gateway | Route + upstream created; verify at APISIX Admin API (step 9b) |
-  | Redpanda Connect | Data pipelines deployed (step 9 / verify step 9b) |
+  | Pipeline engine | Data pipelines deployed (step 9 / verify step 9b) |
 }

@@ -12,6 +12,8 @@ package de.civitascore.configadapter.frost;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * Parser for OGC SensorThings API resource paths.
@@ -225,6 +227,28 @@ public final class StaResourcePathParser {
 
     private final String apiPath;
 
+    /** Lookup index for {@link #fromPathSegment}: lowercase plural and singular forms. */
+    private static final Map<String, EntityType> BY_SEGMENT =
+        Map.ofEntries(
+            Map.entry("things", THING),
+            Map.entry("thing", THING),
+            Map.entry("locations", LOCATION),
+            Map.entry("location", LOCATION),
+            Map.entry("historicallocations", HISTORICAL_LOCATION),
+            Map.entry("historicallocation", HISTORICAL_LOCATION),
+            Map.entry("datastreams", DATASTREAM),
+            Map.entry("datastream", DATASTREAM),
+            Map.entry("sensors", SENSOR),
+            Map.entry("sensor", SENSOR),
+            Map.entry("observedproperties", OBSERVED_PROPERTY),
+            Map.entry("observedproperty", OBSERVED_PROPERTY),
+            Map.entry("observations", OBSERVATION),
+            Map.entry("observation", OBSERVATION),
+            Map.entry("featuresofinterest", FEATURE_OF_INTEREST),
+            Map.entry("featureofinterest", FEATURE_OF_INTEREST),
+            Map.entry("projects", PROJECT),
+            Map.entry("project", PROJECT));
+
     EntityType(String apiPath) {
       this.apiPath = apiPath;
     }
@@ -250,19 +274,7 @@ public final class StaResourcePathParser {
       if (segment == null || segment.isBlank()) {
         return null;
       }
-      String normalized = segment.trim().toLowerCase();
-      return switch (normalized) {
-        case "things", "thing" -> THING;
-        case "locations", "location" -> LOCATION;
-        case "historicallocations", "historicallocation" -> HISTORICAL_LOCATION;
-        case "datastreams", "datastream" -> DATASTREAM;
-        case "sensors", "sensor" -> SENSOR;
-        case "observedproperties", "observedproperty" -> OBSERVED_PROPERTY;
-        case "observations", "observation" -> OBSERVATION;
-        case "featuresofinterest", "featureofinterest" -> FEATURE_OF_INTEREST;
-        case "projects", "project" -> PROJECT;
-        default -> null;
-      };
+      return BY_SEGMENT.get(segment.trim().toLowerCase(Locale.ROOT));
     }
   }
 }
