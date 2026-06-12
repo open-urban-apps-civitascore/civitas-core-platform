@@ -128,8 +128,7 @@ class GrantReconcilerTest {
     assertTrue(plan.toRevoke().isEmpty());
     assertEquals(1, plan.toRevokeGrantOption().size());
     assertEquals("iot", plan.toRevokeGrantOption().get(0).schema());
-    assertEquals(
-        List.of(SchemaPrivilege.USAGE), plan.toRevokeGrantOption().get(0).privileges());
+    assertEquals(List.of(SchemaPrivilege.USAGE), plan.toRevokeGrantOption().get(0).privileges());
   }
 
   @Test

@@ -162,8 +162,7 @@ public final class PostgisDialect implements SqlDialect {
   public List<String> dropRole(DbRoleConfig role) {
     requireName(role.getName(), "role name");
     return List.of(
-        "DROP OWNED BY " + quoteIdent(role.getName()),
-        "DROP ROLE " + quoteIdent(role.getName()));
+        "DROP OWNED BY " + quoteIdent(role.getName()), "DROP ROLE " + quoteIdent(role.getName()));
   }
 
   @Override

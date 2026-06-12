@@ -56,7 +56,6 @@ config-adapter-postgis/                ← module
     │   └── PostgisDialect.java       ← PostGIS implementation (DDL + isDuplicate/
     │                                    isMissing/isConnectivity)
     └── ddl/
-        ├── TableDdlBuilder.java      ← thin wrapper that delegates table DDL to the dialect
         └── GrantReconciler.java      ← pure diff: desired vs. current schema grants
 ```
 
@@ -200,7 +199,7 @@ CIVITAS_MASTER_KEY                (env var; required only to decrypt ENC(...) ro
 
 Alongside the event-driven `PostgisAdapter`, the module provides `PostgisSagaHandler`, a `SagaCommandHandler` (ServiceLoader-registered) discovered by the application's `SagaComponentFactory` and registered in the saga orchestrator's `SagaHandlerRegistry`. It mirrors the FROST / APISIX / RedPanda handlers but executes DDL over JDBC. Because the JAX-RS-oriented `AbstractSagaCommandHandler` would pull a spurious HTTP dependency into this JDBC module, the handler implements `SagaCommandHandler` directly.
 
-Forward/compensation pairs: `CREATE_TABLE`↔`DROP_TABLE`, `CREATE_SCHEMA`↔`DROP_SCHEMA`, `CREATE_ROLE`↔`DROP_ROLE`. The forward command carries the resource definition as a nested map (`tableConfig` / `schemaConfig` / `roleConfig`) including its `resourceType` discriminator — deserialized through the polymorphic `PostgisConfigValue` base, exactly as the config travels in CloudEvents. Each `CREATE_*` returns its identifiers as `compensationData`, which the orchestrator flattens into the compensating `DROP_*`'s payload. CREATE absorbs duplicate-object SQLStates and DROP absorbs missing-object SQLStates, so steps and compensations are retry-safe. The handler reuses `ConnectionProvider`, `PostgisDialect`, `TableDdlBuilder`, `GrantReconciler`, and the same `CredentialDecryptor`-based password handling as the adapter.
+Forward/compensation pairs: `CREATE_TABLE`↔`DROP_TABLE`, `CREATE_SCHEMA`↔`DROP_SCHEMA`, `CREATE_ROLE`↔`DROP_ROLE`. The forward command carries the resource definition as a nested map (`tableConfig` / `schemaConfig` / `roleConfig`) including its `resourceType` discriminator — deserialized through the polymorphic `PostgisConfigValue` base, exactly as the config travels in CloudEvents. Each `CREATE_*` returns its identifiers as `compensationData`, which the orchestrator flattens into the compensating `DROP_*`'s payload. CREATE absorbs duplicate-object SQLStates and DROP absorbs missing-object SQLStates, so steps and compensations are retry-safe. The handler reuses `ConnectionProvider`, `PostgisDialect`, `GrantReconciler`, and the same `CredentialDecryptor`-based password handling as the adapter — shared via the package-private `PostgisDdlSupport` (pool/dialect init, savepointed DDL execution, grant rendering, password resolution, redaction).
 
 A second operation pair — `PROVISION_SINK` ↔ `DEPROVISION_SINK` — integrates the adapter as a **dataset-saga step**. GeoServer publishes feature types from an existing PostGIS table, so when the trigger carries a `POSTGIS` data sink the CREATE saga runs `PROVISION_SINK` (schema + table + GeoServer read-role, one transaction) before GeoServer's `CREATE_DATASTORE`/`PROVISION_LAYERS`; DELETE runs `DEPROVISION_SINK` after `DELETE_WORKSPACE`. These read the trigger's `datasinks[POSTGIS].configuration` directly (the DELETE trigger may omit column definitions — dropping needs only the identifiers). All multi-statement DDL transactions — in the saga handler **and** in the event-driven adapter — use **per-statement savepoints** so an absorbed duplicate/missing object doesn't abort the whole transaction (PostgreSQL aborts a transaction on any statement error). Wired into both the coded builders and the BPMN of `config-adapter-flowable`; CREATE/UPDATE remain FROST → APISIX → [GeoServer] → RedPanda with the PostGIS sink slotted into the GeoServer (`hasGeoSink`) branch.
 
@@ -216,7 +215,7 @@ When a second SQL flavor is needed, move the following to a new `config-adapter-
 
 - `SqlDialect`
 - `ColumnType`, `IndexConfig`, generic `ColumnConfig`
-- `ConnectionProvider`, `TableDdlBuilder`
+- `ConnectionProvider`, `PostgisDdlSupport`
 - shared `*ErrorHandler` skeleton
 
 `config-adapter-postgis` keeps `PostgisDialect`, `GeometryColumnConfig`, `GeometryType`, and the SPI registration. No call-site changes.

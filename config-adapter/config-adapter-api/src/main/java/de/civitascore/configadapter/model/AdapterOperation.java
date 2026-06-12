@@ -66,7 +66,6 @@ public enum AdapterOperation {
 
   // PostGIS / SQL operations
   SQL_TABLE_CREATE("table creation"),
-  SQL_TABLE_UPDATE("table update"),
   SQL_TABLE_DELETE("table deletion"),
   SQL_SCHEMA_CREATE("schema creation"),
   SQL_SCHEMA_UPDATE("schema update"),

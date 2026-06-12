@@ -15,8 +15,6 @@ import de.civitascore.configadapter.adapter.SagaCommandHandler;
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
-import de.civitascore.configadapter.crypto.CredentialDecryptor;
-import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import de.civitascore.configadapter.model.postgis.ColumnConfig;
 import de.civitascore.configadapter.model.postgis.DbRoleConfig;
 import de.civitascore.configadapter.model.postgis.GeometryColumnConfig;
@@ -28,24 +26,14 @@ import de.civitascore.configadapter.model.postgis.SchemaPrivilege;
 import de.civitascore.configadapter.model.postgis.TableConfig;
 import de.civitascore.configadapter.postgis.ddl.DataStructureTableMapper;
 import de.civitascore.configadapter.postgis.ddl.GrantReconciler;
-import de.civitascore.configadapter.postgis.ddl.GrantReconciler.GrantReconcilePlan;
-import de.civitascore.configadapter.postgis.ddl.GrantReconciler.SchemaRevoke;
-import de.civitascore.configadapter.postgis.ddl.TableDdlBuilder;
-import de.civitascore.configadapter.postgis.dialect.PostgisDialect;
 import de.civitascore.configadapter.postgis.dialect.SqlDialect;
-import java.security.GeneralSecurityException;
-import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.Savepoint;
-import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,7 +76,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Columns come from explicit {@code configuration.columns} when present, otherwise derived from
  * {@code dataStructure} via {@link DataStructureTableMapper}; at least one column or geometry
- * column must result.
+ * column must result for provisioning (deprovisioning needs only the identifiers).
  *
  * <p>{@code PROVISION_SINK} creates schema (if given), table, and read role + grants for each sink
  * in one transaction; {@code DEPROVISION_SINK} drops the table and role (schemas are left, as they
@@ -106,31 +94,13 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   private static final Logger logger = LoggerFactory.getLogger(PostgisSagaHandler.class);
 
   private static final String ADAPTER_NAME = "postgis";
-  private static final String ROLE_CREDENTIAL_CONTEXT = PostgisAdapter.ROLE_CREDENTIAL_CONTEXT;
-  private static final String MASTER_KEY_ENV = "CIVITAS_MASTER_KEY";
-
   private static final String COMPENSATE_TYPE = "COMPENSATE_STEP";
   private static final String DATASINK_TYPE_POSTGIS = "POSTGIS";
-
-  private static final String JDBC_URL_KEY = "postgis.jdbc.url";
-  private static final String JDBC_USER_KEY = "postgis.jdbc.user";
-  private static final String JDBC_PASSWORD_KEY = "postgis.jdbc.password";
-  private static final String JDBC_MAX_POOL_SIZE_KEY = "postgis.jdbc.maxPoolSize";
-  private static final String JDBC_CONNECTION_TIMEOUT_MS_KEY = "postgis.jdbc.connectionTimeoutMs";
-
-  private static final String DEFAULT_MAX_POOL_SIZE = "5";
-  private static final String DEFAULT_CONNECTION_TIMEOUT_MS = "5000";
-
-  private static final Pattern PASSWORD_LITERAL =
-      Pattern.compile("(?i)(PASSWORD\\s+)'(?:[^']|'')*'");
 
   private final ObjectMapper objectMapper =
       new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-  private ConnectionProvider connectionProvider;
-  private SqlDialect dialect;
-  private TableDdlBuilder ddlBuilder;
-  private byte[] stretchedKey = new byte[0];
+  private final PostgisDdlSupport ddl = new PostgisDdlSupport();
 
   /** No-arg constructor for ServiceLoader discovery. Call {@link #initialize} before use. */
   public PostgisSagaHandler() {}
@@ -142,40 +112,18 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   @Override
   public void initialize(AdapterConfig config) {
-    String jdbcUrl = requireProperty(config, JDBC_URL_KEY);
-    String user = requireProperty(config, JDBC_USER_KEY);
-    String password = config.getProperty(JDBC_PASSWORD_KEY, "");
-    int maxPoolSize =
-        Integer.parseInt(config.getProperty(JDBC_MAX_POOL_SIZE_KEY, DEFAULT_MAX_POOL_SIZE));
-    long connectionTimeoutMs =
-        Long.parseLong(
-            config.getProperty(JDBC_CONNECTION_TIMEOUT_MS_KEY, DEFAULT_CONNECTION_TIMEOUT_MS));
-
-    if (this.connectionProvider == null) {
-      this.connectionProvider =
-          new ConnectionProvider(jdbcUrl, user, password, maxPoolSize, connectionTimeoutMs);
-    }
-    if (this.dialect == null) {
-      this.dialect = new PostgisDialect();
-    }
-    this.ddlBuilder = new TableDdlBuilder(this.dialect);
-
-    this.stretchedKey = CryptoKeyLoader.loadAndStretchKeyFromEnv(MASTER_KEY_ENV);
-    if (this.stretchedKey.length == 0) {
-      logger.warn("{} not set — encrypted role passwords cannot be decrypted", MASTER_KEY_ENV);
-    }
-
+    String jdbcUrl = ddl.initialize(config);
     logger.info("PostgisSagaHandler initialized for: {}", Encode.forJava(jdbcUrl));
   }
 
   /** Test seam — inject a pre-configured provider before {@link #initialize(AdapterConfig)}. */
   void setConnectionProvider(ConnectionProvider connectionProvider) {
-    this.connectionProvider = connectionProvider;
+    ddl.setConnectionProvider(connectionProvider);
   }
 
   /** Test seam — inject an alternate dialect. */
   void setDialect(SqlDialect dialect) {
-    this.dialect = dialect;
+    ddl.setDialect(dialect);
   }
 
   @Override
@@ -194,7 +142,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
         default -> unknownOperation(command, compensation);
       };
     } catch (Exception e) {
-      String error = command.operation() + " failed: " + redact(e.getMessage());
+      String error = command.operation() + " failed: " + PostgisDdlSupport.redact(e.getMessage());
       logger.error(
           "PostGIS {} failed for saga {}",
           Encode.forJava(command.operation()),
@@ -210,9 +158,9 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   private SagaCommandResult createTable(SagaCommandMessage command) throws SQLException {
     TableConfig table = convert(command, "tableConfig", TableConfig.class);
-    runDdl(ddlBuilder.buildCreate(table), true, false);
+    ddl.runDdl(dialect().createTable(table), true, false);
 
-    Map<String, Object> identifiers = new java.util.HashMap<>();
+    Map<String, Object> identifiers = new LinkedHashMap<>();
     if (table.getSchema() != null && !table.getSchema().isBlank()) {
       identifiers.put("schema", table.getSchema());
     }
@@ -227,7 +175,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   private SagaCommandResult createSchema(SagaCommandMessage command) throws SQLException {
     SchemaConfig schema = convert(command, "schemaConfig", SchemaConfig.class);
-    runDdl(dialect.createSchema(schema), true, false);
+    ddl.runDdl(dialect().createSchema(schema), true, false);
 
     Map<String, Object> identifiers = Map.of("schema", schema.getName());
     logger.info(
@@ -239,11 +187,11 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   private SagaCommandResult createRole(SagaCommandMessage command) throws SQLException {
     DbRoleConfig role = convert(command, "roleConfig", DbRoleConfig.class);
-    String password = resolvePassword(role.getPassword());
+    String password = ddl.resolvePassword(role.getPassword());
 
-    List<String> statements = new ArrayList<>(dialect.createRole(role, password));
+    List<String> statements = new ArrayList<>(dialect().createRole(role, password));
     appendGrantStatements(statements, role.getName(), role.getGrants());
-    runDdl(statements, true, false);
+    ddl.runDdl(statements, true, false);
 
     Map<String, Object> identifiers = Map.of("role", role.getName());
     logger.info(
@@ -260,20 +208,20 @@ public class PostgisSagaHandler implements SagaCommandHandler {
     List<String> statements = new ArrayList<>();
     List<Map<String, Object>> provisioned = new ArrayList<>();
     for (SinkSpec sink : sinks) {
-      // buildCreate already emits CREATE SCHEMA for the table's schema; only the owner (if any)
+      // createTable already emits CREATE SCHEMA for the table's schema; only the owner (if any)
       // needs a separate ALTER SCHEMA … OWNER TO.
-      statements.addAll(ddlBuilder.buildCreate(sink.table()));
+      statements.addAll(dialect().createTable(sink.table()));
       if (sink.schema() != null) {
-        statements.addAll(dialect.alterSchemaOwner(sink.schema()));
+        statements.addAll(dialect().alterSchemaOwner(sink.schema()));
       }
       if (sink.role() != null) {
-        String password = resolvePassword(sink.role().getPassword());
-        statements.addAll(dialect.createRole(sink.role(), password));
+        String password = ddl.resolvePassword(sink.role().getPassword());
+        statements.addAll(dialect().createRole(sink.role(), password));
         appendGrantStatements(statements, sink.role().getName(), sink.role().getGrants());
       }
       provisioned.add(sink.identifiers());
     }
-    runDdl(statements, true, false);
+    ddl.runDdl(statements, true, false);
 
     logger.info(
         "PostGIS sink(s) provisioned: {}, saga={}",
@@ -289,13 +237,13 @@ public class PostgisSagaHandler implements SagaCommandHandler {
     List<String> statements = new ArrayList<>();
     for (SinkSpec sink : sinks) {
       if (sink.role() != null) {
-        statements.addAll(dialect.dropRole(sink.role()));
+        statements.addAll(dialect().dropRole(sink.role()));
       }
-      statements.addAll(dialect.dropTable(sink.table().getSchema(), sink.table().getName()));
+      statements.addAll(dialect().dropTable(sink.table().getSchema(), sink.table().getName()));
       // The schema is intentionally left in place: it may be shared across datasets. The table and
       // read role are the per-dataset artifacts this step removes.
     }
-    runDdl(statements, false, true);
+    ddl.runDdl(statements, false, true);
 
     logger.info("PostGIS sink(s) deprovisioned, saga={}", Encode.forJava(command.sagaId()));
     return done(command, compensation);
@@ -307,7 +255,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       throws SQLException {
     String schema = optionalString(command, "schema");
     String table = requireString(command, "table");
-    runDdl(dialect.dropTable(schema, table), false, true);
+    ddl.runDdl(dialect().dropTable(schema, table), false, true);
     logger.info(
         "PostGIS table {} dropped, saga={}",
         Encode.forJava(qualified(schema, table)),
@@ -320,7 +268,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
     SchemaConfig schema = new SchemaConfig();
     schema.setName(requireString(command, "schema"));
     schema.setCascade(Boolean.parseBoolean(String.valueOf(command.payload().get("cascade"))));
-    runDdl(dialect.dropSchema(schema), false, true);
+    ddl.runDdl(dialect().dropSchema(schema), false, true);
     logger.info(
         "PostGIS schema {} dropped, saga={}",
         Encode.forJava(schema.getName()),
@@ -332,7 +280,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       throws SQLException {
     DbRoleConfig role = new DbRoleConfig();
     role.setName(requireString(command, "role"));
-    runDdl(dialect.dropRole(role), false, true);
+    ddl.runDdl(dialect().dropRole(role), false, true);
     logger.info(
         "PostGIS role {} dropped, saga={}",
         Encode.forJava(role.getName()),
@@ -340,78 +288,17 @@ public class PostgisSagaHandler implements SagaCommandHandler {
     return done(command, compensation);
   }
 
-  // ─── DDL execution ───────────────────────────────────────────────────────
-
-  private void runDdl(List<String> statements, boolean absorbDuplicate, boolean absorbMissing)
-      throws SQLException {
-    try (Connection connection = connectionProvider.getConnection()) {
-      connection.setAutoCommit(false);
-      try (Statement stmt = connection.createStatement()) {
-        for (String sql : statements) {
-          executeOne(connection, stmt, sql, absorbDuplicate, absorbMissing);
-        }
-        connection.commit();
-      } catch (SQLException | RuntimeException e) {
-        safeRollback(connection);
-        throw e;
-      }
-    }
-  }
-
-  /**
-   * Executes one DDL statement, wrapped in a savepoint. An absorbed duplicate/missing object rolls
-   * back to the savepoint rather than the whole transaction: PostgreSQL aborts the entire
-   * transaction on any error, so without the savepoint the following statements in a
-   * multi-statement step (schema → table → role) would fail with "current transaction is aborted".
-   * The savepoint keeps the idempotency-by-absorption contract working inside one transaction.
-   */
-  private void executeOne(
-      Connection connection,
-      Statement stmt,
-      String sql,
-      boolean absorbDuplicate,
-      boolean absorbMissing)
-      throws SQLException {
-    Savepoint savepoint = connection.setSavepoint();
-    try {
-      logger.debug("Executing DDL: {}", Encode.forJava(redact(sql)));
-      stmt.execute(sql);
-      connection.releaseSavepoint(savepoint);
-    } catch (SQLException e) {
-      boolean absorb =
-          (absorbDuplicate && dialect.isDuplicate(e)) || (absorbMissing && dialect.isMissing(e));
-      if (!absorb) {
-        throw e;
-      }
-      connection.rollback(savepoint);
-      logger.info(
-          "PostGIS object already in desired state (SQLState {}), treating as success (idempotent)",
-          Encode.forJava(String.valueOf(e.getSQLState())));
-    }
-  }
-
+  /** Renders the desired grants for a freshly created role (no current state to reconcile). */
   private void appendGrantStatements(
       List<String> statements, String roleName, List<SchemaGrant> grants) {
-    GrantReconcilePlan plan = GrantReconciler.reconcile(grants, Map.of());
-    for (SchemaGrant grant : plan.toGrant()) {
-      statements.add(
-          dialect.grantOnSchema(
-              roleName, grant.schema(), grant.effectivePrivileges(), grant.isWithGrantOption()));
-    }
-    for (SchemaRevoke revoke : plan.toRevoke()) {
-      statements.add(dialect.revokeOnSchema(roleName, revoke.schema(), revoke.privileges()));
-    }
-  }
-
-  private void safeRollback(Connection connection) {
-    try {
-      connection.rollback();
-    } catch (SQLException rollbackEx) {
-      logger.warn("Rollback failed: {}", Encode.forJava(String.valueOf(rollbackEx.getMessage())));
-    }
+    ddl.appendGrantStatements(statements, roleName, GrantReconciler.reconcile(grants, Map.of()));
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
+
+  private SqlDialect dialect() {
+    return ddl.dialect();
+  }
 
   private SagaCommandResult done(SagaCommandMessage command, boolean compensation) {
     return compensation
@@ -523,9 +410,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       table.setGeometryColumns(geometryColumns);
       table.setPrimaryKey(stringList(config.get("primaryKey")));
       table.setIndexes(convertList(config.get("indexes"), IndexConfig.class));
-      if (requireColumns
-          && table.getColumns().isEmpty()
-          && table.getGeometryColumns().isEmpty()) {
+      if (requireColumns && table.getColumns().isEmpty() && table.getGeometryColumns().isEmpty()) {
         throw new IllegalArgumentException(
             "POSTGIS data sink '" + tableName + "' configuration must define at least one column");
       }
@@ -622,48 +507,12 @@ public class PostgisSagaHandler implements SagaCommandHandler {
     return value instanceof String s && !s.isBlank() ? s : null;
   }
 
-  private String resolvePassword(String rawPassword) {
-    if (rawPassword == null || rawPassword.isBlank()) {
-      return null;
-    }
-    Map<String, Object> wrapper = Map.of("password", rawPassword);
-    if (CredentialDecryptor.containsEncryptedValues(wrapper) && stretchedKey.length == 0) {
-      throw new IllegalStateException(
-          MASTER_KEY_ENV + " is required to decrypt the encrypted role password");
-    }
-    try {
-      Map<String, Object> decrypted =
-          CredentialDecryptor.decryptMapValues(wrapper, stretchedKey, ROLE_CREDENTIAL_CONTEXT);
-      return (String) decrypted.get("password");
-    } catch (GeneralSecurityException e) {
-      throw new IllegalStateException("Failed to decrypt role password", e);
-    }
-  }
-
   private static String qualified(String schema, String name) {
     return schema == null || schema.isBlank() ? name : schema + "." + name;
   }
 
-  private static String redact(String text) {
-    return text == null ? null : PASSWORD_LITERAL.matcher(text).replaceAll("$1'***'");
-  }
-
-  private static String requireProperty(AdapterConfig config, String key) {
-    String value = config.getProperty(key);
-    if (value == null || value.isBlank()) {
-      throw new IllegalStateException("Required postgis saga handler property missing: " + key);
-    }
-    return value;
-  }
-
   @Override
   public void close() {
-    if (connectionProvider != null) {
-      connectionProvider.close();
-      connectionProvider = null;
-    }
-    if (stretchedKey != null) {
-      Arrays.fill(stretchedKey, (byte) 0);
-    }
+    ddl.close();
   }
 }

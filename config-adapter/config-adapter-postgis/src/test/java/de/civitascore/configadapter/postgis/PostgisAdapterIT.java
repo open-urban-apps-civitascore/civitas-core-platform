@@ -393,8 +393,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
 
     DbRoleConfig role = new DbRoleConfig();
     role.setName("optiondown_role_it");
-    role.setGrants(
-        List.of(new SchemaGrant("optiondown_it", List.of(SchemaPrivilege.USAGE), null)));
+    role.setGrants(List.of(new SchemaGrant("optiondown_it", List.of(SchemaPrivilege.USAGE), null)));
 
     adapter.processConfigEvent(
         Topics.SQL_ROLE_UPDATED.toString(),

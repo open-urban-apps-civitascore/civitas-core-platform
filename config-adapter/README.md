@@ -259,7 +259,6 @@ Adapter for managing PostgreSQL/PostGIS table configuration via DDL.
 **Key Components:**
 - `PostgisAdapter` - Routes by payload type and applies DDL via JDBC against a Postgres/PostGIS database
 - `PostgisDialect` - Renders DDL (tables, schemas, roles, grants) and classifies `SQLException`s (duplicate / missing / connectivity)
-- `TableDdlBuilder` - Produces the ordered DDL statement list for a `TableConfig`
 - `GrantReconciler` - Diffs a role's desired vs. current schema grants (used on role UPDATE)
 - `ConnectionProvider` - HikariCP-backed `DataSource` wrapper
 

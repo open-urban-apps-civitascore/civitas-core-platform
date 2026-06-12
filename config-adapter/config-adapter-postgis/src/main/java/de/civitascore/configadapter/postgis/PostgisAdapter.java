@@ -12,7 +12,6 @@ package de.civitascore.configadapter.postgis;
 import de.civitascore.configadapter.adapter.AbstractConfigAdapter;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.crypto.CredentialDecryptor;
-import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
@@ -23,29 +22,21 @@ import de.civitascore.configadapter.model.Operation;
 import de.civitascore.configadapter.model.postgis.DbRoleConfig;
 import de.civitascore.configadapter.model.postgis.PostgisConfigValue;
 import de.civitascore.configadapter.model.postgis.SchemaConfig;
-import de.civitascore.configadapter.model.postgis.SchemaGrant;
 import de.civitascore.configadapter.model.postgis.SchemaPrivilege;
 import de.civitascore.configadapter.model.postgis.TableConfig;
+import de.civitascore.configadapter.postgis.PostgisDdlSupport.StatementPlanner;
 import de.civitascore.configadapter.postgis.ddl.GrantReconciler;
 import de.civitascore.configadapter.postgis.ddl.GrantReconciler.GrantReconcilePlan;
-import de.civitascore.configadapter.postgis.ddl.GrantReconciler.SchemaRevoke;
-import de.civitascore.configadapter.postgis.ddl.TableDdlBuilder;
-import de.civitascore.configadapter.postgis.dialect.PostgisDialect;
 import de.civitascore.configadapter.postgis.dialect.SqlDialect;
-import java.security.GeneralSecurityException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Savepoint;
-import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,31 +72,7 @@ public class PostgisAdapter extends AbstractConfigAdapter {
   /** Credential context for per-credential key isolation when decrypting role passwords. */
   public static final String ROLE_CREDENTIAL_CONTEXT = "portal-backend:sql-role";
 
-  private static final String MASTER_KEY_ENV = "CIVITAS_MASTER_KEY";
-
-  private static final String JDBC_URL_KEY = "jdbc.url";
-  private static final String JDBC_USER_KEY = "jdbc.user";
-  private static final String JDBC_PASSWORD_KEY = "jdbc.password";
-  private static final String JDBC_MAX_POOL_SIZE_KEY = "jdbc.maxPoolSize";
-  private static final String JDBC_CONNECTION_TIMEOUT_MS_KEY = "jdbc.connectionTimeoutMs";
-
-  private static final String DEFAULT_MAX_POOL_SIZE = "5";
-  private static final String DEFAULT_CONNECTION_TIMEOUT_MS = "5000";
-
-  /** Masks {@code PASSWORD '…'} literals so plaintext never reaches logs or error messages. */
-  private static final Pattern PASSWORD_LITERAL =
-      Pattern.compile("(?i)(PASSWORD\\s+)'(?:[^']|'')*'");
-
-  private ConnectionProvider connectionProvider;
-  private SqlDialect dialect;
-  private TableDdlBuilder ddlBuilder;
-  private byte[] stretchedKey = new byte[0];
-
-  /** Read within the transaction to build the statement list, possibly using the connection. */
-  @FunctionalInterface
-  private interface StatementPlanner {
-    List<String> plan(Connection connection) throws SQLException;
-  }
+  private final PostgisDdlSupport ddl = new PostgisDdlSupport();
 
   @Override
   public String getName() {
@@ -115,29 +82,7 @@ public class PostgisAdapter extends AbstractConfigAdapter {
   @Override
   public void initialize(AdapterConfig config) {
     super.initialize(config);
-
-    String jdbcUrl = requireProperty(JDBC_URL_KEY);
-    String user = requireProperty(JDBC_USER_KEY);
-    String password = getAdapterProperty(JDBC_PASSWORD_KEY, "");
-    int maxPoolSize =
-        Integer.parseInt(getAdapterProperty(JDBC_MAX_POOL_SIZE_KEY, DEFAULT_MAX_POOL_SIZE));
-    long connectionTimeoutMs =
-        Long.parseLong(
-            getAdapterProperty(JDBC_CONNECTION_TIMEOUT_MS_KEY, DEFAULT_CONNECTION_TIMEOUT_MS));
-
-    if (this.connectionProvider == null) {
-      this.connectionProvider =
-          new ConnectionProvider(jdbcUrl, user, password, maxPoolSize, connectionTimeoutMs);
-    }
-    if (this.dialect == null) {
-      this.dialect = new PostgisDialect();
-    }
-    this.ddlBuilder = new TableDdlBuilder(this.dialect);
-
-    this.stretchedKey = CryptoKeyLoader.loadAndStretchKeyFromEnv(MASTER_KEY_ENV);
-    if (this.stretchedKey.length == 0) {
-      logger.warn("{} not set — encrypted role passwords cannot be decrypted", MASTER_KEY_ENV);
-    }
+    String jdbcUrl = ddl.initialize(config);
 
     logger.info(
         "PostGIS adapter '{}' initialized for: {}",
@@ -151,23 +96,17 @@ public class PostgisAdapter extends AbstractConfigAdapter {
 
   /** Test seam — inject a pre-configured provider before {@link #initialize(AdapterConfig)}. */
   void setConnectionProvider(ConnectionProvider connectionProvider) {
-    this.connectionProvider = connectionProvider;
+    ddl.setConnectionProvider(connectionProvider);
   }
 
   /** Test seam — inject an alternate dialect. */
   void setDialect(SqlDialect dialect) {
-    this.dialect = dialect;
+    ddl.setDialect(dialect);
   }
 
   /** Releases the JDBC connection pool and zeroes the key. Safe to call multiple times. */
   public void close() {
-    if (connectionProvider != null) {
-      connectionProvider.close();
-      connectionProvider = null;
-    }
-    if (stretchedKey != null) {
-      Arrays.fill(stretchedKey, (byte) 0);
-    }
+    ddl.close();
   }
 
   @Override
@@ -210,11 +149,15 @@ public class PostgisAdapter extends AbstractConfigAdapter {
       throws FatalAdapterException, RetryableAdapterException {
     switch (operation) {
       case CREATE -> {
-        executeDdl(AdapterOperation.SQL_TABLE_CREATE, ddlBuilder.buildCreate(table), true, false);
+        executeDdl(AdapterOperation.SQL_TABLE_CREATE, dialect().createTable(table), true, false);
         publishSuccess(event, "Table " + table.qualifiedName() + " created", table.qualifiedName());
       }
       case DELETE -> {
-        executeDdl(AdapterOperation.SQL_TABLE_DELETE, ddlBuilder.buildDrop(table), false, true);
+        executeDdl(
+            AdapterOperation.SQL_TABLE_DELETE,
+            dialect().dropTable(table.getSchema(), table.getName()),
+            false,
+            true);
         publishSuccess(event, "Table " + table.qualifiedName() + " deleted", table.qualifiedName());
       }
       default -> throw new FatalAdapterException(AdapterErrorCode.UNSUPPORTED_OPERATION, operation);
@@ -227,16 +170,16 @@ public class PostgisAdapter extends AbstractConfigAdapter {
       throws FatalAdapterException, RetryableAdapterException {
     switch (operation) {
       case CREATE -> {
-        executeDdl(AdapterOperation.SQL_SCHEMA_CREATE, dialect.createSchema(schema), true, false);
+        executeDdl(AdapterOperation.SQL_SCHEMA_CREATE, dialect().createSchema(schema), true, false);
         publishSuccess(event, "Schema " + schema.getName() + " created", schema.getName());
       }
       case UPDATE -> {
         executeDdl(
-            AdapterOperation.SQL_SCHEMA_UPDATE, dialect.alterSchemaOwner(schema), false, false);
+            AdapterOperation.SQL_SCHEMA_UPDATE, dialect().alterSchemaOwner(schema), false, false);
         publishSuccess(event, "Schema " + schema.getName() + " updated", schema.getName());
       }
       case DELETE -> {
-        executeDdl(AdapterOperation.SQL_SCHEMA_DELETE, dialect.dropSchema(schema), false, true);
+        executeDdl(AdapterOperation.SQL_SCHEMA_DELETE, dialect().dropSchema(schema), false, true);
         publishSuccess(event, "Schema " + schema.getName() + " deleted", schema.getName());
       }
       default -> throw new FatalAdapterException(AdapterErrorCode.UNSUPPORTED_OPERATION, operation);
@@ -250,8 +193,8 @@ public class PostgisAdapter extends AbstractConfigAdapter {
     switch (operation) {
       case CREATE -> {
         String password = resolvePassword(role.getPassword());
-        List<String> statements = new ArrayList<>(dialect.createRole(role, password));
-        appendGrantStatements(
+        List<String> statements = new ArrayList<>(dialect().createRole(role, password));
+        ddl.appendGrantStatements(
             statements, role.getName(), GrantReconciler.reconcile(role.getGrants(), Map.of()));
         executeDdl(AdapterOperation.SQL_ROLE_CREATE, statements, true, false);
         publishSuccess(event, "Role " + role.getName() + " created", role.getName());
@@ -266,7 +209,7 @@ public class PostgisAdapter extends AbstractConfigAdapter {
         publishSuccess(event, "Role " + role.getName() + " updated", role.getName());
       }
       case DELETE -> {
-        executeDdl(AdapterOperation.SQL_ROLE_DELETE, dialect.dropRole(role), false, true);
+        executeDdl(AdapterOperation.SQL_ROLE_DELETE, dialect().dropRole(role), false, true);
         publishSuccess(event, "Role " + role.getName() + " deleted", role.getName());
       }
       default -> throw new FatalAdapterException(AdapterErrorCode.UNSUPPORTED_OPERATION, operation);
@@ -279,32 +222,16 @@ public class PostgisAdapter extends AbstractConfigAdapter {
     Map<String, Map<SchemaPrivilege, Boolean>> current =
         readSchemaGrants(connection, role.getName());
     GrantReconcilePlan plan = GrantReconciler.reconcile(role.getGrants(), current);
-    List<String> statements = new ArrayList<>(dialect.alterRole(role, password));
-    appendGrantStatements(statements, role.getName(), plan);
+    List<String> statements = new ArrayList<>(dialect().alterRole(role, password));
+    ddl.appendGrantStatements(statements, role.getName(), plan);
     return statements;
-  }
-
-  private void appendGrantStatements(
-      List<String> statements, String roleName, GrantReconcilePlan plan) {
-    for (SchemaGrant grant : plan.toGrant()) {
-      statements.add(
-          dialect.grantOnSchema(
-              roleName, grant.schema(), grant.effectivePrivileges(), grant.isWithGrantOption()));
-    }
-    for (SchemaRevoke revoke : plan.toRevoke()) {
-      statements.add(dialect.revokeOnSchema(roleName, revoke.schema(), revoke.privileges()));
-    }
-    for (SchemaRevoke revoke : plan.toRevokeGrantOption()) {
-      statements.add(
-          dialect.revokeGrantOptionOnSchema(roleName, revoke.schema(), revoke.privileges()));
-    }
   }
 
   /** Reads the role's current schema privileges, keyed by schema, with their grant-option state. */
   private Map<String, Map<SchemaPrivilege, Boolean>> readSchemaGrants(
       Connection connection, String roleName) throws SQLException {
     Map<String, Map<SchemaPrivilege, Boolean>> grantsBySchema = new LinkedHashMap<>();
-    try (PreparedStatement ps = connection.prepareStatement(dialect.readSchemaGrantsQuery())) {
+    try (PreparedStatement ps = connection.prepareStatement(dialect().readSchemaGrantsQuery())) {
       ps.setString(1, roleName);
       try (ResultSet rs = ps.executeQuery()) {
         while (rs.next()) {
@@ -330,22 +257,14 @@ public class PostgisAdapter extends AbstractConfigAdapter {
   }
 
   private String resolvePassword(String rawPassword) throws FatalAdapterException {
-    if (rawPassword == null || rawPassword.isBlank()) {
-      return null;
-    }
-    Map<String, Object> wrapper = Map.of("password", rawPassword);
-    if (CredentialDecryptor.containsEncryptedValues(wrapper) && stretchedKey.length == 0) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.POSTGIS_ERROR,
-          MASTER_KEY_ENV + " is required to decrypt the encrypted role password");
-    }
     try {
-      Map<String, Object> decrypted =
-          CredentialDecryptor.decryptMapValues(wrapper, stretchedKey, ROLE_CREDENTIAL_CONTEXT);
-      return (String) decrypted.get("password");
-    } catch (GeneralSecurityException e) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.POSTGIS_ERROR, e, "Failed to decrypt role password");
+      return ddl.resolvePassword(rawPassword);
+    } catch (IllegalStateException e) {
+      if (e.getCause() != null) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.POSTGIS_ERROR, e.getCause(), e.getMessage());
+      }
+      throw new FatalAdapterException(AdapterErrorCode.POSTGIS_ERROR, e.getMessage());
     }
   }
 
@@ -366,95 +285,30 @@ public class PostgisAdapter extends AbstractConfigAdapter {
       boolean absorbDuplicate,
       boolean absorbMissing)
       throws FatalAdapterException, RetryableAdapterException {
-    try (Connection connection = connectionProvider.getConnection()) {
-      connection.setAutoCommit(false);
-      try {
-        List<String> statements = planner.plan(connection);
-        try (Statement stmt = connection.createStatement()) {
-          for (String sql : statements) {
-            executeOne(connection, stmt, sql, absorbDuplicate, absorbMissing);
-          }
-        }
-        connection.commit();
-      } catch (SQLException | RuntimeException e) {
-        safeRollback(connection);
-        throw e;
-      }
+    try {
+      ddl.runDdl(planner, absorbDuplicate, absorbMissing);
     } catch (SQLException e) {
-      if (dialect.isConnectivity(e)) {
+      if (dialect().isConnectivity(e)) {
         throw new RetryableAdapterException(
-            AdapterErrorCode.POSTGIS_CONNECTION_ERROR, e, ADAPTER_NAME, redact(e.getMessage()));
+            AdapterErrorCode.POSTGIS_CONNECTION_ERROR,
+            e,
+            ADAPTER_NAME,
+            PostgisDdlSupport.redact(e.getMessage()));
       }
       throw new FatalAdapterException(
           AdapterErrorCode.POSTGIS_DDL_ERROR,
           e,
-          operation.getDescription() + " failed: " + redact(e.getMessage()));
+          operation.getDescription() + " failed: " + PostgisDdlSupport.redact(e.getMessage()));
     }
   }
 
-  /**
-   * Executes one DDL statement, wrapped in a savepoint. An absorbed duplicate/missing object rolls
-   * back to the savepoint rather than the whole transaction: PostgreSQL aborts the entire
-   * transaction on any error, so without the savepoint the following statements in a
-   * multi-statement plan (schema → table → index, or role → grants) would fail with "current
-   * transaction is aborted". The savepoint keeps the idempotency-by-absorption contract working
-   * inside one transaction.
-   */
-  private void executeOne(
-      Connection connection,
-      Statement stmt,
-      String sql,
-      boolean absorbDuplicate,
-      boolean absorbMissing)
-      throws SQLException {
-    Savepoint savepoint = connection.setSavepoint();
-    try {
-      logger.debug("Executing DDL: {}", Encode.forJava(redact(sql)));
-      stmt.execute(sql);
-      connection.releaseSavepoint(savepoint);
-    } catch (SQLException e) {
-      if (absorbDuplicate && dialect.isDuplicate(e)) {
-        connection.rollback(savepoint);
-        logger.info(
-            "PostGIS object already exists (SQLState {}), treating create as success (idempotent)",
-            Encode.forJava(String.valueOf(e.getSQLState())));
-        return;
-      }
-      if (absorbMissing && dialect.isMissing(e)) {
-        connection.rollback(savepoint);
-        logger.info(
-            "PostGIS object not found (SQLState {}), treating delete as success (already gone, idempotent)",
-            Encode.forJava(String.valueOf(e.getSQLState())));
-        return;
-      }
-      throw e;
-    }
-  }
-
-  private void safeRollback(Connection connection) {
-    try {
-      connection.rollback();
-    } catch (SQLException rollbackEx) {
-      logger.warn("Rollback failed: {}", Encode.forJava(String.valueOf(rollbackEx.getMessage())));
-    }
+  private SqlDialect dialect() {
+    return ddl.dialect();
   }
 
   private void publishSuccess(ConfigEvent event, String message, String resourceId)
       throws FatalAdapterException, RetryableAdapterException {
     logger.info(Encode.forJava(message));
     publishSuccessResult(event, message, resourceId);
-  }
-
-  private static String redact(String text) {
-    return text == null ? null : PASSWORD_LITERAL.matcher(text).replaceAll("$1'***'");
-  }
-
-  private String requireProperty(String key) {
-    String value = getAdapterProperty(key);
-    if (value == null || value.isBlank()) {
-      throw new IllegalStateException(
-          "Required postgis adapter property missing: " + getName() + "." + key);
-    }
-    return value;
   }
 }

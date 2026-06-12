@@ -43,7 +43,9 @@ public final class GrantReconciler {
 
   /** The grants to add and the (grant-option) revokes to apply to reach the desired state. */
   public record GrantReconcilePlan(
-      List<SchemaGrant> toGrant, List<SchemaRevoke> toRevoke, List<SchemaRevoke> toRevokeGrantOption) {}
+      List<SchemaGrant> toGrant,
+      List<SchemaRevoke> toRevoke,
+      List<SchemaRevoke> toRevokeGrantOption) {}
 
   /**
    * @param desired the grants from the role payload (empty when none requested)

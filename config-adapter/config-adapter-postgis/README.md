@@ -219,7 +219,7 @@ Forward operations and their compensations:
 - `CREATE_*` absorbs duplicate-object SQLStates and `DROP_*` absorbs missing-object SQLStates, so steps and compensations are safe to retry.
 - `DROP_*` can also be used as a forward step; encrypted role passwords are decrypted exactly as in the event path.
 
-The handler reuses the same `ConnectionProvider`, `PostgisDialect`, `TableDdlBuilder`, and `GrantReconciler` as the adapter.
+The handler reuses the same `ConnectionProvider`, `PostgisDialect`, and `GrantReconciler` as the adapter (shared via the package-private `PostgisDdlSupport`).
 
 ### Dataset-saga sink provisioning (`PROVISION_SINK` / `DEPROVISION_SINK`)
 
