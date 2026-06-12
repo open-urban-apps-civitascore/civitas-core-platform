@@ -111,6 +111,7 @@ public class DataSetSagaPublisher {
             buildRouteIds(dataset),
             dataset.getServiceId(),
             dataset.getPipelineIds(),
+            buildDatasinks(dataset),
             buildNamedApis(dataset));
     sendTrigger(trigger);
   }

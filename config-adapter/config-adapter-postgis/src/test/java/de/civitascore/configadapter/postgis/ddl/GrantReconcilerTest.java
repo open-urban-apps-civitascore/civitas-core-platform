@@ -17,7 +17,6 @@ import de.civitascore.configadapter.model.postgis.SchemaPrivilege;
 import de.civitascore.configadapter.postgis.ddl.GrantReconciler.GrantReconcilePlan;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class GrantReconcilerTest {
@@ -33,14 +32,15 @@ class GrantReconcilerTest {
     assertEquals("iot", plan.toGrant().get(0).schema());
     assertEquals(List.of(SchemaPrivilege.USAGE), plan.toGrant().get(0).effectivePrivileges());
     assertTrue(plan.toRevoke().isEmpty());
+    assertTrue(plan.toRevokeGrantOption().isEmpty());
   }
 
   @Test
   void privilegeRemovedFromPayloadIsRevoked() {
     List<SchemaGrant> desired =
         List.of(new SchemaGrant("iot", List.of(SchemaPrivilege.USAGE), null));
-    Map<String, Set<SchemaPrivilege>> current =
-        Map.of("iot", Set.of(SchemaPrivilege.USAGE, SchemaPrivilege.CREATE));
+    Map<String, Map<SchemaPrivilege, Boolean>> current =
+        Map.of("iot", Map.of(SchemaPrivilege.USAGE, false, SchemaPrivilege.CREATE, false));
 
     GrantReconcilePlan plan = GrantReconciler.reconcile(desired, current);
 
@@ -54,18 +54,21 @@ class GrantReconcilerTest {
   void unchangedPrivilegesProduceNoStatements() {
     List<SchemaGrant> desired =
         List.of(new SchemaGrant("iot", List.of(SchemaPrivilege.USAGE), null));
-    Map<String, Set<SchemaPrivilege>> current = Map.of("iot", Set.of(SchemaPrivilege.USAGE));
+    Map<String, Map<SchemaPrivilege, Boolean>> current =
+        Map.of("iot", Map.of(SchemaPrivilege.USAGE, false));
 
     GrantReconcilePlan plan = GrantReconciler.reconcile(desired, current);
 
     assertTrue(plan.toGrant().isEmpty());
     assertTrue(plan.toRevoke().isEmpty());
+    assertTrue(plan.toRevokeGrantOption().isEmpty());
   }
 
   @Test
   void allExpandsToUsageAndCreateForComparison() {
     List<SchemaGrant> desired = List.of(new SchemaGrant("iot", List.of(SchemaPrivilege.ALL), null));
-    Map<String, Set<SchemaPrivilege>> current = Map.of("iot", Set.of(SchemaPrivilege.USAGE));
+    Map<String, Map<SchemaPrivilege, Boolean>> current =
+        Map.of("iot", Map.of(SchemaPrivilege.USAGE, false));
 
     GrantReconcilePlan plan = GrantReconciler.reconcile(desired, current);
 
@@ -75,8 +78,8 @@ class GrantReconcilerTest {
 
   @Test
   void schemaDroppedFromPayloadRevokesAllItsPrivileges() {
-    Map<String, Set<SchemaPrivilege>> current =
-        Map.of("iot", Set.of(SchemaPrivilege.USAGE, SchemaPrivilege.CREATE));
+    Map<String, Map<SchemaPrivilege, Boolean>> current =
+        Map.of("iot", Map.of(SchemaPrivilege.USAGE, false, SchemaPrivilege.CREATE, false));
 
     GrantReconcilePlan plan = GrantReconciler.reconcile(List.of(), current);
 
@@ -94,5 +97,52 @@ class GrantReconcilerTest {
     GrantReconcilePlan plan = GrantReconciler.reconcile(desired, Map.of());
 
     assertTrue(plan.toGrant().get(0).isWithGrantOption());
+  }
+
+  @Test
+  void grantOptionRequestedOnHeldPrivilegeRegrantsWithGrantOption() {
+    List<SchemaGrant> desired =
+        List.of(new SchemaGrant("iot", List.of(SchemaPrivilege.USAGE), true));
+    Map<String, Map<SchemaPrivilege, Boolean>> current =
+        Map.of("iot", Map.of(SchemaPrivilege.USAGE, false));
+
+    GrantReconcilePlan plan = GrantReconciler.reconcile(desired, current);
+
+    assertEquals(1, plan.toGrant().size());
+    assertEquals(List.of(SchemaPrivilege.USAGE), plan.toGrant().get(0).effectivePrivileges());
+    assertTrue(plan.toGrant().get(0).isWithGrantOption());
+    assertTrue(plan.toRevoke().isEmpty());
+    assertTrue(plan.toRevokeGrantOption().isEmpty());
+  }
+
+  @Test
+  void grantOptionDroppedFromPayloadIsRevokedWhilePrivilegeIsKept() {
+    List<SchemaGrant> desired =
+        List.of(new SchemaGrant("iot", List.of(SchemaPrivilege.USAGE), null));
+    Map<String, Map<SchemaPrivilege, Boolean>> current =
+        Map.of("iot", Map.of(SchemaPrivilege.USAGE, true));
+
+    GrantReconcilePlan plan = GrantReconciler.reconcile(desired, current);
+
+    assertTrue(plan.toGrant().isEmpty());
+    assertTrue(plan.toRevoke().isEmpty());
+    assertEquals(1, plan.toRevokeGrantOption().size());
+    assertEquals("iot", plan.toRevokeGrantOption().get(0).schema());
+    assertEquals(
+        List.of(SchemaPrivilege.USAGE), plan.toRevokeGrantOption().get(0).privileges());
+  }
+
+  @Test
+  void unchangedGrantOptionProducesNoStatements() {
+    List<SchemaGrant> desired =
+        List.of(new SchemaGrant("iot", List.of(SchemaPrivilege.USAGE), true));
+    Map<String, Map<SchemaPrivilege, Boolean>> current =
+        Map.of("iot", Map.of(SchemaPrivilege.USAGE, true));
+
+    GrantReconcilePlan plan = GrantReconciler.reconcile(desired, current);
+
+    assertTrue(plan.toGrant().isEmpty());
+    assertTrue(plan.toRevoke().isEmpty());
+    assertTrue(plan.toRevokeGrantOption().isEmpty());
   }
 }

@@ -62,7 +62,7 @@ class PostgisDialectTest {
     void simpleTableHasSingleCreateTableStatement() {
       TableConfig table =
           tableWithSingleColumn(
-              "widgets", new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false, null));
+              "widgets", new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false));
 
       List<String> statements = dialect.createTable(table);
 
@@ -76,7 +76,7 @@ class PostgisDialectTest {
       table.setSchema("iot");
       table.setName("readings");
       table.setColumns(
-          List.of(new ColumnConfig("id", ColumnType.INTEGER, null, null, null, false, null)));
+          List.of(new ColumnConfig("id", ColumnType.INTEGER, null, null, null, false)));
 
       List<String> statements = dialect.createTable(table);
 
@@ -91,8 +91,8 @@ class PostgisDialectTest {
       table.setName("orders");
       table.setColumns(
           List.of(
-              new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false, null),
-              new ColumnConfig("region", ColumnType.TEXT, null, null, null, false, null)));
+              new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false),
+              new ColumnConfig("region", ColumnType.TEXT, null, null, null, false)));
       table.setPrimaryKey(List.of("id", "region"));
 
       String createStatement = dialect.createTable(table).get(0);
@@ -104,7 +104,7 @@ class PostgisDialectTest {
     void varcharRendersExplicitLengthWhenProvided() {
       TableConfig table =
           tableWithSingleColumn(
-              "people", new ColumnConfig("name", ColumnType.VARCHAR, 120, null, null, true, null));
+              "people", new ColumnConfig("name", ColumnType.VARCHAR, 120, null, null, true));
 
       String createStatement = dialect.createTable(table).get(0);
 
@@ -115,7 +115,7 @@ class PostgisDialectTest {
     void varcharRendersWithoutLengthWhenLengthOmitted() {
       TableConfig table =
           tableWithSingleColumn(
-              "people", new ColumnConfig("name", ColumnType.VARCHAR, null, null, null, true, null));
+              "people", new ColumnConfig("name", ColumnType.VARCHAR, null, null, null, true));
 
       assertTrue(dialect.createTable(table).get(0).contains("\"name\" VARCHAR"));
       assertFalse(dialect.createTable(table).get(0).contains("VARCHAR("));
@@ -125,7 +125,7 @@ class PostgisDialectTest {
     void numericRendersPrecisionAndScale() {
       TableConfig table =
           tableWithSingleColumn(
-              "invoices", new ColumnConfig("amount", ColumnType.NUMERIC, null, 12, 2, false, null));
+              "invoices", new ColumnConfig("amount", ColumnType.NUMERIC, null, 12, 2, false));
 
       assertTrue(dialect.createTable(table).get(0).contains("\"amount\" NUMERIC(12, 2)"));
     }
@@ -134,8 +134,7 @@ class PostgisDialectTest {
     void numericRendersPrecisionOnlyWhenScaleOmitted() {
       TableConfig table =
           tableWithSingleColumn(
-              "invoices",
-              new ColumnConfig("amount", ColumnType.NUMERIC, null, 12, null, false, null));
+              "invoices", new ColumnConfig("amount", ColumnType.NUMERIC, null, 12, null, false));
 
       assertTrue(dialect.createTable(table).get(0).contains("\"amount\" NUMERIC(12)"));
     }
@@ -144,32 +143,16 @@ class PostgisDialectTest {
     void nullableColumnOmitsNotNullKeyword() {
       TableConfig table =
           tableWithSingleColumn(
-              "widgets", new ColumnConfig("label", ColumnType.TEXT, null, null, null, true, null));
+              "widgets", new ColumnConfig("label", ColumnType.TEXT, null, null, null, true));
 
       assertFalse(dialect.createTable(table).get(0).contains("NOT NULL"));
-    }
-
-    @Test
-    void defaultExpressionIsAppendedAsIs() {
-      TableConfig table =
-          tableWithSingleColumn(
-              "widgets",
-              new ColumnConfig(
-                  "created", ColumnType.TIMESTAMPTZ, null, null, null, false, "now()"));
-
-      assertTrue(
-          dialect
-              .createTable(table)
-              .get(0)
-              .contains("\"created\" TIMESTAMPTZ NOT NULL DEFAULT now()"));
     }
 
     @Test
     void geometryColumnRendersTypeAndSrid() {
       TableConfig table = new TableConfig();
       table.setName("places");
-      table.setColumns(
-          List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false, null)));
+      table.setColumns(List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false)));
       table.setGeometryColumns(
           List.of(new GeometryColumnConfig("geom", GeometryType.POINT, 4326, null, false)));
 
@@ -182,8 +165,7 @@ class PostgisDialectTest {
     void geometryColumnWithDimensionThreeAppendsZSuffix() {
       TableConfig table = new TableConfig();
       table.setName("places3d");
-      table.setColumns(
-          List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false, null)));
+      table.setColumns(List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false)));
       table.setGeometryColumns(
           List.of(new GeometryColumnConfig("geom", GeometryType.POINT, 4326, 3, false)));
 
@@ -194,8 +176,7 @@ class PostgisDialectTest {
     void geometryColumnWithoutSridOmitsSridArgument() {
       TableConfig table = new TableConfig();
       table.setName("places");
-      table.setColumns(
-          List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false, null)));
+      table.setColumns(List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false)));
       table.setGeometryColumns(
           List.of(new GeometryColumnConfig("geom", GeometryType.POLYGON, null, null, true)));
 
@@ -206,8 +187,7 @@ class PostgisDialectTest {
     void gistIndexOnGeometryColumnUsesGistMethod() {
       TableConfig table = new TableConfig();
       table.setName("places");
-      table.setColumns(
-          List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false, null)));
+      table.setColumns(List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false)));
       table.setGeometryColumns(
           List.of(new GeometryColumnConfig("geom", GeometryType.POINT, 4326, null, false)));
       table.setIndexes(
@@ -226,7 +206,7 @@ class PostgisDialectTest {
       TableConfig table = new TableConfig();
       table.setName("users");
       table.setColumns(
-          List.of(new ColumnConfig("email", ColumnType.TEXT, null, null, null, false, null)));
+          List.of(new ColumnConfig("email", ColumnType.TEXT, null, null, null, false)));
       table.setIndexes(
           List.of(new IndexConfig("idx_users_email", List.of("email"), true, IndexMethod.BTREE)));
 
@@ -242,7 +222,7 @@ class PostgisDialectTest {
       TableConfig table = new TableConfig();
       table.setName("users");
       table.setColumns(
-          List.of(new ColumnConfig("email", ColumnType.TEXT, null, null, null, false, null)));
+          List.of(new ColumnConfig("email", ColumnType.TEXT, null, null, null, false)));
       table.setIndexes(List.of(new IndexConfig(null, List.of("email"), false, IndexMethod.BTREE)));
 
       String indexStatement = dialect.createTable(table).get(1);

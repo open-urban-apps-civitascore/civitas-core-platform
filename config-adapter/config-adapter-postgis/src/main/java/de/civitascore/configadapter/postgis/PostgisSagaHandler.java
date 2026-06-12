@@ -256,7 +256,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   // ─── Dataset-saga sink provisioning ─────────────────────────────────────────
 
   private SagaCommandResult provisionSink(SagaCommandMessage command) throws SQLException {
-    List<SinkSpec> sinks = parseSinks(command);
+    List<SinkSpec> sinks = parseSinks(command, true);
     List<String> statements = new ArrayList<>();
     List<Map<String, Object>> provisioned = new ArrayList<>();
     for (SinkSpec sink : sinks) {
@@ -285,7 +285,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   private SagaCommandResult deprovisionSink(SagaCommandMessage command, boolean compensation)
       throws SQLException {
-    List<SinkSpec> sinks = parseSinks(command);
+    List<SinkSpec> sinks = parseSinks(command, false);
     List<String> statements = new ArrayList<>();
     for (SinkSpec sink : sinks) {
       if (sink.role() != null) {
@@ -421,7 +421,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   private SagaCommandResult unknownOperation(SagaCommandMessage command, boolean compensation) {
     String error = "Unknown postgis operation: " + command.operation();
-    logger.warn(error);
+    logger.warn("Unknown postgis operation: {}", Encode.forJava(command.operation()));
     return compensation
         ? SagaCommandResult.compensationFailure(command.sagaId(), command.stepId(), error)
         : SagaCommandResult.failure(command.sagaId(), command.stepId(), error);
@@ -470,10 +470,12 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   /**
    * Parses the trigger's {@code datasinks} into per-sink specs. See the class javadoc for the
-   * {@code POSTGIS} sink {@code configuration} shape. Used identically by {@code PROVISION_SINK}
-   * and {@code DEPROVISION_SINK} so the forward and rollback paths stay symmetric.
+   * {@code POSTGIS} sink {@code configuration} shape. Used by {@code PROVISION_SINK} and {@code
+   * DEPROVISION_SINK} so the forward and rollback paths resolve the same identifiers; only the
+   * provisioning path needs the column definitions ({@code requireColumns}) — dropping a table
+   * requires just its name, so a delete trigger may omit columns and {@code dataStructure}.
    */
-  private List<SinkSpec> parseSinks(SagaCommandMessage command) {
+  private List<SinkSpec> parseSinks(SagaCommandMessage command, boolean requireColumns) {
     List<SinkSpec> specs = new ArrayList<>();
     for (Map<String, Object> sink : mapList(command.payload(), "datasinks")) {
       if (!DATASINK_TYPE_POSTGIS.equals(sink.get("type"))) {
@@ -496,7 +498,9 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       List<GeometryColumnConfig> geometryColumns =
           convertList(config.get("geometryColumns"), GeometryColumnConfig.class);
       List<ColumnConfig> columns = convertList(config.get("columns"), ColumnConfig.class);
-      if (columns.isEmpty() && sink.get("dataStructure") instanceof Map<?, ?> model) {
+      if (requireColumns
+          && columns.isEmpty()
+          && sink.get("dataStructure") instanceof Map<?, ?> model) {
         Set<String> geometryNames = new HashSet<>();
         for (GeometryColumnConfig geometry : geometryColumns) {
           geometryNames.add(geometry.name());
@@ -519,7 +523,9 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       table.setGeometryColumns(geometryColumns);
       table.setPrimaryKey(stringList(config.get("primaryKey")));
       table.setIndexes(convertList(config.get("indexes"), IndexConfig.class));
-      if (table.getColumns().isEmpty() && table.getGeometryColumns().isEmpty()) {
+      if (requireColumns
+          && table.getColumns().isEmpty()
+          && table.getGeometryColumns().isEmpty()) {
         throw new IllegalArgumentException(
             "POSTGIS data sink '" + tableName + "' configuration must define at least one column");
       }

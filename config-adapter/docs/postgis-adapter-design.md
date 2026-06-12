@@ -29,8 +29,7 @@ config-adapter-api/
     ├── SchemaGrant.java              ← record(schema, privileges, withGrantOption)
     ├── SchemaPrivilege.java          ← enum: USAGE, CREATE, ALL
     ├── TableConfig.java              ← class (Jackson POJO with setters)
-    ├── ColumnConfig.java             ← record(name, type, length, precision, scale,
-    │                                            nullable, defaultExpr)
+    ├── ColumnConfig.java             ← record(name, type, length, precision, scale, nullable)
     ├── ColumnType.java               ← enum: SMALLINT, INTEGER, BIGINT, NUMERIC, REAL,
     │                                          DOUBLE_PRECISION, BOOLEAN, VARCHAR, TEXT,
     │                                          UUID, DATE, TIME, TIMESTAMP, TIMESTAMPTZ,
@@ -154,7 +153,7 @@ Mapping lives inside `PostgisDialect` (via `isDuplicate` / `isMissing` / `isConn
 3. The matching handler produces the ordered DDL list:
    - Table CREATE → `CREATE SCHEMA …` (if schema given), `CREATE TABLE …`, `CREATE INDEX …`; Table DELETE → `DROP TABLE …`; Table UPDATE → `UNSUPPORTED_OPERATION` (deferred).
    - Schema CREATE/UPDATE/DELETE → `CREATE`/`ALTER … OWNER TO`/`DROP SCHEMA`.
-   - Role CREATE → `CREATE ROLE …` + `GRANT …`; Role UPDATE → read current grants, then `ALTER ROLE …` + reconciled `GRANT`/`REVOKE`; Role DELETE → `DROP ROLE …`. Encrypted passwords are decrypted first.
+   - Role CREATE → `CREATE ROLE …` + `GRANT …`; Role UPDATE → read current grants (incl. grant-option state), then `ALTER ROLE …` + reconciled `GRANT`/`REVOKE`/`REVOKE GRANT OPTION FOR`; Role DELETE → `DROP OWNED BY …` + `DROP ROLE …` (privileges must be revoked before a role can be dropped). Encrypted passwords are decrypted first.
 4. Statements are executed inside a single JDBC transaction. Per statement:
    - success → continue
    - `dialect.isDuplicate` on a CREATE-class op → log info, treat as success
@@ -203,11 +202,11 @@ Alongside the event-driven `PostgisAdapter`, the module provides `PostgisSagaHan
 
 Forward/compensation pairs: `CREATE_TABLE`↔`DROP_TABLE`, `CREATE_SCHEMA`↔`DROP_SCHEMA`, `CREATE_ROLE`↔`DROP_ROLE`. The forward command carries the resource definition as a nested map (`tableConfig` / `schemaConfig` / `roleConfig`) including its `resourceType` discriminator — deserialized through the polymorphic `PostgisConfigValue` base, exactly as the config travels in CloudEvents. Each `CREATE_*` returns its identifiers as `compensationData`, which the orchestrator flattens into the compensating `DROP_*`'s payload. CREATE absorbs duplicate-object SQLStates and DROP absorbs missing-object SQLStates, so steps and compensations are retry-safe. The handler reuses `ConnectionProvider`, `PostgisDialect`, `TableDdlBuilder`, `GrantReconciler`, and the same `CredentialDecryptor`-based password handling as the adapter.
 
-A second operation pair — `PROVISION_SINK` ↔ `DEPROVISION_SINK` — integrates the adapter as a **dataset-saga step**. GeoServer publishes feature types from an existing PostGIS table, so when the trigger carries a `POSTGIS` data sink the CREATE saga runs `PROVISION_SINK` (schema + table + GeoServer read-role, one transaction) before GeoServer's `CREATE_DATASTORE`/`PROVISION_LAYERS`; DELETE runs `DEPROVISION_SINK` after `DELETE_WORKSPACE`. These read the trigger's `datasinks[POSTGIS].configuration` directly. The multi-statement transaction uses **per-statement savepoints** so an absorbed duplicate/missing object doesn't abort the whole transaction (PostgreSQL aborts a transaction on any statement error). Wired into both the coded builders and the BPMN of `config-adapter-flowable`; CREATE/UPDATE remain FROST → APISIX → [GeoServer] → RedPanda with the PostGIS sink slotted into the GeoServer (`hasGeoSink`) branch.
+A second operation pair — `PROVISION_SINK` ↔ `DEPROVISION_SINK` — integrates the adapter as a **dataset-saga step**. GeoServer publishes feature types from an existing PostGIS table, so when the trigger carries a `POSTGIS` data sink the CREATE saga runs `PROVISION_SINK` (schema + table + GeoServer read-role, one transaction) before GeoServer's `CREATE_DATASTORE`/`PROVISION_LAYERS`; DELETE runs `DEPROVISION_SINK` after `DELETE_WORKSPACE`. These read the trigger's `datasinks[POSTGIS].configuration` directly (the DELETE trigger may omit column definitions — dropping needs only the identifiers). All multi-statement DDL transactions — in the saga handler **and** in the event-driven adapter — use **per-statement savepoints** so an absorbed duplicate/missing object doesn't abort the whole transaction (PostgreSQL aborts a transaction on any statement error). Wired into both the coded builders and the BPMN of `config-adapter-flowable`; CREATE/UPDATE remain FROST → APISIX → [GeoServer] → RedPanda with the PostGIS sink slotted into the GeoServer (`hasGeoSink`) branch.
 
 ### Connection-pool startup behaviour
 
-`ConnectionProvider` configures HikariCP with `initializationFailTimeout = -1`. The pool is constructed lazily — adapter startup does **not** probe the database. If the DB is unreachable when an event arrives, the connection attempt fails inside `executeDdl`, the `SQLException` is classified by `PostgisDialect.isConnectivity` (`SQLState 08*`), and the event surfaces as a `RetryableAdapterException` — preserving the retry contract instead of crashing the adapter at startup. This mirrors the FROST adapter, which creates its JAX-RS client up front but defers real I/O to event processing.
+`ConnectionProvider` configures HikariCP with `initializationFailTimeout = -1`. The pool starts eagerly but skips the fail-fast initial connection attempt — adapter startup does **not** fail on an unreachable database. If the DB is unreachable when an event arrives, the connection attempt fails inside `executeDdl`, the `SQLException` is classified by `PostgisDialect.isConnectivity` (`SQLState 08*`), and the event surfaces as a `RetryableAdapterException` — preserving the retry contract instead of crashing the adapter at startup. This mirrors the FROST adapter, which creates its JAX-RS client up front but defers real I/O to event processing.
 
 ---
 

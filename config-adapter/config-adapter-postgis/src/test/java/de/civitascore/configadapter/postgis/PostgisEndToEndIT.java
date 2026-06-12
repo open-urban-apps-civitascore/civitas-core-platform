@@ -201,10 +201,9 @@ class PostgisEndToEndIT extends AbstractPostgisIT {
     table.setName("sensor_readings");
     table.setColumns(
         List.of(
-            new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false, null),
-            new ColumnConfig(
-                "recorded_at", ColumnType.TIMESTAMPTZ, null, null, null, false, "now()"),
-            new ColumnConfig("temperature", ColumnType.NUMERIC, null, 6, 2, true, null)));
+            new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false),
+            new ColumnConfig("recorded_at", ColumnType.TIMESTAMPTZ, null, null, null, false),
+            new ColumnConfig("temperature", ColumnType.NUMERIC, null, 6, 2, true)));
     table.setGeometryColumns(
         List.of(new GeometryColumnConfig("location", GeometryType.POINT, 4326, null, false)));
     table.setPrimaryKey(List.of("id"));

@@ -67,11 +67,9 @@
       <incoming>flow-workspace-sink</incoming>
       <incoming>SequenceFlow_5</incoming>
       <outgoing>flow-sink-frost</outgoing>
-      <outgoing>SequenceFlow_1</outgoing>
     </serviceTask>
     <boundaryEvent id="deprovision-sink-error" name="Step Failed" attachedToRef="deprovision-sink">
       <outgoing>flow-sink-error</outgoing>
-      <outgoing>SequenceFlow_2</outgoing>
       <errorEventDefinition id="ErrorEventDefinition_5" errorRef="stepFailedError"/>
     </boundaryEvent>
     <serviceTask id="delete-project" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Delete FROST Project">
@@ -83,8 +81,6 @@
       <incoming>flow-geo-skip</incoming>
       <incoming>flow-sink-frost</incoming>
       <incoming>flow-sink-error</incoming>
-      <incoming>SequenceFlow_1</incoming>
-      <incoming>SequenceFlow_2</incoming>
       <outgoing>SequenceFlow_4</outgoing>
     </serviceTask>
     <boundaryEvent id="frost-error" name="Step Failed" attachedToRef="delete-project">
@@ -138,8 +134,6 @@
     <sequenceFlow id="flow-publish-failure-end" sourceRef="publish-failure" targetRef="end"/>
     <sequenceFlow id="flow-redpanda-error" sourceRef="redpanda-error" targetRef="delete-route"/>
     <sequenceFlow id="flow-apisix-error" sourceRef="apisix-error" targetRef="geo-gateway"/>
-    <sequenceFlow id="SequenceFlow_1" sourceRef="deprovision-sink" targetRef="delete-project"/>
-    <sequenceFlow id="SequenceFlow_2" sourceRef="deprovision-sink-error" targetRef="delete-project"/>
     <sequenceFlow id="SequenceFlow_3" sourceRef="frost-error" targetRef="result-gateway"/>
     <sequenceFlow id="SequenceFlow_4" sourceRef="delete-project" targetRef="result-gateway"/>
     <sequenceFlow id="SequenceFlow_5" sourceRef="workspace-error" targetRef="deprovision-sink"/>
@@ -350,20 +344,6 @@
         <di:waypoint xsi:type="dc:Point" x="1608.0" y="259.0"/>
         <di:waypoint xsi:type="dc:Point" x="1608.0" y="219.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_29"/>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_19" bpmnElement="SequenceFlow_1" sourceElement="BPMNShape_deprovision_sink" targetElement="BPMNShape_ServiceTask_4">
-        <di:waypoint xsi:type="dc:Point" x="963.0" y="201.0"/>
-        <di:waypoint xsi:type="dc:Point" x="991.0" y="200.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1020.0" y="200.0"/>
-        <bpmndi:BPMNLabel id="BPMNLabel_37"/>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_20" bpmnElement="SequenceFlow_2" sourceElement="BPMNShape_deprovision_sink_error" targetElement="BPMNShape_ServiceTask_4">
-        <di:waypoint xsi:type="dc:Point" x="908.0" y="244.0"/>
-        <di:waypoint xsi:type="dc:Point" x="908.0" y="254.0"/>
-        <di:waypoint xsi:type="dc:Point" x="994.0" y="254.0"/>
-        <di:waypoint xsi:type="dc:Point" x="994.0" y="208.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1020.0" y="208.0"/>
-        <bpmndi:BPMNLabel id="BPMNLabel_38"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_21" bpmnElement="SequenceFlow_3" sourceElement="BPMNShape_BoundaryEvent_4" targetElement="BPMNShape_ExclusiveGateway_4">
         <di:waypoint xsi:type="dc:Point" x="1074.0" y="243.0"/>

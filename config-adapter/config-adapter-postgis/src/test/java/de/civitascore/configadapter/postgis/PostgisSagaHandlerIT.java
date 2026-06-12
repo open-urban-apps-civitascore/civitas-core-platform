@@ -126,9 +126,6 @@ class PostgisSagaHandlerIT extends AbstractPostgisIT {
     assertTrue(roleExists("saga_role_it"));
     assertTrue(hasSchemaPrivilege("saga_role_it", "saga_grant_it", "USAGE"));
 
-    // role owns granted privileges → revoke them before drop so the compensation succeeds cleanly
-    executeSql("REVOKE ALL ON SCHEMA \"saga_grant_it\" FROM \"saga_role_it\"");
-
     SagaCommandResult compensated =
         handler.handle(compensate("DROP_ROLE", Map.of("role", "saga_role_it")));
 
@@ -156,9 +153,6 @@ class PostgisSagaHandlerIT extends AbstractPostgisIT {
     assertTrue(
         hasSchemaPrivilege("sink_it_geo", "sink_it", "USAGE"),
         "read role should hold USAGE on the schema");
-
-    // GeoServer's read role must be able to use the schema before we can drop it cleanly.
-    executeSql("REVOKE ALL ON SCHEMA \"sink_it\" FROM \"sink_it_geo\"");
 
     SagaCommandResult deprovisioned = handler.handle(compensate("DEPROVISION_SINK", trigger));
     assertEquals("COMPENSATION_COMPLETED", deprovisioned.type());

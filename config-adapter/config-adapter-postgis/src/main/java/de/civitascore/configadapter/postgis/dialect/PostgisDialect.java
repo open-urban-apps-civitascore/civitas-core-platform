@@ -61,9 +61,6 @@ public final class PostgisDialect implements SqlDialect {
     if (!column.isNullable()) {
       sb.append(" NOT NULL");
     }
-    if (column.defaultExpr() != null && !column.defaultExpr().isBlank()) {
-      sb.append(" DEFAULT ").append(column.defaultExpr());
-    }
     return sb.toString();
   }
 
@@ -152,10 +149,21 @@ public final class PostgisDialect implements SqlDialect {
         "ALTER ROLE " + quoteIdent(role.getName()) + roleOptionsClause(role, decryptedPassword));
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Emits {@code DROP OWNED BY} first — PostgreSQL refuses {@code DROP ROLE} while the role
+   * still holds privileges (SQLState 2BP01), and {@code DROP OWNED BY} both revokes them and drops
+   * objects the role owns (the read roles provisioned by this adapter own nothing; the sink table
+   * is dropped explicitly by the same step). This is the role-removal procedure documented by
+   * PostgreSQL.
+   */
   @Override
   public List<String> dropRole(DbRoleConfig role) {
     requireName(role.getName(), "role name");
-    return List.of("DROP ROLE " + quoteIdent(role.getName()));
+    return List.of(
+        "DROP OWNED BY " + quoteIdent(role.getName()),
+        "DROP ROLE " + quoteIdent(role.getName()));
   }
 
   @Override
@@ -182,8 +190,20 @@ public final class PostgisDialect implements SqlDialect {
   }
 
   @Override
+  public String revokeGrantOptionOnSchema(
+      String roleName, String schema, List<SchemaPrivilege> privileges) {
+    return "REVOKE GRANT OPTION FOR "
+        + renderPrivileges(privileges)
+        + " ON SCHEMA "
+        + quoteIdent(schema)
+        + " FROM "
+        + quoteIdent(roleName);
+  }
+
+  @Override
   public String readSchemaGrantsQuery() {
-    return "SELECT n.nspname AS schema_name, acl.privilege_type AS privilege_type "
+    return "SELECT n.nspname AS schema_name, acl.privilege_type AS privilege_type, "
+        + "acl.is_grantable AS is_grantable "
         + "FROM pg_namespace n "
         + "CROSS JOIN LATERAL aclexplode(n.nspacl) AS acl "
         + "JOIN pg_roles r ON r.oid = acl.grantee "

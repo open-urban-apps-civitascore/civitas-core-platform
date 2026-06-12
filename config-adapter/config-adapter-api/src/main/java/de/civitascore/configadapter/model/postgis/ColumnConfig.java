@@ -21,8 +21,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * @param precision optional precision for NUMERIC; ignored for other types
  * @param scale optional scale for NUMERIC; ignored for other types
  * @param nullable whether the column may be NULL; {@code null} treated as {@code true}
- * @param defaultExpr raw SQL expression for the column default (e.g. {@code "now()"}); no quoting
- *     applied — caller is responsible for syntactic correctness
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -32,8 +30,7 @@ public record ColumnConfig(
     Integer length,
     Integer precision,
     Integer scale,
-    Boolean nullable,
-    String defaultExpr) {
+    Boolean nullable) {
 
   public boolean isNullable() {
     return nullable == null || nullable;

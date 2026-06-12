@@ -180,11 +180,12 @@ class PostgisDialectSchemaRoleTest {
     }
 
     @Test
-    void dropRoleProducesDropStatement() {
+    void dropRoleRevokesOwnedPrivilegesBeforeDropping() {
       DbRoleConfig role = new DbRoleConfig();
       role.setName("analyst");
 
-      assertEquals(List.of("DROP ROLE \"analyst\""), dialect.dropRole(role));
+      assertEquals(
+          List.of("DROP OWNED BY \"analyst\"", "DROP ROLE \"analyst\""), dialect.dropRole(role));
     }
   }
 
@@ -213,6 +214,19 @@ class PostgisDialectSchemaRoleTest {
       String statement = dialect.revokeOnSchema("analyst", "iot", List.of(SchemaPrivilege.CREATE));
 
       assertEquals("REVOKE CREATE ON SCHEMA \"iot\" FROM \"analyst\"", statement);
+    }
+
+    @Test
+    void revokeGrantOptionKeepsPrivilegeAndStripsOption() {
+      String statement =
+          dialect.revokeGrantOptionOnSchema("analyst", "iot", List.of(SchemaPrivilege.USAGE));
+
+      assertEquals("REVOKE GRANT OPTION FOR USAGE ON SCHEMA \"iot\" FROM \"analyst\"", statement);
+    }
+
+    @Test
+    void readSchemaGrantsQueryExposesGrantableState() {
+      assertTrue(dialect.readSchemaGrantsQuery().contains("is_grantable"));
     }
 
     @Test

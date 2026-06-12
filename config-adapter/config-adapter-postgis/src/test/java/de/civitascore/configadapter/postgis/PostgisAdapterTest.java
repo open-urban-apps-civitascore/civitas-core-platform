@@ -485,8 +485,7 @@ class PostgisAdapterTest {
   private TableConfig buildSimpleTable() {
     TableConfig table = new TableConfig();
     table.setName("widgets");
-    table.setColumns(
-        List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false, null)));
+    table.setColumns(List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false)));
     return table;
   }
 

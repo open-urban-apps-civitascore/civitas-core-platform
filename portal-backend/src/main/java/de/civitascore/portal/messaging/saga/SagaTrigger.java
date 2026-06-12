@@ -146,6 +146,7 @@ public sealed interface SagaTrigger
       Map<String, String> routeIds,
       String serviceId,
       List<String> pipelineIds,
+      List<DataSinkPayload> datasinks,
       List<NamedApi> namedApis)
       implements SagaTrigger {
 
@@ -164,6 +165,7 @@ public sealed interface SagaTrigger
         Map<String, String> routeIds,
         String serviceId,
         List<String> pipelineIds,
+        List<DataSinkPayload> datasinks,
         List<NamedApi> namedApis) {
       return new DatasetDelete(
           SagaType.DATASET_DELETE,
@@ -173,6 +175,7 @@ public sealed interface SagaTrigger
           routeIds,
           serviceId,
           pipelineIds,
+          datasinks,
           namedApis);
     }
   }

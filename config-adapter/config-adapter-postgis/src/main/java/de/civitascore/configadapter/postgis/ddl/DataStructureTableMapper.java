@@ -75,7 +75,7 @@ public final class DataStructureTableMapper {
         continue;
       }
       ColumnType type = columnType(spec);
-      columns.add(new ColumnConfig(name, type, null, null, null, nullable, null));
+      columns.add(new ColumnConfig(name, type, null, null, null, nullable));
     }
     return new TableColumns(columns, geometryColumns);
   }

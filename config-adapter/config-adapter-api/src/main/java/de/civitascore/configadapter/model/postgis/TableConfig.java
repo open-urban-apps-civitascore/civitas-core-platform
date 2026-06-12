@@ -31,7 +31,7 @@ import java.util.Objects;
  *   "name": "sensor_readings",
  *   "columns": [
  *     {"name": "id", "type": "BIGINT", "nullable": false},
- *     {"name": "recorded_at", "type": "TIMESTAMPTZ", "nullable": false, "defaultExpr": "now()"}
+ *     {"name": "recorded_at", "type": "TIMESTAMPTZ", "nullable": false}
  *   ],
  *   "geometryColumns": [
  *     {"name": "location", "geometryType": "POINT", "srid": 4326, "nullable": false}

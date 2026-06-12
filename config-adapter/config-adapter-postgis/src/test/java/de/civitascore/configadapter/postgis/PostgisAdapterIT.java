@@ -88,8 +88,8 @@ class PostgisAdapterIT extends AbstractPostgisIT {
     table.setName("widgets_it_simple");
     table.setColumns(
         List.of(
-            new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false, null),
-            new ColumnConfig("label", ColumnType.TEXT, null, null, null, true, null)));
+            new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false),
+            new ColumnConfig("label", ColumnType.TEXT, null, null, null, true)));
     table.setPrimaryKey(List.of("id"));
 
     adapter.processConfigEvent(
@@ -105,8 +105,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
   void tableWithGeometryAndGistIndexIsCreatedSuccessfully() throws Exception {
     TableConfig table = new TableConfig();
     table.setName("places_it");
-    table.setColumns(
-        List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false, null)));
+    table.setColumns(List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false)));
     table.setGeometryColumns(
         List.of(new GeometryColumnConfig("geom", GeometryType.POINT, 4326, null, false)));
     table.setPrimaryKey(List.of("id"));
@@ -129,9 +128,8 @@ class PostgisAdapterIT extends AbstractPostgisIT {
     table.setName("readings_it");
     table.setColumns(
         List.of(
-            new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false, null),
-            new ColumnConfig(
-                "recorded_at", ColumnType.TIMESTAMPTZ, null, null, null, false, "now()")));
+            new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false),
+            new ColumnConfig("recorded_at", ColumnType.TIMESTAMPTZ, null, null, null, false)));
     table.setPrimaryKey(List.of("id"));
 
     adapter.processConfigEvent(
@@ -147,8 +145,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
   void duplicateTableCreateIsAbsorbedAsSuccess() throws Exception {
     TableConfig table = new TableConfig();
     table.setName("dup_it");
-    table.setColumns(
-        List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false, null)));
+    table.setColumns(List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false)));
 
     adapter.processConfigEvent(
         Topics.SQL_TABLE_CREATED.toString(), createEvent(Operation.CREATE, table));
@@ -160,6 +157,27 @@ class PostgisAdapterIT extends AbstractPostgisIT {
     assertTrue(
         results.stream().allMatch(r -> r.status() == ConfigResultEvent.Status.SUCCESS),
         "Both CREATE attempts should be reported as SUCCESS (idempotent on duplicate)");
+  }
+
+  @Test
+  void redeliveredTableCreateWithSchemaIsAbsorbedAsSuccess() throws Exception {
+    TableConfig table = new TableConfig();
+    table.setSchema("redeliver_it");
+    table.setName("readings_redeliver_it");
+    table.setColumns(List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false)));
+    table.setPrimaryKey(List.of("id"));
+
+    adapter.processConfigEvent(
+        Topics.SQL_TABLE_CREATED.toString(), createEvent(Operation.CREATE, table));
+    adapter.processConfigEvent(
+        Topics.SQL_TABLE_CREATED.toString(), createEvent(Operation.CREATE, table));
+
+    List<ConfigResultEvent> results = eventPublisher.published();
+    assertEquals(2, results.size());
+    assertTrue(
+        results.stream().allMatch(r -> r.status() == ConfigResultEvent.Status.SUCCESS),
+        "Redelivered CREATE of a schema-qualified table must absorb the duplicate schema"
+            + " and still treat the duplicate table as success");
   }
 
   @Test
@@ -205,8 +223,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
   void invalidDdlIsReportedAsFatalAdapterException() {
     TableConfig table = new TableConfig();
     table.setName("bad_it");
-    table.setColumns(
-        List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false, null)));
+    table.setColumns(List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false)));
     // Reference a column that does not exist in the table — Postgres rejects with
     // SQLState 42703 (undefined_column), which the adapter must classify as fatal.
     table.setPrimaryKey(List.of("does_not_exist"));
@@ -305,6 +322,26 @@ class PostgisAdapterIT extends AbstractPostgisIT {
   }
 
   @Test
+  void redeliveredRoleCreateWithGrantsIsAbsorbedAsSuccess() throws Exception {
+    executeSql("CREATE SCHEMA IF NOT EXISTS \"regrant_it\"");
+    DbRoleConfig role = new DbRoleConfig();
+    role.setName("regrant_role_it");
+    role.setGrants(List.of(new SchemaGrant("regrant_it", List.of(SchemaPrivilege.USAGE), null)));
+
+    adapter.processConfigEvent(
+        Topics.SQL_ROLE_CREATED.toString(), createEvent(Operation.CREATE, role, "regrant_role_it"));
+    adapter.processConfigEvent(
+        Topics.SQL_ROLE_CREATED.toString(), createEvent(Operation.CREATE, role, "regrant_role_it"));
+
+    List<ConfigResultEvent> results = eventPublisher.published();
+    assertEquals(2, results.size());
+    assertTrue(
+        results.stream().allMatch(r -> r.status() == ConfigResultEvent.Status.SUCCESS),
+        "Redelivered CREATE of a role with grants must absorb the duplicate role"
+            + " and still apply the grant statements");
+  }
+
+  @Test
   void updateRoleReconcilesGrantsRevokingRemovedPrivilege() throws Exception {
     executeSql("CREATE SCHEMA IF NOT EXISTS \"reconcile_it\"");
     executeSql("CREATE ROLE \"reconcile_role_it\"");
@@ -328,6 +365,51 @@ class PostgisAdapterIT extends AbstractPostgisIT {
   }
 
   @Test
+  void updateRoleUpgradesHeldPrivilegeToWithGrantOption() throws Exception {
+    executeSql("CREATE SCHEMA IF NOT EXISTS \"optionup_it\"");
+    executeSql("CREATE ROLE \"optionup_role_it\"");
+    executeSql("GRANT USAGE ON SCHEMA \"optionup_it\" TO \"optionup_role_it\"");
+
+    DbRoleConfig role = new DbRoleConfig();
+    role.setName("optionup_role_it");
+    role.setGrants(List.of(new SchemaGrant("optionup_it", List.of(SchemaPrivilege.USAGE), true)));
+
+    adapter.processConfigEvent(
+        Topics.SQL_ROLE_UPDATED.toString(),
+        createEvent(Operation.UPDATE, role, "optionup_role_it"));
+
+    assertSingleSuccessfulResult();
+    assertTrue(
+        hasSchemaPrivilege("optionup_role_it", "optionup_it", "USAGE WITH GRANT OPTION"),
+        "USAGE should have been upgraded to WITH GRANT OPTION");
+  }
+
+  @Test
+  void updateRoleStripsGrantOptionWhileKeepingPrivilege() throws Exception {
+    executeSql("CREATE SCHEMA IF NOT EXISTS \"optiondown_it\"");
+    executeSql("CREATE ROLE \"optiondown_role_it\"");
+    executeSql(
+        "GRANT USAGE ON SCHEMA \"optiondown_it\" TO \"optiondown_role_it\" WITH GRANT OPTION");
+
+    DbRoleConfig role = new DbRoleConfig();
+    role.setName("optiondown_role_it");
+    role.setGrants(
+        List.of(new SchemaGrant("optiondown_it", List.of(SchemaPrivilege.USAGE), null)));
+
+    adapter.processConfigEvent(
+        Topics.SQL_ROLE_UPDATED.toString(),
+        createEvent(Operation.UPDATE, role, "optiondown_role_it"));
+
+    assertSingleSuccessfulResult();
+    assertTrue(
+        hasSchemaPrivilege("optiondown_role_it", "optiondown_it", "USAGE"),
+        "USAGE itself should be retained");
+    assertFalse(
+        hasSchemaPrivilege("optiondown_role_it", "optiondown_it", "USAGE WITH GRANT OPTION"),
+        "the grant option should have been revoked");
+  }
+
+  @Test
   void deleteRoleRemovesIt() throws Exception {
     executeSql("CREATE ROLE \"doomed_role_it\"");
     DbRoleConfig role = new DbRoleConfig();
@@ -348,8 +430,7 @@ class PostgisAdapterIT extends AbstractPostgisIT {
 
     TableConfig table = new TableConfig();
     table.setName("any_offline");
-    table.setColumns(
-        List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false, null)));
+    table.setColumns(List.of(new ColumnConfig("id", ColumnType.BIGINT, null, null, null, false)));
 
     try {
       assertThrows(

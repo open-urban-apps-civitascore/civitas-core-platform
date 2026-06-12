@@ -37,14 +37,14 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Savepoint;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.EnumSet;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Pattern;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
@@ -276,7 +276,8 @@ public class PostgisAdapter extends AbstractConfigAdapter {
   /** Reads the role's current schema grants and computes ALTER + reconcile statements. */
   private List<String> planRoleUpdate(Connection connection, DbRoleConfig role, String password)
       throws SQLException {
-    Map<String, Set<SchemaPrivilege>> current = readSchemaGrants(connection, role.getName());
+    Map<String, Map<SchemaPrivilege, Boolean>> current =
+        readSchemaGrants(connection, role.getName());
     GrantReconcilePlan plan = GrantReconciler.reconcile(role.getGrants(), current);
     List<String> statements = new ArrayList<>(dialect.alterRole(role, password));
     appendGrantStatements(statements, role.getName(), plan);
@@ -293,11 +294,16 @@ public class PostgisAdapter extends AbstractConfigAdapter {
     for (SchemaRevoke revoke : plan.toRevoke()) {
       statements.add(dialect.revokeOnSchema(roleName, revoke.schema(), revoke.privileges()));
     }
+    for (SchemaRevoke revoke : plan.toRevokeGrantOption()) {
+      statements.add(
+          dialect.revokeGrantOptionOnSchema(roleName, revoke.schema(), revoke.privileges()));
+    }
   }
 
-  private Map<String, Set<SchemaPrivilege>> readSchemaGrants(Connection connection, String roleName)
-      throws SQLException {
-    Map<String, Set<SchemaPrivilege>> grantsBySchema = new LinkedHashMap<>();
+  /** Reads the role's current schema privileges, keyed by schema, with their grant-option state. */
+  private Map<String, Map<SchemaPrivilege, Boolean>> readSchemaGrants(
+      Connection connection, String roleName) throws SQLException {
+    Map<String, Map<SchemaPrivilege, Boolean>> grantsBySchema = new LinkedHashMap<>();
     try (PreparedStatement ps = connection.prepareStatement(dialect.readSchemaGrantsQuery())) {
       ps.setString(1, roleName);
       try (ResultSet rs = ps.executeQuery()) {
@@ -306,8 +312,8 @@ public class PostgisAdapter extends AbstractConfigAdapter {
           if (privilege != null) {
             grantsBySchema
                 .computeIfAbsent(
-                    rs.getString("schema_name"), s -> EnumSet.noneOf(SchemaPrivilege.class))
-                .add(privilege);
+                    rs.getString("schema_name"), s -> new EnumMap<>(SchemaPrivilege.class))
+                .put(privilege, rs.getBoolean("is_grantable"));
           }
         }
       }
@@ -366,14 +372,11 @@ public class PostgisAdapter extends AbstractConfigAdapter {
         List<String> statements = planner.plan(connection);
         try (Statement stmt = connection.createStatement()) {
           for (String sql : statements) {
-            executeOne(stmt, sql, absorbDuplicate, absorbMissing);
+            executeOne(connection, stmt, sql, absorbDuplicate, absorbMissing);
           }
         }
         connection.commit();
-      } catch (SQLException e) {
-        safeRollback(connection);
-        throw e;
-      } catch (RuntimeException e) {
+      } catch (SQLException | RuntimeException e) {
         safeRollback(connection);
         throw e;
       }
@@ -389,20 +392,36 @@ public class PostgisAdapter extends AbstractConfigAdapter {
     }
   }
 
+  /**
+   * Executes one DDL statement, wrapped in a savepoint. An absorbed duplicate/missing object rolls
+   * back to the savepoint rather than the whole transaction: PostgreSQL aborts the entire
+   * transaction on any error, so without the savepoint the following statements in a
+   * multi-statement plan (schema → table → index, or role → grants) would fail with "current
+   * transaction is aborted". The savepoint keeps the idempotency-by-absorption contract working
+   * inside one transaction.
+   */
   private void executeOne(
-      Statement stmt, String sql, boolean absorbDuplicate, boolean absorbMissing)
+      Connection connection,
+      Statement stmt,
+      String sql,
+      boolean absorbDuplicate,
+      boolean absorbMissing)
       throws SQLException {
+    Savepoint savepoint = connection.setSavepoint();
     try {
       logger.debug("Executing DDL: {}", Encode.forJava(redact(sql)));
       stmt.execute(sql);
+      connection.releaseSavepoint(savepoint);
     } catch (SQLException e) {
       if (absorbDuplicate && dialect.isDuplicate(e)) {
+        connection.rollback(savepoint);
         logger.info(
             "PostGIS object already exists (SQLState {}), treating create as success (idempotent)",
             Encode.forJava(String.valueOf(e.getSQLState())));
         return;
       }
       if (absorbMissing && dialect.isMissing(e)) {
+        connection.rollback(savepoint);
         logger.info(
             "PostGIS object not found (SQLState {}), treating delete as success (already gone, idempotent)",
             Encode.forJava(String.valueOf(e.getSQLState())));

@@ -57,7 +57,7 @@ Idempotency on conflict (absorbed as success):
 | CREATE | `42P07` / `42P06` / `42710` | duplicate table / schema / role |
 | DELETE | `42P01` / `3F000` / `42704` | undefined table / invalid schema / undefined role |
 
-**Grant reconciliation (role UPDATE):** the payload is the desired state. The adapter reads the role's current schema privileges from the database, `GRANT`s those newly present, and `REVOKE`s those no longer listed. `ALL` expands to `USAGE` + `CREATE` for comparison.
+**Grant reconciliation (role UPDATE):** the payload is the desired state. The adapter reads the role's current schema privileges (including their grant-option state) from the database, `GRANT`s those newly present, and `REVOKE`s those no longer listed. The grant option is reconciled too: a held privilege is re-granted `WITH GRANT OPTION` when the payload requests it, and downgraded via `REVOKE GRANT OPTION FOR …` when it no longer does. `ALL` expands to `USAGE` + `CREATE` for comparison.
 
 ## Subscribed Topics
 
@@ -97,11 +97,11 @@ All properties are overridable via environment variables (`.` → `_`, uppercase
 
 **Role passwords:** the `password` field may be an encrypted `ENC(...)` value following the project credential convention. The adapter decrypts it with the `CIVITAS_MASTER_KEY` master key (see [`CredentialDecryptor`](../config-adapter-api/src/main/java/de/civitascore/configadapter/crypto/CredentialDecryptor.java), credential context `portal-backend:sql-role`). If `CIVITAS_MASTER_KEY` is unset and an encrypted password arrives, the event fails fatally. Plaintext passwords are accepted as-is. Passwords are never written to logs or error messages (`PASSWORD '…'` literals are redacted).
 
-**Startup behaviour:** the HikariCP pool is created lazily (`initializationFailTimeout = -1`) — adapter startup does not probe the database. If the DB is unreachable when an event arrives, the failure is reported as a `RetryableAdapterException` rather than crashing the adapter at boot.
+**Startup behaviour:** the HikariCP pool starts eagerly but skips the fail-fast initial connection attempt (`initializationFailTimeout = -1`) — an unreachable database never fails adapter startup. If the DB is unreachable when an event arrives, the failure is reported as a `RetryableAdapterException` rather than crashing the adapter at boot.
 
 ## Event Payload
 
-The payload uses the sealed `PostgisConfigValue` hierarchy, currently with one variant — `TableConfig`. JSON discriminator: `"resourceType": "sql-table"`.
+The payload uses the sealed `PostgisConfigValue` hierarchy with three variants — `TableConfig` (`"resourceType": "sql-table"`), `SchemaConfig` (`"sql-schema"`), and `DbRoleConfig` (`"sql-role"`). The example below shows a table payload.
 
 ```json
 {
@@ -118,7 +118,7 @@ The payload uses the sealed `PostgisConfigValue` hierarchy, currently with one v
         "name": "sensor_readings",
         "columns": [
           { "name": "id",          "type": "BIGINT",      "nullable": false },
-          { "name": "recorded_at", "type": "TIMESTAMPTZ", "nullable": false, "defaultExpr": "now()" },
+          { "name": "recorded_at", "type": "TIMESTAMPTZ", "nullable": false },
           { "name": "temperature", "type": "NUMERIC", "precision": 6, "scale": 2, "nullable": true }
         ],
         "geometryColumns": [
@@ -140,7 +140,7 @@ Generated DDL for the example above:
 CREATE SCHEMA "iot";
 CREATE TABLE "iot"."sensor_readings" (
   "id" BIGINT NOT NULL,
-  "recorded_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  "recorded_at" TIMESTAMPTZ NOT NULL,
   "temperature" NUMERIC(6, 2),
   "location" GEOMETRY(POINT, 4326) NOT NULL,
   PRIMARY KEY ("id")
@@ -176,7 +176,7 @@ CREATE INDEX "idx_sensor_readings_location" ON "iot"."sensor_readings" USING GIS
 }
 ```
 
-`CREATE` generates `CREATE ROLE "analyst" WITH LOGIN PASSWORD '…' INHERIT` followed by `GRANT USAGE, CREATE ON SCHEMA "iot" TO "analyst"`. On `UPDATE`, the grants are reconciled against the live database (see *Grant reconciliation* above). `DELETE` → `DROP ROLE "analyst"`.
+`CREATE` generates `CREATE ROLE "analyst" WITH LOGIN PASSWORD '…' INHERIT` followed by `GRANT USAGE, CREATE ON SCHEMA "iot" TO "analyst"`. On `UPDATE`, the grants are reconciled against the live database (see *Grant reconciliation* above). `DELETE` → `DROP OWNED BY "analyst"` + `DROP ROLE "analyst"` (the `DROP OWNED BY` revokes the role's remaining privileges first — PostgreSQL refuses to drop a role that still holds grants).
 
 ## Supported Column Types
 

@@ -82,9 +82,16 @@ public interface SqlDialect {
   String revokeOnSchema(String roleName, String schema, List<SchemaPrivilege> privileges);
 
   /**
+   * Build a single {@code REVOKE GRANT OPTION FOR ... ON SCHEMA ... FROM role} statement — strips
+   * the grant option while the role keeps the privileges themselves.
+   */
+  String revokeGrantOptionOnSchema(
+      String roleName, String schema, List<SchemaPrivilege> privileges);
+
+  /**
    * Returns a parameterised query (one {@code ?} bind for the role name) that yields the role's
-   * current explicit schema privileges as rows of {@code (schema_name, privilege_type)}. Used to
-   * reconcile embedded grants on UPDATE.
+   * current explicit schema privileges as rows of {@code (schema_name, privilege_type,
+   * is_grantable)}. Used to reconcile embedded grants on UPDATE.
    */
   String readSchemaGrantsQuery();
 

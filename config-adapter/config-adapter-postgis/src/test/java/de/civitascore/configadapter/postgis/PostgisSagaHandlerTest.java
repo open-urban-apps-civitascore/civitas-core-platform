@@ -357,6 +357,29 @@ class PostgisSagaHandlerTest {
       verify(mockConnection).commit();
     }
 
+    @Test
+    void deprovisionSinkWorksWithoutColumnDefinitions() throws Exception {
+      // A delete trigger carries only the sink identifiers — dropping needs no column derivation.
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of("schema", "ds_42", "tableName", "sensor_readings"))));
+
+      SagaCommandResult result = handler.handle(compensate("DEPROVISION_SINK", trigger));
+
+      assertEquals("COMPENSATION_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      assertTrue(
+          sql.getAllValues().stream()
+              .anyMatch(s -> s.startsWith("DROP TABLE \"ds_42\".\"sensor_readings\"")));
+    }
+
     private Map<String, Object> postgisSinkTrigger() {
       return Map.of(
           "datasetId",
