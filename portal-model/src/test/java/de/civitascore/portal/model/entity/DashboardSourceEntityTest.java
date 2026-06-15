@@ -20,11 +20,11 @@ class DashboardSourceEntityTest {
       UUID datasetId = UUID.randomUUID();
 
       DashboardSource source = new DashboardSource();
-      source.setExternalSourceId("superset-ds-7");
+      source.setExternalSourceId("source-7");
       source.setMappedDatasetId(datasetId);
       source.setPhysicalSourceIdentifier("orders");
 
-      assertThat(source.getExternalSourceId()).isEqualTo("superset-ds-7");
+      assertThat(source.getExternalSourceId()).isEqualTo("source-7");
       assertThat(source.getMappedDatasetId()).isEqualTo(datasetId);
       assertThat(source.getPhysicalSourceIdentifier()).isEqualTo("orders");
     }

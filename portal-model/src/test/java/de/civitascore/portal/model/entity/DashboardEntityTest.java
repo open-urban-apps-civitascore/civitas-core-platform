@@ -23,12 +23,12 @@ class DashboardEntityTest {
       source.setId(UUID.randomUUID());
 
       Dashboard dashboard = new Dashboard();
-      dashboard.setExternalDashboardId("superset-dash-42");
+      dashboard.setExternalDashboardId("dash-42");
       dashboard.setActive(false);
       dashboard.setDataset(dataset);
       dashboard.getSources().add(source);
 
-      assertThat(dashboard.getExternalDashboardId()).isEqualTo("superset-dash-42");
+      assertThat(dashboard.getExternalDashboardId()).isEqualTo("dash-42");
       assertThat(dashboard.isActive()).isFalse();
       assertThat(dashboard.getDataset()).isSameAs(dataset);
       assertThat(dashboard.getSources()).containsExactly(source);

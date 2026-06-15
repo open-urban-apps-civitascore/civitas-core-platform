@@ -10,8 +10,10 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -19,9 +21,8 @@ import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 /**
- * A dashboard rendered by the dashboard engine (Superset today). The dashboard itself lives in the
- * engine's metadata DB; the platform row holds the binding the engine and the authorisation layer
- * need.
+ * The dashboard itself lives in the rendering engine's own metadata DB; this platform row holds
+ * only the binding the engine and the authorisation layer need to resolve and authorise it.
  */
 @Entity
 @Table(name = "dashboards")
@@ -47,10 +48,25 @@ public class Dashboard extends NamedEntity {
   private boolean active = true;
 
   @Builder.Default
+  @Setter(AccessLevel.NONE)
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
       name = "dashboard_dashboard_sources",
       joinColumns = @JoinColumn(name = "dashboard_id"),
       inverseJoinColumns = @JoinColumn(name = "dashboard_source_id"))
   private Set<DashboardSource> sources = new HashSet<>();
+
+  /**
+   * Mutates the managed set in place rather than swapping the reference, so the binding relation a
+   * persistence context already tracks stays intact. The 1:N anchor invariant (every source maps to
+   * this dashboard's dataset) is enforced on the write path, not here.
+   *
+   * @param newSources the new source bindings, or {@code null} to clear
+   */
+  public void setSources(Collection<DashboardSource> newSources) {
+    this.sources.clear();
+    if (newSources != null) {
+      this.sources.addAll(newSources);
+    }
+  }
 }

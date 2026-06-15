@@ -14,8 +14,8 @@ import lombok.experimental.SuperBuilder;
 
 /**
  * The platform-side projection of a source object that lives in the dashboard engine's own metadata
- * DB (Superset today). The platform stores only what it needs to authorise access: the engine's id
- * for the object, the dataset that authorises it, and the physical table/view the engine queries.
+ * DB. The platform stores only what it needs to authorise access: the engine's id for the object,
+ * the dataset that authorises it, and the physical table/view the engine queries.
  *
  * <p>This is deliberately <em>not</em> the platform {@link DataSet}: several of these may map to
  * the same dataset, and they carry no scope of their own.
