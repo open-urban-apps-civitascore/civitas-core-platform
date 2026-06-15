@@ -15,7 +15,6 @@ import de.civitascore.portal.model.saga.DataSinkPayload;
 import de.civitascore.portal.model.saga.LayerPayload;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
-import de.civitascore.portal.service.DataStructureVersionService;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -49,21 +48,18 @@ public class DataSetSagaPublisher {
   private final SagaProperties sagaProperties;
   private final DataSinkRepository dataSinkRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
-  private final DataStructureVersionService dataStructureVersionService;
 
   public DataSetSagaPublisher(
       KafkaTemplate<String, String> eventKafkaTemplate,
       ObjectMapper objectMapper,
       SagaProperties sagaProperties,
       DataSinkRepository dataSinkRepository,
-      DataStructureVersionRepository dataStructureVersionRepository,
-      DataStructureVersionService dataStructureVersionService) {
+      DataStructureVersionRepository dataStructureVersionRepository) {
     this.eventKafkaTemplate = eventKafkaTemplate;
     this.objectMapper = objectMapper;
     this.sagaProperties = sagaProperties;
     this.dataSinkRepository = dataSinkRepository;
     this.dataStructureVersionRepository = dataStructureVersionRepository;
-    this.dataStructureVersionService = dataStructureVersionService;
   }
 
   /**
@@ -201,9 +197,10 @@ public class DataSetSagaPublisher {
   }
 
   /**
-   * Resolves the sink's referenced data-structure JSON Schema from Model Atlas. {@code null} when
-   * no version is referenced (e.g. FROST); throws {@link InvalidInputException} if a referenced
-   * version cannot be resolved, failing the publish. The id is already validated at sink save time.
+   * Resolves the sink's referenced data-structure model (JSON Schema) persisted on the {@code
+   * DataStructureVersion}. {@code null} when no version is referenced (e.g. FROST); throws {@link
+   * InvalidInputException} if a referenced version is missing or carries no model, failing the
+   * publish. The id is already validated at sink save time.
    */
   private Map<String, Object> resolveDataStructure(DataSink sink) {
     if (sink.getConfiguration() == null) {
@@ -225,16 +222,14 @@ public class DataSetSagaPublisher {
                         "DataSink",
                         "configuration.dataStructureVersionId",
                         "DataStructureVersion not found: " + dsvId));
-    return dataStructureVersionService
-        .resolveJsonSchemaByAtlasUri(version.getModelAtlasUri())
-        .filter(schema -> !schema.isEmpty())
-        .orElseThrow(
-            () ->
-                new InvalidInputException(
-                    "DataSink",
-                    "configuration.dataStructureVersionId",
-                    "Cannot resolve JSON Schema from Model Atlas for DataStructureVersion "
-                        + dsvId));
+    Map<String, Object> model = version.getModel();
+    if (model == null || model.isEmpty()) {
+      throw new InvalidInputException(
+          "DataSink",
+          "configuration.dataStructureVersionId",
+          "DataStructureVersion " + dsvId + " has no model");
+    }
+    return model;
   }
 
   private List<DataPipeline> buildPipelines(Set<Pipeline> pipelines, PipelineAction action) {

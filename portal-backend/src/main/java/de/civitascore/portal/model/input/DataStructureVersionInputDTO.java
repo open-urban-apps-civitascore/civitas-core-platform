@@ -25,13 +25,10 @@ public class DataStructureVersionInputDTO extends BaseInputDTO {
 
   private String description;
 
-  @Schema(description = "URI to the model in the atlas")
-  private String modelAtlasUri;
-
   private String modelName;
 
-  @Schema(description = "Data model definition (JSON schema)")
-  private String model;
+  @Schema(description = "Data model definition as a JSON Schema document")
+  private Map<String, Object> model;
 
   private Map<String, Object> styles;
 

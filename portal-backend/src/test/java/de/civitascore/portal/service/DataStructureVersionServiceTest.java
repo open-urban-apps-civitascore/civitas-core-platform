@@ -4,10 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,10 +32,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DataStructureVersionService Unit Tests")
@@ -47,9 +40,7 @@ class DataStructureVersionServiceTest {
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @Mock private DataStructureVersionMapper dataStructureVersionMapper;
   @Mock private DataStructureService dataStructureService;
-  @Mock private ModelService modelService;
   @Mock private DataSourceRepository dataSourceRepository;
-  @Mock private ObjectMapper objectMapper;
 
   @InjectMocks private DataStructureVersionService dataStructureVersionService;
 
@@ -169,8 +160,8 @@ class DataStructureVersionServiceTest {
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setVersion("1.0.0");
-      version.setModelAtlasUri("https://modelatlas.example.com/old");
       version.setModelName("OldModel");
+      version.setModel(new HashMap<>(Map.of("title", "Old")));
       version.setStyles(new HashMap<>(Map.of("color", "blue")));
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       version.setDataStructure(ds);
@@ -179,8 +170,7 @@ class DataStructureVersionServiceTest {
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setVersion("2.0.0");
-      input.setModelAtlasUri("https://modelatlas.example.com/new");
-      input.setModel("<xml>new model</xml>");
+      input.setModel(new HashMap<>(Map.of("title", "New")));
       input.setStyles(new HashMap<>(Map.of("color", "red")));
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
@@ -197,8 +187,7 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
-    @DisplayName(
-        "Should block model and structural changes via updateReleasedMeta when version is in use")
+    @DisplayName("Should block model and structural changes via updateReleasedMeta when in use")
     void shouldBlockStructuralChangesWhenInUse() {
       UUID versionId = UUID.randomUUID();
       UUID dataStructureId = UUID.randomUUID();
@@ -206,11 +195,12 @@ class DataStructureVersionServiceTest {
       ds.setId(dataStructureId);
       ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
 
+      Map<String, Object> originalModel = new HashMap<>(Map.of("title", "Original"));
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setVersion("1.0.0");
-      version.setModelAtlasUri("https://modelatlas.example.com/original");
       version.setModelName("OldModel");
+      version.setModel(originalModel);
       version.setStyles(new HashMap<>(Map.of("color", "blue")));
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       version.setDataStructure(ds);
@@ -219,8 +209,7 @@ class DataStructureVersionServiceTest {
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setVersion("2.0.0");
-      input.setModelAtlasUri("https://modelatlas.example.com/SHOULD_NOT_CHANGE");
-      input.setModel("<xml>should not upload</xml>");
+      input.setModel(new HashMap<>(Map.of("title", "SHOULD_NOT_CHANGE")));
       input.setStyles(new HashMap<>(Map.of("color", "red")));
       input.setModelName("UpdatedModelName");
 
@@ -234,13 +223,15 @@ class DataStructureVersionServiceTest {
 
       dataStructureVersionService.updateReleasedMeta(versionId, input);
 
-      // After preProcessUpdateInput, in-use fields should be reverted
-      assertThat(input.getModelAtlasUri())
-          .as("ModelAtlasUri should be reverted to original")
-          .isEqualTo("https://modelatlas.example.com/original");
-      assertThat(input.getModel()).as("Model should be cleared").isNull();
+      // After preProcessUpdateInput, in-use structural fields should be reverted
+      assertThat(input.getModel())
+          .as("Model should be reverted to original")
+          .isEqualTo(originalModel);
       assertThat(input.getVersion()).as("Version should be reverted").isEqualTo("1.0.0");
       assertThat(input.getStyles().get("color")).as("Styles should be reverted").isEqualTo("blue");
+      assertThat(input.getModelName())
+          .as("ModelName is editable while in use")
+          .isEqualTo("UpdatedModelName");
     }
 
     @Test
@@ -263,58 +254,50 @@ class DataStructureVersionServiceTest {
   }
 
   @Nested
-  @DisplayName("Release model existence guard")
-  class ReleaseModelExistenceTests {
+  @DisplayName("Release model guard")
+  class ReleaseModelGuardTests {
 
     @Test
-    @DisplayName(
-        "Should block release when modelAtlasUri is set but no model exists in Model Atlas")
-    void shouldBlockReleaseWhenModelNotFoundInAtlas() {
+    @DisplayName("Should block release when version has no model")
+    void shouldBlockReleaseWhenModelIsNull() {
       UUID versionId = UUID.randomUUID();
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setModelAtlasUri("http://example.com/model/missing");
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(modelService.downloadModel("http://example.com/model/missing", "application/xml"))
-          .thenThrow(new RuntimeException("Not found"));
 
       assertThatThrownBy(() -> dataStructureVersionService.release(versionId))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("no model found in Model Atlas");
+          .hasMessageContaining("model");
     }
 
     @Test
-    @DisplayName("Should block release when Model Atlas returns null content")
-    void shouldBlockReleaseWhenModelContentIsNull() {
+    @DisplayName("Should block release when version model is empty")
+    void shouldBlockReleaseWhenModelIsEmpty() {
       UUID versionId = UUID.randomUUID();
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setModelAtlasUri("http://example.com/model/empty");
+      version.setModel(new HashMap<>());
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(modelService.downloadModel("http://example.com/model/empty", "application/xml"))
-          .thenReturn(null);
 
       assertThatThrownBy(() -> dataStructureVersionService.release(versionId))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("no model found in Model Atlas");
+          .hasMessageContaining("model");
     }
 
     @Test
-    @DisplayName("Should allow release when model exists in Model Atlas")
-    void shouldAllowReleaseWhenModelExists() {
+    @DisplayName("Should allow release when version carries a model")
+    void shouldAllowReleaseWhenModelPresent() {
       UUID versionId = UUID.randomUUID();
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setModelAtlasUri("http://example.com/model/valid");
+      version.setModel(new HashMap<>(Map.of("title", "Observation")));
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(modelService.downloadModel("http://example.com/model/valid", "application/xml"))
-          .thenReturn("<xml>model content</xml>");
       when(dataStructureVersionRepository.save(version)).thenReturn(version);
 
       DataStructureVersion result = dataStructureVersionService.release(versionId);
@@ -322,22 +305,6 @@ class DataStructureVersionServiceTest {
       assertThat(result.getDataStructureVersionStatus())
           .isEqualTo(DataStructureVersionStatus.AVAILABLE);
       verify(dataStructureVersionRepository).save(version);
-    }
-
-    @Test
-    @DisplayName("Should block release when modelAtlasUri is blank")
-    void shouldBlockReleaseWhenModelAtlasUriIsBlank() {
-      UUID versionId = UUID.randomUUID();
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setModelAtlasUri("  ");
-
-      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-
-      assertThatThrownBy(() -> dataStructureVersionService.release(versionId))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("modelAtlasUri");
     }
 
     @Test
@@ -353,131 +320,6 @@ class DataStructureVersionServiceTest {
       assertThatThrownBy(() -> dataStructureVersionService.release(versionId))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("already released");
-    }
-  }
-
-  @Nested
-  @DisplayName("findModelByAtlasUri")
-  class FindModelByAtlasUriTests {
-
-    @Test
-    @DisplayName("Should return model content when modelAtlasUri is present and download succeeds")
-    void shouldReturnModelWhenUriPresentAndDownloadSucceeds() {
-      String expectedModel = "<?xml version=\"1.0\"?><model>content</model>";
-      when(modelService.downloadModel("http://example.com/model/1.0.0", "application/xml"))
-          .thenReturn(expectedModel);
-
-      Optional<String> result =
-          dataStructureVersionService.findModelByAtlasUri("http://example.com/model/1.0.0");
-
-      assertThat(result).isPresent().contains(expectedModel);
-      verify(modelService).downloadModel("http://example.com/model/1.0.0", "application/xml");
-    }
-
-    @Test
-    @DisplayName("Should return empty when modelAtlasUri is blank")
-    void shouldReturnEmptyWhenUriIsBlank() {
-      Optional<String> result = dataStructureVersionService.findModelByAtlasUri("  ");
-
-      assertThat(result).isEmpty();
-    }
-
-    @Test
-    @DisplayName("Should return empty when modelAtlasUri is null")
-    void shouldReturnEmptyWhenUriIsNull() {
-      Optional<String> result = dataStructureVersionService.findModelByAtlasUri(null);
-
-      assertThat(result).isEmpty();
-    }
-
-    @Test
-    @DisplayName("Should return empty when download fails")
-    void shouldReturnEmptyWhenDownloadFails() {
-      when(modelService.downloadModel("http://example.com/model/1.0.0", "application/xml"))
-          .thenThrow(new RuntimeException("Connection refused"));
-
-      Optional<String> result =
-          dataStructureVersionService.findModelByAtlasUri("http://example.com/model/1.0.0");
-
-      assertThat(result).isEmpty();
-    }
-  }
-
-  @Nested
-  @DisplayName("resolveJsonSchemaByAtlasUri")
-  class ResolveJsonSchemaByAtlasUriTests {
-
-    @Test
-    @DisplayName("Fetches the schema with Accept application/schema+json and returns it parsed")
-    void resolvesSchemaWithSchemaJsonAcceptHeader() {
-      String uri = "http://example.com/model/1.0.0";
-      String schemaJson = "{\"title\":\"Observation\"}";
-      Map<String, Object> parsed = Map.of("title", "Observation");
-      when(modelService.downloadModel(uri, "application/schema+json")).thenReturn(schemaJson);
-      when(objectMapper.<Map<String, Object>>readValue(eq(schemaJson), any(TypeReference.class)))
-          .thenReturn(parsed);
-
-      Optional<Map<String, Object>> result =
-          dataStructureVersionService.resolveJsonSchemaByAtlasUri(uri);
-
-      assertThat(result).isPresent().contains(parsed);
-      verify(modelService).downloadModel(uri, "application/schema+json");
-    }
-
-    @Test
-    @DisplayName("Returns empty when modelAtlasUri is blank, without calling Model Atlas")
-    void returnsEmptyWhenUriBlank() {
-      assertThat(dataStructureVersionService.resolveJsonSchemaByAtlasUri("  ")).isEmpty();
-      verify(modelService, never()).downloadModel(any(), any());
-    }
-
-    @Test
-    @DisplayName("Returns empty when Model Atlas returns no content")
-    void returnsEmptyWhenNoContent() {
-      String uri = "http://example.com/model/1.0.0";
-      when(modelService.downloadModel(uri, "application/schema+json")).thenReturn("");
-
-      assertThat(dataStructureVersionService.resolveJsonSchemaByAtlasUri(uri)).isEmpty();
-    }
-  }
-
-  @Nested
-  @DisplayName("Model upload with special characters")
-  class ModelUploadUmlautTests {
-
-    @Test
-    @DisplayName("Should pass German umlauts through to ModelService without corruption")
-    void shouldPreserveUmlautsOnCreate() {
-      UUID dataStructureId = UUID.randomUUID();
-      DataStructure dataStructure = new DataStructure();
-      dataStructure.setId(dataStructureId);
-      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
-
-      String modelWithUmlauts = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><model>äöüÄÖÜß</model>";
-      String nsUri = "http://example.com/model";
-
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setVersion("1.0.0");
-      input.setDataStructureId(dataStructureId);
-      input.setModel(modelWithUmlauts);
-      input.setModelAtlasUri(nsUri);
-
-      DataStructureVersion newEntity = new DataStructureVersion();
-      newEntity.setVersion("1.0.0");
-      newEntity.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      newEntity.setModelAtlasUri(nsUri);
-
-      when(dataStructureVersionMapper.toEntity(any())).thenReturn(newEntity);
-      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
-      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
-              dataStructureId, "1.0.0"))
-          .thenReturn(Set.of());
-      when(dataStructureVersionRepository.save(any())).thenReturn(newEntity);
-
-      dataStructureVersionService.create(input);
-
-      verify(modelService).uploadModelString(eq(modelWithUmlauts), eq(nsUri));
     }
   }
 
@@ -608,48 +450,6 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
-    @DisplayName("Should allow update when modelAtlasUri is present but model is null (PATCH fix)")
-    void shouldAllowUpdateWithModelAtlasUriButNoModel() {
-      UUID dataStructureId = UUID.randomUUID();
-      UUID versionId = UUID.randomUUID();
-      DataStructure dataStructure = buildDataStructure(dataStructureId);
-
-      DataStructureVersion existingEntity = new DataStructureVersion();
-      existingEntity.setId(versionId);
-      existingEntity.setVersion("1.0.0");
-      existingEntity.setModelAtlasUri("https://modelatlas.example.com/model1");
-      existingEntity.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      existingEntity.setDataStructure(dataStructure);
-
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setDataStructureId(dataStructureId);
-      input.setVersion("1.0.0");
-      input.setModelAtlasUri("https://modelatlas.example.com/model1");
-      // model is null — simulates a PATCH that only changes description
-
-      doAnswer(
-              invocation -> {
-                DataStructureVersion entity = invocation.getArgument(0);
-                DataStructureVersionInputDTO dto = invocation.getArgument(1);
-                entity.setVersion(dto.getVersion());
-                return null;
-              })
-          .when(dataStructureVersionMapper)
-          .updateEntity(any(), any());
-      when(dataStructureVersionRepository.findById(versionId))
-          .thenReturn(Optional.of(existingEntity));
-      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
-              dataStructureId, "1.0.0"))
-          .thenReturn(Set.of(existingEntity));
-      when(dataStructureVersionRepository.save(any())).thenReturn(existingEntity);
-      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
-
-      assertThatNoException()
-          .isThrownBy(() -> dataStructureVersionService.update(versionId, input));
-    }
-
-    @Test
     @DisplayName(
         "Should allow update when the only matching version is the entity itself (self-assignment)")
     void shouldAllowUpdateWithSameVersionString() {
@@ -681,214 +481,6 @@ class DataStructureVersionServiceTest {
           .isThrownBy(() -> dataStructureVersionService.update(versionId, input));
       verify(dataStructureVersionRepository)
           .findAllByDataStructureIdAndVersion(dataStructureId, "1.0.0");
-    }
-  }
-
-  @Nested
-  @DisplayName("Model Atlas delete on version delete")
-  class DeleteModelAtlasTests {
-
-    @Test
-    @DisplayName("Should delete model from Model Atlas when version with modelAtlasUri is deleted")
-    void shouldDeleteModelFromAtlasOnVersionDelete() {
-      UUID versionId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
-      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
-
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-      version.setModelAtlasUri("https://modelatlas.example.com/model1");
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setDataStructure(ds);
-
-      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
-      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
-
-      dataStructureVersionService.deleteById(versionId);
-
-      verify(modelService).deleteModel("https://modelatlas.example.com/model1");
-    }
-
-    @Test
-    @DisplayName("Should not call delete on Model Atlas when version has no modelAtlasUri")
-    void shouldNotDeleteFromAtlasWhenNoUri() {
-      UUID versionId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
-      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
-
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setDataStructure(ds);
-
-      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
-      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
-
-      dataStructureVersionService.deleteById(versionId);
-
-      verify(modelService, never()).deleteModel(any());
-    }
-
-    @Test
-    @DisplayName("Should still delete version even if Model Atlas delete fails")
-    void shouldStillDeleteVersionWhenAtlasDeleteFails() {
-      UUID versionId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
-      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
-
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-      version.setModelAtlasUri("https://modelatlas.example.com/model1");
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setDataStructure(ds);
-
-      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
-      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
-      doThrow(new RuntimeException("Atlas down"))
-          .when(modelService)
-          .deleteModel("https://modelatlas.example.com/model1");
-
-      assertThatNoException().isThrownBy(() -> dataStructureVersionService.deleteById(versionId));
-      verify(dataStructureVersionRepository).deleteById(versionId);
-    }
-  }
-
-  @Nested
-  @DisplayName("Model Atlas URI change on update")
-  class UriChangeOnUpdateTests {
-
-    @Test
-    @DisplayName("Should delete old model from Atlas when modelAtlasUri changes on update")
-    void shouldDeleteOldModelWhenUriChanges() {
-      UUID versionId = UUID.randomUUID();
-      UUID dataStructureId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
-      ds.setId(dataStructureId);
-      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
-
-      DataStructureVersion existingEntity = new DataStructureVersion();
-      existingEntity.setId(versionId);
-      existingEntity.setVersion("1.0.0");
-      existingEntity.setModelAtlasUri("https://modelatlas.example.com/old-uri");
-      existingEntity.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      existingEntity.setDataStructure(ds);
-
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setDataStructureId(dataStructureId);
-      input.setVersion("1.0.0");
-      input.setModelAtlasUri("https://modelatlas.example.com/new-uri");
-      input.setModel("<xml>new model</xml>");
-
-      String uploadResponse = "{\"objectId\":\"dGVzdE9iamVjdElk\",\"objectName\":\"TestModel\"}";
-
-      when(dataStructureVersionRepository.findById(versionId))
-          .thenReturn(Optional.of(existingEntity));
-      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
-              dataStructureId, "1.0.0"))
-          .thenReturn(Set.of(existingEntity));
-      when(dataStructureVersionRepository.save(any())).thenReturn(existingEntity);
-      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
-      when(modelService.uploadModelString(
-              "<xml>new model</xml>", "https://modelatlas.example.com/new-uri"))
-          .thenReturn(uploadResponse);
-
-      dataStructureVersionService.update(versionId, input);
-
-      verify(modelService).deleteModel("https://modelatlas.example.com/old-uri");
-      verify(modelService)
-          .uploadModelString("<xml>new model</xml>", "https://modelatlas.example.com/new-uri");
-    }
-
-    @Test
-    @DisplayName("Should not delete old model when modelAtlasUri stays the same")
-    void shouldNotDeleteWhenUriUnchanged() {
-      UUID versionId = UUID.randomUUID();
-      UUID dataStructureId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
-      ds.setId(dataStructureId);
-      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
-
-      DataStructureVersion existingEntity = new DataStructureVersion();
-      existingEntity.setId(versionId);
-      existingEntity.setVersion("1.0.0");
-      existingEntity.setModelAtlasUri("https://modelatlas.example.com/same-uri");
-      existingEntity.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      existingEntity.setDataStructure(ds);
-
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setDataStructureId(dataStructureId);
-      input.setVersion("1.0.0");
-      input.setModelAtlasUri("https://modelatlas.example.com/same-uri");
-      input.setModel("<xml>updated model</xml>");
-
-      String uploadResponse = "{\"objectId\":\"dGVzdE9iamVjdElk\",\"objectName\":\"TestModel\"}";
-
-      when(dataStructureVersionRepository.findById(versionId))
-          .thenReturn(Optional.of(existingEntity));
-      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
-              dataStructureId, "1.0.0"))
-          .thenReturn(Set.of(existingEntity));
-      when(dataStructureVersionRepository.save(any())).thenReturn(existingEntity);
-      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
-      when(modelService.uploadModelString(
-              "<xml>updated model</xml>", "https://modelatlas.example.com/same-uri"))
-          .thenReturn(uploadResponse);
-
-      dataStructureVersionService.update(versionId, input);
-
-      verify(modelService, never()).deleteModel(any());
-      verify(modelService)
-          .uploadModelString("<xml>updated model</xml>", "https://modelatlas.example.com/same-uri");
-    }
-
-    @Test
-    @DisplayName("Should parse and save externalId from upload response")
-    void shouldParseExternalIdFromUploadResponse() throws Exception {
-      UUID versionId = UUID.randomUUID();
-      UUID dataStructureId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
-      ds.setId(dataStructureId);
-      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
-
-      DataStructureVersion existingEntity = new DataStructureVersion();
-      existingEntity.setId(versionId);
-      existingEntity.setVersion("1.0.0");
-      existingEntity.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      existingEntity.setDataStructure(ds);
-
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setDataStructureId(dataStructureId);
-      input.setVersion("1.0.0");
-      input.setModelAtlasUri("https://modelatlas.example.com/model1");
-      input.setModel("<xml>model</xml>");
-
-      String uploadResponse =
-          "{\"objectId\":\"aHR0cDovL3Rlc3QvbW9kZWw=\",\"objectName\":\"TestModel\"}";
-
-      when(dataStructureVersionRepository.findById(versionId))
-          .thenReturn(Optional.of(existingEntity));
-      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
-              dataStructureId, "1.0.0"))
-          .thenReturn(Set.of(existingEntity));
-      when(dataStructureVersionRepository.save(any())).thenReturn(existingEntity);
-      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
-      when(modelService.uploadModelString(
-              "<xml>model</xml>", "https://modelatlas.example.com/model1"))
-          .thenReturn(uploadResponse);
-
-      ObjectMapper realMapper = new JsonMapper();
-      JsonNode rootNode = realMapper.readTree(uploadResponse);
-      when(objectMapper.readTree(uploadResponse)).thenReturn(rootNode);
-
-      dataStructureVersionService.update(versionId, input);
-
-      assertThat(existingEntity.getExternalId()).isEqualTo("aHR0cDovL3Rlc3QvbW9kZWw=");
     }
   }
 }

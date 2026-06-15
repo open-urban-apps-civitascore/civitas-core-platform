@@ -26,14 +26,11 @@ public class DataStructureVersionOutputDTO extends BaseOutputDTO {
   @Schema(description = "How this version was created (e.g. MANUAL, AUTO)")
   private DataStructureVersionSource dataStructureVersionSource;
 
-  @Schema(description = "URI to the model in the atlas", accessMode = Schema.AccessMode.READ_ONLY)
-  private String modelAtlasUri;
-
   private String modelName;
   private Map<String, Object> styles;
 
-  @Schema(description = "Data model definition (JSON schema)")
-  private String model;
+  @Schema(description = "Data model definition as a JSON Schema document")
+  private Map<String, Object> model;
 
   @Schema(
       description = "Whether this version is currently referenced by a data source",
