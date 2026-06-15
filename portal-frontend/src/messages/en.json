@@ -1202,7 +1202,7 @@
       "validationFailed": "Validation failed for: {names}",
       "duplicateNames": "Duplicate pipeline names: {names}",
       "saveFailed": "Failed to save: {names}",
-      "saveSucces": "Pipelines saved successfully"
+      "saveSuccess": "Pipeline \"{name}\" saved successfully"
     },
     "tabs": {
       "closeTab": "Close tab",

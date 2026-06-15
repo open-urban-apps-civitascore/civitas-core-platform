@@ -457,7 +457,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
           sessionManager.updateSessionPipeline(session.id, { ...currentPipeline, isDirty: false })
           sessionManager.markSessionClean(session.id)
           datasinkSnapshotsRef.current[session.id] = createDatasinkSnapshot(currentPipeline)
-          toast.success(t('header.saveSucces'))
+          toast.success(t('header.saveSuccess', { name: currentPipeline.name }))
         } catch {
           saveFailedNames.push(session.name)
         }
