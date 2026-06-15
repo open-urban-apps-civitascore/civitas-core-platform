@@ -254,6 +254,36 @@ class DataStructureVersionServiceTest {
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("DRAFT");
     }
+
+    @Test
+    @DisplayName("Should reject clearing the model of a released version that is not in use")
+    void shouldRejectClearingModelWhenReleasedAndNotInUse() {
+      UUID versionId = UUID.randomUUID();
+      UUID dataStructureId = UUID.randomUUID();
+      DataStructure ds = new DataStructure();
+      ds.setId(dataStructureId);
+      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setVersion("1.0.0");
+      version.setModel(new HashMap<>(Map.of("title", "Existing")));
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      version.setDataStructure(ds);
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setDataStructureId(dataStructureId);
+      input.setVersion("1.0.0");
+      input.setModel(null);
+
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
+      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
+
+      assertThatThrownBy(() -> dataStructureVersionService.updateReleasedMeta(versionId, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("model");
+    }
   }
 
   @Nested

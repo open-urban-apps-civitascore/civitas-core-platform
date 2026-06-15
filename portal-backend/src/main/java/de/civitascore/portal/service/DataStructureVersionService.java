@@ -95,12 +95,14 @@ public class DataStructureVersionService
   /**
    * Validates and constrains update input based on the version's current state. If the version is
    * in use by a data source, structural fields (model, version, styles) are locked and only
-   * description and modelName may change.
+   * description and modelName may change. A released version that is not in use may have its model
+   * replaced but never cleared — it must always retain a non-empty model.
    *
    * @param input the update input
    * @param existingEntity the current version entity
    * @return the preprocessed input with restricted fields preserved if in use
-   * @throws InvalidInputException if the version string is blank
+   * @throws InvalidInputException if the version string is blank, or if an update to a released
+   *     version would clear its model
    */
   @Override
   protected DataStructureVersionInputDTO preProcessUpdateInput(
@@ -110,8 +112,10 @@ public class DataStructureVersionService
           "version", existingEntity.getId(), "Version cannot be null or blank");
     }
 
-    if (existingEntity.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT
-        && dataSourceRepository.existsByDataStructureVersionId(existingEntity.getId())) {
+    boolean isReleased =
+        existingEntity.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT;
+
+    if (isReleased && dataSourceRepository.existsByDataStructureVersionId(existingEntity.getId())) {
       // Version is in use: block all structural changes, allow only description and modelName.
       // Copy the maps so the update mapper does not clear the managed entity's own collections
       // (MapStruct clears + putAll on the target map; sharing the reference would empty it).
@@ -122,6 +126,13 @@ public class DataStructureVersionService
           existingEntity.getStyles() != null
               ? new HashMap<>(existingEntity.getStyles())
               : new HashMap<>());
+    } else if (isReleased && (input.getModel() == null || input.getModel().isEmpty())) {
+      // Released but not in use: the model may be replaced, but never cleared — a released
+      // version must always retain a non-empty model (mirrors the guard in release()).
+      throw new InvalidInputException(
+          "model",
+          existingEntity.getId(),
+          "Cannot clear the model of a released DataStructureVersion");
     }
 
     return super.preProcessUpdateInput(input, existingEntity);

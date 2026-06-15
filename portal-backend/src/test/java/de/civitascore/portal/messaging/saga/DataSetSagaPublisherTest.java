@@ -215,6 +215,23 @@ class DataSetSagaPublisherTest {
     }
 
     @Test
+    @DisplayName("fails the publish when a referenced DSV carries an empty model")
+    void failsWhenReferencedVersionHasEmptyModel() {
+      UUID dsvId = UUID.randomUUID();
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      DataSink sink = postgisSink(UUID.randomUUID(), dsvId, "sensor_observations");
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setModel(Map.of());
+      when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
+      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
+
+      DataSet dataSet = datasetWithPipeline(pipeline);
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class);
+    }
+
+    @Test
     @DisplayName("FROST sink without a DSV reference carries a null dataStructure, no failure")
     void frostSinkHasNoSchema() throws Exception {
       UUID sinkId = UUID.randomUUID();
