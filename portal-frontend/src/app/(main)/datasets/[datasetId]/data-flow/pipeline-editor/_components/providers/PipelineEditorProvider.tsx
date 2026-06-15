@@ -15,7 +15,11 @@ import { useTranslations } from 'next-intl'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
-import { useCreateDataSink, useUpdateDataSink } from '@/app/services/api/datasets/datasinks/clientRequests'
+import {
+  useCreateDataSink,
+  useDeleteDataSink,
+  useUpdateDataSink,
+} from '@/app/services/api/datasets/datasinks/clientRequests'
 import {
   useCreatePipeline,
   useDeletePipeline,
@@ -30,6 +34,7 @@ import {
   buildPipelinePayload,
   createDatasinkSnapshot,
   type DatasinkSnapshot,
+  getRemovedDatasinkIds,
   hasDatasinkChanged,
   updateNodeEntityId,
 } from '../../_services/payloadBuilderService'
@@ -94,6 +99,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const updatePipelineMutation = useUpdatePipeline(datasetId)
   const deletePipelineMutation = useDeletePipeline(datasetId)
   const createDatasinkMutation = useCreateDataSink()
+  const deleteDatasinkMutation = useDeleteDataSink()
   const updateDatasinkMutation = useUpdateDataSink()
 
   // ===== Datasink snapshot for change detection =====
@@ -419,7 +425,13 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
           let currentPipeline = session.pipeline
           const snapshot = datasinkSnapshotsRef.current[session.id] ?? {}
 
-          // Step 1: Save datasinks first (create new / update changed)
+          // Step 1: Delete datasinks for removed persistence nodes
+          const removedDatasinkIds = getRemovedDatasinkIds(currentPipeline, snapshot)
+          for (const datasinkId of removedDatasinkIds) {
+            await deleteDatasinkMutation.mutateAsync({ datasetId, datasinkId })
+          }
+
+          // Step 2: Save datasinks (create new / update changed)
           const datasinkPayloads = buildDatasinkPayloads(currentPipeline)
           for (const { nodeId, entityId, payload } of datasinkPayloads) {
             if (!entityId) {
@@ -430,7 +442,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
             }
           }
 
-          // Step 2: Save pipeline (with updated entityIds from step 1)
+          // Step 3: Save pipeline (with updated entityIds from step 1)
           const pipelinePayload = buildPipelinePayload(currentPipeline)
           const pipelineId = currentPipeline.id
 
@@ -466,6 +478,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     createPipelineMutation,
     updatePipelineMutation,
     createDatasinkMutation,
+    deleteDatasinkMutation,
     updateDatasinkMutation,
     datasetId,
     t,

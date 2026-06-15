@@ -3,7 +3,7 @@ import { AxiosError } from 'axios'
 
 import { apiRequest, type ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { GetListInput } from '@/types/common'
-import { CreateDatasinkInput, Datasink, UpdateDatasinkInput } from '@/types/datasinks'
+import { CreateDatasinkInput, Datasink, DeleteDatasinkInput, UpdateDatasinkInput } from '@/types/datasinks'
 
 const key = 'datasinks'
 
@@ -31,6 +31,22 @@ export const useCreateDataSink = () => {
         headers: { 'x-api-request': 'true' },
         data,
         errorMessage: 'An error occurred while creating the datasink.',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [key] })
+    },
+  })
+}
+
+export const useDeleteDataSink = () => {
+  const queryClient = useQueryClient()
+  return useMutation<ApiServiceResponse<void>, AxiosError, DeleteDatasinkInput>({
+    mutationFn: ({ datasetId, datasinkId }) =>
+      apiRequest<void>({
+        method: 'DELETE',
+        endpoint: `/datasets/${datasetId}/datasinks/${datasinkId}`,
+        headers: { 'x-api-request': 'true' },
+        errorMessage: 'An error occurred while deleting the datasink.',
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [key] })

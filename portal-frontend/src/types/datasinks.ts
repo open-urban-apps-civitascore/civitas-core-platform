@@ -44,3 +44,5 @@ export type DataSinkPayload = PostgisDataSinkPayload | FrostDataSinkPayload
 export type CreateDatasinkInput = { datasetId: string; data: DataSinkPayload }
 
 export type UpdateDatasinkInput = { datasetId: string; datasinkId: string; data: DataSinkPayload }
+
+export type DeleteDatasinkInput = { datasetId: string; datasinkId: string }

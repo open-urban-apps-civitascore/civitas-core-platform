@@ -34,25 +34,15 @@ export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
 
   // 2. Extract entity data by node type
 
-  // DataSources: numeric entity IDs from configured DataSource nodes
+  // DataSources: entity IDs from configured DataSource nodes
   const dataSourceIds: string[] = pipeline.nodes
     .filter(n => isDataSourceNodeData(n.data) && n.data.entityId != null)
     .map(n => (n.data as DataSourceNodeData).entityId as string)
-  const dataSinks: DataSinkPayload[] = pipeline.nodes.flatMap<DataSinkPayload>(n => {
-    if (isGeoPersistenceNodeData(n.data) && n.data.dataStructureVersionId != null) {
-      return [
-        {
-          id: n.data.entityId ?? null,
-          dataSinkType: DATASINK_TYPES.POSTGIS,
-          configuration: {
-            tableName: n.data.tableName,
-            dataStructureVersionId: n.data.dataStructureVersionId.split('/')[1],
-          },
-        },
-      ]
-    }
-    return []
-  })
+
+  // DataSinks: only IDs (config is saved separately via datasink API)
+  const dataSinkIds: string[] = pipeline.nodes
+    .filter(n => (isGeoPersistenceNodeData(n.data) || isFrostNodeData(n.data)) && n.data.entityId != null)
+    .map(n => n.data.entityId as string)
 
   // 3. Build RedPandaConnect model
   const model = buildRedPandaConnectModel(pipeline)
@@ -63,7 +53,7 @@ export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
     description: pipeline.description || '-',
     styles: styles,
     dataSourceIds,
-    dataSinks: dataSinks,
+    dataSinkIds,
     model: model || {},
   }
 }
@@ -155,22 +145,33 @@ export const buildDatasinkPayloads = (pipeline: Pipeline): DatasinkNodePayload[]
 }
 
 /**
- * Snapshot type for change detection: maps nodeId → JSON-stringified payload (without `id` field).
+ * Snapshot entry for a single datasink node: tracks both the entityId and configuration.
  */
-export type DatasinkSnapshot = Record<string, string>
+export interface DatasinkSnapshotEntry {
+  /** The backend datasink ID at snapshot time, or null for unsaved nodes */
+  entityId: string | null
+  /** JSON-stringified payload config (dataSinkType + configuration, excluding `id`) */
+  configJson: string
+}
+
+/**
+ * Snapshot type for change detection: maps nodeId → snapshot entry.
+ */
+export type DatasinkSnapshot = Record<string, DatasinkSnapshotEntry>
 
 /**
  * Creates a snapshot of the current datasink payloads for later change detection.
- * The snapshot stores a JSON string of the payload configuration (excluding `id`)
- * keyed by pipeline node ID.
+ * The snapshot stores the entityId and a JSON string of the payload configuration
  */
 export const createDatasinkSnapshot = (pipeline: Pipeline): DatasinkSnapshot => {
   const payloads = buildDatasinkPayloads(pipeline)
   const snapshot: DatasinkSnapshot = {}
-  for (const { nodeId, payload } of payloads) {
-    // Compare only dataSinkType + configuration, not the mutable `id`
+  for (const { nodeId, entityId, payload } of payloads) {
     const { id: _id, ...comparable } = payload
-    snapshot[nodeId] = JSON.stringify(comparable)
+    snapshot[nodeId] = {
+      entityId,
+      configJson: JSON.stringify(comparable),
+    }
   }
   return snapshot
 }
@@ -180,11 +181,21 @@ export const createDatasinkSnapshot = (pipeline: Pipeline): DatasinkSnapshot => 
  * Returns true if the datasink is new (not in snapshot) or its configuration differs.
  */
 export const hasDatasinkChanged = (nodeId: string, payload: DataSinkPayload, snapshot: DatasinkSnapshot): boolean => {
-  const savedJson = snapshot[nodeId]
-  if (!savedJson) return true // new node, not in snapshot
+  const entry = snapshot[nodeId]
+  if (!entry) return true // new node, not in snapshot
 
   const { id: _id, ...comparable } = payload
-  return JSON.stringify(comparable) !== savedJson
+  return JSON.stringify(comparable) !== entry.configJson
+}
+
+/**
+ * Finds datasink IDs that were in the snapshot but no longer exist in the current pipeline.
+ */
+export const getRemovedDatasinkIds = (pipeline: Pipeline, snapshot: DatasinkSnapshot): string[] => {
+  const currentNodeIds = new Set(pipeline.nodes.map(n => n.id))
+  return Object.entries(snapshot)
+    .filter(([nodeId, entry]) => !currentNodeIds.has(nodeId) && entry.entityId != null)
+    .map(([, entry]) => entry.entityId as string)
 }
 
 /**
