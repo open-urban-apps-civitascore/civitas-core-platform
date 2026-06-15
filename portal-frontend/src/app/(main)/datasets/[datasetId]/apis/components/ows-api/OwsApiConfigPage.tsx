@@ -22,10 +22,10 @@ import {
   DEFAULTS_BY_TYPE,
   LayerFormData,
   NamedApi,
+  OwsApiFormData,
+  OwsApiFormSchema,
   StaApiFormData,
   StyleFormData,
-  WfsWmsApiFormData,
-  WfsWmsApiFormSchema,
 } from '@/types/namedApis'
 import { getNativeCRSFromDatasink, mapApiLayerToFormData, mapApiStyleToFormData } from '@/utils/namedApis'
 
@@ -66,15 +66,15 @@ const defaultStyle: StyleFormData = {
   sldContent: '',
 }
 
-interface WfsWmsApiConfigPageProps {
+interface OwsApiConfigPageProps {
   dataset: Dataset
   existingApi?: NamedApi
   testId?: string
 }
 
-export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiConfigPageProps) => {
+export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigPageProps) => {
   const t = useTranslations('datasets.overview.completion.apis.config')
-  const apiType = API_TYPE_QUERY.WFS_WMS
+  const apiType = API_TYPE_QUERY.OWS
   const typeLabel = t(`title.${apiType}`)
 
   const defaults = DEFAULTS_BY_TYPE[apiType]
@@ -86,7 +86,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     [dataset.namedApis, existingApi?.slug],
   )
   const existingSlugs = useMemo(() => otherNamedApis.map(a => a.slug), [otherNamedApis])
-  const formSchema = useMemo(() => WfsWmsApiFormSchema({ existingSlugs }), [existingSlugs])
+  const formSchema = useMemo(() => OwsApiFormSchema({ existingSlugs }), [existingSlugs])
   const initialSlug = existingApi?.slug ?? defaults.defaultSlug
 
   const { data: datasinksData, isPending: isDatasinksLoading } = useGetDatasinks(dataset.id)
@@ -141,8 +141,8 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
   const [selectedLayerIndex, setSelectedLayerIndex] = useState<number | null>(layers.length > 0 ? 0 : null)
   const [selectedStyleIndex, setSelectedStyleIndex] = useState<number | null>(styleFormData.length > 0 ? 0 : null)
 
-  const wfsWmsDefaults: WfsWmsApiFormData = {
-    type: API_TYPE_QUERY.WFS_WMS,
+  const owsDefaults: OwsApiFormData = {
+    type: API_TYPE_QUERY.OWS,
     baseInfo: {
       name: existingApi?.name ?? '',
       slug: initialSlug,
@@ -153,10 +153,10 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     styles: styleFormData,
   }
 
-  const form = useForm<WfsWmsApiFormData>({
+  const form = useForm<OwsApiFormData>({
     resolver: zodResolver(formSchema),
     mode: 'onChange',
-    defaultValues: wfsWmsDefaults,
+    defaultValues: owsDefaults,
   })
 
   const {
@@ -172,7 +172,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
   } = useFieldArray({ control: form.control, name: 'styles', keyName: '_key' })
 
   useEffect(() => {
-    form.reset(wfsWmsDefaults)
+    form.reset(owsDefaults)
     setSelectedLayerIndex(layers.length > 0 ? 0 : null)
     setSelectedStyleIndex(styleFormData.length > 0 ? 0 : null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -211,7 +211,7 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
     existingApi,
     otherNamedApis,
     initialSlug,
-    initialFormData: wfsWmsDefaults,
+    initialFormData: owsDefaults,
     onAfterDiscard: () => {
       setSelectedLayerIndex(layers.length > 0 ? 0 : null)
       setSelectedStyleIndex(styleFormData.length > 0 ? 0 : null)
@@ -280,15 +280,15 @@ export const WfsWmsApiConfigPage = ({ dataset, existingApi, testId }: WfsWmsApiC
 
   const handleTableChange = (datasinkId: string) => {
     if (selectedLayerIndex === null) return
-    form.setValue(`layers.${selectedLayerIndex}.dataSinkId` as FieldPath<WfsWmsApiFormData>, datasinkId, {
+    form.setValue(`layers.${selectedLayerIndex}.dataSinkId` as FieldPath<OwsApiFormData>, datasinkId, {
       shouldDirty: true,
     })
     const nativeCRS = getNativeCRSFromDatasink(datasinkId, postgisDatasinks, postgisDatastructures)
-    form.setValue(`layers.${selectedLayerIndex}.nativeCRS` as FieldPath<WfsWmsApiFormData>, nativeCRS, {
+    form.setValue(`layers.${selectedLayerIndex}.nativeCRS` as FieldPath<OwsApiFormData>, nativeCRS, {
       shouldDirty: true,
     })
     if (nativeCRS) {
-      form.setValue(`layers.${selectedLayerIndex}.crs` as FieldPath<WfsWmsApiFormData>, nativeCRS, {
+      form.setValue(`layers.${selectedLayerIndex}.crs` as FieldPath<OwsApiFormData>, nativeCRS, {
         shouldDirty: true,
       })
     }

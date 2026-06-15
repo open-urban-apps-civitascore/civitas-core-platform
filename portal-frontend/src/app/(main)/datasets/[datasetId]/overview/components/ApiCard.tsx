@@ -1,6 +1,6 @@
 'use client'
 
-import { Copy, Globe, Layers, Map, MoreVertical, Timer } from 'lucide-react'
+import { Copy, Globe, Layers, MoreVertical, Timer } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { ComponentType, useState } from 'react'
@@ -16,8 +16,7 @@ import { ApiStandard, NamedApi, namedApiPathPrefix, NamedApiPayload } from '@/ty
 
 const STANDARD_ICONS: Record<ApiStandard, ComponentType<{ className?: string }>> = {
   STA: Timer,
-  WFS: Map,
-  WMS: Layers,
+  OWS: Layers,
   CUSTOM: Globe,
 }
 

@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import { useEffect } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 
-import { API_TYPE_QUERY, LayerFormData, WfsWmsApiFormData } from '@/types/namedApis'
+import { API_TYPE_QUERY, LayerFormData, OwsApiFormData } from '@/types/namedApis'
 
 import { BoundingBoxConfig } from './BoundingBoxConfig'
 
@@ -54,9 +54,9 @@ interface WrapperProps {
 }
 
 const Wrapper = ({ layer = makeLayer(), isDisabled }: WrapperProps) => {
-  const form = useForm<WfsWmsApiFormData>({
+  const form = useForm<OwsApiFormData>({
     defaultValues: {
-      type: API_TYPE_QUERY.WFS_WMS,
+      type: API_TYPE_QUERY.OWS,
       baseInfo: { name: 'Test API', slug: 'test-api', description: '', persistence: 'postgis' },
       layers: [layer],
     },
@@ -71,9 +71,9 @@ const Wrapper = ({ layer = makeLayer(), isDisabled }: WrapperProps) => {
 type BboxField = 'minX' | 'minY' | 'maxX' | 'maxY'
 
 const WrapperWithErrors = ({ fields }: { fields: BboxField[] }) => {
-  const form = useForm<WfsWmsApiFormData>({
+  const form = useForm<OwsApiFormData>({
     defaultValues: {
-      type: API_TYPE_QUERY.WFS_WMS,
+      type: API_TYPE_QUERY.OWS,
       baseInfo: { name: 'Test API', slug: 'test-api', description: '', persistence: 'postgis' },
       layers: [makeLayer()],
     },

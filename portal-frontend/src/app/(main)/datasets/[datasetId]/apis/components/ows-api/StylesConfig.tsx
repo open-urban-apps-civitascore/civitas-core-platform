@@ -17,11 +17,11 @@ import { Button } from '@/components/ui/button'
 import { FormItem, FormLabel } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { StyleFormData, WfsWmsApiFormData } from '@/types/namedApis'
+import { OwsApiFormData, StyleFormData } from '@/types/namedApis'
 import { getEmptyLabelIndex, isNewItem } from '@/utils/common'
 
 interface StylesConfigProps {
-  form: UseFormReturn<WfsWmsApiFormData>
+  form: UseFormReturn<OwsApiFormData>
   existingStyles: StyleFormData[]
   selectedStyleIndex: number | null
   isReadOnly: boolean
@@ -46,8 +46,8 @@ export const StylesConfig = (props: StylesConfigProps) => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const stylePath = (path: string): FieldPath<WfsWmsApiFormData> =>
-    `styles.${selectedStyleIndex}.${path}` as FieldPath<WfsWmsApiFormData>
+  const stylePath = (path: string): FieldPath<OwsApiFormData> =>
+    `styles.${selectedStyleIndex}.${path}` as FieldPath<OwsApiFormData>
 
   const allStyles = form.watch('styles')
 

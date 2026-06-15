@@ -13,11 +13,11 @@ import {
   LayerFormData,
   NamedApi,
   NamedApiPayload,
+  OwsApiFormData,
   StaApiFormData,
   Style,
   StyleApiPayload,
   StyleFormData,
-  WfsWmsApiFormData,
 } from '@/types/namedApis'
 
 export const hasApiType = (apis: NamedApi[], apiType: ApiStandard): boolean =>
@@ -94,9 +94,9 @@ export const buildStaPayloadData = (data: StaApiFormData): NamedApiPayload => ({
   standard: DEFAULTS_BY_TYPE.sensorthings.standard,
 })
 
-export const buildWfsWmsPayload = (data: WfsWmsApiFormData): NamedApiPayload => ({
+export const buildOwsPayload = (data: OwsApiFormData): NamedApiPayload => ({
   ...data.baseInfo,
-  standard: DEFAULTS_BY_TYPE['wfs-wms'].standard,
+  standard: DEFAULTS_BY_TYPE['ows'].standard,
   description: data.baseInfo.description || undefined,
 })
 

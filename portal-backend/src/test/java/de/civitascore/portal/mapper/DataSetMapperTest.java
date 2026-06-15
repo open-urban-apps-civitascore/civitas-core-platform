@@ -37,7 +37,7 @@ class DataSetMapperTest {
     NamedApi weather = new NamedApi();
     weather.setName("Weather");
     weather.setSlug("weather");
-    weather.setStandard(ApiStandard.WFS);
+    weather.setStandard(ApiStandard.OWS);
     entity.setNamedApis(Set.of(traffic, weather));
 
     DataSetInputDTO input = new DataSetInputDTO();
