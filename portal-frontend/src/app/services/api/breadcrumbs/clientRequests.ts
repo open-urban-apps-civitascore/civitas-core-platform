@@ -11,7 +11,7 @@ export const useGetBredcrumbs = (breadcrumbs: Breadcrumb[]) =>
   useQueries({
     queries: breadcrumbs.map(crumb => ({
       queryKey: ['breadcrumb', crumb.href],
-      enabled: crumb.isDynamic && !!crumb.href,
+      enabled: crumb.isDynamic && crumb.apiHref !== undefined,
       queryFn: () =>
         apiRequest<BreadcrumbApiResponse>({
           endpoint: crumb.apiHref ?? crumb.href,

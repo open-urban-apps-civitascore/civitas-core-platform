@@ -54,7 +54,7 @@ class DatasetSerializationTest {
 
   @Test
   void shouldDeserializePostgresqlDatasource() {
-    Datasource pg = dataset.datasources().get(0);
+    Datasource pg = dataset.datasources().getFirst();
     assertEquals("0a7b8c9d-1e2f-4a5b-9c0d-1e2f3a4b5c6d", pg.getId());
     assertEquals("postgresql", pg.getType());
     assertEquals("Neustadt Mobility DB", pg.getName());
@@ -95,7 +95,7 @@ class DatasetSerializationTest {
     @SuppressWarnings("unchecked")
     List<String> topics = (List<String>) mqtt.getAdditionalProperties().get("topics");
     assertEquals(3, topics.size());
-    assertEquals("neustadt/traffic/+/counts", topics.get(0));
+    assertEquals("neustadt/traffic/+/counts", topics.getFirst());
 
     @SuppressWarnings("unchecked")
     Map<String, Object> tls = (Map<String, Object>) mqtt.getAdditionalProperties().get("tls");
@@ -116,7 +116,7 @@ class DatasetSerializationTest {
 
   @Test
   void shouldDeserializeAddPipeline() {
-    DataPipeline addPipeline = dataset.datapipelines().get(0);
+    DataPipeline addPipeline = dataset.datapipelines().getFirst();
     assertEquals("db-to-frost-01", addPipeline.id());
     assertEquals("1", addPipeline.version());
     assertEquals("ADD", addPipeline.action());
@@ -140,15 +140,15 @@ class DatasetSerializationTest {
     assertNotNull(dataset.namedApis());
     assertEquals(2, dataset.namedApis().size());
 
-    NamedApi traffic = dataset.namedApis().get(0);
+    NamedApi traffic = dataset.namedApis().getFirst();
     assertEquals("traffic", traffic.slug());
-    assertEquals(ApiStandard.STA, traffic.standard());
+    assertEquals(ApiStandards.STA, traffic.standard());
     assertEquals("1.1", traffic.version());
 
     // Second fixture entry exercises a non-STA standard and an absent (null) version.
     NamedApi boundaries = dataset.namedApis().get(1);
     assertEquals("boundaries", boundaries.slug());
-    assertEquals(ApiStandard.WFS, boundaries.standard());
+    assertEquals(ApiStandards.OWS, boundaries.standard());
     assertNull(boundaries.version());
   }
 
@@ -174,8 +174,31 @@ class DatasetSerializationTest {
     NamedApi api = objectMapper.readValue(json, NamedApi.class);
 
     assertEquals("traffic", api.slug());
-    assertEquals(ApiStandard.STA, api.standard());
+    assertEquals(ApiStandards.STA, api.standard());
     assertEquals("1.1", api.version());
+  }
+
+  /**
+   * #1309: {@code standard} is a String, so a value outside the current controlled vocabulary must
+   * deserialize cleanly (an adapter can then ignore or diagnose it) instead of failing the whole
+   * event — the forward-compatibility property that a Java enum would break.
+   */
+  @Test
+  void shouldDeserializeUnknownStandardValueForForwardCompatibility() throws Exception {
+    String json =
+        """
+        {
+          "slug": "coverage",
+          "standard": "COVERAGE",
+          "version": null
+        }
+        """;
+
+    NamedApi api = objectMapper.readValue(json, NamedApi.class);
+
+    assertEquals("coverage", api.slug());
+    assertEquals("COVERAGE", api.standard());
+    assertNull(api.version());
   }
 
   @Test

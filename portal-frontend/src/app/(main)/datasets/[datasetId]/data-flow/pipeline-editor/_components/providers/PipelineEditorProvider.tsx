@@ -10,7 +10,7 @@
  */
 
 import type { Connection } from '@xyflow/react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -24,7 +24,7 @@ import {
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
-import { buildPipelinePayload } from '../../_services/payloadBuilderService'
+import { buildPipelinePayload, syncDatasinkIds } from '../../_services/payloadBuilderService'
 import {
   createEmptyPipeline,
   getPipelineStats,
@@ -70,6 +70,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   sessionManager,
 }) => {
   const params = useParams<{ datasetId: string }>()
+  const searchParams = useSearchParams()
+  const requestedPipelineId = searchParams.get('pipeline')
   const t = useTranslations('pipelineEditor')
   const datasetId = params.datasetId
   const activeSession = sessionManager.getActiveSession()
@@ -99,11 +101,14 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
     // Convert backend DTOs to sessions
     const sessions = pipelineDTOs.map(dto => createSessionFromBackendDTO(dto))
-    const activeSessionId = sessions[0]?.id || null
+    // Preselect the session whose backend pipeline id matches the ?pipeline= search param,
+    // so deep-links from the dataset overview open the right tab.
+    const matchedSession = requestedPipelineId ? sessions.find(s => s.pipeline.id === requestedPipelineId) : undefined
+    const activeSessionId = matchedSession?.id ?? sessions[0]?.id ?? null
 
     // Load all sessions into the session manager
     sessionManager.loadSessions(sessions, activeSessionId)
-  }, [pipelinesQuery.data, sessionManager])
+  }, [pipelinesQuery.data, sessionManager, requestedPipelineId])
 
   // ===== Validation State =====
   const [validationResult, setValidationResult] = useState<ValidationResultWithNodeStatus | null>(null)
@@ -169,7 +174,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   // ===== Node Operations =====
   const addNode = useCallback(
     (context: NodeCreationContext) => {
-      const nodeData = createDefaultNodeData(context.nodeType, datasetId)
+      const nodeData = createDefaultNodeData(context.nodeType)
       const newNode: PipelineNode = {
         id: crypto.randomUUID(),
         type: context.nodeType as PipelineNodeType,
@@ -178,7 +183,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       }
       dispatch({ type: 'ADD_NODE', payload: newNode })
     },
-    [dispatch, datasetId],
+    [dispatch],
   )
 
   const updateNode = useCallback(
@@ -396,19 +401,29 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
           const payload = buildPipelinePayload(session.pipeline)
           const pipelineId = session.pipeline.id
 
+          let savedPipeline: Pipeline
           if (pipelineId) {
-            await updatePipelineMutation.mutateAsync({ pipelineId, data: payload })
-            sessionManager.markSessionClean(session.id)
+            const response = await updatePipelineMutation.mutateAsync({ pipelineId, data: payload })
+            savedPipeline = session.pipeline
+            const { pipeline: synced, hasChanges } = syncDatasinkIds(savedPipeline, response.data.dataSinks ?? [])
+            if (hasChanges) {
+              await updatePipelineMutation.mutateAsync({ pipelineId, data: buildPipelinePayload(synced) })
+              savedPipeline = synced
+            }
           } else {
             const response = await createPipelineMutation.mutateAsync(payload)
-            const updatedPipeline: Pipeline = {
-              ...session.pipeline,
-              id: response.data.id,
-              isDirty: false,
+            savedPipeline = { ...session.pipeline, id: response.data.id }
+            const { pipeline: synced, hasChanges } = syncDatasinkIds(savedPipeline, response.data.dataSinks ?? [])
+            if (hasChanges) {
+              await updatePipelineMutation.mutateAsync({
+                pipelineId: response.data.id,
+                data: buildPipelinePayload(synced),
+              })
+              savedPipeline = synced
             }
-            sessionManager.updateSessionPipeline(session.id, updatedPipeline)
-            sessionManager.markSessionClean(session.id)
           }
+          sessionManager.updateSessionPipeline(session.id, { ...savedPipeline, isDirty: false })
+          sessionManager.markSessionClean(session.id)
           toast.success(t('header.saveSucces'))
         } catch {
           saveFailedNames.push(session.name)

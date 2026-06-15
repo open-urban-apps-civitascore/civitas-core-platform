@@ -1,13 +1,16 @@
 vars {
-  baseUrl: http://localhost:9080/v1
+  baseUrl: http://localhost:8089/v1
   keycloakUrl: http://localhost:8080
   realm: civitas-core
   clientId: portal-frontend
   clientSecret: dev-only-portal-frontend-secret
+  apiAccessClientId: api-access
   username: dev@civitas.local
   password: dev123
-  apisixGatewayUrl: http://localhost:9080
   apisixAdminUrl: http://localhost:9180
   apisixAdminKey: edd1c9f034335f136f87ad84b625c8f1
+  apisixApiUrl: http://api.localhost:9080
+  apisixGatewayHost: http://localhost:9080
+  discoveryEnabled: false
   mailpitUrl: http://localhost:8025
 }

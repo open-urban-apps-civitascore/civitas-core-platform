@@ -206,7 +206,54 @@ redpanda.topics=de.civitascore.data.pipeline.created,de.civitascore.data.pipelin
 
 **Documentation:** For detailed documentation including event formats, credential encryption, error handling, and integration examples, see [RedPanda Adapter Documentation](config-adapter-redpanda/README.md).
 
-### 8. config-adapter-examples
+### 8. config-adapter-geoserver
+Production implementation of GeoServer adapter for managing OGC geo service configuration.
+
+**Key Components:**
+- `GeoServerAdapter` — Manages GeoServer resources via REST API (workspaces, datastores, feature types, layers, styles)
+- `GeoServerSagaHandler` — Minimal saga handler for atomic workspace provisioning
+
+**Supported Operations:**
+- CREATE — Create GeoServer resources (idempotent: HTTP 409 → success)
+- UPDATE — Update existing resources
+- DELETE — Delete resources (idempotent: HTTP 404 → success; workspace/datastore deletes use `?recurse=true`)
+
+**Subscribed Topics:**
+- `de.civitascore.geo.workspace.{created,updated,deleted}`
+- `de.civitascore.geo.datastore.{created,updated,deleted}`
+- `de.civitascore.geo.featuretype.{created,updated,deleted}`
+- `de.civitascore.geo.layer.{updated,deleted}`
+- `de.civitascore.geo.style.{created,updated,deleted}`
+
+**Saga Topics:**
+- `de.civitascore.dataset.geoserver.execute`
+- `de.civitascore.dataset.geoserver.compensate`
+
+**Configuration Properties:**
+```properties
+# GeoServer REST API URL (default: http://localhost:8080/geoserver)
+geoserver.url=http://localhost:8080/geoserver
+
+# Admin credentials for GeoServer REST API (required)
+geoserver.admin.user=admin
+geoserver.admin.password=geoserver
+
+# Topics to subscribe to
+geoserver.topics=de.civitascore.geo.workspace.created,...
+
+# PostGIS connection for saga handler (required for PROVISION_WORKSPACE)
+geoserver.postgis.host=localhost
+geoserver.postgis.port=5432
+geoserver.postgis.database=civitas_geo
+geoserver.postgis.user=geo_user
+geoserver.postgis.password=secret
+```
+
+**Authentication note:** Basic Auth protects the GeoServer management REST API. Data access (WFS/WMS) is secured upstream by APISIX and OPA.
+
+**Documentation:** For detailed documentation including event formats, typed configuration models, error handling, and saga operations, see [GeoServer Adapter Documentation](config-adapter-geoserver/README.md).
+
+### 9. config-adapter-examples
 Example adapter implementations for reference and testing.
 
 **Key Components:**
@@ -978,7 +1025,7 @@ When an event fails all retry attempts or encounters a fatal error, it is sent t
 
 #### Saga Consumer Retry Behavior
 
-The saga consumers (`SagaResultConsumer`, `SagaTriggerConsumer`, `KafkaSagaCommandConsumer`) use the same retry algorithm via `ConsumerRecordRetry`. Permanent errors (e.g., malformed JSON → `IOException`) are skipped immediately. Transient errors (e.g., engine/publish failures → `RuntimeException`) are retried with exponential backoff up to 3 attempts. After max retries, the record is skipped and committed. All saga consumers use **per-record commits** (not batch commits) to ensure a single poison-pill record cannot block the consumer. The saga timeout mechanism handles recovery by triggering compensation. No DLQ is used for saga consumers.
+The saga consumers (`SagaResultConsumer`, `SagaTriggerConsumer`) use the same retry algorithm via `ConsumerRecordRetry`. (The legacy custom-orchestrator `KafkaSagaCommandConsumer` has been removed — Flowable is now the sole saga engine.) Permanent errors (e.g., malformed JSON → `IOException`) are skipped immediately. Transient errors (e.g., engine/publish failures → `RuntimeException`) are retried with exponential backoff up to 3 attempts. After max retries, the record is skipped and committed. All saga consumers use **per-record commits** (not batch commits) to ensure a single poison-pill record cannot block the consumer. The saga timeout mechanism handles recovery by triggering compensation. No DLQ is used for saga consumers.
 
 #### Failure Result Event
 
@@ -1044,6 +1091,13 @@ Error codes are categorized by type and severity:
 | 3101 | `APISIX_ERROR` | No | APISIX error: %s | Gateway error |
 | 3102 | `APISIX_ROUTE_ERROR` | No | APISIX route error: %s | Route operation failed |
 | 3103 | `APISIX_UPSTREAM_ERROR` | No | APISIX upstream error: %s | Upstream operation failed |
+
+**GeoServer Adapter (3401-3402):**
+
+| Code | Name | Retryable | Internal Log Template | External Message |
+|------|------|-----------|----------------------|------------------|
+| 3401 | `GEOSERVER_ERROR` | Yes | GeoServer error: %s | Geo service error |
+| 3402 | `GEOSERVER_RESOURCE_ERROR` | No | GeoServer resource error: %s | Geo resource operation failed |
 
 #### 9xxx - Unknown/Unexpected Errors
 
@@ -1116,6 +1170,25 @@ All topics are defined in `de.civitascore.configadapter.Topics` and validated at
 | `ROUTE_CREATED` | `de.civitascore.api.route.created` |
 | `ROUTE_UPDATED` | `de.civitascore.api.route.updated` |
 | `ROUTE_DELETED` | `de.civitascore.api.route.deleted` |
+
+#### GeoServer Events
+
+| Topic Constant | Topic Value |
+|----------------|-------------|
+| `GEO_WORKSPACE_CREATED` | `de.civitascore.geo.workspace.created` |
+| `GEO_WORKSPACE_UPDATED` | `de.civitascore.geo.workspace.updated` |
+| `GEO_WORKSPACE_DELETED` | `de.civitascore.geo.workspace.deleted` |
+| `GEO_DATASTORE_CREATED` | `de.civitascore.geo.datastore.created` |
+| `GEO_DATASTORE_UPDATED` | `de.civitascore.geo.datastore.updated` |
+| `GEO_DATASTORE_DELETED` | `de.civitascore.geo.datastore.deleted` |
+| `GEO_FEATURE_TYPE_CREATED` | `de.civitascore.geo.featuretype.created` |
+| `GEO_FEATURE_TYPE_UPDATED` | `de.civitascore.geo.featuretype.updated` |
+| `GEO_FEATURE_TYPE_DELETED` | `de.civitascore.geo.featuretype.deleted` |
+| `GEO_LAYER_UPDATED` | `de.civitascore.geo.layer.updated` |
+| `GEO_LAYER_DELETED` | `de.civitascore.geo.layer.deleted` |
+| `GEO_STYLE_CREATED` | `de.civitascore.geo.style.created` |
+| `GEO_STYLE_UPDATED` | `de.civitascore.geo.style.updated` |
+| `GEO_STYLE_DELETED` | `de.civitascore.geo.style.deleted` |
 
 **Topic Validation:**
 - Topics are validated using `Topics.isValidTopic(String)` method

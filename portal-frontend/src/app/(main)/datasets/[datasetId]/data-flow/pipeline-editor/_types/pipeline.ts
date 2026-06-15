@@ -1,5 +1,7 @@
 import type { Edge, Node, Viewport } from '@xyflow/react'
 
+import { PipelineDatasink } from '@/types/datasinks'
+
 import type { PipelineNodeData } from './nodes'
 
 // ============================================================================
@@ -16,13 +18,12 @@ export const PIPELINE_NODE_TYPES = {
   Start: 'start',
   End: 'end',
   // Trigger nodes
-  ApiRequest: 'apiRequest',
-  ApiResponse: 'apiResponse',
   Cron: 'cron',
   // Source nodes
   DataSource: 'dataSource',
   // Storage nodes
   Frost: 'frost',
+  GeoPersistence: 'geoPersistence',
   // Transform nodes
   Mapping: 'mapping',
 } as const
@@ -115,8 +116,7 @@ export interface PipelinePayload {
   /** JSON-stringified PipelineStylesPayload — backend stores as opaque string */
   styles: PipelineStylesPayload
   dataSourceIds: string[] // IDs extracted from DataSource nodes
-  apis: string[] // endpoint paths from ApiRequest/ApiResponse nodes
-  persistences: number[] // persistence config IDs (Long[] in backend)
+  dataSinks: PipelineDatasink[] // datasinks config
   model: object // Pipeline graph serialized in RedPandaConnect syntax
 }
 
@@ -137,7 +137,7 @@ export interface PipelineOutputDTO {
   styles: PipelineStylesPayload
   dataSources: number[]
   apis: string[]
-  persistences: number[]
+  dataSinks: PipelineDatasink[]
   model: object
 }
 

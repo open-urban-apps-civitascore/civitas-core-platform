@@ -1,0 +1,50 @@
+meta {
+  name: Get Dataset Named APIs
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id/apis
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSetId}}
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns named API list", function() {
+    expect(res.body).to.be.an('array');
+  });
+  test("Each named API carries a slug and a server-built previewUrl", function() {
+    res.body.forEach(function(api) {
+      expect(api.slug).to.be.a('string');
+      expect(api.previewUrl).to.be.a('string');
+      expect(api.previewUrl).to.contain('/v1/datasets/' + bru.getVar('dataSetId') + '/' + api.slug);
+    });
+  });
+}
+
+docs {
+  **Discovery endpoint (#1596, concept #1379)** — lists the **published** named APIs of a dataset via
+  the dedicated `GET /v1/datasets/{id}/apis` surface (each `NamedApiOutputDTO` with the server-built
+  `previewUrl`).
+
+  Per concept #1379 only **active published** APIs are discoverable: the list is populated only when
+  the dataset is **AVAILABLE**; a `DRAFT`/`READY` dataset returns an **empty list**. Requires
+  `DATASET_READ` and respects the caller's `X-Allowed-Scope-Ids`; an unknown or out-of-scope dataset
+  returns 404 (route existence is not leaked).
+
+  **Precondition:** `dataSetId` is set; for a non-empty result the dataset must be AVAILABLE.
+
+  **Expected Response:** 200 OK, body is the (possibly empty) list of named APIs for the dataset.
+}

@@ -1,7 +1,10 @@
 meta {
   name: 11. Unrelease DataSet (triggers delete saga)
   type: http
-  seq: 27
+  seq: 33
+  tags: [
+    requires-nifi
+  ]
 }
 
 post {
@@ -27,8 +30,8 @@ docs {
 
   Transitions the dataset from `AVAILABLE` back to `READY` and triggers the **DATASET_DELETE** saga asynchronously. The saga de-provisions infrastructure in reverse order:
 
-  1. **Redpanda Connect** — removes deployed pipelines
-  2. **APISIX Gateway** — removes route + upstream
+  1. **Pipeline engine** — removes deployed pipelines
+  2. **APISIX Gateway** — removes all named-API routes + the dataset's upstream
   3. **FROST Server** — removes the Project
 
   On completion, the dataset reverts to `READY` state and `pendingSagaType` becomes `null`.
@@ -46,8 +49,8 @@ docs {
   | System | Expected Change |
   |---|---|
   | Backend | DataSet status → `READY`; `pendingSagaType` set to `DELETE` until saga completes |
-  | Config Adapter (Orchestrator) | Receives saga trigger; de-provisions Redpanda → APISIX → FROST in reverse |
+  | Config Adapter (Orchestrator) | Receives saga trigger; de-provisions pipeline engine → APISIX → FROST in reverse |
   | FROST Server | Project removed |
   | APISIX Gateway | Route + upstream removed |
-  | Redpanda Connect | Pipelines undeployed |
+  | Pipeline engine | Pipelines undeployed |
 }

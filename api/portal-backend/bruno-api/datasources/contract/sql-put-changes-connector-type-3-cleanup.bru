@@ -1,0 +1,21 @@
+meta {
+  name: Contract SQL — PUT changes connectorType (3/3 cleanup)
+  type: http
+  seq: 37
+}
+
+delete {
+  url: {{baseUrl}}/datasources/{{contractSqlPutTypeChangeId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+tests {
+  test("Status is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}

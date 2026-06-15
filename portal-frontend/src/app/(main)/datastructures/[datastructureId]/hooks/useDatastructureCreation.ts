@@ -1,5 +1,4 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AxiosError } from 'axios'
 import { useTranslations } from 'next-intl'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -11,12 +10,11 @@ import {
   DatastructureCreateFormData,
   DatastructureCreateFormSchema,
 } from '@/types/datastructures'
-import { isNameConflictError } from '@/utils/errors'
 
 export const useDatastructureCreation = () => {
   const t = useTranslations('datastructures')
   const tCommon = useTranslations('common')
-  const { handleFormValidationError, handleNameError } = useError()
+  const { handleFormValidationError } = useError()
 
   const createDatastructure = useCreateDatastructure()
   const isLoading = createDatastructure.isPending
@@ -46,12 +44,7 @@ export const useDatastructureCreation = () => {
       toast.success(tCommon('messages.createSuccess', { item: tCommon('items.datastructure') }))
       return response.data
     } catch (error) {
-      // Name-Konflikt gezielt behandeln
-      if (isNameConflictError(error as AxiosError)) {
-        handleNameError(form, form.getValues('name'))
-      } else {
-        toast.error(t('errors.creationError'))
-      }
+      toast.error(t('errors.creationError'))
       throw error
     }
   }

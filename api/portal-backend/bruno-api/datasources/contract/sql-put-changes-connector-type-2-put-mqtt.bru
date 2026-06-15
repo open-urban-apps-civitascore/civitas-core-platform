@@ -1,0 +1,69 @@
+meta {
+  name: Contract SQL — PUT changes connectorType (2/3 put-mqtt)
+  type: http
+  seq: 36
+}
+
+put {
+  url: {{baseUrl}}/datasources/{{contractSqlPutTypeChangeId}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+body:json {
+  {
+    "name": "contract_sql_put_type_change",
+    "description": "contract — flipped to MQTT",
+    "connectorType": "MQTT",
+    "configuration": {
+      "urls": ["tcp://broker:1883"],
+      "topics": ["sensor/data"],
+      "qos": 1
+    },
+    "dataStructureVersionId": null
+  }
+}
+
+tests {
+  test("Status is 200 — DRAFT permits connectorType change", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Response reflects the new connectorType", function() {
+    expect(res.body.connectorType).to.equal("MQTT");
+    expect(res.body.dataSourceStatus).to.equal("DRAFT");
+    expect(res.body.name).to.equal("contract_sql_put_type_change");
+    expect(res.body.description).to.equal("contract — flipped to MQTT");
+  });
+  test("Configuration is normalized under the new (MQTT) connector schema", function() {
+    expect(res.body.configuration.urls).to.deep.equal(["tcp://broker:1883"]);
+    expect(res.body.configuration.topics).to.deep.equal(["sensor/data"]);
+    expect(res.body.configuration.qos).to.equal(1);
+    expect(res.body.configuration.tls).to.deep.equal({ enabled: false });
+  });
+  test("Old SQL-only schema fields are absent from the response", function() {
+    expect(res.body.configuration).to.not.have.property('driver');
+    expect(res.body.configuration).to.not.have.property('dsn');
+    expect(res.body.configuration).to.not.have.property('table');
+    expect(res.body.configuration).to.not.have.property('columns');
+    expect(res.body.configuration).to.not.have.property('conn_max_open');
+    expect(res.body.configuration).to.not.have.property('conn_max_idle');
+  });
+}
+
+docs {
+  Pins the current behaviour: a PUT that changes `connectorType` on a
+  **DRAFT** data source is accepted (200) and the configuration is
+  re-normalized under the new connector's schema.
+
+  Server-side: `DataSourceService.validateConnectorTypeChange` only rejects
+  the change when the resource is in `AVAILABLE` status. For DRAFT, the new
+  type and a configuration matching it round-trip cleanly.
+
+  Refactor target — connectorType is currently *mutable on DRAFT*. The
+  refactor must explicitly preserve or change this; if changed, this test
+  needs to be inverted.
+}

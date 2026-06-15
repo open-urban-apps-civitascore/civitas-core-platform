@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
-import { NoDataPage } from '@/components/no-data-page/NoDataPage'
+import { NoDataCard } from '@/components/no-data/no-data-card/NoDataCard'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -233,19 +233,12 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
         </div>
       )}
       {assignedGroups.length === 0 ? (
-        <ContentCard className="w-full">
-          <div className="flex flex-col items-center gap-6 p-6 rounded-lg border border-dashed border-border">
-            <div className="flex w-12 h-12 p-2 justify-center items-center gap-2 rounded-md border border-border bg-white shadow-xs">
-              <List size={24} />
-            </div>
-            <NoDataPage
-              title={t('noDataPage.title')}
-              subTitle={t('noDataPage.description')}
-              isDisabled={isReadOnly}
-              className="border-0 shadow-none p-0 items-center text-center"
-            />
-          </div>
-        </ContentCard>
+        <NoDataCard
+          icon={<List size={24} />}
+          title={t('noDataPage.title')}
+          subTitle={t('noDataPage.description')}
+          isDisabled={isReadOnly}
+        />
       ) : (
         <>
           <AccessManagementTable

@@ -13,8 +13,8 @@ import static java.util.Objects.requireNonNull;
 
 import de.civitascore.configadapter.configuration.AppConfig;
 import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.flowable.common.FlowableSagaOrchestrator;
 import de.civitascore.configadapter.messaging.EventConsumer;
-import de.civitascore.event.handler.kafka.KafkaSagaCommandConsumer;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,9 +56,27 @@ public class Application {
    *     created
    */
   public Application(String configFileName) throws FatalAdapterException {
+    this(configFileName, new SagaComponentFactory());
+  }
+
+  /**
+   * Seam constructor for tests: lets a test inject a no-op {@link SagaComponentFactory} so
+   * consumer-wiring tests don't pay for a real Flowable engine bootstrap (H2 + coded-process
+   * deployment) on every case. Production always uses the no-arg factory via {@link
+   * #Application(String)}.
+   *
+   * @param configFileName the name of the properties file to load from the classpath, must not be
+   *     null
+   * @param sagaComponentFactory the factory used to build the saga orchestration components
+   * @throws NullPointerException if configFileName is null
+   * @throws FatalAdapterException if configuration is invalid or required components cannot be
+   *     created
+   */
+  Application(String configFileName, SagaComponentFactory sagaComponentFactory)
+      throws FatalAdapterException {
     appConfig = new AppConfig(requireNonNull(configFileName));
     consumers = new ConsumerFactory().createAll(appConfig);
-    sagaComponents = new SagaComponentFactory().create(appConfig);
+    sagaComponents = sagaComponentFactory.create(appConfig);
   }
 
   /**
@@ -88,15 +106,7 @@ public class Application {
         consumer.start();
       }
 
-      sagaComponents
-          .orchestrator()
-          .ifPresent(
-              pair -> {
-                pair.orchestrator().start();
-                pair.triggerConsumer().start();
-              });
-
-      sagaComponents.commandConsumer().ifPresent(KafkaSagaCommandConsumer::start);
+      sagaComponents.flowableOrchestrator().ifPresent(FlowableSagaOrchestrator::start);
 
       healthCheckServer.markReady();
 
@@ -116,29 +126,13 @@ public class Application {
       logger.info("Shutting down {} consumer(s)", consumers.size());
 
       sagaComponents
-          .orchestrator()
+          .flowableOrchestrator()
           .ifPresent(
-              pair -> {
+              flowable -> {
                 try {
-                  pair.triggerConsumer().stop();
+                  flowable.close();
                 } catch (Exception e) {
-                  logger.error("Error stopping saga trigger consumer", e);
-                }
-                try {
-                  pair.orchestrator().stop();
-                } catch (Exception e) {
-                  logger.error("Error stopping saga orchestrator", e);
-                }
-              });
-
-      sagaComponents
-          .commandConsumer()
-          .ifPresent(
-              cmd -> {
-                try {
-                  cmd.close();
-                } catch (Exception e) {
-                  logger.error("Error closing saga command consumer", e);
+                  logger.error("Error stopping Flowable orchestrator", e);
                 }
               });
 

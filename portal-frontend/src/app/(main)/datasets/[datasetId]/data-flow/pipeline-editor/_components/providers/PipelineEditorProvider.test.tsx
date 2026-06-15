@@ -20,6 +20,7 @@ import { PipelineEditorProviderComponent } from './PipelineEditorProvider'
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ datasetId: 'dataset-1' }),
+  useSearchParams: () => new URLSearchParams(),
 }))
 
 vi.mock('next-intl', () => ({
@@ -53,9 +54,10 @@ vi.mock('../../_services/payloadBuilderService', () => ({
     styles: { nodes: [], edges: [], nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
     dataSourceIds: [],
     apis: [],
-    persistences: [],
+    datasinks: [],
     model: {},
   }),
+  syncDatasinkIds: vi.fn().mockImplementation((pipeline: unknown) => ({ pipeline, hasChanges: false })),
 }))
 
 const contextRef = { current: null as ReturnType<typeof useActivePipeline> | null }
@@ -168,7 +170,7 @@ describe('PipelineEditorProviderComponent', () => {
         styles: { nodes: [], edges: [], nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
         dataSources: [],
         apis: [],
-        persistences: [],
+        dataSinks: [],
         model: {},
         createdAt: '2024-01-01T00:00:00Z',
         modifiedAt: '2024-01-01T00:00:00Z',

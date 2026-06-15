@@ -43,7 +43,7 @@
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <apache-jena.version>5.6.0</apache-jena.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
-        <config-adapter.version>1.0.2-MR-465-SNAPSHOT</config-adapter.version>
+        <config-adapter.version>1.0.2-MR-547-SNAPSHOT</config-adapter.version>
         <portal-model.version>1.0.0</portal-model.version>
     </properties>
 
@@ -254,39 +254,6 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Config adapter - Saga orchestrator + adapters for E2E saga integration tests -->
-        <dependency>
-            <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-orchestrator</artifactId>
-            <version>${config-adapter.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-frost</artifactId>
-            <version>${config-adapter.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-apisix</artifactId>
-            <version>${config-adapter.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-redpanda</artifactId>
-            <version>${config-adapter.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Testcontainers Kafka for saga E2E tests (real broker, not EmbeddedKafka) -->
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers-kafka</artifactId>
-            <scope>test</scope>
-        </dependency>
-
     </dependencies>
 
     <build>
@@ -306,9 +273,28 @@
                         <ignoredUnusedDeclaredDependency>org.hibernate.orm:hibernate-processor</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>de.civitas-core:event-handler-kafka</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>org.postgresql:postgresql</ignoredUnusedDeclaredDependency>
+                        <!-- portal-model is heavily used but analyzer can't detect it
+                             through the ${revision}/flatten-plugin indirection -->
+                        <ignoredUnusedDeclaredDependency>de.civitascore:portal-model</ignoredUnusedDeclaredDependency>
                     </ignoredUnusedDeclaredDependencies>
                     <ignoredNonTestScopedDependencies>
                         <ignoredNonTestScopedDependency>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</ignoredNonTestScopedDependency>
+                        <!-- Used at runtime by Spring Security autoconfig; main code uses
+                             only the .oauth2ResourceServer().jwt() DSL, no direct imports -->
+                        <ignoredNonTestScopedDependency>org.springframework.boot:spring-boot-security-oauth2-resource-server</ignoredNonTestScopedDependency>
+                        <!-- event-handler-kafka declared for transitive cloudevents-kafka serialization; no direct main-code usage -->
+                        <ignoredNonTestScopedDependency>de.civitas-core:event-handler-kafka</ignoredNonTestScopedDependency>
+                        <!-- Transitively pulled compile-scope by oauth2-resource-server;
+                             only direct use is JWTParser in UserMeIntegrationTest -->
+                        <ignoredNonTestScopedDependency>com.nimbusds:nimbus-jose-jwt</ignoredNonTestScopedDependency>
+                        <!-- Transitively pulled compile-scope by spring-boot-starter-data-jpa;
+                             only direct use is JdbcTemplate in DataSourceContractIntegrationTest -->
+                        <ignoredNonTestScopedDependency>org.springframework:spring-jdbc</ignoredNonTestScopedDependency>
+                        <!-- Compile-scope for app boot (auto-migration on startup);
+                             additionally used directly only by DiscriminatorBackfillMigrationIntegrationTest -->
+                        <ignoredNonTestScopedDependency>org.flywaydb:flyway-core</ignoredNonTestScopedDependency>
+                        <!-- Transitively pulled test-only -->
+                        <ignoredUsedUndeclaredDependency>ch.qos.logback:*</ignoredUsedUndeclaredDependency>
                     </ignoredNonTestScopedDependencies>
                     <ignoredUsedUndeclaredDependencies>
                         <ignoredUsedUndeclaredDependency>org.springframework.boot:*</ignoredUsedUndeclaredDependency>
@@ -319,6 +305,9 @@
                         <ignoredUsedUndeclaredDependency>org.springdoc:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.slf4j:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>com.fasterxml.jackson.*:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>tools.jackson.*:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>org.hibernate.*:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>org.springframework.kafka:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.apache.commons:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.assertj:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.jspecify:*</ignoredUsedUndeclaredDependency>
@@ -335,6 +324,21 @@
                         <ignoredUsedUndeclaredDependency>org.wiremock:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.apache.logging.log4j:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.postgresql:*</ignoredUsedUndeclaredDependency>
+                        <!-- Transitively pulled, used directly only in tests; versions
+                             managed by upstream BOMs (testcontainers, oauth2-resource-server) -->
+                        <ignoredUsedUndeclaredDependency>com.github.docker-java:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>com.nimbusds:*</ignoredUsedUndeclaredDependency>
+                        <!-- Transitively pulled, used directly only in tests; versions
+                             managed by upstream BOMs (springframework) -->
+                        <ignoredUsedUndeclaredDependency>ch.qos.logback:*</ignoredUsedUndeclaredDependency>
+                        <!-- Transitively pulled by spring-boot-starter-test;
+                             used directly only by Phase 1 contract tests (#1391) -->
+                        <ignoredUsedUndeclaredDependency>com.jayway.jsonpath:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>org.skyscreamer:*</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>com.vaadin.external.google:*</ignoredUsedUndeclaredDependency>
+                        <!-- Pulled compile-scope for app boot; additionally used directly
+                             only by DiscriminatorBackfillMigrationIntegrationTest (Phase 1 of #1391) -->
+                        <ignoredUsedUndeclaredDependency>org.flywaydb:flyway-core</ignoredUsedUndeclaredDependency>
                     </ignoredUsedUndeclaredDependencies>
                 </configuration>
                 <executions>

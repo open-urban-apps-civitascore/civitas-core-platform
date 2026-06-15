@@ -1,8 +1,11 @@
 package de.civitascore.portal.model.entity;
 
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.entity.base.NamedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
@@ -16,8 +19,8 @@ import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 /**
- * A named API endpoint exposed by a {@link DataSet}. Each entry produces one published distribution
- * and, after release, one APISIX route at {@code /v1/datasets/{datasetId}/{slug}}.
+ * A named API endpoint exposed by a {@link DataSet}. Each entry produces one APISIX route at {@code
+ * /v1/datasets/{datasetId}/{slug}} after release.
  *
  * <p>{@code slug} and {@code standard} are immutable once the dataset reaches AVAILABLE. Slug
  * format ({@code ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$}, max 32 chars) is enforced at the DTO boundary;
@@ -45,12 +48,9 @@ public class NamedApi extends NamedEntity {
   @Column(name = "slug", nullable = false, length = 32)
   private String slug;
 
-  /**
-   * API standard: one of {@code WFS}, {@code WMS}, {@code STA}, {@code CUSTOM}. Stored as a string
-   * so the vocabulary can grow and {@code CUSTOM} stays free-form.
-   */
+  @Enumerated(EnumType.STRING)
   @Column(name = "standard", nullable = false, length = 16)
-  private String standard;
+  private ApiStandard standard;
 
   @Column(name = "version", length = 32)
   private String version;

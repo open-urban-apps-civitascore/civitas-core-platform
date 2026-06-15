@@ -10,8 +10,10 @@
  * - RedPandaConnect model from the graph
  */
 
-import type { ApiNodeData, DataSourceNodeData } from '../_types/nodes'
-import { isApiNodeData, isDataSourceNodeData } from '../_types/nodes'
+import { DATASINK_TYPES, type PipelineDatasink } from '@/types/datasinks'
+
+import type { DataSourceNodeData } from '../_types/nodes'
+import { isDataSourceNodeData, isGeoPersistenceNodeData } from '../_types/nodes'
 import type { Pipeline, PipelinePayload, PipelineStylesPayload } from '../_types/pipeline'
 import { buildRedPandaConnectModel } from './modelBuilderService'
 
@@ -36,14 +38,21 @@ export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
   const dataSourceIds: string[] = pipeline.nodes
     .filter(n => isDataSourceNodeData(n.data) && n.data.entityId != null)
     .map(n => (n.data as DataSourceNodeData).entityId as string)
-
-  // APIs: unique apiPath strings from ApiRequest/ApiResponse nodes
-  const apis: string[] = [
-    ...new Set(pipeline.nodes.filter(n => isApiNodeData(n.data)).map(n => (n.data as ApiNodeData).apiPath)),
-  ]
-
-  // Persistences: numeric IDs (Long[] in backend). Currently empty array.
-  const persistences: number[] = []
+  const dataSinks: PipelineDatasink[] = pipeline.nodes.flatMap<PipelineDatasink>(n => {
+    if (isGeoPersistenceNodeData(n.data) && n.data.dataStructureVersionId != null) {
+      return [
+        {
+          id: n.data.entityId ?? null,
+          dataSinkType: DATASINK_TYPES.POSTGIS,
+          configuration: {
+            tableName: n.data.tableName,
+            dataStructureVersionId: n.data.dataStructureVersionId.split('/')[1],
+          },
+        },
+      ]
+    }
+    return []
+  })
 
   // 3. Build RedPandaConnect model
   const model = buildRedPandaConnectModel(pipeline)
@@ -54,8 +63,38 @@ export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
     description: pipeline.description || '-',
     styles: styles,
     dataSourceIds,
-    apis,
-    persistences,
+    dataSinks: dataSinks,
     model: model || {},
+  }
+}
+
+/**
+ * Writes datasink IDs from a save response back into the matching pipeline nodes.
+ * POSTGIS datasinks are matched by tableName.
+ * Returns the updated pipeline and whether any entityId changed.
+ */
+export const syncDatasinkIds = (
+  pipeline: Pipeline,
+  responseDatasinks: PipelineDatasink[],
+): { pipeline: Pipeline; hasChanges: boolean } => {
+  let hasChanges = false
+
+  const updatedNodes = pipeline.nodes.map(node => {
+    if (!isGeoPersistenceNodeData(node.data)) return node
+
+    const match = responseDatasinks.find(
+      d =>
+        d.dataSinkType === DATASINK_TYPES.POSTGIS && d.id != null && d.configuration.tableName === node.data.tableName,
+    )
+    if (match?.id != null && match.id !== node.data.entityId) {
+      hasChanges = true
+      return { ...node, data: { ...node.data, entityId: match.id } }
+    }
+    return node
+  })
+
+  return {
+    pipeline: hasChanges ? { ...pipeline, nodes: updatedNodes } : pipeline,
+    hasChanges,
   }
 }

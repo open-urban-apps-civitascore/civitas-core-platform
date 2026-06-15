@@ -16,19 +16,10 @@ import { datasourceToSelectable, useDataSourceEntities } from '../../../_service
 import type { DataSourceNodeData } from '../../../_types/nodes'
 import { EntityMetadata } from '../components/EntityMetadata'
 import { EntitySelector } from '../components/EntitySelector'
-
-// ============================================================================
-// Props
-// ============================================================================
-
 interface DataSourcePanelProps {
   data: DataSourceNodeData
   onUpdate: (data: Partial<DataSourceNodeData>) => void
 }
-
-// ============================================================================
-// Component
-// ============================================================================
 
 export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate }) => {
   const t = useTranslations('pipelineEditor')
@@ -40,15 +31,18 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
 
   const handleEntityChange = (entity: { id: string; name: string } | undefined) => {
     if (entity) {
+      const fullEntity = getEntityById(entity.id)
       onUpdate({
         entityId: entity.id,
         entityName: entity.name,
         configured: true,
+        entityMetadata: fullEntity?.connectorType ? { connector: fullEntity.connectorType } : undefined,
       })
     } else {
       onUpdate({
         entityId: undefined,
         entityName: undefined,
+        entityMetadata: undefined,
         configured: false,
       })
     }

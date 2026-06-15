@@ -19,11 +19,66 @@ body:json {
   {
     "name": "Traffic Data Pipeline",
     "description": "Updated pipeline description",
-    "styles": {},
-    "model": {},
     "dataSourceIds": [],
-    "apis": [],
-    "persistences": []
+    "model": {
+      "viewport": { "x": 0, "y": 0, "zoom": 1 },
+      "nodePositions": {
+        "11111111-1111-4000-8000-000000000001": { "x": 360, "y": -40 },
+        "11111111-1111-4000-8000-000000000002": { "x": 320, "y": 100 },
+        "11111111-1111-4000-8000-000000000003": { "x": 740, "y": 80 }
+      },
+      "nodes": [
+        {
+          "id": "11111111-1111-4000-8000-000000000001",
+          "type": "start",
+          "position": { "x": 360, "y": -40 },
+          "data": { "nodeType": "start", "label": "Start", "configured": true, "description": "Entry point of the pipeline. Execution begins here." },
+          "measured": { "width": 32, "height": 32 }
+        },
+        {
+          "id": "11111111-1111-4000-8000-000000000002",
+          "type": "mapping",
+          "position": { "x": 320, "y": 100 },
+          "data": {
+            "label": "Mapping",
+            "configured": true,
+            "mappingConfig": {
+              "$schema": "https://civitasconnect.digital/core/mapping/v1",
+              "source": "urn:core:datastructure:8cc31216-5417-4d0a-abea-dde0659ce00d:501b78f7-f076-46e2-b5cb-748267a75e24",
+              "target": "urn:core:datastructure:08e34478-8aa3-42a5-9431-d805e209ceec:c10bbb60-d1bc-4c73-be81-2270b906837c",
+              "fields": {
+                "$.station_id": "$.sensorId",
+                "$.vehicle_count": "$.count",
+                "$.observed_at": { "op": "toDate", "input": "$.timestamp", "pattern": "yyyy-MM-dd" }
+              },
+              "positions": {
+                "$.observed_at#toDate": { "x": 503.3, "y": 98.5 }
+              }
+            },
+            "sourceDatastructureId": "8cc31216-5417-4d0a-abea-dde0659ce00d",
+            "sourceVersionId": "501b78f7-f076-46e2-b5cb-748267a75e24",
+            "sourceName": "TrafficReading",
+            "targetDatastructureId": "08e34478-8aa3-42a5-9431-d805e209ceec",
+            "targetVersionId": "c10bbb60-d1bc-4c73-be81-2270b906837c",
+            "targetName": "TrafficObservation"
+          },
+          "measured": { "width": 160, "height": 66 },
+          "selected": false,
+          "dragging": false
+        },
+        {
+          "id": "11111111-1111-4000-8000-000000000003",
+          "type": "end",
+          "position": { "x": 740, "y": 80 },
+          "data": { "nodeType": "end", "label": "End", "configured": true, "description": "Exit point of the pipeline. Execution completes here." },
+          "measured": { "width": 32, "height": 32 }
+        }
+      ],
+      "edges": [
+        { "id": "11111111-1111-4000-8000-0000000000e1", "source": "11111111-1111-4000-8000-000000000001", "target": "11111111-1111-4000-8000-000000000002", "type": "smoothstep", "data": { "label": "" } },
+        { "id": "11111111-1111-4000-8000-0000000000e2", "source": "11111111-1111-4000-8000-000000000002", "target": "11111111-1111-4000-8000-000000000003", "type": "smoothstep", "data": { "label": "" } }
+      ]
+    }
   }
 }
 

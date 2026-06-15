@@ -2,10 +2,13 @@ meta {
   name: 9b. Verify APISIX Route Config
   type: http
   seq: 23
+  tags: [
+    requires-nifi
+  ]
 }
 
 get {
-  url: {{apisixAdminUrl}}/apisix/admin/routes/{{sagaDataSetId}}
+  url: {{apisixAdminUrl}}/apisix/admin/routes
   body: none
   auth: none
 }
@@ -15,59 +18,70 @@ headers {
 }
 
 script:pre-request {
-  // Wait for async saga to create APISIX route (max 30s, poll every 2s)
+  // Per-NamedApi route model (#1368): the saga provisions ONE route per named-API slug at
+  // /v1/datasets/{id}/{slug} (deterministic derived id) — NOT a flat route keyed by {datasetId}.
+  // List the routes and poll until the slug route appears (max 30s, async saga).
   const axios = require('axios');
   const adminUrl = bru.getEnvVar('apisixAdminUrl');
   const adminKey = bru.getEnvVar('apisixAdminKey');
   const datasetId = bru.getVar('sagaDataSetId');
+  const slug = bru.getVar('sagaSlug') || 'things';
+  const wanted = `/v1/datasets/${datasetId}/${slug}`;
 
   for (let i = 0; i < 15; i++) {
     try {
       const resp = await axios.get(
-        `${adminUrl}/apisix/admin/routes/${datasetId}`,
+        `${adminUrl}/apisix/admin/routes`,
         { headers: { 'X-API-KEY': adminKey }, validateStatus: () => true }
       );
-      if (resp.status === 200) break;
+      const items = (resp.data && (resp.data.list || (resp.data.node && resp.data.node.nodes))) || [];
+      const found = items
+        .map(n => n.value || n)
+        .some(r => (r.uris || [r.uri]).some(u => u && u.indexOf(wanted) === 0));
+      if (found) break;
     } catch (e) { /* route not created yet */ }
     await new Promise(r => setTimeout(r, 2000));
   }
 }
 
 tests {
-  test("Route exists in APISIX", function() {
-    expect(res.getStatus()).to.equal(200);
+  const items = (res.body && (res.body.list || (res.body.node && res.body.node.nodes))) || [];
+  const datasetId = bru.getVar('sagaDataSetId');
+  const slug = bru.getVar('sagaSlug') || 'things';
+  const wanted = `/v1/datasets/${datasetId}/${slug}`;
+  const route = items
+    .map(n => n.value || n)
+    .find(r => (r.uris || [r.uri]).some(u => u && u.indexOf(wanted) === 0));
+
+  test("Per-slug route exists in APISIX", function() {
+    expect(route, `route for ${wanted}`).to.be.an('object');
   });
 
-  test("Route has correct URI pattern", function() {
-    const route = res.body.value || res.body;
-    const uris = route.uris || [route.uri];
-    const datasetId = bru.getVar('sagaDataSetId');
-    const hasDatasetUri = uris.some(u => u.includes(datasetId));
-    expect(hasDatasetUri).to.be.true;
+  test("Per-slug route has the /v1/datasets/{id}/{slug} URI pattern", function() {
+    const uris = (route && (route.uris || [route.uri])) || [];
+    expect(uris.some(u => u.includes(wanted))).to.be.true;
   });
 
-  test("Route references upstream", function() {
-    const route = res.body.value || res.body;
-    expect(route.upstream_id).to.be.a('string');
+  test("Per-slug route references the shared dataset upstream", function() {
+    expect(route && route.upstream_id).to.be.a('string');
   });
 
-  test("Route has plugin_config_id (auth enabled)", function() {
-    const route = res.body.value || res.body;
-    expect(route.plugin_config_id).to.equal('1');
+  test("Per-slug route has plugin_config_id (auth enabled while protected)", function() {
+    expect(route && String(route.plugin_config_id)).to.equal('1');
   });
 }
 
 docs {
-  **Saga step 9b of 18** — Verify APISIX route provisioned by the saga.
+  **Saga step 9b of 18** — Verify the per-named-API APISIX routes provisioned by the saga (issue #1368).
 
-  Queries the APISIX Admin API directly to confirm the saga created a route for the dataset. The pre-request script polls for up to 30 seconds (15 × 2 s intervals) to accommodate async saga completion.
+  Lists the APISIX Admin API routes and locates the route for the dataset's named-API slug — the saga creates one route per slug at `/v1/datasets/{datasetId}/{slug}` (deterministic id via `NamedApiHelper.derive`), bound to the shared dataset upstream. The pre-request polls for up to 30 seconds to accommodate async saga completion.
 
-  The route must:
-  - include the `sagaDataSetId` in its URI pattern
-  - reference an upstream (pointing to the FROST server)
-  - have `plugin_config_id=1` confirming the OpenID-Connect auth plugin is applied
+  The slug route must:
+  - match the `/v1/datasets/{datasetId}/{slug}` URI pattern
+  - reference an upstream (the dataset's FROST project)
+  - carry `plugin_config_id=1` while the dataset is still protected (`openDataAccess=false`)
 
-  **Precondition:** `sagaDataSetId` is set; APISIX Admin API reachable at `apisixAdminUrl`.
+  **Precondition:** `sagaDataSetId` and `sagaSlug` are set (steps 4 / 9); APISIX Admin API reachable at `apisixAdminUrl`.
 
-  **Expected Response:** 200 OK from APISIX Admin API with the route object.
+  **Expected Response:** 200 OK from the APISIX Admin API route list; the slug route is present.
 }

@@ -1,0 +1,7 @@
+{
+  "version": "1",
+  "name": "NiFi MVP Demo (MQTT to PostGIS)",
+  "type": "collection",
+  "ignore": ["node_modules"],
+  "auth": "bearer"
+}

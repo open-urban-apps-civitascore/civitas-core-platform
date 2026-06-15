@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- origin at X=0.0 Y=0.0 -->
+<definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:flowable="http://flowable.org/bpmn" xmlns:xs="http://www.w3.org/2001/XMLSchema" id="Definitions_1" exporter="org.eclipse.bpmn2.modeler.core" exporterVersion="1.5.4.RC1-v20220528-0836-B1" targetNamespace="http://civitas.de/saga">
+  <error id="stepFailedError" errorCode="STEP_FAILED" name="Step Failed"/>
+  <process id="dataset-delete" name="Dataset Delete Saga" isExecutable="true">
+    <startEvent id="start" name="Start">
+      <outgoing>flow-start</outgoing>
+    </startEvent>
+    <exclusiveGateway id="pipeline-gateway" name="Has Pipelines?" default="flow-gateway-skip">
+      <incoming>flow-start</incoming>
+      <outgoing>flow-gateway-redpanda</outgoing>
+      <outgoing>flow-gateway-skip</outgoing>
+    </exclusiveGateway>
+    <serviceTask id="delete-pipelines" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Delete Pipelines">
+      <extensionElements>
+        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="redpanda"/>
+        <flowable:field xsi:type="xs:anyType" name="operation" stringValue="DELETE_PIPELINES"/>
+        <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="delete-pipelines"/>
+      </extensionElements>
+      <incoming>flow-gateway-redpanda</incoming>
+      <outgoing>flow-redpanda-apisix</outgoing>
+    </serviceTask>
+    <boundaryEvent id="redpanda-error" name="Step Failed" attachedToRef="delete-pipelines">
+      <outgoing>flow-redpanda-error</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_1" errorRef="stepFailedError"/>
+    </boundaryEvent>
+    <serviceTask id="delete-route" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Delete APISIX Route">
+      <extensionElements>
+        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="apisix"/>
+        <flowable:field xsi:type="xs:anyType" name="operation" stringValue="DELETE_ROUTE"/>
+        <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="delete-route"/>
+      </extensionElements>
+      <incoming>flow-gateway-skip</incoming>
+      <incoming>flow-redpanda-apisix</incoming>
+      <incoming>flow-redpanda-error</incoming>
+      <outgoing>flow-apisix-geo</outgoing>
+    </serviceTask>
+    <boundaryEvent id="apisix-error" name="Step Failed" attachedToRef="delete-route">
+      <outgoing>flow-apisix-error</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_2" errorRef="stepFailedError"/>
+    </boundaryEvent>
+    <exclusiveGateway id="geo-gateway" name="Has Geo Sink?" default="flow-geo-skip">
+      <incoming>flow-apisix-geo</incoming>
+      <incoming>flow-apisix-error</incoming>
+      <outgoing>flow-geo-workspace</outgoing>
+      <outgoing>flow-geo-skip</outgoing>
+    </exclusiveGateway>
+    <serviceTask id="delete-workspace" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Delete GeoServer Workspace">
+      <extensionElements>
+        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="geoserver"/>
+        <flowable:field xsi:type="xs:anyType" name="operation" stringValue="DELETE_WORKSPACE"/>
+        <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="delete-workspace"/>
+      </extensionElements>
+      <incoming>flow-geo-workspace</incoming>
+      <outgoing>flow-workspace-frost</outgoing>
+    </serviceTask>
+    <boundaryEvent id="workspace-error" name="Step Failed" attachedToRef="delete-workspace">
+      <outgoing>flow-workspace-error</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_4" errorRef="stepFailedError"/>
+    </boundaryEvent>
+    <serviceTask id="delete-project" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Delete FROST Project">
+      <extensionElements>
+        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="frost"/>
+        <flowable:field xsi:type="xs:anyType" name="operation" stringValue="DELETE_PROJECT"/>
+        <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="delete-project"/>
+      </extensionElements>
+      <incoming>flow-geo-skip</incoming>
+      <incoming>flow-workspace-frost</incoming>
+      <incoming>flow-workspace-error</incoming>
+      <outgoing>flow-frost-result</outgoing>
+    </serviceTask>
+    <boundaryEvent id="frost-error" name="Step Failed" attachedToRef="delete-project">
+      <outgoing>flow-frost-error</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_3" errorRef="stepFailedError"/>
+    </boundaryEvent>
+    <serviceTask id="publish-success" flowable:async="true" flowable:class="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate" name="Publish Success">
+      <extensionElements>
+        <flowable:field xsi:type="xs:anyType" name="resultType" stringValue="success"/>
+      </extensionElements>
+      <incoming>flow-result-success</incoming>
+      <outgoing>flow-publish-success-end</outgoing>
+    </serviceTask>
+    <serviceTask id="publish-failure" flowable:async="true" flowable:class="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate" name="Publish Failure">
+      <extensionElements>
+        <flowable:field xsi:type="xs:anyType" name="resultType" stringValue="failure"/>
+        <flowable:field xsi:type="xs:anyType" name="supportsCompensation" stringValue="false"/>
+      </extensionElements>
+      <incoming>flow-result-failure</incoming>
+      <outgoing>flow-publish-failure-end</outgoing>
+    </serviceTask>
+    <exclusiveGateway id="result-merge">
+      <incoming>flow-frost-result</incoming>
+      <incoming>flow-frost-error</incoming>
+      <outgoing>flow-merge-to-gateway</outgoing>
+    </exclusiveGateway>
+    <exclusiveGateway id="result-gateway" name="Has Errors?" default="flow-result-success">
+      <incoming>flow-merge-to-gateway</incoming>
+      <outgoing>flow-result-failure</outgoing>
+      <outgoing>flow-result-success</outgoing>
+    </exclusiveGateway>
+    <endEvent id="end" name="Saga Completed">
+      <incoming>flow-publish-success-end</incoming>
+      <incoming>flow-publish-failure-end</incoming>
+    </endEvent>
+    <sequenceFlow id="flow-start" sourceRef="start" targetRef="pipeline-gateway"/>
+    <sequenceFlow id="flow-gateway-redpanda" name="yes" sourceRef="pipeline-gateway" targetRef="delete-pipelines">
+      <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_1">${hasPipelines == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-gateway-skip" name="no" sourceRef="pipeline-gateway" targetRef="delete-route"/>
+    <sequenceFlow id="flow-redpanda-apisix" sourceRef="delete-pipelines" targetRef="delete-route"/>
+    <sequenceFlow id="flow-apisix-geo" sourceRef="delete-route" targetRef="geo-gateway"/>
+    <sequenceFlow id="flow-geo-workspace" name="yes" sourceRef="geo-gateway" targetRef="delete-workspace">
+      <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_2">${execution.getVariable('hasGeoSink') == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-geo-skip" name="no" sourceRef="geo-gateway" targetRef="delete-project"/>
+    <sequenceFlow id="flow-workspace-frost" sourceRef="delete-workspace" targetRef="delete-project"/>
+    <sequenceFlow id="flow-frost-result" sourceRef="delete-project" targetRef="result-merge"/>
+    <sequenceFlow id="flow-merge-to-gateway" sourceRef="result-merge" targetRef="result-gateway"/>
+    <sequenceFlow id="flow-result-failure" name="has error" sourceRef="result-gateway" targetRef="publish-failure">
+      <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_3">${execution.getVariable('sagaError') != null}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-result-success" name="ok" sourceRef="result-gateway" targetRef="publish-success"/>
+    <sequenceFlow id="flow-publish-success-end" sourceRef="publish-success" targetRef="end"/>
+    <sequenceFlow id="flow-publish-failure-end" sourceRef="publish-failure" targetRef="end"/>
+    <sequenceFlow id="flow-redpanda-error" sourceRef="redpanda-error" targetRef="delete-route"/>
+    <sequenceFlow id="flow-apisix-error" sourceRef="apisix-error" targetRef="geo-gateway"/>
+    <sequenceFlow id="flow-workspace-error" sourceRef="workspace-error" targetRef="delete-project"/>
+    <sequenceFlow id="flow-frost-error" sourceRef="frost-error" targetRef="result-merge"/>
+  </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_Process_1" bpmnElement="dataset-delete">
+      <bpmndi:BPMNShape id="BPMNShape_StartEvent_1" bpmnElement="start">
+        <dc:Bounds height="36.0" width="36.0" x="50.0" y="182.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_1" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="14.0" width="25.0" x="55.0" y="218.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_ExclusiveGateway_1" bpmnElement="pipeline-gateway" isMarkerVisible="true">
+        <dc:Bounds height="50.0" width="50.0" x="136.0" y="175.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_2" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="54.0" x="134.0" y="225.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_ServiceTask_1" bpmnElement="delete-pipelines">
+        <dc:Bounds height="50.0" width="110.0" x="234.0" y="175.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_3" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="14.0" width="90.0" x="244.0" y="193.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_ServiceTask_2" bpmnElement="delete-route">
+        <dc:Bounds height="50.0" width="110.0" x="399.0" y="175.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_4" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="86.0" x="411.0" y="186.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_ExclusiveGateway_2" bpmnElement="geo-gateway" isMarkerVisible="true">
+        <dc:Bounds height="50.0" width="50.0" x="555.0" y="175.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_5" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="57.0" x="552.0" y="225.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_ServiceTask_3" bpmnElement="delete-workspace">
+        <dc:Bounds height="50.0" width="110.0" x="675.0" y="175.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_6" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="110.0" x="675.0" y="186.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_ServiceTask_4" bpmnElement="delete-project">
+        <dc:Bounds height="50.0" width="110.0" x="850.0" y="175.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_7" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="88.0" x="861.0" y="186.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_ServiceTask_5" bpmnElement="publish-success">
+        <dc:Bounds height="50.0" width="110.0" x="1260.0" y="126.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_8" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="14.0" width="90.0" x="1270.0" y="144.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_ServiceTask_6" bpmnElement="publish-failure">
+        <dc:Bounds height="50.0" width="110.0" x="1260.0" y="226.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_9" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="14.0" width="82.0" x="1274.0" y="244.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_ExclusiveGateway_3" bpmnElement="result-merge" isMarkerVisible="true">
+        <dc:Bounds height="50.0" width="50.0" x="1050.0" y="175.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_10" labelStyle="BPMNLabelStyle_1"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_ExclusiveGateway_4" bpmnElement="result-gateway" isMarkerVisible="true">
+        <dc:Bounds height="50.0" width="50.0" x="1160.0" y="176.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_11" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="14.0" width="65.0" x="1153.0" y="226.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_EndEvent_1" bpmnElement="end">
+        <dc:Bounds height="36.0" width="36.0" x="1420.0" y="183.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_12" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="60.0" x="1408.0" y="219.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_2" bpmnElement="apisix-error">
+        <dc:Bounds height="36.0" width="36.0" x="435.0" y="207.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_32" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="14.0" width="62.0" x="422.0" y="243.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_1" bpmnElement="redpanda-error">
+        <dc:Bounds height="36.0" width="36.0" x="270.0" y="207.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_31" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="14.0" width="62.0" x="257.0" y="243.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_4" bpmnElement="frost-error">
+        <dc:Bounds height="36.0" width="36.0" x="886.0" y="207.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_34" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="14.0" width="62.0" x="873.0" y="243.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_3" bpmnElement="workspace-error">
+        <dc:Bounds height="36.0" width="36.0" x="711.0" y="207.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_33" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="14.0" width="62.0" x="698.0" y="243.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_1" bpmnElement="flow-start" sourceElement="BPMNShape_StartEvent_1" targetElement="BPMNShape_ExclusiveGateway_1">
+        <di:waypoint xsi:type="dc:Point" x="86.0" y="200.0"/>
+        <di:waypoint xsi:type="dc:Point" x="111.0" y="200.0"/>
+        <di:waypoint xsi:type="dc:Point" x="136.0" y="200.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_13"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_2" bpmnElement="flow-gateway-redpanda" sourceElement="BPMNShape_ExclusiveGateway_1" targetElement="BPMNShape_ServiceTask_1">
+        <di:waypoint xsi:type="dc:Point" x="186.0" y="200.0"/>
+        <di:waypoint xsi:type="dc:Point" x="210.0" y="200.0"/>
+        <di:waypoint xsi:type="dc:Point" x="234.0" y="200.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_14">
+          <dc:Bounds height="14.0" width="19.0" x="201.0" y="205.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_3" bpmnElement="flow-gateway-skip" sourceElement="BPMNShape_ExclusiveGateway_1" targetElement="BPMNShape_ServiceTask_2">
+        <di:waypoint xsi:type="dc:Point" x="161.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="161.0" y="146.0"/>
+        <di:waypoint xsi:type="dc:Point" x="454.0" y="146.0"/>
+        <di:waypoint xsi:type="dc:Point" x="454.0" y="175.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_15">
+          <dc:Bounds height="14.0" width="14.0" x="302.0" y="147.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_4" bpmnElement="flow-redpanda-apisix" sourceElement="BPMNShape_ServiceTask_1" targetElement="BPMNShape_ServiceTask_2">
+        <di:waypoint xsi:type="dc:Point" x="344.0" y="200.0"/>
+        <di:waypoint xsi:type="dc:Point" x="371.0" y="200.0"/>
+        <di:waypoint xsi:type="dc:Point" x="371.0" y="191.0"/>
+        <di:waypoint xsi:type="dc:Point" x="399.0" y="191.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_16"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_5" bpmnElement="flow-redpanda-error" sourceElement="BPMNShape_BoundaryEvent_1" targetElement="BPMNShape_ServiceTask_2">
+        <di:waypoint xsi:type="dc:Point" x="288.0" y="243.0"/>
+        <di:waypoint xsi:type="dc:Point" x="288.0" y="268.0"/>
+        <di:waypoint xsi:type="dc:Point" x="371.0" y="268.0"/>
+        <di:waypoint xsi:type="dc:Point" x="371.0" y="208.0"/>
+        <di:waypoint xsi:type="dc:Point" x="399.0" y="208.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_17"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_6" bpmnElement="flow-apisix-geo" sourceElement="BPMNShape_ServiceTask_2" targetElement="BPMNShape_ExclusiveGateway_2">
+        <di:waypoint xsi:type="dc:Point" x="509.0" y="200.0"/>
+        <di:waypoint xsi:type="dc:Point" x="532.0" y="200.0"/>
+        <di:waypoint xsi:type="dc:Point" x="555.0" y="200.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_18"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_7" bpmnElement="flow-apisix-error" sourceElement="BPMNShape_BoundaryEvent_2" targetElement="BPMNShape_ExclusiveGateway_2">
+        <di:waypoint xsi:type="dc:Point" x="453.0" y="243.0"/>
+        <di:waypoint xsi:type="dc:Point" x="453.0" y="267.0"/>
+        <di:waypoint xsi:type="dc:Point" x="580.0" y="267.0"/>
+        <di:waypoint xsi:type="dc:Point" x="580.0" y="225.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_19"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_8" bpmnElement="flow-geo-workspace" sourceElement="BPMNShape_ExclusiveGateway_2" targetElement="BPMNShape_ServiceTask_3">
+        <di:waypoint xsi:type="dc:Point" x="605.0" y="200.0"/>
+        <di:waypoint xsi:type="dc:Point" x="640.0" y="200.0"/>
+        <di:waypoint xsi:type="dc:Point" x="675.0" y="200.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_20">
+          <dc:Bounds height="14.0" width="19.0" x="631.0" y="201.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_9" bpmnElement="flow-geo-skip" sourceElement="BPMNShape_ExclusiveGateway_2" targetElement="BPMNShape_ServiceTask_4">
+        <di:waypoint xsi:type="dc:Point" x="580.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="580.0" y="154.0"/>
+        <di:waypoint xsi:type="dc:Point" x="727.0" y="154.0"/>
+        <di:waypoint xsi:type="dc:Point" x="877.0" y="154.0"/>
+        <di:waypoint xsi:type="dc:Point" x="877.0" y="175.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_21">
+          <dc:Bounds height="14.0" width="14.0" x="723.0" y="155.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_10" bpmnElement="flow-workspace-frost" sourceElement="BPMNShape_ServiceTask_3" targetElement="BPMNShape_ServiceTask_4">
+        <di:waypoint xsi:type="dc:Point" x="785.0" y="200.0"/>
+        <di:waypoint xsi:type="dc:Point" x="820.0" y="200.0"/>
+        <di:waypoint xsi:type="dc:Point" x="820.0" y="191.0"/>
+        <di:waypoint xsi:type="dc:Point" x="850.0" y="191.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_22"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_11" bpmnElement="flow-workspace-error" sourceElement="BPMNShape_BoundaryEvent_3" targetElement="BPMNShape_ServiceTask_4">
+        <di:waypoint xsi:type="dc:Point" x="729.0" y="243.0"/>
+        <di:waypoint xsi:type="dc:Point" x="729.0" y="267.0"/>
+        <di:waypoint xsi:type="dc:Point" x="786.0" y="267.0"/>
+        <di:waypoint xsi:type="dc:Point" x="786.0" y="208.0"/>
+        <di:waypoint xsi:type="dc:Point" x="850.0" y="208.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_23"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_12" bpmnElement="flow-frost-result" sourceElement="BPMNShape_ServiceTask_4" targetElement="BPMNShape_ExclusiveGateway_3">
+        <di:waypoint xsi:type="dc:Point" x="960.0" y="200.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1005.0" y="200.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1050.0" y="200.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_24"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_13" bpmnElement="flow-frost-error" sourceElement="BPMNShape_BoundaryEvent_4" targetElement="BPMNShape_ExclusiveGateway_3">
+        <di:waypoint xsi:type="dc:Point" x="904.0" y="243.0"/>
+        <di:waypoint xsi:type="dc:Point" x="904.0" y="253.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1075.0" y="253.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1075.0" y="225.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_25"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_14" bpmnElement="flow-result-success" sourceElement="BPMNShape_ExclusiveGateway_4" targetElement="BPMNShape_ServiceTask_5">
+        <di:waypoint xsi:type="dc:Point" x="1185.0" y="176.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1185.0" y="151.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1260.0" y="151.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_26">
+          <dc:Bounds height="14.0" width="13.0" x="1204.0" y="152.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_15" bpmnElement="flow-publish-success-end" sourceElement="BPMNShape_ServiceTask_5" targetElement="BPMNShape_EndEvent_1">
+        <di:waypoint xsi:type="dc:Point" x="1370.0" y="151.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1438.0" y="151.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1438.0" y="183.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_27"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_16" bpmnElement="flow-result-failure" sourceElement="BPMNShape_ExclusiveGateway_4" targetElement="BPMNShape_ServiceTask_6">
+        <di:waypoint xsi:type="dc:Point" x="1185.0" y="226.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1185.0" y="251.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1260.0" y="251.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_28">
+          <dc:Bounds height="14.0" width="49.0" x="1186.0" y="252.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_17" bpmnElement="flow-publish-failure-end" sourceElement="BPMNShape_ServiceTask_6" targetElement="BPMNShape_EndEvent_1">
+        <di:waypoint xsi:type="dc:Point" x="1370.0" y="251.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1438.0" y="251.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1438.0" y="219.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_29"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_18" bpmnElement="flow-merge-to-gateway" sourceElement="BPMNShape_ExclusiveGateway_3" targetElement="BPMNShape_ExclusiveGateway_4">
+        <di:waypoint xsi:type="dc:Point" x="1100.0" y="200.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1130.0" y="200.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1160.0" y="201.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_30"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+    <bpmndi:BPMNLabelStyle id="BPMNLabelStyle_1">
+      <dc:Font name="arial" size="9.0"/>
+    </bpmndi:BPMNLabelStyle>
+  </bpmndi:BPMNDiagram>
+</definitions>

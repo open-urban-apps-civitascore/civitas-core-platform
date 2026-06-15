@@ -16,19 +16,19 @@ import { LAYOUT_DIMENSIONS } from '../../_constants/pipelineStyles'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
 import type { PipelineNodeData } from '../../_types/nodes'
 import {
-  isApiNodeData,
   isControlNodeData,
   isCronNodeData,
   isDataSourceNodeData,
   isFrostNodeData,
+  isGeoPersistenceNodeData,
   isMappingNodeData,
 } from '../../_types/nodes'
 import { InspectorHeader } from './components/InspectorHeader'
-import { ApiPanel } from './panels/ApiPanel'
 import { ControlPanel } from './panels/ControlPanel'
 import { CronPanel } from './panels/CronPanel'
 import { DataSourcePanel } from './panels/DataSourcePanel'
 import { FrostPanel } from './panels/FrostPanel'
+import { GeoPersistencePanel } from './panels/GeoPersistencePanel'
 import { MappingPanel } from './panels/MappingPanel'
 import { ValidationPanel } from './validation'
 
@@ -109,14 +109,14 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
     if (isDataSourceNodeData(data)) {
       return <DataSourcePanel data={data} onUpdate={handleNodeUpdate} />
     }
-    if (isApiNodeData(data)) {
-      return <ApiPanel data={data} />
-    }
     if (isCronNodeData(data)) {
       return <CronPanel data={data} onUpdate={handleNodeUpdate} />
     }
     if (isFrostNodeData(data)) {
       return <FrostPanel data={data} />
+    }
+    if (isGeoPersistenceNodeData(data)) {
+      return <GeoPersistencePanel data={data} onUpdate={handleNodeUpdate} />
     }
     if (isMappingNodeData(data)) {
       return <MappingPanel data={data} onUpdate={handleNodeUpdate} />

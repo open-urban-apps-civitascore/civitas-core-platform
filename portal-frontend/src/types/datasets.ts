@@ -1,9 +1,10 @@
 import { CheckedState } from '@radix-ui/react-checkbox'
-import { JSX } from 'react'
+import { JSX, ReactNode } from 'react'
 import { z } from 'zod'
 
 import { AssignmentScopedInputSchema } from './assignments'
 import { ItemType, MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, STATUS_TYPES, WithId } from './common'
+import { NamedApiPayloadSchema, NamedApiSchema } from './namedApis'
 
 export const DATASET_STATUS_TYPES = {
   [STATUS_TYPES.DRAFT]: 'DRAFT',
@@ -17,11 +18,6 @@ const enumFromConst = <T extends Record<string, string>>(obj: T) =>
   z.enum(Object.values(obj) as [T[keyof T], ...T[keyof T][]])
 
 export const DatasetStatusSchema = enumFromConst(DATASET_STATUS_TYPES)
-
-export type Distribution = {
-  id: string
-  accessUrl: string
-}
 
 export type PipelineBasicInfo = {
   id: string
@@ -41,8 +37,8 @@ export const DatasetApiResponseSchema = z.object({
   description: z.string(),
   dataSetStatus: DatasetStatusSchema,
   openDataAccess: z.boolean(),
-  distributions: z.array(z.object({ id: z.string(), accessUrl: z.string() })),
   pipelines: z.array(z.object({ id: z.string(), name: z.string() })),
+  namedApis: z.array(NamedApiSchema).optional(),
 })
 
 export type Dataset = z.infer<typeof DatasetApiResponseSchema>
@@ -54,6 +50,7 @@ export const DatasetBaseInputSchema = z.object({
   description: z.string(),
   openDataAccess: z.boolean(),
   assignments: AssignmentScopedInputSchema.array(),
+  namedApis: z.array(NamedApiPayloadSchema).optional(),
 })
 
 // ---------- API Create ----------
@@ -134,10 +131,11 @@ export type DatasetTableData = {
   dataSetStatus: DatasetStatusTypes
 }
 
-export type CompletionStepParam = 'access-management' | 'data-flow'
+export type CompletionStepParam = 'access-management' | 'data-flow' | 'apis'
 
 export type CompletionStepData = {
   title: string
+  description?: string
   isCompleted: CheckedState
   buttons: {
     text: string
@@ -145,4 +143,5 @@ export type CompletionStepData = {
     queryParam?: string
   }[]
   content?: JSX.Element
+  actionElement?: ReactNode
 }

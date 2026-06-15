@@ -77,7 +77,23 @@ public enum Topics {
   // --- Pipeline Events ---
   PIPELINE_CREATED("de.civitascore.data.pipeline.created"),
   PIPELINE_UPDATED("de.civitascore.data.pipeline.updated"),
-  PIPELINE_DELETED("de.civitascore.data.pipeline.deleted");
+  PIPELINE_DELETED("de.civitascore.data.pipeline.deleted"),
+
+  // --- GeoServer Events ---
+  GEO_WORKSPACE_CREATED("de.civitascore.geo.workspace.created"),
+  GEO_WORKSPACE_UPDATED("de.civitascore.geo.workspace.updated"),
+  GEO_WORKSPACE_DELETED("de.civitascore.geo.workspace.deleted"),
+  GEO_DATASTORE_CREATED("de.civitascore.geo.datastore.created"),
+  GEO_DATASTORE_UPDATED("de.civitascore.geo.datastore.updated"),
+  GEO_DATASTORE_DELETED("de.civitascore.geo.datastore.deleted"),
+  GEO_FEATURE_TYPE_CREATED("de.civitascore.geo.featuretype.created"),
+  GEO_FEATURE_TYPE_UPDATED("de.civitascore.geo.featuretype.updated"),
+  GEO_FEATURE_TYPE_DELETED("de.civitascore.geo.featuretype.deleted"),
+  GEO_STYLE_CREATED("de.civitascore.geo.style.created"),
+  GEO_STYLE_UPDATED("de.civitascore.geo.style.updated"),
+  GEO_STYLE_DELETED("de.civitascore.geo.style.deleted"),
+  GEO_LAYER_UPDATED("de.civitascore.geo.layer.updated"),
+  GEO_LAYER_DELETED("de.civitascore.geo.layer.deleted");
 
   private final String value;
 

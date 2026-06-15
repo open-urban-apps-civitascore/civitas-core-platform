@@ -15,6 +15,7 @@
     "form": "Formular",
     "actions": {
       "submit": "Speichern",
+      "apply": "Übernehmen",
       "cancel": "Abbrechen",
       "close": "Schließen",
       "delete": "Löschen",
@@ -70,7 +71,6 @@
       "role": "Rolle",
       "roles": "Rollen",
       "datasets": "Datensätze",
-      "dataspaces": "Datenräume",
       "permissions": "Berechtigungen",
       "datasources": "Datenquellen",
       "datasource": "Datenquelle",
@@ -188,7 +188,6 @@
     "edit": "bearbeiten",
     "users": "User",
     "groups": "Gruppen",
-    "dataspaces": "Datenräume",
     "tenants": "Mandanten-Management",
     "uml-modeler": "UML Modeler",
     "data-flow": "Datenfluss",
@@ -197,7 +196,8 @@
     "data-management": "Daten-Management",
     "datasources": "Datenquellen",
     "datastructures": "Datenstrukturen",
-    "access-management": "Zugriffsmanagement"
+    "access-management": "Zugriffsmanagement",
+    "apis": "APIs"
   },
   "datasets": {
     "title": "Datensätze",
@@ -250,13 +250,197 @@
         },
         "dataFlow": {
           "title": "Datenfluss",
-          "button": {
-            "readOnly": "Daten laden und bereitstellen",
-            "editable": "Datenfluss bearbeiten"
+          "description": "Konfiguriert, wie Daten durch Pipelines verarbeitet und über APIs bereitgestellt werden",
+          "pipelines": {
+            "title": "Pipeline(s)",
+            "empty": "Noch keine Pipeline vorhanden",
+            "addButton": "Pipeline hinzufügen"
           },
-          "pipelines": "Pipeline",
-          "distributionAccessURLs": "SensorThings API",
-          "noDataFlow": "Es sind noch keine Daten vorhanden."
+          "apis": {
+            "title": "APIs",
+            "empty": "Noch keine API vorhanden",
+            "noDescription": "Keine Beschreibung vorhanden",
+            "addButton": "API hinzufügen",
+            "sensorThings": "SensorThings API",
+            "sensorThingsSubtitle": "Zeitreihendaten",
+            "ows": "WFS/WMS API",
+            "owsSubtitle": "Geodaten",
+            "standardLabels": {
+              "STA": "SensorThings API",
+              "OWS": "WFS/WMS",
+              "CUSTOM": "Custom API"
+            },
+            "card": {
+              "actions": {
+                "edit": "Bearbeiten",
+                "view": "Öffnen",
+                "delete": "Löschen",
+                "copyPath": "Pfad kopieren"
+              },
+              "deleteConfirm": {
+                "title": "API löschen",
+                "description": "Möchtest du die API \"{name}\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+                "confirm": "Löschen"
+              },
+              "messages": {
+                "copySuccess": "Pfad wurde in die Zwischenablage kopiert.",
+                "deleteSuccess": "API wurde erfolgreich gelöscht.",
+                "deleteError": "Beim Löschen der API ist ein Fehler aufgetreten. Bitte versuche es erneut."
+              }
+            }
+          }
+        },
+        "apis": {
+          "config": {
+            "title": {
+              "sensorthings": "SensorThings API",
+              "ows": "WFS/WMS API"
+            },
+            "protectedBadge": "Geschützt",
+            "openDataBadge": "Open Data",
+            "protectedBadgeTooltip": "Der Zugriff auf diese API ist eingeschränkt und erfordert entsprechende Berechtigungen.",
+            "tabs": {
+              "basicInfo": "Basisinformationen",
+              "layer": "Layer",
+              "styles": "Stile",
+              "placeholder": "Inhalte folgen in einem späteren Schritt."
+            },
+            "styles": {
+              "title": "Stile",
+              "addStyle": "Stil hinzufügen",
+              "newStyle": "Neuer Stil {index}",
+              "untitledStyle": "Unbenannter Stil {index}",
+
+              "name": "Name",
+              "sldFile": "SLD-Datei",
+              "sldFilePlaceholder": "SLD auswählen...",
+              "styleEditor": "Stil-Editor",
+              "deleteStyle": "Stil löschen",
+              "validation": {
+                "nameRequired": "Stilname ist erforderlich",
+                "sldContentRequired": "Stilinhalt ist erforderlich"
+              },
+              "noStyles": {
+                "title": "Keine Stile vorhanden",
+                "subtitle": "Stile können erstellt und anschließend den Layern dieser API zugeordnet werden"
+              },
+              "deleteModal": {
+                "title": "Stil wirklich löschen?",
+                "description": "Diese Änderung hat folgende Auswirkungen:\n• Der Stil steht nicht mehr zur Verfügung\n• Layer, die diesen Stil verwenden, verlieren ihre aktuelle Darstellung\n• Die Darstellung kann sich in verbundenen Diensten (z. B. WMS) ändern"
+              },
+              "messages": {
+                "deleteSuccess": "Stil wurde erfolgreich gelöscht.",
+                "deleteError": "Beim Löschen des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+                "createSuccess": "Stil wurde erfolgreich erstellt.",
+                "updateSuccess": "Stil wurde erfolgreich aktualisiert.",
+                "saveError": "Beim Speichern des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+                "saveSuccess": "Stile wurden erfolgreich gespeichert."
+              }
+            },
+            "baseInfo": {
+              "sectionTitle": "Basisinformationen",
+              "type": "Typ",
+              "persistence": "Persistenz",
+              "persistenceHint": "aus Pipeline",
+              "persistencePlaceholder": "Persistenz auswählen",
+              "slug": "Slug",
+              "urlPreview": "URL-Vorschau",
+              "name": "Bezeichnung",
+              "nameHint": "Beschreibt, welche Daten diese API bereitstellt.",
+              "description": "Beschreibung",
+              "descriptionHint": "max. 150 Zeichen, optional",
+              "descriptionPlaceholder": ""
+            },
+            "layer": {
+              "sectionTitle": "Layer",
+              "addLayer": "Layer hinzufügen",
+              "deleteLayer": "Layer löschen",
+              "untitledLayer": "Unbenannter Layer {index}",
+              "newLayer": "Neuer Layer {index}",
+              "baseInfo": {
+                "sectionTitle": "Basisinformationen",
+                "title": "Bezeichnung",
+                "technicalName": "Technischer Name",
+                "technicalNameHint": "für URL",
+                "description": "Beschreibung"
+              },
+              "dataSelection": {
+                "sectionTitle": "Datenauswahl",
+                "table": "Tabelle",
+                "tablePlaceHolder": "Tabelle auswählen ...",
+                "attributes": "Attribute",
+                "attributesPlaceHolder": "Attribute auswählen ...",
+                "filter": "Filter definieren",
+                "filterHint": "mit CQL, z. B. attribut='wert'"
+              },
+              "geometry": {
+                "sectionTitle": "Geometrie",
+                "geometryField": "Geometriefeld",
+                "geometryFieldPlaceHolder": "Geometriefeld auswählen ...",
+                "nativeCrs": "Natives Koordinatenreferenzsystem (CRS)",
+                "definedCrs": "Angegebenes Koordinatenreferenzsystem (CRS)",
+                "crsPlaceHolder": "CRS auswählen ...",
+                "boundingBox": "Bounding Box",
+                "calculateFromCrs": "Aus den Grenzen des CRS berechnen",
+                "calculateFromData": "Aus Daten berechnen"
+              },
+              "style": {
+                "sectionTitle": "Layer-Stil",
+                "standardStyle": "Standardanzeige",
+                "default": "Standard (Geoserver default)",
+                "alternativeStyles": "Alternative Stile",
+                "alternativeStylesPlaceHolder": "Alternative Stile auswählen ...",
+                "addAlternativeStyle": "Alternativen Stil hinzufügen"
+              },
+              "deleteConfirm": {
+                "title": "Layer wirklich löschen?",
+                "description": "Diese Änderung hat folgende Auswirkungen:",
+                "impact1": "Der Layer ist nicht mehr verfügbar",
+                "impact2": "Die Darstellung in verbundenen Diensten ändert sich",
+                "impact3": "Externe Anwendungen können betroffen sein, wenn sie diesen Layer verwenden",
+                "confirm": "Layer löschen"
+              },
+              "noData": {
+                "title": "Keine Layer vorhanden",
+                "description": "Layer definieren die bereitgestellten Daten und deren Darstellung"
+              }
+            },
+            "messages": {
+              "createSuccess": "API wurde erfolgreich angelegt.",
+              "updateSuccess": "API wurde erfolgreich aktualisiert.",
+              "saveError": "Beim Speichern der API ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "createLayerSuccess": "Layer wurde erfolgreich angelegt.",
+              "updateLayerSuccess": "Layer wurde erfolgreich aktualisiert.",
+              "saveLayerError": "Beim Speichern des Layers ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "deleteLayerSuccess": "Layer wurde erfolgreich gelöscht.",
+              "deleteLayerError": "Beim Löschen des Layers ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "layerNameExists": "Für die gewählte Tabelle existiert bereits ein Layer mit dem Namen \"{name}\".",
+              "createStyleSuccess": "Stil wurde erfolgreich angelegt.",
+              "updateStyleSuccess": "Stil wurde erfolgreich aktualisiert.",
+              "saveStyleError": "Beim Speichern des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "deleteStyleSuccess": "Stil wurde erfolgreich gelöscht.",
+              "deleteStyleError": "Beim Löschen des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut."
+            },
+
+            "errors": {
+              "name": {
+                "required": "Bezeichnung ist erforderlich"
+              },
+              "slug": {
+                "required": "Slug ist erforderlich",
+                "tooLong": "Slug darf maximal 32 Zeichen lang sein",
+                "invalidFormat": "Slug darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten und nicht mit einem Bindestrich beginnen oder enden",
+                "reserved": "Dieser Slug ist reserviert und kann nicht verwendet werden",
+                "notUnique": "Dieser Slug existiert bereits in diesem Datensatz"
+              },
+              "description": {
+                "tooLong": "Beschreibung darf maximal 150 Zeichen lang sein"
+              },
+              "persistence": {
+                "required": "Persistenz ist erforderlich"
+              }
+            }
+          }
         }
       }
     },
@@ -295,7 +479,12 @@
       "subheader": "Persönliche Angaben und allgemeine Informationen.",
       "id": "ID",
       "displayName": "Name",
-      "title": { "title": "Anrede", "mr": "Herr", "ms": "Frau", "other": "Keine Angabe" },
+      "title": {
+        "title": "Anrede",
+        "mr": "Herr",
+        "ms": "Frau",
+        "other": "Keine Angabe"
+      },
       "firstName": "Vorname",
       "lastName": "Name",
       "role": "Systemrolle",
@@ -398,7 +587,10 @@
       "baseInfo": "Basisinformationen",
       "name": "Name",
       "description": "Beschreibung",
-      "contact": { "label": "Ansprechpartner", "placeholder": "Nach Name oder Email suchen" }
+      "contact": {
+        "label": "Ansprechpartner",
+        "placeholder": "Nach Name oder Email suchen"
+      }
     },
     "roles": {
       "scopeTabs": {
@@ -479,24 +671,6 @@
       "previousPage": "Zur vorherigen Seite wechseln",
       "nextPage": "Zur nächsten Seite wechseln",
       "lastPage": "Zur letzten Seite wechseln"
-    }
-  },
-  "dataspaces": {
-    "title": "Datenräume",
-    "newDataSpace": "Neuer Datenraum",
-    "createDataSpace": "Datenraum erstellen",
-    "tableHeaders": {
-      "name": "Name",
-      "description": "Beschreibung",
-      "protected": "Geschützt"
-    },
-    "form": {
-      "inputs": {
-        "name": "Name des Datenraums",
-        "description": "Beschreibung des Datenraums",
-        "protected": "Datenraum schützen",
-        "protectedDescription": "Geschützte Datenräume erfordern erweiterte Berechtigungen für den Zugriff"
-      }
     }
   },
   "permissions": {
@@ -740,8 +914,7 @@
       "basicInfo": "Basisinformationen",
       "connector": "Konnektor",
       "dataStructure": "Datenstruktur",
-      "accessManagement": "Zugriffsberechtigungen",
-      "dataspaces": "Datenräume"
+      "accessManagement": "Zugriffsberechtigungen"
     },
     "connectorTab": {
       "title1": "Konnektor",
@@ -862,7 +1035,8 @@
     }
   },
   "pipelineEditor": {
-    "title": "Pipeline-Editor",
+    "title": "Pipeline Editor",
+    "subtitle": "Definiert, wie Daten ingestiert, transformiert und persistiert werden",
     "canvas": {
       "noPipeline": "Keine Pipeline verfügbar"
     },
@@ -880,10 +1054,9 @@
       "start": "Start",
       "end": "Ende",
       "dataSource": "Datenquelle",
-      "apiRequest": "API-Request",
-      "apiResponse": "API-Response",
       "cronTrigger": "CRON-Trigger",
       "frostStorage": "FROST-Server",
+      "geoPersistence": "Geo-Persistenz",
       "mapping": "Mapping"
     },
     "palette": {
@@ -897,20 +1070,18 @@
       "transformation": "Transformation"
     },
     "paletteItems": {
-      "flowStart": "Flow Start",
+      "flowStart": "Pipeline Start",
       "flowStartDesc": "Pipeline-Einstiegspunkt. Ausführung beginnt hier.",
-      "flowEnd": "Flow Ende",
+      "flowEnd": "Pipeline Ende",
       "flowEndDesc": "Pipeline-Endpunkt. Ausführung endet hier.",
       "dataSource": "Datenquelle",
-      "dataSourceDesc": "Datenquelle. Wähle eine konfigurierte Datenquelle aus.",
-      "apiRequest": "API-Request",
-      "apiRequestDesc": "REST-API Request. Erstellt Endpunkt, der Daten bereitstellt.",
-      "apiResponse": "API-Response",
-      "apiResponseDesc": "REST-API Response.",
+      "dataSourceDesc": "Datenquelle auswählen",
       "cron": "CRON",
       "cronDesc": "Geplanter Trigger. Führt Pipeline nach Zeitplan aus.",
       "frostServer": "FROST Server",
-      "frostServerDesc": "SensorThings API Persistenz. Daten speichern oder abrufen.",
+      "frostServerDesc": "SensorThings API persistence",
+      "geoPersistence": "Geo-Persistenz",
+      "geoPersistenceDesc": "WFS/WMS Geo-Daten-Persistenz.",
       "mapping": "Mapping",
       "mappingDesc": "Bloblang-Datentransformation. Daten zuordnen und transformieren."
     },
@@ -943,11 +1114,6 @@
       "showDataStructure": "Datenstruktur anzeigen",
       "noPermission": "Keine Berechtigung zum Lesen von Datenquellen"
     },
-    "apiPanel": {
-      "requestDetails": "API-Request-Details",
-      "responseDetails": "API-Response-Details",
-      "apiPath": "API-Pfad"
-    },
     "frostPanel": {
       "details": "FROST Server Details",
       "serverName": "Servername",
@@ -955,13 +1121,30 @@
       "internalServer": "Interner Frost Server",
       "version": "Version"
     },
+    "geoPersistencePanel": {
+      "title": "Geo-Persistenz",
+      "tableName": "Tabellenname",
+      "tableNamePlaceholder": "Tabellennamen eingeben...",
+      "dataStructureVersion": "Datenstruktur-Version",
+      "importDataStructure": "Datenstruktur importieren",
+      "changeDataStructure": "Datenstruktur ändern",
+      "details": "Datenstruktur-Details",
+      "dataStructureName": "Datenstruktur",
+      "versionNumber": "Version"
+    },
     "mappingPanel": {
       "hint": "Definiere deine Datentransformations-Zuordnung im YAML- oder JSON-Format.",
       "mappingCode": "Mapping-Code",
       "loadingEditor": "Editor wird geladen...",
       "status": "Status",
       "mappingConfigured": "Mapping konfiguriert",
-      "noMappingDefined": "Kein Mapping definiert"
+      "noMappingDefined": "Kein Mapping definiert",
+      "name": "Name",
+      "namePlaceholder": "Mapping-Name",
+      "selectDatastructure": "Datenstruktur auswählen…",
+      "inputDatastructure": "Eingangs-Datenstruktur",
+      "outputDatastructure": "Ausgangs-Datenstruktur",
+      "openMappingEditor": "Mapping-Editor öffnen"
     },
     "entitySelector": {
       "selectEntity": "Entität auswählen...",
@@ -980,11 +1163,11 @@
       "messages": {
         "startNodeRequired": "Pipeline muss mindestens einen Start-Knoten haben",
         "endNodeRequired": "Pipeline muss mindestens einen End-Knoten haben",
-        "apiPairing": "API-Request-Knoten benötigt einen API-Response-Knoten in der Pipeline",
         "nodeNotConfigured": "{label} ist nicht konfiguriert",
         "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein.",
         "orphanNode": "{label} ist mit keinem anderen Knoten verbunden",
-        "minimumFunctionalNodes": "Pipeline muss mindestens einen funktionalen Knoten zwischen Start und Ende haben"
+        "minimumFunctionalNodes": "Pipeline muss mindestens einen funktionalen Knoten zwischen Start und Ende haben",
+        "duplicateTableName": "Zwei Geo-Persistenz-Speicher dürfen nicht den gleichen Namen haben"
       }
     },
     "toolbar": {
@@ -1011,12 +1194,86 @@
     "tabs": {
       "closeTab": "Tab schließen",
       "newPipeline": "Neue Pipeline",
-      "untitledPipeline": "Unbenannte Pipeline"
+      "untitledPipeline": "Pipeline ohne Namen"
     },
     "nodeLabels": {
       "notConfigured": "Nicht konfiguriert"
     },
-    "lines": "{count, plural, one {# Zeile} other {# Zeilen}}"
+    "lines": "{count, plural, one {# Zeile} other {# Zeilen}}",
+    "mappingEditor": {
+      "toolbar": {
+        "title": "Mapping",
+        "status": "{mapped} zugeordnet · {unmapped} nicht zugeordnet"
+      },
+      "palette": {
+        "title": "Transformationen"
+      },
+      "inspector": {
+        "title": "Inspektor",
+        "emptyMessage": "Transformation auswählen, um sie zu bearbeiten",
+        "noConfig": "Keine Konfiguration."
+      },
+      "node": {
+        "input": "EINGANG",
+        "output": "AUSGANG"
+      },
+      "errors": {
+        "typeMismatchWithType": "Typen stimmen nicht überein ({type}). Konvertierungsfunktion hinzufügen.",
+        "typeMismatch": "Typen stimmen nicht überein. Konvertierungsfunktion hinzufügen."
+      },
+      "categories": {
+        "literal": "Literal",
+        "recordPathFunctions": "RecordPath-Funktionen",
+        "conversionFunctions": "Konvertierungsfunktionen"
+      },
+      "transforms": {
+        "literal": {
+          "description": "Festen Wert ausgeben.",
+          "fields": {
+            "type": {
+              "label": "Typ",
+              "placeholder": "Typ auswählen…"
+            },
+            "value": {
+              "label": "Wert"
+            }
+          }
+        },
+        "concat": {
+          "description": "Zwei oder mehr Werte verketten.",
+          "fields": {
+            "separator": {
+              "label": "Trennzeichen"
+            }
+          }
+        },
+        "toString": {
+          "description": "beliebiger Skalar → str"
+        },
+        "toInt": {
+          "description": "str / float → int"
+        },
+        "toFloat": {
+          "description": "str / int → float"
+        },
+        "toDate": {
+          "description": "str → date",
+          "fields": {
+            "pattern": {
+              "label": "Muster"
+            }
+          }
+        },
+        "format": {
+          "description": "date → str",
+          "fields": {
+            "pattern": {
+              "label": "Muster"
+            }
+          }
+        }
+      }
+    }
   },
   "umlModeler": {
     "closeTabModal": {

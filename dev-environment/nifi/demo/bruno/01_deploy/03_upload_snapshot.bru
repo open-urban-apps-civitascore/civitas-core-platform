@@ -1,0 +1,48 @@
+meta {
+  name: 03 Upload Flow Snapshot
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{nifiBaseUrl}}/nifi-api/process-groups/{{rootPgId}}/process-groups/upload
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  id: {{rootPgId}}
+  groupName: {{groupName}}
+  positionX: 200
+  positionY: 200
+  clientId: bruno-demo
+  file: @file(../MQTT_TO_POSTGIS_demo.snapshot.json)
+}
+
+script:pre-request {
+  // Reset before upload — never reuse a stale PG id.
+  bru.setVar('demoPgId', null);
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    bru.setVar('demoPgId', res.body.id);
+  }
+}
+
+tests {
+  test("Status 200/201", function() {
+    expect([200, 201]).to.include(res.status);
+  });
+  test("demoPgId saved", function() {
+    expect(bru.getVar('demoPgId')).to.be.a('string');
+  });
+}
+
+docs {
+  Multipart-uploads MQTT_TO_POSTGIS_demo.snapshot.json as a new child PG
+  under the root. The response carries the new PG's UUID — saved as
+  `demoPgId` for subsequent steps. Controller-services land in DISABLED
+  state with sensitive properties stripped; both are addressed by steps
+  05 and 06.
+}

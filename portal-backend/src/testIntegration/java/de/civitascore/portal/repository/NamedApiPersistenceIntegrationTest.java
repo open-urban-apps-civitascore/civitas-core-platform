@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.NamedApi;
 import jakarta.persistence.EntityManager;
@@ -39,7 +40,7 @@ class NamedApiPersistenceIntegrationTest extends BaseKeycloakIntegrationTest {
     NamedApi api = new NamedApi();
     api.setName("API " + slug);
     api.setSlug(slug);
-    api.setStandard("STA");
+    api.setStandard(ApiStandard.STA);
     return api;
   }
 

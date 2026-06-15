@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+  <!-- Flowable field injection requires mutable setter parameters — cannot defensively copy Expression objects -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+    <Or>
+      <Class name="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate"/>
+      <Class name="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate"/>
+      <Class name="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate"/>
+      <Class name="de.civitascore.configadapter.flowable.common.delegate.AbstractSagaDelegate"/>
+    </Or>
+    <Method name="~set.*"/>
+  </Match>
+
+  <!-- RuntimeService and HistoryService are Flowable framework objects, not mutable data -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+    <Class name="de.civitascore.configadapter.flowable.common.kafka.FlowableTriggerConsumer"/>
+  </Match>
+</FindBugsFilter>

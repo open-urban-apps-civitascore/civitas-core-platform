@@ -1,0 +1,15 @@
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{nifiToken}}
+}
+
+script:pre-request {
+  // NiFi's POST /access/token sets a __Secure-Authorization-Bearer cookie.
+  // If Bruno also sends it back, NiFi's CSRF filter rejects state-changing
+  // requests (403, logged as anonymous) even though the Authorization header
+  // is present. Drop cookies before every request — only the header is used.
+  bru.cookies.jar().clear();
+}

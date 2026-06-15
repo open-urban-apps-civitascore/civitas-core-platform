@@ -101,6 +101,63 @@ class PermissionInitializerTest {
   }
 
   @Test
+  @DisplayName(
+      "Should treat (name, source) as the identity, creating a same-named permission with a"
+          + " different source")
+  void shouldDistinguishPermissionsByNameAndSource() {
+    // given - a permission whose name collides with a DASHBOARD-sourced one but has a different
+    // source already exists. The dedup key is name + ":" + source, mirroring the (name, source)
+    // unique constraint, so the DASHBOARD-sourced permission must still be created.
+    Permission collidingInternal = new Permission();
+    collidingInternal.setName(PermissionName.DATASET_DASHBOARD_READ.name());
+    collidingInternal.setPermissionType(PermissionType.SYSTEM);
+    collidingInternal.setCategory(PermissionCategory.TENANT_ADMINISTRATION);
+    collidingInternal.setSource(PermissionSource.INTERNAL);
+    when(permissionRepository.findAll()).thenReturn(List.of(collidingInternal));
+
+    // when
+    permissionInitializer.initialize();
+
+    // then - DATASET_DASHBOARD_READ with source DATASET_DASHBOARD is still created despite the name
+    // match
+    verify(permissionRepository).saveAll(permissionsCaptor.capture());
+    List<Permission> created = permissionsCaptor.getValue();
+
+    assertThat(created)
+        .filteredOn(p -> p.getName().equals(PermissionName.DATASET_DASHBOARD_READ.name()))
+        .singleElement()
+        .satisfies(p -> assertThat(p.getSource()).isEqualTo(PermissionSource.DATASET_DASHBOARD));
+  }
+
+  @Test
+  @DisplayName("Should seed both dashboard permissions with dashboard source")
+  void shouldSeedDashboardPermissions() {
+    // given
+    when(permissionRepository.findAll()).thenReturn(List.of());
+
+    // when
+    permissionInitializer.initialize();
+
+    // then
+    verify(permissionRepository).saveAll(permissionsCaptor.capture());
+    List<Permission> created = permissionsCaptor.getValue();
+
+    // orElseThrow() below enforces presence, so no separate contains() check is needed.
+    for (PermissionName dashboardPermission :
+        List.of(PermissionName.DATASET_DASHBOARD_READ, PermissionName.DATASET_DASHBOARD_WRITE)) {
+      Permission seeded =
+          created.stream()
+              .filter(p -> p.getName().equals(dashboardPermission.name()))
+              .findFirst()
+              .orElseThrow();
+
+      assertThat(seeded.getPermissionType()).isEqualTo(PermissionType.DATA);
+      assertThat(seeded.getCategory()).isEqualTo(PermissionCategory.DATA);
+      assertThat(seeded.getSource()).isEqualTo(PermissionSource.DATASET_DASHBOARD);
+    }
+  }
+
+  @Test
   @DisplayName("Should set correct permission type and category for data permissions")
   void shouldSetCorrectMetadataForDataPermissions() {
     // given

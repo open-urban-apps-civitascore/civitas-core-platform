@@ -38,7 +38,7 @@ mvn package -Pdist -pl config-adapter-application
 
 ## Architecture
 
-Java 21 Maven multi-module project. Event-driven config adapter framework consuming CNCF CloudEvents from Kafka, applying changes to backend services (Keycloak, APISIX, RedPanda Connect, FROST), and publishing result events.
+Java 21 Maven multi-module project. Event-driven config adapter framework consuming CNCF CloudEvents from Kafka, applying changes to backend services (Keycloak, APISIX, RedPanda Connect, FROST, GeoServer), and publishing result events.
 
 ### Module Dependency Graph
 
@@ -51,7 +51,9 @@ config-adapter-api          ← Pure interfaces & models, no impl dependencies
     ├── config-adapter-apisix         ← APISIX Admin API adapter
     ├── config-adapter-redpanda       ← RedPanda Connect Streams API adapter (JAX-RS/Jersey)
     ├── config-adapter-frost          ← FROST SensorThings API adapter (JAX-RS/Jersey)
-    └── config-adapter-examples       ← DummyLogAdapter (logging reference impl)
+    ├── config-adapter-geoserver      ← GeoServer REST API adapter (JAX-RS/Jersey)
+    ├── config-adapter-examples       ← DummyLogAdapter (logging reference impl)
+    └── config-adapter-flowable       ← Flowable saga engine (embedded, PostgreSQL state; coded by default, BPMN optional). Sole saga orchestrator — the legacy custom config-adapter-orchestrator has been removed.
     ↑
 config-adapter-application  ← Bootstrap, ServiceLoader discovery, health checks, shade JAR
 ```
@@ -75,6 +77,7 @@ Key interfaces: `ConfigAdapter`, `EventConsumer`, `EventPublisher`, `AdapterConf
 IdmConfigValue (sealed) → UserConfig, ClientConfig, RealmConfig, RoleConfig, GroupConfig
 ApisixConfigValue → RouteConfigValue
 FrostConfigValue (interface with toApiMap())
+GeoServerConfigValue (passthrough container; toApiMap() returns additionalProperties as-is)
 ```
 
 ### Error Codes

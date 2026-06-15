@@ -9,6 +9,7 @@
    - [Keycloak / Security](#12-keycloak--security)
    - [Kafka](#13-kafka)
    - [Model Atlas](#14-model-atlas)
+   - [Data-Plane Base URL](#15-data-plane-base-url)
 2. [Optional / Tuning](#2-optional--tuning)
    - [Server](#21-server)
    - [Event Publishing & Config-Adapter](#22-event-publishing--config-adapter)
@@ -69,6 +70,16 @@
 | `MODEL_ATLAS_BASEURL` | `http://model-atlas:8080` | Model Atlas base URL |
 | `MODEL_ATLAS_SCOPE` | `civitas`                 | Scope for requests |
 | `MODEL_ATLAS_STAGE` | `draft`                   | Stage for requests |
+
+---
+
+### 1.5 Data-Plane Base URL
+
+| Property / Env Var | Example Value | Description |
+|---|---|---|
+| `CIVITAS_API_BASE_URL` | `https://api.core.civitasconnect.digital` | Public data-plane base URL used to build the per-named-API `previewUrl` returned on GET `/datasets/{id}`. MUST point at the data-plane host (the host APISIX exposes for `/v1/datasets/{id}/{slug}`), not the management host. Fully-qualified HTTPS URL with no path and no trailing slash. No default — startup fails with a `ConstraintViolationException` if missing or malformed. |
+
+> Validation rejects: missing/empty value, non-`https` scheme, paths, trailing slashes (e.g. `https://api.example.com/` or `https://api.example.com/v1`).
 
 ---
 
@@ -245,6 +256,9 @@ environment:
 
   # Credential Encryption (shared with config-adapter)
   CIVITAS_MASTER_KEY: <hex-encoded 256-bit key>
+
+  # Data-Plane Base URL (used to build per-named-API previewUrl)
+  CIVITAS_API_BASE_URL: https://api.core.civitasconnect.digital
 
   # Keycloak
   KEYCLOAK_AUTH_SERVER_URL: https://keycloak.example.com

@@ -123,6 +123,13 @@ springdoc:
     path: /swagger-ui.html
     enabled: true
 
+# CIVITAS platform configuration
+civitas:
+  api:
+    # Data-plane base URL used to build public preview URLs for named APIs.
+    # Form: https://host[:port] — no path, no trailing slash. No default.
+    base-url:
+
 # Security: paths permitted without authentication
 security:
   permit-paths:

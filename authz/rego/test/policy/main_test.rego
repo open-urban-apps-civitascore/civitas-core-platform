@@ -342,6 +342,81 @@ test_scope_dataset_wrong if {
 	result.reason == "permission_denied"
 }
 
+# Test: Named-API discovery endpoint (#1596) is gated by DATASET_READ on the dataset
+test_scope_dataset_apis_discovery_allowed if {
+	result := authz.decision with http.send as mock_send_dataset_abc_reader
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets/dataset-abc/apis")
+	result.allow == true
+	result.reason == "permission_granted"
+}
+
+# Test: discovery on a dataset outside the caller's scope is denied (no route-existence leakage)
+test_scope_dataset_apis_discovery_wrong_scope_denied if {
+	result := authz.decision with http.send as mock_send_dataset_abc_reader
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets/other-dataset/apis")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# =============================================================================
+# FROST DATA-PLANE PAYLOAD-READ TESTS (P1)
+# Reading SensorThings *content* through the protected FROST route must require
+# DATASET_PAYLOAD_READ, not the broader metadata DATASET_READ.
+# =============================================================================
+
+# A published-data request reaching FROST through APISIX: frost-server service, gateway Host
+# (data.backends.frost_server.api_host = api.localhost), authenticated user.
+frost_dataplane_request(method, path) := {
+	"request": {
+		"method": method,
+		"path": path,
+		"headers": {
+			"x-userinfo": mock_http.encode_userinfo("test-user"),
+			"host": "api.localhost",
+		},
+	},
+	"service": {"name": "frost-server"},
+}
+
+mock_send_dataset_abc_payload_reader(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_PAYLOAD_READ"], "DATASET", "dataset-abc")}
+
+# The FROST data-plane GET requires DATASET_PAYLOAD_READ (content), not metadata DATASET_READ.
+test_frost_dataplane_requires_payload_read if {
+	result := authz.decision with http.send as mock_send_dataset_abc_payload_reader
+		with data.config as mock_http.mock_config
+		with input as frost_dataplane_request("GET", "/v1/datasets/dataset-abc")
+	result.required_permissions == {"DATASET_PAYLOAD_READ"}
+}
+
+# A user with DATASET_PAYLOAD_READ scoped to the dataset may read SensorThings content.
+test_frost_dataplane_payload_read_allowed if {
+	result := authz.decision with http.send as mock_send_dataset_abc_payload_reader
+		with data.config as mock_http.mock_config
+		with input as frost_dataplane_request("GET", "/v1/datasets/dataset-abc")
+	result.allow == true
+	result.reason == "permission_granted"
+}
+
+# Metadata-only DATASET_READ must NOT unlock payload content via the protected FROST route.
+test_frost_dataplane_metadata_read_denied if {
+	result := authz.decision with http.send as mock_send_dataset_abc_reader
+		with data.config as mock_http.mock_config
+		with input as frost_dataplane_request("GET", "/v1/datasets/dataset-abc")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# DATASET_PAYLOAD_READ scoped to a different dataset must not grant access (scope mismatch).
+test_frost_dataplane_wrong_scope_denied if {
+	result := authz.decision with http.send as mock_send_dataset_abc_payload_reader
+		with data.config as mock_http.mock_config
+		with input as frost_dataplane_request("GET", "/v1/datasets/other-dataset")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
 # Test: TENANT-scoped user can access tenant-level resources (users)
 test_scope_tenant_user_access if {
 	result := authz.decision with http.send as mock_send_admin

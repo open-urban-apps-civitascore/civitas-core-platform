@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.application;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.civitascore.configadapter.configuration.AppConfig;
@@ -32,46 +33,69 @@ class SagaComponentFactoryTest {
   class Create {
 
     @Test
+    @DisplayName("Should reject the removed legacy custom orchestrator engine")
+    void customEngine_rejected() {
+      AppConfig config =
+          configWith(
+              Map.of(
+                  "orchestrator.engine", "custom",
+                  "kafka.bootstrap.servers", "localhost:9092"));
+
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> factory.create(config),
+          "The legacy custom orchestrator was removed — 'custom' must be rejected");
+    }
+
+    @Test
+    @DisplayName("Should reject unknown orchestrator.engine values instead of silently degrading")
+    void unknownEngine_failsFast() {
+      AppConfig config =
+          configWith(
+              Map.of(
+                  "orchestrator.engine", "flowabel",
+                  "kafka.bootstrap.servers", "localhost:9092"));
+
+      assertThrows(IllegalArgumentException.class, () -> factory.create(config));
+    }
+
+    @Test
+    @DisplayName("Should fail-fast on the (default) flowable engine when JDBC config is missing")
+    void flowableWithoutJdbcConfig_failsFast() {
+      AppConfig config =
+          configWith(
+              Map.of(
+                  "orchestrator.engine", "flowable",
+                  "kafka.bootstrap.servers", "localhost:9092"));
+
+      assertThrows(
+          IllegalStateException.class,
+          () -> factory.create(config),
+          "Flowable mode without JDBC config must fail-fast, not silently degrade");
+    }
+
+    @Test
     @DisplayName(
-        "Should return empty commandConsumer when no SagaCommandHandler implementations exist")
-    void noSagaHandlers() {
+        "Should surface the real cause instead of mislabeling every init failure as a JDBC problem")
+    void flowableInitFailure_surfacesRealCause() {
+      // Bare config: the required saga handlers (frost/apisix) cannot initialize and are dropped,
+      // so FlowableSagaOrchestrator.initialize() fails at validateRequiredHandlers — BEFORE it ever
+      // touches the database. The operator-facing message must therefore reflect that real cause
+      // and not steer everyone to flowable.jdbc.* (the #1368 debugging trap where a missing
+      // apisix.api.host surfaced as a bogus "check flowable.jdbc" error).
       AppConfig config =
           configWith(
               Map.of(
-                  "kafka.bootstrap.servers", "localhost:9092",
-                  "kafka.group.id", "test-group"));
+                  "orchestrator.engine", "flowable",
+                  "kafka.bootstrap.servers", "localhost:9092"));
 
-      SagaComponents components = factory.create(config);
+      IllegalStateException ex =
+          assertThrows(IllegalStateException.class, () -> factory.create(config));
 
-      assertNotNull(components);
-      assertTrue(components.commandConsumer().isEmpty());
-    }
-
-    @Test
-    @DisplayName("Should not throw when using default bootstrap servers")
-    void defaultBootstrapServers() {
-      AppConfig config = configWith(Map.of("kafka.group.id", "test-group"));
-
-      SagaComponents components = factory.create(config);
-
-      assertNotNull(components);
-      assertNotNull(components.orchestrator());
-    }
-
-    @Test
-    @DisplayName("Should return consistent SagaComponents record")
-    void consistentRecord() {
-      AppConfig config =
-          configWith(
-              Map.of(
-                  "kafka.bootstrap.servers", "localhost:9092",
-                  "kafka.group.id", "test-group"));
-
-      SagaComponents components = factory.create(config);
-
-      assertNotNull(components);
-      assertNotNull(components.commandConsumer());
-      assertNotNull(components.orchestrator());
+      assertNotNull(ex.getCause(), "the underlying cause must be preserved for diagnosis");
+      assertTrue(
+          ex.getMessage().contains(ex.getCause().getMessage()),
+          "wrapper must surface the real cause, but was: " + ex.getMessage());
     }
   }
 }

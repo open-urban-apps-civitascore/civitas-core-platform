@@ -14,8 +14,7 @@ package de.civitascore.configadapter.model.dataset;
  * non-standard APIs that still need a named route.
  */
 public enum ApiStandard {
-  WFS,
-  WMS,
+  OWS,
   STA,
   CUSTOM
 }

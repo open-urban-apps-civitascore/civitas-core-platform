@@ -6,7 +6,7 @@
  *
  */
 
-import { isCronNodeData } from '../_types/nodes'
+import { isCronNodeData, isGeoPersistenceNodeData } from '../_types/nodes'
 import { type Pipeline, PIPELINE_NODE_TYPES } from '../_types/pipeline'
 
 // ============================================================================
@@ -186,36 +186,6 @@ const validateEndNode: ValidationRule = {
 }
 
 /**
- * Rule: When API Request node is used, API Response node must also exist.
- */
-const validateApiPairing: ValidationRule = {
-  id: 'api-pairing',
-  name: 'API Request/Response Pairing',
-  description: 'When API Request is used, API Response must also exist',
-  validate: (pipeline: Pipeline) => {
-    const apiRequestNodes = pipeline.nodes.filter(node => node.type === PIPELINE_NODE_TYPES.ApiRequest)
-    const apiResponseNodes = pipeline.nodes.filter(node => node.type === PIPELINE_NODE_TYPES.ApiResponse)
-
-    const errors: PipelineValidationError[] = []
-
-    if (apiRequestNodes.length > 0 && apiResponseNodes.length === 0) {
-      // Find the API Request nodes to attach errors to
-      apiRequestNodes.forEach(node => {
-        errors.push({
-          id: crypto.randomUUID(),
-          type: 'node',
-          elementId: node.id,
-          messageKey: 'validation.messages.apiPairing',
-          severity: 'error',
-        })
-      })
-    }
-
-    return { errors, warnings: [] }
-  },
-}
-
-/**
  * Rule: All entity-referencing nodes must be configured.
  */
 const validateNodeConfiguration: ValidationRule = {
@@ -225,7 +195,7 @@ const validateNodeConfiguration: ValidationRule = {
   validate: (pipeline: Pipeline) => {
     const errors: PipelineValidationError[] = []
 
-    const entityNodeTypes = ['dataSource', 'apiRequest', 'apiResponse', 'frost', 'cron', 'mapping']
+    const entityNodeTypes = ['dataSource', 'frost', 'cron', 'mapping', 'geoPersistence']
 
     pipeline.nodes.forEach(node => {
       if (entityNodeTypes.includes(node.type) && !node.data.configured) {
@@ -342,6 +312,36 @@ const validateOrphanNodes: ValidationRule = {
   },
 }
 
+const validateUniqueGeoPersistenceTableNames: ValidationRule = {
+  id: 'unique-geo-persistence-table-names',
+  name: 'Unique Geo Persistence Table Names',
+  description: 'No two GeoPersistence nodes within a pipeline may have the same table name',
+  validate: (pipeline: Pipeline) => {
+    const errors: PipelineValidationError[] = []
+    const seen = new Map<string, string>()
+
+    pipeline.nodes.forEach(node => {
+      if (!isGeoPersistenceNodeData(node.data)) return
+      const tableName = node.data.tableName.trim()
+      if (!tableName) return
+
+      if (seen.has(tableName)) {
+        errors.push({
+          id: crypto.randomUUID(),
+          type: 'node',
+          elementId: node.id,
+          messageKey: 'validation.messages.duplicateTableName',
+          severity: 'error',
+        })
+      } else {
+        seen.set(tableName, node.id)
+      }
+    })
+
+    return { errors, warnings: [] }
+  },
+}
+
 // ============================================================================
 // All Validation Rules
 // ============================================================================
@@ -354,10 +354,10 @@ export const VALIDATION_RULES: ValidationRule[] = [
   validateStartNode,
   validateEndNode,
   validateMinimumFunctionalNodes,
-  validateApiPairing,
   validateNodeConfiguration,
   validateCronExpression,
   validateOrphanNodes,
+  validateUniqueGeoPersistenceTableNames,
 ]
 
 // ============================================================================

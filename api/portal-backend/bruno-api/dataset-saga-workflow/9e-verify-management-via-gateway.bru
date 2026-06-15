@@ -1,0 +1,49 @@
+meta {
+  name: 9e. Verify Management API via Gateway (host-agnostic catch-all)
+  type: http
+  seq: 26
+  tags: [
+    requires-nifi
+  ]
+}
+
+get {
+  url: {{apisixGatewayHost}}/v1/datasets/{{sagaDataSetId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  x-api-request: true
+}
+
+tests {
+  test("sagaDataSetId is set by earlier steps", function() {
+    expect(bru.getVar('sagaDataSetId'), "sagaDataSetId must be set").to.be.a('string').and.not.empty;
+  });
+
+  test("Management catch-all route is host-agnostic — not 404", function() {
+    // apisixGatewayHost uses a Host that is NOT the API vhost (api.localhost). The dynamic
+    // FROST data-plane route is bound to api.localhost, so this request must fall through to
+    // the host-agnostic /v1/* management catch-all and reach portal-backend. A 404 means the
+    // catch-all got host-bound again (the pre-fix regression, issue #1368).
+    expect(res.getStatus()).to.not.equal(404);
+  });
+
+  test("Authenticated management request reaches the backend and returns the dataset", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body).to.have.property('id', bru.getVar('sagaDataSetId'));
+  });
+}
+
+docs {
+  **Saga step 9e of 18** — Verify the management API stays reachable through the gateway on any Host.
+
+  Issue #1368 introduced an API virtual host (`api.localhost`) for the published data-plane and, in an early port, also bound the `/v1/*` management catch-all route to it. That broke the portal-frontend, whose server-side proxy strips the `Host` header and calls APISIX as `localhost:9080` — the bound route then 404s. The fix keeps the catch-all **host-agnostic** (only the dynamic per-dataset FROST routes are bound to the API vhost).
+
+  This step pins that contract: it sends an authenticated GET to APISIX via `apisixGatewayHost` (a Host other than `api.localhost`) and asserts it reaches portal-backend and returns the dataset — not a 404 from a host mismatch.
+
+  **Precondition:** `sagaDataSetId` set; APISIX reachable at `apisixGatewayHost`; the requesting user has DATASET_READ on the dataset.
+
+  **Expected Response:** 200 OK with the dataset JSON. A 404 indicates the management catch-all was host-bound again.
+}

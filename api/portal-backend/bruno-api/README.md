@@ -143,3 +143,18 @@ Uses Docker Compose service names to reach containers within the CI network.
 | `password`     | `dev123`                           |
 
 Authentication is handled automatically via OAuth2 password grant (configured in `collection.bru`).
+
+### Gateway routing (issue #1368)
+
+FROST published-data routes are served under the configured API virtual host at
+`/v1/datasets/{id}/*`. All environments define one variable used by the dataset
+saga workflow tests (`9c`, `9d`):
+
+| Variable         | Purpose                                                              |
+|------------------|----------------------------------------------------------------------|
+| `apisixApiUrl`   | Gateway URL whose hostname matches the `hosts` filter on FROST routes |
+
+The hostname in `apisixApiUrl` (e.g. `api.localhost`) must match the `hosts` value on
+the saga-provisioned APISIX routes; that happens automatically when the HTTP client
+resolves the hostname (either via Docker network alias in CI or via `/etc/hosts`
+locally — see `dev-environment/README.md`).

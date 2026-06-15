@@ -1,0 +1,37 @@
+meta {
+  name: Contract MQTT — release rejects empty config (3/6 release setup DS)
+  type: http
+  seq: 47
+}
+
+post {
+  url: {{baseUrl}}/datastructures/{{setupDataStructureId}}/release
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+tests {
+  test("Setup DataStructure released or already released", function() {
+    const status = res.getStatus();
+    // 200=released now, 400=already released by an earlier chain in the same run
+    expect(status === 200 || status === 400).to.be.true;
+    if (status === 400) {
+      expect(res.body.type).to.equal("urn:civitas:error:INVALID_INPUT");
+      expect(res.body.title).to.equal("Bad Request");
+      expect(res.body.detail).to.match(/already released|in DRAFT/i);
+    }
+  });
+}
+
+docs {
+  Releases the setup DataStructure so its children DSVs can be linked to
+  DataSources. See sibling `sql-release-rejects-empty-configuration-3-
+  release-setup-ds.bru` for full rationale — on the MQTT chain's run
+  the DataStructure is typically already AVAILABLE (released by the SQL
+  chain earlier in the same execution), so this returns 400 and the
+  tolerant assertion passes.
+}

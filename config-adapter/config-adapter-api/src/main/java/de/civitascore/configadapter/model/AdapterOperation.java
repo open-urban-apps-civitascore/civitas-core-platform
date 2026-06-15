@@ -59,6 +59,11 @@ public enum AdapterOperation {
   PIPELINE_UPDATE("pipeline update"),
   PIPELINE_DELETE("pipeline deletion"),
 
+  // GeoServer operations
+  GEOSERVER_RESOURCE_CREATE("GeoServer resource creation"),
+  GEOSERVER_RESOURCE_UPDATE("GeoServer resource update"),
+  GEOSERVER_RESOURCE_DELETE("GeoServer resource deletion"),
+
   // DummyLog operations
   EVENT_PROCESSING("event processing");
 
