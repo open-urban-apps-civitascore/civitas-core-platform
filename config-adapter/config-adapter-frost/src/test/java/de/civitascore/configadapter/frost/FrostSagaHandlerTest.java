@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.frost;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -28,11 +29,13 @@ import jakarta.ws.rs.client.Invocation;
 import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class FrostSagaHandlerTest {
 
@@ -104,6 +107,34 @@ class FrostSagaHandlerTest {
         assertEquals("42", result.resultData().get("projectId"));
         assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
         assertEquals("42", result.compensationData().get("projectId"));
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "names the FROST project '{datasetName} ({datasetId})' so same-named datasets stay isolated")
+    void shouldNameProjectUniquelyWithDatasetId() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(201);
+        when(mockResponse.getHeaderString("Location"))
+            .thenReturn("http://frost:8080/v1.1/Projects(42)");
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Entity<Map<String, Object>>> captor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.post(captor.capture())).thenReturn(mockResponse);
+
+        handler.handle(
+            createCommand(
+                "EXECUTE_STEP",
+                "CREATE_PROJECT",
+                Map.of("datasetName", "Foo", "datasetId", "ds-1")));
+
+        Map<String, Object> body = captor.getValue().getEntity();
+        assertEquals(
+            "Foo (ds-1)",
+            body.get("name"),
+            "FROST project name must include datasetId — two datasets with the same display name"
+                + " must get separate FROST projects (P1 data-isolation)");
       }
     }
 
@@ -240,6 +271,56 @@ class FrostSagaHandlerTest {
         assertNotNull(result.error());
       }
     }
+
+    @Test
+    @DisplayName("sets public=true on body when openDataAccess is true")
+    void shouldSetPublicTrueWhenOpenDataAccess() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(201);
+        when(mockResponse.getHeaderString("Location"))
+            .thenReturn("http://frost:8080/v1.1/Projects(42)");
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.post(captor.capture())).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "CREATE_PROJECT",
+                Map.of("datasetName", "Public Dataset", "openDataAccess", true));
+
+        handler.handle(command);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        assertEquals(true, body.get("public"));
+      }
+    }
+
+    @Test
+    @DisplayName("defaults public to false when openDataAccess missing or false")
+    void shouldDefaultPublicToFalse() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(201);
+        when(mockResponse.getHeaderString("Location"))
+            .thenReturn("http://frost:8080/v1.1/Projects(42)");
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.post(captor.capture())).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP", "CREATE_PROJECT", Map.of("datasetName", "Private Dataset"));
+
+        handler.handle(command);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        assertEquals(false, body.get("public"));
+      }
+    }
   }
 
   @Nested
@@ -281,6 +362,37 @@ class FrostSagaHandlerTest {
     }
 
     @Test
+    @DisplayName("omits previousName from compensationData when FROST returns no name")
+    void shouldOmitPreviousNameWhenFrostReturnsNone() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response getResponse = mock(Response.class);
+        when(getResponse.getStatus()).thenReturn(200);
+        // FROST body without a "name" — capturing "" would arm a later RESTORE to blank the name.
+        when(getResponse.readEntity(Map.class))
+            .thenReturn(Map.of("description", "Old Description"));
+        when(mockBuilder.get()).thenReturn(getResponse);
+
+        Response patchResponse = mock(Response.class);
+        when(patchResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.method(eq("PATCH"), any(Entity.class))).thenReturn(patchResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "UPDATE_PROJECT",
+                Map.of(
+                    "projectId", "42", "datasetName", "Updated Dataset", "description", "Updated"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertFalse(
+            result.compensationData().containsKey("previousName"),
+            "a blank captured name must be omitted so RESTORE_PROJECT keeps the current name");
+      }
+    }
+
+    @Test
     @DisplayName("uses publicUrl in baseUrl when configured differently from serverUrl")
     void shouldUsePublicUrlInBaseUrl() {
       try (FrostSagaHandler handler = createHandlerWithPublicUrl("http://public-frost:80/v1.1")) {
@@ -306,6 +418,47 @@ class FrostSagaHandlerTest {
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals(
             "http://public-frost:80/v1.1/Projects(42)", result.resultData().get("baseUrl"));
+      }
+    }
+
+    @Test
+    @DisplayName("sets public on body and captures previousPublic in compensationData")
+    void shouldSetPublicAndCapturePreviousPublic() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response getResponse = mock(Response.class);
+        when(getResponse.getStatus()).thenReturn(200);
+        when(getResponse.readEntity(Map.class))
+            .thenReturn(
+                Map.of("name", "Old Name", "description", "Old Description", "public", false));
+        when(mockBuilder.get()).thenReturn(getResponse);
+
+        Response patchResponse = mock(Response.class);
+        when(patchResponse.getStatus()).thenReturn(200);
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(patchResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "UPDATE_PROJECT",
+                Map.of(
+                    "projectId",
+                    "42",
+                    "datasetName",
+                    "Updated Dataset",
+                    "description",
+                    "Updated",
+                    "openDataAccess",
+                    true));
+
+        SagaCommandResult result = handler.handle(command);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        assertEquals(true, body.get("public"));
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals(false, result.compensationData().get("previousPublic"));
       }
     }
   }
@@ -350,18 +503,36 @@ class FrostSagaHandlerTest {
     }
 
     @Test
-    @DisplayName("returns COMPENSATION_FAILED on compensate error")
-    void shouldReturnCompensationFailureOnError() {
+    @DisplayName("treats 404 as success on compensation — 'project already gone' is the goal state")
+    void shouldTreat404AsSuccessOnCompensation() {
       try (FrostSagaHandler handler = createHandler()) {
         Response mockResponse = mock(Response.class);
         when(mockResponse.getStatus()).thenReturn(404);
         when(mockResponse.readEntity(String.class)).thenReturn("Not Found");
         when(mockBuilder.delete()).thenReturn(mockResponse);
 
-        SagaCommandMessage command =
-            createCommand("COMPENSATE_STEP", "DELETE_PROJECT", Map.of("projectId", "999"));
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("COMPENSATE_STEP", "DELETE_PROJECT", Map.of("projectId", "999")));
 
-        SagaCommandResult result = handler.handle(command);
+        // Idempotent compensation: the project no longer existing IS the desired end state, so a
+        // retried/already-cleaned-up DELETE_PROJECT compensation must not fail the saga rollback.
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+      }
+    }
+
+    @Test
+    @DisplayName("returns COMPENSATION_FAILED on a genuine error (500) during compensation")
+    void shouldReturnCompensationFailureOnGenuineError() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(500);
+        when(mockResponse.readEntity(String.class)).thenReturn("Internal Server Error");
+        when(mockBuilder.delete()).thenReturn(mockResponse);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("COMPENSATE_STEP", "DELETE_PROJECT", Map.of("projectId", "999")));
 
         assertEquals("COMPENSATION_FAILED", result.type());
         assertNotNull(result.error());
@@ -394,6 +565,61 @@ class FrostSagaHandlerTest {
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
         assertEquals("saga-001", result.sagaId());
+      }
+    }
+
+    @Test
+    @DisplayName("omits name from body when previousName missing (no blanking, MR !547 finding 6)")
+    void shouldOmitNameWhenPreviousNameMissing() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(200);
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_PROJECT",
+                Map.of("projectId", "42", "previousDescription", "Old Description"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        // PATCHing name="" would blank the project identity and break the unique-name
+        // duplicate-recovery lookup — the field must be left out so FROST keeps the current name.
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        assertNull(body.get("name"));
+      }
+    }
+
+    @Test
+    @DisplayName("treats a blank previousName like a missing one (legacy \"\" capture)")
+    void shouldOmitNameWhenPreviousNameBlank() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(200);
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_PROJECT",
+                Map.of(
+                    "projectId", "42",
+                    "previousName", "",
+                    "previousDescription", "Old Description"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        assertNull(body.get("name"));
       }
     }
 
@@ -442,6 +668,61 @@ class FrostSagaHandlerTest {
 
         assertEquals("COMPENSATION_FAILED", result.type());
         assertNotNull(result.error());
+      }
+    }
+
+    @Test
+    @DisplayName("restores previousPublic in body when present in payload")
+    void shouldRestorePreviousPublicWhenPresent() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(200);
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_PROJECT",
+                Map.of(
+                    "projectId", "42",
+                    "previousName", "Old Name",
+                    "previousDescription", "Old Description",
+                    "previousPublic", true));
+
+        handler.handle(command);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        assertEquals(true, body.get("public"));
+      }
+    }
+
+    @Test
+    @DisplayName("omits public from body when previousPublic missing (back-compat)")
+    void shouldOmitPublicWhenPreviousPublicMissing() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(200);
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_PROJECT",
+                Map.of(
+                    "projectId", "42",
+                    "previousName", "Old Name",
+                    "previousDescription", "Old Description"));
+
+        handler.handle(command);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+        assertNull(body.get("public"));
       }
     }
   }
@@ -507,7 +788,11 @@ class FrostSagaHandlerTest {
 
   private SagaCommandMessage createCommand(
       String type, String operation, Map<String, Object> payload) {
+    // CREATE_PROJECT / UPDATE_PROJECT require datasetId (it makes the FROST project name globally
+    // unique — P1). Default it here so individual tests only set it when they assert on it.
+    Map<String, Object> effective = new HashMap<>(payload);
+    effective.putIfAbsent("datasetId", "ds-default");
     return new SagaCommandMessage(
-        type, "msg-001", "saga-001", "create-project", "frost", operation, payload);
+        type, "msg-001", "saga-001", "create-project", "frost", operation, effective);
   }
 }

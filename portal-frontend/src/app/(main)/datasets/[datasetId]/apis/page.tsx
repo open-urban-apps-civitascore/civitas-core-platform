@@ -21,10 +21,7 @@ const ApisPage = async (props: ApisPageProps) => {
 
   const { data: dataset } = await getDataset(datasetId)
 
-  if (
-    type === API_TYPE_QUERY.WFS_WMS &&
-    (hasApiType(dataset.namedApis ?? [], API_STANDARDS.WFS) || hasApiType(dataset.namedApis ?? [], API_STANDARDS.WMS))
-  ) {
+  if (type === API_TYPE_QUERY.OWS && hasApiType(dataset.namedApis ?? [], API_STANDARDS.OWS)) {
     redirect(`/datasets/${datasetId}`)
   }
 

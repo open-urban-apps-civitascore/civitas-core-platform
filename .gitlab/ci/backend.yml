@@ -75,7 +75,11 @@ dependency-prune-backend:
   needs:
     - job: setup-version-portal-model
       artifacts: true
+    - job: setup-version-config-adapter
+      artifacts: true
     - job: publish-portal-model
+      optional: true
+    - job: publish-config-adapter
       optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
@@ -88,7 +92,7 @@ dependency-prune-backend:
       - .m2/repository
   script:
     - cd portal-backend
-    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Dportal-model.version=$PORTAL_MODEL_VERSION -DfailOnWarning=true -DignoreNonCompile=false -s ci_settings.xml
+    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Dportal-model.version=$PORTAL_MODEL_VERSION -Dconfig-adapter.version=$CONFIG_ADAPTER_VERSION -DfailOnWarning=true -DignoreNonCompile=false -s ci_settings.xml
 
 test-backend:
   extends: .only-backend-changes
@@ -100,6 +104,8 @@ test-backend:
     - job: setup-version
       artifacts: true
     - job: setup-version-portal-model
+      artifacts: true
+    - job: setup-version-config-adapter
       artifacts: true
     - job: publish-config-adapter
       optional: true
@@ -118,7 +124,7 @@ test-backend:
     - cd portal-backend
   script:
     # Compile test sources, then run unit tests
-    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent surefire:test jacoco:report -Dportal-model.version=$PORTAL_MODEL_VERSION -s ci_settings.xml
+    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent surefire:test jacoco:report -Dportal-model.version=$PORTAL_MODEL_VERSION -Dconfig-adapter.version=$CONFIG_ADAPTER_VERSION -s ci_settings.xml
   artifacts:
     when: always
     expire_in: 1 month
@@ -140,6 +146,8 @@ integration-test-backend:
     - job: setup-version
       artifacts: true
     - job: setup-version-portal-model
+      artifacts: true
+    - job: setup-version-config-adapter
       artifacts: true
     - job: publish-config-adapter
       optional: true
@@ -163,7 +171,7 @@ integration-test-backend:
     - cd portal-backend
   script:
     # Compile test sources, then run integration tests only. Saga-tagged tests are excluded via pom.xml (run in saga-e2e-test-backend)
-    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION
+    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION -Dconfig-adapter.version=$CONFIG_ADAPTER_VERSION
   artifacts:
     when: always
     expire_in: 1 month
@@ -186,6 +194,8 @@ saga-e2e-test-backend:
     - job: setup-version
       artifacts: true
     - job: setup-version-portal-model
+      artifacts: true
+    - job: setup-version-config-adapter
       artifacts: true
     - job: publish-config-adapter
       optional: true
@@ -218,7 +228,7 @@ saga-e2e-test-backend:
     - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
     - cd portal-backend
   script:
-    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION -Psaga -Dfailsafe.rerunFailingTestsCount=1
+    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION -Dconfig-adapter.version=$CONFIG_ADAPTER_VERSION -Psaga -Dfailsafe.rerunFailingTestsCount=1
   artifacts:
     when: always
     expire_in: 1 month
@@ -364,6 +374,8 @@ build-backend:
       artifacts: true
     - job: setup-version-portal-model
       artifacts: true
+    - job: setup-version-config-adapter
+      artifacts: true
     - lint-backend
     - job: publish-config-adapter
       optional: true
@@ -383,7 +395,7 @@ build-backend:
   script:
     # Use GitLab Maven repository for config-adapter and portal-model dependencies
     - |
-      mvn package -DskipTests -Dportal-model.version=$PORTAL_MODEL_VERSION -s ci_settings.xml
+      mvn package -DskipTests -Dportal-model.version=$PORTAL_MODEL_VERSION -Dconfig-adapter.version=$CONFIG_ADAPTER_VERSION -s ci_settings.xml
   artifacts:
     when: on_success
     paths:

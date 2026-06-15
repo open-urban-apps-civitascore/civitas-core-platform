@@ -16,7 +16,7 @@ dev-environment/
 ├── keycloak/   # Keycloak only
 ├── apisix/     # API Gateway + Authorization (OPA, AuthZ Repository)
 ├── frost/      # FROST IoT Server
-├── geoserver/  # GeoServer OGC Services (WFS/WMS)
+├── geoserver/  # GeoServer OGC Services (OWS)
 ├── nifi/       # Apache NiFi (data integration / pipeline engine)
 └── modelatlas/ # Model Atlas
 ```
@@ -37,6 +37,15 @@ dev-environment/
 
 **Optional:**
 * jq (for dev-mode scripts)
+* `/etc/hosts` entry for the API gateway virtual host (issue #1368):
+
+  ```
+  127.0.0.1  api.localhost
+  ```
+
+  Chrome/Firefox resolve `*.localhost` automatically, but `curl`, the JDK HTTP client, and Bruno's CLI need this entry. All APISIX routes are served under `api.localhost`:
+  * `api.localhost/v1/*` — portal-backend catch-all (static)
+  * `api.localhost/v1/datasets/{id}/*` — FROST proxy (created dynamically by the APISIX saga; the more specific URI wins)
 
 Supported platforms: **Linux**, **macOS** (including Apple Silicon / ARM), and **Windows** (WSL / Git Bash).
 
@@ -203,19 +212,19 @@ cd apisix    && docker compose up -d
 
 ## Key URLs
 
-| Service | URL | Notes |
-|---------|-----|-------|
-| Keycloak | http://localhost:8080 | admin / admin |
-| Portal Backend | http://localhost:8089 | Swagger: /v1/swagger-ui.html |
-| Config Adapter | http://localhost:8088 | |
-| APISIX Gateway | http://localhost:9080 | Routes to backend via OPA authz |
-| OPA | http://localhost:8181 | Policy decision point |
-| AuthZ Repository | http://localhost:8091 | User authorization context |
-| Kafka UI | http://localhost:8090 | |
-| FROST Server | http://localhost:8085/FROST-Server/v1.1 | |
-| GeoServer Admin | http://localhost:8082/geoserver/web | admin / see geoserver/.env |
-| GeoServer WFS | http://localhost:9080/geoserver/{workspace}/wfs | via APISIX |
-| Apache NiFi | https://localhost:8443/nifi | admin / see nifi/.env |
+| Service          | URL                                             | Notes |
+|------------------|-------------------------------------------------|-------|
+| Keycloak         | http://localhost:8080                           | admin / admin |
+| Portal Backend   | http://localhost:8089                           | Swagger: /v1/swagger-ui.html |
+| Config Adapter   | http://localhost:8088                           | |
+| APISIX Gateway   | http://localhost:9080                           | Routes to backend via OPA authz |
+| OPA              | http://localhost:8181                           | Policy decision point |
+| AuthZ Repository | http://localhost:8091                           | User authorization context |
+| Kafka UI         | http://localhost:8090                           | |
+| FROST Server     | http://localhost:8085/FROST-Server/v1.1         | |
+| GeoServer Admin  | http://localhost:8082/geoserver/web             | admin / see geoserver/.env |
+| GeoServer OWS    | http://localhost:9080/geoserver/{workspace}/ows | via APISIX |
+| Apache NiFi      | https://localhost:8443/nifi                     | admin / see nifi/.env |
 
 ---
 

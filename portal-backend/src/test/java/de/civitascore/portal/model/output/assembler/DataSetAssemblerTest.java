@@ -127,6 +127,45 @@ class DataSetAssemblerTest {
   }
 
   @Test
+  void prefersSagaProvisionedPublicUrlOverBaseUrl() {
+    UUID dataSetId = UUID.fromString("b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a");
+    DataSet dataSet = new DataSet();
+    dataSet.setId(dataSetId);
+    // The saga provisioned the APISIX route under APISIX_API_PUBLIC_URL, which can differ from the
+    // backend-local civitas.api.base-url (https://api.example.com here). The authoritative public
+    // base must win so preview/discovery links point at the real gateway route, not a divergent
+    // backend-configured host.
+    dataSet.setPublicUrl("https://api.localhost:9080/v1/datasets/" + dataSetId);
+
+    DataSetOutputDTO dto = new DataSetOutputDTO();
+    dto.setNamedApis(List.of(namedApiDto("traffic"), namedApiDto("weather")));
+
+    assembler().enrichDto(dto, dataSet);
+
+    assertThat(dto.getNamedApis())
+        .extracting(NamedApiOutputDTO::getSlug, NamedApiOutputDTO::getPreviewUrl)
+        .containsExactlyInAnyOrder(
+            tuple("traffic", "https://api.localhost:9080/v1/datasets/" + dataSetId + "/traffic"),
+            tuple("weather", "https://api.localhost:9080/v1/datasets/" + dataSetId + "/weather"));
+  }
+
+  @Test
+  void fallsBackToBaseUrlWhenPublicUrlAbsent() {
+    UUID dataSetId = UUID.fromString("b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a");
+    DataSet dataSet = new DataSet();
+    dataSet.setId(dataSetId);
+    // publicUrl null (e.g. dataset predates the saga) → fall back to civitas.api.base-url.
+
+    DataSetOutputDTO dto = new DataSetOutputDTO();
+    dto.setNamedApis(List.of(namedApiDto("traffic")));
+
+    assembler().enrichDto(dto, dataSet);
+
+    assertThat(dto.getNamedApis().get(0).getPreviewUrl())
+        .isEqualTo("https://api.example.com/v1/datasets/" + dataSetId + "/traffic");
+  }
+
+  @Test
   void doesNotPopulatePreviewUrlWhenDataSetHasNoId() {
     DataSet dataSet = new DataSet(); // not persisted yet
 

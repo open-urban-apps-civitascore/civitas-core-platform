@@ -128,7 +128,15 @@ class DatasetCreateFlowableIT {
 
     ApisixSagaHandler apisixHandler = new ApisixSagaHandler();
     apisixHandler.initialize(
-        mapConfig(Map.of("apisix.admin.url", apisixMockUrl, "apisix.admin.key", "test-key")));
+        mapConfig(
+            Map.of(
+                "apisix.admin.url", apisixMockUrl,
+                "apisix.admin.key", "test-key",
+                // Required since #1368 — the handler fails fast without these.
+                "apisix.api.host", "api.test.local",
+                "apisix.api.public.url", "http://api.test.local",
+                "apisix.plugin.config.id", "test-plugin-config",
+                "apisix.frost.api.key", "test-frost-upstream-key")));
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
@@ -169,6 +177,9 @@ class DatasetCreateFlowableIT {
     variables.put("hasPipelines", false);
     variables.put("datasources", List.of());
     variables.put("dataPipelines", List.of());
+    // Per-NamedApi route model (#1311/#1379): CREATE_ROUTE provisions one route per named-API
+    // slug and NO route (and no upstream) without one.
+    variables.put("namedApis", List.of(Map.of("slug", "sta", "standard", "STA", "version", "v1")));
 
     RuntimeService runtimeService = processEngine.getRuntimeService();
     ProcessInstance instance =
@@ -256,6 +267,9 @@ class DatasetCreateFlowableIT {
     variables.put("hasPipelines", false);
     variables.put("datasources", List.of());
     variables.put("dataPipelines", List.of());
+    // Without a named API the APISIX step is a contract-mandated no-op (no route, no upstream),
+    // so the 500-mock would never be hit and no compensation would run.
+    variables.put("namedApis", List.of(Map.of("slug", "sta", "standard", "STA", "version", "v1")));
 
     ProcessInstance instance =
         processEngine.getRuntimeService().startProcessInstanceByKey("dataset-create", variables);

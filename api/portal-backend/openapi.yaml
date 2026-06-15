@@ -5509,6 +5509,53 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  /datasets/{id}/apis:
+    get:
+      tags:
+      - DataSets
+      summary: List a dataset's published named APIs
+      description: Returns the named APIs of a PUBLISHED dataset (lifecycle status AVAILABLE),
+        including the server-built previewUrl. Per concept 1379 only active published APIs
+        are discoverable; a DRAFT/READY dataset returns an empty list. Respects the caller's
+        X-Allowed-Scope-Ids; unknown or out-of-scope datasets return 404.
+      operationId: getDataSetApis
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Named APIs returned successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NamedApiOutputDTO"
+        "404":
+          description: Dataset not found or out of scope
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasets/{id}/apis"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   /datasets/{id}/assignments:
     get:
       tags:
@@ -6503,8 +6550,7 @@ components:
           description: "API standard. CUSTOM allows free-form, non-standard APIs.\
             \ Immutable once the dataset reaches AVAILABLE."
           enum:
-          - WFS
-          - WMS
+          - OWS
           - STA
           - CUSTOM
           example: STA
@@ -6609,8 +6655,7 @@ components:
           type: string
           description: API standard.
           enum:
-          - WFS
-          - WMS
+          - OWS
           - STA
           - CUSTOM
           example: STA

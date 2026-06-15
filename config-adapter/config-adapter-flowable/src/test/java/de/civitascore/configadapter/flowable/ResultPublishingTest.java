@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.flowable;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -138,6 +139,28 @@ class ResultPublishingTest {
       assertTrue(results.containsKey("projectId"), "FROST result key missing");
       assertTrue(results.containsKey("routeId"), "APISIX result key missing");
       assertTrue(results.containsKey("pipelineIds"), "Redpanda result key missing");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("de.civitascore.configadapter.flowable.ResultPublishingTest#approaches")
+    void slugKeyedRouteIdsMapSurvivesResultRoundTrip(String label, boolean useBpmn) {
+      setUp(useBpmn);
+      stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1", "baseUrl", "http://f"));
+      // The per-named-API APISIX handler returns a nested slug→routeId map (issue #1368). Assert it
+      // survives storage as a Flowable process variable and the result aggregation untouched, for
+      // both the BPMN and coded deployment approaches.
+      Map<String, Object> routeIds = Map.of("traffic", "rid-traffic", "weather", "rid-weather");
+      stubSuccess(apisixHandler, "create-route", Map.of("routeIds", routeIds, "serviceId", "ds-1"));
+
+      start("dataset-create", createVars("saga-cmap"));
+
+      @SuppressWarnings("unchecked")
+      ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+      verify(resultPublisher).publishCompleted(eq("saga-cmap"), captor.capture());
+      assertEquals(
+          routeIds,
+          captor.getValue().get("routeIds"),
+          "slug-keyed routeIds map must round-trip through the Flowable result path");
     }
   }
 

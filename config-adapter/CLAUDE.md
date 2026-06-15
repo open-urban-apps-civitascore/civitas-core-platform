@@ -53,8 +53,7 @@ config-adapter-api          ← Pure interfaces & models, no impl dependencies
     ├── config-adapter-frost          ← FROST SensorThings API adapter (JAX-RS/Jersey)
     ├── config-adapter-geoserver      ← GeoServer REST API adapter (JAX-RS/Jersey)
     ├── config-adapter-examples       ← DummyLogAdapter (logging reference impl)
-    ├── config-adapter-orchestrator   ← Custom saga engine (Kafka-based state machine)
-    └── config-adapter-flowable       ← Flowable BPMN saga engine (embedded, PostgreSQL state)
+    └── config-adapter-flowable       ← Flowable saga engine (embedded, PostgreSQL state; coded by default, BPMN optional). Sole saga orchestrator — the legacy custom config-adapter-orchestrator has been removed.
     ↑
 config-adapter-application  ← Bootstrap, ServiceLoader discovery, health checks, shade JAR
 ```

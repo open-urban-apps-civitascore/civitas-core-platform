@@ -101,6 +101,22 @@ public abstract class BaseService<T, I extends BaseInputDTO> {
   }
 
   /**
+   * Find the single entity matching the given specification.
+   *
+   * <p><b>Contract:</b> callers MUST pass a specification that matches at most one row (an id or
+   * other unique-key predicate). A spec that matches more than one entity causes Spring Data to
+   * throw {@link org.springframework.dao.IncorrectResultSizeDataAccessException} — use {@link
+   * #findAll(Specification, org.springframework.data.domain.Pageable)} for non-unique filters
+   * instead.
+   *
+   * @param spec a uniqueness-guaranteeing specification (e.g. an id predicate)
+   * @return Optional of the matching entity, empty if none matches
+   */
+  public Optional<T> findOne(Specification<T> spec) {
+    return getRepository().findOne(spec);
+  }
+
+  /**
    * Find an entity by ID.
    *
    * <p>This method uses lifecycle hooks:

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+  <!-- No exclusions yet — add a Match entry with a justification comment when a
+       finding is a verified false positive, never to silence a real issue. -->
+</FindBugsFilter>

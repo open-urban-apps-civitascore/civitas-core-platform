@@ -42,14 +42,30 @@
 
         <dependency>
             <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-orchestrator</artifactId>
+            <artifactId>config-adapter-flowable</artifactId>
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Saga command handlers (apisix, frost, redpanda) are bundled at runtime via the
+             dist profile below. They are also needed on the TEST classpath so the bootstrap
+             tests can ServiceLoader-discover the handlers the Flowable orchestrator requires. -->
         <dependency>
             <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-flowable</artifactId>
+            <artifactId>config-adapter-apisix</artifactId>
             <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>de.civitas-core</groupId>
+            <artifactId>config-adapter-frost</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>de.civitas-core</groupId>
+            <artifactId>config-adapter-redpanda</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
         </dependency>
 
         <dependency>
@@ -81,6 +97,12 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- In-memory DB so Application/Flowable bootstrap tests run without an external database -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

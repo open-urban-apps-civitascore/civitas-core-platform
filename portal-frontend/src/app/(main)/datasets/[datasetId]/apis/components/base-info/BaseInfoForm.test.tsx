@@ -56,7 +56,7 @@ const Wrapper = (props: WrapperProps) => {
         apiType={apiType}
         isReadOnly={isReadOnly}
         datasetId="dataset-123"
-        typeLabel={apiType === API_TYPE_QUERY.SENSORTHINGS ? 'SensorThings API' : 'WFS/WMS API'}
+        typeLabel={apiType === API_TYPE_QUERY.SENSORTHINGS ? 'SensorThings API' : 'OWS API'}
         urlPreviewSlug={urlPreviewSlug ?? defaults.defaultSlug}
         onSlugBlur={onSlugBlur}
       />
@@ -87,16 +87,16 @@ describe('ApiConfigForm', () => {
     })
   })
 
-  describe('WFS/WMS variant', () => {
+  describe('OWS variant', () => {
     test('renders persistence as a dropdown', () => {
-      render(<Wrapper apiType={API_TYPE_QUERY.WFS_WMS} />)
+      render(<Wrapper apiType={API_TYPE_QUERY.OWS} />)
       expect(screen.getByTestId('baseInfo.persistenceSelectTrigger')).toBeInTheDocument()
       expect(screen.queryByTestId('apiPersistenceReadOnly')).not.toBeInTheDocument()
     })
 
-    test('pre-fills slug as "wfswms"', () => {
-      render(<Wrapper apiType={API_TYPE_QUERY.WFS_WMS} />)
-      expect(screen.getByTestId('slugTextField')).toHaveValue('wfswms')
+    test('pre-fills slug as "ows"', () => {
+      render(<Wrapper apiType={API_TYPE_QUERY.OWS} />)
+      expect(screen.getByTestId('slugTextField')).toHaveValue('ows')
     })
   })
 
@@ -110,10 +110,12 @@ describe('ApiConfigForm', () => {
   })
 
   describe('URL preview', () => {
-    test('renders the preview path with the slug bolded', () => {
+    test('renders the preview path with the /v1 data-plane scheme and slug bolded', () => {
       render(<Wrapper apiType={API_TYPE_QUERY.SENSORTHINGS} urlPreviewSlug="my-slug" />)
       const preview = screen.getByTestId('apiUrlPreview')
-      expect(preview).toHaveTextContent('/datasets/dataset-123/my-slug')
+      // The gateway serves named APIs at /v1/datasets/{id}/{slug} (issue #1368).
+      expect(preview).toHaveTextContent('/v1/datasets/dataset-123/my-slug')
+      expect(preview.textContent?.startsWith('/v1/datasets/')).toBe(true)
       expect(preview.querySelector('strong')).toHaveTextContent('my-slug')
     })
 
@@ -166,9 +168,10 @@ describe('ApiConfigForm', () => {
       })
     })
 
-    test('blocks the reserved slug "apis"', async () => {
+    // Mirrors the backend blocklist NamedApiAllowedSlugValidator.RESERVED.
+    test.each(['apis', 'api', 'v1', 'admin'])('blocks the reserved slug "%s"', async reservedSlug => {
       render(<Wrapper apiType={API_TYPE_QUERY.SENSORTHINGS} />)
-      await triggerSlugChange('apis')
+      await triggerSlugChange(reservedSlug)
       await waitFor(() => {
         expect(screen.getByTestId('slugFormMessage')).toHaveTextContent('apis.config.errors.slug.reserved')
       })

@@ -122,6 +122,11 @@ class FrostSagaHandlerIntegrationTest extends AbstractFrostIntegrationTest {
   @Test
   void createProjectIsIdempotentWhenProjectAlreadyExists() {
     String datasetName = "Idempotent-" + UUID.randomUUID();
+    String datasetId = "ds-" + UUID.randomUUID();
+    // Same datasetId on both calls → same unique FROST project name "name (datasetId)" → the second
+    // call hits FROST's 500-duplicate and recovers to the SAME project (P1: recovery binds a
+    // dataset
+    // only to its OWN project).
     SagaCommandMessage command =
         new SagaCommandMessage(
             "EXECUTE_STEP",
@@ -130,7 +135,13 @@ class FrostSagaHandlerIntegrationTest extends AbstractFrostIntegrationTest {
             "create-frost-project",
             "frost",
             "CREATE_PROJECT",
-            Map.of("datasetName", datasetName, "description", "idempotence test"));
+            Map.of(
+                "datasetName",
+                datasetName,
+                "datasetId",
+                datasetId,
+                "description",
+                "idempotence test"));
 
     SagaCommandResult firstResult = handler.handle(command);
     assertEquals(

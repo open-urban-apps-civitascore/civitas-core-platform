@@ -7,12 +7,19 @@ export const NAMED_API_DESCRIPTION_MAX_LENGTH = 150
 // no leading/trailing dash. Single-character slugs allowed.
 export const SLUG_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/
 
-// Slugs that would collide with sibling routes under /datasets/{id}/...
-export const RESERVED_SLUGS = ['apis'] as const
+// Slugs that would collide with reserved platform path segments (e.g. the management endpoint
+// /datasets/{id}/apis and the /v1 data-plane prefix). Mirrors the backend blocklist —
+// NamedApiAllowedSlugValidator.RESERVED — which is the authoritative source; keep the two in sync.
+export const RESERVED_SLUGS = ['apis', 'api', 'v1', 'admin'] as const
 
+// Public data-plane path prefix for a dataset's named APIs. The gateway serves them at
+// /v1/datasets/{datasetId}/{slug} (issue #1368). Single source of truth so the scheme
+// can't drift across the UI (URL preview, copy-to-clipboard); the caller appends the slug.
+export const namedApiPathPrefix = (datasetId: string) => `/v1/datasets/${datasetId}/`
+
+// Standard values mirror the backend enum names. UI labels are handled via translations.
 export const API_STANDARDS = {
-  WFS: 'WFS',
-  WMS: 'WMS',
+  OWS: 'OWS',
   STA: 'STA',
   CUSTOM: 'CUSTOM',
 } as const
@@ -21,13 +28,13 @@ export type ApiStandard = (typeof API_STANDARDS)[keyof typeof API_STANDARDS]
 
 export const API_TYPE_QUERY = {
   SENSORTHINGS: 'sensorthings',
-  WFS_WMS: 'wfs-wms',
+  OWS: 'ows',
 } as const
 
 export type ApiTypeQuery = (typeof API_TYPE_QUERY)[keyof typeof API_TYPE_QUERY]
 
 export const isApiTypeQuery = (value: unknown): value is ApiTypeQuery =>
-  value === API_TYPE_QUERY.SENSORTHINGS || value === API_TYPE_QUERY.WFS_WMS
+  value === API_TYPE_QUERY.SENSORTHINGS || value === API_TYPE_QUERY.OWS
 
 // FE-hardcoded for now. Follow-up: derive from dataset's data-flow state.
 export const PERSISTENCE_OPTIONS = {
@@ -50,9 +57,9 @@ export const DEFAULTS_BY_TYPE: Record<
     persistenceValue: PERSISTENCE_OPTIONS.FROST.value,
     persistenceLabel: PERSISTENCE_OPTIONS.FROST.label,
   },
-  [API_TYPE_QUERY.WFS_WMS]: {
-    standard: API_STANDARDS.WFS,
-    defaultSlug: 'wfswms',
+  [API_TYPE_QUERY.OWS]: {
+    standard: API_STANDARDS.OWS,
+    defaultSlug: 'ows',
     persistenceValue: PERSISTENCE_OPTIONS.POSTGIS.value,
     persistenceLabel: PERSISTENCE_OPTIONS.POSTGIS.label,
   },
@@ -62,7 +69,7 @@ export const NamedApiSchema = z.object({
   id: z.string().optional(),
   name: z.string(),
   slug: z.string(),
-  standard: z.enum([API_STANDARDS.WFS, API_STANDARDS.WMS, API_STANDARDS.STA, API_STANDARDS.CUSTOM]),
+  standard: z.enum([API_STANDARDS.OWS, API_STANDARDS.STA, API_STANDARDS.CUSTOM]),
   version: z.string().optional(),
   description: z.string().optional(),
   previewUrl: z.string().optional(),
@@ -81,7 +88,7 @@ export const BoundingBoxPayloadSchema = z.object({
 export const NamedApiPayloadSchema = z.object({
   name: z.string(),
   slug: z.string(),
-  standard: z.enum([API_STANDARDS.WFS, API_STANDARDS.WMS, API_STANDARDS.STA, API_STANDARDS.CUSTOM]),
+  standard: z.enum([API_STANDARDS.OWS, API_STANDARDS.STA, API_STANDARDS.CUSTOM]),
   version: z.string().optional(),
   description: z.string().optional(),
 })
@@ -280,15 +287,15 @@ export type StyleFormData = z.infer<typeof StyleFormSchema>
 export type StyleApiPayload = z.infer<typeof StylePayloadSchema>
 
 // ============================================================================
-// Types for WFS/WMS-API
+// Types for OWS-API
 // ============================================================================
 
-export const WfsWmsApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) =>
+export const OwsApiFormSchema = ({ existingSlugs }: BuildSchemaArgs) =>
   z.object({
-    type: z.literal(API_TYPE_QUERY.WFS_WMS),
+    type: z.literal(API_TYPE_QUERY.OWS),
     baseInfo: NamedApiBaseInfoFormSchema({ existingSlugs }),
     layers: z.array(LayerFormSchema),
     styles: z.array(StyleFormSchema),
   })
 
-export type WfsWmsApiFormData = z.infer<ReturnType<typeof WfsWmsApiFormSchema>>
+export type OwsApiFormData = z.infer<ReturnType<typeof OwsApiFormSchema>>
