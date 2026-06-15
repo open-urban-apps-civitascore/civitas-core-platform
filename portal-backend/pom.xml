@@ -254,13 +254,7 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Config adapter - Saga orchestrator + adapters for E2E saga integration tests -->
-        <dependency>
-            <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-orchestrator</artifactId>
-            <version>${config-adapter.version}</version>
-            <scope>test</scope>
-        </dependency>
+        <!-- Config adapter - saga handlers for the Flowable-based E2E saga integration tests -->
         <dependency>
             <groupId>de.civitas-core</groupId>
             <artifactId>config-adapter-frost</artifactId>
@@ -270,12 +264,6 @@
         <dependency>
             <groupId>de.civitas-core</groupId>
             <artifactId>config-adapter-apisix</artifactId>
-            <version>${config-adapter.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-redpanda</artifactId>
             <version>${config-adapter.version}</version>
             <scope>test</scope>
         </dependency>
