@@ -1,0 +1,38 @@
+meta {
+  name: Delete Visualization
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:dataSetId/visualizations/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{visualizationId}}
+}
+
+tests {
+  test("Status code is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` and `visualizationId` are set.
+
+  **Expected Response:** 204 No Content.
+
+  **Verification:** Issue get-visualization for same `visualizationId` and confirm 404.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Dashboard record hard-deleted from `portal_backend` DB |
+  | Config Adapter | -- |
+  | External System | -- |
+}

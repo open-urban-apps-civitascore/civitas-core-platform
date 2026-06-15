@@ -1,0 +1,35 @@
+meta {
+  name: Create Visualization (Invalid - blank name)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/visualizations
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+body:json {
+  {
+    "visualizationType": "DASHBOARD",
+    "name": "",
+    "description": "This should fail because name is blank"
+  }
+}
+
+tests {
+  test("Status code is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` is set.
+
+  **Expected Response:** 400 Bad Request — `name` is blank, violating the `@NotBlank` constraint.
+}

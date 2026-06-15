@@ -1,0 +1,29 @@
+meta {
+  name: Get Visualization (Foreign Dataset - not found)
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/datasets/:dataSetId/visualizations/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: 00000000-0000-4000-8000-000000000000
+  id: {{visualizationId}}
+}
+
+tests {
+  test("Status code is 404", function() {
+    expect(res.getStatus()).to.equal(404);
+  });
+}
+
+docs {
+  **Precondition:** `visualizationId` is set (created by `create-visualization.bru`).
+
+  **Expected Response:** 404 Not Found — the visualization belongs to a different dataset;
+  requesting it under an unrelated dataset UUID must not expose it.
+}
