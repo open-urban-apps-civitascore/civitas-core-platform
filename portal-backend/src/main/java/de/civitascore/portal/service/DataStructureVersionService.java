@@ -128,7 +128,7 @@ public class DataStructureVersionService
               : new HashMap<>());
     } else if (isReleased && (input.getModel() == null || input.getModel().isEmpty())) {
       // Released but not in use: the model may be replaced, but never cleared — a released
-      // version must always retain a non-empty model (mirrors the guard in release()).
+      // version must always retain a non-empty model.
       throw new InvalidInputException(
           "model",
           existingEntity.getId(),

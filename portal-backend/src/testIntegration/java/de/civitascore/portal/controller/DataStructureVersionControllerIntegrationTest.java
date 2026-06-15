@@ -49,15 +49,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   private UUID dataStructureId;
   private UUID versionId1;
 
-  /** A minimal, well-formed JSON Schema document used as the persisted model. */
-  private static Map<String, Object> model(String title) {
-    Map<String, Object> schema = new HashMap<>();
-    schema.put("$id", "urn:core:datastructure:" + title);
-    schema.put("title", title);
-    schema.put("type", "object");
-    return schema;
-  }
-
   @BeforeEach
   void initTestData() {
     // Create parent data structure
@@ -77,7 +68,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
                 b.version("1.0.0")
                     .description("First version of the test data structure")
                     .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
-                    .model(model("Model1"))
+                    .model(portalData.dataStructureVersionModel("Model1"))
                     .modelName("TestModel1")
                     .styles(Map.of("color", "blue", "size", 10)));
     versionId1 = version1.getId();
@@ -88,7 +79,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
             b.version("2.0.0")
                 .description("Second version with updated fields")
                 .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
-                .model(model("Model2"))
+                .model(portalData.dataStructureVersionModel("Model2"))
                 .modelName("TestModel2")
                 .styles(Map.of("color", "red", "size", 20)));
   }
@@ -125,7 +116,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setVersion("3.0.0");
       input.setDescription("Third version with new features");
-      input.setModel(model("Model3"));
+      input.setModel(portalData.dataStructureVersionModel("Model3"));
       input.setModelName("TestModel3");
 
       Map<String, Object> styles = new HashMap<>();
@@ -245,7 +236,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("5.0.0");
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setModel(model("Model5"));
+      input.setModel(portalData.dataStructureVersionModel("Model5"));
       // Try to set a different dataStructureId - should be ignored due to @JsonIgnore
       input.setDataStructureId(otherDataStructureId);
 
@@ -390,7 +381,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setVersion("1.1.0");
       input.setDescription("Updated description for version 1.1.0");
-      input.setModel(model("Model1Updated"));
+      input.setModel(portalData.dataStructureVersionModel("Model1Updated"));
       input.setModelName("TestModel1-Updated");
 
       Map<String, Object> styles = new HashMap<>();
@@ -531,7 +522,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @Test
     @DisplayName("Should patch the model")
     void shouldPatchModel() {
-      Map<String, Object> patchMap = Collections.singletonMap("model", model("Model1Patched"));
+      Map<String, Object> patchMap =
+          Collections.singletonMap("model", portalData.dataStructureVersionModel("Model1Patched"));
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
@@ -882,7 +874,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       version3.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version3.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       version3.setVersion("3.0.0");
-      version3.setModel(model("Model3"));
+      version3.setModel(portalData.dataStructureVersionModel("Model3"));
       version3.setModelName("TestModel3");
       version3.setDataStructure(dataStructureRepository.findById(dataStructureId).orElseThrow());
       version3 = dataStructureVersionRepository.save(version3);
@@ -981,6 +973,9 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       input.setVersion("1.1.0");
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setModelName("UpdatedReleasedModel");
+      // PUT /released/meta is a full replace (SET_TO_NULL); a released version must always retain a
+      // non-empty model, so the model is sent here.
+      input.setModel(portalData.dataStructureVersionModel("ReleasedModel"));
 
       Map<String, Object> newStyles = new HashMap<>();
       newStyles.put("color", "red");
@@ -1014,7 +1009,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     void shouldUpdateModelWhenNotInUse() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("1.0.0");
-      input.setModel(model("UpdatedModel"));
+      input.setModel(portalData.dataStructureVersionModel("UpdatedModel"));
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
@@ -1039,7 +1034,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       draftVersion.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       draftVersion.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       draftVersion.setVersion("4.0.0");
-      draftVersion.setModel(model("Model4"));
+      draftVersion.setModel(portalData.dataStructureVersionModel("Model4"));
       draftVersion.setModelName("TestModel4");
       draftVersion.setDataStructure(
           dataStructureRepository.findById(dataStructureId).orElseThrow());
@@ -1152,7 +1147,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       version.setVersion("1.0.0");
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       version.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      version.setModel(model("InUse"));
+      version.setModel(portalData.dataStructureVersionModel("InUse"));
       version.setModelName("InUse Model");
       version = dataStructureVersionRepository.save(version);
       inUseVersionId = version.getId();
@@ -1221,7 +1216,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     void shouldProtectStructuralFieldsWhenInUse() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("2.0.0");
-      input.setModel(model("SHOULD_NOT_CHANGE"));
+      input.setModel(portalData.dataStructureVersionModel("SHOULD_NOT_CHANGE"));
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setModelName("UpdatedModelName");
 
