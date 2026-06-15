@@ -227,6 +227,9 @@ class DataStructureVersionServiceTest {
       assertThat(input.getModel())
           .as("Model should be reverted to original")
           .isEqualTo(originalModel);
+      assertThat(input.getModel())
+          .as("Reverted model must be a copy, not the managed entity's own map reference")
+          .isNotSameAs(originalModel);
       assertThat(input.getVersion()).as("Version should be reverted").isEqualTo("1.0.0");
       assertThat(input.getStyles().get("color")).as("Styles should be reverted").isEqualTo("blue");
       assertThat(input.getModelName())

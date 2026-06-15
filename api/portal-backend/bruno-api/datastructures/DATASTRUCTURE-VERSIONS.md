@@ -51,9 +51,13 @@ Content-Type: application/json
   "dataStructureVersionSource": "OWN",
   "version": "1.0.4",
   "description": "Initial version",
-  "modelAtlasUri": "http://civitas.org/model/StudentDatabaseModel1/1.0.4",
   "modelName": "StudentDatabaseModel1",
-  "model": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>...",
+  "model": {
+    "$id": "http://civitas.org/model/StudentDatabaseModel1/1.0.4",
+    "title": "StudentDatabaseModel1",
+    "type": "object",
+    "properties": {}
+  },
   "styles": {}
 }
 ```
@@ -88,9 +92,13 @@ Content-Type: application/json
   "dataStructureVersionSource": "OWN",
   "version": "1.0.4",
   "description": "Updated version",
-  "modelAtlasUri": "http://civitas.org/model/StudentDatabaseModel1/1.0.4",
   "modelName": "StudentDatabaseModel1",
-  "model": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>...",
+  "model": {
+    "$id": "http://civitas.org/model/StudentDatabaseModel1/1.0.4",
+    "title": "StudentDatabaseModel1",
+    "type": "object",
+    "properties": {}
+  },
   "styles": {}
 }
 ```
@@ -181,7 +189,7 @@ POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/release
 |---|---|---|
 | Backend | Version status updated to released in `portal_backend` DB | ☐ |
 | Config Adapter | — | ☐ |
-| Model Atlas / Apicurio Registry | Version schema released at `modelAtlasUri`; verify in Apicurio Registry UI (`http://localhost:8888`) | ☐ |
+| External System | — (the model/JSON Schema is persisted on the version in `portal_backend`) | ☐ |
 
 ---
 
@@ -204,7 +212,7 @@ POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/unrelease
 |---|---|---|
 | Backend | Version status reverted to draft in `portal_backend` DB | ☐ |
 | Config Adapter | — | ☐ |
-| Model Atlas / Apicurio Registry | Version schema unreleased/removed from registry | ☐ |
+| External System | — | ☐ |
 
 ---
 
@@ -236,4 +244,4 @@ Content-Type: application/json
 |---|---|---|
 | Backend | Released version metadata updated in `portal_backend` DB | ☐ |
 | Config Adapter | — | ☐ |
-| Model Atlas / Apicurio Registry | Version metadata updated in registry | ☐ |
+| External System | — | ☐ |

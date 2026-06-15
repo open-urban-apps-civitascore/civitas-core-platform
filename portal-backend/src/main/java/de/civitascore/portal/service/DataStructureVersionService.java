@@ -112,8 +112,11 @@ public class DataStructureVersionService
 
     if (existingEntity.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT
         && dataSourceRepository.existsByDataStructureVersionId(existingEntity.getId())) {
-      // Version is in use: block all structural changes, allow only description and modelName
-      input.setModel(existingEntity.getModel());
+      // Version is in use: block all structural changes, allow only description and modelName.
+      // Copy the maps so the update mapper does not clear the managed entity's own collections
+      // (MapStruct clears + putAll on the target map; sharing the reference would empty it).
+      input.setModel(
+          existingEntity.getModel() != null ? new HashMap<>(existingEntity.getModel()) : null);
       input.setVersion(existingEntity.getVersion());
       input.setStyles(
           existingEntity.getStyles() != null
