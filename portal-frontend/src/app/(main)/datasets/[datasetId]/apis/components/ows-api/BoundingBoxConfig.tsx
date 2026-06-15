@@ -5,10 +5,10 @@ import { FieldPath, UseFormReturn } from 'react-hook-form'
 import { TextField } from '@/components/form/fields/TextField'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
-import { WfsWmsApiFormData } from '@/types/namedApis'
+import { OwsApiFormData } from '@/types/namedApis'
 
 interface BoundingBoxConfigProps {
-  form: UseFormReturn<WfsWmsApiFormData>
+  form: UseFormReturn<OwsApiFormData>
   layerFieldIndex: number
   className?: string
   isDisabled?: boolean
@@ -38,7 +38,7 @@ export const BoundingBoxConfig = (props: BoundingBoxConfigProps) => {
               key={field}
               form={form}
               label={field}
-              name={`layers.${layerFieldIndex}.nativeBoundingBox.${field}` as FieldPath<WfsWmsApiFormData>}
+              name={`layers.${layerFieldIndex}.nativeBoundingBox.${field}` as FieldPath<OwsApiFormData>}
               placeholder=""
               type="number"
               required

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import { useGetDatasinks } from '@/app/services/api/datasets/datasinks/clientRequests'
-import { NamedApi } from '@/types/namedApis'
+import { API_STANDARDS, NamedApi } from '@/types/namedApis'
 
 import { ApiList } from './ApiList'
 
@@ -74,7 +74,7 @@ describe('ApiList', () => {
       renderComponent()
       await userEvent.click(screen.getByText('addButton'))
       expect(screen.getByText('sensorThings')).toBeInTheDocument()
-      expect(screen.getByText('wfsWms')).toBeInTheDocument()
+      expect(screen.getByText('ows')).toBeInTheDocument()
     })
 
     it('SensorThings link points to the sensorthings type route', async () => {
@@ -84,28 +84,28 @@ describe('ApiList', () => {
       expect(link).toHaveAttribute('href', '/datasets/ds-1/apis?type=sensorthings')
     })
 
-    it('WFS/WMS link points to the wfs-wms type route when no WFS/WMS api exists', async () => {
+    it('OWS link points to the ows type route when no OWS api exists', async () => {
       renderComponent({ datasetId: 'ds-1' })
       await userEvent.click(screen.getByText('addButton'))
-      const link = screen.getByText('wfsWms').closest('a')
-      expect(link).toHaveAttribute('href', '/datasets/ds-1/apis?type=wfs-wms')
+      const link = screen.getByText('ows').closest('a')
+      expect(link).toHaveAttribute('href', '/datasets/ds-1/apis?type=ows')
     })
 
     it('WFS/WMS item is disabled when a WFS/WMS api already exists', async () => {
-      renderComponent({ apis: [makeApi({ standard: 'WFS' })] })
+      renderComponent({ apis: [makeApi({ standard: API_STANDARDS.OWS })] })
       await userEvent.click(screen.getByText('addButton'))
-      const item = screen.getByText('wfsWms').closest('[role="menuitem"]')
+      const item = screen.getByText('ows').closest('[data-slot="dropdown-menu-item"]')
       expect(item).toHaveAttribute('data-disabled')
-      expect(screen.getByText('wfsWms').closest('a')).toBeNull()
+      expect(screen.getByText('ows').closest('a')).toBeNull()
     })
 
     it('WFS/WMS item is disabled when there are no PostGIS datasinks', async () => {
       vi.mocked(useGetDatasinks).mockReturnValueOnce({ data: { data: [] } } as never)
       renderComponent()
       await userEvent.click(screen.getByText('addButton'))
-      const item = screen.getByText('wfsWms').closest('[role="menuitem"]')
+      const item = screen.getByText('ows').closest('[role="menuitem"]')
       expect(item).toHaveAttribute('data-disabled')
-      expect(screen.getByText('wfsWms').closest('a')).toBeNull()
+      expect(screen.getByText('ows').closest('a')).toBeNull()
     })
   })
 })

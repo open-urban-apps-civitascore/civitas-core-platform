@@ -1,8 +1,8 @@
 #!/bin/bash
-# Setup APISIX route for GeoServer WFS/WMS endpoints
+# Setup APISIX route for GeoServer OWS endpoints
 #
 # The GeoServer REST API is called directly by the config-adapter (not through APISIX).
-# This route exposes only the OGC service endpoints (WFS, WMS) via the APISIX gateway.
+# This route exposes only the OGC service endpoints (OWS) via the APISIX gateway.
 #
 # Prerequisites:
 #   - APISIX must be running (dev-environment/apisix)
@@ -34,8 +34,7 @@ echo ""
 echo "APISIX route setup complete!"
 echo ""
 echo "GeoServer OGC services are now accessible via APISIX:"
-echo "  WFS: http://localhost:9080/geoserver/{workspace}/wfs"
-echo "  WMS: http://localhost:9080/geoserver/{workspace}/wms"
+echo "  OWS: http://localhost:9080/geoserver/{workspace}/ows"
 echo ""
 echo "GeoServer admin UI and REST API (direct access, not through APISIX):"
 echo "  Admin UI:  http://localhost:8082/geoserver/web"

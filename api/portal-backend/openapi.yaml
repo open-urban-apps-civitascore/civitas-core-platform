@@ -6550,8 +6550,7 @@ components:
           description: "API standard. CUSTOM allows free-form, non-standard APIs.\
             \ Immutable once the dataset reaches AVAILABLE."
           enum:
-          - WFS
-          - WMS
+          - OWS
           - STA
           - CUSTOM
           example: STA
@@ -6656,8 +6655,7 @@ components:
           type: string
           description: API standard.
           enum:
-          - WFS
-          - WMS
+          - OWS
           - STA
           - CUSTOM
           example: STA

@@ -4,8 +4,8 @@ import { NoDataPage } from '@/components/no-data/no-data-page/NoDataPage'
 import { Dataset } from '@/types/datasets'
 import { API_TYPE_QUERY, ApiTypeQuery, NamedApi } from '@/types/namedApis'
 
+import { OwsApiConfigPage } from './ows-api/OwsApiConfigPage'
 import { StaApiConfigPage } from './sta-api/StaApiConfigPage'
-import { WfsWmsApiConfigPage } from './wfs-wms-api/WfsWmsApiConfigPage'
 
 interface ApiConfigPageProps {
   dataset: Dataset
@@ -16,8 +16,8 @@ interface ApiConfigPageProps {
 
 export const ApiConfigPage = ({ apiType, ...props }: ApiConfigPageProps) => {
   switch (apiType) {
-    case API_TYPE_QUERY.WFS_WMS:
-      return <WfsWmsApiConfigPage {...props} />
+    case API_TYPE_QUERY.OWS:
+      return <OwsApiConfigPage {...props} />
     case API_TYPE_QUERY.SENSORTHINGS:
       return <StaApiConfigPage {...props} />
     default:

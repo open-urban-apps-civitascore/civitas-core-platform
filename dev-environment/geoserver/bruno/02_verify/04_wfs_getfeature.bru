@@ -1,11 +1,11 @@
 meta {
-  name: 04 WFS GetFeature (returns actual data)
+  name: 04 OWS GetFeature (returns actual data)
   type: http
   seq: 4
 }
 
 get {
-  url: {{geoserver_url}}/{{workspace_name}}/wfs?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&typeNames={{workspace_name}}:{{featuretype_point}}&count=10&outputFormat=application/json
+  url: {{geoserver_url}}/{{workspace_name}}/ows?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&typeNames={{workspace_name}}:{{featuretype_point}}&count=10&outputFormat=application/json
   body: none
   auth: none
 }
