@@ -15,7 +15,6 @@ CREATE TABLE dashboards
     CONSTRAINT fk_dashboards_on_dataset FOREIGN KEY (dataset_id) REFERENCES datasets (id)
 );
 
-CREATE INDEX idx_dashboards_external_dashboard_id ON dashboards (external_dashboard_id);
 CREATE INDEX idx_dashboards_dataset_id ON dashboards (dataset_id);
 
 CREATE TABLE dashboard_sources
@@ -32,7 +31,6 @@ CREATE TABLE dashboard_sources
     CONSTRAINT uk_dashboard_sources_external_source_id UNIQUE (external_source_id)
 );
 
-CREATE INDEX idx_dashboard_sources_external_source_id ON dashboard_sources (external_source_id);
 CREATE INDEX idx_dashboard_sources_mapped_dataset_id ON dashboard_sources (mapped_dataset_id);
 
 CREATE TABLE dashboard_dashboard_sources
