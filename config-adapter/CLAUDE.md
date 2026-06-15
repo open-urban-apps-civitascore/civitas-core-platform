@@ -84,7 +84,7 @@ PostgisConfigValue (sealed) → TableConfig, SchemaConfig, DbRoleConfig
 
 ### Error Codes
 
-`AdapterErrorCode` enum: 1xxx = fatal/validation, 2xxx = retryable/connectivity, 3xxx = adapter-specific (30xx Keycloak, 31xx APISIX, 32xx FROST, 33xx RedPanda, 34xx GeoServer, 35xx PostGIS), 9xxx = unknown. Each code carries retryable flag, internal log template, and safe external message.
+`AdapterErrorCode` enum: 1xxx = fatal/validation, 2xxx = retryable/connectivity, 3xxx = adapter-specific (30xx Keycloak, 31xx APISIX, 32xx FROST, 34xx GeoServer, 35xx PostGIS), 9xxx = unknown. Each code carries retryable flag, internal log template, and safe external message.
 
 ## Conventions
 

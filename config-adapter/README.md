@@ -1138,14 +1138,6 @@ Error codes are categorized by type and severity:
 |------|------|-----------|----------------------|------------------|
 | 3201 | `FROST_ENTITY_ERROR` | No | FROST entity error: %s | Entity operation failed |
 
-**RedPanda Adapter (3301-3303):**
-
-| Code | Name | Retryable | Internal Log Template | External Message |
-|------|------|-----------|----------------------|------------------|
-| 3301 | `REDPANDA_ERROR` | Yes | RedPanda Connect error: %s | Pipeline service error |
-| 3302 | `REDPANDA_PIPELINE_ERROR` | No | RedPanda pipeline error: %s | Pipeline operation failed |
-| 3303 | `REDPANDA_DECRYPTION_ERROR` | No | Credential decryption error: %s | Credential processing failed |
-
 **GeoServer Adapter (3401-3402):**
 
 | Code | Name | Retryable | Internal Log Template | External Message |
@@ -1262,14 +1254,6 @@ All topics are defined in `de.civitascore.configadapter.Topics` and validated at
 | `OBSERVED_PROPERTY_CREATED` / `_UPDATED` / `_DELETED` | `de.civitascore.data.observedproperty.{created,updated,deleted}` |
 | `DATASTREAM_CREATED` / `_UPDATED` / `_DELETED` | `de.civitascore.data.datastream.{created,updated,deleted}` |
 | `FROST_PROJECT_CREATED` / `_UPDATED` / `_DELETED` | `de.civitascore.data.project.{created,updated,deleted}` |
-
-#### Pipeline Events (RedPanda Connect)
-
-| Topic Constant | Topic Value |
-|----------------|-------------|
-| `PIPELINE_CREATED` | `de.civitascore.data.pipeline.created` |
-| `PIPELINE_UPDATED` | `de.civitascore.data.pipeline.updated` |
-| `PIPELINE_DELETED` | `de.civitascore.data.pipeline.deleted` |
 
 #### Table / Schema / Role Events (PostGIS)
 
