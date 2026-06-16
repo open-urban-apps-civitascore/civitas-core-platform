@@ -1,14 +1,18 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useGetDatasinks } from '@/app/services/api/datasets/datasinks/clientRequests'
+import { useGetPipelines } from '@/app/services/api/pipelines/clientRequests'
+import { PipelineBasicInfo } from '@/types/datasets'
 import { API_STANDARDS, NamedApi } from '@/types/namedApis'
 
 import { ApiList } from './ApiList'
 
 vi.mock('./ApiCard', () => ({
-  ApiCard: ({ api }: { api: { slug: string } }) => <div data-testid={`apiCard-${api.slug}`} />,
+  ApiCard: ({ api, canEdit }: { api: { slug: string }; canEdit: boolean }) => (
+    <div data-testid={`apiCard-${api.slug}`} data-can-edit={String(canEdit)} />
+  ),
 }))
 
 vi.mock('@/components/guarded-link/GuardedLink', () => ({
@@ -23,6 +27,7 @@ vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
   useGetDatasinks: vi.fn().mockReturnValue({
     data: { data: [{ id: 'sink-1', dataSinkType: 'POSTGIS' }] },
   }),
+  useGetPipelines: vi.fn(),
 }))
 
 const makeApi = (overrides: Partial<NamedApi> = {}): NamedApi => ({
@@ -33,16 +38,32 @@ const makeApi = (overrides: Partial<NamedApi> = {}): NamedApi => ({
   ...overrides,
 })
 
+const makePipeline = (overrides: Partial<PipelineBasicInfo> = {}): PipelineBasicInfo => ({
+  id: 'p-1',
+  name: 'Pipeline 1',
+  ...overrides,
+})
+
+const frostPipelineData = {
+  data: [{ id: 'p-1', styles: { nodes: [{ type: 'frost', data: {} }] } }],
+}
+
 const defaultProps = {
   datasetId: 'dataset-123',
   apis: [] as NamedApi[],
+  pipelines: [makePipeline()] as PipelineBasicInfo[],
   canEdit: true,
+  isPublished: false,
   isOpenDataAccess: false,
 }
 
 const renderComponent = (props: Partial<typeof defaultProps> = {}) => render(<ApiList {...defaultProps} {...props} />)
 
 describe('ApiList', () => {
+  beforeEach(() => {
+    vi.mocked(useGetPipelines).mockReturnValue({ data: undefined } as ReturnType<typeof useGetPipelines>)
+  })
+
   describe('Empty state', () => {
     it('shows the empty message when there are no apis', () => {
       renderComponent({ apis: [] })
@@ -70,14 +91,27 @@ describe('ApiList', () => {
   })
 
   describe('Add API dropdown', () => {
-    it('opens the add-api dropdown when the button is clicked', async () => {
+    it('disables the button when there are no pipelines', () => {
+      renderComponent({ pipelines: [] })
+      expect(screen.getByText('addButton').closest('button')).toBeDisabled()
+    })
+
+    it('opens the add-api dropdown when a pipeline exists', async () => {
       renderComponent()
       await userEvent.click(screen.getByText('addButton'))
       expect(screen.getByText('sensorThings')).toBeInTheDocument()
       expect(screen.getByText('ows')).toBeInTheDocument()
     })
 
-    it('SensorThings link points to the sensorthings type route', async () => {
+    it('SensorThings item is disabled when no FROST pipeline exists', async () => {
+      renderComponent()
+      await userEvent.click(screen.getByText('addButton'))
+      const item = screen.getByText('sensorThings').closest('[role="menuitem"]')
+      expect(item).toHaveAttribute('data-disabled')
+    })
+
+    it('SensorThings link points to the sensorthings type route when a FROST pipeline exists', async () => {
+      vi.mocked(useGetPipelines).mockReturnValue({ data: frostPipelineData } as ReturnType<typeof useGetPipelines>)
       renderComponent({ datasetId: 'ds-1' })
       await userEvent.click(screen.getByText('addButton'))
       const link = screen.getByText('sensorThings').closest('a')
@@ -106,6 +140,23 @@ describe('ApiList', () => {
       const item = screen.getByText('ows').closest('[role="menuitem"]')
       expect(item).toHaveAttribute('data-disabled')
       expect(screen.getByText('ows').closest('a')).toBeNull()
+    })
+
+    it('disables the button when the dataset is published', () => {
+      renderComponent({ isPublished: true })
+      expect(screen.getByText('addButton').closest('button')).toBeDisabled()
+    })
+  })
+
+  describe('Published dataset', () => {
+    it('passes canEdit=false to ApiCards when dataset is published', () => {
+      renderComponent({ apis: [makeApi()], canEdit: true, isPublished: true })
+      expect(screen.getByTestId('apiCard-my-api')).toHaveAttribute('data-can-edit', 'false')
+    })
+
+    it('passes canEdit normally to ApiCards when dataset is not published', () => {
+      renderComponent({ apis: [makeApi()], canEdit: true, isPublished: false })
+      expect(screen.getByTestId('apiCard-my-api')).toHaveAttribute('data-can-edit', 'true')
     })
   })
 })

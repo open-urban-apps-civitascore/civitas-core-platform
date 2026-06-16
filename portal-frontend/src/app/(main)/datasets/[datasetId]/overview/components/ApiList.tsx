@@ -3,10 +3,13 @@
 import { ChevronDown } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
+import { PIPELINE_NODE_TYPES } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types/pipeline'
 import { useGetDatasinks } from '@/app/services/api/datasets/datasinks/clientRequests'
+import { useGetPipelines } from '@/app/services/api/pipelines/clientRequests'
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { PipelineBasicInfo } from '@/types/datasets'
 import { DATASINK_TYPES } from '@/types/datasinks'
 import { API_STANDARDS, NamedApi } from '@/types/namedApis'
 import { hasApiType } from '@/utils/namedApis'
@@ -16,11 +19,13 @@ import { ApiCard } from './ApiCard'
 interface ApiListProps {
   datasetId: string
   apis: NamedApi[]
+  pipelines: PipelineBasicInfo[]
   canEdit: boolean
+  isPublished: boolean
   isOpenDataAccess: boolean
 }
 
-export const ApiList = ({ datasetId, apis, canEdit, isOpenDataAccess }: ApiListProps) => {
+export const ApiList = ({ datasetId, apis, pipelines, canEdit, isPublished, isOpenDataAccess }: ApiListProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.apis')
   const hasOws = hasApiType(apis, API_STANDARDS.OWS)
 
@@ -32,23 +37,36 @@ export const ApiList = ({ datasetId, apis, canEdit, isOpenDataAccess }: ApiListP
 
   const canCreateOwsApi = !hasOws && hasPostgisDatasinks
 
+  const { data: pipelinesData } = useGetPipelines(datasetId)
+
+  const hasPipeline = pipelines.length > 0
+  const hasFrostPipeline =
+    pipelinesData?.data?.some(p => p.styles?.nodes?.some(n => n.type === PIPELINE_NODE_TYPES.Frost)) ?? false
+
   return (
     <div className="py-3">
       <div className="flex items-center justify-between gap-4">
         <h4 className="font-semibold">{t('title')}</h4>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline">
+            <Button variant="outline" disabled={!hasPipeline || isPublished}>
               {t('addButton')}
               <ChevronDown className="ml-2 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <GuardedLink href={`/datasets/${datasetId}/apis?type=sensorthings`} className="flex items-center gap-3">
-                <span>{t('sensorThings')}</span>
-                <span className="text-xs text-muted-foreground">{t('sensorThingsSubtitle')}</span>
-              </GuardedLink>
+            <DropdownMenuItem disabled={!hasFrostPipeline} asChild={hasFrostPipeline}>
+              {hasFrostPipeline ? (
+                <GuardedLink href={`/datasets/${datasetId}/apis?type=sensorthings`} className="flex items-center gap-3">
+                  <span>{t('sensorThings')}</span>
+                  <span className="text-xs text-muted-foreground">{t('sensorThingsSubtitle')}</span>
+                </GuardedLink>
+              ) : (
+                <span className="flex items-center gap-3">
+                  <span>{t('sensorThings')}</span>
+                  <span className="text-xs text-muted-foreground">{t('sensorThingsSubtitle')}</span>
+                </span>
+              )}
             </DropdownMenuItem>
             <DropdownMenuItem disabled={!canCreateOwsApi} asChild={!hasOws}>
               {canCreateOwsApi ? (
