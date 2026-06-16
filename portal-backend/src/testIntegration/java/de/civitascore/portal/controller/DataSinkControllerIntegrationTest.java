@@ -304,15 +304,21 @@ class DataSinkControllerIntegrationTest
   class UpdateDataSinkTests {
 
     @Test
-    @DisplayName("PUT replaces an existing DataSink")
-    void putReplacesDataSink() {
+    @DisplayName("PUT replaces the configuration of an existing same-type DataSink")
+    void putReplacesDataSinkConfiguration() {
       ensureTestData();
       var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
 
-      UUID id = createTestEntity();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      DataSink sink = new DataSink();
+      sink.setDataSet(dataSet);
+      sink.setDataSinkType(DataSinkType.POSTGIS);
+      sink.setConfiguration(
+          Map.of("tableName", "original_table", "dataStructureVersionId", dsv.getId().toString()));
+      UUID id = dataSinkRepository.save(sink).getId();
 
       DataSinkInputDTO updateInput = new DataSinkInputDTO();
       updateInput.setDataSinkType(DataSinkType.POSTGIS);
@@ -327,7 +333,31 @@ class DataSinkControllerIntegrationTest
       assertThat(dataSinkRepository.findById(id))
           .isPresent()
           .get()
-          .satisfies(s -> assertThat(s.getDataSinkType()).isEqualTo(DataSinkType.POSTGIS));
+          .satisfies(
+              s -> assertThat(s.getConfiguration()).containsEntry("tableName", "updated_table"));
+    }
+
+    @Test
+    @DisplayName("PUT returns 400 when changing the immutable dataSinkType")
+    void putRejectsTypeChange() {
+      UUID id = createTestEntity();
+
+      DataSinkInputDTO updateInput = new DataSinkInputDTO();
+      updateInput.setDataSinkType(DataSinkType.POSTGIS);
+      updateInput.setConfiguration(
+          Map.of("tableName", "any_table", "dataStructureVersionId", UUID.randomUUID().toString()));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id, HttpMethod.PUT, createAuthHeaders(), updateInput);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail()).contains("dataSinkType cannot be changed");
+      assertThat(dataSinkRepository.findById(id))
+          .isPresent()
+          .get()
+          .satisfies(s -> assertThat(s.getDataSinkType()).isEqualTo(DataSinkType.FROST));
     }
 
     @Test
@@ -436,8 +466,8 @@ class DataSinkControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("PATCH switches dataSinkType together with a matching configuration")
-    void patchSwitchesTypeAndConfiguration() {
+    @DisplayName("PATCH returns 400 when changing the immutable dataSinkType")
+    void patchRejectsTypeChange() {
       ensureTestData();
       var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
       DataStructureVersion dsv =
@@ -452,15 +482,32 @@ class DataSinkControllerIntegrationTest
           "configuration",
           Map.of("tableName", "patched_table", "dataStructureVersionId", dsv.getId().toString()));
 
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id, HttpMethod.PATCH, createAuthHeaders(), patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail()).contains("dataSinkType cannot be changed");
+      assertThat(dataSinkRepository.findById(id))
+          .isPresent()
+          .get()
+          .satisfies(s -> assertThat(s.getDataSinkType()).isEqualTo(DataSinkType.FROST));
+    }
+
+    @Test
+    @DisplayName("PATCH allows explicitly setting dataSinkType to its current value")
+    void patchAllowsSameTypeRestate() {
+      UUID id = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("dataSinkType", DataSinkType.FROST.name());
+
       ResponseEntity<DataSinkOutputDTO> response = performPatch(id, patchMap);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
-      assertThat(dataSinkRepository.findById(id))
-          .isPresent()
-          .get()
-          .satisfies(s -> assertThat(s.getDataSinkType()).isEqualTo(DataSinkType.POSTGIS));
+      assertThat(response.getBody().getDataSinkType()).isEqualTo(DataSinkType.FROST);
     }
 
     @Test
@@ -470,21 +517,6 @@ class DataSinkControllerIntegrationTest
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("configuration", Map.of("unexpected", "value"));
-
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              getEndpointPath() + "/" + id, HttpMethod.PATCH, createAuthHeaders(), patchMap);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName("PATCH returns 400 when switching to POSTGIS without a valid configuration")
-    void patchRejectsTypeSwitchWithoutMatchingConfiguration() {
-      UUID id = createTestEntity();
-
-      Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("dataSinkType", DataSinkType.POSTGIS.name());
 
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(

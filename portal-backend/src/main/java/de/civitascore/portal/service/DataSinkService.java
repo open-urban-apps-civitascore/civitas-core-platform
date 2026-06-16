@@ -84,6 +84,24 @@ public class DataSinkService extends BaseService<DataSink, DataSinkInputDTO> {
   }
 
   /**
+   * Rejects attempts to change the immutable {@code dataSinkType} of an existing DataSink. Runs for
+   * both PUT and PATCH; a PATCH that omits {@code dataSinkType} carries the entity's current type
+   * forward via the assembler and passes this check.
+   *
+   * @throws InvalidInputException if the incoming type differs from the persisted type
+   */
+  @Override
+  protected DataSinkInputDTO preProcessUpdateInput(
+      DataSinkInputDTO input, DataSink existingEntity) {
+    if (input.getDataSinkType() != null
+        && input.getDataSinkType() != existingEntity.getDataSinkType()) {
+      throw new InvalidInputException(
+          getEntityName(), existingEntity.getId(), "dataSinkType cannot be changed after creation");
+    }
+    return input;
+  }
+
+  /**
    * Resolves the parent dataset and validates the type-specific configuration.
    *
    * @throws ResourceNotFoundException if the dataset is not found
