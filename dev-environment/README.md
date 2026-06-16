@@ -16,7 +16,7 @@ dev-environment/
 ├── keycloak/   # Keycloak only
 ├── apisix/     # API Gateway + Authorization (OPA, AuthZ Repository)
 ├── frost/      # FROST IoT Server
-├── geoserver/  # GeoServer OGC Services (WFS/WMS)
+├── geoserver/  # GeoServer OGC Services (OWS)
 ├── nifi/       # Apache NiFi (data integration / pipeline engine)
 └── modelatlas/ # Model Atlas
 ```
@@ -212,19 +212,19 @@ cd apisix    && docker compose up -d
 
 ## Key URLs
 
-| Service | URL | Notes |
-|---------|-----|-------|
-| Keycloak | http://localhost:8080 | admin / admin |
-| Portal Backend | http://localhost:8089 | Swagger: /v1/swagger-ui.html |
-| Config Adapter | http://localhost:8088 | |
-| APISIX Gateway | http://localhost:9080 | Routes to backend via OPA authz |
-| OPA | http://localhost:8181 | Policy decision point |
-| AuthZ Repository | http://localhost:8091 | User authorization context |
-| Kafka UI | http://localhost:8090 | |
-| FROST Server | http://localhost:8085/FROST-Server/v1.1 | |
-| GeoServer Admin | http://localhost:8082/geoserver/web | admin / see geoserver/.env |
-| GeoServer WFS | http://localhost:9080/geoserver/{workspace}/wfs | via APISIX |
-| Apache NiFi | https://localhost:8443/nifi | admin / see nifi/.env |
+| Service          | URL                                             | Notes |
+|------------------|-------------------------------------------------|-------|
+| Keycloak         | http://localhost:8080                           | admin / admin |
+| Portal Backend   | http://localhost:8089                           | Swagger: /v1/swagger-ui.html |
+| Config Adapter   | http://localhost:8088                           | |
+| APISIX Gateway   | http://localhost:9080                           | Routes to backend via OPA authz |
+| OPA              | http://localhost:8181                           | Policy decision point |
+| AuthZ Repository | http://localhost:8091                           | User authorization context |
+| Kafka UI         | http://localhost:8090                           | |
+| FROST Server     | http://localhost:8085/FROST-Server/v1.1         | |
+| GeoServer Admin  | http://localhost:8082/geoserver/web             | admin / see geoserver/.env |
+| GeoServer OWS    | http://localhost:9080/geoserver/{workspace}/ows | via APISIX |
+| Apache NiFi      | https://localhost:8443/nifi                     | admin / see nifi/.env |
 
 ---
 

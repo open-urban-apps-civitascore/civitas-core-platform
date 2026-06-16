@@ -20,13 +20,13 @@ import { crsOptions } from '@/const/crs'
 import { cn } from '@/lib/utils'
 import { Datasink } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
-import { Style, WfsWmsApiFormData } from '@/types/namedApis'
+import { OwsApiFormData, Style } from '@/types/namedApis'
 import { getEmptyLabelIndex, isNewItem } from '@/utils/common'
 
 import { BoundingBoxConfig } from './BoundingBoxConfig'
 
 interface LayerConfigProps {
-  form: UseFormReturn<WfsWmsApiFormData>
+  form: UseFormReturn<OwsApiFormData>
   styles: Style[]
   postgisDatasinks: Datasink[]
   postGisDatastructures: DatastructureVersion[]
@@ -84,8 +84,8 @@ export const LayerConfig = (props: LayerConfigProps) => {
     void onDeleteLayer?.().then(() => setIsDeleteModalOpen(false))
   }
 
-  const layerPath = (path: string): FieldPath<WfsWmsApiFormData> =>
-    `layers.${selectedLayerIndex}.${path}` as FieldPath<WfsWmsApiFormData>
+  const layerPath = (path: string): FieldPath<OwsApiFormData> =>
+    `layers.${selectedLayerIndex}.${path}` as FieldPath<OwsApiFormData>
 
   const allLayers = form.watch('layers')
   const selectedLayer = selectedLayerIndex !== null ? allLayers[selectedLayerIndex] : null
@@ -280,7 +280,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
                     form={form}
                     label={t('geometry.definedCrs')}
                     name={layerPath('crs')}
-                    id="wfsWmsLayerCrs"
+                    id="owsLayerCrs"
                     options={crsOptions}
                     disabled={isReadOnly}
                     formItemProps={wideField}

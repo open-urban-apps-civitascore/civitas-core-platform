@@ -169,7 +169,7 @@
     ],
     "namedApis": [
       { "slug": "traffic", "standard": "STA", "version": "1.1" },
-      { "slug": "boundaries", "standard": "WFS" }
+      { "slug": "boundaries", "standard": "OWS" }
     ]
   }
 }

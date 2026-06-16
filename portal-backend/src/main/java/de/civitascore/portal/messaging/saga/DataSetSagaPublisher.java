@@ -146,19 +146,9 @@ public class DataSetSagaPublisher {
         .toList();
   }
 
-  /**
-   * Flat, deduplicated datasinks across the dataset's pipelines (mirrors {@link
-   * #buildDatasources}).
-   */
+  /** All datasinks belonging to the dataset, regardless of pipeline attachment. */
   private List<DataSinkPayload> buildDatasinks(DataSet dataset) {
-    if (dataset.getPipelines() == null) {
-      return List.of();
-    }
-
-    Set<UUID> seen = new HashSet<>();
-    return dataset.getPipelines().stream()
-        .flatMap(p -> dataSinkRepository.findByPipelineId(p.getId()).stream())
-        .filter(sink -> seen.add(sink.getId()))
+    return dataSinkRepository.findByDataSetId(dataset.getId()).stream()
         .map(this::toDataSinkPayload)
         .toList();
   }

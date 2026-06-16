@@ -37,13 +37,13 @@ The gateway is also connected to `civitas-network` so APISIX can route
 
 ## Services
 
-| Container | Role | Local Port |
-|-----------|------|------------|
-| `civitas-geoserver` | Gateway — single entry point | `8082` |
+| Container | Role                                | Local Port |
+|-----------|-------------------------------------|------------|
+| `civitas-geoserver` | Gateway — single entry point        | `8082` |
 | `civitas-geoserver-db` | PostgreSQL/PostGIS (pgconfig + ACL) | `5434` |
-| *(internal)* | Consul discovery UI | `8500` |
-| *(internal)* | WFS, WMS, WCS, WPS, REST, WebUI, GWC | — |
-| *(internal)* | RabbitMQ, ACL, Config server | — |
+| *(internal)* | Consul discovery UI                 | `8500` |
+| *(internal)* | OWS, WCS, WPS, REST, WebUI, GWC     | — |
+| *(internal)* | RabbitMQ, ACL, Config server        | — |
 
 ---
 
@@ -112,12 +112,11 @@ curl -u admin:geoserver http://localhost:8082/geoserver/rest/workspaces.json
 
 ### GeoServer OGC Services (via APISIX gateway)
 
-| Service | URL |
-|---------|-----|
-| WFS GetCapabilities | `http://localhost:9080/geoserver/{workspace}/wfs?SERVICE=WFS&REQUEST=GetCapabilities` |
-| WMS GetCapabilities | `http://localhost:9080/geoserver/{workspace}/wms?SERVICE=WMS&REQUEST=GetCapabilities` |
-| WFS direct | `http://localhost:8082/geoserver/{workspace}/wfs` |
-| WMS direct | `http://localhost:8082/geoserver/{workspace}/wms` |
+| Service | URL                                                                                   |
+|---------|---------------------------------------------------------------------------------------|
+| WFS GetCapabilities | `http://localhost:9080/geoserver/{workspace}/ows?SERVICE=WFS&REQUEST=GetCapabilities` |
+| WFS direct | `http://localhost:8082/geoserver/{workspace}/wfs`                                     |
+| WMS direct | `http://localhost:8082/geoserver/{workspace}/wms`                                     |
 
 ### GeoServer Admin UI
 

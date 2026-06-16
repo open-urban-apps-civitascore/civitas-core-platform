@@ -263,12 +263,11 @@
             "addButton": "API hinzufügen",
             "sensorThings": "SensorThings API",
             "sensorThingsSubtitle": "Zeitreihendaten",
-            "wfsWms": "WFS/WMS API",
-            "wfsWmsSubtitle": "Geodaten",
+            "ows": "WFS/WMS API",
+            "owsSubtitle": "Geodaten",
             "standardLabels": {
               "STA": "SensorThings API",
-              "WFS": "WFS",
-              "WMS": "WMS",
+              "OWS": "WFS/WMS",
               "CUSTOM": "Custom API"
             },
             "card": {
@@ -295,7 +294,7 @@
           "config": {
             "title": {
               "sensorthings": "SensorThings API",
-              "wfs-wms": "WFS/WMS API"
+              "ows": "WFS/WMS API"
             },
             "protectedBadge": "Geschützt",
             "openDataBadge": "Open Data",

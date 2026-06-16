@@ -54,7 +54,7 @@ class DatasetSerializationTest {
 
   @Test
   void shouldDeserializePostgresqlDatasource() {
-    Datasource pg = dataset.datasources().get(0);
+    Datasource pg = dataset.datasources().getFirst();
     assertEquals("0a7b8c9d-1e2f-4a5b-9c0d-1e2f3a4b5c6d", pg.getId());
     assertEquals("postgresql", pg.getType());
     assertEquals("Neustadt Mobility DB", pg.getName());
@@ -95,7 +95,7 @@ class DatasetSerializationTest {
     @SuppressWarnings("unchecked")
     List<String> topics = (List<String>) mqtt.getAdditionalProperties().get("topics");
     assertEquals(3, topics.size());
-    assertEquals("neustadt/traffic/+/counts", topics.get(0));
+    assertEquals("neustadt/traffic/+/counts", topics.getFirst());
 
     @SuppressWarnings("unchecked")
     Map<String, Object> tls = (Map<String, Object>) mqtt.getAdditionalProperties().get("tls");
@@ -116,7 +116,7 @@ class DatasetSerializationTest {
 
   @Test
   void shouldDeserializeAddPipeline() {
-    DataPipeline addPipeline = dataset.datapipelines().get(0);
+    DataPipeline addPipeline = dataset.datapipelines().getFirst();
     assertEquals("db-to-frost-01", addPipeline.id());
     assertEquals("1", addPipeline.version());
     assertEquals("ADD", addPipeline.action());
@@ -140,15 +140,15 @@ class DatasetSerializationTest {
     assertNotNull(dataset.namedApis());
     assertEquals(2, dataset.namedApis().size());
 
-    NamedApi traffic = dataset.namedApis().get(0);
+    NamedApi traffic = dataset.namedApis().getFirst();
     assertEquals("traffic", traffic.slug());
-    assertEquals("STA", traffic.standard());
+    assertEquals(ApiStandards.STA, traffic.standard());
     assertEquals("1.1", traffic.version());
 
     // Second fixture entry exercises a non-STA standard and an absent (null) version.
     NamedApi boundaries = dataset.namedApis().get(1);
     assertEquals("boundaries", boundaries.slug());
-    assertEquals("WFS", boundaries.standard());
+    assertEquals(ApiStandards.OWS, boundaries.standard());
     assertNull(boundaries.version());
   }
 
@@ -174,7 +174,7 @@ class DatasetSerializationTest {
     NamedApi api = objectMapper.readValue(json, NamedApi.class);
 
     assertEquals("traffic", api.slug());
-    assertEquals("STA", api.standard());
+    assertEquals(ApiStandards.STA, api.standard());
     assertEquals("1.1", api.version());
   }
 

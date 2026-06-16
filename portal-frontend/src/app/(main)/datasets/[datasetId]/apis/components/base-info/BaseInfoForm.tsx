@@ -38,8 +38,8 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
   const t = useTranslations('datasets.overview.completion.apis.config')
   const isMobile = useIsMobile()
 
-  const isWfsWms = apiType === API_TYPE_QUERY.WFS_WMS
-  const persistenceOptions = isWfsWms ? [PERSISTENCE_OPTIONS.POSTGIS] : [PERSISTENCE_OPTIONS.FROST]
+  const isOws = apiType === API_TYPE_QUERY.OWS
+  const persistenceOptions = isOws ? [PERSISTENCE_OPTIONS.POSTGIS] : [PERSISTENCE_OPTIONS.FROST]
 
   // Wider right column than the shared default so long URL previews don't wrap.
   const gridClass = isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,540px)]'
@@ -64,7 +64,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
       </DetailsFieldContainer>
 
       <DetailsFieldContainer>
-        {isWfsWms ? (
+        {isOws ? (
           <FormSelect
             id="apiPersistence"
             label={t('baseInfo.persistence')}

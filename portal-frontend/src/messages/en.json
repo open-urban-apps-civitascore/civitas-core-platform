@@ -264,12 +264,11 @@
             "addButton": "Add API",
             "sensorThings": "SensorThings API",
             "sensorThingsSubtitle": "Time Series Data",
-            "wfsWms": "WFS/WMS API",
-            "wfsWmsSubtitle": "Geo Data",
+            "ows": "WFS/WMS API",
+            "owsSubtitle": "Geo Data",
             "standardLabels": {
               "STA": "SensorThings API",
-              "WFS": "WFS",
-              "WMS": "WMS",
+              "OWS": "WFS/WMS",
               "CUSTOM": "Custom API"
             },
             "card": {
@@ -296,7 +295,7 @@
           "config": {
             "title": {
               "sensorthings": "SensorThings API",
-              "wfs-wms": "WFS/WMS API"
+              "ows": "OWS API"
             },
             "protectedBadge": "Protected",
             "openDataBadge": "Open Data",
@@ -1094,7 +1093,7 @@
       "frostServer": "FROST Server",
       "frostServerDesc": "SensorThings API persistence. Store or retrieve data.",
       "geoPersistence": "Geo Persistence",
-      "geoPersistenceDesc": "WFS/WMS geo data persistence.",
+      "geoPersistenceDesc": "OWS geo data persistence.",
       "mapping": "Mapping",
       "mappingDesc": "Bloblang data transformation. Map and transform data."
     },

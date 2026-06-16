@@ -285,9 +285,17 @@ public class PortalTestDataFactory {
 
   public DataSink dataSink(DataSet dataSet, Pipeline pipeline, Consumer<DataSink> customizer) {
     DataSink sink = new DataSink();
+    sink.setDataSet(dataSet);
     sink.setPipeline(pipeline);
     sink.setDataSinkType(DataSinkType.FROST);
     customizer.accept(sink);
+    return dataSinkRepository.save(sink);
+  }
+
+  public DataSink dataSink(DataSet dataSet) {
+    DataSink sink = new DataSink();
+    sink.setDataSet(dataSet);
+    sink.setDataSinkType(DataSinkType.FROST);
     return dataSinkRepository.save(sink);
   }
 

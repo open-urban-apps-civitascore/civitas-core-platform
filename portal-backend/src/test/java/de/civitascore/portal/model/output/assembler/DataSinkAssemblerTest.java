@@ -48,7 +48,20 @@ class DataSinkAssemblerTest {
     pipeline.setDataSet(dataSet);
 
     DataSink entity = new DataSink();
+    entity.setDataSet(dataSet);
     entity.setPipeline(pipeline);
+    entity.setDataSinkType(type);
+    entity.setConfiguration(configuration);
+    return entity;
+  }
+
+  private DataSink sinkWithoutPipeline(DataSinkType type, Map<String, Object> configuration) {
+    DataSet dataSet = new DataSet();
+    dataSet.setId(UUID.randomUUID());
+    dataSet.setName("ds");
+
+    DataSink entity = new DataSink();
+    entity.setDataSet(dataSet);
     entity.setDataSinkType(type);
     entity.setConfiguration(configuration);
     return entity;
@@ -178,6 +191,31 @@ class DataSinkAssemblerTest {
 
       assertThat(result.getConfiguration()).isNull();
       verifyNoInteractions(dataStructureVersionRepository);
+    }
+  }
+
+  @Nested
+  @DisplayName("enrichDto() — inUse")
+  class InUseFlag {
+
+    @Test
+    @DisplayName("Should set inUse=true when the DataSink has a linked pipeline")
+    void shouldSetInUseTrueWhenPipelineLinked() {
+      DataSink entity = sinkWithPipeline(DataSinkType.FROST, Map.of());
+
+      DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
+
+      assertThat(result.isInUse()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Should set inUse=false when the DataSink has no linked pipeline")
+    void shouldSetInUseFalseWhenNoPipeline() {
+      DataSink entity = sinkWithoutPipeline(DataSinkType.FROST, Map.of());
+
+      DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
+
+      assertThat(result.isInUse()).isFalse();
     }
   }
 }

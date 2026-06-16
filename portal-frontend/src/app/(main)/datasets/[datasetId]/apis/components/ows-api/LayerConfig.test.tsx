@@ -4,7 +4,7 @@ import { FormProvider, useForm } from 'react-hook-form'
 import { STATUS_TYPES } from '@/types/common'
 import { Datasink, DATASINK_TYPES } from '@/types/datasinks'
 import { DATASTRUCTURE_VERSION_SOURCE, DatastructureVersion } from '@/types/datastructures'
-import { API_TYPE_QUERY, LayerFormData, Style, WfsWmsApiFormData } from '@/types/namedApis'
+import { API_TYPE_QUERY, LayerFormData, OwsApiFormData, Style } from '@/types/namedApis'
 
 import { LayerConfig } from './LayerConfig'
 
@@ -109,9 +109,9 @@ const Wrapper = ({
   onDeleteLayer,
   onTableChange = vi.fn(),
 }: WrapperProps) => {
-  const form = useForm<WfsWmsApiFormData>({
+  const form = useForm<OwsApiFormData>({
     defaultValues: {
-      type: API_TYPE_QUERY.WFS_WMS,
+      type: API_TYPE_QUERY.OWS,
       baseInfo: { name: 'Test API', slug: 'test-api', description: '', persistence: 'postgis' },
       layers,
     },

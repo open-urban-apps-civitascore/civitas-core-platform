@@ -20,23 +20,25 @@ import org.mapstruct.ReportingPolicy;
     unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface DataSinkMapper extends DtoMapper<DataSinkInputDTO, DataSinkOutputDTO, DataSink> {
 
+  @Mapping(target = "dataSet", ignore = true)
   @Mapping(target = "pipeline", ignore = true)
   @Override
   DataSink toEntity(DataSinkInputDTO input);
 
-  @Mapping(target = "dataSetId", ignore = true)
+  @Mapping(target = "dataSetId", source = "dataSet.id")
   @Mapping(target = "pipelineId", source = "pipeline.id")
   @Mapping(target = "configuration", ignore = true)
   @Override
   DataSinkOutputDTO toOutput(DataSink entity);
 
   @Mapping(target = "id", source = "id")
-  @Mapping(target = "pipelineId", source = "pipeline.id")
+  @Mapping(target = "dataSetId", source = "dataSet.id")
   @Override
   DataSinkInputDTO toInput(DataSink entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "id", ignore = true)
+  @Mapping(target = "dataSet", ignore = true)
   @Mapping(target = "pipeline", ignore = true)
   @Override
   void updateEntity(@MappingTarget DataSink entity, DataSinkInputDTO input);
