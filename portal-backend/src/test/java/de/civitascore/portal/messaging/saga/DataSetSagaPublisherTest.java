@@ -239,11 +239,12 @@ class DataSetSagaPublisherTest {
       UUID sinkId = UUID.randomUUID();
       Pipeline pipeline = pipeline(UUID.randomUUID());
       DataSink sink = postgisSink(sinkId, dsvId, "sensor_observations");
+      DataSet dataSet = datasetWithPipeline(pipeline);
 
       DataStructureVersion version = new DataStructureVersion();
       version.setModelAtlasUri("atlas://dsv/" + dsvId);
 
-      when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
       when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
       when(dataStructureVersionService.resolveJsonSchemaByAtlasUri("atlas://dsv/" + dsvId))
           .thenReturn(Optional.of(Map.of("$id", "urn:core:datastructure:" + dsvId)));
@@ -254,7 +255,7 @@ class DataSetSagaPublisherTest {
               CompletableFuture.completedFuture(
                   new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
 
-      publisher.publishDeleteRequested(datasetWithPipeline(pipeline));
+      publisher.publishDeleteRequested(dataSet);
 
       var payload = new JsonMapper().readTree(jsonCaptor.getValue());
       var datasinks = payload.get("datasinks");
