@@ -9,6 +9,7 @@ import de.civitascore.portal.service.DataSinkService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.io.IOException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
 
 /** REST controller for DataSink resources nested under a parent dataset. */
 @RestController
@@ -80,6 +82,16 @@ public class DataSinkController
     UUID dataSetId = extractDataSetId();
     dataSinkService.findByIdAndDataSetOrThrow(id, dataSetId);
     return super.update(id, input);
+  }
+
+  /** Partially updates a DataSink after verifying it belongs to the parent dataset. */
+  @Override
+  @Operation(operationId = "patchDataSink", summary = "Partially update a DataSink")
+  public ResponseEntity<DataSinkOutputDTO> patch(
+      @PathVariable UUID id, @RequestBody JsonNode updates) throws IOException {
+    UUID dataSetId = extractDataSetId();
+    dataSinkService.findByIdAndDataSetOrThrow(id, dataSetId);
+    return super.patch(id, updates);
   }
 
   /** Deletes a DataSink after verifying it belongs to the parent dataset. */

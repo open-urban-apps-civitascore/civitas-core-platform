@@ -17,6 +17,7 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.util.RestPage;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -359,6 +360,196 @@ class DataSinkControllerIntegrationTest
               getEndpointPath() + "/" + id, HttpMethod.PUT, createAuthHeaders(), invalidUpdate);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Nested
+  @DisplayName("Patch DataSink Tests")
+  class PatchDataSinkTests {
+
+    @Test
+    @DisplayName("PATCH updates configuration on a POSTGIS DataSink in place")
+    void patchUpdatesPostgisConfiguration() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      DataSink sink = new DataSink();
+      sink.setDataSet(dataSet);
+      sink.setDataSinkType(DataSinkType.POSTGIS);
+      sink.setConfiguration(
+          Map.of("tableName", "original_table", "dataStructureVersionId", dsv.getId().toString()));
+      UUID id = dataSinkRepository.save(sink).getId();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put(
+          "configuration",
+          Map.of("tableName", "renamed_table", "dataStructureVersionId", dsv.getId().toString()));
+
+      ResponseEntity<DataSinkOutputDTO> response = performPatch(id, patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
+      assertThat(dataSinkRepository.findById(id))
+          .isPresent()
+          .get()
+          .satisfies(
+              s -> assertThat(s.getConfiguration()).containsEntry("tableName", "renamed_table"));
+    }
+
+    @Test
+    @DisplayName("PATCH leaves omitted fields unchanged")
+    void patchLeavesOmittedFieldsUnchanged() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      DataSink sink = new DataSink();
+      sink.setDataSet(dataSet);
+      sink.setDataSinkType(DataSinkType.POSTGIS);
+      sink.setConfiguration(
+          Map.of("tableName", "sensor_data", "dataStructureVersionId", dsv.getId().toString()));
+      UUID id = dataSinkRepository.save(sink).getId();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put(
+          "configuration",
+          Map.of("tableName", "renamed_table", "dataStructureVersionId", dsv.getId().toString()));
+
+      ResponseEntity<DataSinkOutputDTO> response = performPatch(id, patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSinkType())
+          .as("dataSinkType should remain POSTGIS")
+          .isEqualTo(DataSinkType.POSTGIS);
+      assertThat(response.getBody().getDataSetId())
+          .as("dataSetId should remain the parent dataset")
+          .isEqualTo(testDataSetId);
+    }
+
+    @Test
+    @DisplayName("PATCH switches dataSinkType together with a matching configuration")
+    void patchSwitchesTypeAndConfiguration() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      UUID id = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("dataSinkType", DataSinkType.POSTGIS.name());
+      patchMap.put(
+          "configuration",
+          Map.of("tableName", "patched_table", "dataStructureVersionId", dsv.getId().toString()));
+
+      ResponseEntity<DataSinkOutputDTO> response = performPatch(id, patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
+      assertThat(dataSinkRepository.findById(id))
+          .isPresent()
+          .get()
+          .satisfies(s -> assertThat(s.getDataSinkType()).isEqualTo(DataSinkType.POSTGIS));
+    }
+
+    @Test
+    @DisplayName("PATCH returns 400 when resulting configuration is invalid for the type")
+    void patchRejectsInvalidConfigurationForType() {
+      UUID id = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("configuration", Map.of("unexpected", "value"));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id, HttpMethod.PATCH, createAuthHeaders(), patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("PATCH returns 400 when switching to POSTGIS without a valid configuration")
+    void patchRejectsTypeSwitchWithoutMatchingConfiguration() {
+      UUID id = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("dataSinkType", DataSinkType.POSTGIS.name());
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id, HttpMethod.PATCH, createAuthHeaders(), patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("PATCH returns 404 when DataSink belongs to a different dataset")
+    void patchReturns404ForCrossDatasetUpdate() {
+      UUID sinkId = createTestEntity();
+      DataSet otherDataSet = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT));
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("configuration", Map.of());
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              "/datasets/" + otherDataSet.getId() + "/datasinks/" + sinkId,
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("PATCH returns 400 when patched against a non-UUID dataSetId path variable")
+    void patchReturns400ForInvalidDataSetIdPath() {
+      UUID sinkId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("configuration", Map.of());
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              "/datasets/not-a-valid-uuid/datasinks/" + sinkId,
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail())
+          .isEqualTo("Missing or invalid dataSetId in path variables");
+    }
+
+    @Test
+    @DisplayName("Empty PATCH leaves the DataSink unchanged")
+    void emptyPatchLeavesDataSinkUnchanged() {
+      UUID id = createTestEntity();
+
+      ResponseEntity<DataSinkOutputDTO> before = performGetById(id);
+      assertThat(before.getBody()).isNotNull();
+      DataSinkType originalType = before.getBody().getDataSinkType();
+
+      Map<String, Object> patchMap = new HashMap<>();
+
+      ResponseEntity<DataSinkOutputDTO> response = performPatch(id, patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSinkType()).isEqualTo(originalType);
+      assertThat(response.getBody().getDataSetId()).isEqualTo(testDataSetId);
     }
   }
 
