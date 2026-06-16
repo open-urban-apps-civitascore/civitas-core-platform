@@ -27,7 +27,6 @@ public interface DataSinkMapper extends DtoMapper<DataSinkInputDTO, DataSinkOutp
 
   @Mapping(target = "dataSetId", source = "dataSet.id")
   @Mapping(target = "pipelineId", source = "pipeline.id")
-  @Mapping(target = "inUse", ignore = true)
   @Mapping(target = "configuration", ignore = true)
   @Override
   DataSinkOutputDTO toOutput(DataSink entity);
