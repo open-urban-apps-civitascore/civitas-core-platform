@@ -24,7 +24,7 @@ class DashboardMapperTest {
     // externalDashboardId and the dataset binding are populated by the engine-sync flow and the
     // service respectively — the mapper must never carry a client-supplied value into them.
     assertThat(entity.getExternalDashboardId()).isNull();
-    assertThat(entity.getDataset()).isNull();
+    assertThat(entity.getDataSet()).isNull();
   }
 
   @Test

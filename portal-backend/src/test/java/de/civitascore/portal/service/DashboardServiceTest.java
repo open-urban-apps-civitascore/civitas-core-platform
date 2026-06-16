@@ -32,26 +32,26 @@ class DashboardServiceTest {
   @Mock private DataSetRepository dataSetRepository;
   @InjectMocks private DashboardService service;
 
-  private UUID datasetId;
-  private DataSet dataset;
+  private UUID dataSetId;
+  private DataSet dataSet;
 
   @BeforeEach
   void setUp() {
-    datasetId = UUID.randomUUID();
-    dataset = new DataSet();
-    dataset.setId(datasetId);
+    dataSetId = UUID.randomUUID();
+    dataSet = new DataSet();
+    dataSet.setId(dataSetId);
   }
 
   @Test
-  void postConvertToEntityResolvesDataset() {
+  void postConvertToEntityResolvesDataSet() {
     DashboardInputDTO input = new DashboardInputDTO();
     input.setName("Traffic");
-    input.setDatasetId(datasetId);
-    when(dataSetRepository.findById(datasetId)).thenReturn(Optional.of(dataset));
+    input.setDataSetId(dataSetId);
+    when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
 
     Dashboard result = service.postConvertToEntity(new Dashboard(), input);
 
-    assertThat(result.getDataset()).isEqualTo(dataset);
+    assertThat(result.getDataSet()).isEqualTo(dataSet);
     assertThat(result.isActive()).isTrue();
   }
 
@@ -59,8 +59,8 @@ class DashboardServiceTest {
   void postConvertToEntityOnUpdatePreservesActiveState() {
     DashboardInputDTO input = new DashboardInputDTO();
     input.setName("Traffic");
-    input.setDatasetId(datasetId);
-    when(dataSetRepository.findById(datasetId)).thenReturn(Optional.of(dataset));
+    input.setDataSetId(dataSetId);
+    when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
     Dashboard existing = new Dashboard();
     existing.setId(UUID.randomUUID()); // non-null id => update path
     existing.setActive(false);
@@ -72,91 +72,91 @@ class DashboardServiceTest {
   }
 
   @Test
-  void postConvertToEntityThrowsWhenDatasetMissing() {
+  void postConvertToEntityThrowsWhenDataSetMissing() {
     DashboardInputDTO input = new DashboardInputDTO();
     input.setName("Traffic");
-    input.setDatasetId(datasetId);
-    when(dataSetRepository.findById(datasetId)).thenReturn(Optional.empty());
+    input.setDataSetId(dataSetId);
+    when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.postConvertToEntity(new Dashboard(), input))
         .isInstanceOf(ResourceNotFoundException.class);
   }
 
   @Test
-  void findByIdAndDatasetThrowsOnMismatch() {
+  void findByIdAndDataSetThrowsOnMismatch() {
     UUID dashboardId = UUID.randomUUID();
     Dashboard dashboard = new Dashboard();
     dashboard.setId(dashboardId);
-    dashboard.setDataset(dataset);
+    dashboard.setDataSet(dataSet);
     when(dashboardRepository.findById(dashboardId)).thenReturn(Optional.of(dashboard));
 
-    assertThatThrownBy(() -> service.findByIdAndDatasetOrThrow(dashboardId, UUID.randomUUID()))
+    assertThatThrownBy(() -> service.findByIdAndDataSetOrThrow(dashboardId, UUID.randomUUID()))
         .isInstanceOf(ResourceNotFoundException.class);
   }
 
   @Test
-  void findByIdAndDatasetReturnsWhenDatasetMatches() {
+  void findByIdAndDataSetReturnsWhenDataSetMatches() {
     UUID dashboardId = UUID.randomUUID();
     Dashboard dashboard = new Dashboard();
     dashboard.setId(dashboardId);
-    dashboard.setDataset(dataset);
+    dashboard.setDataSet(dataSet);
     when(dashboardRepository.findById(dashboardId)).thenReturn(Optional.of(dashboard));
 
-    assertThat(service.findByIdAndDatasetOrThrow(dashboardId, datasetId)).isSameAs(dashboard);
+    assertThat(service.findByIdAndDataSetOrThrow(dashboardId, dataSetId)).isSameAs(dashboard);
   }
 
   @Test
-  void findByIdAndDatasetThrowsWhenDashboardHasNoDataset() {
+  void findByIdAndDataSetThrowsWhenDashboardHasNoDataSet() {
     UUID dashboardId = UUID.randomUUID();
     Dashboard dashboard = new Dashboard();
-    dashboard.setId(dashboardId); // dataset left null
+    dashboard.setId(dashboardId); // dataSet left null
     when(dashboardRepository.findById(dashboardId)).thenReturn(Optional.of(dashboard));
 
-    assertThatThrownBy(() -> service.findByIdAndDatasetOrThrow(dashboardId, datasetId))
+    assertThatThrownBy(() -> service.findByIdAndDataSetOrThrow(dashboardId, dataSetId))
         .isInstanceOf(ResourceNotFoundException.class);
   }
 
   @Test
-  void preProcessUpdateRejectsRebindingToAnotherDataset() {
+  void preProcessUpdateRejectsRebindingToAnotherDataSet() {
     Dashboard existing = new Dashboard();
     existing.setId(UUID.randomUUID());
-    existing.setDataset(dataset);
+    existing.setDataSet(dataSet);
     DashboardInputDTO input = new DashboardInputDTO();
-    input.setDatasetId(UUID.randomUUID()); // a dataset other than the one the dashboard is bound to
+    input.setDataSetId(UUID.randomUUID()); // a dataSet other than the one the dashboard is bound to
 
     assertThatThrownBy(() -> service.preProcessUpdateInput(input, existing))
         .isInstanceOf(ResourceNotFoundException.class);
   }
 
   @Test
-  void preProcessUpdateAcceptsSameDataset() {
+  void preProcessUpdateAcceptsSameDataSet() {
     Dashboard existing = new Dashboard();
     existing.setId(UUID.randomUUID());
-    existing.setDataset(dataset);
+    existing.setDataSet(dataSet);
     DashboardInputDTO input = new DashboardInputDTO();
-    input.setDatasetId(datasetId); // matches the bound dataset (the controller injects this)
+    input.setDataSetId(dataSetId); // matches the bound dataSet (the controller injects this)
 
     assertThat(service.preProcessUpdateInput(input, existing)).isSameAs(input);
   }
 
   @Test
-  void preSaveRejectsSourceWithForeignMappedDataset() {
+  void preSaveRejectsSourceWithForeignMappedDataSet() {
     Dashboard dashboard = new Dashboard();
-    dashboard.setDataset(dataset);
+    dashboard.setDataSet(dataSet);
     DashboardSource foreign = new DashboardSource();
     foreign.setMappedDatasetId(
-        UUID.randomUUID()); // anchored to a different dataset than the dashboard
+        UUID.randomUUID()); // anchored to a different dataSet than the dashboard
     dashboard.setSources(Set.of(foreign));
 
     assertThatThrownBy(() -> service.preSave(dashboard)).isInstanceOf(InvalidInputException.class);
   }
 
   @Test
-  void preSaveAcceptsSourceMatchingDataset() {
+  void preSaveAcceptsSourceMatchingDataSet() {
     Dashboard dashboard = new Dashboard();
-    dashboard.setDataset(dataset);
+    dashboard.setDataSet(dataSet);
     DashboardSource matching = new DashboardSource();
-    matching.setMappedDatasetId(datasetId);
+    matching.setMappedDatasetId(dataSetId);
     dashboard.setSources(Set.of(matching));
 
     Dashboard result = service.preSave(dashboard);

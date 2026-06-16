@@ -43,11 +43,11 @@ class DashboardBindingPersistenceIntegrationTest extends BaseKeycloakIntegration
     return dataSetRepository.saveAndFlush(ds);
   }
 
-  private Dashboard newDashboard(DataSet dataset) {
+  private Dashboard newDashboard(DataSet dataSet) {
     Dashboard dashboard = new Dashboard();
     dashboard.setExternalDashboardId("dash-" + UUID.randomUUID().toString().substring(0, 8));
     dashboard.setName("Dashboard");
-    dashboard.setDataset(dataset);
+    dashboard.setDataSet(dataSet);
     return dashboard;
   }
 
@@ -71,12 +71,12 @@ class DashboardBindingPersistenceIntegrationTest extends BaseKeycloakIntegration
 
   @Test
   @DisplayName("A dashboard requires a dataset (the FK is mandatory)")
-  void dashboardRequiresDataset() {
+  void dashboardRequiresDataSet() {
     Dashboard dashboard = newDashboard(null);
 
     assertThatThrownBy(() -> dashboardRepository.saveAndFlush(dashboard))
         .isInstanceOf(ConstraintViolationException.class)
-        .hasMessageContaining("dataset");
+        .hasMessageContaining("dataSet");
   }
 
   @Test
@@ -142,8 +142,8 @@ class DashboardBindingPersistenceIntegrationTest extends BaseKeycloakIntegration
   }
 
   @Test
-  @DisplayName("findByDatasetId returns the dashboards of a platform dataset")
-  void findByDatasetIdReturnsDashboards() {
+  @DisplayName("findByDataSetId returns the dashboards of a platform dataset")
+  void findByDataSetIdReturnsDashboards() {
     DataSet dsA = newDataSet();
     DataSet dsB = newDataSet();
     Dashboard a1 = newDashboard(dsA);
@@ -152,7 +152,7 @@ class DashboardBindingPersistenceIntegrationTest extends BaseKeycloakIntegration
     dashboardRepository.saveAllAndFlush(List.of(a1, a2, b1));
     entityManager.clear();
 
-    assertThat(dashboardRepository.findByDatasetId(dsA.getId()))
+    assertThat(dashboardRepository.findByDataSetId(dsA.getId()))
         .extracting(Dashboard::getExternalDashboardId)
         .containsExactlyInAnyOrder(a1.getExternalDashboardId(), a2.getExternalDashboardId());
   }

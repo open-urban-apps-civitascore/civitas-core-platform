@@ -13,8 +13,8 @@ import lombok.EqualsAndHashCode;
 @Schema(description = "Dashboard visualization write payload")
 public final class DashboardInputDTO extends VisualizationInputDTO {
 
-  /** Injected by the controller from the {datasetId} path variable; never read from the body. */
-  @JsonIgnore private UUID datasetId;
+  /** Injected by the controller from the {dataSetId} path variable; never read from the body. */
+  @JsonIgnore private UUID dataSetId;
 
   @Override
   @JsonProperty("visualizationType")

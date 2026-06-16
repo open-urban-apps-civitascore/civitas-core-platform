@@ -13,5 +13,5 @@ public interface DashboardRepository extends BaseRepository<Dashboard, UUID> {
 
   boolean existsByExternalDashboardId(String externalDashboardId);
 
-  List<Dashboard> findByDatasetId(UUID datasetId);
+  List<Dashboard> findByDataSetId(UUID dataSetId);
 }

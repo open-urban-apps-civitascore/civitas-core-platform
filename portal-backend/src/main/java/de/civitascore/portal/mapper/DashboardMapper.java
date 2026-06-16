@@ -17,23 +17,23 @@ import org.mapstruct.ReportingPolicy;
 public interface DashboardMapper
     extends DtoMapper<DashboardInputDTO, DashboardOutputDTO, Dashboard> {
 
-  @Mapping(target = "dataset", ignore = true)
+  @Mapping(target = "dataSet", ignore = true)
   @Mapping(target = "sources", ignore = true)
   @Mapping(target = "active", ignore = true)
   @Mapping(target = "externalDashboardId", ignore = true)
   @Override
   Dashboard toEntity(DashboardInputDTO input);
 
-  @Mapping(target = "datasetId", source = "dataset.id")
+  @Mapping(target = "dataSetId", source = "dataSet.id")
   @Override
   DashboardOutputDTO toOutput(Dashboard entity);
 
-  @Mapping(target = "datasetId", source = "dataset.id")
+  @Mapping(target = "dataSetId", source = "dataSet.id")
   @Override
   DashboardInputDTO toInput(Dashboard entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
-  @Mapping(target = "dataset", ignore = true)
+  @Mapping(target = "dataSet", ignore = true)
   @Mapping(target = "sources", ignore = true)
   @Mapping(target = "active", ignore = true)
   @Mapping(target = "externalDashboardId", ignore = true)

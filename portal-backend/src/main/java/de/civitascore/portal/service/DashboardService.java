@@ -41,12 +41,12 @@ public class DashboardService extends BaseService<Dashboard, DashboardInputDTO> 
   }
 
   /**
-   * Guards the dataset-nested routes: a dashboard reached under a foreign {datasetId} must read as
+   * Guards the dataset-nested routes: a dashboard reached under a foreign {dataSetId} must read as
    * absent, not as someone else's resource.
    */
-  public Dashboard findByIdAndDatasetOrThrow(UUID id, UUID datasetId) {
+  public Dashboard findByIdAndDataSetOrThrow(UUID id, UUID dataSetId) {
     Dashboard dashboard = findByIdOrThrow(id);
-    if (dashboard.getDataset() == null || !datasetId.equals(dashboard.getDataset().getId())) {
+    if (dashboard.getDataSet() == null || !dataSetId.equals(dashboard.getDataSet().getId())) {
       throw new ResourceNotFoundException(getEntityName(), id);
     }
     return dashboard;
@@ -54,14 +54,14 @@ public class DashboardService extends BaseService<Dashboard, DashboardInputDTO> 
 
   @Override
   protected Dashboard postConvertToEntity(Dashboard entity, DashboardInputDTO input) {
-    DataSet dataset =
-        Optional.ofNullable(input.getDatasetId())
+    DataSet dataSet =
+        Optional.ofNullable(input.getDataSetId())
             .flatMap(dataSetRepository::findById)
             .orElseThrow(
                 () ->
                     new ResourceNotFoundException(
-                        DataSet.class.getSimpleName(), input.getDatasetId()));
-    entity.setDataset(dataset);
+                        DataSet.class.getSimpleName(), input.getDataSetId()));
+    entity.setDataSet(dataSet);
     // active is a sync status owned by the engine-sync flow, not a delete marker (CRUD delete
     // removes the row). Seed it only on creation so updates can't reset what the sync flow set.
     if (entity.getId() == null) {
@@ -73,9 +73,9 @@ public class DashboardService extends BaseService<Dashboard, DashboardInputDTO> 
   @Override
   protected DashboardInputDTO preProcessUpdateInput(
       DashboardInputDTO input, Dashboard existingEntity) {
-    if (input.getDatasetId() != null
-        && existingEntity.getDataset() != null
-        && !input.getDatasetId().equals(existingEntity.getDataset().getId())) {
+    if (input.getDataSetId() != null
+        && existingEntity.getDataSet() != null
+        && !input.getDataSetId().equals(existingEntity.getDataSet().getId())) {
       throw new ResourceNotFoundException(getEntityName(), existingEntity.getId());
     }
     return super.preProcessUpdateInput(input, existingEntity);
@@ -89,16 +89,16 @@ public class DashboardService extends BaseService<Dashboard, DashboardInputDTO> 
    */
   @Override
   protected Dashboard preSave(Dashboard entity) {
-    UUID datasetId = entity.getDataset() != null ? entity.getDataset().getId() : null;
+    UUID dataSetId = entity.getDataSet() != null ? entity.getDataSet().getId() : null;
     entity.getSources().stream()
-        .filter(source -> datasetId == null || !datasetId.equals(source.getMappedDatasetId()))
+        .filter(source -> dataSetId == null || !dataSetId.equals(source.getMappedDatasetId()))
         .findFirst()
         .ifPresent(
             source -> {
               throw new InvalidInputException(
                   getEntityName(),
                   "sources",
-                  "every bound source's mappedDatasetId must equal the dashboard's datasetId");
+                  "every bound source's mappedDatasetId must equal the dashboard's dataSetId");
             });
     return super.preSave(entity);
   }

@@ -28,7 +28,7 @@ import org.springframework.web.server.MethodNotAllowedException;
 import tools.jackson.databind.JsonNode;
 
 @RestController
-@RequestMapping("/datasets/{datasetId}/visualizations")
+@RequestMapping("/datasets/{dataSetId}/visualizations")
 @RequiredArgsConstructor
 @Tag(
     name = "Visualizations",
@@ -62,7 +62,7 @@ public class VisualizationController
   @Override
   @Operation(operationId = "getVisualization", summary = "Get visualization by id")
   public ResponseEntity<DashboardOutputDTO> getById(@PathVariable UUID id) {
-    Dashboard dashboard = dashboardService.findByIdAndDatasetOrThrow(id, extractDatasetId());
+    Dashboard dashboard = dashboardService.findByIdAndDataSetOrThrow(id, extractDataSetId());
     return ResponseEntity.ok(dashboardAssembler.toOutput(dashboard));
   }
 
@@ -76,14 +76,14 @@ public class VisualizationController
   @Operation(operationId = "updateVisualization", summary = "Replace a visualization")
   public ResponseEntity<DashboardOutputDTO> update(
       @PathVariable UUID id, @Valid @RequestBody DashboardInputDTO input) {
-    dashboardService.findByIdAndDatasetOrThrow(id, extractDatasetId());
+    dashboardService.findByIdAndDataSetOrThrow(id, extractDataSetId());
     return super.update(id, input);
   }
 
   @Override
   @Operation(operationId = "deleteVisualization", summary = "Delete a visualization")
   public void delete(@PathVariable UUID id) {
-    dashboardService.findByIdAndDatasetOrThrow(id, extractDatasetId());
+    dashboardService.findByIdAndDataSetOrThrow(id, extractDataSetId());
     super.delete(id);
   }
 
@@ -99,11 +99,11 @@ public class VisualizationController
 
   @Override
   protected DashboardInputDTO preProcessInput(DashboardInputDTO input) {
-    input.setDatasetId(extractDatasetId());
+    input.setDataSetId(extractDataSetId());
     return super.preProcessInput(input);
   }
 
-  private UUID extractDatasetId() {
-    return extractUUIDFromPathVariable("datasetId", Dashboard.class);
+  private UUID extractDataSetId() {
+    return extractUUIDFromPathVariable("dataSetId", Dashboard.class);
   }
 }

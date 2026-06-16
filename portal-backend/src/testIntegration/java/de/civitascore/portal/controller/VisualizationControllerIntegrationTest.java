@@ -31,26 +31,26 @@ class VisualizationControllerIntegrationTest
   @Autowired private DashboardRepository dashboardRepository;
   @Autowired private DataSetRepository dataSetRepository;
 
-  private UUID datasetId;
+  private UUID dataSetId;
 
   private void ensurePrerequisites() {
-    if (datasetId == null || dataSetRepository.findById(datasetId).isEmpty()) {
+    if (dataSetId == null || dataSetRepository.findById(dataSetId).isEmpty()) {
       DataSet ds = portalData.dataSet();
-      datasetId = ds.getId();
+      dataSetId = ds.getId();
     }
   }
 
   @Override
   protected String getEndpointPath() {
     ensurePrerequisites();
-    return "/datasets/" + datasetId + "/visualizations";
+    return "/datasets/" + dataSetId + "/visualizations";
   }
 
   @Override
   protected void performAdditionalCleanup() {
     dashboardRepository.deleteAll();
     portalData.cleanAll();
-    datasetId = null;
+    dataSetId = null;
   }
 
   @Override
@@ -119,15 +119,15 @@ class VisualizationControllerIntegrationTest
   // ── Dashboard-specific tests ───────────────────────────────────────────────
 
   @Test
-  @DisplayName("Create sets datasetId, active=true and visualizationType=DASHBOARD")
-  void createReturnsDiscriminatorDatasetAndActive() {
+  @DisplayName("Create sets dataSetId, active=true and visualizationType=DASHBOARD")
+  void createReturnsDiscriminatorDataSetAndActive() {
     ensurePrerequisites();
     ResponseEntity<DashboardOutputDTO> response = performCreate(createValidInput());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     DashboardOutputDTO body = response.getBody();
     assertThat(body).isNotNull();
-    assertThat(body.getDatasetId()).isEqualTo(datasetId);
+    assertThat(body.getDataSetId()).isEqualTo(dataSetId);
     assertThat(body.isActive()).isTrue();
     assertThat(body.getVisualizationType()).isEqualTo(VisualizationType.DASHBOARD);
   }
@@ -146,14 +146,14 @@ class VisualizationControllerIntegrationTest
   }
 
   @Test
-  @DisplayName("GET /{id} under a foreign datasetId returns 404")
-  void getByIdWithForeignDatasetReturns404() {
+  @DisplayName("GET /{id} under a foreign dataSetId returns 404")
+  void getByIdWithForeignDataSetReturns404() {
     UUID id = createTestEntity();
-    UUID foreignDatasetId = UUID.randomUUID();
+    UUID foreignDataSetId = UUID.randomUUID();
 
     ResponseEntity<ProblemDetail> response =
         exchangeForProblem(
-            "/datasets/" + foreignDatasetId + "/visualizations/" + id,
+            "/datasets/" + foreignDataSetId + "/visualizations/" + id,
             HttpMethod.GET,
             createAuthHeaders(),
             null);
@@ -178,14 +178,14 @@ class VisualizationControllerIntegrationTest
   }
 
   @Test
-  @DisplayName("GET collection under a foreign datasetId returns an empty page (spec filter)")
-  void listUnderForeignDatasetReturnsEmpty() {
-    createTestEntity(); // belongs to this.datasetId, not the foreign one queried below
+  @DisplayName("GET collection under a foreign dataSetId returns an empty page (spec filter)")
+  void listUnderForeignDataSetReturnsEmpty() {
+    createTestEntity(); // belongs to this.dataSetId, not the foreign one queried below
 
-    UUID foreignDatasetId = UUID.randomUUID();
+    UUID foreignDataSetId = UUID.randomUUID();
     ResponseEntity<RestPage<DashboardOutputDTO>> response =
         exchange(
-            buildUri("/datasets/" + foreignDatasetId + "/visualizations", Map.of()),
+            buildUri("/datasets/" + foreignDataSetId + "/visualizations", Map.of()),
             HttpMethod.GET,
             createAuthHeaders(),
             getPageTypeReference());
@@ -216,14 +216,14 @@ class VisualizationControllerIntegrationTest
   }
 
   @Test
-  @DisplayName("PUT under a foreign datasetId returns 404 and does not mutate the dashboard")
-  void updateUnderForeignDatasetReturns404() {
+  @DisplayName("PUT under a foreign dataSetId returns 404 and does not mutate the dashboard")
+  void updateUnderForeignDataSetReturns404() {
     UUID id = createTestEntity();
-    UUID foreignDatasetId = UUID.randomUUID();
+    UUID foreignDataSetId = UUID.randomUUID();
 
     ResponseEntity<ProblemDetail> response =
         exchangeForProblem(
-            "/datasets/" + foreignDatasetId + "/visualizations/" + id,
+            "/datasets/" + foreignDataSetId + "/visualizations/" + id,
             HttpMethod.PUT,
             createAuthHeaders(),
             createUpdateInput());
@@ -234,14 +234,14 @@ class VisualizationControllerIntegrationTest
   }
 
   @Test
-  @DisplayName("DELETE under a foreign datasetId returns 404 and leaves the row in place")
-  void deleteUnderForeignDatasetReturns404() {
+  @DisplayName("DELETE under a foreign dataSetId returns 404 and leaves the row in place")
+  void deleteUnderForeignDataSetReturns404() {
     UUID id = createTestEntity();
-    UUID foreignDatasetId = UUID.randomUUID();
+    UUID foreignDataSetId = UUID.randomUUID();
 
     ResponseEntity<ProblemDetail> response =
         exchangeForProblem(
-            "/datasets/" + foreignDatasetId + "/visualizations/" + id,
+            "/datasets/" + foreignDataSetId + "/visualizations/" + id,
             HttpMethod.DELETE,
             createAuthHeaders(),
             null);

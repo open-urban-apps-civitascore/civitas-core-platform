@@ -13,7 +13,7 @@ import lombok.EqualsAndHashCode;
 public final class DashboardOutputDTO extends VisualizationOutputDTO {
 
   @Schema(description = "UUID of the platform DataSet this dashboard belongs to (1:N)")
-  private UUID datasetId;
+  private UUID dataSetId;
 
   @Schema(description = "Object id in the dashboard engine; null until the engine confirms it")
   private String externalDashboardId;

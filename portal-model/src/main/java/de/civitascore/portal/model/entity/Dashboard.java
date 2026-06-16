@@ -34,7 +34,7 @@ public class Dashboard extends NamedEntity {
 
   @NotNull @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "dataset_id", nullable = false)
-  private DataSet dataset;
+  private DataSet dataSet;
 
   /**
    * Null until the engine has materialised the dashboard: the platform creates the row first, and

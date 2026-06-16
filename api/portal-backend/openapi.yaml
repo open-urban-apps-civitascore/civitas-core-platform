@@ -2690,7 +2690,7 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /datasets/{datasetId}/visualizations/{id}:
+  /datasets/{dataSetId}/visualizations/{id}:
     get:
       tags:
       - Visualizations
@@ -2703,7 +2703,7 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: datasetId
+      - name: dataSetId
         in: path
         required: true
         schema:
@@ -2729,7 +2729,7 @@ paths:
                     title: Not Found
                     status: 404
                     detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -2748,7 +2748,7 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: datasetId
+      - name: dataSetId
         in: path
         required: true
         schema:
@@ -2780,7 +2780,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: "Validation failed: name must not be blank"
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
                 validation_failed:
                   summary: validation_failed
                   value:
@@ -2788,7 +2788,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: Request body validation failed
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
                 malformed_request:
                   summary: malformed_request
                   value:
@@ -2796,7 +2796,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: Failed to read request body
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
         "404":
           description: Visualization not found
           content:
@@ -2811,7 +2811,7 @@ paths:
                     title: Not Found
                     status: 404
                     detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
         "409":
           description: Conflict (e.g. unique constraint violation)
           content:
@@ -2826,7 +2826,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: A resource with this name already exists
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
                 resource_in_use:
                   summary: resource_in_use
                   value:
@@ -2834,7 +2834,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: "Cannot delete: resource is referenced by other entities"
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
                 foreign_key_violation:
                   summary: foreign_key_violation
                   value:
@@ -2842,7 +2842,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: Referenced entity does not exist
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -2861,7 +2861,7 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: datasetId
+      - name: dataSetId
         in: path
         required: true
         schema:
@@ -2883,7 +2883,7 @@ paths:
                     title: Not Found
                     status: 404
                     detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
         "409":
           description: Conflict (visualization still in use)
           content:
@@ -2898,7 +2898,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: A resource with this name already exists
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
                 resource_in_use:
                   summary: resource_in_use
                   value:
@@ -2906,7 +2906,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: "Cannot delete: resource is referenced by other entities"
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
                 foreign_key_violation:
                   summary: foreign_key_violation
                   value:
@@ -2914,7 +2914,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: Referenced entity does not exist
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -2935,7 +2935,7 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: datasetId
+      - name: dataSetId
         in: path
         required: true
         schema:
@@ -2967,7 +2967,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: "Validation failed: name must not be blank"
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
                 validation_failed:
                   summary: validation_failed
                   value:
@@ -2975,7 +2975,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: Request body validation failed
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
                 malformed_request:
                   summary: malformed_request
                   value:
@@ -2983,7 +2983,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: Failed to read request body
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
         "404":
           description: Visualization not found
           content:
@@ -2998,7 +2998,7 @@ paths:
                     title: Not Found
                     status: 404
                     detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
         "409":
           description: Conflict (e.g. unique constraint violation)
           content:
@@ -3013,7 +3013,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: A resource with this name already exists
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
                 resource_in_use:
                   summary: resource_in_use
                   value:
@@ -3021,7 +3021,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: "Cannot delete: resource is referenced by other entities"
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
                 foreign_key_violation:
                   summary: foreign_key_violation
                   value:
@@ -3029,7 +3029,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: Referenced entity does not exist
-                    instance: "/datasets/{datasetId}/visualizations/{id}"
+                    instance: "/datasets/{dataSetId}/visualizations/{id}"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -5829,7 +5829,7 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /datasets/{datasetId}/visualizations:
+  /datasets/{dataSetId}/visualizations:
     get:
       tags:
       - Visualizations
@@ -5902,7 +5902,7 @@ paths:
           type: string
           format: date-time
           example: 2024-12-31T23:59:59Z
-      - name: datasetId
+      - name: dataSetId
         in: path
         required: true
         schema:
@@ -5926,7 +5926,7 @@ paths:
       summary: Create a visualization
       operationId: createVisualization
       parameters:
-      - name: datasetId
+      - name: dataSetId
         in: path
         required: true
         schema:
@@ -5958,7 +5958,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: "Validation failed: name must not be blank"
-                    instance: "/datasets/{datasetId}/visualizations"
+                    instance: "/datasets/{dataSetId}/visualizations"
                 validation_failed:
                   summary: validation_failed
                   value:
@@ -5966,7 +5966,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: Request body validation failed
-                    instance: "/datasets/{datasetId}/visualizations"
+                    instance: "/datasets/{dataSetId}/visualizations"
                 malformed_request:
                   summary: malformed_request
                   value:
@@ -5974,7 +5974,7 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: Failed to read request body
-                    instance: "/datasets/{datasetId}/visualizations"
+                    instance: "/datasets/{dataSetId}/visualizations"
         "409":
           description: Conflict (e.g. unique constraint violation)
           content:
@@ -5989,7 +5989,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: A resource with this name already exists
-                    instance: "/datasets/{datasetId}/visualizations"
+                    instance: "/datasets/{dataSetId}/visualizations"
                 resource_in_use:
                   summary: resource_in_use
                   value:
@@ -5997,7 +5997,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: "Cannot delete: resource is referenced by other entities"
-                    instance: "/datasets/{datasetId}/visualizations"
+                    instance: "/datasets/{dataSetId}/visualizations"
                 foreign_key_violation:
                   summary: foreign_key_violation
                   value:
@@ -6005,7 +6005,7 @@ paths:
                     title: Conflict
                     status: 409
                     detail: Referenced entity does not exist
-                    instance: "/datasets/{datasetId}/visualizations"
+                    instance: "/datasets/{dataSetId}/visualizations"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -8404,7 +8404,7 @@ components:
         description:
           type: string
           description: Optional human-readable description
-        datasetId:
+        dataSetId:
           type: string
           format: uuid
           description: UUID of the platform DataSet this dashboard belongs to (1:N)
@@ -8771,12 +8771,12 @@ components:
     PageUserOutputDTO:
       type: object
       properties:
-        totalElements:
-          type: integer
-          format: int64
         totalPages:
           type: integer
           format: int32
+        totalElements:
+          type: integer
+          format: int64
         size:
           type: integer
           format: int32
@@ -8787,10 +8787,10 @@ components:
         number:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -8806,6 +8806,8 @@ components:
         offset:
           type: integer
           format: int64
+        sort:
+          $ref: "#/components/schemas/SortObject"
         paged:
           type: boolean
         pageNumber:
@@ -8814,8 +8816,6 @@ components:
         pageSize:
           type: integer
           format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
         unpaged:
           type: boolean
     SortObject:
@@ -8891,12 +8891,12 @@ components:
     PageRoleOutputDTO:
       type: object
       properties:
-        totalElements:
-          type: integer
-          format: int64
         totalPages:
           type: integer
           format: int32
+        totalElements:
+          type: integer
+          format: int64
         size:
           type: integer
           format: int32
@@ -8907,10 +8907,10 @@ components:
         number:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -8971,12 +8971,12 @@ components:
     PageGroupOutputDTO:
       type: object
       properties:
-        totalElements:
-          type: integer
-          format: int64
         totalPages:
           type: integer
           format: int32
+        totalElements:
+          type: integer
+          format: int64
         size:
           type: integer
           format: int32
@@ -8987,10 +8987,10 @@ components:
         number:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9003,12 +9003,12 @@ components:
     PageDataStructureOutputDTO:
       type: object
       properties:
-        totalElements:
-          type: integer
-          format: int64
         totalPages:
           type: integer
           format: int32
+        totalElements:
+          type: integer
+          format: int64
         size:
           type: integer
           format: int32
@@ -9019,10 +9019,10 @@ components:
         number:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9035,12 +9035,12 @@ components:
     PageDataSourceOutputDTO:
       type: object
       properties:
-        totalElements:
-          type: integer
-          format: int64
         totalPages:
           type: integer
           format: int32
+        totalElements:
+          type: integer
+          format: int64
         size:
           type: integer
           format: int32
@@ -9051,10 +9051,10 @@ components:
         number:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9067,12 +9067,12 @@ components:
     PageDataSetOutputDTO:
       type: object
       properties:
-        totalElements:
-          type: integer
-          format: int64
         totalPages:
           type: integer
           format: int32
+        totalElements:
+          type: integer
+          format: int64
         size:
           type: integer
           format: int32
@@ -9083,10 +9083,10 @@ components:
         number:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9099,12 +9099,12 @@ components:
     PageDashboardOutputDTO:
       type: object
       properties:
-        totalElements:
-          type: integer
-          format: int64
         totalPages:
           type: integer
           format: int32
+        totalElements:
+          type: integer
+          format: int64
         size:
           type: integer
           format: int32
@@ -9115,10 +9115,10 @@ components:
         number:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9131,12 +9131,12 @@ components:
     PageStyleOutputDTO:
       type: object
       properties:
-        totalElements:
-          type: integer
-          format: int64
         totalPages:
           type: integer
           format: int32
+        totalElements:
+          type: integer
+          format: int64
         size:
           type: integer
           format: int32
@@ -9147,10 +9147,10 @@ components:
         number:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9163,12 +9163,12 @@ components:
     PagePipelineOutputDTO:
       type: object
       properties:
-        totalElements:
-          type: integer
-          format: int64
         totalPages:
           type: integer
           format: int32
+        totalElements:
+          type: integer
+          format: int64
         size:
           type: integer
           format: int32
@@ -9179,10 +9179,10 @@ components:
         number:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9195,12 +9195,12 @@ components:
     PageLayerOutputDTO:
       type: object
       properties:
-        totalElements:
-          type: integer
-          format: int64
         totalPages:
           type: integer
           format: int32
+        totalElements:
+          type: integer
+          format: int64
         size:
           type: integer
           format: int32
@@ -9211,10 +9211,10 @@ components:
         number:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9227,12 +9227,12 @@ components:
     PageDataSinkOutputDTO:
       type: object
       properties:
-        totalElements:
-          type: integer
-          format: int64
         totalPages:
           type: integer
           format: int32
+        totalElements:
+          type: integer
+          format: int64
         size:
           type: integer
           format: int32
@@ -9243,10 +9243,10 @@ components:
         number:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9259,12 +9259,12 @@ components:
     PageAssignmentOutputDTO:
       type: object
       properties:
-        totalElements:
-          type: integer
-          format: int64
         totalPages:
           type: integer
           format: int32
+        totalElements:
+          type: integer
+          format: int64
         size:
           type: integer
           format: int32
@@ -9275,10 +9275,10 @@ components:
         number:
           type: integer
           format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9637,6 +9637,6 @@ components:
       description: Keycloak OAuth2 Authorization Code with PKCE
       flows:
         authorizationCode:
-          authorizationUrl: http://localhost:8080/realms/civitas-core/protocol/openid-connect/auth
-          tokenUrl: http://localhost:8080/realms/civitas-core/protocol/openid-connect/token
+          authorizationUrl: http://civitas-keycloak:8080/realms/civitas-core/protocol/openid-connect/auth
+          tokenUrl: http://civitas-keycloak:8080/realms/civitas-core/protocol/openid-connect/token
           scopes: {}

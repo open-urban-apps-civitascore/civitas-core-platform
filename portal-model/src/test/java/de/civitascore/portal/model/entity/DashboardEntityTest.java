@@ -17,20 +17,20 @@ class DashboardEntityTest {
     @Test
     @DisplayName("Holds the dashboard-specific fields, the dataset reference, and bound sources")
     void shouldHoldAllFields() {
-      DataSet dataset = new DataSet();
-      dataset.setId(UUID.randomUUID());
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
       DashboardSource source = new DashboardSource();
       source.setId(UUID.randomUUID());
 
       Dashboard dashboard = new Dashboard();
       dashboard.setExternalDashboardId("dash-42");
       dashboard.setActive(false);
-      dashboard.setDataset(dataset);
+      dashboard.setDataSet(dataSet);
       dashboard.getSources().add(source);
 
       assertThat(dashboard.getExternalDashboardId()).isEqualTo("dash-42");
       assertThat(dashboard.isActive()).isFalse();
-      assertThat(dashboard.getDataset()).isSameAs(dataset);
+      assertThat(dashboard.getDataSet()).isSameAs(dataSet);
       assertThat(dashboard.getSources()).containsExactly(source);
     }
   }
