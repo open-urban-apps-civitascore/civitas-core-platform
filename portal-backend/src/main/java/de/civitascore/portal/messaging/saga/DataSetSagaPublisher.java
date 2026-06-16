@@ -5,11 +5,14 @@ import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.model.dataset.NamedApi;
 import de.civitascore.portal.configuration.SagaProperties;
 import de.civitascore.portal.model.datasink.PostgisConfiguration;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.PipelineAction;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
+import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.saga.DataSinkPayload;
+import de.civitascore.portal.model.saga.LayerPayload;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.service.DataStructureVersionService;
@@ -78,6 +81,7 @@ public class DataSetSagaPublisher {
             dataset.getOpenDataAccess(),
             buildDatasources(dataset),
             buildDatasinks(dataset),
+            buildLayers(dataset),
             buildPipelines(dataset.getPipelines(), PipelineAction.ADD),
             buildNamedApis(dataset));
     sendTrigger(trigger);
@@ -101,6 +105,7 @@ public class DataSetSagaPublisher {
             dataset.getPipelineIds(),
             buildDatasources(dataset),
             buildDatasinks(dataset),
+            buildLayers(dataset),
             buildPipelineDiff(previousPipelines, dataset.getPipelines()),
             buildNamedApis(dataset));
     sendTrigger(trigger);
@@ -159,6 +164,40 @@ public class DataSetSagaPublisher {
         sink.getDataSinkType() != null ? sink.getDataSinkType().name() : null,
         sink.getConfiguration(),
         resolveDataStructure(sink));
+  }
+
+  /**
+   * All WFS/WMS layers attached to the dataset, mapped to the payload shape. Returns {@code null}
+   * when the dataset has no layers so {@code @JsonInclude(NON_NULL)} drops the field — keeps {@code
+   * hasLayers=false} on the consumer side when no layers are configured.
+   */
+  private List<LayerPayload> buildLayers(DataSet dataset) {
+    if (dataset.getLayers() == null || dataset.getLayers().isEmpty()) {
+      return null;
+    }
+    return dataset.getLayers().stream().map(this::toLayerPayload).toList();
+  }
+
+  private LayerPayload toLayerPayload(Layer layer) {
+    return new LayerPayload(
+        layer.getId().toString(), layer.getLayerName(), resolveNativeName(layer), layer.getCrs());
+  }
+
+  /**
+   * Resolves the PostGIS table name for a layer attached to a POSTGIS sink. Returns {@code null}
+   * for layers on non-POSTGIS sinks; the adapter then falls back to the sole POSTGIS table on the
+   * dataset or to the layer name.
+   */
+  private String resolveNativeName(Layer layer) {
+    DataSink sink = layer.getDataSink();
+    if (sink == null
+        || sink.getDataSinkType() != DataSinkType.POSTGIS
+        || sink.getConfiguration() == null) {
+      return null;
+    }
+    return objectMapper
+        .convertValue(sink.getConfiguration(), PostgisConfiguration.class)
+        .getTableName();
   }
 
   /**

@@ -13,6 +13,7 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.repository.DataSinkRepository;
@@ -266,6 +267,139 @@ class DataSetSagaPublisherTest {
       assertThat(ds.get("type").asString()).isEqualTo("POSTGIS");
       assertThat(ds.get("configuration").get("tableName").asString())
           .isEqualTo("sensor_observations");
+    }
+  }
+
+  @Nested
+  @DisplayName("buildLayers() native-name resolution")
+  class BuildLayersTests {
+
+    private DataSink postgisSink(UUID id, String tableName) {
+      DataSink sink = new DataSink();
+      sink.setId(id);
+      sink.setDataSinkType(DataSinkType.POSTGIS);
+      Map<String, Object> cfg = new HashMap<>();
+      cfg.put("tableName", tableName);
+      sink.setConfiguration(cfg);
+      return sink;
+    }
+
+    private DataSink frostSink(UUID id) {
+      DataSink sink = new DataSink();
+      sink.setId(id);
+      sink.setDataSinkType(DataSinkType.FROST);
+      return sink;
+    }
+
+    private Layer layer(UUID id, String layerName, String crs, DataSink sink) {
+      Layer layer = new Layer();
+      layer.setId(id);
+      layer.setLayerName(layerName);
+      layer.setCrs(crs);
+      layer.setDataSink(sink);
+      return layer;
+    }
+
+    private ArgumentCaptor<String> stubKafkaSend() {
+      ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
+      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
+          .thenReturn(
+              CompletableFuture.completedFuture(
+                  new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
+      return jsonCaptor;
+    }
+
+    @Test
+    @DisplayName("CREATE trigger carries a layer with nativeName from its POSTGIS sink's tableName")
+    void createTriggerCarriesLayerWithPostgisTableName() throws Exception {
+      UUID sinkId = UUID.randomUUID();
+      UUID layerId = UUID.randomUUID();
+      DataSink sink = postgisSink(sinkId, "my_table");
+      Layer l = layer(layerId, "layer1", "EPSG:4326", sink);
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setLayers(Set.of(l));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var layers = payload.get("layers");
+      assertThat(layers).as("layers must be present in CREATE trigger").isNotNull();
+      assertThat(layers.size()).isEqualTo(1);
+      var entry = layers.get(0);
+      assertThat(entry.get("id").asString()).isEqualTo(layerId.toString());
+      assertThat(entry.get("layerName").asString()).isEqualTo("layer1");
+      assertThat(entry.get("nativeName").asString()).isEqualTo("my_table");
+      assertThat(entry.get("crs").asString()).isEqualTo("EPSG:4326");
+    }
+
+    @Test
+    @DisplayName("Layer on a non-POSTGIS sink carries a null nativeName (adapter falls back)")
+    void layerOnNonPostgisSinkHasNullNativeName() throws Exception {
+      DataSink sink = frostSink(UUID.randomUUID());
+      Layer l = layer(UUID.randomUUID(), "frost-layer", null, sink);
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setLayers(Set.of(l));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var entry = payload.get("layers").get(0);
+      assertThat(entry.get("layerName").asString()).isEqualTo("frost-layer");
+      assertThat(entry.get("nativeName").isNull())
+          .as("non-POSTGIS sink → null nativeName for adapter fallback")
+          .isTrue();
+    }
+
+    @Test
+    @DisplayName("Empty layers is omitted from the trigger JSON (NON_NULL)")
+    void emptyLayersOmitted() throws Exception {
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.has("layers"))
+          .as("empty layers should be omitted from the JSON via @JsonInclude(NON_NULL)")
+          .isFalse();
+    }
+
+    @Test
+    @DisplayName("UPDATE trigger also carries layers")
+    void updateTriggerCarriesLayers() throws Exception {
+      DataSink sink = postgisSink(UUID.randomUUID(), "events");
+      Layer l = layer(UUID.randomUUID(), "events-layer", "EPSG:3857", sink);
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setProjectId("proj-1");
+      dataSet.setServiceId("svc-1");
+      dataSet.setPipelines(Set.of());
+      dataSet.setLayers(Set.of(l));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishUpdateRequested(dataSet, Set.of());
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var layers = payload.get("layers");
+      assertThat(layers).isNotNull();
+      assertThat(layers.size()).isEqualTo(1);
+      assertThat(layers.get(0).get("nativeName").asString()).isEqualTo("events");
     }
   }
 
