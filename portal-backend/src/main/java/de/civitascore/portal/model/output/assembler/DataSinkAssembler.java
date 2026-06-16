@@ -41,13 +41,12 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
   }
 
   /**
-   * {@inheritDoc} Resolves the type-specific {@code configuration} object from the raw JSONB map.
+   * {@inheritDoc} Resolves the type-specific {@code configuration} object from the raw JSONB map
+   * and the derived {@code inUse} flag.
    */
   @Override
   public DataSinkOutputDTO enrichDto(DataSinkOutputDTO dto, DataSink entity) {
-    if (entity.getPipeline() != null && entity.getPipeline().getDataSet() != null) {
-      dto.setDataSetId(entity.getPipeline().getDataSet().getId());
-    }
+    dto.setInUse(entity.getPipeline() != null);
 
     if (entity.getDataSinkType() == null) {
       return dto;

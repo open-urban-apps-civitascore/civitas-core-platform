@@ -6,9 +6,7 @@ import static org.mockito.Mockito.when;
 import de.civitascore.portal.mapper.PipelineMapper;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.Pipeline;
-import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.PipelineInputDTO;
-import de.civitascore.portal.model.output.DataSinkOutputDTO;
 import de.civitascore.portal.model.output.PipelineOutputDTO;
 import de.civitascore.portal.repository.DataSinkRepository;
 import java.util.List;
@@ -25,48 +23,47 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class PipelineAssemblerTest {
 
   @Mock private PipelineMapper pipelineMapper;
-  @Mock private DataSinkAssembler dataSinkAssembler;
   @Mock private DataSinkRepository dataSinkRepository;
 
   @InjectMocks private PipelineAssembler assembler;
 
+  private DataSink sinkWithId(UUID id) {
+    DataSink sink = new DataSink();
+    sink.setId(id);
+    return sink;
+  }
+
   @Test
-  @DisplayName("enrichDto populates dataSinks from repository")
-  void enrichDto_populatesDataSinksFromRepository() {
+  @DisplayName("enrichDto populates dataSinkIds from repository")
+  void enrichDto_populatesDataSinkIdsFromRepository() {
     UUID pipelineId = UUID.randomUUID();
+    UUID sinkId = UUID.randomUUID();
     Pipeline pipeline = new Pipeline();
     pipeline.setId(pipelineId);
 
-    DataSink sink = new DataSink();
-    DataSinkOutputDTO sinkDto = new DataSinkOutputDTO();
-
-    when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of(sink));
-    when(dataSinkAssembler.toOutput(sink)).thenReturn(sinkDto);
+    when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of(sinkWithId(sinkId)));
 
     PipelineOutputDTO dto = new PipelineOutputDTO();
     PipelineOutputDTO result = assembler.enrichDto(dto, pipeline);
 
-    assertThat(result.getDataSinks()).containsExactly(sinkDto);
+    assertThat(result.getDataSinkIds()).containsExactly(sinkId);
   }
 
   @Test
-  @DisplayName("toInput includes DataSink inputs from repository")
-  void toInput_includesDataSinkInputs() {
+  @DisplayName("toInput populates dataSinkIds from repository")
+  void toInput_populatesDataSinkIds() {
     UUID pipelineId = UUID.randomUUID();
+    UUID sinkId = UUID.randomUUID();
     Pipeline pipeline = new Pipeline();
     pipeline.setId(pipelineId);
-
-    DataSink sink = new DataSink();
-    DataSinkInputDTO sinkInput = new DataSinkInputDTO();
 
     PipelineInputDTO pipelineInput = new PipelineInputDTO();
 
     when(pipelineMapper.toInput(pipeline)).thenReturn(pipelineInput);
-    when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of(sink));
-    when(dataSinkAssembler.<DataSinkInputDTO>toInput(sink)).thenReturn(sinkInput);
+    when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of(sinkWithId(sinkId)));
 
     PipelineInputDTO result = assembler.toInput(pipeline);
 
-    assertThat(result.getDataSinks()).containsExactly(sinkInput);
+    assertThat(result.getDataSinkIds()).containsExactly(sinkId);
   }
 }
