@@ -32,8 +32,8 @@ export const useCreateDataSink = () => {
         data,
         errorMessage: 'An error occurred while creating the datasink.',
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [key] })
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: [key, variables.datasetId] })
     },
   })
 }
@@ -48,8 +48,8 @@ export const useDeleteDataSink = () => {
         headers: { 'x-api-request': 'true' },
         errorMessage: 'An error occurred while deleting the datasink.',
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [key] })
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: [key, variables.datasetId] })
     },
   })
 }
@@ -65,8 +65,8 @@ export const useUpdateDataSink = () => {
         data,
         errorMessage: 'An error occurred while updating the datasink.',
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [key] })
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: [key, variables.datasetId] })
     },
   })
 }

@@ -145,7 +145,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   // Pipeline can be saved when: isDirty && validation passed (no errors) && validation has been run
   const canSave = useMemo(() => {
     const isDirty = activeSession?.isDirty || false
-    const hasErrors = validationResult?.errors?.length ?? 0 > 0
+    const hasErrors = (validationResult?.errors?.length ?? 0) > 0
     return isDirty && !isValidationRequired && !hasErrors
   }, [activeSession?.isDirty, validationResult?.errors?.length, isValidationRequired])
 
