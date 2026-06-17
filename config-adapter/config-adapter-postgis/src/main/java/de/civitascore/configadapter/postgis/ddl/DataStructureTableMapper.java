@@ -142,9 +142,9 @@ public final class DataStructureTableMapper {
 
   /**
    * Geometry type when the ref points at a GeoJSON geometry schema ({@code
-   * https://geojson.org/schema/<Type>.json}), else null. Only GeoJSON-host refs are geometry; a
-   * local {@code $ref} to a named type (e.g. {@code #/$defs/Point}) stays a nested object so a
-   * class merely named "Point" is not misread as a geometry column.
+   * https://geojson.org/schema/<Type>.json}), else null. Only GeoJSON refs are geometry; a local
+   * {@code $ref} to a named type (e.g. {@code #/$defs/Point}) stays a nested object so a class
+   * merely named "Point" is not misread as a geometry column.
    */
   private static GeometryType geometryType(String ref) {
     if (ref == null) {

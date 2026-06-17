@@ -54,25 +54,21 @@ class GeoDataSetSagaIntegrationTest extends AbstractSagaIntegrationTest {
   private static final String MODEL_ATLAS_URI = "http://test/geoprobe/1.0.0";
 
   /**
-   * Flat schema with a geometry reference — the form Model Atlas serves once it recurses
-   * sub-packages and resolves the geometry type package; the geometry property references its
-   * inlined type definition.
+   * Flat schema the editor produces: root properties, with the geometry property referencing the
+   * GeoJSON schema for its type.
    */
   private static final String FLAT_SCHEMA =
       """
       { "$id": "http://test/geoprobe/1.0.0",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "GeoProbe",
-        "definitions": {
-          "Point": { "type": "object" },
-          "Observation": {
-            "type": "object",
-            "properties": {
-              "station_id": { "type": "string" },
-              "temperature": { "type": "string" },
-              "location": { "$ref": "#/definitions/Point" }
-            },
-            "required": ["station_id", "temperature", "location"]
-          } } }
+        "type": "object",
+        "properties": {
+          "station_id": { "type": "string" },
+          "temperature": { "type": "string" },
+          "location": { "$ref": "https://geojson.org/schema/Point.json" }
+        },
+        "required": ["station_id", "temperature", "location"] }
       """;
 
   /** Sink + Flowable database — host-reachable, unlike the network-internal FROST PostGIS. */
