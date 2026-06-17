@@ -50,7 +50,7 @@ class DatasetDeleteBpmnTest {
     geoserverHandler = mock(SagaCommandHandler.class);
     when(frostHandler.adapter()).thenReturn("frost");
     when(apisixHandler.adapter()).thenReturn("apisix");
-    when(redpandaHandler.adapter()).thenReturn("redpanda");
+    when(redpandaHandler.adapter()).thenReturn("nifi");
     when(geoserverHandler.adapter()).thenReturn("geoserver");
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();

@@ -110,7 +110,7 @@ final class DatasetProvisioningSagaTemplate {
         saga.exclusiveGateway(ProcessBuilderUtils.PIPELINE_GATEWAY_ID, "Has Pipelines?");
     SagaStepRef redpanda =
         saga.sagaStep(
-            v.pipelinesStepId(), v.pipelinesDisplayName(), "redpanda", v.pipelinesForwardOp());
+            v.pipelinesStepId(), v.pipelinesDisplayName(), "nifi", v.pipelinesForwardOp());
 
     // GeoServer branch — fine-grained for Create, a single step for Update.
     List<SagaStepRef> geoSteps = new ArrayList<>();

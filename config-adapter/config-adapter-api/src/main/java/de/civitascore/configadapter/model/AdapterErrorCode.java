@@ -61,14 +61,15 @@ public enum AdapterErrorCode {
 
   FROST_ENTITY_ERROR(3201, false, "FROST entity error: %s", "Entity operation failed"),
 
-  REDPANDA_ERROR(3301, true, "RedPanda Connect error: %s", "Pipeline service error"),
-  REDPANDA_PIPELINE_ERROR(3302, false, "RedPanda pipeline error: %s", "Pipeline operation failed"),
-  REDPANDA_DECRYPTION_ERROR(
-      3303, false, "Credential decryption error: %s", "Credential processing failed"),
-
   GEOSERVER_ERROR(3401, true, "GeoServer error: %s", "Geo service error"),
   GEOSERVER_RESOURCE_ERROR(
       3402, false, "GeoServer resource error: %s", "Geo resource operation failed"),
+
+  NIFI_ERROR(3501, true, "NiFi error: %s", "Pipeline service error"),
+  NIFI_FLOW_ERROR(3502, false, "NiFi flow error: %s", "Pipeline operation failed"),
+  NIFI_TEMPLATE_ERROR(
+      3503, false, "No curated NiFi template for %s", "Unsupported pipeline combination"),
+  NIFI_MAPPING_ERROR(3504, false, "NiFi mapping compile error: %s", "Pipeline mapping invalid"),
 
   // 9xxx: Unknown/unexpected errors
   UNKNOWN_ERROR(9001, false, "Unexpected error: %s", "Internal error"),

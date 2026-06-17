@@ -20,7 +20,7 @@ import java.util.List;
  * @param name human-readable dataset name
  * @param openDataAccess whether the dataset is publicly accessible
  * @param datasources external data source connections
- * @param datapipelines Redpanda Connect pipeline definitions
+ * @param datapipelines engine-neutral pipeline graphs
  * @param namedApis named API endpoints exposed by this dataset (per concepts #1379 and #1383); one
  *     APISIX route per entry
  */

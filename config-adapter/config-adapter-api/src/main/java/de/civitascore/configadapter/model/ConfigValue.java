@@ -24,7 +24,6 @@ import de.civitascore.configadapter.model.idm.GroupConfig;
 import de.civitascore.configadapter.model.idm.RealmConfig;
 import de.civitascore.configadapter.model.idm.RoleConfig;
 import de.civitascore.configadapter.model.idm.UserConfig;
-import de.civitascore.configadapter.model.redpanda.PipelineConfigValue;
 
 /**
  * Base interface for typed configuration values. Each adapter domain (IDM, APISIX, etc.) provides
@@ -53,7 +52,6 @@ import de.civitascore.configadapter.model.redpanda.PipelineConfigValue;
   @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-observedproperty"),
   @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-datastream"),
   @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-project"),
-  @JsonSubTypes.Type(value = PipelineConfigValue.class, name = "redpanda-pipeline"),
   @JsonSubTypes.Type(value = WorkspaceConfig.class, name = "geoserver-workspace"),
   @JsonSubTypes.Type(value = DataStoreConfig.class, name = "geoserver-datastore"),
   @JsonSubTypes.Type(value = FeatureTypeConfig.class, name = "geoserver-featuretype"),

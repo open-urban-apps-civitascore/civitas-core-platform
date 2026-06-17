@@ -1,0 +1,270 @@
+{
+  "name": "PutDatabaseRecord",
+  "comments": "",
+  "position": {
+    "x": 0.0,
+    "y": 0.0
+  },
+  "type": "org.apache.nifi.processors.standard.PutDatabaseRecord",
+  "bundle": {
+    "group": "org.apache.nifi",
+    "artifact": "nifi-standard-nar",
+    "version": "2.9.0"
+  },
+  "properties": {
+    "Table Name": "sensor_observations",
+    "Quote Column Identifiers": "false",
+    "Max Wait Time": "0 seconds",
+    "Database Connection Pooling Service": "${CS:PostGISConnectionPool}",
+    "Delete Keys": null,
+    "Record Reader": "${CS:JsonTreeReader}",
+    "Quote Table Identifiers": "false",
+    "Schema Name": "public",
+    "Database Session AutoCommit": "false",
+    "Unmatched Field Behavior": "Ignore Unmatched Fields",
+    "Database Name": null,
+    "Allow Multiple SQL Statements": "false",
+    "Rollback On Failure": "false",
+    "Update Keys": null,
+    "Field Containing SQL": null,
+    "Database Dialect Service": null,
+    "Data Record Path": null,
+    "Statement Type Record Path": null,
+    "Column Name Translation Pattern": null,
+    "Column Name Translation Strategy": "REMOVE_UNDERSCORE",
+    "Binary String Format": "UTF-8",
+    "Unmatched Column Behavior": "Ignore Unmatched Columns",
+    "Database Type": "Generic",
+    "Post-Processing SQL": null,
+    "Translate Field Names": "true",
+    "Statement Type": "INSERT",
+    "Pre-Processing SQL": null,
+    "Table Schema Cache Size": "100",
+    "Maximum Batch Size": "1000"
+  },
+  "propertyDescriptors": {
+    "Table Name": {
+      "name": "Table Name",
+      "displayName": "Table Name",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Quote Column Identifiers": {
+      "name": "Quote Column Identifiers",
+      "displayName": "Quote Column Identifiers",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Max Wait Time": {
+      "name": "Max Wait Time",
+      "displayName": "Max Wait Time",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Database Connection Pooling Service": {
+      "name": "Database Connection Pooling Service",
+      "displayName": "Database Connection Pooling Service",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Delete Keys": {
+      "name": "Delete Keys",
+      "displayName": "Delete Keys",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Record Reader": {
+      "name": "Record Reader",
+      "displayName": "Record Reader",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Quote Table Identifiers": {
+      "name": "Quote Table Identifiers",
+      "displayName": "Quote Table Identifiers",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Schema Name": {
+      "name": "Schema Name",
+      "displayName": "Schema Name",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Database Session AutoCommit": {
+      "name": "Database Session AutoCommit",
+      "displayName": "Database Session AutoCommit",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Unmatched Field Behavior": {
+      "name": "Unmatched Field Behavior",
+      "displayName": "Unmatched Field Behavior",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Database Name": {
+      "name": "Database Name",
+      "displayName": "Database Name",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Allow Multiple SQL Statements": {
+      "name": "Allow Multiple SQL Statements",
+      "displayName": "Allow Multiple SQL Statements",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Rollback On Failure": {
+      "name": "Rollback On Failure",
+      "displayName": "Rollback On Failure",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Update Keys": {
+      "name": "Update Keys",
+      "displayName": "Update Keys",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Field Containing SQL": {
+      "name": "Field Containing SQL",
+      "displayName": "Field Containing SQL",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Database Dialect Service": {
+      "name": "Database Dialect Service",
+      "displayName": "Database Dialect Service",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Data Record Path": {
+      "name": "Data Record Path",
+      "displayName": "Data Record Path",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Statement Type Record Path": {
+      "name": "Statement Type Record Path",
+      "displayName": "Statement Type Record Path",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Column Name Translation Pattern": {
+      "name": "Column Name Translation Pattern",
+      "displayName": "Column Name Translation Pattern",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Column Name Translation Strategy": {
+      "name": "Column Name Translation Strategy",
+      "displayName": "Column Name Translation Strategy",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Binary String Format": {
+      "name": "Binary String Format",
+      "displayName": "Binary String Format",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Unmatched Column Behavior": {
+      "name": "Unmatched Column Behavior",
+      "displayName": "Unmatched Column Behavior",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Database Type": {
+      "name": "Database Type",
+      "displayName": "Database Type",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Post-Processing SQL": {
+      "name": "Post-Processing SQL",
+      "displayName": "Post-Processing SQL",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Translate Field Names": {
+      "name": "Translate Field Names",
+      "displayName": "Translate Field Names",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Statement Type": {
+      "name": "Statement Type",
+      "displayName": "Statement Type",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Pre-Processing SQL": {
+      "name": "Pre-Processing SQL",
+      "displayName": "Pre-Processing SQL",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Table Schema Cache Size": {
+      "name": "Table Schema Cache Size",
+      "displayName": "Table Schema Cache Size",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Maximum Batch Size": {
+      "name": "Maximum Batch Size",
+      "displayName": "Maximum Batch Size",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    }
+  },
+  "style": {},
+  "schedulingPeriod": "0 sec",
+  "schedulingStrategy": "TIMER_DRIVEN",
+  "executionNode": "ALL",
+  "penaltyDuration": "30 sec",
+  "yieldDuration": "1 sec",
+  "bulletinLevel": "WARN",
+  "runDurationMillis": 0,
+  "concurrentlySchedulableTaskCount": 1,
+  "autoTerminatedRelationships": [
+    "success",
+    "failure",
+    "retry"
+  ],
+  "scheduledState": "ENABLED",
+  "retryCount": 10,
+  "retriedRelationships": [],
+  "backoffMechanism": "PENALIZE_FLOWFILE",
+  "maxBackoffPeriod": "10 mins",
+  "componentType": "PROCESSOR"
+}

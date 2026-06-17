@@ -48,7 +48,7 @@ class ResultPublishingTest {
   void setUp(boolean useBpmn) {
     frostHandler = FlowableTestSupport.mockHandler("frost");
     apisixHandler = FlowableTestSupport.mockHandler("apisix");
-    redpandaHandler = FlowableTestSupport.mockHandler("redpanda");
+    redpandaHandler = FlowableTestSupport.mockHandler("nifi");
     resultPublisher = mock(FlowableResultPublisher.class);
 
     processEngine =

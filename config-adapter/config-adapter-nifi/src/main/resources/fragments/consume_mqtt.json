@@ -1,0 +1,209 @@
+{
+  "name": "ConsumeMQTT",
+  "comments": "",
+  "position": {
+    "x": 0.0,
+    "y": 0.0
+  },
+  "type": "org.apache.nifi.processors.mqtt.ConsumeMQTT",
+  "bundle": {
+    "group": "org.apache.nifi",
+    "artifact": "nifi-mqtt-nar",
+    "version": "2.9.0"
+  },
+  "properties": {
+    "Max Queue Size": "1024",
+    "Client ID": "civitas-nifi-demo-consumer",
+    "Keep Alive": "60",
+    "Last Will QoS Level": "0",
+    "Message Demarcator": null,
+    "Session State": "true",
+    "Record Reader": null,
+    "Quality of Service": "0",
+    "Broker URI": "tcp://civitas-nifi-demo-mosquitto:1883",
+    "Connection Timeout": "30",
+    "SSL Context Service": null,
+    "Username": null,
+    "Session Expiry Interval": "24 hrs",
+    "Last Will Message": null,
+    "Last Will Topic": null,
+    "Topic Filter": "sensors/+/temp",
+    "Record Writer": null,
+    "Group ID": null,
+    "MQTT Specification Version": "0",
+    "Add Attributes as Fields": "true",
+    "Last Will Retain": "false"
+  },
+  "propertyDescriptors": {
+    "Max Queue Size": {
+      "name": "Max Queue Size",
+      "displayName": "Max Queue Size",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Client ID": {
+      "name": "Client ID",
+      "displayName": "Client ID",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Keep Alive": {
+      "name": "Keep Alive",
+      "displayName": "Keep Alive",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Last Will QoS Level": {
+      "name": "Last Will QoS Level",
+      "displayName": "Last Will QoS Level",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Message Demarcator": {
+      "name": "Message Demarcator",
+      "displayName": "Message Demarcator",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Session State": {
+      "name": "Session State",
+      "displayName": "Session State",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Record Reader": {
+      "name": "Record Reader",
+      "displayName": "Record Reader",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Quality of Service": {
+      "name": "Quality of Service",
+      "displayName": "Quality of Service",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Broker URI": {
+      "name": "Broker URI",
+      "displayName": "Broker URI",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Connection Timeout": {
+      "name": "Connection Timeout",
+      "displayName": "Connection Timeout",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "SSL Context Service": {
+      "name": "SSL Context Service",
+      "displayName": "SSL Context Service",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Username": {
+      "name": "Username",
+      "displayName": "Username",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Session Expiry Interval": {
+      "name": "Session Expiry Interval",
+      "displayName": "Session Expiry Interval",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Last Will Message": {
+      "name": "Last Will Message",
+      "displayName": "Last Will Message",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Last Will Topic": {
+      "name": "Last Will Topic",
+      "displayName": "Last Will Topic",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Topic Filter": {
+      "name": "Topic Filter",
+      "displayName": "Topic Filter",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Record Writer": {
+      "name": "Record Writer",
+      "displayName": "Record Writer",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Group ID": {
+      "name": "Group ID",
+      "displayName": "Group ID",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "MQTT Specification Version": {
+      "name": "MQTT Specification Version",
+      "displayName": "MQTT Specification Version",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Password": {
+      "name": "Password",
+      "displayName": "Password",
+      "identifiesControllerService": false,
+      "sensitive": true,
+      "dynamic": false
+    },
+    "Add Attributes as Fields": {
+      "name": "Add Attributes as Fields",
+      "displayName": "Add Attributes as Fields",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Last Will Retain": {
+      "name": "Last Will Retain",
+      "displayName": "Last Will Retain",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    }
+  },
+  "style": {},
+  "schedulingPeriod": "0 sec",
+  "schedulingStrategy": "TIMER_DRIVEN",
+  "executionNode": "ALL",
+  "penaltyDuration": "30 sec",
+  "yieldDuration": "1 sec",
+  "bulletinLevel": "WARN",
+  "runDurationMillis": 0,
+  "concurrentlySchedulableTaskCount": 1,
+  "autoTerminatedRelationships": [],
+  "scheduledState": "ENABLED",
+  "retryCount": 10,
+  "retriedRelationships": [],
+  "backoffMechanism": "PENALIZE_FLOWFILE",
+  "maxBackoffPeriod": "10 mins",
+  "componentType": "PROCESSOR"
+}

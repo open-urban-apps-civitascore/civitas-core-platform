@@ -57,7 +57,7 @@ class BpmnVsCodedEquivalenceTest {
   void datasetCreateHappyPath(String approach, boolean useBpmn) {
     SagaCommandHandler frost = FlowableTestSupport.mockHandler("frost");
     SagaCommandHandler apisix = FlowableTestSupport.mockHandler("apisix");
-    SagaCommandHandler redpanda = FlowableTestSupport.mockHandler("redpanda");
+    SagaCommandHandler redpanda = FlowableTestSupport.mockHandler("nifi");
 
     when(frost.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(
@@ -100,7 +100,7 @@ class BpmnVsCodedEquivalenceTest {
   void datasetCreateSkipRedpanda(String approach, boolean useBpmn) {
     SagaCommandHandler frost = FlowableTestSupport.mockHandler("frost");
     SagaCommandHandler apisix = FlowableTestSupport.mockHandler("apisix");
-    SagaCommandHandler redpanda = FlowableTestSupport.mockHandler("redpanda");
+    SagaCommandHandler redpanda = FlowableTestSupport.mockHandler("nifi");
 
     when(frost.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(
@@ -137,7 +137,7 @@ class BpmnVsCodedEquivalenceTest {
   void datasetDeleteBestEffort(String approach, boolean useBpmn) {
     SagaCommandHandler frost = FlowableTestSupport.mockHandler("frost");
     SagaCommandHandler apisix = FlowableTestSupport.mockHandler("apisix");
-    SagaCommandHandler redpanda = FlowableTestSupport.mockHandler("redpanda");
+    SagaCommandHandler redpanda = FlowableTestSupport.mockHandler("nifi");
 
     when(redpanda.handle(any()))
         .thenReturn(SagaCommandResult.success("s", "delete-pipelines", Map.of(), Map.of()));

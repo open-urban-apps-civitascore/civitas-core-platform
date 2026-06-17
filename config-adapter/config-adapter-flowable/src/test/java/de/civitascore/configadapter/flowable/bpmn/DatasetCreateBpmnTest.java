@@ -51,7 +51,7 @@ class DatasetCreateBpmnTest {
   void setUp() {
     frostHandler = FlowableTestSupport.mockHandler("frost");
     apisixHandler = FlowableTestSupport.mockHandler("apisix");
-    redpandaHandler = FlowableTestSupport.mockHandler("redpanda");
+    redpandaHandler = FlowableTestSupport.mockHandler("nifi");
     geoserverHandler = FlowableTestSupport.mockHandler("geoserver");
     stubGeoserverSuccess();
 
@@ -193,7 +193,7 @@ class DatasetCreateBpmnTest {
   }
 
   @Test
-  void shouldPassBaseUrlFromFrostToRedpandaAsTargetUrl() {
+  void shouldPassFrostBaseUrlToPipelineStep() {
     stubFrostSuccess();
     stubApisixSuccess();
     stubRedpandaSuccess();
@@ -206,10 +206,12 @@ class DatasetCreateBpmnTest {
     ArgumentCaptor<SagaCommandMessage> captor = ArgumentCaptor.forClass(SagaCommandMessage.class);
     verify(redpandaHandler).handle(captor.capture());
 
+    // The NiFi pipeline adapter declares no field aliases, so the FROST baseUrl reaches the
+    // pipeline step under its original key (no baseUrl->targetUrl rename).
     assertEquals(
         "http://frost/v1.1/Projects(1)",
-        captor.getValue().payload().get("targetUrl"),
-        "FROST baseUrl should be mapped to targetUrl for Redpanda");
+        captor.getValue().payload().get("baseUrl"),
+        "FROST baseUrl should reach the pipeline step unrenamed");
   }
 
   @Test

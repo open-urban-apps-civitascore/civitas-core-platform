@@ -53,7 +53,7 @@ class DatasetUpdateBpmnTest {
     redpandaHandler = mock(SagaCommandHandler.class);
     when(frostHandler.adapter()).thenReturn("frost");
     when(apisixHandler.adapter()).thenReturn("apisix");
-    when(redpandaHandler.adapter()).thenReturn("redpanda");
+    when(redpandaHandler.adapter()).thenReturn("nifi");
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);

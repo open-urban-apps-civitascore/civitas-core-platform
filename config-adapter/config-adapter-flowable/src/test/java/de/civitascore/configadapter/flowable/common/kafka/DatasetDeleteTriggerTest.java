@@ -57,7 +57,7 @@ class DatasetDeleteTriggerTest {
   void setUp() {
     frost = FlowableTestSupport.mockHandler("frost");
     apisix = FlowableTestSupport.mockHandler("apisix");
-    redpanda = FlowableTestSupport.mockHandler("redpanda");
+    redpanda = FlowableTestSupport.mockHandler("nifi");
     geoserver = FlowableTestSupport.mockHandler("geoserver");
     stubStepSuccess(frost, "delete-project");
     stubStepSuccess(apisix, "delete-route");

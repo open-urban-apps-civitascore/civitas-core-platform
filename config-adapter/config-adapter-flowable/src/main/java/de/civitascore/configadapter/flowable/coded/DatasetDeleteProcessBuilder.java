@@ -35,7 +35,7 @@ public final class DatasetDeleteProcessBuilder {
     ExclusiveGateway pipelineGw =
         saga.exclusiveGateway(ProcessBuilderUtils.PIPELINE_GATEWAY_ID, "Has Pipelines?");
     SagaStepRef redpanda =
-        saga.sagaStep("delete-pipelines", "Delete Pipelines", "redpanda", "DELETE_PIPELINES");
+        saga.sagaStep("delete-pipelines", "Delete Pipelines", "nifi", "DELETE_PIPELINES");
     SagaStepRef apisix =
         saga.sagaStep("delete-route", "Delete APISIX Route", "apisix", "DELETE_ROUTE");
     ExclusiveGateway geoGw =

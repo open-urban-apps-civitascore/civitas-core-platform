@@ -38,7 +38,7 @@ mvn package -Pdist -pl config-adapter-application
 
 ## Architecture
 
-Java 21 Maven multi-module project. Event-driven config adapter framework consuming CNCF CloudEvents from Kafka, applying changes to backend services (Keycloak, APISIX, RedPanda Connect, FROST, GeoServer), and publishing result events.
+Java 21 Maven multi-module project. Event-driven config adapter framework consuming CNCF CloudEvents from Kafka, applying changes to backend services (Keycloak, APISIX, Apache NiFi, FROST, GeoServer), and publishing result events.
 
 ### Module Dependency Graph
 
@@ -49,7 +49,7 @@ config-adapter-api          ← Pure interfaces & models, no impl dependencies
     ├── event-handler-kafka           ← KafkaEventHandler (consumer + publisher), virtual threads
     ├── config-adapter-keycloak       ← Keycloak Admin Client REST adapter
     ├── config-adapter-apisix         ← APISIX Admin API adapter
-    ├── config-adapter-redpanda       ← RedPanda Connect Streams API adapter (JAX-RS/Jersey)
+    ├── config-adapter-nifi           ← Apache NiFi pipeline adapter (transforms the engine-neutral graph → curated NiFi flow, deploys via REST)
     ├── config-adapter-frost          ← FROST SensorThings API adapter (JAX-RS/Jersey)
     ├── config-adapter-geoserver      ← GeoServer REST API adapter (JAX-RS/Jersey)
     ├── config-adapter-examples       ← DummyLogAdapter (logging reference impl)

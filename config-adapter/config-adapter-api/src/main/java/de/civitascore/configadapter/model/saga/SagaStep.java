@@ -19,7 +19,7 @@ import java.util.Map;
  * across saga types.
  *
  * @param stepId unique identifier (e.g. "create-project", "create-route")
- * @param adapter adapter name for routing (e.g. "frost", "apisix", "redpanda")
+ * @param adapter adapter name for routing (e.g. "frost", "apisix", "nifi")
  * @param operation what to do (e.g. "CREATE_PROJECT", "DELETE_ROUTE")
  * @param status current step status
  * @param result adapter-specific output (e.g. projectId, routeId, baseUrl)

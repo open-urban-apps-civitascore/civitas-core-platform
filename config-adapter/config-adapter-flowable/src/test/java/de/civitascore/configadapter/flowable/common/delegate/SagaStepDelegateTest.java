@@ -159,12 +159,12 @@ class SagaStepDelegateTest {
   @Test
   void shouldApplyAdapterMappingBaseUrlToTargetUrlForRedpanda() {
     SagaCommandHandler redpandaHandler = mock(SagaCommandHandler.class);
-    when(redpandaHandler.adapter()).thenReturn("redpanda");
+    when(redpandaHandler.adapter()).thenReturn("nifi");
     when(redpandaHandler.fieldAliases()).thenReturn(Map.of("baseUrl", "targetUrl"));
     registry.register(redpandaHandler);
 
     SagaStepDelegate redpandaDelegate = new SagaStepDelegate();
-    redpandaDelegate.setAdapterName(mockExpression("redpanda"));
+    redpandaDelegate.setAdapterName(mockExpression("nifi"));
     redpandaDelegate.setOperation(mockExpression("DEPLOY_PIPELINES"));
     redpandaDelegate.setStepId(mockExpression("deploy-pipelines"));
     redpandaDelegate.setSagaHandlerRegistry(registry);

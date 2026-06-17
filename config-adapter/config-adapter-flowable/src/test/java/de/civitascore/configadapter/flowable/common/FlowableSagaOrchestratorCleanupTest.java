@@ -97,10 +97,10 @@ class FlowableSagaOrchestratorCleanupTest {
     SagaCommandHandler apisix = mock(SagaCommandHandler.class);
     when(apisix.adapter()).thenReturn("apisix");
     SagaCommandHandler redpanda = mock(SagaCommandHandler.class);
-    when(redpanda.adapter()).thenReturn("redpanda");
+    when(redpanda.adapter()).thenReturn("nifi");
 
     Map<String, SagaCommandHandler> mutableMap =
-        new HashMap<>(Map.of("frost", frost, "apisix", apisix, "redpanda", redpanda));
+        new HashMap<>(Map.of("frost", frost, "apisix", apisix, "nifi", redpanda));
 
     FlowableSagaOrchestrator sut = orchestratorWith("jdbc:h2:mem:copy-test", "sa", "", mutableMap);
 
@@ -145,7 +145,7 @@ class FlowableSagaOrchestratorCleanupTest {
     SagaCommandHandler apisix = mock(SagaCommandHandler.class);
     when(apisix.adapter()).thenReturn("apisix");
     SagaCommandHandler redpanda = mock(SagaCommandHandler.class);
-    when(redpanda.adapter()).thenReturn("redpanda");
-    return Map.of("frost", frost, "apisix", apisix, "redpanda", redpanda);
+    when(redpanda.adapter()).thenReturn("nifi");
+    return Map.of("frost", frost, "apisix", apisix, "nifi", redpanda);
   }
 }

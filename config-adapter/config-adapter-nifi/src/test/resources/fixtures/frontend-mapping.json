@@ -1,0 +1,29 @@
+{
+  "$schema": "https://civitasconnect.digital/core/mapping/v1",
+  "source": "urn:core:datastructure:8cc31216-5417-4d0a-abea-dde0659ce00d:501b78f7-f076-46e2-b5cb-748267a75e24",
+  "target": "urn:core:datastructure:08e34478-8aa3-42a5-9431-d805e209ceec:c10bbb60-d1bc-4c73-be81-2270b906837c",
+  "fields": {
+    "$.titel": "$.name",
+    "$.groups.boolean": {
+      "op": "toString",
+      "input": "$.klasse.offen"
+    },
+    "$.groups.datum": {
+      "op": "toDate",
+      "input": "$.klasse.Stufe",
+      "pattern": "yyyy-MM-dd"
+    },
+    "$.adresse": {
+      "op": "concat",
+      "inputs": [
+        "$.adresse",
+        "$.klasse.Bezeichnung"
+      ]
+    }
+  },
+  "positions": {
+    "$.groups.boolean#toString": { "x": 502.23514049427126, "y": 220.14580312446782 },
+    "$.groups.datum#toDate": { "x": 503.3017574093086, "y": 98.55147481019506 },
+    "$.adresse#concat": { "x": 503.30175740930883, "y": -69.9739977657269 }
+  }
+}

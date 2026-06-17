@@ -1,0 +1,170 @@
+{
+  "name": "PostGISConnectionPool",
+  "comments": "",
+  "type": "org.apache.nifi.dbcp.DBCPConnectionPool",
+  "bundle": {
+    "group": "org.apache.nifi",
+    "artifact": "nifi-dbcp-service-nar",
+    "version": "2.9.0"
+  },
+  "properties": {
+    "Maximum Idle Connections": "8",
+    "Database Driver Locations": "/opt/nifi/drivers/postgresql.jar",
+    "Max Wait Time": "500 millis",
+    "Database Driver Class Name": "org.postgresql.Driver",
+    "Minimum Idle Connections": "0",
+    "Kerberos User Service": null,
+    "Max Total Connections": "8",
+    "Validation Query": null,
+    "Database Password Provider": null,
+    "Database Connection URL": "jdbc:postgresql://civitas-nifi-demo-postgis:5432/nifi_demo",
+    "Password Source": "PASSWORD",
+    "Time Between Eviction Runs": "-1",
+    "Database User": "nifi",
+    "Soft Minimum Evictable Idle Time": "-1",
+    "Maximum Connection Lifetime": "-1",
+    "Minimum Evictable Idle Time": "30 mins"
+  },
+  "propertyDescriptors": {
+    "Maximum Idle Connections": {
+      "name": "Maximum Idle Connections",
+      "displayName": "Maximum Idle Connections",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Database Driver Locations": {
+      "name": "Database Driver Locations",
+      "displayName": "Database Driver Locations",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false,
+      "resourceDefinition": {
+        "cardinality": "MULTIPLE",
+        "resourceTypes": [
+          "DIRECTORY",
+          "FILE",
+          "URL"
+        ]
+      }
+    },
+    "Max Wait Time": {
+      "name": "Max Wait Time",
+      "displayName": "Max Wait Time",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Database Driver Class Name": {
+      "name": "Database Driver Class Name",
+      "displayName": "Database Driver Class Name",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Minimum Idle Connections": {
+      "name": "Minimum Idle Connections",
+      "displayName": "Minimum Idle Connections",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Kerberos User Service": {
+      "name": "Kerberos User Service",
+      "displayName": "Kerberos User Service",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Max Total Connections": {
+      "name": "Max Total Connections",
+      "displayName": "Max Total Connections",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Validation Query": {
+      "name": "Validation Query",
+      "displayName": "Validation Query",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Database Password Provider": {
+      "name": "Database Password Provider",
+      "displayName": "Database Password Provider",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Database Connection URL": {
+      "name": "Database Connection URL",
+      "displayName": "Database Connection URL",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Password Source": {
+      "name": "Password Source",
+      "displayName": "Password Source",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Time Between Eviction Runs": {
+      "name": "Time Between Eviction Runs",
+      "displayName": "Time Between Eviction Runs",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Database User": {
+      "name": "Database User",
+      "displayName": "Database User",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Soft Minimum Evictable Idle Time": {
+      "name": "Soft Minimum Evictable Idle Time",
+      "displayName": "Soft Minimum Evictable Idle Time",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Maximum Connection Lifetime": {
+      "name": "Maximum Connection Lifetime",
+      "displayName": "Maximum Connection Lifetime",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Minimum Evictable Idle Time": {
+      "name": "Minimum Evictable Idle Time",
+      "displayName": "Minimum Evictable Idle Time",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Password": {
+      "name": "Password",
+      "displayName": "Password",
+      "identifiesControllerService": false,
+      "sensitive": true,
+      "dynamic": false
+    }
+  },
+  "controllerServiceApis": [
+    {
+      "type": "org.apache.nifi.dbcp.DBCPService",
+      "bundle": {
+        "group": "org.apache.nifi",
+        "artifact": "nifi-standard-services-api-nar",
+        "version": "2.9.0"
+      }
+    }
+  ],
+  "scheduledState": "DISABLED",
+  "bulletinLevel": "WARN",
+  "componentType": "CONTROLLER_SERVICE"
+}

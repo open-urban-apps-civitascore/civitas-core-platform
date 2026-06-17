@@ -58,7 +58,7 @@
     </exclusiveGateway>
     <serviceTask id="update-pipelines" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Update Pipelines">
       <extensionElements>
-        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="redpanda"/>
+        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="nifi"/>
         <flowable:field xsi:type="xs:anyType" name="operation" stringValue="UPDATE_PIPELINES"/>
         <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="update-pipelines"/>
       </extensionElements>
