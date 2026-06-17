@@ -254,16 +254,16 @@ public class FlowableTriggerConsumer {
   }
 
   /**
-   * Derives the hasGeoSink flag from the trigger payload: true if {@code dataSinks} contains a sink
+   * Derives the hasGeoSink flag from the trigger payload: true if {@code datasinks} contains a sink
    * of type {@code POSTGIS} (the sink type that GeoServer publishes via a PostGIS datastore). Gates
    * the conditional GeoServer branch of the dataset sagas.
    */
   private static boolean deriveHasGeoSink(Map<String, Object> trigger) {
-    return trigger.get("dataSinks") instanceof List<?> dataSinks
-        && dataSinks.stream()
+    return trigger.get("datasinks") instanceof List<?> datasinks
+        && datasinks.stream()
             .filter(Map.class::isInstance)
             .map(Map.class::cast)
-            .anyMatch(sink -> DATASINK_TYPE_POSTGIS.equals(sink.get("dataSinkType")));
+            .anyMatch(sink -> DATASINK_TYPE_POSTGIS.equals(sink.get("type")));
   }
 
   /**
