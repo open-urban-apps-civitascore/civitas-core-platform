@@ -99,6 +99,17 @@ const mockGroups: Group[] = [
     createdAt: '2024-01-01',
     modifiedAt: '2024-01-01',
   },
+  {
+    id: 'group-4',
+    name: 'Group 4',
+    description: '',
+    members: [],
+    contactUser: null,
+    roles: null,
+    assignments: null,
+    createdAt: '2024-01-01',
+    modifiedAt: '2024-01-01',
+  },
 ]
 
 const mockAssignments: Assignment[] = [
@@ -128,6 +139,15 @@ const mockAssignments: Assignment[] = [
     role: { id: 'role-3', name: 'Test Role 3', roleType: ROLE_TYPES.DATA, description: '', readonly: false },
     scopeType: ASSIGNMENT_SCOPE_TYPES.DATASET,
     scope: { id: 'dataset-1', name: 'Dataset 1' },
+  },
+  {
+    id: 'assignment-4',
+    createdAt: '2024-01-01',
+    modifiedAt: '2024-01-01',
+    group: { id: 'group-4', name: 'Group 4' },
+    role: { id: 'role-4', name: 'Test Role 4', roleType: ROLE_TYPES.DATA, description: '', readonly: false },
+    scopeType: ASSIGNMENT_SCOPE_TYPES.DATAPOOL,
+    scope: { id: 'datapool-1', name: 'Datapool 1' },
   },
 ]
 
@@ -175,7 +195,7 @@ describe('Add group and Delete group button Visibility', () => {
         onGroupAssignmentUpdate={onGroupAssignmentUpdate}
       />,
     )
-    fireEvent.click(screen.getByText('roles.groupAssignmentTab.scopeTabs.dataset'))
+    fireEvent.click(screen.getByText('scopeTabs.dataset'))
     expect(screen.getByText('Group 3')).toBeInTheDocument()
     expect(screen.queryByText('addGroup')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument()
@@ -254,7 +274,7 @@ describe('GroupAssignmentTab scope filtering', () => {
         initialAssignments={mockSystemRoleAssignments}
       />,
     )
-    expect(screen.queryByTestId('segmentedControlBar')).not.toBeInTheDocument()
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
   })
   it('shows scope tabs for data roles', () => {
     render(
@@ -264,7 +284,7 @@ describe('GroupAssignmentTab scope filtering', () => {
         initialAssignments={mockDataRoleAssignments}
       />,
     )
-    expect(screen.getByTestId('segmentedControlBar')).toBeInTheDocument()
+    expect(screen.getByRole('tablist')).toBeInTheDocument()
   })
   it('shows only scope-specific groups after switching to a non-TENANT scope tab', () => {
     render(
@@ -274,9 +294,48 @@ describe('GroupAssignmentTab scope filtering', () => {
         initialAssignments={mockDataRoleAssignments}
       />,
     )
-    fireEvent.click(screen.getByText('roles.groupAssignmentTab.scopeTabs.dataset'))
+    fireEvent.click(screen.getByText('scopeTabs.dataset'))
     expect(screen.queryByText('Group 2')).not.toBeInTheDocument()
     expect(screen.getByText('Group 3')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('scopeTabs.datapool'))
+    expect(screen.queryByText('Group 2')).not.toBeInTheDocument()
+    expect(screen.getByText('Group 4')).toBeInTheDocument()
+  })
+
+  it('shows scope-specific scopeType for a group that also has a TENANT assignment', () => {
+    const multiScopeAssignments: Assignment[] = [
+      {
+        id: 'a-tenant',
+        createdAt: '2024-01-01',
+        modifiedAt: '2024-01-01',
+        group: { id: 'group-1', name: 'Group 1' },
+        role: { id: 'role-1', name: 'Test Role', roleType: ROLE_TYPES.DATA, description: '', readonly: false },
+        scopeType: ASSIGNMENT_SCOPE_TYPES.TENANT,
+        scope: null,
+      },
+      {
+        id: 'a-datapool',
+        createdAt: '2024-01-01',
+        modifiedAt: '2024-01-01',
+        group: { id: 'group-1', name: 'Group 1' },
+        role: { id: 'role-1', name: 'Test Role', roleType: ROLE_TYPES.DATA, description: '', readonly: false },
+        scopeType: ASSIGNMENT_SCOPE_TYPES.DATAPOOL,
+        scope: { id: 'datapool-1', name: 'Datapool 1' },
+      },
+    ]
+    render(
+      <GroupAssignmentTab
+        {...defaultProps}
+        selectedGroupIds={['group-1']}
+        initialAssignments={multiScopeAssignments}
+      />,
+    )
+    fireEvent.click(screen.getByText('scopeTabs.datapool'))
+    expect(screen.getByText('Group 1')).toBeInTheDocument()
+
+    expect(screen.getByText(`scopeLabels.${ASSIGNMENT_SCOPE_TYPES.DATAPOOL}`)).toBeInTheDocument()
+    expect(screen.queryByText(`scopeLabels.${ASSIGNMENT_SCOPE_TYPES.TENANT}`)).not.toBeInTheDocument()
   })
 })
 
@@ -348,7 +407,7 @@ describe('GroupAssignmentTab pagination reset', () => {
     render(<GroupAssignmentTab {...defaultProps} />)
     setPaginationParams.mockClear()
 
-    fireEvent.click(screen.getByText('roles.groupAssignmentTab.scopeTabs.dataset'))
+    fireEvent.click(screen.getByText('scopeTabs.dataset'))
 
     expect(setPaginationParams).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 10 })
   })

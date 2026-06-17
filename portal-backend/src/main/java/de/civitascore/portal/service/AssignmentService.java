@@ -111,6 +111,40 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
   }
 
   /**
+   * Finds all assignments with the given scope type that apply to the user via their group
+   * memberships.
+   *
+   * @param userId the user ID
+   * @param scopeType the scope type to filter by
+   * @return list of matching assignments
+   */
+  public List<Assignment> findAllByUserIdAndScopeType(UUID userId, ScopeType scopeType) {
+    return getRepository().findAllByUserIdAndScopeType(userId, scopeType);
+  }
+
+  /**
+   * Finds all assignments with the given scope type for the given group.
+   *
+   * @param groupId the group ID
+   * @param scopeType the scope type to filter by
+   * @return list of matching assignments
+   */
+  public List<Assignment> findAllByGroupIdAndScopeType(UUID groupId, ScopeType scopeType) {
+    return getRepository().findAllByGroupIdAndScopeType(groupId, scopeType);
+  }
+
+  /**
+   * Finds all assignments with the given scope type that reference the given role.
+   *
+   * @param roleId the role ID
+   * @param scopeType the scope type to filter by
+   * @return list of matching assignments
+   */
+  public List<Assignment> findAllByRoleIdAndScopeType(UUID roleId, ScopeType scopeType) {
+    return getRepository().findAllByRoleIdAndScopeType(roleId, scopeType);
+  }
+
+  /**
    * Finds all assignments scoped to a specific resource type and resource ID. Dispatches to the
    * appropriate repository query based on the {@link ScopeType}.
    *
@@ -123,10 +157,10 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
     return switch (scopeType) {
       case DATASOURCE -> getRepository().findAllByScopeTypeAndDataSourceId(scopeType, scopeId);
       case DATASET -> getRepository().findAllByScopeTypeAndDatasetId(scopeType, scopeId);
-      case DATASPACE -> getRepository().findAllByScopeTypeAndDataSpaceId(scopeType, scopeId);
       case CATALOG -> getRepository().findAllByScopeTypeAndCatalogId(scopeType, scopeId);
       case DATASTRUCTURE ->
           getRepository().findAllByScopeTypeAndDataStructureId(scopeType, scopeId);
+      case DATAPOOL -> getRepository().findAllByScopeTypeAndDataPoolId(scopeType, scopeId);
       default ->
           throw new InvalidInputException("Assignment", scopeType.name(), "Unsupported scope type");
     };

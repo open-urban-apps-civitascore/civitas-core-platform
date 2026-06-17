@@ -106,5 +106,6 @@ init:
       title: OTHER
       groups:
         - 'Local Tenant Admins'
+        - 'Local Data Architects'
         - 'Local Data Owners'
         - 'Local Data Gatekeepers'

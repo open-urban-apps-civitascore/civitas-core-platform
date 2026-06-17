@@ -46,6 +46,7 @@ class DatasetCreateBpmnTest {
   private SagaCommandHandler apisixHandler;
   private SagaCommandHandler redpandaHandler;
   private SagaCommandHandler geoserverHandler;
+  private SagaCommandHandler postgisHandler;
 
   @BeforeEach
   void setUp() {
@@ -53,13 +54,16 @@ class DatasetCreateBpmnTest {
     apisixHandler = FlowableTestSupport.mockHandler("apisix");
     redpandaHandler = FlowableTestSupport.mockHandler("nifi");
     geoserverHandler = FlowableTestSupport.mockHandler("geoserver");
+    postgisHandler = FlowableTestSupport.mockHandler("postgis");
     stubGeoserverSuccess();
+    stubPostgisSuccess();
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
     registry.register(apisixHandler);
     registry.register(redpandaHandler);
     registry.register(geoserverHandler);
+    registry.register(postgisHandler);
 
     processEngine = FlowableTestSupport.createTestEngine(Map.of("sagaHandlerRegistry", registry));
     runtimeService = processEngine.getRuntimeService();
@@ -227,10 +231,16 @@ class DatasetCreateBpmnTest {
     // Assert execution order via the handlers' actual invocation order (deterministic). Sorting
     // HistoricActivityInstances by start time is flaky: sequential synchronous tasks can share a
     // millisecond timestamp, so workspace/datastore can appear swapped.
-    var inOrder = inOrder(frostHandler, apisixHandler, geoserverHandler);
+    // PostGIS sink is provisioned first (so the table exists), then the GeoServer steps run.
+    var inOrder = inOrder(frostHandler, apisixHandler, postgisHandler, geoserverHandler);
     inOrder.verify(frostHandler).handle(any());
     inOrder.verify(apisixHandler).handle(any());
+    inOrder.verify(postgisHandler).handle(any());
     inOrder.verify(geoserverHandler, times(3)).handle(any());
+
+    ArgumentCaptor<SagaCommandMessage> sink = ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(postgisHandler).handle(sink.capture());
+    assertEquals("PROVISION_SINK", sink.getValue().operation());
 
     ArgumentCaptor<SagaCommandMessage> geo = ArgumentCaptor.forClass(SagaCommandMessage.class);
     verify(geoserverHandler, times(3)).handle(geo.capture());
@@ -249,9 +259,10 @@ class DatasetCreateBpmnTest {
 
     assertProcessCompleted(instance.getId());
 
-    var inOrder = inOrder(frostHandler, apisixHandler, geoserverHandler);
+    var inOrder = inOrder(frostHandler, apisixHandler, postgisHandler, geoserverHandler);
     inOrder.verify(frostHandler).handle(any());
     inOrder.verify(apisixHandler).handle(any());
+    inOrder.verify(postgisHandler).handle(any());
 
     // Only workspace + datastore run; provision-layers is skipped — so exactly 2 geoserver calls,
     // in invocation order (deterministic, unlike a HistoricActivityInstance start-time sort).
@@ -312,6 +323,13 @@ class DatasetCreateBpmnTest {
     assertEquals("DELETE_ROUTE", apisixCompensation.operation());
     SagaCommandMessage frostCompensation = captureCompensation(frostHandler);
     assertEquals("DELETE_PROJECT", frostCompensation.operation());
+
+    // The PostGIS sink was provisioned (forward) and dropped during compensation.
+    ArgumentCaptor<SagaCommandMessage> sink = ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(postgisHandler, times(2)).handle(sink.capture());
+    assertEquals(
+        List.of("PROVISION_SINK", "DEPROVISION_SINK"),
+        sink.getAllValues().stream().map(SagaCommandMessage::operation).toList());
   }
 
   private SagaCommandMessage captureCompensation(SagaCommandHandler handler) {
@@ -343,8 +361,8 @@ class DatasetCreateBpmnTest {
     }
     if (hasGeoSink) {
       variables.put(
-          "dataSinks",
-          List.of(Map.of("dataSinkType", "POSTGIS", "configuration", Map.of("tableName", "t1"))));
+          "datasinks",
+          List.of(Map.of("type", "POSTGIS", "configuration", Map.of("tableName", "t1"))));
     }
     if (hasLayers) {
       variables.put("layers", List.of(Map.of("layerName", "t1", "crs", "EPSG:4326")));
@@ -412,6 +430,18 @@ class DatasetCreateBpmnTest {
   private void stubApisixCompensationSuccess() {
     when(apisixHandler.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "create-route"));
+  }
+
+  private void stubPostgisSuccess() {
+    when(postgisHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+        .thenReturn(
+            SagaCommandResult.success(
+                "saga-test-123",
+                "provision-sink",
+                Map.of("provisionedSinks", List.of(Map.of("schema", "ds_456", "table", "t1"))),
+                Map.of("provisionedSinks", List.of(Map.of("schema", "ds_456", "table", "t1")))));
+    when(postgisHandler.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
+        .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "provision-sink"));
   }
 
   private void stubGeoserverSuccess() {

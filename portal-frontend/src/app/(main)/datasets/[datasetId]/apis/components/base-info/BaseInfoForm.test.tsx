@@ -56,7 +56,7 @@ const Wrapper = (props: WrapperProps) => {
         apiType={apiType}
         isReadOnly={isReadOnly}
         datasetId="dataset-123"
-        typeLabel={apiType === API_TYPE_QUERY.SENSORTHINGS ? 'SensorThings API' : 'WFS/WMS API'}
+        typeLabel={apiType === API_TYPE_QUERY.SENSORTHINGS ? 'SensorThings API' : 'OWS API'}
         urlPreviewSlug={urlPreviewSlug ?? defaults.defaultSlug}
         onSlugBlur={onSlugBlur}
       />
@@ -87,16 +87,16 @@ describe('ApiConfigForm', () => {
     })
   })
 
-  describe('WFS/WMS variant', () => {
+  describe('OWS variant', () => {
     test('renders persistence as a dropdown', () => {
-      render(<Wrapper apiType={API_TYPE_QUERY.WFS_WMS} />)
+      render(<Wrapper apiType={API_TYPE_QUERY.OWS} />)
       expect(screen.getByTestId('baseInfo.persistenceSelectTrigger')).toBeInTheDocument()
       expect(screen.queryByTestId('apiPersistenceReadOnly')).not.toBeInTheDocument()
     })
 
-    test('pre-fills slug as "wfswms"', () => {
-      render(<Wrapper apiType={API_TYPE_QUERY.WFS_WMS} />)
-      expect(screen.getByTestId('slugTextField')).toHaveValue('wfswms')
+    test('pre-fills slug as "ows"', () => {
+      render(<Wrapper apiType={API_TYPE_QUERY.OWS} />)
+      expect(screen.getByTestId('slugTextField')).toHaveValue('ows')
     })
   })
 

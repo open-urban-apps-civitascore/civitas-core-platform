@@ -44,7 +44,7 @@ export const DatasourcesList = ({
   const [datasourceToDelete, setDatasourceToDelete] = useState<Datasource | null>(null)
   const deleteDatasource = useDeleteDatasource()
   const { handleSortingChange, handlePaginationChange, handleSearchChange } = useTableSearchParams()
-  const { hasPermission } = usePermissions()
+  const { hasPermissionInScope } = usePermissions()
 
   const handleDeleteConfirm = () => {
     if (datasourceToDelete) {
@@ -55,7 +55,7 @@ export const DatasourcesList = ({
     setDatasourceToDelete(null)
   }
 
-  const CustomElement = hasPermission(PERMISSION_NAMES.DATASOURCE_CREATE) ? (
+  const CustomElement = hasPermissionInScope(PERMISSION_NAMES.DATASOURCE_CREATE, 'TENANT') ? (
     <Button data-testid="addDatasourceButton" onClick={() => router.push('/datasources/create')}>
       <Plus />
       {t('newDatasource')}

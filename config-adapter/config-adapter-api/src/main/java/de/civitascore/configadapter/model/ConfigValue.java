@@ -24,6 +24,9 @@ import de.civitascore.configadapter.model.idm.GroupConfig;
 import de.civitascore.configadapter.model.idm.RealmConfig;
 import de.civitascore.configadapter.model.idm.RoleConfig;
 import de.civitascore.configadapter.model.idm.UserConfig;
+import de.civitascore.configadapter.model.postgis.DbRoleConfig;
+import de.civitascore.configadapter.model.postgis.SchemaConfig;
+import de.civitascore.configadapter.model.postgis.TableConfig;
 
 /**
  * Base interface for typed configuration values. Each adapter domain (IDM, APISIX, etc.) provides
@@ -57,5 +60,8 @@ import de.civitascore.configadapter.model.idm.UserConfig;
   @JsonSubTypes.Type(value = FeatureTypeConfig.class, name = "geoserver-featuretype"),
   @JsonSubTypes.Type(value = LayerConfig.class, name = "geoserver-layer"),
   @JsonSubTypes.Type(value = StyleConfig.class, name = "geoserver-style"),
+  @JsonSubTypes.Type(value = TableConfig.class, name = "sql-table"),
+  @JsonSubTypes.Type(value = SchemaConfig.class, name = "sql-schema"),
+  @JsonSubTypes.Type(value = DbRoleConfig.class, name = "sql-role"),
 })
 public interface ConfigValue {}

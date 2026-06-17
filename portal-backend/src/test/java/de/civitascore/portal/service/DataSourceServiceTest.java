@@ -10,10 +10,14 @@ import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.DatapoolScopeType;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
+import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
+import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
@@ -49,6 +53,7 @@ class DataSourceServiceTest {
   @Mock private DataStructureVersionService dataStructureVersionService;
   @Mock private DataSetRepository dataSetRepository;
   @Mock private PipelineRepository pipelineRepository;
+  @Mock private DataPoolRepository dataPoolRepository;
 
   @InjectMocks private DataSourceService dataSourceService;
 
@@ -940,6 +945,201 @@ class DataSourceServiceTest {
       dataSourceService.update(id, input);
 
       assertThat(normalized).containsEntry("password", "newpass");
+    }
+  }
+
+  @Nested
+  @DisplayName("Datapool Scope")
+  class DatapoolScopeTests {
+
+    @Test
+    @DisplayName("Should not modify scope when datapoolScope is null")
+    void shouldNotModifyScopeWhenNull() {
+      DataSource entity = DataSource.builder().build();
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("source");
+
+      when(dataSourceMapper.toEntity(any())).thenReturn(entity);
+      when(dataSourceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSource result = dataSourceService.create(input);
+
+      assertThat(result.getDatapoolScopeType()).isEqualTo(DatapoolScopeType.ALL);
+      assertThat(result.getScopedDataPools()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should set scope to ALL and clear existing scoped pools")
+    void shouldSetScopeToAll() {
+      UUID poolId = UUID.randomUUID();
+      DataPool existingPool = new DataPool();
+      existingPool.setId(poolId);
+
+      DataSource entity = DataSource.builder().build();
+      entity.setDatapoolScopeType(DatapoolScopeType.SPECIFIC);
+      entity.getScopedDataPools().add(existingPool);
+
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.ALL);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("source");
+      input.setDatapoolScope(scope);
+
+      when(dataSourceMapper.toEntity(any())).thenReturn(entity);
+      when(dataSourceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSource result = dataSourceService.create(input);
+
+      assertThat(result.getDatapoolScopeType()).isEqualTo(DatapoolScopeType.ALL);
+      assertThat(result.getScopedDataPools()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should set scope to NONE and clear existing scoped pools")
+    void shouldSetScopeToNone() {
+      UUID poolId = UUID.randomUUID();
+      DataPool existingPool = new DataPool();
+      existingPool.setId(poolId);
+
+      DataSource entity = DataSource.builder().build();
+      entity.setDatapoolScopeType(DatapoolScopeType.SPECIFIC);
+      entity.getScopedDataPools().add(existingPool);
+
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.NONE);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("source");
+      input.setDatapoolScope(scope);
+
+      when(dataSourceMapper.toEntity(any())).thenReturn(entity);
+      when(dataSourceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSource result = dataSourceService.create(input);
+
+      assertThat(result.getDatapoolScopeType()).isEqualTo(DatapoolScopeType.NONE);
+      assertThat(result.getScopedDataPools()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should set scope to SPECIFIC and resolve DataPool entities by ID")
+    void shouldSetScopeToSpecificAndResolveDataPools() {
+      UUID poolId = UUID.randomUUID();
+      DataPool pool = new DataPool();
+      pool.setId(poolId);
+
+      DataSource entity = DataSource.builder().build();
+
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.SPECIFIC);
+      scope.setDatapoolIds(List.of(poolId));
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("source");
+      input.setDatapoolScope(scope);
+
+      when(dataSourceMapper.toEntity(any())).thenReturn(entity);
+      when(dataPoolRepository.findAllById(List.of(poolId))).thenReturn(List.of(pool));
+      when(dataSourceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSource result = dataSourceService.create(input);
+
+      assertThat(result.getDatapoolScopeType()).isEqualTo(DatapoolScopeType.SPECIFIC);
+      assertThat(result.getScopedDataPools()).containsExactly(pool);
+    }
+
+    @Test
+    @DisplayName("Should reject SPECIFIC scope with null datapoolIds")
+    void shouldRejectSpecificScopeWithNullIds() {
+      DataSource entity = DataSource.builder().build();
+
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.SPECIFIC);
+      scope.setDatapoolIds(null);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("source");
+      input.setDatapoolScope(scope);
+
+      when(dataSourceMapper.toEntity(any())).thenReturn(entity);
+
+      assertThatThrownBy(() -> dataSourceService.create(input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("At least one datapoolId");
+    }
+
+    @Test
+    @DisplayName("Should reject SPECIFIC scope with empty datapoolIds list")
+    void shouldRejectSpecificScopeWithEmptyIds() {
+      DataSource entity = DataSource.builder().build();
+
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.SPECIFIC);
+      scope.setDatapoolIds(List.of());
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("source");
+      input.setDatapoolScope(scope);
+
+      when(dataSourceMapper.toEntity(any())).thenReturn(entity);
+
+      assertThatThrownBy(() -> dataSourceService.create(input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("At least one datapoolId");
+    }
+
+    @Test
+    @DisplayName("Should reject SPECIFIC scope with unknown DataPool ID")
+    void shouldRejectSpecificScopeWithUnknownId() {
+      UUID unknownId = UUID.randomUUID();
+      DataSource entity = DataSource.builder().build();
+
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.SPECIFIC);
+      scope.setDatapoolIds(List.of(unknownId));
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("source");
+      input.setDatapoolScope(scope);
+
+      when(dataSourceMapper.toEntity(any())).thenReturn(entity);
+      when(dataPoolRepository.findAllById(List.of(unknownId))).thenReturn(List.of());
+
+      assertThatThrownBy(() -> dataSourceService.create(input))
+          .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("Should apply datapoolScope change via updateReleasedMeta")
+    void shouldApplyScopeChangeViaUpdateReleasedMeta() {
+      UUID id = UUID.randomUUID();
+      UUID poolId = UUID.randomUUID();
+      DataPool pool = new DataPool();
+      pool.setId(poolId);
+
+      DataSource entity = DataSource.builder().build();
+      entity.setId(id);
+      entity.setName("source");
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.SPECIFIC);
+      scope.setDatapoolIds(List.of(poolId));
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("source");
+      input.setDatapoolScope(scope);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(pipelineRepository.existsByDataSourcesId(id)).thenReturn(false);
+      when(dataPoolRepository.findAllById(List.of(poolId))).thenReturn(List.of(pool));
+      when(dataSourceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSource result = dataSourceService.updateReleasedMeta(id, input);
+
+      assertThat(result.getDatapoolScopeType()).isEqualTo(DatapoolScopeType.SPECIFIC);
+      assertThat(result.getScopedDataPools()).containsExactly(pool);
     }
   }
 

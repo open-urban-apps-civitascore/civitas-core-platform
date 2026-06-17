@@ -871,6 +871,10 @@ export GEOSERVER_POSTGIS_PORT=5434
 export GEOSERVER_POSTGIS_DB=geoserver
 export GEOSERVER_POSTGIS_USER=geoserver
 export GEOSERVER_POSTGIS_PASSWORD=geoserver
+# PostGIS adapter DDL connection — must point at the same database the GeoServer datastore reads
+export POSTGIS_JDBC_URL=jdbc:postgresql://localhost:5434/geoserver
+export POSTGIS_JDBC_USER=geoserver
+export POSTGIS_JDBC_PASSWORD=geoserver
 
 java -jar "$CONFIG_ADAPTER_JAR"
 exec bash
@@ -954,6 +958,9 @@ if [ "$config_adapter_option" = "3" ]; then
     echo "  GEOSERVER_POSTGIS_DB=geoserver"
     echo "  GEOSERVER_POSTGIS_USER=geoserver"
     echo "  GEOSERVER_POSTGIS_PASSWORD=geoserver"
+    echo "  POSTGIS_JDBC_URL=jdbc:postgresql://localhost:5434/geoserver"
+    echo "  POSTGIS_JDBC_USER=geoserver"
+    echo "  POSTGIS_JDBC_PASSWORD=geoserver"
     echo
 fi
 
@@ -1183,7 +1190,7 @@ echo "  Kafka UI:         http://localhost:8090"
 echo "  FROST Server:     http://localhost:8085/FROST-Server/v1.1 (HTTP)"
 echo "  FROST MQTT:       mqtt://localhost:1883"
 echo "  GeoServer Admin:  http://localhost:8082/geoserver/web (admin / geoserver)"
-echo "  GeoServer WFS:    http://localhost:9080/geoserver/{workspace}/wfs (via APISIX)"
+echo "  GeoServer OWS:    http://localhost:9080/geoserver/{workspace}/ows (via APISIX)"
 echo "  GeoServer PostGIS: localhost:5434  db=geoserver  user=geoserver  (see geoserver/.env)"
 echo "  GeoServer Consul: http://localhost:8500"
 echo "  APISIX Gateway:   http://localhost:9080"

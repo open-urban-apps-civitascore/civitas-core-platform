@@ -1,9 +1,8 @@
 package de.civitascore.portal.model.input;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import java.util.List;
+import jakarta.validation.constraints.NotNull;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -22,9 +21,9 @@ public class PipelineInputDTO extends BaseInputDTO {
   private Map<String, Object> styles;
   private Map<String, Object> model;
 
-  private Set<UUID> dataSourceIds;
+  private Set<@NotNull UUID> dataSourceIds;
 
-  @Valid private List<DataSinkInputDTO> dataSinks;
+  private Set<@NotNull UUID> dataSinkIds;
 
   @JsonIgnore private UUID dataSetId;
 }

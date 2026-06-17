@@ -77,10 +77,13 @@
       "datastructures": "Datenstrukturen",
       "datastructure": "Datenstruktur",
       "datastructureVersion": "Version",
-      "assignments": "Zuweisungen"
+      "assignments": "Zuweisungen",
+      "datapool": "Datenpool",
+      "datapools": "Datenpools"
     },
     "messages": {
       "updateSuccess": "{item} wurde erfolgreich aktualisiert",
+      "updateError": "Beim Aktualisieren des {item}s ist ein Fehler aufgetreten.",
       "createSuccess": "{item} wurde erfolgreich angelegt",
       "deleteSuccess": "{item} wurde erfolgreich gelöscht"
     },
@@ -197,7 +200,8 @@
     "datasources": "Datenquellen",
     "datastructures": "Datenstrukturen",
     "access-management": "Zugriffsmanagement",
-    "apis": "APIs"
+    "apis": "APIs",
+    "datapools": "Datenpools"
   },
   "datasets": {
     "title": "Datensätze",
@@ -209,29 +213,46 @@
       "createdBy": "Erstellt von",
       "lastUpdated": "Aktualisiert",
       "status": "Status",
-      "action": "Aktion"
+      "action": "Aktion",
+      "datapool": "Datenpool"
     },
+    "anonymousDatapool": "Anonym",
     "tableValues": {
       "draft": "Entwurf",
       "available": "Verfügbar",
       "ready": "Fertig",
       "yesterday": "Gestern"
     },
+    "form": {
+      "title": "Basisinformationen",
+      "subtitle": "Der Name kann später angepasst werden.",
+      "name": "Name",
+      "datapoolSelect": "Datenpool",
+      "datapoolSelectPlaceholder": "Kein Datenpool",
+      "description": "Beschreibung",
+      "descriptionHint": "max. 150 Zeichen"
+    },
+    "changeDatapoolModal": {
+      "title": "Datenpool wirklich ändern?",
+      "description": "Der Datensatz wird einem anderen Datenpool zugeordnet. Diese Änderung kann Auswirkungen auf den Zugriff haben.",
+      "consequences": {
+        "permissions": "Berechtigungen können sich ändern",
+        "access": "Der Zugriff auf diesen Datensatz kann verloren gehen",
+        "otherUsers": "Andere User erhalten oder verlieren möglicherweise Zugriff auf diesen Datensatz"
+      },
+      "warnings": {
+        "inheritance": "Wenn Berechtigungen aktuell über den Datenpool vererbt werden, gelten diese im neuen Datenpool möglicherweise nicht.",
+        "checkPermissions": "Vor der Änderung sollten die Berechtigungen im ausgewählten Datenpool geprüft werden."
+      },
+      "confirmButton": "Datenpool ändern"
+    },
     "create": {
       "title": "Neuer Datensatz",
-      "subtitle": "Neue Datensätze sind nur intern sichtbar.",
-      "form": {
-        "title": "Basisinformationen",
-        "subtitle": "Der Name kann später angepasst werden.",
-        "name": "Name"
-      }
+      "subtitle": "Neue Datensätze sind nur intern sichtbar."
     },
     "overview": {
       "info": {
-        "title": "Basisinformationen",
-        "name": "Name",
-        "description": "Beschreibung",
-        "descriptionHint": "max. 150 Zeichen"
+        "title": "Basisinformationen"
       },
       "completion": {
         "title": "Erstellungsfortschritt",
@@ -263,12 +284,11 @@
             "addButton": "API hinzufügen",
             "sensorThings": "SensorThings API",
             "sensorThingsSubtitle": "Zeitreihendaten",
-            "wfsWms": "WFS/WMS API",
-            "wfsWmsSubtitle": "Geodaten",
+            "ows": "WFS/WMS API",
+            "owsSubtitle": "Geodaten",
             "standardLabels": {
               "STA": "SensorThings API",
-              "WFS": "WFS",
-              "WMS": "WMS",
+              "OWS": "WFS/WMS",
               "CUSTOM": "Custom API"
             },
             "card": {
@@ -295,7 +315,7 @@
           "config": {
             "title": {
               "sensorthings": "SensorThings API",
-              "wfs-wms": "WFS/WMS API"
+              "ows": "WFS/WMS API"
             },
             "protectedBadge": "Geschützt",
             "openDataBadge": "Open Data",
@@ -520,7 +540,8 @@
         "platformWide": "Plattformweit",
         "datasets": "Datensätze",
         "datasources": "Datenquellen",
-        "datastructures": "Datenstrukturen"
+        "datastructures": "Datenstrukturen",
+        "datapools": "Datenpools"
       },
       "columns": {
         "name": "Name",
@@ -543,7 +564,8 @@
       "scopedInfoBanner": {
         "dataset": "Datensatzbezogene Zuordnungen erfolgen am jeweiligen Datensatz.",
         "datasource": "Datenquellenbezogene Zuordnungen erfolgen an der jeweiligen Datenquelle.",
-        "datastructure": "Datenstrukturbezogene Zuordnungen erfolgen an der jeweiligen Datenstruktur."
+        "datastructure": "Datenstrukturbezogene Zuordnungen erfolgen an der jeweiligen Datenstruktur.",
+        "datapool": "Datenpoolbezogene Zuordnungen erfolgen am jeweiligen Datenpool."
       },
       "disabledHint": "Zugeordnete Rollen können nach dem Speichern des Nutzers eingesehen werden."
     },
@@ -598,7 +620,8 @@
         "platform": "Plattformweit",
         "datasets": "Datensätze",
         "datasources": "Datenquellen",
-        "datastructures": "Datenstruktur"
+        "datastructures": "Datenstruktur",
+        "datapools": "Datenpools"
       },
       "scopePlatform": "Plattform",
       "addRole": "Rolle hinzufügen",
@@ -616,7 +639,8 @@
       "scopedInfoBanner": {
         "DATASET": "Datensatzbezogene Zuordnungen erfolgen am jeweiligen Datensatz.",
         "DATASOURCE": "Datenquellenbezogene Zuordnungen erfolgen an der jeweiligen Datenquelle.",
-        "DATASTRUCTURE": "Datenstrukturbezogene Zuordnungen erfolgen an der jeweiligen Datenstruktur."
+        "DATASTRUCTURE": "Datenstrukturbezogene Zuordnungen erfolgen an der jeweiligen Datenstruktur.",
+        "DATAPOOL": "Datenpoolbezogene Zuordnungen erfolgen am jeweiligen Datenpool."
       },
       "columns": {
         "name": "Name",
@@ -825,18 +849,21 @@
         "platformWide": "Plattformweit",
         "dataset": "Datensatz",
         "datasource": "Datenquelle",
-        "datastructure": "Datenstruktur"
+        "datastructure": "Datenstruktur",
+        "datapool": "Datenpool"
       },
       "scopeLabels": {
         "TENANT": "Plattformweit",
         "DATASET": "Datensatz",
         "DATASOURCE": "Datenquelle",
-        "DATASTRUCTURE": "Datenstruktur"
+        "DATASTRUCTURE": "Datenstruktur",
+        "DATAPOOL": "Datenpool"
       },
       "infoBox": "Gruppen, die hier zugeordnet werden, erhalten den Typ Plattformweit (Berechtigungen auf alle datenbezogenen Elemente der Plattform)",
       "scopeReadOnlyMessageDATASET": "Datensatzbezogene Zuordnungen erfolgen am jeweiligen Datensatz",
       "scopeReadOnlyMessageDATASOURCE": "Datenquellenbezogene Zuordnungen erfolgen an der jeweiligen Datenquelle",
       "scopeReadOnlyMessageDATASTRUCTURE": "Datenstrukturbezogene Zuordnungen erfolgen an der jeweiligen Datenstruktur",
+      "scopeReadOnlyMessageDATAPOOL": "Datenpoolbezogene Zuordnungen erfolgen am jeweiligen Datenpool",
       "modal": {
         "title": "Gruppe hinzufügen",
         "description": "zur Rolle {roleName}",
@@ -915,7 +942,8 @@
       "basicInfo": "Basisinformationen",
       "connector": "Konnektor",
       "dataStructure": "Datenstruktur",
-      "accessManagement": "Zugriffsberechtigungen"
+      "accessManagement": "Zugriffsberechtigungen",
+      "datapools": "Datenpools"
     },
     "connectorTab": {
       "title1": "Konnektor",
@@ -944,6 +972,39 @@
     "accessManagementTab": {
       "infoBoxes": {
         "firstBox": "Gruppen, die plattformweite Berechtigungen an allen datenbezogenen Elementen besitzen, haben Zugriff auf diese Datenquelle."
+      }
+    },
+    "datapoolsTab": {
+      "addDatapool": "Datenpool hinzufügen",
+      "allDatapoolsSwitch": "Für alle Datenpools freigeben*",
+      "allDatapoolsInfo": "*Diese Funktion schließt auch Datensätze ohne Datenpool-Zuordnung mit ein.",
+      "noDataPage": {
+        "title": "Für keine Datenpools freigegeben",
+        "description": "Diese Datenquelle ist derzeit für keinen Datenpool freigegeben und kann daher in keinen Datensätzen verwendet werden."
+      },
+      "allDatapoolsPage": {
+        "title": "Für alle Datenpools freigegeben",
+        "description": "Diese Datenquelle kann in Datensätzen aller Datenpools sowie in Datensätzen ohne Datenpool-Zuordnung verwendet werden."
+      },
+      "table": {
+        "title": "Freigegebene Datenpools",
+        "subtitle": "Die Nutzung dieser Datenquelle ist für die ausgewählten Datenpools freigegeben.",
+        "tableHeaders": {
+          "name": "Name",
+          "description": "Beschreibung",
+          "contactPerson": "Ansprechperson",
+          "action": "Aktion"
+        },
+        "noContact": "Keine"
+      },
+      "addDatapoolModal": {
+        "title": "Datenpools hinzufügen",
+        "description": "Wähle die Datenpools aus, für die diese Datenquelle freigegeben werden soll.",
+        "selectedDatapools": "{number} ausgewählt",
+        "tableHeaders": {
+          "name": "Name",
+          "description": "Beschreibung"
+        }
       }
     }
   },
@@ -1190,7 +1251,8 @@
       "validationFailed": "Validierung fehlgeschlagen für: {names}",
       "duplicateNames": "Doppelte Pipeline-Namen: {names}",
       "saveFailed": "Speichern fehlgeschlagen: {names}",
-      "saveSucces": "Pipelines erfolgreich gespeichert"
+      "saveSucces": "Pipelines erfolgreich gespeichert",
+      "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datapool nicht erlaubt."
     },
     "tabs": {
       "closeTab": "Tab schließen",
@@ -1293,6 +1355,94 @@
     "export": {
       "success": "Diagramm erfolgreich exportiert",
       "error": "Diagramm konnte nicht exportiert werden. Bitte versuchen Sie es erneut."
+    }
+  },
+  "datapools": {
+    "title": "Datenpools",
+    "searchDatapools": "Datenpools durchsuchen...",
+    "addDatapool": "Datenpool erstellen",
+    "noContact": "Keine",
+    "tableHeaders": {
+      "name": "Name",
+      "description": "Beschreibung",
+      "datasets": "Datensätze",
+      "contact": "Ansprechperson",
+      "action": "Aktion"
+    },
+    "deleteModal": {
+      "title": "Datenpool wirklich löschen?",
+      "description": "Diese Aktion löscht den Datenpool endgültig. Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "infoModal": {
+      "title": "Datenpool kann nicht gelöscht werden",
+      "description": "Zuerst müssen alle Zuordnungen von Datensätzen entfernt werden."
+    },
+    "create": {
+      "title": "Neuer Datenpool"
+    },
+    "form": {
+      "title": "Basisinformationen",
+      "subtitle": "Der Name kann später angepasst werden.",
+      "name": "Name",
+      "namePlaceholder": "Name des Datenpools",
+      "description": "Beschreibung",
+      "descriptionPlaceholder": "Füge eine Beschreibung ein",
+      "contact": "Ansprechperson (optional)",
+      "contactPlaceholder": "Nach Name oder Email suchen..."
+    },
+    "overview": {
+      "tabs": {
+        "basicInfo": "Basisinformationen",
+        "accessManagement": "Zugriff",
+        "datasets": "Datensätze",
+        "datasources": "Datenquellen"
+      },
+      "datasourcesTab": {
+        "title": "Freigegebene Datenquellen",
+        "subtitle": "Für diesen Datenpool freigegebene Datenquellen. Änderungen erfolgen in der jeweiligen Datenquelle.",
+        "noDatasources": "Keine Datenquellen freigegeben",
+        "noDatasourcesSubTitle": "Für diesen Datenpool wurden noch keine Datenquellen freigegeben. Die Freigabe erfolgt in der jeweiligen Datenquelle.",
+        "search": "Datenquellen durchsuchen",
+        "tableHeaders": {
+          "name": "Name",
+          "description": "Beschreibung",
+          "connector": "Konnektor",
+          "lastActive": "Aktualisiert vor",
+          "status": "Status"
+        },
+        "status": {
+          "DRAFT": "Entwurf",
+          "AVAILABLE": "Verfügbar"
+        }
+      },
+      "datasetsTab": {
+        "title": "Datensätze",
+        "addDataset": "Datensatz erstellen",
+        "noDatasets": "Keine Datensätze vorhanden",
+        "noDatasetsSubTitle": "Zu diesem Datenpool wurden noch keine Datensätze hinzugefügt.",
+        "tableHeaders": {
+          "name": "Name",
+          "contact": "Ansprechperson",
+          "modifiedAt": "Aktualisiert",
+          "status": "Status"
+        }
+      }
+    },
+    "accessManagementTab": {
+      "title": "Zugriff auf Datenpool und Datensätze",
+      "subtitle": "Hier werden Berechtigungen für den Datenpool und optional für alle enthaltenen Datensätze definiert.",
+      "noDataPage": {
+        "subtitle": "Keine Gruppe besitzt Berechtigungen an diesem Datenpool oder optional an allen enthaltenen Datensätzen."
+      },
+      "infoBoxes": {
+        "firstBox": "Gruppen, die plattformweite Berechtigungen an allen datenbezogenen Elementen besitzen, haben Zugriff auf diesen Datenpool und alle enthaltenen Datensätze."
+      }
+    },
+    "errors": {
+      "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert.",
+      "createError": "Beim Anlegen des Datenpools ist ein Fehler aufgetreten.",
+      "updateError": "Beim Aktualisieren des Datenpools ist ein Fehler aufgetreten.",
+      "deleteError": "Beim Löschen des Datenpools ist ein Fehler aufgetreten."
     }
   }
 }

@@ -18,20 +18,15 @@ import {
   LayerFormData,
   NamedApi,
   NamedApiPayload,
+  OwsApiFormData,
   StaApiFormData,
   StyleFormData,
-  WfsWmsApiFormData,
 } from '@/types/namedApis'
 import { isLayerNameError, LayerSaveError } from '@/utils/errors'
 import { hasDirtyField } from '@/utils/form'
-import {
-  buildStaPayloadData,
-  buildWfsWmsPayload,
-  mapFormLayerToPayload,
-  mapFormStyleToPayload,
-} from '@/utils/namedApis'
+import { buildOwsPayload, buildStaPayloadData, mapFormLayerToPayload, mapFormStyleToPayload } from '@/utils/namedApis'
 
-type FormData = StaApiFormData | WfsWmsApiFormData
+type FormData = StaApiFormData | OwsApiFormData
 
 interface UseApiConfigActionsArgs<TFormData extends FormData> {
   form: UseFormReturn<TFormData>
@@ -43,10 +38,10 @@ interface UseApiConfigActionsArgs<TFormData extends FormData> {
   onAfterDiscard?: () => void
 }
 
-const isWfsWmsFormData = (data: StaApiFormData | WfsWmsApiFormData) => data.type === API_TYPE_QUERY.WFS_WMS
+const isOwsFormData = (data: StaApiFormData | OwsApiFormData) => data.type === API_TYPE_QUERY.OWS
 
 const buildPayloadData = (data: FormData) => {
-  if (isWfsWmsFormData(data)) return buildWfsWmsPayload(data)
+  if (isOwsFormData(data)) return buildOwsPayload(data)
   return buildStaPayloadData(data)
 }
 
@@ -128,14 +123,14 @@ export const useApiConfig = <TFormData extends FormData>({
     }
   }
 
-  const handleSaveLayers = async (data: WfsWmsApiFormData) => {
-    const wfsDirtyFields = dirtyFields as Partial<Record<keyof WfsWmsApiFormData, unknown>>
-    if (!hasDirtyField(wfsDirtyFields.layers)) return
+  const handleSaveLayers = async (data: OwsApiFormData) => {
+    const owsDirtyFields = dirtyFields as Partial<Record<keyof OwsApiFormData, unknown>>
+    if (!hasDirtyField(owsDirtyFields.layers)) return
 
     const isNew = (layer: LayerFormData) => layer.id.startsWith('new-')
 
     const isDirtyOrNew = (layer: LayerFormData, i: number) =>
-      isNew(layer) || hasDirtyField(Array.isArray(wfsDirtyFields.layers) ? wfsDirtyFields.layers[i] : undefined)
+      isNew(layer) || hasDirtyField(Array.isArray(owsDirtyFields.layers) ? owsDirtyFields.layers[i] : undefined)
 
     const layersToSave = data.layers.filter(isDirtyOrNew)
     if (layersToSave.length === 0) return
@@ -159,14 +154,14 @@ export const useApiConfig = <TFormData extends FormData>({
     if (layersToSave.some(l => !isNew(l))) toast.success(t('messages.updateLayerSuccess'))
   }
 
-  const handleSaveStyles = async (data: WfsWmsApiFormData) => {
-    const wfsDirtyFields = dirtyFields as Partial<Record<keyof WfsWmsApiFormData, unknown>>
-    if (!hasDirtyField(wfsDirtyFields.styles)) return
+  const handleSaveStyles = async (data: OwsApiFormData) => {
+    const owsDirtyFields = dirtyFields as Partial<Record<keyof OwsApiFormData, unknown>>
+    if (!hasDirtyField(owsDirtyFields.styles)) return
 
     const isNew = (style: StyleFormData) => style.id.startsWith('new-')
 
     const isDirtyOrNew = (style: StyleFormData, i: number) =>
-      isNew(style) || hasDirtyField(Array.isArray(wfsDirtyFields.styles) ? wfsDirtyFields.styles[i] : undefined)
+      isNew(style) || hasDirtyField(Array.isArray(owsDirtyFields.styles) ? owsDirtyFields.styles[i] : undefined)
 
     const stylesToSave = data.styles.filter(isDirtyOrNew)
     if (stylesToSave.length === 0) return
@@ -196,12 +191,21 @@ export const useApiConfig = <TFormData extends FormData>({
   }
 
   const handleSave = async (): Promise<boolean> => {
+    const dirtyLayers = (form.formState.dirtyFields as Partial<Record<keyof OwsApiFormData, unknown>>).layers
+    const layerValues = (form.getValues as () => OwsApiFormData)().layers
+    console.log(
+      '[dirty layer fields]',
+      (dirtyLayers as Record<string, unknown>[] | undefined)?.map((dirty, i) => ({
+        layerName: layerValues?.[i]?.layerName,
+        dirtyFields: dirty,
+      })),
+    )
     let isSaved = false
     await form.handleSubmit(
       async data => {
         try {
           await handleSaveBaseInfo(data)
-          if (isWfsWmsFormData(data)) {
+          if (isOwsFormData(data)) {
             await handleSaveLayers(data)
             await handleSaveStyles(data)
           }
@@ -218,7 +222,6 @@ export const useApiConfig = <TFormData extends FormData>({
         handleFormValidationError(errors)
       },
     )()
-
     return isSaved
   }
 

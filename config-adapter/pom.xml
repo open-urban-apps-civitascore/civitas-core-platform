@@ -32,6 +32,7 @@
 		<module>config-adapter-geoserver</module>
 		<module>config-adapter-nifi</module>
 		<module>config-adapter-flowable</module>
+		<module>config-adapter-postgis</module>
 	</modules>
 
 	<properties>
@@ -216,6 +217,7 @@
 				<artifactId>HikariCP</artifactId>
 				<version>${hikaricp.version}</version>
 			</dependency>
+			<!-- JDBC / Connection Pool -->
 			<dependency>
 				<groupId>org.postgresql</groupId>
 				<artifactId>postgresql</artifactId>
@@ -255,6 +257,12 @@
 			<dependency>
 				<groupId>org.testcontainers</groupId>
 				<artifactId>testcontainers-kafka</artifactId>
+				<version>${testcontainers.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.testcontainers</groupId>
+				<artifactId>testcontainers-postgresql</artifactId>
 				<version>${testcontainers.version}</version>
 				<scope>test</scope>
 			</dependency>

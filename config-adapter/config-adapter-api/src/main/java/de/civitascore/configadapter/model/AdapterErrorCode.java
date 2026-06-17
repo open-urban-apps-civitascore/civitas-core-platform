@@ -65,11 +65,16 @@ public enum AdapterErrorCode {
   GEOSERVER_RESOURCE_ERROR(
       3402, false, "GeoServer resource error: %s", "Geo resource operation failed"),
 
-  NIFI_ERROR(3501, true, "NiFi error: %s", "Pipeline service error"),
-  NIFI_FLOW_ERROR(3502, false, "NiFi flow error: %s", "Pipeline operation failed"),
+  POSTGIS_ERROR(3501, false, "PostGIS error: %s", "Database error"),
+  POSTGIS_DDL_ERROR(3502, false, "PostGIS DDL error: %s", "Table operation failed"),
+  POSTGIS_CONNECTION_ERROR(
+      3503, true, "PostGIS connection error: %s", "Database temporarily unavailable"),
+
+  NIFI_ERROR(3601, true, "NiFi error: %s", "Pipeline service error"),
+  NIFI_FLOW_ERROR(3602, false, "NiFi flow error: %s", "Pipeline operation failed"),
   NIFI_TEMPLATE_ERROR(
-      3503, false, "No curated NiFi template for %s", "Unsupported pipeline combination"),
-  NIFI_MAPPING_ERROR(3504, false, "NiFi mapping compile error: %s", "Pipeline mapping invalid"),
+      3603, false, "No curated NiFi template for %s", "Unsupported pipeline combination"),
+  NIFI_MAPPING_ERROR(3604, false, "NiFi mapping compile error: %s", "Pipeline mapping invalid"),
 
   // 9xxx: Unknown/unexpected errors
   UNKNOWN_ERROR(9001, false, "Unexpected error: %s", "Internal error"),

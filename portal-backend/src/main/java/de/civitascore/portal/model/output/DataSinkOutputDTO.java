@@ -18,6 +18,7 @@ public class DataSinkOutputDTO extends BaseOutputDTO {
   private UUID dataSetId;
   private UUID pipelineId;
   private DataSinkType dataSinkType;
+  private boolean inUse;
 
   @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
   @JsonSubTypes({

@@ -44,7 +44,8 @@ const DatasetsList = (props: DatasetsListProps) => {
     totalPages,
   } = useQueryParams()
 
-  const { hasPermission } = usePermissions()
+  const { hasPermissionInScope } = usePermissions()
+  const canCreateDataset = hasPermissionInScope(PERMISSION_NAMES.DATASET_CREATE, 'TENANT')
 
   const [datasetToDelete, setDatasetToDelete] = useState<string | null>(null)
   const [isWarningOpen, setIsWarningOpen] = useState(false)
@@ -76,7 +77,7 @@ const DatasetsList = (props: DatasetsListProps) => {
 
   useEffect(() => setTotalPages(Math.ceil(rowCount / pageSize) || 1), [rowCount, pageSize, setTotalPages])
 
-  const CustomElement = hasPermission(PERMISSION_NAMES.DATASET_CREATE) ? (
+  const CustomElement = canCreateDataset ? (
     <Button
       data-testid="addDatasetButton"
       onClick={() => router.push(`datasets/create?${getApiRequestParamsByUrl().toString()}`)}

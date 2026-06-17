@@ -22,7 +22,7 @@ interface ApiListProps {
 
 export const ApiList = ({ datasetId, apis, canEdit, isOpenDataAccess }: ApiListProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.apis')
-  const hasWfsWms = hasApiType(apis, API_STANDARDS.WFS) || hasApiType(apis, API_STANDARDS.WMS)
+  const hasOws = hasApiType(apis, API_STANDARDS.OWS)
 
   const { data: datasinksData } = useGetDatasinks(datasetId)
 
@@ -30,7 +30,7 @@ export const ApiList = ({ datasetId, apis, canEdit, isOpenDataAccess }: ApiListP
     datasinksData?.data.filter(datasink => datasink.dataSinkType === DATASINK_TYPES.POSTGIS) || []
   const hasPostgisDatasinks = postgisDatasinks.length > 0
 
-  const canCreateWfsWmsApi = !hasWfsWms && hasPostgisDatasinks
+  const canCreateOwsApi = !hasOws && hasPostgisDatasinks
 
   return (
     <div className="py-3">
@@ -50,16 +50,16 @@ export const ApiList = ({ datasetId, apis, canEdit, isOpenDataAccess }: ApiListP
                 <span className="text-xs text-muted-foreground">{t('sensorThingsSubtitle')}</span>
               </GuardedLink>
             </DropdownMenuItem>
-            <DropdownMenuItem disabled={!canCreateWfsWmsApi} asChild={!hasWfsWms}>
-              {canCreateWfsWmsApi ? (
-                <GuardedLink href={`/datasets/${datasetId}/apis?type=wfs-wms`} className="flex items-center gap-3">
-                  <span>{t('wfsWms')}</span>
-                  <span className="text-xs text-muted-foreground">{t('wfsWmsSubtitle')}</span>
+            <DropdownMenuItem disabled={!canCreateOwsApi} asChild={!hasOws}>
+              {canCreateOwsApi ? (
+                <GuardedLink href={`/datasets/${datasetId}/apis?type=ows`} className="flex items-center gap-3">
+                  <span>{t('ows')}</span>
+                  <span className="text-xs text-muted-foreground">{t('owsSubtitle')}</span>
                 </GuardedLink>
               ) : (
                 <div className="flex items-center gap-3">
-                  <span className="text-muted-foreground">{t('wfsWms')}</span>
-                  <span className="text-xs text-muted-foreground">{t('wfsWmsSubtitle')}</span>
+                  <span className="text-muted-foreground">{t('ows')}</span>
+                  <span className="text-xs text-muted-foreground">{t('owsSubtitle')}</span>
                 </div>
               )}
             </DropdownMenuItem>

@@ -194,10 +194,10 @@ class GeoServerSagaHandlerTest {
                     Map.of(
                         "datasetId",
                         "ds-abc",
-                        "dataSinks",
+                        "datasinks",
                         List.of(
                             Map.of(
-                                "dataSinkType",
+                                "type",
                                 "POSTGIS",
                                 "configuration",
                                 Map.of("tableName", "traffic"))),
@@ -230,18 +230,10 @@ class GeoServerSagaHandlerTest {
                     Map.of(
                         "datasetId",
                         "ds-abc",
-                        "dataSinks",
+                        "datasinks",
                         List.of(
-                            Map.of(
-                                "dataSinkType",
-                                "POSTGIS",
-                                "configuration",
-                                Map.of("tableName", "t1")),
-                            Map.of(
-                                "dataSinkType",
-                                "POSTGIS",
-                                "configuration",
-                                Map.of("tableName", "t2"))),
+                            Map.of("type", "POSTGIS", "configuration", Map.of("tableName", "t1")),
+                            Map.of("type", "POSTGIS", "configuration", Map.of("tableName", "t2"))),
                         "layers",
                         List.of(Map.of("layerName", "roads")))));
 
@@ -292,10 +284,10 @@ class GeoServerSagaHandlerTest {
                     Map.of(
                         "datasetId", "ds-abc",
                         "layers", List.of(Map.of("layerName", "t1")),
-                        "dataSinks", List.of("not-an-object"))));
+                        "datasinks", List.of("not-an-object"))));
 
         assertEquals("STEP_FAILED", result.type());
-        // The dataSinks list is also type-guarded (read via firstSinkTableName) — clean error.
+        // The datasinks list is also type-guarded (read via firstSinkTableName) — clean error.
         assertTrue(result.error().contains("must be"), result.error());
       }
     }
