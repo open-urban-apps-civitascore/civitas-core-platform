@@ -117,7 +117,8 @@ export interface PipelinePayload {
   styles: PipelineStylesPayload
   dataSourceIds: string[] // IDs extracted from DataSource nodes
   dataSinks: PipelineDatasink[] // datasinks config
-  model: object // Pipeline graph serialized in RedPandaConnect syntax
+  /** Engine-neutral pipeline graph forwarded to the config-adapter as-is (React-Flow nodes/edges + mappingConfig). */
+  model: PipelineStylesPayload
 }
 
 // ============================================================================

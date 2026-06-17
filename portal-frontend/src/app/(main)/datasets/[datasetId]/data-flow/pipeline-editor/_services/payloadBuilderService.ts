@@ -15,7 +15,6 @@ import { DATASINK_TYPES, type PipelineDatasink } from '@/types/datasinks'
 import type { DataSourceNodeData } from '../_types/nodes'
 import { isDataSourceNodeData, isGeoPersistenceNodeData } from '../_types/nodes'
 import type { Pipeline, PipelinePayload, PipelineStylesPayload } from '../_types/pipeline'
-import { buildRedPandaConnectModel } from './modelBuilderService'
 
 /**
  * Builds the complete PipelinePayload for backend API submission.
@@ -54,17 +53,18 @@ export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
     return []
   })
 
-  // 3. Build RedPandaConnect model
-  const model = buildRedPandaConnectModel(pipeline)
-
-  // 4. Assemble payload — styles is JSON-stringified for the backend
+  // 3. Assemble payload. `model` is the engine-neutral pipeline graph (React-Flow nodes/edges +
+  //    inline mappingConfig) that the backend forwards to the config-adapter as-is; the
+  //    config-adapter (NiFi) is the only place engine specifics appear. `styles` carries the same
+  //    React-Flow layout for editor round-tripping. No engine-specific (RedPanda) model is built
+  //    on the frontend anymore.
   return {
     name: pipeline.name,
     description: pipeline.description || '-',
     styles: styles,
+    model: styles,
     dataSourceIds,
     dataSinks: dataSinks,
-    model: model || {},
   }
 }
 
