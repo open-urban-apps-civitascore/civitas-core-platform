@@ -21,14 +21,15 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Derives the table columns for a PostGIS sink from the JSON Schema the portal-backend resolves
- * from Model Atlas and ships at {@code datasinks[].dataStructure}.
+ * Derives the table columns for a PostGIS sink from the JSON Schema the portal-backend stores on
+ * the data-structure version and ships at {@code datasinks[].dataStructure}.
  *
- * <p>Properties come from the root {@code properties} or the schema's {@code definitions} entry;
- * {@code required} properties become {@code NOT NULL}. A property referencing a geometry definition
- * ({@code $ref} fragment ending in a PostGIS geometry type name, e.g. {@code …/Point}) becomes a
- * geometry column with SRID 4326 — the schema cannot carry an SRID, and 4326 matches the GeoServer
- * handler's CRS default. Other {@code $ref}s are nested objects and map to {@code JSONB}.
+ * <p>Properties come from the root {@code properties} or the schema's {@code $defs}/{@code
+ * definitions}; {@code required} properties become {@code NOT NULL}. A property whose {@code $ref}
+ * points at a GeoJSON geometry schema ({@code https://geojson.org/schema/<Type>.json}) becomes a
+ * geometry column; its SRID is taken from an optional {@code srid} on the property (the data
+ * structure's CRS), defaulting to 4326 (the GeoServer handler's CRS default). Any other {@code
+ * $ref} is a nested object and maps to {@code JSONB}.
  *
  * <p>Names in {@code excludedNames} (explicitly configured geometry columns) are skipped so they
  * are not duplicated as derived columns.
@@ -36,6 +37,9 @@ import java.util.Set;
 public final class DataStructureTableMapper {
 
   private static final int DEFAULT_SRID = 4326;
+
+  /** Geometry properties reference a GeoJSON schema under this host; the type is the file name. */
+  private static final String GEOJSON_SCHEMA_MARKER = "geojson.org/schema/";
 
   private DataStructureTableMapper() {}
 
@@ -70,8 +74,10 @@ public final class DataStructureTableMapper {
 
       GeometryType geometryType = geometryType(stringValue(spec.get("$ref")));
       if (geometryType != null) {
+        Integer srid = intValue(spec.get("srid"));
         geometryColumns.add(
-            new GeometryColumnConfig(name, geometryType, DEFAULT_SRID, null, nullable));
+            new GeometryColumnConfig(
+                name, geometryType, srid != null ? srid : DEFAULT_SRID, null, nullable));
         continue;
       }
       ColumnType type = columnType(spec);
@@ -85,7 +91,7 @@ public final class DataStructureTableMapper {
     if (!mapValue(schema.get("properties")).isEmpty()) {
       return schema;
     }
-    Map<String, Object> definitions = mapValue(schema.get("definitions"));
+    Map<String, Object> definitions = definitions(schema);
     if (definitions.size() == 1) {
       return mapValue(definitions.values().iterator().next());
     }
@@ -108,6 +114,15 @@ public final class DataStructureTableMapper {
   }
 
   /**
+   * Named type definitions, merging draft 2020-12 {@code $defs} with the older {@code definitions}.
+   */
+  private static Map<String, Object> definitions(Map<String, Object> schema) {
+    Map<String, Object> merged = new LinkedHashMap<>(mapValue(schema.get("definitions")));
+    merged.putAll(mapValue(schema.get("$defs")));
+    return merged;
+  }
+
+  /**
    * The only definition that carries properties, if exactly one does. Referenced type definitions
    * (e.g. an inlined geometry class) have none and do not count as table candidates.
    */
@@ -125,12 +140,24 @@ public final class DataStructureTableMapper {
     return match;
   }
 
-  /** Geometry type when the ref fragment ends in a PostGIS geometry type name, else null. */
+  /**
+   * Geometry type when the ref points at a GeoJSON geometry schema ({@code
+   * https://geojson.org/schema/<Type>.json}), else null. Only GeoJSON-host refs are geometry; a
+   * local {@code $ref} to a named type (e.g. {@code #/$defs/Point}) stays a nested object so a
+   * class merely named "Point" is not misread as a geometry column.
+   */
   private static GeometryType geometryType(String ref) {
     if (ref == null) {
       return null;
     }
-    String name = ref.substring(ref.lastIndexOf('/') + 1);
+    int marker = ref.indexOf(GEOJSON_SCHEMA_MARKER);
+    if (marker < 0) {
+      return null;
+    }
+    String name = ref.substring(marker + GEOJSON_SCHEMA_MARKER.length());
+    if (name.endsWith(".json")) {
+      name = name.substring(0, name.length() - ".json".length());
+    }
     for (GeometryType type : GeometryType.values()) {
       if (type.name().equals(name.toUpperCase(Locale.ROOT))) {
         return type;
@@ -179,5 +206,9 @@ public final class DataStructureTableMapper {
 
   private static String stringValue(Object value) {
     return value instanceof String s ? s : null;
+  }
+
+  private static Integer intValue(Object value) {
+    return value instanceof Number n ? n.intValue() : null;
   }
 }

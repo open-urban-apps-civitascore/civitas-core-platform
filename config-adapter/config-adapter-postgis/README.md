@@ -225,7 +225,7 @@ The handler reuses the same `ConnectionProvider`, `PostgisDialect`, and `GrantRe
 
 Beyond the generic resource ops, the handler is a **step in the dataset sagas**. When the dataset trigger carries a `POSTGIS` data sink (`hasGeoSink`), the CREATE saga runs `PROVISION_SINK` **before** GeoServer registers its datastore — GeoServer publishes feature types from a PostGIS table, and that table must exist first. `PROVISION_SINK` reads each `datasinks[POSTGIS].configuration` and creates the schema (optional), table, and a GeoServer read role + grant, all in one transaction (idempotent). `DEPROVISION_SINK` (DELETE saga / CREATE compensation) drops the table and role; the schema is left (it may be shared).
 
-`datasinks[POSTGIS]` shape — `configuration.columns` is an optional explicit override; when absent, columns are derived from the sink's `dataStructure` (the JSON Schema the backend resolves from Model Atlas at publish time):
+`datasinks[POSTGIS]` shape — `configuration.columns` is an optional explicit override; when absent, columns are derived from the sink's `dataStructure` (the JSON Schema the backend stores on the data-structure version and ships at publish time):
 
 ```json
 { "type": "POSTGIS",
@@ -236,13 +236,17 @@ Beyond the generic resource ops, the handler is a **step in the dataset sagas**.
     "geometryColumns": [ {"name": "geom", "geometryType": "POINT", "srid": 4326} ],
     "primaryKey": ["id"],
     "readRole": {"name": "ds_42_geo", "privileges": ["USAGE"]} },
-  "dataStructure": { "$id": "urn:core:datastructure:…", "title": "Observation",
-    "definitions": { "Observation": { "type": "object", "properties": { "..." : {} } } } } }
+  "dataStructure": { "$id": "http://civitas.org/model/observation/1.0.0",
+    "$schema": "https://json-schema.org/draft/2020-12/schema", "title": "Observation",
+    "type": "object",
+    "properties": { "station_id": {"type": "string"},
+      "location": {"$ref": "https://geojson.org/schema/Point.json"} },
+    "required": ["station_id"] } }
 ```
 
 #### Column derivation from `dataStructure`
 
-`DataStructureTableMapper` reads the root `properties` or the schema's property-carrying `definitions` entry (inlined referenced types have no properties and are skipped); `required` properties become `NOT NULL`.
+`DataStructureTableMapper` reads the root `properties`, or the schema's property-carrying `$defs`/`definitions` entry (inlined referenced types have no properties and are skipped); `required` properties become `NOT NULL`.
 
 | JSON Schema type | Column type |
 |---|---|
@@ -252,11 +256,11 @@ Beyond the generic resource ops, the handler is a **step in the dataset sagas**.
 | `string(date-time)` | `TIMESTAMPTZ` |
 | `string(date)` / `string(time)` / `string(uuid)` | `DATE` / `TIME` / `UUID` |
 | `object`, `array` | `JSONB` |
-| `$ref` ending in a geometry type name (`…/Point`, `…/MultiPolygon`, …) | geometry column, SRID 4326 |
-| other `$ref` (nested object) | `JSONB` |
+| `$ref` to a GeoJSON schema (`https://geojson.org/schema/<Type>.json`) | geometry column, SRID from the property's `srid` (default 4326) |
+| other `$ref` (e.g. `#/$defs/<Type>`, nested object) | `JSONB` |
 | `string`, unknown | `TEXT` |
 
-The geometry `$ref` form is what the schema generator emits once the geometry type packages resolve in Model Atlas; until then geometry properties arrive as plain `string` and degrade to `TEXT`. Explicit `configuration.geometryColumns` are excluded from derivation. A schema without usable properties fails the step with an actionable error.
+Geometry is recognized only by the GeoJSON-host `$ref` — a local `#/$defs/Point` is a nested object, not geometry. The geometry column's CRS comes from an optional integer `srid` on the property (`{ "$ref": "https://geojson.org/schema/Point.json", "srid": 25832 }`), defaulting to EPSG:4326 (matching the GeoServer handler) when absent. Explicit `configuration.geometryColumns` are excluded from derivation. A schema without usable properties fails the step with an actionable error.
 
 Saga placement — CREATE: `… APISIX → [hasGeoSink] PROVISION_SINK → GeoServer workspace → datastore → layers → …`; DELETE: `… GeoServer DELETE_WORKSPACE → DEPROVISION_SINK → FROST`. UPDATE does not re-provision the sink.
 

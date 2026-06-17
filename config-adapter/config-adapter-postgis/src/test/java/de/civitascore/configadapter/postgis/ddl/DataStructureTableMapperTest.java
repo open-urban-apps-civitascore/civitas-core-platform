@@ -119,23 +119,18 @@ class DataStructureTableMapperTest {
   }
 
   @Test
-  void geometryRefBecomesGeometryColumnWithDefaultSrid() {
-    // The shape Model Atlas produces once the geometry package resolves: the property references
-    // an inlined geometry definition. Verified against the schema generator's $ref emission.
+  void geojsonRefBecomesGeometryColumnWithDefaultSrid() {
+    // The editor emits a geometry attribute as a GeoJSON $ref; the schema carries no SRID, so 4326.
     Map<String, Object> schema =
         json(
             """
             { "title": "GeoProbe",
-              "definitions": {
-                "Point": { "type": "object" },
-                "Observation": {
-                  "type": "object",
-                  "properties": {
-                    "station_id": { "type": "string" },
-                    "location":   { "$ref": "#/definitions/Point" }
-                  },
-                  "required": ["location"]
-                } } }
+              "type": "object",
+              "properties": {
+                "station_id": { "type": "string" },
+                "location":   { "$ref": "https://geojson.org/schema/Point.json" }
+              },
+              "required": ["location"] }
             """);
 
     TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
@@ -151,12 +146,27 @@ class DataStructureTableMapperTest {
   }
 
   @Test
-  void externalGeometryRefIsRecognized() {
+  void geometrySridIsTakenFromThePropertyWhenPresent() {
+    // The data structure's CRS rides on the geometry property as `srid`; default is 4326.
     Map<String, Object> schema =
         json(
             """
             { "properties": {
-                "area": { "$ref": "http://models.civitasconnect.org/models/postgis/1.0#//MultiPolygon" } } }
+                "location": { "$ref": "https://geojson.org/schema/Point.json", "srid": 25832 } } }
+            """);
+
+    TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
+
+    assertEquals(25832, derived.geometryColumns().get(0).srid());
+  }
+
+  @Test
+  void geojsonRefTypeIsCaseAndExtensionTolerant() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "properties": {
+                "area": { "$ref": "https://geojson.org/schema/MultiPolygon.json" } } }
             """);
 
     TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
@@ -165,23 +175,46 @@ class DataStructureTableMapperTest {
   }
 
   @Test
-  void nonGeometryRefMapsToJsonb() {
-    // Includes the generator's unresolved-name bug ("#/definitions/null"): an unidentifiable
-    // reference is a nested object, not a geometry.
+  void localRefMapsToJsonbAndIsNeverGeometry() {
+    // Local $defs/definitions refs are nested objects → JSONB, even when a type is named like a
+    // geometry ("Point"): only GeoJSON-host refs are geometry.
     Map<String, Object> schema =
         json(
             """
             { "properties": {
-                "address": { "$ref": "#/definitions/Address" },
-                "broken":  { "$ref": "#/definitions/null" } } }
+                "address": { "$ref": "#/$defs/Address" },
+                "point":   { "$ref": "#/$defs/Point" } } }
             """);
 
     TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
 
     Map<String, ColumnConfig> named = byName(derived);
     assertEquals(ColumnType.JSONB, named.get("address").type());
-    assertEquals(ColumnType.JSONB, named.get("broken").type());
+    assertEquals(ColumnType.JSONB, named.get("point").type());
     assertTrue(derived.geometryColumns().isEmpty());
+  }
+
+  @Test
+  void definitionIsSelectedFromDollarDefs() {
+    // Draft 2020-12 keeps named types under $defs; a schema with no root properties resolves there.
+    Map<String, Object> schema =
+        json(
+            """
+            { "title": "Observation",
+              "$defs": {
+                "Observation": {
+                  "type": "object",
+                  "properties": { "station_id": { "type": "string" } },
+                  "required": ["station_id"]
+                } } }
+            """);
+
+    Map<String, ColumnConfig> named =
+        byName(DataStructureTableMapper.deriveColumns(schema, Set.of()));
+
+    assertEquals(1, named.size());
+    assertEquals(ColumnType.TEXT, named.get("station_id").type());
+    assertEquals(false, named.get("station_id").nullable());
   }
 
   @Test
