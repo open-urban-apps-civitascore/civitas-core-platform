@@ -29,7 +29,7 @@ import lombok.experimental.SuperBuilder;
 
 /**
  * Represents a dataset with its lifecycle status, infrastructure references, and relationships to
- * {@link Pipeline Pipelines}, {@link Distribution Distributions}, and {@link DataSpace DataSpaces}.
+ * {@link Pipeline Pipelines} and {@link Distribution Distributions}.
  *
  * @see DataSetStatus
  */
@@ -72,20 +72,12 @@ public class DataSet extends BaseDataEntity {
   private User owner;
 
   @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "datapool_id")
+  private DataPool dataPool;
+
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "dataset_series_id")
   private DataSetSeries dataSetSeries;
-
-  @ManyToMany(fetch = FetchType.LAZY)
-  @JoinTable(
-      name = "dataset_dataspaces",
-      joinColumns = @JoinColumn(name = "dataset_id"),
-      inverseJoinColumns = @JoinColumn(name = "dataspace_id"),
-      indexes = {
-        @Index(name = "idx_dataset_dataspaces_dataset", columnList = "dataset_id"),
-        @Index(name = "idx_dataset_dataspaces_dataspace", columnList = "dataspace_id")
-      })
-  @Builder.Default
-  private Set<DataSpace> dataSpaces = new HashSet<>();
 
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(

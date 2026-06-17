@@ -1,5 +1,6 @@
 package de.civitascore.portal.controller.exception;
 
+import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;
 import de.civitascore.portal.util.ForbiddenException;
@@ -118,6 +119,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
    * @param request the current HTTP request
    * @return a Problem Detail with HTTP 403 status
    */
+  @ExceptionHandler(DataSourceScopeViolationException.class)
+  @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+  public ProblemDetail handleDataSourceScopeViolation(
+      DataSourceScopeViolationException ex, HttpServletRequest request) {
+    log.warn("DataSource scope violation: offending IDs {}", ex.getOffendingDataSourceIds());
+    ProblemDetail pd =
+        createProblemDetail(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "DATASOURCE_SCOPE_VIOLATION",
+            ex.getMessage(),
+            request);
+    pd.setProperty("offendingDataSourceIds", ex.getOffendingDataSourceIds());
+    return pd;
+  }
+
   @ExceptionHandler(ForbiddenException.class)
   @ResponseStatus(HttpStatus.FORBIDDEN)
   public ProblemDetail handleForbidden(ForbiddenException ex, HttpServletRequest request) {

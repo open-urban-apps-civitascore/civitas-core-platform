@@ -46,7 +46,11 @@ const defaultProps = {
   search: '',
 }
 
-const mockCurrentUser = (permissions: PermissionName[]) => {
+const mockCurrentUser = (
+  permissions: PermissionName[],
+  scopeType: 'TENANT' | 'DATASOURCE' = 'TENANT',
+  scopeId: string | null = null,
+) => {
   vi.mocked(useGetCurrentUser).mockReturnValue({
     data: {
       username: 'test',
@@ -54,7 +58,7 @@ const mockCurrentUser = (permissions: PermissionName[]) => {
       title: 'MR' as const,
       firstName: 'Test',
       lastName: 'User',
-      assignments: [{ scopeType: 'TENANT', scopeId: null, permissions }],
+      assignments: [{ scopeType, scopeId, permissions }],
     },
   } as unknown as ReturnType<typeof useGetCurrentUser>)
 }
@@ -74,6 +78,12 @@ describe('DatasourcesList permission gating', () => {
 
   it('hides create button when user lacks DATASOURCE_CREATE permission', () => {
     mockCurrentUser([PERMISSION_NAMES.DATASOURCE_READ])
+    renderComponent()
+    expect(screen.queryByTestId('addDatasourceButton')).not.toBeInTheDocument()
+  })
+
+  it('hides create button when user has DATASOURCE_CREATE only via resource-scoped assignment', () => {
+    mockCurrentUser([PERMISSION_NAMES.DATASOURCE_CREATE], 'DATASOURCE', 'ds1')
     renderComponent()
     expect(screen.queryByTestId('addDatasourceButton')).not.toBeInTheDocument()
   })

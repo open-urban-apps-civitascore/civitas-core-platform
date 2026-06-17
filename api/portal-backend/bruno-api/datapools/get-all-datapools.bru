@@ -1,0 +1,37 @@
+meta {
+  name: Get All DataPools
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/datapools
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+  ~sort: createdAt,DESC
+  ~name: mobility
+  ~description: governance
+  ~q: city
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns paginated list", function() {
+    expect(res.body.content).to.be.an('array');
+  });
+}
+
+docs {
+  **Expected Response:** 200 OK, paginated list of datapool objects.
+}

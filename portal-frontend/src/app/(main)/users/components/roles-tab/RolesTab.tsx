@@ -7,13 +7,13 @@ import { useMemo, useState } from 'react'
 import { useGetAssignments } from '@/app/services/api/assignments/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { SearchHeader } from '@/components/search-area/SearchArea'
-import { SegmentedControlBar, Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { AlertBox } from '@/components/text-box/TextBox'
+import { Button } from '@/components/ui/button'
 
 import { RolesAssignmentTable } from './RolesAssignmentTable'
 
-type ScopeSegment = 'platformWide' | 'dataset' | 'datasource' | 'datastructure'
+type ScopeSegment = 'platformWide' | 'dataset' | 'datasource' | 'datastructure' | 'datapool'
 
 const SCOPE_SEGMENT_PARAMS: Record<ScopeSegment, string[][]> = {
   platformWide: [
@@ -23,6 +23,7 @@ const SCOPE_SEGMENT_PARAMS: Record<ScopeSegment, string[][]> = {
   dataset: [['scopeType', 'DATASET']],
   datasource: [['scopeType', 'DATASOURCE']],
   datastructure: [['scopeType', 'DATASTRUCTURE']],
+  datapool: [['scopeType', 'DATAPOOL']],
 }
 
 interface RolesTabProps {
@@ -39,11 +40,12 @@ export const RolesTab = (props: RolesTabProps) => {
   const [pageSize, setPageSize] = useState(10)
   const [sorting, setSorting] = useState<SortingState>([{ id: 'role.name', desc: false }])
 
-  const segments: Tab<ScopeSegment>[] = [
-    { value: 'platformWide', label: 'users.rolesTab.segments.platformWide' },
-    { value: 'dataset', label: 'users.rolesTab.segments.datasets' },
-    { value: 'datasource', label: 'users.rolesTab.segments.datasources' },
-    { value: 'datastructure', label: 'users.rolesTab.segments.datastructures' },
+  const segments: { value: ScopeSegment; label: string }[] = [
+    { value: 'platformWide', label: t('users.rolesTab.segments.platformWide') },
+    { value: 'datapool', label: t('users.rolesTab.segments.datapools') },
+    { value: 'dataset', label: t('users.rolesTab.segments.datasets') },
+    { value: 'datasource', label: t('users.rolesTab.segments.datasources') },
+    { value: 'datastructure', label: t('users.rolesTab.segments.datastructures') },
   ]
 
   const requestParams = useMemo(() => {
@@ -77,6 +79,7 @@ export const RolesTab = (props: RolesTabProps) => {
     if (activeSegment === 'dataset') return t('users.rolesTab.scopedInfoBanner.dataset')
     if (activeSegment === 'datasource') return t('users.rolesTab.scopedInfoBanner.datasource')
     if (activeSegment === 'datastructure') return t('users.rolesTab.scopedInfoBanner.datastructure')
+    if (activeSegment === 'datapool') return t('users.rolesTab.scopedInfoBanner.datapool')
     return null
   }
 
@@ -111,7 +114,21 @@ export const RolesTab = (props: RolesTabProps) => {
         className="my-2"
       />
       <div className="flex items-center justify-between gap-4 mb-4">
-        <SegmentedControlBar tabs={segments} selectedTab={activeSegment} onTabChange={handleSegmentChange} />
+        <div className="flex gap-2" role="tablist">
+          {segments.map(seg => (
+            <Button
+              key={seg.value}
+              type="button"
+              role="tab"
+              aria-selected={activeSegment === seg.value}
+              variant={activeSegment === seg.value ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleSegmentChange(seg.value)}
+            >
+              {seg.label}
+            </Button>
+          ))}
+        </div>
         {infoBannerText && <AlertBox text={infoBannerText} />}
       </div>
       <TableContainer shouldRespectSearchHeight={true} shouldRespectSegmentedControlBar>

@@ -72,6 +72,7 @@ describe('AppSidebarContent', () => {
       setupPermissions(Object.values(PERMISSION_NAMES))
       const { container } = renderWithProvider()
 
+      expect(container.querySelector('a[href="/datapools"]')).toBeInTheDocument()
       expect(container.querySelector('a[href="/datasets"]')).toBeInTheDocument()
       expect(container.querySelector('a[href="/datasources"]')).toBeInTheDocument()
       expect(container.querySelector('a[href="/datastructures"]')).toBeInTheDocument()
@@ -84,6 +85,7 @@ describe('AppSidebarContent', () => {
       setupPermissions([PERMISSION_NAMES.USER_READ, PERMISSION_NAMES.GROUP_READ, PERMISSION_NAMES.ROLE_READ])
       const { container } = renderWithProvider()
 
+      expect(container.querySelector('a[href="/datapools"]')).not.toBeInTheDocument()
       expect(container.querySelector('a[href="/datasets"]')).not.toBeInTheDocument()
       expect(container.querySelector('a[href="/datasources"]')).not.toBeInTheDocument()
       expect(container.querySelector('a[href="/datastructures"]')).not.toBeInTheDocument()

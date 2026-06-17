@@ -169,6 +169,20 @@
     "/v1/datastructures/{id}/versions/{id}/released/meta": {
       "PUT": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
     },
+    "/v1/datapools": {
+      "_collection": true,
+      "GET": "DATAPOOL_READ",
+      "POST": "DATAPOOL_CREATE"
+    },
+    "/v1/datapools/{id}": {
+      "GET": "DATAPOOL_READ",
+      "PUT": "DATAPOOL_UPDATE",
+      "PATCH": "DATAPOOL_UPDATE",
+      "DELETE": "DATAPOOL_DELETE"
+    },
+    "/v1/datapools/{id}/assignments": {
+      "GET": "DATAPOOL_READ"
+    },
     "_removed_for_v2": "catalogs and dataspaces removed — not implemented in v2.0 (see #989). OPA denies as unknown_endpoint."
   }
 }

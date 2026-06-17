@@ -27,6 +27,11 @@ export const appSidebarNavSections: NavSection[] = [
         url: '/datasets',
         icon: SquareMenu,
         items: [
+          {
+            title: 'datapools',
+            url: '/datapools',
+            requiredPermission: PERMISSION_NAMES.DATAPOOL_READ,
+          },
           { title: 'datasets', url: '/datasets', requiredPermission: PERMISSION_NAMES.DATASET_READ },
           { title: 'datasources', url: '/datasources', requiredPermission: PERMISSION_NAMES.DATASOURCE_READ },
           { title: 'datastructures', url: '/datastructures', requiredPermission: PERMISSION_NAMES.DATASTRUCTURE_READ },

@@ -69,7 +69,7 @@ describe('RolesTab', () => {
   it('renders the segmented control with all tabs', () => {
     renderRolesTab()
     expect(screen.getByRole('tablist')).toBeDefined()
-    ;['Plattformweit', 'Datensätze', 'Datenquellen', 'Datenstrukturen'].forEach(label => {
+    ;['Plattformweit', 'Datensätze', 'Datenquellen', 'Datenstrukturen', 'Datenpools'].forEach(label => {
       expect(screen.getByRole('tab', { name: label })).toBeDefined()
     })
   })

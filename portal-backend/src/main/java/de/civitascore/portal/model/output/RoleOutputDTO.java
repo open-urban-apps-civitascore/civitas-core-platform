@@ -1,6 +1,7 @@
 package de.civitascore.portal.model.output;
 
 import de.civitascore.portal.model.embedded.RoleType;
+import de.civitascore.portal.model.output.summary.DataPoolSummaryDTO;
 import de.civitascore.portal.model.output.summary.PermissionSummaryDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.ArrayList;
@@ -38,4 +39,6 @@ public class RoleOutputDTO extends BaseOutputDTO {
       accessMode = Schema.AccessMode.READ_ONLY,
       example = "12")
   private Long userCount;
+
+  private List<DataPoolSummaryDTO> datapools = new ArrayList<>();
 }

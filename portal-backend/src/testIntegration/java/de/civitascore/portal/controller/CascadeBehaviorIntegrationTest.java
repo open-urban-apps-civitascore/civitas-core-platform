@@ -14,7 +14,6 @@ import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
-import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Distribution;
@@ -27,7 +26,6 @@ import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
-import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.DistributionRepository;
@@ -36,7 +34,6 @@ import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.StyleRepository;
-import de.civitascore.portal.service.DataSpaceService;
 import de.civitascore.portal.service.GroupService;
 import de.civitascore.portal.util.ResourceInUseException;
 import jakarta.persistence.EntityManager;
@@ -67,13 +64,11 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private DataStructureRepository dataStructureRepository;
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
   @Autowired private GroupRepository groupRepository;
-  @Autowired private DataSpaceRepository dataSpaceRepository;
   @Autowired private AssignmentRepository assignmentRepository;
   @Autowired private RoleRepository roleRepository;
   @Autowired private LayerRepository layerRepository;
   @Autowired private StyleRepository styleRepository;
   @Autowired private GroupService groupService;
-  @Autowired private DataSpaceService dataSpaceService;
 
   private static String uniqueName(String prefix) {
     return prefix + "-" + UUID.randomUUID().toString().substring(0, 8);
@@ -91,7 +86,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
     dataStructureVersionRepository.deleteAll();
     dataStructureRepository.deleteAll();
     dataSourceRepository.deleteAll();
-    dataSpaceRepository.deleteAll();
     groupRepository.deleteAll();
     roleRepository.deleteAll();
   }
@@ -181,12 +175,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
     return styleRepository.save(style);
   }
 
-  private DataSpace createDataSpace() {
-    DataSpace ds = new DataSpace();
-    ds.setName(uniqueName("dataspace"));
-    return dataSpaceRepository.save(ds);
-  }
-
   private Assignment createUnscopedAssignment(Group group, Role role) {
     Assignment a = new Assignment();
     a.setGroup(group);
@@ -204,7 +192,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
       case DATASET -> a.setDataset((DataSet) scopeEntity);
       case DATASOURCE -> a.setDataSource((DataSource) scopeEntity);
       case DATASTRUCTURE -> a.setDataStructure((DataStructure) scopeEntity);
-      case DATASPACE -> a.setDataSpace((DataSpace) scopeEntity);
       default -> throw new IllegalArgumentException("Unsupported scope type: " + scopeType);
     }
     return assignmentRepository.save(a);
@@ -430,34 +417,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
       entityManager.flush();
 
       assertThat(assignmentRepository.findById(assignmentId)).isEmpty();
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // DataSpace cascades
-  // ---------------------------------------------------------------------------
-
-  @Nested
-  @DisplayName("DataSpace cascades")
-  class DataSpaceCascades {
-
-    @Test
-    @Transactional
-    @DisplayName("Deleting DataSpace with children should be prevented")
-    void deletingDataSpace_withChildren_shouldThrowResourceInUseException() {
-      DataSpace parent = createDataSpace();
-      DataSpace child = new DataSpace();
-      child.setName(uniqueName("child-dataspace"));
-      child.setParentDataSpace(parent);
-      dataSpaceRepository.save(child);
-
-      entityManager.flush();
-      entityManager.clear();
-
-      UUID parentId = parent.getId();
-      assertThatThrownBy(() -> dataSpaceService.deleteById(parentId))
-          .isInstanceOf(ResourceInUseException.class)
-          .hasMessageContaining("child data spaces");
     }
   }
 }

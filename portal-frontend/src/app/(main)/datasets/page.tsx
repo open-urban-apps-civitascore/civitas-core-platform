@@ -13,6 +13,7 @@ const Datasets = async ({ searchParams }: Props) => {
   const { apiParams } = getApiRequestParams(params)
 
   const datasetResponse = await getDatasets(apiParams)
+
   const datasets = datasetResponse.data
 
   return <DatasetsList datasets={datasets} rowCount={datasetResponse.totalElements || 0} />

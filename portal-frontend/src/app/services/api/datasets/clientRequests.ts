@@ -3,12 +3,32 @@ import { AxiosError } from 'axios'
 
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { useCreateMutation } from '@/hooks/use-create-mutation'
+import { useDataQuery } from '@/hooks/use-data-query'
 import { useDeleteMutation } from '@/hooks/use-delete-mutation'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
+import { GetItemInput, GetListInput } from '@/types/common'
 import { Dataset, DatasetCreateApiData, DatasetPatchApiData, DatasetUpdateApiData } from '@/types/datasets'
 import { NamedApi, NamedApiPayload } from '@/types/namedApis'
 
 const key = 'datasets'
+
+export const useGetDataset = ({ id, isEnabled }: GetItemInput) =>
+  useDataQuery<Dataset>({
+    id,
+    key,
+    isEnabled,
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while loading dataset.',
+  })
+
+export const useGetDatasets = ({ params, isEnabled }: GetListInput = {}) =>
+  useDataQuery<Dataset[]>({
+    key,
+    params,
+    isEnabled,
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while loading datasets.',
+  })
 
 export const useCreateDataset = () =>
   useCreateMutation<Dataset, DatasetCreateApiData>({

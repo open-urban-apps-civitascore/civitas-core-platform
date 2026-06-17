@@ -1,0 +1,50 @@
+meta {
+  name: Patch DataPool
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/datapools/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{dataPoolId}}
+}
+
+body:json {
+  {
+    "description": "Rural Mobility DataPool",
+    "contactPersonId": "{{userId}}"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataPoolId', res.body.id);
+    bru.setVar('scopeType', 'DATAPOOL');
+    bru.setVar('scopeId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Precondition:** `dataPoolId` is set.
+  
+  **Expected Response:** 200 OK, body reflects updated `description`; other fields unchanged.
+  
+  **System Impact:**
+  
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataPool `description` updated; other fields unchanged |
+  | Config Adapter | — |
+  | External System | — |
+}
