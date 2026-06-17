@@ -24,6 +24,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
     {
       key: 'password',
       type: 'input',
+      inputType: 'password',
       label: { label: 'Password', labelHint: null },
       placeholder: '',
       defaultValue: '',
@@ -120,6 +121,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
     {
       key: 'password',
       type: 'input',
+      inputType: 'password',
       label: { label: 'Password', labelHint: null },
       placeholder: '',
       defaultValue: '',

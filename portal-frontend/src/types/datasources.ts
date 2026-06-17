@@ -24,9 +24,12 @@ export const DatasourceStatusSchema = enumFromConst(DATASOURCE_STATUS_TYPES)
 
 export type FormFieldType = 'input' | 'textArea' | 'select' | 'checkbox'
 
+export type FormInputType = 'text' | 'password'
+
 export type ConnectorField = {
   key: string
   type: FormFieldType
+  inputType?: FormInputType
   label: { label: string; labelHint: string | null }
   options?: string[]
   defaultValue?: unknown
