@@ -150,11 +150,12 @@ class DataSetSagaPublisherTest {
       UUID sinkId = UUID.randomUUID();
       Pipeline pipeline = pipeline(UUID.randomUUID());
       DataSink sink = postgisSink(sinkId, dsvId, "sensor_observations");
+      DataSet dataSet = datasetWithPipeline(pipeline);
 
       DataStructureVersion version = new DataStructureVersion();
       version.setModelAtlasUri("atlas://dsv/" + dsvId);
 
-      when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
       when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
       when(dataStructureVersionService.resolveJsonSchemaByAtlasUri("atlas://dsv/" + dsvId))
           .thenReturn(
@@ -173,7 +174,7 @@ class DataSetSagaPublisherTest {
               CompletableFuture.completedFuture(
                   new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
 
-      publisher.publishCreateRequested(datasetWithPipeline(pipeline));
+      publisher.publishCreateRequested(dataSet);
 
       var payload = new JsonMapper().readTree(jsonCaptor.getValue());
       var datasinks = payload.get("datasinks");
@@ -194,11 +195,11 @@ class DataSetSagaPublisherTest {
       UUID dsvId = UUID.randomUUID();
       Pipeline pipeline = pipeline(UUID.randomUUID());
       DataSink sink = postgisSink(UUID.randomUUID(), dsvId, "sensor_observations");
+      DataSet dataSet = datasetWithPipeline(pipeline);
 
-      when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
       when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.empty());
 
-      DataSet dataSet = datasetWithPipeline(pipeline);
       assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
           .isInstanceOf(InvalidInputException.class);
     }
@@ -211,8 +212,9 @@ class DataSetSagaPublisherTest {
       DataSink sink = new DataSink();
       sink.setId(sinkId);
       sink.setDataSinkType(DataSinkType.FROST);
+      DataSet dataSet = datasetWithPipeline(pipeline);
 
-      when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
 
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
       when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
@@ -220,7 +222,7 @@ class DataSetSagaPublisherTest {
               CompletableFuture.completedFuture(
                   new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
 
-      publisher.publishCreateRequested(datasetWithPipeline(pipeline));
+      publisher.publishCreateRequested(dataSet);
 
       var payload = new JsonMapper().readTree(jsonCaptor.getValue());
       var ds = payload.get("datasinks").get(0);

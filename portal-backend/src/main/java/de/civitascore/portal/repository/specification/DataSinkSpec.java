@@ -6,5 +6,5 @@ import net.kaczmarzyk.spring.data.jpa.domain.Equal;
 import net.kaczmarzyk.spring.data.jpa.web.annotation.Spec;
 
 /** JPA Specification for filtering {@link DataSink} entities via query parameters. */
-@Spec(path = "pipeline.dataSet.id", pathVars = "dataSetId", spec = Equal.class)
+@Spec(path = "dataSet.id", pathVars = "dataSetId", spec = Equal.class)
 public interface DataSinkSpec extends BaseSpec<DataSink> {}
