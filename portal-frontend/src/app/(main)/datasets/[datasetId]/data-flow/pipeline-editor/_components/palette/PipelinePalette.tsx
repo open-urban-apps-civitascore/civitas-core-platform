@@ -4,18 +4,20 @@
  * PipelinePalette Component
  *
  * Left sidebar containing categorized draggable node items.
- * Adapted from UML modeler's ElementPalette.tsx
+ * Categories and items are DERIVED from the node registry — adding a node type only
+ * requires a new registry entry, not edits here.
  *
  */
 
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
-import { PIPELINE_PALETTE_CATEGORIES } from '../../_constants/paletteItems'
+import { PaletteCategory } from '@/components/node-editor/palette/PaletteCategory'
+import { PaletteItem } from '@/components/node-editor/palette/PaletteItem'
+
+import { PIPELINE_NODE_DEFS, type PipelineNodeDef } from '../../_config/nodeRegistry'
+import { NODE_CATEGORY_ORDER, type NodeCategory } from '../../_constants/nodeCategories'
 import { LAYOUT_DIMENSIONS } from '../../_constants/pipelineStyles'
-import type { PipelineNodeType } from '../../_types/pipeline'
-import { PaletteCategory } from './PaletteCategory'
-import { PaletteItem } from './PaletteItem'
 
 // ============================================================================
 // Props
@@ -23,23 +25,6 @@ import { PaletteItem } from './PaletteItem'
 
 interface PipelinePaletteProps {
   className?: string
-}
-
-// ============================================================================
-// Translation Key Mapping
-// ============================================================================
-
-/**
- * Maps node types to their translation keys in paletteItems namespace
- */
-const NODE_TYPE_TO_TRANSLATION_KEY: Record<PipelineNodeType, string> = {
-  start: 'flowStart',
-  end: 'flowEnd',
-  dataSource: 'dataSource',
-  cron: 'cron',
-  frost: 'frostServer',
-  geoPersistence: 'geoPersistence',
-  mapping: 'mapping',
 }
 
 // ============================================================================
@@ -54,19 +39,25 @@ const NODE_TYPE_TO_TRANSLATION_KEY: Record<PipelineNodeType, string> = {
 export const PipelinePalette: React.FC<PipelinePaletteProps> = ({ className = '' }) => {
   const t = useTranslations('pipelineEditor')
 
-  // Track expanded state for each category
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>(() => {
-    // Initialize all categories as expanded by default
-    const initial: Record<string, boolean> = {}
-    PIPELINE_PALETTE_CATEGORIES.forEach(category => {
-      initial[category.id] = !category.defaultCollapsed
-    })
-    return initial
-  })
+  // Group registry node defs by category, preserving the configured category order.
+  const categories = useMemo(() => {
+    const byCategory = new Map<NodeCategory, PipelineNodeDef[]>()
+    for (const def of PIPELINE_NODE_DEFS) {
+      const list = byCategory.get(def.category) ?? []
+      list.push(def)
+      byCategory.set(def.category, list)
+    }
+    return NODE_CATEGORY_ORDER.filter(id => byCategory.has(id)).map(id => ({
+      id,
+      defs: byCategory.get(id) ?? [],
+    }))
+  }, [])
 
-  /**
-   * Toggles the expanded state of a category.
-   */
+  // Track expanded state for each category (all expanded by default)
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(categories.map(c => [c.id, true])),
+  )
+
   const toggleCategory = (categoryId: string) => {
     setExpandedCategories(prev => ({
       ...prev,
@@ -76,7 +67,7 @@ export const PipelinePalette: React.FC<PipelinePaletteProps> = ({ className = ''
 
   return (
     <div
-      className={`flex flex-shrink-0 flex-col overflow-hidden border-r border-border bg-background ${className}`}
+      className={`flex h-full flex-shrink-0 flex-col overflow-hidden bg-background ${className}`}
       style={{ width: LAYOUT_DIMENSIONS.paletteWidth }}
     >
       {/* Palette Header */}
@@ -86,38 +77,27 @@ export const PipelinePalette: React.FC<PipelinePaletteProps> = ({ className = ''
 
       {/* Categories */}
       <div className="flex-1 overflow-y-auto">
-        {PIPELINE_PALETTE_CATEGORIES.map(category => {
-          // Translate category title using category.id
-          const translatedTitle = t(`categories.${category.id}`)
-
-          return (
-            <PaletteCategory
-              key={category.id}
-              title={translatedTitle}
-              isExpanded={expandedCategories[category.id] ?? true}
-              onToggle={() => toggleCategory(category.id)}
-            >
-              <div className="space-y-1">
-                {category.items.map(item => {
-                  // Translate item label and description using mapping
-                  const translationKey = NODE_TYPE_TO_TRANSLATION_KEY[item.type]
-                  const translatedLabel = t(`paletteItems.${translationKey}`)
-                  const translatedDescription = t(`paletteItems.${translationKey}Desc`)
-
-                  return (
-                    <PaletteItem
-                      key={item.type}
-                      nodeType={item.type}
-                      label={translatedLabel}
-                      icon={item.icon}
-                      description={translatedDescription}
-                    />
-                  )
-                })}
-              </div>
-            </PaletteCategory>
-          )
-        })}
+        {categories.map(category => (
+          <PaletteCategory
+            key={category.id}
+            isCollapsible
+            label={t(`categories.${category.id}`)}
+            isExpanded={expandedCategories[category.id] ?? true}
+            onToggle={() => toggleCategory(category.id)}
+          >
+            <div className="space-y-1">
+              {category.defs.map(def => (
+                <PaletteItem
+                  key={def.type}
+                  type={def.type}
+                  label={t(`paletteItems.${def.paletteKey}`)}
+                  icon={def.icon}
+                  description={t(`paletteItems.${def.paletteKey}Desc`)}
+                />
+              ))}
+            </div>
+          </PaletteCategory>
+        ))}
       </div>
     </div>
   )
