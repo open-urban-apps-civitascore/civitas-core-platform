@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Derives the table columns for a PostGIS sink from the JSON Schema the portal-backend stores on
@@ -27,9 +29,9 @@ import java.util.Set;
  * <p>Properties come from the root {@code properties} or the schema's {@code $defs}/{@code
  * definitions}; {@code required} properties become {@code NOT NULL}. A property whose {@code $ref}
  * points at a GeoJSON geometry schema ({@code https://geojson.org/schema/<Type>.json}) becomes a
- * geometry column; its SRID is taken from an optional {@code srid} on the property (the data
- * structure's CRS), defaulting to 4326 (the GeoServer handler's CRS default). Any other {@code
- * $ref} is a nested object and maps to {@code JSONB}.
+ * geometry column; its SRID is read from an optional {@code crs} on the property (e.g. {@code
+ * EPSG:25832}), defaulting to 4326 (the GeoServer handler's CRS default). Any other {@code $ref} is
+ * a nested object and maps to {@code JSONB}.
  *
  * <p>Names in {@code excludedNames} (explicitly configured geometry columns) are skipped so they
  * are not duplicated as derived columns.
@@ -40,6 +42,9 @@ public final class DataStructureTableMapper {
 
   /** Geometry properties reference a GeoJSON schema under this host; the type is the file name. */
   private static final String GEOJSON_SCHEMA_MARKER = "geojson.org/schema/";
+
+  /** Extracts the numeric SRID from a CRS identifier such as {@code EPSG:25832}. */
+  private static final Pattern EPSG_CODE = Pattern.compile("(?i)EPSG:+\\s*(\\d+)");
 
   private DataStructureTableMapper() {}
 
@@ -74,7 +79,7 @@ public final class DataStructureTableMapper {
 
       GeometryType geometryType = geometryType(stringValue(spec.get("$ref")));
       if (geometryType != null) {
-        Integer srid = intValue(spec.get("srid"));
+        Integer srid = sridFromCrs(spec.get("crs"));
         geometryColumns.add(
             new GeometryColumnConfig(
                 name, geometryType, srid != null ? srid : DEFAULT_SRID, null, nullable));
@@ -208,7 +213,15 @@ public final class DataStructureTableMapper {
     return value instanceof String s ? s : null;
   }
 
-  private static Integer intValue(Object value) {
-    return value instanceof Number n ? n.intValue() : null;
+  /**
+   * SRID from a CRS identifier like {@code EPSG:25832} (or a {@code urn:…:EPSG::25832} form), else
+   * null.
+   */
+  private static Integer sridFromCrs(Object crs) {
+    if (!(crs instanceof String s)) {
+      return null;
+    }
+    Matcher matcher = EPSG_CODE.matcher(s);
+    return matcher.find() ? Integer.valueOf(matcher.group(1)) : null;
   }
 }

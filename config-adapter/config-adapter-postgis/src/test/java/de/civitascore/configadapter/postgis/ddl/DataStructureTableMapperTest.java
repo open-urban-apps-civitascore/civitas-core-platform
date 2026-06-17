@@ -146,18 +146,35 @@ class DataStructureTableMapperTest {
   }
 
   @Test
-  void geometrySridIsTakenFromThePropertyWhenPresent() {
-    // The data structure's CRS rides on the geometry property as `srid`; default is 4326.
+  void geometrySridIsReadFromThePropertyCrs() {
+    // The data structure's CRS rides on the geometry property as `crs` (EPSG form); default is
+    // 4326.
     Map<String, Object> schema =
         json(
             """
             { "properties": {
-                "location": { "$ref": "https://geojson.org/schema/Point.json", "srid": 25832 } } }
+                "location": { "$ref": "https://geojson.org/schema/Point.json", "crs": "EPSG:25832" } } }
             """);
 
     TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
 
     assertEquals(25832, derived.geometryColumns().get(0).srid());
+  }
+
+  @Test
+  void geometryDefaultsTo4326WhenCrsAbsentOrUnparsable() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "properties": {
+                "a": { "$ref": "https://geojson.org/schema/Point.json" },
+                "b": { "$ref": "https://geojson.org/schema/Point.json", "crs": "OGC:CRS84" } } }
+            """);
+
+    TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
+
+    assertEquals(2, derived.geometryColumns().size());
+    derived.geometryColumns().forEach(g -> assertEquals(4326, g.srid()));
   }
 
   @Test

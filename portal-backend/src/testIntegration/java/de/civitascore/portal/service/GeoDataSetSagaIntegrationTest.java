@@ -66,7 +66,7 @@ class GeoDataSetSagaIntegrationTest extends AbstractSagaIntegrationTest {
         "properties": {
           "station_id": { "type": "string" },
           "temperature": { "type": "string" },
-          "location": { "$ref": "https://geojson.org/schema/Point.json" }
+          "location": { "$ref": "https://geojson.org/schema/Point.json", "crs": "EPSG:25832" }
         },
         "required": ["station_id", "temperature", "location"] }
       """;
@@ -177,23 +177,35 @@ class GeoDataSetSagaIntegrationTest extends AbstractSagaIntegrationTest {
 
     assertColumn("sensor_observations", "station_id", "text", false);
     assertColumn("sensor_observations", "temperature", "text", false);
-    assertGeometryColumn("sensor_observations", "location");
+    assertGeometryColumn("sensor_observations", "location", 25832);
 
     verifier.verifyFrostProjectExists(completed.getProjectId());
   }
 
-  private static void assertGeometryColumn(String table, String column) throws SQLException {
-    String sql =
-        "SELECT udt_name, is_nullable FROM information_schema.columns"
-            + " WHERE table_schema = 'public' AND table_name = ? AND column_name = ?";
-    try (Connection connection = DriverManager.getConnection(sinkDb.getJdbcUrl(), "geo", "geo");
-        var statement = connection.prepareStatement(sql)) {
-      statement.setString(1, table);
-      statement.setString(2, column);
-      try (ResultSet rs = statement.executeQuery()) {
-        assertThat(rs.next()).as("column %s.%s should exist", table, column).isTrue();
-        assertThat(rs.getString("udt_name")).isEqualTo("geometry");
-        assertThat(rs.getString("is_nullable")).isEqualTo("NO");
+  private static void assertGeometryColumn(String table, String column, int expectedSrid)
+      throws SQLException {
+    try (Connection connection = DriverManager.getConnection(sinkDb.getJdbcUrl(), "geo", "geo")) {
+      String typeSql =
+          "SELECT udt_name, is_nullable FROM information_schema.columns"
+              + " WHERE table_schema = 'public' AND table_name = ? AND column_name = ?";
+      try (var statement = connection.prepareStatement(typeSql)) {
+        statement.setString(1, table);
+        statement.setString(2, column);
+        try (ResultSet rs = statement.executeQuery()) {
+          assertThat(rs.next()).as("column %s.%s should exist", table, column).isTrue();
+          assertThat(rs.getString("udt_name")).isEqualTo("geometry");
+          assertThat(rs.getString("is_nullable")).isEqualTo("NO");
+        }
+      }
+      // The geometry column's SRID must reflect the data structure's crs (EPSG:25832), not the
+      // 4326 default.
+      try (var statement = connection.prepareStatement("SELECT Find_SRID('public', ?, ?)")) {
+        statement.setString(1, table);
+        statement.setString(2, column);
+        try (ResultSet rs = statement.executeQuery()) {
+          assertThat(rs.next()).isTrue();
+          assertThat(rs.getInt(1)).as("SRID of %s.%s", table, column).isEqualTo(expectedSrid);
+        }
       }
     }
   }

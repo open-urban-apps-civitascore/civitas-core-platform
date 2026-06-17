@@ -256,11 +256,11 @@ Beyond the generic resource ops, the handler is a **step in the dataset sagas**.
 | `string(date-time)` | `TIMESTAMPTZ` |
 | `string(date)` / `string(time)` / `string(uuid)` | `DATE` / `TIME` / `UUID` |
 | `object`, `array` | `JSONB` |
-| `$ref` to a GeoJSON schema (`https://geojson.org/schema/<Type>.json`) | geometry column, SRID from the property's `srid` (default 4326) |
+| `$ref` to a GeoJSON schema (`https://geojson.org/schema/<Type>.json`) | geometry column, SRID from the property's `crs` (default 4326) |
 | other `$ref` (e.g. `#/$defs/<Type>`, nested object) | `JSONB` |
 | `string`, unknown | `TEXT` |
 
-Geometry is recognized only by the GeoJSON-host `$ref` — a local `#/$defs/Point` is a nested object, not geometry. The geometry column's CRS comes from an optional integer `srid` on the property (`{ "$ref": "https://geojson.org/schema/Point.json", "srid": 25832 }`), defaulting to EPSG:4326 (matching the GeoServer handler) when absent. Explicit `configuration.geometryColumns` are excluded from derivation. A schema without usable properties fails the step with an actionable error.
+Geometry is recognized only by the GeoJSON-host `$ref` — a local `#/$defs/Point` is a nested object, not geometry. The geometry column's CRS comes from an optional `crs` in EPSG form on the property (`{ "$ref": "https://geojson.org/schema/Point.json", "crs": "EPSG:25832" }`), which the adapter maps to the column's SRID, defaulting to EPSG:4326 (matching the GeoServer handler) when absent. Explicit `configuration.geometryColumns` are excluded from derivation. A schema without usable properties fails the step with an actionable error.
 
 Saga placement — CREATE: `… APISIX → [hasGeoSink] PROVISION_SINK → GeoServer workspace → datastore → layers → …`; DELETE: `… GeoServer DELETE_WORKSPACE → DEPROVISION_SINK → FROST`. UPDATE does not re-provision the sink.
 
