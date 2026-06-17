@@ -17,6 +17,7 @@ import de.civitascore.portal.service.ConfigEventPublisherService;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -153,8 +154,9 @@ public class UserInitializer {
 
   private void initializeUsers(Map<String, Group> groupsByName) {
     for (InitProperties.UserEntry entry : properties.getUsers()) {
-      if (userRepository.findByEmail(entry.getEmail()).isPresent()) {
-        log.debug("User '{}' already exists — skipping", entry.getEmail());
+      Optional<User> existingUser = userRepository.findByEmail(entry.getEmail());
+      if (existingUser.isPresent()) {
+        reconcileExistingUser(existingUser.get(), entry);
         continue;
       }
 
@@ -192,6 +194,32 @@ public class UserInitializer {
         publishUserCreated(createdUser, entry.getPassword());
       }
     }
+  }
+
+  /**
+   * Reconciles a user row that already exists. When a previous startup created the row but the
+   * asynchronous Keycloak sync never completed (timeout or failure), {@code externalId} stays null.
+   * OPA resolves users by their Keycloak subject, so an unlinked user makes every
+   * gateway-authorized request fail with {@code authentication_required}. Because the create path
+   * is skipped once the row exists, that state is otherwise sticky across restarts. Retry the sync
+   * to backfill the link — the Keycloak adapter is idempotent and returns the existing user's id on
+   * conflict.
+   */
+  private void reconcileExistingUser(User user, InitProperties.UserEntry entry) {
+    if (user.getExternalId() != null) {
+      log.debug("User '{}' already exists and is linked to Keycloak — skipping", entry.getEmail());
+      return;
+    }
+    if (entry.getExternalId() != null) {
+      user.setExternalId(entry.getExternalId());
+      userRepository.save(user);
+      log.info("Backfilled externalId for user '{}' from configuration", entry.getEmail());
+      return;
+    }
+    log.info(
+        "User '{}' exists but is not linked to Keycloak — retrying sync to backfill externalId",
+        entry.getEmail());
+    publishUserCreated(user, entry.getPassword());
   }
 
   private void publishUserCreated(User user, String password) {
