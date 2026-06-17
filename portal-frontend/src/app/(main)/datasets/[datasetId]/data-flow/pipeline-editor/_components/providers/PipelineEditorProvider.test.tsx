@@ -1,5 +1,7 @@
 import { act, render } from '@testing-library/react'
+import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios'
 import React from 'react'
+import { toast } from 'sonner'
 
 import {
   useCreatePipeline,
@@ -758,8 +760,60 @@ describe('PipelineEditorProviderComponent', () => {
       expect(mockCreateMutateAsync).not.toHaveBeenCalled()
     })
 
-    it('returns false when the API call throws', async () => {
+    it('returns false when the API call throws a generic error', async () => {
       mockCreateMutateAsync.mockRejectedValue(new Error('Network error'))
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: undefined } }))
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(false)
+    })
+
+    it('shows a scope violation toast with the pipeline name on a 422 error', async () => {
+      const axiosError = new AxiosError(
+        'Unprocessable Entity',
+        undefined,
+        { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
+        undefined,
+        {
+          status: 422,
+          statusText: 'Unprocessable Entity',
+          headers: new AxiosHeaders(),
+          config: { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
+          data: { detail: 'DataSource "My DS" is not permitted for this datapool' },
+        },
+      )
+      mockCreateMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: undefined } }))
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.datasourceScopeViolation')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(expect.stringContaining('header.saveFailed'))
+    })
+
+    it('returns false on a 422 error', async () => {
+      const axiosError = new AxiosError(
+        'Unprocessable Entity',
+        undefined,
+        { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
+        undefined,
+        {
+          status: 422,
+          statusText: 'Unprocessable Entity',
+          headers: new AxiosHeaders(),
+          config: { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
+          data: { detail: 'DataSource "My DS" is not permitted for this datapool' },
+        },
+      )
+      mockCreateMutateAsync.mockRejectedValue(axiosError)
 
       renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: undefined } }))
 

@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 import { AssignmentScopedInputSchema } from './assignments'
 import { ItemType, MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, STATUS_TYPES, WithId } from './common'
+import { DatapoolItem, DatapoolItemSchema } from './datapools'
 import { NamedApiPayloadSchema, NamedApiSchema } from './namedApis'
 
 export const DATASET_STATUS_TYPES = {
@@ -39,6 +40,7 @@ export const DatasetApiResponseSchema = z.object({
   openDataAccess: z.boolean(),
   pipelines: z.array(z.object({ id: z.string(), name: z.string() })),
   namedApis: z.array(NamedApiSchema).optional(),
+  datapool: DatapoolItemSchema.nullable(),
 })
 
 export type Dataset = z.infer<typeof DatasetApiResponseSchema>
@@ -50,6 +52,7 @@ export const DatasetBaseInputSchema = z.object({
   description: z.string(),
   openDataAccess: z.boolean(),
   assignments: AssignmentScopedInputSchema.array(),
+  datapoolId: z.string().nullable(),
   namedApis: z.array(NamedApiPayloadSchema).optional(),
 })
 
@@ -89,6 +92,7 @@ export const DatasetBaseFormSchema = z.object({
     .min(1, 'common.errors.descriptionRequired')
     .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   openDataAccess: z.boolean(),
+  datapoolId: z.string().nullable(),
 })
 
 export type DatasetBaseFormData = z.input<typeof DatasetBaseFormSchema>
@@ -97,6 +101,7 @@ export type DatasetBaseFormData = z.input<typeof DatasetBaseFormSchema>
 
 export const DatasetCreateFormSchema = z.object({
   name: z.string().trim().min(3, 'common.errors.atLeast3').max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
+  datapoolId: z.string().nullable(),
 })
 
 export type DatasetCreateFormData = z.input<typeof DatasetCreateFormSchema>
@@ -106,6 +111,12 @@ export type DatasetCreateFormData = z.input<typeof DatasetCreateFormSchema>
 export const DatasetFormDraftSchema = DatasetBaseFormSchema.partial().extend({
   id: z.string(),
   name: z.string().trim().min(3, 'common.errors.atLeast3').max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
+  description: z
+    .string()
+    .trim()
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength')
+    .optional()
+    .or(z.literal('')),
 })
 
 export type DatasetFormDraft = z.input<typeof DatasetFormDraftSchema>
@@ -121,14 +132,19 @@ export const DatasetFormAvailableSchema = z.object({
     .min(1, 'common.errors.descriptionRequired')
     .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   openDataAccess: z.boolean(),
+  datapoolId: z.string().nullable(),
 })
 
-export type DatasetTableData = {
+export type BaseDatasetTableData = {
   id: string
   name: string
   modifiedAt: string
   createdBy: ItemType
   dataSetStatus: DatasetStatusTypes
+}
+
+export type DatasetTableData = BaseDatasetTableData & {
+  datapool: DatapoolItem | null
 }
 
 export type CompletionStepParam = 'access-management' | 'data-flow' | 'apis'

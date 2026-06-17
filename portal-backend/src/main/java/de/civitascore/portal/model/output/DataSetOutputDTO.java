@@ -2,6 +2,7 @@ package de.civitascore.portal.model.output;
 
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.model.output.summary.DataPoolSummaryDTO;
 import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
 import de.civitascore.portal.model.output.summary.UserSummaryDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -40,6 +41,9 @@ public class DataSetOutputDTO extends BaseOutputDTO {
 
   @Schema(description = "Whether this dataset is publicly accessible")
   private Boolean openDataAccess;
+
+  @Schema(description = "Datapool this dataset is assigned to")
+  private DataPoolSummaryDTO datapool;
 
   private UserSummaryDTO createdBy;
 

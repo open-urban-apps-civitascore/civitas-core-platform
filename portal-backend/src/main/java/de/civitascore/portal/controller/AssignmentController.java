@@ -74,7 +74,7 @@ public class AssignmentController
       name = "scopeType",
       description =
           "Filter by scope type (exact match). One of: TENANT, DATASET, DATASOURCE,"
-              + " DATASTRUCTURE, DATASPACE, CATALOG.",
+              + " DATASTRUCTURE, CATALOG, DATAPOOL.",
       in = ParameterIn.QUERY,
       schema = @Schema(type = "string", example = "DATASET"))
   @Parameter(

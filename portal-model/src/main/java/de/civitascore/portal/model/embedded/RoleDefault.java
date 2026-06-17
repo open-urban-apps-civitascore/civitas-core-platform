@@ -44,14 +44,19 @@ public enum RoleDefault {
       PermissionName.DATASTRUCTURE_CREATE,
       PermissionName.DATASTRUCTURE_READ,
       PermissionName.DATASTRUCTURE_UPDATE,
-      PermissionName.DATASTRUCTURE_DELETE),
+      PermissionName.DATASTRUCTURE_DELETE,
+      PermissionName.DATAPOOL_READ,
+      PermissionName.DATAPOOL_CREATE,
+      PermissionName.DATAPOOL_UPDATE,
+      PermissionName.DATAPOOL_DELETE),
 
   DATA_CONSUMER(
       "Data Consumer",
       "Lesezugriff auf veröffentlichte Datenprodukte.",
       RoleType.DATA,
       PermissionName.DATASET_READ,
-      PermissionName.DATASET_PAYLOAD_READ),
+      PermissionName.DATASET_PAYLOAD_READ,
+      PermissionName.DATAPOOL_READ),
 
   DATA_STEWARD(
       "Data Steward",
@@ -72,7 +77,9 @@ public enum RoleDefault {
       PermissionName.DATASTRUCTURE_CREATE,
       PermissionName.DATASTRUCTURE_READ,
       PermissionName.DATASTRUCTURE_UPDATE,
-      PermissionName.DATASTRUCTURE_DELETE),
+      PermissionName.DATASTRUCTURE_DELETE,
+      PermissionName.DATAPOOL_READ,
+      PermissionName.DATAPOOL_UPDATE),
 
   DATA_OWNER(
       "Data Owner",
@@ -96,7 +103,9 @@ public enum RoleDefault {
       PermissionName.DATASTRUCTURE_READ,
       PermissionName.DATASTRUCTURE_UPDATE,
       PermissionName.DATASTRUCTURE_DELETE,
-      PermissionName.DATASTRUCTURE_RELEASE),
+      PermissionName.DATASTRUCTURE_RELEASE,
+      PermissionName.DATAPOOL_READ,
+      PermissionName.DATAPOOL_UPDATE),
 
   DATA_GATEKEEPER(
       "Data Gatekeeper",
@@ -108,7 +117,8 @@ public enum RoleDefault {
       PermissionName.DATASOURCE_READ,
       PermissionName.DATASOURCE_RELEASE,
       PermissionName.DATASTRUCTURE_READ,
-      PermissionName.DATASTRUCTURE_RELEASE);
+      PermissionName.DATASTRUCTURE_RELEASE,
+      PermissionName.DATAPOOL_READ);
 
   final String roleName;
   final String description;

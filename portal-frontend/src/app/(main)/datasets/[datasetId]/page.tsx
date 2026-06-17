@@ -1,3 +1,4 @@
+import { getDatapools } from '@/app/services/api/datapools/serverRequests'
 import { getDataset, getDatasetAssignments } from '@/app/services/api/datasets/serverRequests'
 
 import { DatasetOverview } from './overview/components/DatasetOverview'
@@ -10,12 +11,14 @@ const DatasetPage = async (props: DatasetPageProps) => {
   const { params } = props
   const { datasetId } = await params
 
-  const { data: dataset } = await getDataset(datasetId)
-
-  const { data: datasetAssignments } = await getDatasetAssignments(datasetId)
+  const [dataset, datasetAssignments, datapools] = await Promise.all([
+    getDataset(datasetId),
+    getDatasetAssignments(datasetId),
+    getDatapools(),
+  ])
 
   const getUniqueValuesCount = (entity: 'group' | 'role') => {
-    const uniqueGroups = new Set(datasetAssignments.map(a => a[entity]?.id))
+    const uniqueGroups = new Set(datasetAssignments.data.map(a => a[entity]?.id))
 
     return uniqueGroups.size
   }
@@ -23,7 +26,20 @@ const DatasetPage = async (props: DatasetPageProps) => {
   const roleCount = getUniqueValuesCount('role')
   const groupCount = getUniqueValuesCount('group')
 
-  return <DatasetOverview testId="datasetPage" dataset={dataset} groupCount={groupCount} roleCount={roleCount} />
+  const datapoolOptions = datapools.data.map(datapool => ({
+    value: datapool.id,
+    label: datapool.name,
+  }))
+
+  return (
+    <DatasetOverview
+      testId="datasetPage"
+      dataset={dataset.data}
+      groupCount={groupCount}
+      roleCount={roleCount}
+      datapoolOptions={datapoolOptions}
+    />
+  )
 }
 
 export default DatasetPage

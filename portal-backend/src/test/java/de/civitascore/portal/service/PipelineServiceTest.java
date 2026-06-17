@@ -11,6 +11,8 @@ import static org.mockito.Mockito.when;
 import de.civitascore.portal.mapper.PipelineMapper;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
+import de.civitascore.portal.model.embedded.DatapoolScopeType;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
@@ -20,6 +22,7 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.HashSet;
 import java.util.List;
@@ -337,6 +340,191 @@ class PipelineServiceTest {
 
       verify(dataSinkService).unlinkByPipelineId(pipelineId);
       verify(dataSinkService, never()).deleteById(any());
+    }
+  }
+
+  @Nested
+  @DisplayName("DataSource Scope Validation")
+  class DataSourceScopeValidation {
+
+    private DataSet dataSetWithoutDataPool(UUID id) {
+      DataSet ds = new DataSet();
+      ds.setId(id);
+      ds.setDataSetStatus(DataSetStatus.DRAFT);
+      return ds;
+    }
+
+    private DataSet dataSetWithDataPool(UUID id, DataPool pool) {
+      DataSet ds = dataSetWithoutDataPool(id);
+      ds.setDataPool(pool);
+      return ds;
+    }
+
+    private DataPool dataPool(UUID id) {
+      DataPool pool = new DataPool();
+      pool.setId(id);
+      return pool;
+    }
+
+    private DataSource availableDataSource(UUID id, DatapoolScopeType scopeType) {
+      DataSource ds = new DataSource();
+      ds.setId(id);
+      ds.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      ds.setDatapoolScopeType(scopeType);
+      ds.setScopedDataPools(new HashSet<>());
+      return ds;
+    }
+
+    private Pipeline pipelineEntity(DataSet dataSet) {
+      Pipeline p = new Pipeline();
+      p.setId(UUID.randomUUID());
+      p.setName("test-pipeline");
+      p.setDataSet(dataSet);
+      p.setDataSources(new HashSet<>());
+      return p;
+    }
+
+    private PipelineInputDTO createInput(UUID dataSetId, UUID... dataSourceIds) {
+      PipelineInputDTO dto = new PipelineInputDTO();
+      dto.setName("test-pipeline");
+      dto.setDataSetId(dataSetId);
+      if (dataSourceIds.length > 0) {
+        dto.setDataSourceIds(Set.of(dataSourceIds));
+      }
+      return dto;
+    }
+
+    @Test
+    @DisplayName("Should reject DataSource with scope NONE")
+    void shouldRejectDataSourceWithScopeNone() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dsId = UUID.randomUUID();
+      DataSet dataSet = dataSetWithoutDataPool(dataSetId);
+      DataSource noneDs = availableDataSource(dsId, DatapoolScopeType.NONE);
+
+      when(pipelineMapper.toEntity(any())).thenReturn(pipelineEntity(dataSet));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
+      when(dataSourceRepository.findAllById(Set.of(dsId))).thenReturn(List.of(noneDs));
+
+      assertThatThrownBy(() -> pipelineService.create(createInput(dataSetId, dsId)))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(dsId));
+    }
+
+    @Test
+    @DisplayName("Should allow DataSource with scope ALL regardless of DataPool")
+    void shouldAllowDataSourceWithScopeAll() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dsId = UUID.randomUUID();
+      DataSet dataSet = dataSetWithDataPool(dataSetId, dataPool(UUID.randomUUID()));
+      DataSource allDs = availableDataSource(dsId, DatapoolScopeType.ALL);
+      Pipeline pipeline = pipelineEntity(dataSet);
+
+      when(pipelineMapper.toEntity(any())).thenReturn(pipeline);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
+      when(dataSourceRepository.findAllById(Set.of(dsId))).thenReturn(List.of(allDs));
+      when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
+      when(pipelineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataSinkRepository.findByPipelineId(any())).thenReturn(List.of());
+
+      Pipeline result = pipelineService.create(createInput(dataSetId, dsId));
+
+      assertThat(result.getDataSources()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Should allow DataSource with scope SPECIFIC when DataSet has no DataPool")
+    void shouldAllowDataSourceWithScopeSpecificWhenDataSetHasNoDataPool() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dsId = UUID.randomUUID();
+      DataSet dataSet = dataSetWithoutDataPool(dataSetId);
+      DataSource specificDs = availableDataSource(dsId, DatapoolScopeType.SPECIFIC);
+      Pipeline pipeline = pipelineEntity(dataSet);
+
+      when(pipelineMapper.toEntity(any())).thenReturn(pipeline);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
+      when(dataSourceRepository.findAllById(Set.of(dsId))).thenReturn(List.of(specificDs));
+      when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
+      when(pipelineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataSinkRepository.findByPipelineId(any())).thenReturn(List.of());
+
+      Pipeline result = pipelineService.create(createInput(dataSetId, dsId));
+
+      assertThat(result.getDataSources()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Should allow DataSource with scope SPECIFIC when DataPool matches")
+    void shouldAllowDataSourceWithScopeSpecificWhenDataPoolMatches() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dsId = UUID.randomUUID();
+      UUID poolId = UUID.randomUUID();
+      DataPool pool = dataPool(poolId);
+      DataSet dataSet = dataSetWithDataPool(dataSetId, pool);
+      DataSource specificDs = availableDataSource(dsId, DatapoolScopeType.SPECIFIC);
+      specificDs.setScopedDataPools(Set.of(pool));
+      Pipeline pipeline = pipelineEntity(dataSet);
+
+      when(pipelineMapper.toEntity(any())).thenReturn(pipeline);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
+      when(dataSourceRepository.findAllById(Set.of(dsId))).thenReturn(List.of(specificDs));
+      when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
+      when(pipelineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataSinkRepository.findByPipelineId(any())).thenReturn(List.of());
+
+      Pipeline result = pipelineService.create(createInput(dataSetId, dsId));
+
+      assertThat(result.getDataSources()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Should reject DataSource with scope SPECIFIC when DataPool does not match")
+    void shouldRejectDataSourceWithScopeSpecificWhenDataPoolDoesNotMatch() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dsId = UUID.randomUUID();
+      DataSet dataSet = dataSetWithDataPool(dataSetId, dataPool(UUID.randomUUID()));
+      DataSource specificDs = availableDataSource(dsId, DatapoolScopeType.SPECIFIC);
+      specificDs.setScopedDataPools(Set.of(dataPool(UUID.randomUUID())));
+
+      when(pipelineMapper.toEntity(any())).thenReturn(pipelineEntity(dataSet));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
+      when(dataSourceRepository.findAllById(Set.of(dsId))).thenReturn(List.of(specificDs));
+
+      assertThatThrownBy(() -> pipelineService.create(createInput(dataSetId, dsId)))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(dsId));
+    }
+
+    @Test
+    @DisplayName("Should collect all offending DataSource IDs without fail-fast")
+    void shouldCollectAllOffendingDataSourceIdsWithoutFailFast() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID noneId = UUID.randomUUID();
+      UUID specificMismatchId = UUID.randomUUID();
+      DataSet dataSet = dataSetWithDataPool(dataSetId, dataPool(UUID.randomUUID()));
+
+      DataSource noneDs = availableDataSource(noneId, DatapoolScopeType.NONE);
+      DataSource specificDs = availableDataSource(specificMismatchId, DatapoolScopeType.SPECIFIC);
+      specificDs.setScopedDataPools(Set.of(dataPool(UUID.randomUUID())));
+
+      when(pipelineMapper.toEntity(any())).thenReturn(pipelineEntity(dataSet));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
+      when(dataSourceRepository.findAllById(Set.of(noneId, specificMismatchId)))
+          .thenReturn(List.of(noneDs, specificDs));
+
+      assertThatThrownBy(
+              () -> pipelineService.create(createInput(dataSetId, noneId, specificMismatchId)))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactlyInAnyOrder(noneId, specificMismatchId));
     }
   }
 }
