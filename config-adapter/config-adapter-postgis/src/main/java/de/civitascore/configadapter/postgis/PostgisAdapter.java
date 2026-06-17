@@ -87,7 +87,7 @@ public class PostgisAdapter extends AbstractConfigAdapter {
     logger.info(
         "PostGIS adapter '{}' initialized for: {}",
         Encode.forJava(getName()),
-        Encode.forJava(jdbcUrl));
+        Encode.forJava(SqlDdlSupport.sanitizeJdbcUrl(jdbcUrl)));
     logger.info(
         "Subscribed to {} Kafka topics: {}",
         getSubscribedTopics().size(),

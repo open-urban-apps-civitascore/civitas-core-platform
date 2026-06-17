@@ -98,6 +98,27 @@ class DataStructureTableMapperTest {
   }
 
   @Test
+  void missingOrUnknownScalarTypeFallsBackToText() {
+    // A property with no type, an unknown type, or an empty type falls back to TEXT rather than
+    // failing.
+    Map<String, Object> schema =
+        json(
+            """
+            { "properties": {
+                "no_type":      { "description": "a property without a type" },
+                "weird_type":   { "type": "telephone" },
+                "empty_string": { "type": "" } } }
+            """);
+
+    Map<String, ColumnConfig> named =
+        byName(DataStructureTableMapper.deriveColumns(schema, Set.of()));
+
+    assertEquals(ColumnType.TEXT, named.get("no_type").type());
+    assertEquals(ColumnType.TEXT, named.get("weird_type").type());
+    assertEquals(ColumnType.TEXT, named.get("empty_string").type());
+  }
+
+  @Test
   void geometryRefBecomesGeometryColumnWithDefaultSrid() {
     // The shape Model Atlas produces once the geometry package resolves: the property references
     // an inlined geometry definition. Verified against the schema generator's $ref emission.

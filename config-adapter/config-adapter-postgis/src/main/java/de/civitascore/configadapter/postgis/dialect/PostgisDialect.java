@@ -179,6 +179,12 @@ public final class PostgisDialect implements SqlDialect {
   }
 
   @Override
+  public String grantSelectOnTable(String roleName, String schema, String table) {
+    requireName(table, "table name");
+    return "GRANT SELECT ON " + qualified(schema, table) + " TO " + quoteIdent(roleName);
+  }
+
+  @Override
   public String revokeOnSchema(String roleName, String schema, List<SchemaPrivilege> privileges) {
     return "REVOKE "
         + renderPrivileges(privileges)

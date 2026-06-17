@@ -225,6 +225,20 @@ class PostgisDialectSchemaRoleTest {
     }
 
     @Test
+    void grantSelectOnTableQualifiesSchemaAndTable() {
+      assertEquals(
+          "GRANT SELECT ON \"iot\".\"observations\" TO \"reader\"",
+          dialect.grantSelectOnTable("reader", "iot", "observations"));
+    }
+
+    @Test
+    void grantSelectOnTableWithoutSchemaUsesBareTable() {
+      assertEquals(
+          "GRANT SELECT ON \"observations\" TO \"reader\"",
+          dialect.grantSelectOnTable("reader", null, "observations"));
+    }
+
+    @Test
     void readSchemaGrantsQueryExposesGrantableState() {
       assertTrue(dialect.readSchemaGrantsQuery().contains("is_grantable"));
     }

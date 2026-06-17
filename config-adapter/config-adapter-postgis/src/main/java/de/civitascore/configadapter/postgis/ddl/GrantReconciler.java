@@ -12,6 +12,7 @@ package de.civitascore.configadapter.postgis.ddl;
 import de.civitascore.configadapter.model.postgis.SchemaGrant;
 import de.civitascore.configadapter.model.postgis.SchemaPrivilege;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,36 +56,47 @@ public final class GrantReconciler {
    */
   public static GrantReconcilePlan reconcile(
       List<SchemaGrant> desired, Map<String, Map<SchemaPrivilege, Boolean>> current) {
-    Map<String, Set<SchemaPrivilege>> desiredBySchema = new LinkedHashMap<>();
-    Map<String, Boolean> grantOptionBySchema = new LinkedHashMap<>();
+    // Desired privileges per schema with their grant-option flag, tracked per privilege: the option
+    // attaches per privilege in PostgreSQL, so it must not leak onto a schema's other privileges.
+    Map<String, Map<SchemaPrivilege, Boolean>> desiredBySchema = new LinkedHashMap<>();
     for (SchemaGrant grant : desired == null ? List.<SchemaGrant>of() : desired) {
-      Set<SchemaPrivilege> expanded =
+      Map<SchemaPrivilege, Boolean> options =
           desiredBySchema.computeIfAbsent(
-              grant.schema(), s -> EnumSet.noneOf(SchemaPrivilege.class));
-      expanded.addAll(expand(grant.effectivePrivileges()));
-      grantOptionBySchema.merge(grant.schema(), grant.isWithGrantOption(), (a, b) -> a || b);
+              grant.schema(), s -> new EnumMap<>(SchemaPrivilege.class));
+      for (SchemaPrivilege privilege : expand(grant.effectivePrivileges())) {
+        options.merge(privilege, grant.isWithGrantOption(), (a, b) -> a || b);
+      }
     }
 
     List<SchemaGrant> toGrant = new ArrayList<>();
     List<SchemaRevoke> toRevokeGrantOption = new ArrayList<>();
-    for (Map.Entry<String, Set<SchemaPrivilege>> entry : desiredBySchema.entrySet()) {
+    for (Map.Entry<String, Map<SchemaPrivilege, Boolean>> entry : desiredBySchema.entrySet()) {
       String schema = entry.getKey();
-      boolean wantOption = grantOptionBySchema.getOrDefault(schema, false);
       Map<SchemaPrivilege, Boolean> held = current.getOrDefault(schema, Map.of());
 
-      Set<SchemaPrivilege> needsGrant = EnumSet.noneOf(SchemaPrivilege.class);
+      Set<SchemaPrivilege> grantWithOption = EnumSet.noneOf(SchemaPrivilege.class);
+      Set<SchemaPrivilege> grantWithoutOption = EnumSet.noneOf(SchemaPrivilege.class);
       Set<SchemaPrivilege> optionObsolete = EnumSet.noneOf(SchemaPrivilege.class);
-      for (SchemaPrivilege privilege : entry.getValue()) {
+      for (Map.Entry<SchemaPrivilege, Boolean> desiredPriv : entry.getValue().entrySet()) {
+        SchemaPrivilege privilege = desiredPriv.getKey();
+        boolean wantOption = desiredPriv.getValue();
         Boolean grantable = held.get(privilege);
-        if (grantable == null || (wantOption && !grantable)) {
-          // not held at all, or held without the requested grant option — (re-)grant
-          needsGrant.add(privilege);
+        if (grantable == null) {
+          // missing — grant it, in the matching option bucket
+          (wantOption ? grantWithOption : grantWithoutOption).add(privilege);
+        } else if (wantOption && !grantable) {
+          // held without the wanted option — re-grant to add it
+          grantWithOption.add(privilege);
         } else if (!wantOption && grantable) {
+          // held with an unwanted option — strip the option, keep the privilege
           optionObsolete.add(privilege);
         }
       }
-      if (!needsGrant.isEmpty()) {
-        toGrant.add(new SchemaGrant(schema, sorted(needsGrant), wantOption));
+      if (!grantWithoutOption.isEmpty()) {
+        toGrant.add(new SchemaGrant(schema, sorted(grantWithoutOption), false));
+      }
+      if (!grantWithOption.isEmpty()) {
+        toGrant.add(new SchemaGrant(schema, sorted(grantWithOption), true));
       }
       if (!optionObsolete.isEmpty()) {
         toRevokeGrantOption.add(new SchemaRevoke(schema, sorted(optionObsolete)));
@@ -96,7 +108,10 @@ public final class GrantReconciler {
       String schema = entry.getKey();
       Set<SchemaPrivilege> obsolete = EnumSet.noneOf(SchemaPrivilege.class);
       obsolete.addAll(entry.getValue().keySet());
-      obsolete.removeAll(desiredBySchema.getOrDefault(schema, Set.of()));
+      Map<SchemaPrivilege, Boolean> desiredPrivs = desiredBySchema.get(schema);
+      if (desiredPrivs != null) {
+        obsolete.removeAll(desiredPrivs.keySet());
+      }
       if (!obsolete.isEmpty()) {
         toRevoke.add(new SchemaRevoke(schema, sorted(obsolete)));
       }

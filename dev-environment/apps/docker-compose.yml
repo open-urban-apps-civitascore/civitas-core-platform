@@ -67,7 +67,7 @@ services:
       GEOSERVER_ADMIN_PASSWORD: geoserver
       GEOSERVER_POSTGIS_HOST: civitas-geoserver-db
       GEOSERVER_POSTGIS_PORT: 5432
-      GEOSERVER_POSTGIS_DB: geoserver
+      GEOSERVER_POSTGIS_DATABASE: geoserver
       GEOSERVER_POSTGIS_USER: geoserver
       GEOSERVER_POSTGIS_PASSWORD: geoserver
       # PostGIS adapter DDL connection — same database the GeoServer datastore reads

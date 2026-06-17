@@ -220,6 +220,16 @@ final class SqlDdlSupport implements AutoCloseable {
     return text == null ? null : PASSWORD_LITERAL.matcher(text).replaceAll("$1'***'");
   }
 
+  /** Masks credentials in a JDBC URL (userinfo or {@code user=/password=}) before logging. */
+  static String sanitizeJdbcUrl(String url) {
+    if (url == null) {
+      return null;
+    }
+    String sanitized = url.replaceAll("://[^/@]*@", "://");
+    sanitized = sanitized.replaceAll("(?i)([?&](?:user|password)=)[^&]*", "$1***");
+    return sanitized;
+  }
+
   private void safeRollback(Connection connection) {
     try {
       connection.rollback();

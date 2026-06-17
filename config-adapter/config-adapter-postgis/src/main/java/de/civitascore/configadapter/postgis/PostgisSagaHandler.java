@@ -113,7 +113,9 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   @Override
   public void initialize(AdapterConfig config) {
     String jdbcUrl = ddl.initialize(config);
-    logger.info("PostgisSagaHandler initialized for: {}", Encode.forJava(jdbcUrl));
+    logger.info(
+        "PostgisSagaHandler initialized for: {}",
+        Encode.forJava(SqlDdlSupport.sanitizeJdbcUrl(jdbcUrl)));
   }
 
   /** Test seam — inject a pre-configured provider before {@link #initialize(AdapterConfig)}. */
@@ -208,16 +210,20 @@ public class PostgisSagaHandler implements SagaCommandHandler {
     List<String> statements = new ArrayList<>();
     List<Map<String, Object>> provisioned = new ArrayList<>();
     for (SinkSpec sink : sinks) {
-      // createTable already emits CREATE SCHEMA for the table's schema; only the owner (if any)
-      // needs a separate ALTER SCHEMA … OWNER TO.
+      // createTable already emits CREATE SCHEMA for the table's schema.
       statements.addAll(dialect().createTable(sink.table()));
-      if (sink.schema() != null) {
-        statements.addAll(dialect().alterSchemaOwner(sink.schema()));
-      }
       if (sink.role() != null) {
         String password = ddl.resolvePassword(sink.role().getPassword());
         statements.addAll(dialect().createRole(sink.role(), password));
         appendGrantStatements(statements, sink.role().getName(), sink.role().getGrants());
+        statements.add(
+            dialect()
+                .grantSelectOnTable(
+                    sink.role().getName(), sink.table().getSchema(), sink.table().getName()));
+      }
+      // After role creation: ALTER SCHEMA … OWNER TO requires the owner role to already exist.
+      if (sink.schema() != null) {
+        statements.addAll(dialect().alterSchemaOwner(sink.schema()));
       }
       provisioned.add(sink.identifiers());
     }
@@ -267,7 +273,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       throws SQLException {
     SchemaConfig schema = new SchemaConfig();
     schema.setName(requireString(command, "schema"));
-    schema.setCascade(Boolean.parseBoolean(String.valueOf(command.payload().get("cascade"))));
+    schema.setCascade(booleanValue(command.payload(), "cascade"));
     ddl.runDdl(dialect().dropSchema(schema), false, true);
     logger.info(
         "PostGIS schema {} dropped, saga={}",
@@ -436,7 +442,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
     }
     DbRoleConfig role = new DbRoleConfig();
     role.setName(name);
-    role.setCanLogin(Boolean.TRUE.equals(roleConfig.get("canLogin")));
+    role.setCanLogin(booleanValue(roleConfig, "canLogin"));
     role.setPassword(stringValue(roleConfig, "password"));
     if (schemaName != null && !schemaName.isBlank()) {
       role.setGrants(
@@ -491,6 +497,11 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   private static String stringValue(Map<String, Object> map, String key) {
     return map.get(key) instanceof String s ? s : null;
+  }
+
+  /** A payload boolean; absent or non-{@code Boolean} → false. */
+  private static boolean booleanValue(Map<String, Object> map, String key) {
+    return map.get(key) instanceof Boolean b && b;
   }
 
   private static String requireString(SagaCommandMessage command, String key) {

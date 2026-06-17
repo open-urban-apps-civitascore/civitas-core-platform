@@ -245,7 +245,56 @@ class PostgisSagaHandlerTest {
               .anyMatch(s -> s.startsWith("CREATE TABLE \"ds_42\".\"sensor_readings\"")));
       assertTrue(executed.stream().anyMatch(s -> s.startsWith("CREATE ROLE \"ds_42_geo\"")));
       assertTrue(executed.stream().anyMatch(s -> s.startsWith("GRANT USAGE ON SCHEMA \"ds_42\"")));
+      // schema USAGE alone can't read rows — the read role also needs table-level SELECT
+      assertTrue(
+          executed.stream()
+              .anyMatch(
+                  s -> s.equals("GRANT SELECT ON \"ds_42\".\"sensor_readings\" TO \"ds_42_geo\"")),
+          "read role must be granted SELECT on the sink table");
       verify(mockConnection).commit();
+    }
+
+    @Test
+    void provisionSinkAltersSchemaOwnerAfterCreatingRole() throws Exception {
+      // ALTER SCHEMA … OWNER TO requires the target role to exist, so the owner change must come
+      // after CREATE ROLE.
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of(
+                          "schema", "ds_42",
+                          "owner", "ds_42_geo",
+                          "tableName", "sensor_readings",
+                          "columns",
+                              List.of(Map.of("name", "id", "type", "BIGINT", "nullable", false)),
+                          "readRole", Map.of("name", "ds_42_geo", "canLogin", true)))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      List<String> executed = sql.getAllValues();
+      int createRoleIdx = indexOfFirst(executed, s -> s.startsWith("CREATE ROLE \"ds_42_geo\""));
+      int alterOwnerIdx =
+          indexOfFirst(executed, s -> s.startsWith("ALTER SCHEMA \"ds_42\" OWNER TO"));
+      assertTrue(createRoleIdx >= 0, "role should be created");
+      assertTrue(alterOwnerIdx >= 0, "schema owner should be altered");
+      assertTrue(createRoleIdx < alterOwnerIdx, "owner change must run after the role is created");
+    }
+
+    private int indexOfFirst(List<String> statements, java.util.function.Predicate<String> match) {
+      for (int i = 0; i < statements.size(); i++) {
+        if (match.test(statements.get(i))) {
+          return i;
+        }
+      }
+      return -1;
     }
 
     @Test

@@ -64,7 +64,6 @@ Idempotency on conflict (absorbed as success):
 | Topic Constant | Topic Value |
 |----------------|-------------|
 | `SQL_TABLE_CREATED` | `de.civitascore.data.sql.table.created` |
-| `SQL_TABLE_UPDATED` | `de.civitascore.data.sql.table.updated` |
 | `SQL_TABLE_DELETED` | `de.civitascore.data.sql.table.deleted` |
 | `SQL_SCHEMA_CREATED` | `de.civitascore.data.sql.schema.created` |
 | `SQL_SCHEMA_UPDATED` | `de.civitascore.data.sql.schema.updated` |
@@ -76,8 +75,9 @@ Idempotency on conflict (absorbed as success):
 ## Configuration
 
 ```properties
-# Topics to subscribe to (comma-separated)
-postgis.topics=de.civitascore.data.sql.table.created,de.civitascore.data.sql.table.updated,de.civitascore.data.sql.table.deleted,\
+# Topics to subscribe to (comma-separated).
+# Table UPDATE is not supported (no in-place ALTER TABLE), so table.updated is not subscribed.
+postgis.topics=de.civitascore.data.sql.table.created,de.civitascore.data.sql.table.deleted,\
   de.civitascore.data.sql.schema.created,de.civitascore.data.sql.schema.updated,de.civitascore.data.sql.schema.deleted,\
   de.civitascore.data.sql.role.created,de.civitascore.data.sql.role.updated,de.civitascore.data.sql.role.deleted
 

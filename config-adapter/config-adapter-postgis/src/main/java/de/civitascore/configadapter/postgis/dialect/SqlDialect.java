@@ -78,6 +78,9 @@ public interface SqlDialect {
   String grantOnSchema(
       String roleName, String schema, List<SchemaPrivilege> privileges, boolean withGrantOption);
 
+  /** Build a {@code GRANT SELECT ON <table>} statement — schema USAGE alone can't read rows. */
+  String grantSelectOnTable(String roleName, String schema, String table);
+
   /** Build a single {@code REVOKE ... ON SCHEMA ... FROM role} statement. */
   String revokeOnSchema(String roleName, String schema, List<SchemaPrivilege> privileges);
 

@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.postgis.ddl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.civitascore.configadapter.model.postgis.SchemaGrant;
@@ -143,5 +144,31 @@ class GrantReconcilerTest {
     assertTrue(plan.toGrant().isEmpty());
     assertTrue(plan.toRevoke().isEmpty());
     assertTrue(plan.toRevokeGrantOption().isEmpty());
+  }
+
+  @Test
+  void grantOptionStaysWithItsOwnPrivilegeAndDoesNotLeakToOthers() {
+    // USAGE without grant option + CREATE with it, same schema: the option must not spill onto
+    // USAGE.
+    List<SchemaGrant> desired =
+        List.of(
+            new SchemaGrant("iot", List.of(SchemaPrivilege.USAGE), false),
+            new SchemaGrant("iot", List.of(SchemaPrivilege.CREATE), true));
+
+    GrantReconcilePlan plan = GrantReconciler.reconcile(desired, Map.of());
+
+    assertEquals(2, plan.toGrant().size());
+    SchemaGrant usage =
+        plan.toGrant().stream()
+            .filter(g -> g.effectivePrivileges().equals(List.of(SchemaPrivilege.USAGE)))
+            .findFirst()
+            .orElseThrow();
+    SchemaGrant create =
+        plan.toGrant().stream()
+            .filter(g -> g.effectivePrivileges().equals(List.of(SchemaPrivilege.CREATE)))
+            .findFirst()
+            .orElseThrow();
+    assertFalse(usage.isWithGrantOption(), "USAGE must not inherit CREATE's grant option");
+    assertTrue(create.isWithGrantOption(), "CREATE keeps its requested grant option");
   }
 }

@@ -153,6 +153,9 @@ class PostgisSagaHandlerIT extends AbstractPostgisIT {
     assertTrue(
         hasSchemaPrivilege("sink_it_geo", "sink_it", "USAGE"),
         "read role should hold USAGE on the schema");
+    assertTrue(
+        hasTablePrivilege("sink_it_geo", "sink_it.observations", "SELECT"),
+        "read role must hold SELECT on the sink table (USAGE alone cannot read rows)");
 
     SagaCommandResult deprovisioned = handler.handle(compensate("DEPROVISION_SINK", trigger));
     assertEquals("COMPENSATION_COMPLETED", deprovisioned.type());
@@ -214,6 +217,19 @@ class PostgisSagaHandlerIT extends AbstractPostgisIT {
             connection.prepareStatement("SELECT has_schema_privilege(?, ?, ?)")) {
       ps.setString(1, role);
       ps.setString(2, schema);
+      ps.setString(3, privilege);
+      try (ResultSet rs = ps.executeQuery()) {
+        return rs.next() && rs.getBoolean(1);
+      }
+    }
+  }
+
+  private static boolean hasTablePrivilege(String role, String table, String privilege)
+      throws SQLException {
+    try (Connection connection = DriverManager.getConnection(jdbcUrl(), username(), password());
+        PreparedStatement ps = connection.prepareStatement("SELECT has_table_privilege(?, ?, ?)")) {
+      ps.setString(1, role);
+      ps.setString(2, table);
       ps.setString(3, privilege);
       try (ResultSet rs = ps.executeQuery()) {
         return rs.next() && rs.getBoolean(1);
