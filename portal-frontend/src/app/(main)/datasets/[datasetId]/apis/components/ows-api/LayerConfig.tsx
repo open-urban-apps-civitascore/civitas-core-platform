@@ -310,7 +310,11 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 </DetailsFieldContainer>
 
                 <DetailsFieldContainer isTitleField>
-                  <SubHeader title={t('style.sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
+                  <SubHeader
+                    title={t('style.sectionTitle')}
+                    subtitle={t('style.sectionSubtitle')}
+                    titleClassName="mb-1"
+                  />
                 </DetailsFieldContainer>
                 <DetailsFieldContainer className="border-b-0 py-2 pt-6">
                   <FormSelect
