@@ -81,6 +81,9 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   private static final String DEFAULT_CRS = "EPSG:4326";
   private static final String DEFAULT_PROJECTION_POLICY = "REPROJECT_TO_DECLARED";
 
+  /** Content type for SLD 1.0.0 style uploads; GeoServer rejects styles posted as plain XML. */
+  private static final String STYLE_SLD_CONTENT_TYPE = "application/vnd.ogc.sld+xml";
+
   /** Upper bound for HTTP error bodies echoed into saga errors/logs (may be large or sensitive). */
   private static final int MAX_ERROR_BODY_LENGTH = 500;
 
@@ -390,6 +393,9 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
    */
   private void processLayers(
       SagaCommandMessage command, String workspaceName, String datastoreName, boolean upsert) {
+    // Upload the dataset's styles before publishing layers; a layer can only reference a style that
+    // already exists in the workspace.
+    upsertStyles(command, workspaceName);
     List<Map<String, Object>> layers = mapList(command, "layers");
     List<String> sinkTables = sinkTableNames(command);
     for (Map<String, Object> layer : layers) {
@@ -407,10 +413,17 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       if (crs == null || crs.isBlank()) {
         crs = DEFAULT_CRS;
       }
+      // Read and type-check the style references before mutating GeoServer, so malformed input
+      // fails the step without side effects (consistent with the name validations above).
+      String defaultStyle = stringValue(layer, "defaultStyle");
+      List<String> alternativeStyles = stringList(layer, "alternativeStyles");
       if (upsert) {
         upsertFeatureType(workspaceName, datastoreName, layerName, nativeName, crs);
       } else {
         createFeatureType(workspaceName, datastoreName, layerName, nativeName, crs);
+      }
+      if ((defaultStyle != null && !defaultStyle.isBlank()) || !alternativeStyles.isEmpty()) {
+        assignLayerStyles(workspaceName, layerName, defaultStyle, alternativeStyles);
       }
     }
   }
@@ -477,6 +490,22 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       }
     }
     return (List<Map<String, Object>>) value;
+  }
+
+  /** Reads an optional list-of-strings field (missing → empty), rejecting non-string elements. */
+  @SuppressWarnings("unchecked")
+  private static List<String> stringList(Map<String, Object> source, String field) {
+    Object value = source.getOrDefault(field, List.of());
+    if (!(value instanceof List<?> list)) {
+      throw new IllegalArgumentException(field + " must be a list, got " + typeName(value));
+    }
+    for (Object element : list) {
+      if (!(element instanceof String)) {
+        throw new IllegalArgumentException(
+            field + " entries must be strings, got " + typeName(element));
+      }
+    }
+    return (List<String>) value;
   }
 
   /** Reads an optional nested string field, rejecting a non-string value. */
@@ -569,6 +598,93 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     }
   }
 
+  /**
+   * Uploads every style in the command's {@code styles} list into the workspace. Each entry is
+   * {@code {name, sldContent}}; the SLD is created or refreshed under {@code name} so layers can
+   * reference it. The list must contain every style any layer references — a layer referencing a
+   * missing style would later fail its assignment.
+   */
+  private void upsertStyles(SagaCommandMessage command, String workspaceName) {
+    for (Map<String, Object> style : mapList(command, "styles")) {
+      String name = stringValue(style, "name");
+      requireSafeName(name, "styleName");
+      String sld = stringValue(style, "sldContent");
+      if (sld == null || sld.isBlank()) {
+        throw new IllegalArgumentException(
+            "style '" + name + "' is missing the required field: sldContent");
+      }
+      upsertStyle(workspaceName, name, sld);
+    }
+  }
+
+  /**
+   * Creates a style from its SLD, or updates the SLD via PUT if a style of that name already
+   * exists. Unlike the other create paths, an existing style returns HTTP 403 (not 409); on 403 the
+   * SLD is refreshed so CREATE/UPDATE sagas and retries converge to the desired style.
+   */
+  private void upsertStyle(String workspaceName, String name, String sld) {
+    Entity<String> sldEntity = Entity.entity(sld, STYLE_SLD_CONTENT_TYPE);
+    try (Response createResponse =
+        auth.apply(
+                client()
+                    .target(serverUrl)
+                    .path(stylesPath(workspaceName))
+                    .queryParam("name", name)
+                    .request(MediaType.APPLICATION_JSON))
+            .post(sldEntity)) {
+      if (createResponse.getStatus() == 201) {
+        return;
+      }
+      if (createResponse.getStatus() != 403) {
+        checkResponse(createResponse, "create-style/" + name);
+        return;
+      }
+    }
+    try (Response updateResponse =
+        auth.apply(
+                client()
+                    .target(serverUrl)
+                    .path(stylePath(workspaceName, name))
+                    .request(MediaType.APPLICATION_JSON))
+            .put(sldEntity)) {
+      checkResponse(updateResponse, "update-style/" + name);
+    }
+  }
+
+  /**
+   * Assigns the default and/or alternative styles to a layer in a single PUT. Style references are
+   * workspace-qualified ({@code {workspace}:{name}}); alternative styles are sent as a {@code
+   * linked-hash-set} so GeoServer persists them in order. Every referenced style must already exist
+   * in the workspace (uploaded by {@link #upsertStyles}).
+   */
+  private void assignLayerStyles(
+      String workspaceName, String layerName, String defaultStyle, List<String> alternativeStyles) {
+    Map<String, Object> layerBody = new HashMap<>();
+    if (defaultStyle != null && !defaultStyle.isBlank()) {
+      requireSafeName(defaultStyle, "defaultStyle");
+      layerBody.put(
+          "defaultStyle",
+          Map.of("name", workspaceName + ":" + defaultStyle, "workspace", workspaceName));
+    }
+    if (!alternativeStyles.isEmpty()) {
+      List<Map<String, Object>> styleRefs = new ArrayList<>();
+      for (String alternativeStyle : alternativeStyles) {
+        requireSafeName(alternativeStyle, "alternativeStyle");
+        styleRefs.add(Map.of("name", workspaceName + ":" + alternativeStyle));
+      }
+      layerBody.put("styles", Map.of("@class", "linked-hash-set", "style", styleRefs));
+    }
+    try (Response response =
+        auth.apply(
+                client()
+                    .target(serverUrl)
+                    .path(layerPath(workspaceName, layerName))
+                    .request(MediaType.APPLICATION_JSON))
+            .put(Entity.json(Map.of("layer", layerBody)))) {
+      checkResponse(response, "assign-layer-styles/" + layerName);
+    }
+  }
+
   /** Deletes a feature type recursively (its implicitly published layer is removed too). */
   private void deleteFeatureType(String workspaceName, String datastoreName, String ftName) {
     requireSafeName(ftName, "featureType name");
@@ -589,6 +705,18 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   private static String featureTypesPath(String workspaceName, String datastoreName) {
     return "/rest/workspaces/" + workspaceName + "/datastores/" + datastoreName + "/featuretypes";
+  }
+
+  private static String stylesPath(String workspaceName) {
+    return "/rest/workspaces/" + workspaceName + "/styles";
+  }
+
+  private static String stylePath(String workspaceName, String styleName) {
+    return "/rest/workspaces/" + workspaceName + "/styles/" + styleName;
+  }
+
+  private static String layerPath(String workspaceName, String layerName) {
+    return "/rest/workspaces/" + workspaceName + "/layers/" + layerName;
   }
 
   private static String datastoreName(String workspaceName) {

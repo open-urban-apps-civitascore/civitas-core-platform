@@ -15,7 +15,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,6 +41,11 @@ import org.mockito.ArgumentCaptor;
 class GeoServerSagaHandlerTest {
 
   private Invocation.Builder mockBuilder;
+  private WebTarget mockTarget;
+  private WebTarget mockPathTarget;
+
+  private static final String SLD = "<StyledLayerDescriptor version=\"1.0.0\"/>";
+  private static final String SLD_CONTENT_TYPE = "application/vnd.ogc.sld+xml";
 
   @Test
   void adapterNameIsGeoserver() {
@@ -289,6 +296,194 @@ class GeoServerSagaHandlerTest {
         assertEquals("STEP_FAILED", result.type());
         // The datasinks list is also type-guarded (read via firstSinkTableName) — clean error.
         assertTrue(result.error().contains("must be"), result.error());
+      }
+    }
+  }
+
+  @Nested
+  class Styles {
+
+    @Test
+    void provisionLayersUploadsStylesAndAssignsDefaultStyle() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        Response assigned = mock(Response.class);
+        when(assigned.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(assigned);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "styles",
+                        List.of(Map.of("name", "civitas_default_point", "sldContent", SLD)),
+                        "layers",
+                        List.of(
+                            Map.of(
+                                "layerName",
+                                "sensor_locations",
+                                "defaultStyle",
+                                "civitas_default_point")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+
+        // SLD uploaded to .../styles?name=civitas_default_point with the SLD content type.
+        assertTrue(capturedPaths().contains("/rest/workspaces/ds_abc/styles"));
+        verify(mockPathTarget).queryParam("name", "civitas_default_point");
+        assertTrue(postedSldContentType());
+
+        // Layer PUT assigns the workspace-qualified default style.
+        Map<String, Object> layer = capturedLayerPutBody();
+        Map<String, Object> defaultStyle = asMap(layer.get("defaultStyle"));
+        assertEquals("ds_abc:civitas_default_point", defaultStyle.get("name"));
+        assertEquals("ds_abc", defaultStyle.get("workspace"));
+      }
+    }
+
+    @Test
+    void provisionLayersAssignsAlternativeStyles() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        Response assigned = mock(Response.class);
+        when(assigned.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(assigned);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "styles",
+                        List.of(
+                            Map.of("name", "civitas_default_point", "sldContent", SLD),
+                            Map.of("name", "civitas_heat", "sldContent", SLD)),
+                        "layers",
+                        List.of(
+                            Map.of(
+                                "layerName",
+                                "sensor_locations",
+                                "defaultStyle",
+                                "civitas_default_point",
+                                "alternativeStyles",
+                                List.of("civitas_heat"))))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+
+        Map<String, Object> layer = capturedLayerPutBody();
+        Map<String, Object> styles = asMap(layer.get("styles"));
+        assertEquals("linked-hash-set", styles.get("@class"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> styleRefs = (List<Map<String, Object>>) styles.get("style");
+        assertEquals("ds_abc:civitas_heat", styleRefs.get(0).get("name"));
+      }
+    }
+
+    @Test
+    void provisionLayersWithoutStylesSkipsStyleCalls() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "layers",
+                        List.of(Map.of("layerName", "sensor_locations")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // Backward-compatible: no SLD upload and no layer PUT when the payload carries no styles.
+        assertTrue(capturedPaths().stream().noneMatch(path -> path.contains("/styles")));
+        verify(mockBuilder, never()).put(any(Entity.class));
+      }
+    }
+
+    @Test
+    void styleUpsertUpdatesSldWhenStyleExists() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // GeoServer returns 403 (not 409) when a style of that name already exists → upsert via
+        // PUT.
+        Response conflict = mock(Response.class);
+        when(conflict.getStatus()).thenReturn(403);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(conflict);
+        Response updated = mock(Response.class);
+        when(updated.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(updated);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "styles",
+                        List.of(Map.of("name", "civitas_default_point", "sldContent", SLD)))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertTrue(
+            capturedPaths().contains("/rest/workspaces/ds_abc/styles/civitas_default_point"));
+        verify(mockBuilder).put(any(Entity.class));
+      }
+    }
+
+    @Test
+    void failsCleanlyWhenStylesIsNotAList() {
+      assertStyleStepFailsWithoutHttp(Map.of("datasetId", "ds-abc", "styles", "not-a-list"));
+    }
+
+    @Test
+    void failsCleanlyWhenStyleMissingName() {
+      assertStyleStepFailsWithoutHttp(
+          Map.of("datasetId", "ds-abc", "styles", List.of(Map.of("sldContent", SLD))));
+    }
+
+    @Test
+    void failsCleanlyWhenSldContentBlank() {
+      assertStyleStepFailsWithoutHttp(
+          Map.of(
+              "datasetId",
+              "ds-abc",
+              "styles",
+              List.of(Map.of("name", "civitas_default_point", "sldContent", "   "))));
+    }
+
+    @Test
+    void failsCleanlyWhenAlternativeStylesNotListOfStrings() {
+      assertStyleStepFailsWithoutHttp(
+          Map.of(
+              "datasetId",
+              "ds-abc",
+              "layers",
+              List.of(Map.of("layerName", "sensor_locations", "alternativeStyles", List.of(123)))));
+    }
+
+    private void assertStyleStepFailsWithoutHttp(Map<String, Object> payload) {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        SagaCommandResult result =
+            handler.handle(createCommand("EXECUTE_STEP", "PROVISION_LAYERS", payload));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+        verify(mockBuilder, never()).post(any(Entity.class));
+        verify(mockBuilder, never()).put(any(Entity.class));
       }
     }
   }
@@ -778,8 +973,8 @@ class GeoServerSagaHandlerTest {
     handler.initialize(mockConfig);
 
     Client mockClient = mock(Client.class);
-    WebTarget mockTarget = mock(WebTarget.class);
-    WebTarget mockPathTarget = mock(WebTarget.class);
+    mockTarget = mock(WebTarget.class);
+    mockPathTarget = mock(WebTarget.class);
     mockBuilder = mock(Invocation.Builder.class);
 
     when(mockClient.target(any(String.class))).thenReturn(mockTarget);
@@ -820,5 +1015,36 @@ class GeoServerSagaHandlerTest {
     when(response.readEntity(Map.class))
         .thenReturn(Map.of("featureTypes", Map.of("featureType", featureTypes)));
     return response;
+  }
+
+  /** All REST path segments the handler requested, in call order. */
+  private List<String> capturedPaths() {
+    ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+    verify(mockTarget, atLeastOnce()).path(captor.capture());
+    return captor.getAllValues();
+  }
+
+  /** True if any POST body carried the SLD content type (i.e. a style upload happened). */
+  @SuppressWarnings("rawtypes")
+  private boolean postedSldContentType() {
+    ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+    verify(mockBuilder, atLeastOnce()).post(captor.capture());
+    return captor.getAllValues().stream()
+        .anyMatch(entity -> SLD_CONTENT_TYPE.equals(entity.getMediaType().toString()));
+  }
+
+  /** The {@code layer} object from the last layer-assignment PUT body. */
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private Map<String, Object> capturedLayerPutBody() {
+    ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+    verify(mockBuilder, atLeastOnce()).put(captor.capture());
+    List<Entity> puts = captor.getAllValues();
+    Map<String, Object> body = (Map<String, Object>) puts.get(puts.size() - 1).getEntity();
+    return (Map<String, Object>) body.get("layer");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> asMap(Object value) {
+    return (Map<String, Object>) value;
   }
 }
