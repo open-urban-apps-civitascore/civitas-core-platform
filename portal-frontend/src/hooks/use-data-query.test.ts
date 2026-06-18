@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, type UseQueryOptions } from '@tanstack/react-query'
 import { renderHook } from '@testing-library/react'
 
 import { apiRequest } from '@/app/services/api/request/apiRequest'
@@ -14,10 +14,8 @@ vi.mock('@/app/services/api/request/apiRequest', () => ({
   apiRequest: vi.fn(),
 }))
 
-type CapturedQueryOptions = {
-  queryKey: readonly unknown[]
-  queryFn: () => Promise<unknown>
-  enabled?: boolean
+type CapturedQueryOptions = Pick<UseQueryOptions, 'queryKey' | 'enabled'> & {
+  queryFn: (...args: unknown[]) => Promise<unknown>
   placeholderData: (previousData: unknown) => unknown
 }
 
@@ -67,26 +65,26 @@ describe('useDataQuery', () => {
   describe('queryFn forwards options to apiRequest', () => {
     it('calls apiRequest with /${key}/${id} when id is provided', async () => {
       renderHook(() => useDataQuery({ key: 'items', id: 'abc', errorMessage: 'Error' }))
-      await lastQueryOptions().queryFn()
+      await lastQueryOptions().queryFn!({} as never)
       expect(vi.mocked(apiRequest)).toHaveBeenCalledWith(expect.objectContaining({ endpoint: '/items/abc' }))
     })
 
     it('builds endpoint /${key} when id is not provided', async () => {
       renderHook(() => useDataQuery({ key: 'items', errorMessage: 'Error' }))
-      await lastQueryOptions().queryFn()
+      await lastQueryOptions().queryFn!({} as never)
       expect(vi.mocked(apiRequest)).toHaveBeenCalledWith(expect.objectContaining({ endpoint: '/items' }))
     })
 
     it('forwards headers to apiRequest', async () => {
       const headers = { Authorization: 'Bearer token' }
       renderHook(() => useDataQuery({ key: 'items', headers, errorMessage: 'Error' }))
-      await lastQueryOptions().queryFn()
+      await lastQueryOptions().queryFn!({} as never)
       expect(vi.mocked(apiRequest)).toHaveBeenCalledWith(expect.objectContaining({ headers }))
     })
 
     it('forwards errorMessage to apiRequest', async () => {
       renderHook(() => useDataQuery({ key: 'items', errorMessage: 'Something went wrong' }))
-      await lastQueryOptions().queryFn()
+      await lastQueryOptions().queryFn!({} as never)
       expect(vi.mocked(apiRequest)).toHaveBeenCalledWith(
         expect.objectContaining({ errorMessage: 'Something went wrong' }),
       )
@@ -95,25 +93,32 @@ describe('useDataQuery', () => {
     it('forwards params to apiRequest', async () => {
       const params = new URLSearchParams({ page: '1', size: '10' })
       renderHook(() => useDataQuery({ key: 'items', params, errorMessage: 'Error' }))
-      await lastQueryOptions().queryFn()
+      await lastQueryOptions().queryFn!({} as never)
       expect(vi.mocked(apiRequest)).toHaveBeenCalledWith(expect.objectContaining({ params }))
+    })
+
+    it('propagates apiRequest rejection', async () => {
+      const error = new Error('Network error')
+      vi.mocked(apiRequest).mockRejectedValueOnce(error)
+
+      renderHook(() => useDataQuery({ key: 'items', errorMessage: 'Error' }))
+      await expect(lastQueryOptions().queryFn!({} as never)).rejects.toThrow('Network error')
     })
   })
 
   describe('isEnabled', () => {
-    it('passes enabled: true to useQuery when isEnabled is true', () => {
-      renderHook(() => useDataQuery({ key: 'items', errorMessage: 'Error', isEnabled: true }))
-      expect(lastQueryOptions().enabled).toBe(true)
-    })
-
-    it('passes enabled: false to useQuery when isEnabled is false', () => {
-      renderHook(() => useDataQuery({ key: 'items', errorMessage: 'Error', isEnabled: false }))
-      expect(lastQueryOptions().enabled).toBe(false)
+    it.each([
+      { isEnabled: true, expected: true },
+      { isEnabled: false, expected: false },
+      { isEnabled: undefined, expected: undefined },
+    ])('passes enabled: $expected to useQuery when isEnabled is $isEnabled', ({ isEnabled, expected }) => {
+      renderHook(() => useDataQuery({ key: 'items', errorMessage: 'Error', isEnabled }))
+      expect(lastQueryOptions().enabled).toBe(expected)
     })
   })
 
   describe('placeholderData', () => {
-    it('returns previous data when previous data exists', () => {
+    it('returns the same reference as previous data (identity function)', () => {
       renderHook(() => useDataQuery({ key: 'items', errorMessage: 'Error' }))
       const previousData = { data: [{ id: '1' }] }
       expect(lastQueryOptions().placeholderData(previousData)).toBe(previousData)
@@ -122,6 +127,16 @@ describe('useDataQuery', () => {
     it('returns undefined when there is no previous data', () => {
       renderHook(() => useDataQuery({ key: 'items', errorMessage: 'Error' }))
       expect(lastQueryOptions().placeholderData(undefined)).toBeUndefined()
+    })
+  })
+
+  describe('return value', () => {
+    it('returns the result of useQuery', () => {
+      const queryResult = { data: { items: [] }, isLoading: false, isError: false }
+      vi.mocked(useQuery).mockReturnValue(queryResult as never)
+
+      const { result } = renderHook(() => useDataQuery({ key: 'items', errorMessage: 'Error' }))
+      expect(result.current).toBe(queryResult)
     })
   })
 })
