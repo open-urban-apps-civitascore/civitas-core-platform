@@ -1,0 +1,37 @@
+meta {
+  name: Get DataPool by ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/datapools/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataPoolId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Has correct id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+  test("Has datasets list", function() {
+    expect(res.body.datasets).to.be.an('array');
+  });
+  test("Has contactPerson field (object or null)", function() {
+    const cp = res.body.contactPerson;
+    expect(cp === null || (typeof cp === 'object' && typeof cp.id === 'string')).to.be.true;
+  });
+}
+
+docs {
+  **Precondition:** `dataPoolId` is set.
+  
+  **Expected Response:** 200 OK, body contains the datapool with `datasets` (summary list) and `contactPerson` (user summary or null).
+}

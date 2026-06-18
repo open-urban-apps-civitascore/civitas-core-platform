@@ -14,7 +14,10 @@ import {
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { useError } from '@/hooks/use-error'
 import { ConnectorFormToApiSchema, ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
+import { Datapool } from '@/types/datapools'
 import {
+  DATAPOOL_SCOPE_TYPES,
+  DatapoolScope,
   Datasource,
   DATASOURCE_STATUS_TYPES,
   DatasourceApiToFormSchema,
@@ -27,17 +30,18 @@ import {
 } from '@/types/datasources'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
 import { getConnectorDefaults } from '@/utils/connectors'
-import { isNameConflictError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 export const useDatasourceForm = (
   datasource: Datasource,
   assignedGroups: GroupRoleAssignmentTable[],
   initialAssignments: GroupRoleAssignmentTable[],
+  assignedDatapools: Datapool[],
+  initialDatapools: Datapool[],
 ) => {
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
-  const { handleNameError, handleFormValidationError } = useError()
+  const { handleFormValidationError } = useError()
 
   const mapDatasourceToFormValues = (source: Datasource) => {
     const parsedDatasource = DatasourceApiToFormSchema.parse(source)
@@ -157,6 +161,12 @@ export const useDatasourceForm = (
     [assignedGroups, initialAssignments],
   )
 
+  const areDatapoolsDirty = useMemo(() => {
+    const currentIds = new Set(assignedDatapools.map(dp => dp.id))
+    const initialIds = new Set(initialDatapools.map(dp => dp.id))
+    return currentIds.size !== initialIds.size || [...currentIds].some(id => !initialIds.has(id))
+  }, [assignedDatapools, initialDatapools])
+
   const handleStatusChange = (newStatus: DatasourceStatusType) =>
     form.setValue('dataSourceStatus', newStatus, { shouldDirty: true })
 
@@ -186,9 +196,7 @@ export const useDatasourceForm = (
       }
       return response.data
     } catch (error) {
-      if (isNameConflictError(error as AxiosError)) {
-        handleNameError(form, values.name)
-      } else toast.error(t('errors.updateError'))
+      toast.error(t('errors.updateError'))
       throw error
     }
   }
@@ -215,14 +223,26 @@ export const useDatasourceForm = (
     const assignmentsPayload = mapGroupRoleAssignmentsToApiPayload(assignedGroups)
     const areAssignmentsDirty = hasAssignmentChanges(assignedGroups, initialAssignments)
 
+    const resolveDatapoolScope = (): DatapoolScope => {
+      if (parsed.data.datapoolScope?.type === DATAPOOL_SCOPE_TYPES.ALL) return { type: DATAPOOL_SCOPE_TYPES.ALL }
+      if (assignedDatapools.length > 0)
+        return { type: DATAPOOL_SCOPE_TYPES.SPECIFIC, datapoolIds: assignedDatapools.map(dp => dp.id) }
+      return { type: DATAPOOL_SCOPE_TYPES.NONE }
+    }
+
+    const datapoolScopePayload =
+      areDatapoolsDirty || dirtyFields.datapoolScope ? { datapoolScope: resolveDatapoolScope() } : {}
+
     const apiPayload = {
       ...dirtyValues,
       ...(dirtyFields.configuration ? { configuration } : {}),
       ...(areAssignmentsDirty ? { assignments: assignmentsPayload } : {}),
+      ...datapoolScopePayload,
       id: datasource.id,
     } as DatasourcePatchData
 
-    const shouldUpdateValues = Object.keys(dirtyValues).some(key => key !== 'dataSourceStatus') || areAssignmentsDirty
+    const shouldUpdateValues =
+      Object.keys(dirtyValues).some(key => key !== 'dataSourceStatus') || areAssignmentsDirty || areDatapoolsDirty
     const shouldRelease = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
     const shouldUnrelease = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
 
@@ -254,6 +274,7 @@ export const useDatasourceForm = (
 
   return {
     areAssignmentsDirty,
+    areDatapoolsDirty,
     form,
     dataSourceStatus,
     selectedConnectorType,

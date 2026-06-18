@@ -117,7 +117,9 @@ class FrostAuthStrategyTest {
       Invocation.Builder builder = mock(Invocation.Builder.class);
       when(builder.header("Authorization", "Basic dXNlcjpwYXNz")).thenReturn(builder);
 
-      FrostAuthStrategy strategy = FrostAuthStrategy.create("user", "pass", "X-API-Key", "my-key");
+      FrostAuthStrategy strategy =
+          FrostAuthStrategy.create(
+              new FrostAuthStrategy.Credentials("user", "pass", "X-API-Key", "my-key"));
       strategy.apply(builder);
 
       verify(builder).header("Authorization", "Basic dXNlcjpwYXNz");
@@ -129,7 +131,9 @@ class FrostAuthStrategyTest {
       Invocation.Builder builder = mock(Invocation.Builder.class);
       when(builder.header("X-API-Key", "my-key")).thenReturn(builder);
 
-      FrostAuthStrategy strategy = FrostAuthStrategy.create(null, null, "X-API-Key", "my-key");
+      FrostAuthStrategy strategy =
+          FrostAuthStrategy.create(
+              new FrostAuthStrategy.Credentials(null, null, "X-API-Key", "my-key"));
       strategy.apply(builder);
 
       verify(builder).header("X-API-Key", "my-key");
@@ -141,7 +145,9 @@ class FrostAuthStrategyTest {
       Invocation.Builder builder = mock(Invocation.Builder.class);
       when(builder.header("X-API-Key", "my-key")).thenReturn(builder);
 
-      FrostAuthStrategy strategy = FrostAuthStrategy.create("  ", null, "X-API-Key", "my-key");
+      FrostAuthStrategy strategy =
+          FrostAuthStrategy.create(
+              new FrostAuthStrategy.Credentials("  ", null, "X-API-Key", "my-key"));
       strategy.apply(builder);
 
       verify(builder).header("X-API-Key", "my-key");
@@ -153,7 +159,9 @@ class FrostAuthStrategyTest {
       IllegalArgumentException ex =
           assertThrows(
               IllegalArgumentException.class,
-              () -> FrostAuthStrategy.create(null, null, "X-API-Key", null));
+              () ->
+                  FrostAuthStrategy.create(
+                      new FrostAuthStrategy.Credentials(null, null, "X-API-Key", null)));
 
       assertEquals(
           "FROST authentication not configured: provide either basic.auth.username or api.key",
@@ -165,7 +173,9 @@ class FrostAuthStrategyTest {
     void shouldThrowWhenUsernameBlankAndApiKeyBlank() {
       assertThrows(
           IllegalArgumentException.class,
-          () -> FrostAuthStrategy.create("  ", null, "X-API-Key", "  "));
+          () ->
+              FrostAuthStrategy.create(
+                  new FrostAuthStrategy.Credentials("  ", null, "X-API-Key", "  ")));
     }
   }
 

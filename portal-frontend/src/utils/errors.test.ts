@@ -1,7 +1,7 @@
 import { AxiosError, AxiosHeaders, InternalAxiosRequestConfig } from 'axios'
 import { describe, expect, it } from 'vitest'
 
-import { isNameConflictError, isPermissionsError } from './errors'
+import { isDatapoolScopeViolationError, isNameConflictError, isPermissionsError } from './errors'
 
 const getError = (status: number, detail?: string) => {
   return new AxiosError(
@@ -31,14 +31,14 @@ const getError = (status: number, detail?: string) => {
 
 describe('isNameConflictError', () => {
   it('returns true for a 409 conflict error with name conflict message', () => {
-    const error1 = getError(409, 'Datasource with name "Test" already exists')
+    const error1 = getError(409, 'Group with name "Local Data Consumers" already exists')
     expect(isNameConflictError(error1)).toBe(true)
     const error2 = getError(409, 'Role with name "Admin" already exists')
     expect(isNameConflictError(error2)).toBe(true)
   })
 
   it('returns false for non-409 status codes', () => {
-    const error = getError(400, 'Datasource with name "Test" already exists')
+    const error = getError(400, 'Role with name "Admin" already exists')
 
     expect(isNameConflictError(error)).toBe(false)
   })
@@ -50,19 +50,19 @@ describe('isNameConflictError', () => {
   })
 
   it('returns false when detail is missing "with name"', () => {
-    const error = getError(409, 'Datasource "Test" already exists')
+    const error = getError(409, 'Group "Local Data Consumers" already exists')
 
     expect(isNameConflictError(error)).toBe(false)
   })
 
   it('returns false when detail is missing "already exists"', () => {
-    const error = getError(409, 'Datasource with name "Test" is in use')
+    const error = getError(409, 'Group with name "Local Data Consumers" is in use')
 
     expect(isNameConflictError(error)).toBe(false)
   })
 
   it('returns false when both required strings are missing', () => {
-    const error = getError(409, 'Datasource validation failed')
+    const error = getError(409, 'Role validation failed')
     expect(isNameConflictError(error)).toBe(false)
   })
 })
@@ -76,5 +76,21 @@ describe('isPermissionsError', () => {
   it('returns false for non-403 status codes', () => {
     const error = getError(401, 'Unauthorized')
     expect(isPermissionsError(error)).toBe(false)
+  })
+})
+
+describe('isDatapoolScopeViolationError', () => {
+  it('returns true for a 422 error', () => {
+    const error = getError(422, 'DataSource "My DS" is not permitted for this datapool')
+    expect(isDatapoolScopeViolationError(error)).toBe(true)
+  })
+
+  it('returns false for non-422 status codes', () => {
+    const error = getError(400, 'Bad request')
+    expect(isDatapoolScopeViolationError(error)).toBe(false)
+  })
+
+  it('returns false for non-axios errors', () => {
+    expect(isDatapoolScopeViolationError(new Error('plain error'))).toBe(false)
   })
 })

@@ -29,7 +29,7 @@ import lombok.experimental.SuperBuilder;
 
 /**
  * Represents a dataset with its lifecycle status, infrastructure references, and relationships to
- * {@link Pipeline Pipelines}, {@link Distribution Distributions}, and {@link DataSpace DataSpaces}.
+ * {@link Pipeline Pipelines} and {@link Distribution Distributions}.
  *
  * @see DataSetStatus
  */
@@ -53,10 +53,6 @@ public class DataSet extends BaseDataEntity {
   @Builder.Default
   private DataSetStatus dataSetStatus = DataSetStatus.DRAFT;
 
-  /** Master persistence ID (FROST ID). Required for publishing the dataset. */
-  @Column(name = "persistence_id")
-  private Long persistenceId;
-
   @OneToMany(
       mappedBy = "dataSet",
       fetch = FetchType.LAZY,
@@ -76,20 +72,12 @@ public class DataSet extends BaseDataEntity {
   private User owner;
 
   @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "datapool_id")
+  private DataPool dataPool;
+
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "dataset_series_id")
   private DataSetSeries dataSetSeries;
-
-  @ManyToMany(fetch = FetchType.LAZY)
-  @JoinTable(
-      name = "dataset_dataspaces",
-      joinColumns = @JoinColumn(name = "dataset_id"),
-      inverseJoinColumns = @JoinColumn(name = "dataspace_id"),
-      indexes = {
-        @Index(name = "idx_dataset_dataspaces_dataset", columnList = "dataset_id"),
-        @Index(name = "idx_dataset_dataspaces_dataspace", columnList = "dataspace_id")
-      })
-  @Builder.Default
-  private Set<DataSpace> dataSpaces = new HashSet<>();
 
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
@@ -103,6 +91,11 @@ public class DataSet extends BaseDataEntity {
   @Builder.Default
   private Set<Agent> agents = new HashSet<>();
 
+  /**
+   * Distribution rows linked to this dataset. Currently has no production writer — the entity is
+   * reserved for the deferred DCAT distribution work. Existing rows are preserved by cascade
+   * delete; the dormancy is documented on {@link Distribution} itself.
+   */
   @OneToMany(
       mappedBy = "dataSet",
       fetch = FetchType.LAZY,
@@ -131,9 +124,6 @@ public class DataSet extends BaseDataEntity {
   @Column(name = "frost_base_url", length = 500)
   private String frostBaseUrl;
 
-  @Column(name = "route_id")
-  private String routeId;
-
   @Column(name = "service_id")
   private String serviceId;
 
@@ -142,6 +132,36 @@ public class DataSet extends BaseDataEntity {
 
   @Column(name = "pipeline_ids", columnDefinition = "text[]")
   private List<String> pipelineIds;
+
+  /**
+   * Named API endpoints exposed by this dataset. Each entry produces one APISIX route after
+   * release. Slug uniqueness within the dataset is enforced by a DB unique constraint.
+   */
+  @OneToMany(
+      mappedBy = "dataSet",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Builder.Default
+  private Set<NamedApi> namedApis = new HashSet<>();
+
+  @OneToMany(
+      mappedBy = "dataSet",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Setter(AccessLevel.NONE)
+  @Builder.Default
+  private Set<Layer> layers = new HashSet<>();
+
+  @OneToMany(
+      mappedBy = "dataSet",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Setter(AccessLevel.NONE)
+  @Builder.Default
+  private Set<Style> styles = new HashSet<>();
 
   @Enumerated(EnumType.STRING)
   @Column(name = "pending_saga_type", length = 30)
@@ -189,15 +209,57 @@ public class DataSet extends BaseDataEntity {
   }
 
   /**
-   * Resets all infrastructure-related fields (projectId, frostBaseUrl, routeId, serviceId,
-   * publicUrl, pipelineIds) to {@code null}, typically called during unrelease.
+   * Replaces the current named APIs with the provided collection, clearing then re-adding to
+   * satisfy Hibernate orphan-removal semantics. Each entry's {@link NamedApi#getDataSet()} is set
+   * to this dataset.
+   *
+   * @param newNamedApis the new named APIs, or {@code null} to clear
+   */
+  public void setNamedApis(Collection<NamedApi> newNamedApis) {
+    this.namedApis.clear();
+    if (newNamedApis != null) {
+      newNamedApis.forEach(api -> api.setDataSet(this));
+      this.namedApis.addAll(newNamedApis);
+    }
+  }
+
+  /**
+   * Replaces the current layers with the provided collection, clearing then re-adding to satisfy
+   * Hibernate orphan-removal semantics.
+   *
+   * @param newLayers the new layers, or {@code null} to clear
+   */
+  public void setLayers(Collection<Layer> newLayers) {
+    this.layers.clear();
+    if (newLayers != null) {
+      this.layers.addAll(newLayers);
+    }
+  }
+
+  /**
+   * Replaces the current styles with the provided collection, clearing then re-adding to satisfy
+   * Hibernate orphan-removal semantics.
+   *
+   * @param newStyles the new styles, or {@code null} to clear
+   */
+  public void setStyles(Collection<Style> newStyles) {
+    this.styles.clear();
+    if (newStyles != null) {
+      this.styles.addAll(newStyles);
+    }
+  }
+
+  /**
+   * Resets all infrastructure-related fields and clears the per-named-API {@code routeId} on each
+   * entry. The named-API entries themselves are preserved (they are user-authored). The {@code
+   * namedApis} collection must be initialized before this is called.
    */
   public void clearInfrastructureFields() {
     this.projectId = null;
     this.frostBaseUrl = null;
-    this.routeId = null;
     this.serviceId = null;
     this.publicUrl = null;
     this.pipelineIds = null;
+    this.namedApis.forEach(api -> api.setRouteId(null));
   }
 }

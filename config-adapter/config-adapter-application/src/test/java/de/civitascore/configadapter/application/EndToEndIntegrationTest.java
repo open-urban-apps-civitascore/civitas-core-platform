@@ -108,10 +108,8 @@ class EndToEndIntegrationTest {
 
     String keycloakUrl = "http://" + keycloak.getHost() + ":" + keycloak.getMappedPort(8080);
 
-    // Wait for Keycloak to be ready
     waitForKeycloakReady(keycloakUrl);
 
-    // Create configuration
     Map<String, Object> props = new HashMap<>();
     props.put("kafka.bootstrap.servers", kafka.getBootstrapServers());
     props.put("kafka.group.id", "e2e-test-group-" + UUID.randomUUID());
@@ -140,25 +138,20 @@ class EndToEndIntegrationTest {
             Topics.CLIENT_DELETED.toString()));
     AppConfig config = new AppConfig(new MapConfiguration(props));
 
-    // Create adapter
     adapter = new KeycloakAdapter();
     adapter.initialize(config);
 
-    // Create consumer with adapter
     consumer = new KafkaEventHandler();
     consumer.initialize(config, adapter);
     consumer.start();
 
-    // Create Kafka producer for sending test events
     Properties producerProps = new Properties();
     producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
     producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
     producerProps.put(
         ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, CloudEventSerializer.class.getName());
-    // Don't specify encoding - use default binary mode
     producer = new KafkaProducer<>(producerProps);
 
-    // Create Kafka consumer for reading result events
     Properties consumerProps = new Properties();
     consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
     consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "result-consumer-" + UUID.randomUUID());
@@ -167,25 +160,20 @@ class EndToEndIntegrationTest {
     consumerProps.put(
         ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, CloudEventDeserializer.class.getName());
     consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-    // Deserializer will auto-detect encoding mode from CloudEvent headers
     resultConsumer = new KafkaConsumer<>(consumerProps);
     resultConsumer.subscribe(Collections.singletonList("result.topic"));
-
-    // Poll once to trigger topic creation and partition assignment
     resultConsumer.poll(Duration.ofMillis(100));
 
-    // Create Keycloak client for verification
     keycloakClient = Keycloak.getInstance(keycloakUrl, "master", "admin", "admin", "admin-cli");
   }
 
   @AfterEach
   void tearDown() {
-    // Clean up any test realms (ignore errors if they don't exist)
     if (keycloakClient != null) {
       try {
         cleanupTestRealms();
       } catch (Exception e) {
-        // Ignore cleanup errors
+        // ignored
       }
       keycloakClient.close();
     }
@@ -202,7 +190,6 @@ class EndToEndIntegrationTest {
   }
 
   private void cleanupTestRealms() {
-    // Try to delete test realms - don't fail if they don't exist
     String[] testRealms = {
       "e2e-test-realm", "user-e2e-realm", "client-realm", "seq-test-realm", "correlation-test-realm"
     };
@@ -211,7 +198,7 @@ class EndToEndIntegrationTest {
       try {
         keycloakClient.realm(realm).remove();
       } catch (Exception e) {
-        // Realm doesn't exist or already deleted
+        // ignored
       }
     }
   }
@@ -219,7 +206,6 @@ class EndToEndIntegrationTest {
   @Test
   @Order(1)
   void shouldHandleCompleteRealmCreationFlow() throws Exception {
-    // Given - create RealmConfig directly (as developers would)
     RealmConfig realmConfig = new RealmConfig();
     realmConfig.setRealm("e2e-test-realm");
     realmConfig.setEnabled(true);
@@ -231,20 +217,14 @@ class EndToEndIntegrationTest {
 
     CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.REALM_CREATED.toString());
 
-    // When - send event to Kafka
     producer.send(new ProducerRecord<>(Topics.REALM_CREATED.toString(), "key", cloudEvent)).get();
     producer.flush();
 
-    // Then - wait for result event
     CloudEvent resultEvent = waitForResultEvent("correlation123", 15000);
     assertNotNull(resultEvent, "Result event should be published");
     assertEquals("SUCCESS", resultEvent.getExtension("status"));
     assertEquals("e2e-test-realm", resultEvent.getExtension("resourceid"));
-
-    // Verify CloudEvent type is set from resultType
     assertEquals(IdmConfigValue.IDM_RESULT_TYPE, resultEvent.getType());
-
-    // Verify CloudEvent data contains the serialized ConfigResultEvent
     assertNotNull(resultEvent.getData(), "CloudEvent data should not be null");
     ConfigResultEvent resultData =
         objectMapper.readValue(resultEvent.getData().toBytes(), ConfigResultEvent.class);
@@ -254,7 +234,6 @@ class EndToEndIntegrationTest {
     assertEquals("e2e-test-realm", resultData.resourceId());
     assertEquals(IdmConfigValue.IDM_RESULT_TYPE, resultData.resultType());
 
-    // Verify realm was actually created in Keycloak
     RealmRepresentation createdRealm = keycloakClient.realm("e2e-test-realm").toRepresentation();
     assertNotNull(createdRealm);
     assertEquals("e2e-test-realm", createdRealm.getRealm());
@@ -264,13 +243,11 @@ class EndToEndIntegrationTest {
   @Test
   @Order(2)
   void shouldHandleCompleteUserCreationFlow() throws Exception {
-    // Given - create test realm first
     RealmRepresentation realmRep = new RealmRepresentation();
     realmRep.setRealm("user-e2e-realm");
     realmRep.setEnabled(true);
     keycloakClient.realms().create(realmRep);
 
-    // Create UserConfig directly
     UserConfig userConfig = new UserConfig();
     userConfig.setUsername("e2euser");
     userConfig.setEmail("e2euser@example.com");
@@ -284,23 +261,19 @@ class EndToEndIntegrationTest {
 
     CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.USER_CREATED.toString());
 
-    // When - send event to Kafka
     producer.send(new ProducerRecord<>(Topics.USER_CREATED.toString(), "key", cloudEvent)).get();
     producer.flush();
 
-    // Then - wait for result event
     CloudEvent resultEvent = waitForResultEvent("correlationuser123", 15000);
     assertNotNull(resultEvent, "Result event should be published");
     assertEquals("SUCCESS", resultEvent.getExtension("status"));
 
-    // Resource ID should be the Keycloak-generated UUID (used for future UPDATE/DELETE operations)
     String resourceId = (String) resultEvent.getExtension("resourceid");
     assertNotNull(resourceId, "Resource ID should be set");
     assertTrue(
         resourceId.matches("[0-9a-f-]{36}"),
         "Resource ID should be a UUID, but was: " + resourceId);
 
-    // Verify user was actually created in Keycloak
     List<UserRepresentation> users =
         keycloakClient.realm("user-e2e-realm").users().search("e2euser");
     assertEquals(1, users.size());
@@ -310,7 +283,6 @@ class EndToEndIntegrationTest {
   @Test
   @Order(3)
   void shouldHandleErrorsEndToEnd() throws Exception {
-    // Given - try to update non-existent realm
     RealmConfig realmConfig = new RealmConfig();
     realmConfig.setRealm("non-existent-realm");
 
@@ -320,21 +292,16 @@ class EndToEndIntegrationTest {
 
     CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.REALM_UPDATED.toString());
 
-    // When - send event to Kafka
     producer.send(new ProducerRecord<>(Topics.REALM_UPDATED.toString(), "key", cloudEvent)).get();
     producer.flush();
 
-    // Then - wait for error result event
     CloudEvent resultEvent = waitForResultEvent("correlationerror123", 15000);
     assertNotNull(resultEvent, "Error result event should be published");
     assertEquals("FAILURE", resultEvent.getExtension("status"));
     assertNotNull(resultEvent.getExtension("errorcode"));
     assertNotNull(resultEvent.getExtension("errormessage"));
 
-    // Verify CloudEvent type is set from resultType
     assertEquals(IdmConfigValue.IDM_RESULT_TYPE, resultEvent.getType());
-
-    // Verify CloudEvent data contains the serialized ConfigResultEvent with error details
     assertNotNull(resultEvent.getData(), "CloudEvent data should not be null");
     ConfigResultEvent resultData =
         objectMapper.readValue(resultEvent.getData().toBytes(), ConfigResultEvent.class);
@@ -349,7 +316,6 @@ class EndToEndIntegrationTest {
   @Test
   @Order(4)
   void shouldPreserveCorrelationIdThroughoutFlow() throws Exception {
-    // Given
     String correlationId = "testcorrelation" + UUID.randomUUID();
     String messageId = UUID.randomUUID().toString();
 
@@ -368,11 +334,9 @@ class EndToEndIntegrationTest {
 
     CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.REALM_CREATED.toString());
 
-    // When
     producer.send(new ProducerRecord<>(Topics.REALM_CREATED.toString(), "key", cloudEvent)).get();
     producer.flush();
 
-    // Then
     CloudEvent resultEvent = waitForResultEvent(correlationId, 15000);
     assertNotNull(resultEvent);
     assertEquals(correlationId, resultEvent.getExtension("correlationid"));
@@ -384,9 +348,6 @@ class EndToEndIntegrationTest {
   @Test
   @Order(5)
   void shouldHandleMultipleSequentialOperations() throws Exception {
-    // This test verifies the adapter can handle multiple operations in sequence
-
-    // 1. Create realm
     RealmConfig realmConfig = new RealmConfig();
     realmConfig.setRealm("seq-test-realm");
     realmConfig.setEnabled(true);
@@ -395,7 +356,6 @@ class EndToEndIntegrationTest {
         Topics.REALM_CREATED.toString(),
         createConfigEvent("seq-test-realm", "realm", Operation.CREATE, realmConfig, "seq-1"));
 
-    // 2. Create user
     UserConfig userConfig = new UserConfig();
     userConfig.setUsername("sequser");
     userConfig.setEmail("sequser@example.com");
@@ -405,19 +365,17 @@ class EndToEndIntegrationTest {
         Topics.USER_CREATED.toString(),
         createConfigEvent("seq-test-realm", "user", Operation.CREATE, userConfig, "seq-2"));
 
-    // 3. Update user
     List<UserRepresentation> users =
         keycloakClient.realm("seq-test-realm").users().search("sequser");
     String userId = users.get(0).getId();
 
-    userConfig.setId(userId); // Set the Keycloak user ID for UPDATE operation
+    userConfig.setId(userId);
     userConfig.setFirstName("Updated");
 
     sendEventAndWaitForResult(
         Topics.USER_UPDATED.toString(),
         createConfigEvent("seq-test-realm", "user", Operation.UPDATE, userConfig, "seq-3"));
 
-    // Verify all operations succeeded
     RealmRepresentation realm = keycloakClient.realm("seq-test-realm").toRepresentation();
     assertNotNull(realm);
 
@@ -425,8 +383,6 @@ class EndToEndIntegrationTest {
     assertEquals(1, users.size());
     assertEquals("Updated", users.get(0).getFirstName());
   }
-
-  // Helper methods
 
   private void waitForKeycloakReady(String keycloakUrl) {
     ThrowingRunnable assertion =

@@ -1,3 +1,4 @@
+import { emptyMappingConfig, type MappingConfig } from '../_components/mapping-editor/_types'
 import type { PipelineNodeType } from './pipeline'
 import { PIPELINE_NODE_TYPES } from './pipeline'
 
@@ -11,7 +12,6 @@ import { PIPELINE_NODE_TYPES } from './pipeline'
  */
 export const ENTITY_TYPES = {
   Datasource: 'datasource',
-  Api: 'api',
   Frost: 'frost',
   Persistence: 'persistence',
 } as const
@@ -89,19 +89,6 @@ export interface DataSourceNodeData extends BasePipelineNodeData {
 }
 
 /**
- * Data specific to API Request/Response nodes.
- * Auto-configured with a dynamically generated API path.
- * No user configuration needed.
- *
- */
-export interface ApiNodeData extends BasePipelineNodeData {
-  nodeType: typeof PIPELINE_NODE_TYPES.ApiRequest | typeof PIPELINE_NODE_TYPES.ApiResponse
-  entityType: typeof ENTITY_TYPES.Api
-  /** Auto-generated API path (e.g., "api/123") */
-  apiPath: string
-}
-
-/**
  * Data specific to FROST storage nodes.
  * Auto-configured with the platform's fixed FROST server.
  * No user configuration needed.
@@ -109,12 +96,31 @@ export interface ApiNodeData extends BasePipelineNodeData {
  */
 export interface FrostNodeData extends BasePipelineNodeData {
   entityType: typeof ENTITY_TYPES.Frost
+  entityId?: string
   /** Fixed FROST server display name */
   serverName: string
   /** Fixed FROST server URL */
   serverUrl: string
   /** SensorThings API version */
   version: string
+}
+
+/**
+ * Data specific to Geo Persistence storage nodes.
+ * Configured with a table name and a data structure version.
+ *
+ */
+export interface GeoPersistenceNodeData extends BasePipelineNodeData {
+  entityType: typeof ENTITY_TYPES.Persistence
+  entityId?: string
+  /** Table name for geo data storage */
+  tableName: string
+  /** ID of the selected data structure version */
+  dataStructureVersionId?: string
+  /** Display name of the selected data structure */
+  dataStructureName?: string
+  /** Version number of the selected data structure version */
+  versionNumber?: string
 }
 
 // ============================================================================
@@ -138,12 +144,18 @@ export interface CronNodeData extends BasePipelineNodeData {
 
 /**
  * Data for Mapping nodes.
- * Contains Bloblang mapping code.
+ * Holds the source/target schema references and the compiled mapping config (spec §13).
  *
  */
 export interface MappingNodeData extends BasePipelineNodeData {
-  /** Bloblang mapping code */
-  mappingCode: string
+  sourceDatastructureId?: string
+  sourceVersionId?: string
+  sourceName?: string
+  targetDatastructureId?: string
+  targetVersionId?: string
+  targetName?: string
+  /** The single saved artifact produced by the mapping editor. */
+  mappingConfig: MappingConfig
 }
 
 // ============================================================================
@@ -158,8 +170,8 @@ export interface MappingNodeData extends BasePipelineNodeData {
 export type PipelineNodeData =
   | ControlNodeData
   | DataSourceNodeData
-  | ApiNodeData
   | FrostNodeData
+  | GeoPersistenceNodeData
   | CronNodeData
   | MappingNodeData
 
@@ -171,13 +183,13 @@ export type PipelineNodeData =
  * Type guard to check if node data is for a control node (Start/End).
  */
 export const isControlNodeData = (data: PipelineNodeData): data is ControlNodeData => {
-  return 'description' in data && !('entityType' in data) && !('cronExpression' in data) && !('mappingCode' in data)
+  return 'description' in data && !('entityType' in data) && !('cronExpression' in data) && !('mappingConfig' in data)
 }
 
 /**
  * Type guard to check if node data is for an entity-referencing node.
  */
-export const isEntityNodeData = (data: PipelineNodeData): data is DataSourceNodeData | ApiNodeData | FrostNodeData => {
+export const isEntityNodeData = (data: PipelineNodeData): data is DataSourceNodeData | FrostNodeData => {
   return 'entityType' in data
 }
 
@@ -189,17 +201,17 @@ export const isDataSourceNodeData = (data: PipelineNodeData): data is DataSource
 }
 
 /**
- * Type guard to check if node data is for an API node.
- */
-export const isApiNodeData = (data: PipelineNodeData): data is ApiNodeData => {
-  return 'entityType' in data && (data as EntityNodeData).entityType === ENTITY_TYPES.Api
-}
-
-/**
  * Type guard to check if node data is for a FROST node.
  */
 export const isFrostNodeData = (data: PipelineNodeData): data is FrostNodeData => {
   return 'entityType' in data && (data as EntityNodeData).entityType === ENTITY_TYPES.Frost
+}
+
+/**
+ * Type guard to check if node data is for a Geo Persistence node.
+ */
+export const isGeoPersistenceNodeData = (data: PipelineNodeData): data is GeoPersistenceNodeData => {
+  return 'entityType' in data && (data as EntityNodeData).entityType === ENTITY_TYPES.Persistence
 }
 
 /**
@@ -213,7 +225,7 @@ export const isCronNodeData = (data: PipelineNodeData): data is CronNodeData => 
  * Type guard to check if node data is for a Mapping node.
  */
 export const isMappingNodeData = (data: PipelineNodeData): data is MappingNodeData => {
-  return 'mappingCode' in data
+  return 'mappingConfig' in data
 }
 
 // ============================================================================
@@ -225,7 +237,7 @@ export const isMappingNodeData = (data: PipelineNodeData): data is MappingNodeDa
  * Used when creating new nodes from the palette.
  *
  */
-export const createDefaultNodeData = (nodeType: PipelineNodeType, datasetId?: string): PipelineNodeData => {
+export const createDefaultNodeData = (nodeType: PipelineNodeType): PipelineNodeData => {
   switch (nodeType) {
     case PIPELINE_NODE_TYPES.Start:
       return {
@@ -247,30 +259,21 @@ export const createDefaultNodeData = (nodeType: PipelineNodeType, datasetId?: st
         configured: false, // Needs entity selection
         entityType: ENTITY_TYPES.Datasource,
       }
-    case PIPELINE_NODE_TYPES.ApiRequest:
-      return {
-        nodeType: PIPELINE_NODE_TYPES.ApiRequest,
-        label: 'API Request',
-        configured: true, // Auto-configured with generated path
-        entityType: ENTITY_TYPES.Api,
-        apiPath: `api/${datasetId ?? ''}`,
-      }
-    case PIPELINE_NODE_TYPES.ApiResponse:
-      return {
-        nodeType: PIPELINE_NODE_TYPES.ApiResponse,
-        label: 'API Response',
-        configured: true, // Auto-configured with generated path
-        entityType: ENTITY_TYPES.Api,
-        apiPath: `api/${datasetId ?? ''}`,
-      }
     case PIPELINE_NODE_TYPES.Frost:
       return {
-        label: 'Storage',
+        label: 'Frost Server',
         configured: true, // Auto-configured with fixed server
         entityType: ENTITY_TYPES.Frost,
         serverName: 'Frost Server',
         serverUrl: '',
         version: '1.1',
+      }
+    case PIPELINE_NODE_TYPES.GeoPersistence:
+      return {
+        label: 'Geo Persistence',
+        configured: false, // Needs table name and data structure version
+        entityType: ENTITY_TYPES.Persistence,
+        tableName: '',
       }
     case PIPELINE_NODE_TYPES.Cron:
       return {
@@ -281,8 +284,8 @@ export const createDefaultNodeData = (nodeType: PipelineNodeType, datasetId?: st
     case PIPELINE_NODE_TYPES.Mapping:
       return {
         label: 'Mapping',
-        configured: false, // Needs mapping code
-        mappingCode: '',
+        configured: false, // Needs name + source + target
+        mappingConfig: emptyMappingConfig(),
       }
     default:
       throw new Error(`Unknown node type: ${nodeType}`)

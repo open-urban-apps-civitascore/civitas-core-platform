@@ -7,6 +7,8 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.idm.UserConfig;
+import de.civitascore.portal.configuration.EventProperties;
+import de.civitascore.portal.configuration.KeycloakProperties;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.User;
@@ -38,7 +40,12 @@ class UserServiceTest {
 
   private UserService createService() {
     return new UserService(
-        configEventPublisher, userRepository, userMapper, groupRepository, TARGET_REALM);
+        configEventPublisher,
+        userRepository,
+        userMapper,
+        groupRepository,
+        new KeycloakProperties(TARGET_REALM, "http://keycloak:8080", "test-realm"),
+        new EventProperties(10));
   }
 
   private User userWithId(UUID id) {

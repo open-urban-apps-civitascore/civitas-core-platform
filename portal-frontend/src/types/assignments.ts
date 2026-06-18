@@ -10,6 +10,7 @@ export const ASSIGNMENT_SCOPE_TYPES = {
   DATASTRUCTURE: 'DATASTRUCTURE',
   DATASOURCE: 'DATASOURCE',
   DATASET: 'DATASET',
+  DATAPOOL: 'DATAPOOL',
 } as const
 
 export const AssignmentScopeEnum = enumFromConst(ASSIGNMENT_SCOPE_TYPES)

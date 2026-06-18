@@ -14,8 +14,8 @@ export const getMockDatasetData = (overrides: Partial<Dataset> = {}): Dataset =>
     modifiedAt: new Date().toISOString(),
     dataSetStatus: 'DRAFT',
     openDataAccess: false,
-    distributions: [],
     pipelines: [],
+    datapool: null,
     ...overrides,
   }
 }

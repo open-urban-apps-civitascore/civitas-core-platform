@@ -9,7 +9,7 @@
  */
 
 import type { DataSourceNodeData, MappingNodeData } from '../_types/nodes'
-import { isApiNodeData, isDataSourceNodeData, isFrostNodeData, isMappingNodeData } from '../_types/nodes'
+import { isDataSourceNodeData, isFrostNodeData, isMappingNodeData } from '../_types/nodes'
 import type { Pipeline, PipelineNode, PipelineNodeType } from '../_types/pipeline'
 import { PIPELINE_NODE_TYPES } from '../_types/pipeline'
 
@@ -59,12 +59,10 @@ const buildDataSourceInput = (node: PipelineNode): object | null => {
 }
 
 /**
- * Builds a bloblang processor from a Mapping node's code.
- *
- * The mapping code is taken verbatim from the Monaco editor content.
+ * Builds a mapping processor from a Mapping node's compiled config (spec §13).
  *
  * @example
- * // Returns: { bloblang: "root = content().string()..." }
+ * // Returns: { mapping: { fields: { "$.title": "$.name" }, ... } }
  */
 const buildMappingProcessor = (node: PipelineNode): object | null => {
   if (!isMappingNodeData(node.data)) return null
@@ -72,7 +70,7 @@ const buildMappingProcessor = (node: PipelineNode): object | null => {
   const data = node.data as MappingNodeData
 
   return {
-    bloblang: data.mappingCode,
+    mapping: data.mappingConfig,
   }
 }
 
@@ -346,12 +344,10 @@ export const getOrderedNodes = (pipeline: Pipeline): PipelineNode[] => {
  * The type of pipeline based on node composition.
  *
  * - 'feedin': Contains a DataSource node (data ingestion)
- * - 'provide': Contains API Request or API Response nodes (data provision)
- * - 'unknown': Neither pattern matches
+ * - 'unknown': Pattern does not match
  */
 export const PIPELINE_TYPES = {
   feedIn: 'feedin',
-  provide: 'provide',
   unknown: 'unknown',
 } as const
 
@@ -361,15 +357,11 @@ export type PipelineType = (typeof PIPELINE_TYPES)[keyof typeof PIPELINE_TYPES]
  * Detects pipeline type based on node composition.
  *
  * - 'feedin': Contains a DataSource node
- * - 'provide': Contains API Request or API Response nodes
- * - 'unknown': Neither pattern matches
+ * - 'unknown': Pattern does not match
  */
 export const detectPipelineType = (nodes: PipelineNode[]): PipelineType => {
   const hasDataSource = nodes.some(n => isDataSourceNodeData(n.data))
   if (hasDataSource) return PIPELINE_TYPES.feedIn
-
-  const hasApi = nodes.some(n => isApiNodeData(n.data))
-  if (hasApi) return PIPELINE_TYPES.provide
 
   return PIPELINE_TYPES.unknown
 }

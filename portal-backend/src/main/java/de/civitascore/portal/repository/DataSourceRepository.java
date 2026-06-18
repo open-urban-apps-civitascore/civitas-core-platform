@@ -30,4 +30,6 @@ public interface DataSourceRepository extends NamedEntityRepository<DataSource, 
           + "SELECT 1 FROM DataSource ds WHERE ds.dataStructureVersion.id IN :versionIds"
           + ") THEN true ELSE false END")
   boolean existsByDataStructureVersionIdIn(@Param("versionIds") Collection<UUID> versionIds);
+
+  boolean existsByScopedDataPools_Id(UUID datapoolId);
 }

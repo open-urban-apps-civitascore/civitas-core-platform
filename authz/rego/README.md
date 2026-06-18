@@ -107,7 +107,14 @@ Backend data files must be at `data/backends/{backend_id}/data.json` to resolve 
 ```
 data/backends/portal_backend/data.json  →  data.backends.portal_backend.endpoints
 data/backends/frost_server/data.json    →  data.backends.frost_server.endpoints
+                                         +  data.backends.frost_server.api_host  (issue #1368)
 ```
+
+The `frost_server` backend additionally exposes an `api_host` key (e.g. `api.localhost`) that the
+provider uses as a host guard: only requests arriving on the configured API virtual host match
+the FROST path pattern. If `api_host` is empty or the request's `Host` header does not match it,
+the provider fails closed (`path_pattern == ""`). Deployments should inject the
+environment-specific API host via Helm/Kustomize overlay.
 
 ## Usage
 

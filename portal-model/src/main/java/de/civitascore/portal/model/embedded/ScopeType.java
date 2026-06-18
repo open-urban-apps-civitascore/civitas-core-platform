@@ -1,9 +1,8 @@
 package de.civitascore.portal.model.embedded;
 
 /**
- * Defines the hierarchical scope level for assignments: DATASPACE → DATASET.
- *
- * <p>DATASPACE and DATASET scopes require a scope ID to identify the target entity.
+ * Defines the scope level for assignments. TENANT requires no scope ID; all other scope types
+ * require a scope ID identifying the target entity.
  *
  * @see de.civitascore.portal.model.entity.Assignment
  * @see de.civitascore.portal.model.entity.base.AssignableEntity
@@ -21,9 +20,9 @@ public enum ScopeType {
   /** Dataset scope for data roles. Requires scope ID. */
   DATASET,
 
-  /** Dataspace scope for data roles. Requires scope ID. */
-  DATASPACE,
-
   /** Datacatalogue scope for data roles. Requires scope ID. */
   CATALOG,
+
+  /** DataPool scope for data roles. Requires scope ID. */
+  DATAPOOL,
 }

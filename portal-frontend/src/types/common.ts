@@ -20,8 +20,8 @@ export const GroupSummarySchema = ItemSchema.extend({
 
 export type GroupSummary = z.infer<typeof GroupSummarySchema>
 
-export type SelectOption = {
-  value: string
+export type SelectOption<TValue = string> = {
+  value: TValue
   label: string
 }
 

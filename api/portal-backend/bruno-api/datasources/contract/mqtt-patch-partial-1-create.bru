@@ -1,0 +1,42 @@
+meta {
+  name: Contract MQTT — patch partial (1/4 create)
+  type: http
+  seq: 25
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+body:json {
+  {
+    "name": "contract_mqtt_patch",
+    "description": "contract — MQTT",
+    "connectorType": "MQTT",
+    "configuration": {
+      "urls": ["tcp://broker:1883"],
+      "topics": ["sensor/data"],
+      "qos": 1
+    },
+    "dataStructureVersionId": null
+  }
+}
+
+script:post-response {
+  if (!res.body || !res.body.id) {
+    throw new Error("Expected create response to include non-empty 'id'");
+  }
+  bru.setVar('contractMqttPatchId', res.body.id);
+}
+
+tests {
+  test("Status is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

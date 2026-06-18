@@ -15,7 +15,12 @@ body:json {
     "name": "Sensor Readings Dataset",
     "description": "Dataset containing sensor readings",
     "openDataAccess": false,
-    "assignments": []
+    "assignments": [],
+    "namedApis": [
+      { "name": "Traffic Sensor Readings", "slug": "traffic", "standard": "STA", "version": "1.1", "description": "Live traffic counter readings from city sensors." },
+      { "name": "Weather Sensor Readings", "slug": "weather", "standard": "STA", "version": "1.1" }
+    ],
+    "datapoolId": "{{dataPoolId}}"
   }
 }
 
@@ -40,10 +45,17 @@ tests {
   test("Has dataSetStatus", function() {
     expect(res.body.dataSetStatus).to.be.a('string');
   });
+  test("Has datapool reference", function() {
+    expect(res.body.datapool).to.be.an('object');
+    expect(res.body.datapool.id).to.be.a('string');
+    expect(res.body.datapool.name).to.be.a('string');
+  });
 }
 
 docs {
-  **Expected Response:** 201 Created, body contains `id`.
+  **Precondition:** `dataPoolId` is set (e.g. via `00-setup/00-find-existing-datapool`).
+
+  **Expected Response:** 201 Created, body contains `id` and an inline `datapool` summary.
 
   **Post-condition:** Save `dataSetId` from `body.id`.
 

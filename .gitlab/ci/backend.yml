@@ -71,8 +71,12 @@ lint-backend:
 dependency-prune-backend:
   extends: .only-backend-changes
   image: maven:3.9-eclipse-temurin-25-alpine
-  stage: lint
-  needs: []
+  stage: test
+  needs:
+    - job: setup-version-portal-model
+      artifacts: true
+    - job: publish-portal-model
+      optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -84,10 +88,7 @@ dependency-prune-backend:
       - .m2/repository
   script:
     - cd portal-backend
-    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -DfailOnWarning=true -DignoreNonCompile=false -s ci_settings.xml
-  allow_failure:
-    exit_codes:
-      - 1
+    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Dportal-model.version=$PORTAL_MODEL_VERSION -DfailOnWarning=true -DignoreNonCompile=false -s ci_settings.xml
 
 test-backend:
   extends: .only-backend-changes
@@ -113,7 +114,7 @@ test-backend:
     paths:
       - .m2/repository
   before_script:
-    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
     - cd portal-backend
   script:
     # Compile test sources, then run unit tests
@@ -145,7 +146,6 @@ integration-test-backend:
     - job: publish-portal-model
   services:
     - name: docker:27-dind
-      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
     DOCKER_DRIVER: overlay2
@@ -159,7 +159,7 @@ integration-test-backend:
     paths:
       - .m2/repository
   before_script:
-    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
     - cd portal-backend
   script:
     # Compile test sources, then run integration tests only. Saga-tagged tests are excluded via pom.xml (run in saga-e2e-test-backend)
@@ -202,7 +202,6 @@ saga-e2e-test-backend:
         - .gitlab/ci/backend.yml
   services:
     - name: docker:27-dind
-      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
     DOCKER_DRIVER: overlay2
@@ -216,7 +215,7 @@ saga-e2e-test-backend:
     paths:
       - .m2/repository
   before_script:
-    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
     - cd portal-backend
   script:
     - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION -Psaga -Dfailsafe.rerunFailingTestsCount=1
@@ -262,7 +261,6 @@ api-test-backend:
         - .gitlab/ci/backend.yml
   services:
     - name: docker:27-dind
-      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_HOST: tcp://docker:2375
@@ -312,11 +310,12 @@ api-test-backend:
     # Run Bruno API tests from a container on the same Compose network
     - docker run -d --name bruno-runner --network api-test-net node:22-alpine sleep infinity
     - docker cp api/portal-backend/bruno-api/. bruno-runner:/tests/
+    # Skip saga steps tagged requires-nifi while the pipeline adapter is unavailable.
     - |
       docker exec bruno-runner sh -c '
         npm install -g @usebruno/cli 2>/dev/null
         cd /tests
-        npx @usebruno/cli run --env ci > /tests/bruno-output.txt 2>&1
+        npx @usebruno/cli run --env ci --exclude-tags=requires-nifi > /tests/bruno-output.txt 2>&1
         RESULT=$?
         cat /tests/bruno-output.txt
         exit $RESULT
@@ -366,7 +365,6 @@ build-backend:
     - job: setup-version-portal-model
       artifacts: true
     - lint-backend
-    - dependency-prune-backend
     - job: publish-config-adapter
       optional: true
     - job: publish-portal-model
@@ -380,7 +378,7 @@ build-backend:
     paths:
       - .m2/repository
   before_script:
-    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
+    - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core # Force fresh download of config-adapter JARs
     - cd portal-backend
   script:
     # Use GitLab Maven repository for config-adapter and portal-model dependencies
@@ -407,7 +405,6 @@ build-backend-image:
       optional: true
   services:
     - name: docker:27-dind
-      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'

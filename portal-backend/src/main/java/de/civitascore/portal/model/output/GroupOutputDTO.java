@@ -1,5 +1,6 @@
 package de.civitascore.portal.model.output;
 
+import de.civitascore.portal.model.output.summary.DataPoolSummaryDTO;
 import de.civitascore.portal.model.output.summary.UserSummaryDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.ArrayList;
@@ -24,4 +25,6 @@ public class GroupOutputDTO extends BaseOutputDTO {
   private List<UserSummaryDTO> members = new ArrayList<>();
 
   private List<AssignmentOutputDTO> assignments = new ArrayList<>();
+
+  private List<DataPoolSummaryDTO> datapools = new ArrayList<>();
 }

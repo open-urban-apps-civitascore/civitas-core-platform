@@ -3,6 +3,7 @@ package de.civitascore.portal.repository;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
@@ -15,14 +16,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> {
 
-  /**
-   * Find a dataset by ID with related entities eagerly fetched. This prevents N+1 query problems
-   * when loading datasets with their relationships.
-   *
-   * @param id the dataset ID
-   * @return the dataset with eagerly fetched owner, pipelines, and distributions
-   */
-  @EntityGraph(attributePaths = {"owner", "pipelines", "distributions"})
+  @EntityGraph(attributePaths = {"owner", "pipelines", "distributions", "namedApis"})
   @Override
   @NonNull Optional<DataSet> findById(@NonNull UUID id);
 
@@ -37,15 +31,31 @@ public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> 
   boolean existsByPipelinesDataSourcesIdAndDataSetStatusIn(
       UUID dataSourceId, Collection<DataSetStatus> statuses);
 
-  /**
-   * Find a dataset by ID with pipelines and their data sources eagerly fetched. Used for saga
-   * trigger publishing where the full pipeline-datasource graph is needed.
-   *
-   * @param id the dataset ID
-   * @return the dataset with eagerly fetched owner, pipelines, pipeline data sources, and
-   *     distributions
-   */
-  @EntityGraph(attributePaths = {"owner", "pipelines", "pipelines.dataSources", "distributions"})
+  /** Variant for saga trigger publishing: also fetches {@code pipelines.dataSources}. */
+  @EntityGraph(
+      attributePaths = {
+        "owner",
+        "pipelines",
+        "pipelines.dataSources",
+        "distributions",
+        "namedApis"
+      })
   @Query("SELECT d FROM DataSet d WHERE d.id = :id")
   Optional<DataSet> findByIdWithPipelineDataSources(@Param("id") UUID id);
+
+  /**
+   * Find all datasets assigned to a specific datapool.
+   *
+   * @param dataPoolId the datapool ID
+   * @return all datasets assigned to the datapool
+   */
+  List<DataSet> findAllByDataPoolId(UUID dataPoolId);
+
+  /**
+   * Check if any dataset is assigned to the given datapool.
+   *
+   * @param dataPoolId the datapool ID
+   * @return true if at least one dataset is assigned
+   */
+  boolean existsByDataPoolId(UUID dataPoolId);
 }

@@ -6,11 +6,15 @@ import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.Assignment;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
+import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
+import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
@@ -18,6 +22,7 @@ import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
+import de.civitascore.portal.util.ResourceNotFoundException;
 import jakarta.validation.groups.Default;
 import java.util.HashMap;
 import java.util.List;
@@ -46,6 +51,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   private final DataStructureVersionService dataStructureVersionService;
   private final DataSetRepository dataSetRepository;
   private final PipelineRepository pipelineRepository;
+  private final DataPoolRepository dataPoolRepository;
 
   @Override
   protected DataSourceRepository getRepository() {
@@ -106,6 +112,9 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       entity.setDataStructureVersion(dsv);
     } else {
       entity.setDataStructureVersion(null);
+    }
+    if (input.getDatapoolScope() != null) {
+      applyDatapoolScope(entity, input.getDatapoolScope());
     }
     return super.postConvertToEntity(entity, input);
   }
@@ -329,6 +338,9 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
               .collect(Collectors.toSet());
       entity.setAssignments(assignments);
     }
+    if (input.getDatapoolScope() != null) {
+      applyDatapoolScope(entity, input.getDatapoolScope());
+    }
 
     if (!inUse) {
       applyTechnicalFields(input, entity);
@@ -408,6 +420,46 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     }
 
     return entity;
+  }
+
+  private void applyDatapoolScope(DataSource entity, DatapoolScopeInputDTO scope) {
+    requireScopeTypePresent(scope, entity.getId());
+    entity.setDatapoolScopeType(scope.getType());
+    entity.getScopedDataPools().clear();
+    if (scope.getType() == DatapoolScopeType.SPECIFIC) {
+      entity.getScopedDataPools().addAll(resolveSpecificDatapools(scope));
+    }
+  }
+
+  private void requireScopeTypePresent(DatapoolScopeInputDTO scope, UUID entityId) {
+    if (scope.getType() == null) {
+      throw new InvalidInputException(
+          getEntityName(), entityId, "datapoolScope.type must not be null");
+    }
+  }
+
+  private List<DataPool> resolveSpecificDatapools(DatapoolScopeInputDTO scope) {
+    requireDatapoolIdsNotEmpty(scope);
+    List<DataPool> resolvedPools = dataPoolRepository.findAllById(scope.getDatapoolIds());
+    validateAllDatapoolsFound(scope.getDatapoolIds(), resolvedPools);
+    return resolvedPools;
+  }
+
+  private void requireDatapoolIdsNotEmpty(DatapoolScopeInputDTO scope) {
+    if (scope.getDatapoolIds() == null || scope.getDatapoolIds().isEmpty()) {
+      throw new InvalidInputException(
+          getEntityName(),
+          (UUID) null,
+          "At least one datapoolId is required for scope type SPECIFIC");
+    }
+  }
+
+  private void validateAllDatapoolsFound(List<UUID> requestedIds, List<DataPool> foundPools) {
+    if (foundPools.size() != requestedIds.size()) {
+      Set<UUID> foundIds = foundPools.stream().map(DataPool::getId).collect(Collectors.toSet());
+      List<UUID> missingIds = requestedIds.stream().filter(id -> !foundIds.contains(id)).toList();
+      throw new ResourceNotFoundException(DataPool.class.getSimpleName(), missingIds);
+    }
   }
 
   private void validateConfiguration(DataSource entity) {

@@ -2,10 +2,13 @@ package de.civitascore.portal.config;
 
 import de.civitascore.configadapter.crypto.CredentialEncryptor;
 import de.civitascore.configadapter.crypto.CryptoKeyLoader;
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.ConnectorType;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,7 +38,7 @@ public class InfraTestDataFactory {
 
   /**
    * Must match application-test-integration.yml ({@code civitas.master-key}). Package-visible so
-   * {@link SagaOrchestratorTestHelper} can pass it to the config-adapter via adapter config.
+   * integration helpers can pass it to the config-adapter via adapter config.
    */
   static final String TEST_MASTER_KEY_HEX =
       "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -55,12 +58,25 @@ public class InfraTestDataFactory {
 
   private final ObjectMapper objectMapper = new JsonMapper();
 
+  /**
+   * Creates a saga-test dataset with a single seeded {@link NamedApi} (slug {@code traffic},
+   * standard {@code STA}). Required so saga publisher / result handler logic touching the per-slug
+   * {@code routeIds} map has at least one entry to project.
+   */
   public DataSet createDataSet(String name) {
-    return portalData.dataSet(
-        b ->
-            b.name(name + " " + System.nanoTime())
-                .description("Integration test dataset")
-                .openDataAccess(true));
+    DataSet dataSet =
+        portalData.dataSet(
+            b ->
+                b.name(name + " " + System.nanoTime())
+                    .description("Integration test dataset")
+                    .openDataAccess(true));
+    NamedApi defaultApi = new NamedApi();
+    defaultApi.setName("Traffic Sensor Readings");
+    defaultApi.setSlug("traffic");
+    defaultApi.setStandard(ApiStandard.STA);
+    defaultApi.setVersion("1.1");
+    dataSet.setNamedApis(Set.of(defaultApi));
+    return portalData.saveDataSet(dataSet);
   }
 
   public DataSource createMqttDataSource() {
@@ -106,29 +122,17 @@ public class InfraTestDataFactory {
    * model contains no placeholder because {@code generate} produces its own data.
    */
   public Pipeline createGeneratePipeline(DataSet dataSet, DataSource dataSource) {
-    return createGeneratePipeline(dataSet, dataSource, "/v1.1/Things", "default");
+    return createGeneratePipeline(dataSet, dataSource, "default");
   }
 
   public Pipeline createGeneratePipeline(
-      DataSet dataSet, DataSource dataSource, String apiPath, String nameSuffix) {
+      DataSet dataSet, DataSource dataSource, String nameSuffix) {
     return portalData.pipeline(
         dataSet,
         b ->
             b.name("pipeline-" + nameSuffix + "-" + System.nanoTime())
                 .description("Generate → FROST pipeline")
                 .dataSources(Set.of(dataSource))
-                .apis(List.of(apiPath))
-                .model(loadPipelineConfig("pipelines/generate-pipeline-config.json")));
-  }
-
-  public Pipeline createGeneratePipelineWithMultipleApis(DataSet dataSet, DataSource dataSource) {
-    return portalData.pipeline(
-        dataSet,
-        b ->
-            b.name("pipeline-multi-api-" + System.nanoTime())
-                .description("Pipeline with multiple APIs")
-                .dataSources(Set.of(dataSource))
-                .apis(List.of("/v1.1/Things", "/v1.1/Datastreams"))
                 .model(loadPipelineConfig("pipelines/generate-pipeline-config.json")));
   }
 
@@ -144,7 +148,6 @@ public class InfraTestDataFactory {
             b.name("sql-pipeline-" + System.nanoTime())
                 .description("SQL → FROST pipeline")
                 .dataSources(Set.of(dataSource))
-                .apis(List.of("/v1.1/Things"))
                 .model(
                     injectDatasourceId(
                         loadPipelineConfig("pipelines/sql-pipeline-config.json"),
@@ -163,11 +166,31 @@ public class InfraTestDataFactory {
             b.name("mqtt-pipeline-" + System.nanoTime())
                 .description("MQTT → FROST pipeline")
                 .dataSources(Set.of(dataSource))
-                .apis(List.of("/v1.1/Things"))
                 .model(
                     injectDatasourceId(
                         loadPipelineConfig("pipelines/mqtt-pipeline-config.json"),
                         dataSource.getId().toString())));
+  }
+
+  /**
+   * Creates a generate pipeline carrying a POSTGIS sink whose data-structure version resolves via
+   * Model Atlas (the saga publisher fetches the JSON Schema from {@code modelAtlasUri} at release).
+   */
+  public Pipeline createGeoPipeline(
+      DataSet dataSet, DataSource dataSource, String tableName, String modelAtlasUri) {
+    Pipeline pipeline = createGeneratePipeline(dataSet, dataSource, "geo");
+    var dataStructure = portalData.dataStructure();
+    var version =
+        portalData.dataStructureVersion(dataStructure, b -> b.modelAtlasUri(modelAtlasUri));
+    portalData.dataSink(
+        dataSet,
+        pipeline,
+        sink -> {
+          sink.setDataSinkType(DataSinkType.POSTGIS);
+          sink.setConfiguration(
+              Map.of("tableName", tableName, "dataStructureVersionId", version.getId().toString()));
+        });
+    return pipeline;
   }
 
   /** Creates a Group, Role (DATA type), and Assignment scoped to the given DataSet. */

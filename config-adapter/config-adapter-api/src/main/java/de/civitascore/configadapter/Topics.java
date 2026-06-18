@@ -77,7 +77,38 @@ public enum Topics {
   // --- Pipeline Events ---
   PIPELINE_CREATED("de.civitascore.data.pipeline.created"),
   PIPELINE_UPDATED("de.civitascore.data.pipeline.updated"),
-  PIPELINE_DELETED("de.civitascore.data.pipeline.deleted");
+  PIPELINE_DELETED("de.civitascore.data.pipeline.deleted"),
+
+  // --- GeoServer Events ---
+  GEO_WORKSPACE_CREATED("de.civitascore.geo.workspace.created"),
+  GEO_WORKSPACE_UPDATED("de.civitascore.geo.workspace.updated"),
+  GEO_WORKSPACE_DELETED("de.civitascore.geo.workspace.deleted"),
+  GEO_DATASTORE_CREATED("de.civitascore.geo.datastore.created"),
+  GEO_DATASTORE_UPDATED("de.civitascore.geo.datastore.updated"),
+  GEO_DATASTORE_DELETED("de.civitascore.geo.datastore.deleted"),
+  GEO_FEATURE_TYPE_CREATED("de.civitascore.geo.featuretype.created"),
+  GEO_FEATURE_TYPE_UPDATED("de.civitascore.geo.featuretype.updated"),
+  GEO_FEATURE_TYPE_DELETED("de.civitascore.geo.featuretype.deleted"),
+  GEO_STYLE_CREATED("de.civitascore.geo.style.created"),
+  GEO_STYLE_UPDATED("de.civitascore.geo.style.updated"),
+  GEO_STYLE_DELETED("de.civitascore.geo.style.deleted"),
+  GEO_LAYER_UPDATED("de.civitascore.geo.layer.updated"),
+  GEO_LAYER_DELETED("de.civitascore.geo.layer.deleted"),
+
+  // --- SQL Table Events (PostGIS / SQL flavor) ---
+  SQL_TABLE_CREATED("de.civitascore.data.sql.table.created"),
+  SQL_TABLE_UPDATED("de.civitascore.data.sql.table.updated"),
+  SQL_TABLE_DELETED("de.civitascore.data.sql.table.deleted"),
+
+  // --- SQL Schema Events ---
+  SQL_SCHEMA_CREATED("de.civitascore.data.sql.schema.created"),
+  SQL_SCHEMA_UPDATED("de.civitascore.data.sql.schema.updated"),
+  SQL_SCHEMA_DELETED("de.civitascore.data.sql.schema.deleted"),
+
+  // --- SQL Role Events (database roles / users) ---
+  SQL_ROLE_CREATED("de.civitascore.data.sql.role.created"),
+  SQL_ROLE_UPDATED("de.civitascore.data.sql.role.updated"),
+  SQL_ROLE_DELETED("de.civitascore.data.sql.role.deleted");
 
   private final String value;
 

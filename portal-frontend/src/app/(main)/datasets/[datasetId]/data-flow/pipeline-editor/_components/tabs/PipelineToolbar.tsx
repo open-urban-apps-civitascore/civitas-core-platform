@@ -9,7 +9,7 @@
  *
  */
 
-import { CheckCircle2, Settings, Trash2 } from 'lucide-react'
+import { CheckCircle2, EllipsisVertical, Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useState } from 'react'
 
@@ -80,7 +80,7 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title={t('toolbar.pipelineSettings')}>
-                    <Settings className="h-4 w-4 text-muted-foreground" />
+                    <EllipsisVertical className="h-4 w-4 text-muted-foreground" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">

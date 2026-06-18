@@ -1,6 +1,7 @@
 package de.civitascore.portal.config;
 
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
@@ -11,33 +12,39 @@ import de.civitascore.portal.model.entity.Activity;
 import de.civitascore.portal.model.entity.Agent;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Catalog;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSetSeries;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
-import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Resource;
 import de.civitascore.portal.model.entity.Role;
+import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.repository.ActivityRepository;
 import de.civitascore.portal.repository.AgentRepository;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.CatalogRepository;
+import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSetSeriesRepository;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
-import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.GroupRepository;
+import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.ResourceRepository;
 import de.civitascore.portal.repository.RoleRepository;
+import de.civitascore.portal.repository.StyleRepository;
 import de.civitascore.portal.repository.UserRepository;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -64,12 +71,15 @@ public class PortalTestDataFactory {
   @Autowired private RoleRepository roleRepository;
   @Autowired private AssignmentRepository assignmentRepository;
   @Autowired private DataSetRepository dataSetRepository;
+  @Autowired private DataSinkRepository dataSinkRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private DataStructureRepository dataStructureRepository;
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
+  @Autowired private LayerRepository layerRepository;
   @Autowired private PipelineRepository pipelineRepository;
+  @Autowired private StyleRepository styleRepository;
   @Autowired private CatalogRepository catalogRepository;
-  @Autowired private DataSpaceRepository dataSpaceRepository;
+  @Autowired private DataPoolRepository dataPoolRepository;
   @Autowired private DistributionRepository distributionRepository;
   @Autowired private ResourceRepository resourceRepository;
   @Autowired private AgentRepository agentRepository;
@@ -156,13 +166,13 @@ public class PortalTestDataFactory {
     return assignmentRepository.save(a);
   }
 
-  public Assignment assignment(Group group, Role role, DataSpace scope) {
+  public Assignment assignment(Group group, Role role, Catalog scope) {
     Assignment a = Assignment.builder().group(group).role(role).build();
     a.setScope(scope);
     return assignmentRepository.save(a);
   }
 
-  public Assignment assignment(Group group, Role role, Catalog scope) {
+  public Assignment assignment(Group group, Role role, DataPool scope) {
     Assignment a = Assignment.builder().group(group).role(role).build();
     a.setScope(scope);
     return assignmentRepository.save(a);
@@ -184,6 +194,11 @@ public class PortalTestDataFactory {
             .openDataAccess(false);
     customizer.accept(builder);
     return dataSetRepository.save(builder.build());
+  }
+
+  /** Re-saves an existing dataset (e.g. after wiring child collections post-build). */
+  public DataSet saveDataSet(DataSet dataSet) {
+    return dataSetRepository.save(dataSet);
   }
 
   // ---------------------------------------------------------------------------
@@ -261,6 +276,70 @@ public class PortalTestDataFactory {
   }
 
   // ---------------------------------------------------------------------------
+  // DataSink (required parents: DataSet, Pipeline)
+  // ---------------------------------------------------------------------------
+
+  public DataSink dataSink(DataSet dataSet, Pipeline pipeline) {
+    return dataSink(dataSet, pipeline, sink -> {});
+  }
+
+  public DataSink dataSink(DataSet dataSet, Pipeline pipeline, Consumer<DataSink> customizer) {
+    DataSink sink = new DataSink();
+    sink.setDataSet(dataSet);
+    sink.setPipeline(pipeline);
+    sink.setDataSinkType(DataSinkType.FROST);
+    customizer.accept(sink);
+    return dataSinkRepository.save(sink);
+  }
+
+  public DataSink dataSink(DataSet dataSet) {
+    DataSink sink = new DataSink();
+    sink.setDataSet(dataSet);
+    sink.setDataSinkType(DataSinkType.FROST);
+    return dataSinkRepository.save(sink);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Style (required parent: DataSet)
+  // ---------------------------------------------------------------------------
+
+  public Style style(DataSet dataSet) {
+    long seq = nextSeq();
+    Style style = new Style();
+    style.setDataSet(dataSet);
+    style.setName("style-" + seq);
+    style.setSldContent("<StyledLayerDescriptor/>");
+    return styleRepository.save(style);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Layer (required parents: DataSet, DataSink)
+  // ---------------------------------------------------------------------------
+
+  public Layer layer(DataSet dataSet, DataSink dataSink) {
+    long seq = nextSeq();
+    Layer layer = new Layer();
+    layer.setDataSet(dataSet);
+    layer.setDataSink(dataSink);
+    layer.setLayerName("layer-" + seq);
+    return layerRepository.save(layer);
+  }
+
+  // ---------------------------------------------------------------------------
+  // DataPool
+  // ---------------------------------------------------------------------------
+
+  public DataPool dataPool() {
+    return dataPool(b -> {});
+  }
+
+  public DataPool dataPool(Consumer<DataPool.DataPoolBuilder<?, ?>> customizer) {
+    var builder = DataPool.builder().name("datapool-" + nextSeq());
+    customizer.accept(builder);
+    return dataPoolRepository.save(builder.build());
+  }
+
+  // ---------------------------------------------------------------------------
   // Catalog
   // ---------------------------------------------------------------------------
 
@@ -272,20 +351,6 @@ public class PortalTestDataFactory {
     var builder = Catalog.builder().name("catalog-" + nextSeq());
     customizer.accept(builder);
     return catalogRepository.save(builder.build());
-  }
-
-  // ---------------------------------------------------------------------------
-  // DataSpace
-  // ---------------------------------------------------------------------------
-
-  public DataSpace dataSpace() {
-    return dataSpace(b -> {});
-  }
-
-  public DataSpace dataSpace(Consumer<DataSpace.DataSpaceBuilder<?, ?>> customizer) {
-    var builder = DataSpace.builder().name("dataspace-" + nextSeq());
-    customizer.accept(builder);
-    return dataSpaceRepository.save(builder.build());
   }
 
   // ---------------------------------------------------------------------------
@@ -368,6 +433,9 @@ public class PortalTestDataFactory {
   public void cleanAll() {
     assignmentRepository.deleteAll();
     distributionRepository.deleteAll();
+    layerRepository.deleteAll();
+    styleRepository.deleteAll();
+    dataSinkRepository.deleteAll();
     pipelineRepository.deleteAll();
     catalogRepository.deleteAll();
     dataSetRepository.deleteAll();
@@ -378,7 +446,7 @@ public class PortalTestDataFactory {
     agentRepository.deleteAll();
     resourceRepository.deleteAll();
     dataSetSeriesRepository.deleteAll();
-    dataSpaceRepository.deleteAll();
+    dataPoolRepository.deleteAll();
     groupRepository.deleteAll();
     roleRepository.deleteAll();
     userRepository.deleteAll();

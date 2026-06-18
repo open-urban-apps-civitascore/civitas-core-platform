@@ -8,7 +8,7 @@ import { UseFormReturn } from 'react-hook-form'
 
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
-import { NoDataPage } from '@/components/no-data-page/NoDataPage'
+import { NoDataPage } from '@/components/no-data/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
@@ -27,13 +27,14 @@ import { AssignRoleModal } from './AssignRoleModal'
 
 const columnHelper = createColumnHelper<Assignment>()
 
-type ScopeTab = 'platform' | 'datasets' | 'datasources' | 'datastructures'
+type ScopeTab = 'platform' | 'datasets' | 'datasources' | 'datastructures' | 'datapools'
 
 const SCOPE_TAB_CONFIG: Record<ScopeTab, { scopeType: string | null }> = {
   platform: { scopeType: null },
   datasets: { scopeType: 'DATASET' },
   datasources: { scopeType: 'DATASOURCE' },
   datastructures: { scopeType: 'DATASTRUCTURE' },
+  datapools: { scopeType: 'DATAPOOL' },
 }
 
 interface RolesTabProps {
@@ -251,6 +252,7 @@ export const RolesTab = (props: RolesTabProps) => {
 
   const scopeTabs: { key: ScopeTab; label: string }[] = [
     { key: 'platform', label: t('roles.scopeTabs.platform') },
+    { key: 'datapools', label: t('roles.scopeTabs.datapools') },
     { key: 'datasets', label: t('roles.scopeTabs.datasets') },
     { key: 'datasources', label: t('roles.scopeTabs.datasources') },
     { key: 'datastructures', label: t('roles.scopeTabs.datastructures') },
@@ -260,6 +262,7 @@ export const RolesTab = (props: RolesTabProps) => {
     if (activeScopeTab === 'datasets') return t('roles.scopedInfoBanner.DATASET')
     if (activeScopeTab === 'datasources') return t('roles.scopedInfoBanner.DATASOURCE')
     if (activeScopeTab === 'datastructures') return t('roles.scopedInfoBanner.DATASTRUCTURE')
+    if (activeScopeTab === 'datapools') return t('roles.scopedInfoBanner.DATAPOOL')
     return null
   }
 

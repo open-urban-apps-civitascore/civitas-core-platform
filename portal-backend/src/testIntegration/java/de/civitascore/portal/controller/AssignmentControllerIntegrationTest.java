@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
-import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.assignment.AssignmentInputDTO;
@@ -112,15 +111,7 @@ class AssignmentControllerIntegrationTest
     return portalData.group(b -> b.description("Test group for assignment").members(Set.of(user)));
   }
 
-  private UUID createTestDataSpace() {
-    return createTestDataSpaceEntity().getId();
-  }
-
-  private DataSpace createTestDataSpaceEntity() {
-    return portalData.dataSpace(b -> b.description("Test dataspace for assignment"));
-  }
-
-  private UUID createTestDataSet(UUID dataSpaceId) {
+  private UUID createTestDataSet() {
     return portalData.dataSet(b -> b.description("Test dataset for assignment")).getId();
   }
 
@@ -131,10 +122,9 @@ class AssignmentControllerIntegrationTest
   private UUID getScopeIdForType(ScopeType scopeType) {
     return switch (scopeType) {
       case TENANT -> null;
-      case DATASPACE -> createTestDataSpace();
-      case DATASET -> createTestDataSet(createTestDataSpace());
+      case DATASET -> createTestDataSet();
       case CATALOG -> createTestCatalog();
-      case DATASOURCE, DATASTRUCTURE -> null;
+      case DATASOURCE, DATASTRUCTURE, DATAPOOL -> null;
     };
   }
 
@@ -189,7 +179,6 @@ class AssignmentControllerIntegrationTest
           .isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
-    // TODO v2.1: add DATASPACE and CATALOG back to scope types list
     @Test
     @DisplayName("Should create assignment with different scope types")
     void shouldCreateAssignmentWithDifferentScopeTypes() {
@@ -211,21 +200,6 @@ class AssignmentControllerIntegrationTest
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getScopeType()).isEqualTo(scopeType);
       }
-    }
-
-    // TODO v2.1: re-enable when DATASPACE scope is available
-    @Test
-    @DisplayName("Should reject assignment with dataspace scope (not available in this release)")
-    void shouldCreateAssignmentWithDataspaceScope() {
-      DataSpace dataSpace = createTestDataSpaceEntity();
-
-      AssignmentInputDTO input = createValidInput();
-      input.setScopeType(ScopeType.DATASPACE);
-      input.setScopeId(dataSpace.getId());
-
-      ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
@@ -444,17 +418,11 @@ class AssignmentControllerIntegrationTest
       input1.setRoleId(role1Id);
       input1.setScopeType(ScopeType.TENANT);
 
-      // TODO v2.1: switch back to DATASPACE scope
-      // AssignmentInputDTO input2 = new AssignmentInputDTO();
-      // input2.setGroupId(groupId);
-      // input2.setRoleId(role2Id);
-      // input2.setScopeType(ScopeType.DATASPACE);
-      // input2.setScopeId(createTestDataSpace());
       AssignmentInputDTO input2 = new AssignmentInputDTO();
       input2.setGroupId(groupId);
       input2.setRoleId(role2Id);
       input2.setScopeType(ScopeType.DATASET);
-      input2.setScopeId(createTestDataSet(createTestDataSpace()));
+      input2.setScopeId(createTestDataSet());
 
       ResponseEntity<AssignmentOutputDTO> response1 = performCreate(input1);
       ResponseEntity<AssignmentOutputDTO> response2 = performCreate(input2);
@@ -525,7 +493,7 @@ class AssignmentControllerIntegrationTest
       String suffix = UUID.randomUUID().toString().substring(0, 8);
       UUID tenantRoleId = createTestRole("Tenant Role " + suffix, RoleType.DATA);
       UUID datasetRoleId = createTestRole("Dataset Role " + suffix, RoleType.DATA);
-      UUID dataSetId = createTestDataSet(createTestDataSpace());
+      UUID dataSetId = createTestDataSet();
 
       AssignmentInputDTO tenantInput = new AssignmentInputDTO();
       tenantInput.setGroupId(groupId);
@@ -576,7 +544,7 @@ class AssignmentControllerIntegrationTest
 
       // DATASET-scoped DATA role — should NOT match
       UUID datasetRoleId = createTestRole("Dataset Role " + suffix, RoleType.DATA);
-      UUID dataSetId = createTestDataSet(createTestDataSpace());
+      UUID dataSetId = createTestDataSet();
       AssignmentInputDTO datasetInput = new AssignmentInputDTO();
       datasetInput.setGroupId(groupId);
       datasetInput.setRoleId(datasetRoleId);

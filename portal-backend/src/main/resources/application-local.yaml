@@ -9,6 +9,8 @@ app:
 
 civitas:
   master-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+  api:
+    base-url: https://api.civitas.local
 
 spring:
   datasource:
@@ -104,5 +106,6 @@ init:
       title: OTHER
       groups:
         - 'Local Tenant Admins'
+        - 'Local Data Architects'
         - 'Local Data Owners'
         - 'Local Data Gatekeepers'

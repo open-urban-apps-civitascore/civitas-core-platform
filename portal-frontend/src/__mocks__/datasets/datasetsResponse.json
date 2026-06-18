@@ -9,7 +9,6 @@
     "status": null,
     "distribution": null,
     "catalog": ["1"],
-    "dataspace": { "id": "1", "title": "Dataspace 1" },
     "department": { "id": "1", "title": "Stadtentwicklung" }
   },
   {
@@ -27,7 +26,6 @@
       "url": "https://superset.de"
     },
     "catalog": ["1"],
-    "dataspace": null,
     "department": { "id": "2", "title": "Verkehrsplanung" }
   }
 ]

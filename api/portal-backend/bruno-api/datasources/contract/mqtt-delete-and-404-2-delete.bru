@@ -1,0 +1,21 @@
+meta {
+  name: Contract MQTT — delete + 404 (2/3 delete)
+  type: http
+  seq: 30
+}
+
+delete {
+  url: {{baseUrl}}/datasources/{{contractMqttDeleteId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+tests {
+  test("Status is 204 No Content", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
