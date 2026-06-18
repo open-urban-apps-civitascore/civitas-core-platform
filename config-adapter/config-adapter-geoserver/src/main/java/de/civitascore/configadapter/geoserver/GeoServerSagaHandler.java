@@ -21,6 +21,7 @@ import jakarta.ws.rs.core.Response;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -45,7 +46,9 @@ import org.owasp.encoder.Encode;
  *   <li>{@code DELETE_WORKSPACE} — deletes the workspace recursively (compensation for the create
  *       steps and the teardown step in the delete saga)
  *   <li>{@code RESTORE_WORKSPACE} — restores the previous feature type state (compensation for
- *       {@code UPDATE_WORKSPACE})
+ *       {@code UPDATE_WORKSPACE}). Styles are not snapshotted: a failed update that uploaded or
+ *       overwrote styles leaves them in place — only a full {@code DELETE_WORKSPACE} (recursive)
+ *       removes them.
  * </ul>
  *
  * <p>Input contract (process variables forwarded from the saga trigger): {@code datasetId} (the
@@ -413,10 +416,17 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       if (crs == null || crs.isBlank()) {
         crs = DEFAULT_CRS;
       }
-      // Read and type-check the style references before mutating GeoServer, so malformed input
-      // fails the step without side effects (consistent with the name validations above).
+      // Validate style refs before publishing this layer (with the name checks above). Not a
+      // global no-side-effects guarantee — styles were already uploaded and earlier layers may be
+      // published — it just avoids publishing this layer with a ref that would then fail.
       String defaultStyle = stringValue(layer, "defaultStyle");
       List<String> alternativeStyles = stringList(layer, "alternativeStyles");
+      if (defaultStyle != null && !defaultStyle.isBlank()) {
+        requireSafeName(defaultStyle, "defaultStyle");
+      }
+      for (String alternativeStyle : alternativeStyles) {
+        requireSafeName(alternativeStyle, "alternativeStyle");
+      }
       if (upsert) {
         upsertFeatureType(workspaceName, datastoreName, layerName, nativeName, crs);
       } else {
@@ -607,6 +617,9 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   private void upsertStyles(SagaCommandMessage command, String workspaceName) {
     for (Map<String, Object> style : mapList(command, "styles")) {
       String name = stringValue(style, "name");
+      if (name == null || name.isBlank()) {
+        throw new IllegalArgumentException("style is missing the required field: name");
+      }
       requireSafeName(name, "styleName");
       String sld = stringValue(style, "sldContent");
       if (sld == null || sld.isBlank()) {
@@ -618,9 +631,10 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Creates a style from its SLD, or updates the SLD via PUT if a style of that name already
-   * exists. Unlike the other create paths, an existing style returns HTTP 403 (not 409); on 403 the
-   * SLD is refreshed so CREATE/UPDATE sagas and retries converge to the desired style.
+   * Creates a style from its SLD, or updates it via PUT if one of that name already exists. An
+   * existing style returns 403 (not 409) on GeoServer Cloud 2.28.3.0, so the upsert branches on 403
+   * and refreshes the SLD; a genuine auth 403 falls through to the same PUT and surfaces via {@link
+   * #checkResponse}.
    */
   private void upsertStyle(String workspaceName, String name, String sld) {
     Entity<String> sldEntity = Entity.entity(sld, STYLE_SLD_CONTENT_TYPE);
@@ -652,16 +666,19 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Assigns the default and/or alternative styles to a layer in a single PUT. Style references are
-   * workspace-qualified ({@code {workspace}:{name}}); alternative styles are sent as a {@code
-   * linked-hash-set} so GeoServer persists them in order. Every referenced style must already exist
-   * in the workspace (uploaded by {@link #upsertStyles}).
+   * Assigns the default and/or alternative styles to a layer in one PUT, then reads the layer back
+   * to confirm they were applied. References are workspace-qualified ({@code {workspace}:{name}});
+   * alternatives use a {@code linked-hash-set} to preserve order. Names are validated by the caller
+   * before the layer is published.
+   *
+   * <p>The read-back is required because GeoServer answers a PUT with an unresolved style reference
+   * with HTTP 200 while silently keeping the old style — so a 200 alone does not prove the style
+   * was applied (notably under GeoServer Cloud's asynchronous catalog propagation).
    */
   private void assignLayerStyles(
       String workspaceName, String layerName, String defaultStyle, List<String> alternativeStyles) {
     Map<String, Object> layerBody = new HashMap<>();
     if (defaultStyle != null && !defaultStyle.isBlank()) {
-      requireSafeName(defaultStyle, "defaultStyle");
       layerBody.put(
           "defaultStyle",
           Map.of("name", workspaceName + ":" + defaultStyle, "workspace", workspaceName));
@@ -669,7 +686,6 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     if (!alternativeStyles.isEmpty()) {
       List<Map<String, Object>> styleRefs = new ArrayList<>();
       for (String alternativeStyle : alternativeStyles) {
-        requireSafeName(alternativeStyle, "alternativeStyle");
         styleRefs.add(Map.of("name", workspaceName + ":" + alternativeStyle));
       }
       layerBody.put("styles", Map.of("@class", "linked-hash-set", "style", styleRefs));
@@ -683,6 +699,97 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
             .put(Entity.json(Map.of("layer", layerBody)))) {
       checkResponse(response, "assign-layer-styles/" + layerName);
     }
+    verifyLayerStylesApplied(workspaceName, layerName, defaultStyle, alternativeStyles);
+  }
+
+  /**
+   * Reads the layer back and asserts the default and alternative styles resolve to the intended
+   * workspace styles, failing the step otherwise. See {@link #assignLayerStyles} for why a 200 from
+   * the assignment PUT is not a sufficient success signal.
+   */
+  private void verifyLayerStylesApplied(
+      String workspaceName, String layerName, String defaultStyle, List<String> alternativeStyles) {
+    Map<String, Object> layer = readLayer(workspaceName, layerName);
+    if (defaultStyle != null && !defaultStyle.isBlank()) {
+      String expected = workspaceName + ":" + defaultStyle;
+      String actual = nestedString(layer, "defaultStyle", "name");
+      if (!expected.equals(actual)) {
+        throw new IllegalStateException(
+            "layer "
+                + layerName
+                + " default style was not applied: GeoServer kept '"
+                + actual
+                + "', expected '"
+                + expected
+                + "'");
+      }
+    }
+    if (!alternativeStyles.isEmpty()) {
+      Set<String> applied = layerStyleNames(layer);
+      for (String alternativeStyle : alternativeStyles) {
+        String expected = workspaceName + ":" + alternativeStyle;
+        if (!applied.contains(expected)) {
+          throw new IllegalStateException(
+              "layer "
+                  + layerName
+                  + " alternative style was not applied: '"
+                  + expected
+                  + "' missing from "
+                  + applied);
+        }
+      }
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> readLayer(String workspaceName, String layerName) {
+    try (Response response =
+        auth.apply(
+                client()
+                    .target(serverUrl)
+                    .path(layerPath(workspaceName, layerName) + ".json")
+                    .request(MediaType.APPLICATION_JSON))
+            .get()) {
+      checkResponse(response, "read-layer/" + layerName);
+      Object layer = response.readEntity(Map.class).get("layer");
+      if (!(layer instanceof Map)) {
+        throw new IllegalStateException("read-layer/" + layerName + ": unexpected response shape");
+      }
+      return (Map<String, Object>) layer;
+    }
+  }
+
+  /** Reads {@code map.outer.inner} as a String, or {@code null} if absent/not a string. */
+  private static String nestedString(Map<String, Object> map, String outer, String inner) {
+    if (map.get(outer) instanceof Map<?, ?> nested && nested.get(inner) instanceof String value) {
+      return value;
+    }
+    return null;
+  }
+
+  /**
+   * The workspace-qualified names in a layer's alternative-style set. GeoServer serialises a single
+   * alternative style as an object rather than a one-element array, so both shapes are handled.
+   */
+  @SuppressWarnings("unchecked")
+  private static Set<String> layerStyleNames(Map<String, Object> layer) {
+    Set<String> names = new HashSet<>();
+    if (!(layer.get("styles") instanceof Map<?, ?> styles)) {
+      return names;
+    }
+    Object style = ((Map<String, Object>) styles).get("style");
+    List<Object> entries =
+        switch (style) {
+          case List<?> list -> (List<Object>) list;
+          case Map<?, ?> single -> List.of(single);
+          case null, default -> List.of();
+        };
+    for (Object entry : entries) {
+      if (entry instanceof Map<?, ?> ref && ref.get("name") instanceof String name) {
+        names.add(name);
+      }
+    }
+    return names;
   }
 
   /** Deletes a feature type recursively (its implicitly published layer is removed too). */

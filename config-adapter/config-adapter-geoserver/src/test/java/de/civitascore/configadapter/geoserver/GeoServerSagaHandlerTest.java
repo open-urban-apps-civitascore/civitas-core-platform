@@ -312,6 +312,7 @@ class GeoServerSagaHandlerTest {
         Response assigned = mock(Response.class);
         when(assigned.getStatus()).thenReturn(200);
         when(mockBuilder.put(any(Entity.class))).thenReturn(assigned);
+        stubLayerReadback(Map.of("defaultStyle", Map.of("name", "ds_abc:civitas_default_point")));
 
         SagaCommandResult result =
             handler.handle(
@@ -355,6 +356,12 @@ class GeoServerSagaHandlerTest {
         Response assigned = mock(Response.class);
         when(assigned.getStatus()).thenReturn(200);
         when(mockBuilder.put(any(Entity.class))).thenReturn(assigned);
+        stubLayerReadback(
+            Map.of(
+                "defaultStyle",
+                Map.of("name", "ds_abc:civitas_default_point"),
+                "styles",
+                Map.of("style", List.of(Map.of("name", "ds_abc:civitas_heat")))));
 
         SagaCommandResult result =
             handler.handle(
@@ -450,9 +457,20 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
-    void failsCleanlyWhenStyleMissingName() {
-      assertStyleStepFailsWithoutHttp(
-          Map.of("datasetId", "ds-abc", "styles", List.of(Map.of("sldContent", SLD))));
+    void failsWithClearErrorWhenStyleMissingName() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of("datasetId", "ds-abc", "styles", List.of(Map.of("sldContent", SLD)))));
+
+        assertEquals("STEP_FAILED", result.type());
+        // A missing name reads as a missing-field error, not a "contains invalid characters" one.
+        assertTrue(result.error().contains("missing the required field: name"), result.error());
+        verify(mockBuilder, never()).post(any(Entity.class));
+      }
     }
 
     @Test
@@ -473,6 +491,128 @@ class GeoServerSagaHandlerTest {
               "ds-abc",
               "layers",
               List.of(Map.of("layerName", "sensor_locations", "alternativeStyles", List.of(123)))));
+    }
+
+    @Test
+    void invalidStyleReferenceFailsBeforeFeatureTypeIsCreated() {
+      // A bad defaultStyle name must fail before any feature-type or style HTTP call (validated up
+      // front, not inside the layer PUT).
+      assertStyleStepFailsWithoutHttp(
+          Map.of(
+              "datasetId",
+              "ds-abc",
+              "layers",
+              List.of(Map.of("layerName", "sensor_locations", "defaultStyle", "bad/name"))));
+    }
+
+    @Test
+    void styleUploadFailsOnUnexpectedStatus() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // Style POST returns a non-201/non-403 status → the step fails (not silently treated as
+        // ok).
+        Response error = mock(Response.class);
+        when(error.getStatus()).thenReturn(500);
+        when(error.readEntity(String.class)).thenReturn("Internal Server Error");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(error);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "styles",
+                        List.of(Map.of("name", "civitas_default_point", "sldContent", SLD)))));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+      }
+    }
+
+    @Test
+    void layerStyleAssignmentFailsWhenReadbackShowsStyleNotApplied() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        Response assigned = mock(Response.class);
+        when(assigned.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(assigned);
+        // PUT returns 200 but GeoServer kept the generic style — the read-back must catch the
+        // no-op.
+        stubLayerReadback(Map.of("defaultStyle", Map.of("name", "generic")));
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "styles",
+                        List.of(Map.of("name", "civitas_default_point", "sldContent", SLD)),
+                        "layers",
+                        List.of(
+                            Map.of(
+                                "layerName",
+                                "sensor_locations",
+                                "defaultStyle",
+                                "civitas_default_point")))));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertTrue(result.error().contains("was not applied"), result.error());
+      }
+    }
+
+    @Test
+    void provisionLayersAssignsAlternativeStylesInOrder() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        Response assigned = mock(Response.class);
+        when(assigned.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(assigned);
+        stubLayerReadback(
+            Map.of(
+                "styles",
+                Map.of(
+                    "style",
+                    List.of(
+                        Map.of("name", "ds_abc:civitas_heat"),
+                        Map.of("name", "ds_abc:civitas_cool")))));
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "styles",
+                        List.of(
+                            Map.of("name", "civitas_heat", "sldContent", SLD),
+                            Map.of("name", "civitas_cool", "sldContent", SLD)),
+                        "layers",
+                        List.of(
+                            Map.of(
+                                "layerName",
+                                "sensor_locations",
+                                "alternativeStyles",
+                                List.of("civitas_heat", "civitas_cool"))))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        Map<String, Object> layer = capturedLayerPutBody();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> styleRefs =
+            (List<Map<String, Object>>) asMap(layer.get("styles")).get("style");
+        assertEquals("ds_abc:civitas_heat", styleRefs.get(0).get("name"));
+        assertEquals("ds_abc:civitas_cool", styleRefs.get(1).get("name"));
+      }
     }
 
     private void assertStyleStepFailsWithoutHttp(Map<String, Object> payload) {
@@ -1015,6 +1155,14 @@ class GeoServerSagaHandlerTest {
     when(response.readEntity(Map.class))
         .thenReturn(Map.of("featureTypes", Map.of("featureType", featureTypes)));
     return response;
+  }
+
+  /** Stubs the layer GET that {@code assignLayerStyles} reads back to verify the styles applied. */
+  private void stubLayerReadback(Map<String, Object> layer) {
+    Response readback = mock(Response.class);
+    when(readback.getStatus()).thenReturn(200);
+    when(readback.readEntity(Map.class)).thenReturn(Map.of("layer", layer));
+    when(mockBuilder.get()).thenReturn(readback);
   }
 
   /** All REST path segments the handler requested, in call order. */
