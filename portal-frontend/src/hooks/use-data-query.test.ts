@@ -56,19 +56,47 @@ describe('useDataQuery', () => {
       renderHook(() => useDataQuery({ key: 'items', errorMessage: 'Error' }))
       expect(lastQueryOptions().queryKey).toEqual(['items', undefined])
     })
+
+    it('uses id as second element when both id and params are provided', () => {
+      const params = new URLSearchParams({ page: '1' })
+      renderHook(() => useDataQuery({ key: 'items', id: 'abc', params, errorMessage: 'Error' }))
+      expect(lastQueryOptions().queryKey).toEqual(['items', 'abc'])
+    })
   })
 
-  describe('endpoint', () => {
+  describe('queryFn forwards options to apiRequest', () => {
     it('calls apiRequest with /${key}/${id} when id is provided', async () => {
       renderHook(() => useDataQuery({ key: 'items', id: 'abc', errorMessage: 'Error' }))
       await lastQueryOptions().queryFn()
       expect(vi.mocked(apiRequest)).toHaveBeenCalledWith(expect.objectContaining({ endpoint: '/items/abc' }))
     })
 
-    it('calls apiRequest with /${key} when id is not provided', async () => {
+    it('builds endpoint /${key} when id is not provided', async () => {
       renderHook(() => useDataQuery({ key: 'items', errorMessage: 'Error' }))
       await lastQueryOptions().queryFn()
       expect(vi.mocked(apiRequest)).toHaveBeenCalledWith(expect.objectContaining({ endpoint: '/items' }))
+    })
+
+    it('forwards headers to apiRequest', async () => {
+      const headers = { Authorization: 'Bearer token' }
+      renderHook(() => useDataQuery({ key: 'items', headers, errorMessage: 'Error' }))
+      await lastQueryOptions().queryFn()
+      expect(vi.mocked(apiRequest)).toHaveBeenCalledWith(expect.objectContaining({ headers }))
+    })
+
+    it('forwards errorMessage to apiRequest', async () => {
+      renderHook(() => useDataQuery({ key: 'items', errorMessage: 'Something went wrong' }))
+      await lastQueryOptions().queryFn()
+      expect(vi.mocked(apiRequest)).toHaveBeenCalledWith(
+        expect.objectContaining({ errorMessage: 'Something went wrong' }),
+      )
+    })
+
+    it('forwards params to apiRequest', async () => {
+      const params = new URLSearchParams({ page: '1', size: '10' })
+      renderHook(() => useDataQuery({ key: 'items', params, errorMessage: 'Error' }))
+      await lastQueryOptions().queryFn()
+      expect(vi.mocked(apiRequest)).toHaveBeenCalledWith(expect.objectContaining({ params }))
     })
   })
 
