@@ -615,6 +615,40 @@ class GeoServerSagaHandlerTest {
       }
     }
 
+    @Test
+    void readbackAcceptsSingleAlternativeStyleSerialisedAsObject() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+        Response assigned = mock(Response.class);
+        when(assigned.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(assigned);
+        // GeoServer serialises a lone alternative style as an object, not a one-element array.
+        stubLayerReadback(Map.of("styles", Map.of("style", Map.of("name", "ds_abc:civitas_heat"))));
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "PROVISION_LAYERS",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "styles",
+                        List.of(Map.of("name", "civitas_heat", "sldContent", SLD)),
+                        "layers",
+                        List.of(
+                            Map.of(
+                                "layerName",
+                                "sensor_locations",
+                                "alternativeStyles",
+                                List.of("civitas_heat"))))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+      }
+    }
+
     private void assertStyleStepFailsWithoutHttp(Map<String, Object> payload) {
       try (GeoServerSagaHandler handler = createHandler()) {
         SagaCommandResult result =
