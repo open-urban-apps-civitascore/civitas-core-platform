@@ -21,7 +21,7 @@ const targetTree: SchemaTree = {
   fields: [
     { path: '$.title', name: 'title', type: 'str', portType: 'scalar' },
     { path: '$.fullCode', name: 'fullCode', type: 'str', portType: 'scalar' },
-    { path: '$.geometry_column', name: 'geometry_column', type: 'Point', portType: 'scalar' },
+    { path: '$.geometry_column', name: 'geometry_column', type: 'Point', portType: 'geometry' },
   ],
 }
 
@@ -69,8 +69,18 @@ describe('mapping editor compile', () => {
     const geoPointDef = mappingRegistry.byType.geoPoint
 
     const geoNodes: Node[] = [
-      { id: SOURCE_NODE_ID, type: 'mega', position: { x: 0, y: 0 }, data: { role: 'source', fields: sourceTree.fields } },
-      { id: TARGET_NODE_ID, type: 'mega', position: { x: 700, y: 0 }, data: { role: 'target', fields: targetTree.fields } },
+      {
+        id: SOURCE_NODE_ID,
+        type: 'mega',
+        position: { x: 0, y: 0 },
+        data: { role: 'source', fields: sourceTree.fields },
+      },
+      {
+        id: TARGET_NODE_ID,
+        type: 'mega',
+        position: { x: 700, y: 0 },
+        data: { role: 'target', fields: targetTree.fields },
+      },
       {
         id: 'gp',
         type: 'transform',

@@ -8,9 +8,8 @@ export const ARRAY_EDGE_STYLE = { strokeWidth: 3, stroke: 'hsl(var(--primary))' 
 // ---------------------------------------------------------------------------
 
 /**
- * Concrete geometry types are first-class field types (alongside the scalar
- * primitives) so Point vs Polygon mismatches are caught by the same exact-subtype
- * matching used for int↔int / str↔str.
+ * Concrete geometry types are first-class field types, but they are separate from
+ * scalar primitives so Point vs Polygon mismatches can be handled explicitly.
  */
 export type GeometryType =
   | 'Point'

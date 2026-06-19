@@ -22,7 +22,7 @@ interface PortHandleProps {
   status?: PortStatus
 }
 
-/** Shape encodes the port type (§8): circle=scalar, square=array, diamond=object. */
+/** Shape encodes the port type (§8): circle=scalar, hexagon=geometry, square=array, diamond=object. */
 export const PortHandle = ({ id, portType, side, status = 'default' }: PortHandleProps) => (
   <Handle
     type={side === 'left' ? 'target' : 'source'}
@@ -39,6 +39,7 @@ export const PortHandle = ({ id, portType, side, status = 'default' }: PortHandl
       border: `2px solid ${STATUS_COLOR[status]}`,
       transform: portType === 'object' ? 'rotate(45deg)' : 'none',
       borderRadius: portType === 'scalar' ? '50%' : 2,
+      clipPath: portType === 'geometry' ? 'polygon(25% 6%, 75% 6%, 100% 50%, 75% 94%, 25% 94%, 0% 50%)' : undefined,
     }}
   />
 )

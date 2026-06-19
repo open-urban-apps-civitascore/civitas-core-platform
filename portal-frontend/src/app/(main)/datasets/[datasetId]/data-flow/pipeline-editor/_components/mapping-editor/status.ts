@@ -83,12 +83,12 @@ export const computeStatus = (
     // Directly connected target port.
     if (edge) {
       const src = endpointInfo(edge.source, edge.sourceHandle ?? '')
-      // Port category mismatch (scalar vs object/array), OR — for scalar ports
-      // (which now include geometries as first-class types) — a concrete subtype
-      // mismatch such as Point vs Polygon. The source's `sub` carries the concrete
-      // field type, so comparing it to the target's `type` catches it directly.
+      // Port category mismatch (scalar/geometry vs object/array), OR — for scalar/geometry
+      // ports — a concrete subtype mismatch such as Point vs Polygon. The source's `sub`
+      // carries the concrete field type, so comparing it to the target's `type` catches it directly.
       const hasCategoryMismatch = !!src && src.type !== field.portType
-      const hasSubtypeMismatch = !!src && field.portType === 'scalar' && !!src.sub && src.sub !== field.type
+      const hasSubtypeMismatch =
+        !!src && (field.portType === 'scalar' || field.portType === 'geometry') && !!src.sub && src.sub !== field.type
       const isMismatch = hasCategoryMismatch || hasSubtypeMismatch
 
       targetPortStatus[path] = isMismatch ? 'mismatch' : 'mapped'

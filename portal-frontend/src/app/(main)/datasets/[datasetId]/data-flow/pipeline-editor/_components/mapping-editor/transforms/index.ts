@@ -17,6 +17,7 @@ export interface MappingTransformDef extends TransformDef {
 }
 
 const scalar = (id: string, label: string, dataType?: string): PortDef => ({ id, label, type: 'scalar', dataType })
+const geometry = (id: string, label: string, dataType?: string): PortDef => ({ id, label, type: 'geometry', dataType })
 
 /** stringConcat is variadic; ports are grown on demand and persisted on the node. */
 export const concatInputPorts = (count: number): PortDef[] =>
@@ -76,13 +77,14 @@ export const LITERAL_DEFAULT_TYPE = 'String'
 /**
  * Given a UML type name, returns the output PortDef for a literal node.
  * Reuses adapter.ts's GEOMETRY set and PRIMITIVE map — single source of truth.
- * Geometries are scalar-like first-class types: their `dataType` is the concrete
- * geometry name (e.g. 'Point') so Point vs Polygon is matched exactly like int↔int;
+ * Geometries are first-class typed ports: their `dataType` is the concrete
+ * geometry name (e.g. 'Point') so Point vs Polygon is matched by exact type;
  * other primitives → scalar port with the matching subtype.
  */
 export const literalOutputPort = (umlType: string): PortDef => {
-  const dataType = (GEOMETRY as Set<string>).has(umlType) ? umlType : (PRIMITIVE[umlType] ?? 'str')
-  return { id: 'out', label: 'value', type: 'scalar', dataType }
+  const isGeom = (GEOMETRY as Set<string>).has(umlType)
+  const dataType = isGeom ? umlType : (PRIMITIVE[umlType] ?? 'str')
+  return { id: 'out', label: 'value', type: isGeom ? 'geometry' : 'scalar', dataType }
 }
 
 const literal: MappingTransformDef = {
@@ -149,7 +151,7 @@ const geoPoint: MappingTransformDef = {
   description: 'transforms.geoPoint.description',
   icon: MapPin,
   inputs: [scalar('lon', 'longitude', 'float'), scalar('lat', 'latitude', 'float')],
-  outputs: [scalar('out', 'Point', 'Point')],
+  outputs: [geometry('out', 'Point', 'Point')],
   config: [],
   op: 'geoPoint',
   toValueNode: inputs => ({
