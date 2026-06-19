@@ -53,6 +53,32 @@ record RoutePayload(
   }
 
   /**
+   * Resolves each named API's routing kind from its standard (see {@link RouteUpstreamKind}),
+   * failing fast on a non-routable standard (CUSTOM/unknown) so CREATE_ROUTE rejects it before
+   * creating any gateway state. STA (and a null/blank standard) routes to the dataset's
+   * FROST-project upstream; OWS routes to the dataset's map-server upstream.
+   */
+  Map<String, RouteUpstreamKind> routingKinds() {
+    Map<String, RouteUpstreamKind> kinds = new LinkedHashMap<>();
+    for (String slug : slugs) {
+      String standard = standardBySlug.get(slug);
+      RouteUpstreamKind kind =
+          RouteUpstreamKind.fromStandard(standard)
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "named API '"
+                              + slug
+                              + "' has standard '"
+                              + standard
+                              + "' which is not routable — only STA (FROST/SensorThings) and OWS"
+                              + " (GeoServer WFS/WMS) named APIs are supported"));
+      kinds.put(slug, kind);
+    }
+    return kinds;
+  }
+
+  /**
    * Named-API slugs that have no entry in {@link #routeIds} — the persisted route map drifted from
    * the dataset's named APIs. UPDATE fails loud on this (all-or-nothing), DELETE heals it by
    * deriving the deterministic route id.

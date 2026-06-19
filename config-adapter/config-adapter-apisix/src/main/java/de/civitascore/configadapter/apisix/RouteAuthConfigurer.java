@@ -182,35 +182,14 @@ final class RouteAuthConfigurer {
     if (proxyRewrite == null) {
       return;
     }
-    if (sensor) {
-      mergeProxyRewriteHeaders(proxyRewrite, isOpenData, staleManagedHeader);
-    } else {
-      // OWS map-service routes never carry an upstream credential — GeoServer serves the workspace
-      // OWS endpoint anonymously and the gateway/OPA gate is the authorization boundary. Only the
-      // always-strip list (internal trust headers) applies.
-      applyHeaderStrip(proxyRewrite);
-    }
+    // SENSOR routes inject the FROST upstream credential; OWS map-service routes carry none.
+    mergeProxyRewriteHeaders(proxyRewrite, isOpenData, staleManagedHeader, sensor);
   }
 
   /** A route's upstream kind, read from {@link #MANAGED_STANDARD_LABEL}; absent marker ⇒ SENSOR. */
   private static RouteUpstreamKind readUpstreamKind(Map<String, Object> route) {
     String standard = RouteLabels.read(route, MANAGED_STANDARD_LABEL);
     return RouteUpstreamKind.fromStandard(standard).orElse(RouteUpstreamKind.SENSOR);
-  }
-
-  /**
-   * Applies only the adapter's {@code headers.remove} strip list (no upstream credential) — the
-   * map-service (OWS) path. Foreign {@code headers.*} entries are preserved.
-   */
-  @SuppressWarnings("unchecked")
-  private void applyHeaderStrip(Map<String, Object> proxyRewrite) {
-    Map<String, Object> headers = mutableMap((Map<String, Object>) proxyRewrite.get("headers"));
-    mergeStripList(headers);
-    if (headers.isEmpty()) {
-      proxyRewrite.remove("headers");
-    } else {
-      proxyRewrite.put("headers", headers);
-    }
   }
 
   /**
@@ -228,14 +207,22 @@ final class RouteAuthConfigurer {
   /**
    * Merges the adapter-managed entries into an existing {@code proxy-rewrite.headers} block instead
    * of replacing it — preserves foreign {@code headers.add} entries, {@code headers.set} entries
-   * owned by other operators, and additional {@code headers.remove} items.
+   * owned by other operators, and additional {@code headers.remove} items. For SENSOR (STA → FROST)
+   * routes this includes the FROST upstream credential; OWS map-service routes ({@code sensor =
+   * false}) get only the always-strip list, since GeoServer serves the workspace OWS endpoint
+   * anonymously and the gateway/OPA gate is the authorization boundary.
    */
   @SuppressWarnings("unchecked")
   private void mergeProxyRewriteHeaders(
-      Map<String, Object> proxyRewrite, boolean isOpenData, String staleManagedHeader) {
+      Map<String, Object> proxyRewrite,
+      boolean isOpenData,
+      String staleManagedHeader,
+      boolean sensor) {
     Map<String, Object> headers = mutableMap((Map<String, Object>) proxyRewrite.get("headers"));
 
-    mergeAuthSetEntries(headers, isOpenData, staleManagedHeader);
+    if (sensor) {
+      mergeAuthSetEntries(headers, isOpenData, staleManagedHeader);
+    }
     mergeStripList(headers);
 
     if (headers.isEmpty()) {
