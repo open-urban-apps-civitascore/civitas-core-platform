@@ -27,20 +27,22 @@ import org.owasp.encoder.Encode;
  * dataset provisioning:
  *
  * <ul>
- *   <li>{@code CREATE_ROUTE} — creates one shared dataset upstream + one route per named-API slug
+ *   <li>{@code CREATE_ROUTE} — creates the dataset's upstream(s) and one route per named-API slug,
+ *       each bound to the upstream its standard selects (see {@link RouteUpstreams})
  *   <li>{@code UPDATE_ROUTE} — updates each slug route's configuration (plugin_config_id for auth)
- *   <li>{@code DELETE_ROUTE} — deletes each slug route + the shared upstream
+ *   <li>{@code DELETE_ROUTE} — deletes each slug route + the dataset's upstream(s)
  *   <li>{@code RESTORE_ROUTE} — restores each slug route to its previous auth config (compensation)
  * </ul>
  *
  * <p>Per the per-NamedApi route model (#1311/#1379) the saga provisions one route per slug at
  * {@code /v1/datasets/{id}/{slug}} with a deterministic id ({@code NamedApiHelper.derive(id,
- * slug)}) bound to a single per-dataset upstream (keyed by {@code datasetId}); it returns a
- * slug-keyed {@code routeIds} map. A command with no {@code namedApis} provisions NO data-plane
- * route (a dataset with no named APIs has nothing to publish — the old dataset-level fallback was
- * removed). Uses PUT with deterministic IDs for idempotent operations; DELETE/RESTORE tolerate an
- * already-absent route (404) so compensation is idempotent. Compensation: {@code DELETE_ROUTE} for
- * create rollback, {@code RESTORE_ROUTE} for update rollback.
+ * slug)}), bound to the per-dataset upstream its standard selects — the FROST-project upstream for
+ * {@code STA} and/or the map-server upstream for {@code OWS}; it returns a slug-keyed {@code
+ * routeIds} map. A command with no {@code namedApis} provisions NO data-plane route (a dataset with
+ * no named APIs has nothing to publish — the old dataset-level fallback was removed). Uses PUT with
+ * deterministic IDs for idempotent operations; DELETE/RESTORE tolerate an already-absent route
+ * (404) so compensation is idempotent. Compensation: {@code DELETE_ROUTE} for create rollback,
+ * {@code RESTORE_ROUTE} for update rollback.
  *
  * <p><b>Drift between {@code namedApis} and the persisted {@code routeIds} map</b> (MR !547 review
  * findings 2 and 5) is handled per the established philosophy "UPDATE atomic-fail, DELETE stays
