@@ -56,6 +56,7 @@ export type OpNode =
   | { op: 'const'; value: unknown; valueType?: string }
   | { op: 'concat'; separator?: string; inputs: ValueNode[] }
   | { op: ConversionOp; input: ValueNode; pattern?: string }
+  | { op: 'geoPoint'; lon: ValueNode; lat: ValueNode }
 
 /** A path string is shorthand for a copy. */
 export type ValueNode = string | OpNode

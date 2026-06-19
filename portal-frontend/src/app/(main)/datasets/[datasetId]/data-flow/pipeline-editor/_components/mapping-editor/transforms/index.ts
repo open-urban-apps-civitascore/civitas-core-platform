@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Binary, Calendar, CalendarClock, Combine, Hash, Type } from 'lucide-react'
+import { Binary, Calendar, CalendarClock, Combine, Hash, MapPin, Type } from 'lucide-react'
 
 import type { ConfigField, PortDef, TransformDef } from '@/components/node-editor/types'
 import { buildRegistry } from '@/components/node-editor/types'
@@ -142,6 +142,25 @@ const concat: MappingTransformDef = {
   opConfig: op => (op.op === 'concat' ? { separator: op.separator ?? '' } : {}),
 }
 
+const geoPoint: MappingTransformDef = {
+  type: 'geoPoint',
+  category: 'categories.conversionFunctions',
+  label: 'geoPoint',
+  description: 'transforms.geoPoint.description',
+  icon: MapPin,
+  inputs: [scalar('lon', 'longitude', 'float'), scalar('lat', 'latitude', 'float')],
+  outputs: [scalar('out', 'Point', 'Point')],
+  config: [],
+  op: 'geoPoint',
+  toValueNode: inputs => ({
+    op: 'geoPoint' as const,
+    lon: inputs[0] ?? '',
+    lat: inputs[1] ?? '',
+  }),
+  opInputs: op => (op.op === 'geoPoint' ? [op.lon, op.lat] : []),
+  opConfig: () => ({}),
+}
+
 /**
  * Conversion nodes
  */
@@ -163,4 +182,4 @@ const conversions: MappingTransformDef[] = [
   ]),
 ]
 
-export const mappingRegistry = buildRegistry<MappingTransformDef>([literal, concat, ...conversions])
+export const mappingRegistry = buildRegistry<MappingTransformDef>([literal, concat, geoPoint, ...conversions])
