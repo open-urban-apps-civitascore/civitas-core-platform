@@ -14,6 +14,7 @@ import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.crypto.CryptoKeyLoader;
+import de.civitascore.configadapter.model.dataset.WorkspaceNames;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
@@ -954,9 +955,8 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   }
 
   static String toWorkspaceName(String datasetId) {
-    if (datasetId == null || datasetId.isBlank()) {
-      throw new IllegalArgumentException("datasetId must not be blank");
-    }
-    return datasetId.toLowerCase().replaceAll("[^a-z0-9_]", "_");
+    // Single source of truth shared with the APISIX adapter, which derives the same workspace name
+    // to build the OWS named-API route's path-rewrite target.
+    return WorkspaceNames.fromDatasetId(datasetId);
   }
 }

@@ -33,8 +33,8 @@ import org.slf4j.LoggerFactory;
  * @param routeIds slug-keyed APISIX route ids persisted by the portal-backend from the prior
  *     CREATE_ROUTE result (null-keyed/-valued entries are dropped and logged)
  * @param previousOpenBySlug per-slug open-data state captured by UPDATE_ROUTE for RESTORE_ROUTE
- * @param standardBySlug per-slug API standard ({@code STA}/{@code WFS}/{@code WMS}) gating
- *     routability in CREATE_ROUTE
+ * @param standardBySlug per-slug API standard ({@code STA}/{@code OWS}/{@code CUSTOM}) gating
+ *     routability in CREATE_ROUTE and selecting the upstream (see {@link RouteUpstreamKind})
  */
 record RoutePayload(
     List<String> slugs,
@@ -50,18 +50,6 @@ record RoutePayload(
         readRouteIds(command),
         readPreviousOpenBySlug(command),
         readStandardBySlug(command));
-  }
-
-  /**
-   * Whether a named API's standard can be routed by the current (FROST-only) data plane. Every saga
-   * route binds to the dataset's FROST-project upstream, so only {@code STA} (SensorThings) is
-   * routable; {@code WFS}/{@code WMS} will route to a separate GeoServer upstream that is not wired
-   * yet. A null/blank standard is treated as STA for backward compatibility (the production saga
-   * always sends STA). Non-STA standards fail fast in CREATE_ROUTE rather than producing a FROST
-   * route behind a WFS/WMS public URL — that is the seam GeoServer support plugs into.
-   */
-  static boolean isRoutableStandard(String standard) {
-    return standard == null || standard.isBlank() || "STA".equalsIgnoreCase(standard);
   }
 
   /**

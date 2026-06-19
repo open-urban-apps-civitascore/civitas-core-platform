@@ -54,6 +54,8 @@ services:
       # FROST upstream auth APISIX injects when proxying private dataset routes.
       APISIX_FROST_API_KEY: dev-frost-api-key
       APISIX_FROST_API_KEY_HEADER: X-API-Key
+      # Gateway-reachable GeoServer base for OWS (map services) named-API routes.
+      APISIX_GEOSERVER_URL: http://civitas-geoserver:8080/geoserver
       APISIX_TOPICS: de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted
       FROST_URL: http://civitas-frost:8080/FROST-Server/v1.1
       FROST_PUBLIC_URL: http://civitas-frost:8080/FROST-Server/v1.1

@@ -14,8 +14,10 @@ import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.model.dataset.NamedApiHelper;
+import de.civitascore.configadapter.model.dataset.WorkspaceNames;
 import jakarta.ws.rs.client.Client;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +73,12 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
   private static final String KEY_ROUTE_IDS = "routeIds";
   private static final String KEY_SERVICE_ID = "serviceId";
 
+  /**
+   * Suffix for the per-dataset map-server (GeoServer/OWS) upstream id. Distinct from the FROST
+   * upstream (keyed by the bare dataset id) so a dataset can route both STA and OWS named APIs.
+   */
+  private static final String OWS_UPSTREAM_SUFFIX = "-ows";
+
   private ApisixHandlerSettings settings;
   private ApisixAdminClient adminClient;
   private RouteAuthConfigurer authConfigurer;
@@ -119,7 +127,10 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
   @SuppressWarnings("PMD.AvoidCatchingGenericException")
   private SagaCommandResult handleCreateRoute(SagaCommandMessage command) {
     String datasetId = requireString(command, "datasetId");
-    UpstreamTarget upstream = UpstreamTarget.parse(requireString(command, "upstreamUrl"));
+    // The FROST upstream URL is always carried by the saga (the FROST project is provisioned for
+    // every dataset). Parsed up front so a malformed value fails the step before any gateway state
+    // is touched; the FROST upstream itself is only created when an STA named API actually uses it.
+    UpstreamTarget sensorUpstream = UpstreamTarget.parse(requireString(command, "upstreamUrl"));
     boolean openDataAccess =
         Boolean.TRUE.equals(command.payload().getOrDefault("openDataAccess", false));
 
@@ -141,37 +152,52 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
       return SagaCommandResult.success(command.sagaId(), command.stepId(), empty, empty);
     }
 
-    // GeoServer seam (WFS/WMS): validate every standard BEFORE provisioning anything, so a
-    // non-routable named API fails fast without creating gateway state that needs cleanup.
-    requireRoutableStandards(routePayload);
+    // Resolve every slug's routing kind up front (standard → upstream). A non-routable standard
+    // (CUSTOM/unknown) fails fast here, before any gateway state is created. STA → the dataset's
+    // FROST-project upstream; OWS → the dataset's map-server upstream (the seam this feature adds).
+    Map<String, RouteUpstreamKind> kindBySlug = resolveRoutingKinds(routePayload);
+    boolean hasSensor = kindBySlug.containsValue(RouteUpstreamKind.SENSOR);
+    boolean hasMap = kindBySlug.containsValue(RouteUpstreamKind.MAP);
 
-    // One upstream per dataset (the dataset's FROST project), shared by every named-API route.
-    adminClient.putUpstream(
-        datasetId,
-        Map.of(
-            "type", "roundrobin", "scheme", upstream.scheme(), "nodes", Map.of(upstream.node(), 1)),
-        "CREATE upstream");
+    // The map-server upstream base comes from configuration; build it only when an OWS named API
+    // needs it. A dataset with only OWS named APIs gets no FROST upstream, and one with only STA
+    // named APIs gets no map upstream.
+    UpstreamTarget mapUpstream = hasMap ? mapUpstreamTarget(datasetId) : null;
 
-    // Per-named-API model (#1311/#1379): one route per slug at /v1/datasets/{id}/{slug}, all
-    // bound to the shared dataset upstream. The slug-keyed routeIds map is the saga contract the
-    // portal-backend persists onto each NamedApi entity.
-    //
     // The loop is a non-atomic sequence of PUTs. If a later route fails after earlier ones (and the
-    // shared upstream) were created, a failed saga step records no compensation data, so the
+    // upstream(s)) were created, a failed saga step records no compensation data, so the
     // orchestrator cannot roll back this step's partial state. We therefore best-effort clean up
     // what this step already created before propagating the failure, leaving no orphaned routes or
-    // upstream behind.
+    // upstreams behind.
+    List<String> createdUpstreamIds = new ArrayList<>();
     Map<String, String> routeIds = new LinkedHashMap<>();
     try {
+      if (hasSensor) {
+        adminClient.putUpstream(datasetId, upstreamBody(sensorUpstream), "CREATE upstream");
+        createdUpstreamIds.add(datasetId);
+      }
+      if (hasMap) {
+        String owsUpstreamId = owsUpstreamId(datasetId);
+        adminClient.putUpstream(owsUpstreamId, upstreamBody(mapUpstream), "CREATE map upstream");
+        createdUpstreamIds.add(owsUpstreamId);
+      }
+
+      // Per-named-API model (#1311/#1379): one route per slug at /v1/datasets/{id}/{slug}, each
+      // bound to the upstream selected by its standard. The slug-keyed routeIds map is the saga
+      // contract the portal-backend persists onto each NamedApi entity.
       for (String slug : slugs) {
+        RouteUpstreamKind kind = kindBySlug.get(slug);
+        UpstreamTarget upstream = kind == RouteUpstreamKind.MAP ? mapUpstream : sensorUpstream;
+        String upstreamId = kind == RouteUpstreamKind.MAP ? owsUpstreamId(datasetId) : datasetId;
         String routeId = NamedApiHelper.derive(datasetId, slug);
         adminClient.putRoute(
             routeId,
             authConfigurer.newRouteBody(
                 DATASETS_PATH_PREFIX + datasetId + "/" + slug,
-                datasetId,
+                upstreamId,
                 openDataAccess,
-                upstream.path()),
+                upstream.path(),
+                kind),
             "CREATE route");
         routeIds.put(slug, routeId);
       }
@@ -180,11 +206,12 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
       // step's partial state — clean up best-effort before propagating the original failure.
       log.warn(
           "CREATE_ROUTE failed mid-provisioning — cleaning up partial state: datasetId={},"
-              + " routes={}, saga={}",
+              + " routes={}, upstreams={}, saga={}",
           Encode.forJava(datasetId),
           Encode.forJava(String.join(",", routeIds.values())),
+          Encode.forJava(String.join(",", createdUpstreamIds)),
           Encode.forJava(command.sagaId()));
-      adminClient.bestEffortCleanup(datasetId, routeIds.values(), command.sagaId());
+      adminClient.bestEffortCleanup(createdUpstreamIds, routeIds.values(), command.sagaId());
       throw e;
     }
 
@@ -309,24 +336,58 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * GeoServer seam (WFS/WMS): every saga route binds to the dataset's FROST-project upstream, so
-   * only STA (SensorThings) named APIs are routable today. A non-STA standard fails fast rather
-   * than silently provisioning a FROST route behind a WFS/WMS public URL. When GeoServer routing
-   * lands, this is where upstream + path-rewrite get selected by standard.
+   * Resolves each named API's routing kind from its standard, failing fast on a non-routable
+   * standard (CUSTOM/unknown) BEFORE any gateway state is created. STA (and a null/blank standard)
+   * routes to the dataset's FROST-project upstream; OWS routes to the dataset's map-server
+   * (GeoServer) upstream — the seam this feature adds.
    */
-  private static void requireRoutableStandards(RoutePayload payload) {
+  private static Map<String, RouteUpstreamKind> resolveRoutingKinds(RoutePayload payload) {
+    Map<String, RouteUpstreamKind> kinds = new LinkedHashMap<>();
     for (String slug : payload.slugs()) {
       String standard = payload.standardBySlug().get(slug);
-      if (!RoutePayload.isRoutableStandard(standard)) {
-        throw new IllegalStateException(
-            "named API '"
-                + slug
-                + "' has standard '"
-                + standard
-                + "' which is not yet routable — only STA (FROST/SensorThings) is supported;"
-                + " WFS/WMS routing via GeoServer is not implemented");
-      }
+      RouteUpstreamKind kind =
+          RouteUpstreamKind.fromStandard(standard)
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "named API '"
+                              + slug
+                              + "' has standard '"
+                              + standard
+                              + "' which is not routable — only STA (FROST/SensorThings) and OWS"
+                              + " (GeoServer WFS/WMS) named APIs are supported"));
+      kinds.put(slug, kind);
     }
+    return kinds;
+  }
+
+  /** APISIX upstream id for a dataset's map-server (GeoServer/OWS) upstream. */
+  private static String owsUpstreamId(String datasetId) {
+    return datasetId + OWS_UPSTREAM_SUFFIX;
+  }
+
+  private static Map<String, Object> upstreamBody(UpstreamTarget target) {
+    return Map.of(
+        "type", "roundrobin", "scheme", target.scheme(), "nodes", Map.of(target.node(), 1));
+  }
+
+  /**
+   * Builds the map-server upstream target for a dataset's OWS routes: host/port/scheme from the
+   * configured {@code apisix.geoserver.url} plus the per-workspace OWS path {@code
+   * /geoserver/{workspace}/ows}. The workspace name is derived from the dataset id via the same
+   * normalization the GeoServer provisioning side uses ({@link WorkspaceNames#fromDatasetId}), so
+   * the route reaches the workspace the GeoServer adapter creates for the same dataset.
+   */
+  private UpstreamTarget mapUpstreamTarget(String datasetId) {
+    String geoserverUrl = settings.geoserverUrl();
+    if (geoserverUrl == null || geoserverUrl.isBlank()) {
+      throw new IllegalStateException(
+          "apisix.geoserver.url must be configured to route an OWS (map services) named API to"
+              + " GeoServer");
+    }
+    UpstreamTarget base = UpstreamTarget.parse(geoserverUrl);
+    String owsPath = base.path() + "/" + WorkspaceNames.fromDatasetId(datasetId) + "/ows";
+    return new UpstreamTarget(base.node(), owsPath, base.scheme());
   }
 
   /**
@@ -413,7 +474,7 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
               + " saga={}",
           Encode.forJava(command.sagaId()));
     } else {
-      // Per-named-API model: delete every slug route, then the shared dataset upstream.
+      // Per-named-API model: delete every slug route, then the dataset upstream(s).
       payload.logRouteIdDivergence(serviceId, command.sagaId());
       int routesRemoved = 0;
       for (Map.Entry<String, String> entry : routeIds.entrySet()) {
@@ -421,7 +482,11 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
           routesRemoved++;
         }
       }
+      // The DELETE payload carries no per-slug standard, so attempt both the FROST and the
+      // map-server upstream; deletes are 404-tolerant, so the one that was never created is a
+      // no-op.
       adminClient.deleteUpstream(serviceId, "DELETE upstream");
+      adminClient.deleteUpstream(owsUpstreamId(serviceId), "DELETE map upstream");
       log.info(
           "APISIX routes deleted: serviceId={}, slugs={}, removed={}/{}, saga={}",
           Encode.forJava(serviceId),

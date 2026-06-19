@@ -148,6 +148,8 @@ class ApisixSagaHandlerTest {
         when(config.getProperty("apisix.frost.api.key")).thenReturn("test-api-key");
         when(config.getProperty("apisix.frost.api.key.header", "X-API-Key"))
             .thenReturn("X-API-Key");
+        when(config.getProperty("apisix.geoserver.url", "http://localhost:8080/geoserver"))
+            .thenReturn("http://civitas-geoserver:8080/geoserver");
 
         h.initialize(config);
       }
@@ -393,9 +395,8 @@ class ApisixSagaHandlerTest {
     }
 
     @Test
-    @DisplayName(
-        "fails (STEP_FAILED) for a non-STA standard — WFS/WMS not yet routable (GeoServer)")
-    void shouldFailForNonStaStandard() {
+    @DisplayName("fails (STEP_FAILED) for a non-routable standard (CUSTOM/unknown)")
+    void shouldFailForNonRoutableStandard() {
       try (ApisixSagaHandler handler = createHandler()) {
         Response ok = mock(Response.class);
         when(ok.getStatus()).thenReturn(200);
@@ -404,17 +405,15 @@ class ApisixSagaHandlerTest {
 
         SagaCommandResult result =
             handler.handle(
-                createPerApiCommand(true, List.of(Map.of("slug", "map", "standard", "WFS"))));
+                createPerApiCommand(true, List.of(Map.of("slug", "custom", "standard", "CUSTOM"))));
 
-        // Non-STA fails fast rather than provisioning a FROST route behind a WFS public URL; the
-        // error names the offending standard so the cause is attributable.
+        // Only STA (FROST) and OWS (GeoServer) are routable; a non-routable standard fails fast and
+        // the error names the offending standard so the cause is attributable.
         assertEquals("STEP_FAILED", result.type());
-        assertTrue(
-            result.error().contains("WFS") || result.error().contains("GeoServer"),
-            "error should name the unsupported standard / GeoServer gap");
+        assertTrue(result.error().contains("CUSTOM"), "error should name the unsupported standard");
 
-        // Standards are validated BEFORE provisioning, so neither a route nor the shared upstream
-        // is ever created — no gateway state, no cleanup needed.
+        // Standards are validated BEFORE provisioning, so neither a route nor an upstream is ever
+        // created — no gateway state, no cleanup needed.
         verify(mockBuilder, never()).put(any(Entity.class));
         verify(mockBuilder, never()).delete();
       }
@@ -798,14 +797,16 @@ class ApisixSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
-        // Two slug routes + one shared upstream.
-        verify(mockBuilder, times(3)).delete();
+        // Two slug routes + both per-dataset upstreams (FROST + map server). The DELETE payload
+        // carries no standard, so both upstreams are torn down (404-tolerant for the absent one).
+        verify(mockBuilder, times(4)).delete();
         ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
         verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
         List<String> paths = pathCaptor.getAllValues();
         assertTrue(paths.contains("/apisix/admin/routes/rid-traffic"));
         assertTrue(paths.contains("/apisix/admin/routes/rid-weather"));
         assertTrue(paths.contains("/apisix/admin/upstreams/ds-001"));
+        assertTrue(paths.contains("/apisix/admin/upstreams/ds-001-ows"));
       }
     }
 
@@ -818,8 +819,8 @@ class ApisixSagaHandlerTest {
         Response notFound = mock(Response.class);
         when(notFound.getStatus()).thenReturn(404);
         when(notFound.readEntity(String.class)).thenReturn("Key not found");
-        // First delete is an already-gone route (404), the remaining route + upstream are present.
-        when(mockBuilder.delete()).thenReturn(notFound, ok, ok);
+        // First delete is an already-gone route (404), the remaining route + upstreams are present.
+        when(mockBuilder.delete()).thenReturn(notFound, ok, ok, ok);
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("traffic", "rid-traffic", "weather", "rid-weather"));
@@ -837,7 +838,8 @@ class ApisixSagaHandlerTest {
 
         // Idempotent: a 404 on one slug route must not abort the per-slug teardown.
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, times(3)).delete();
+        // Two slug routes + both per-dataset upstreams (FROST + map server).
+        verify(mockBuilder, times(4)).delete();
       }
     }
 
@@ -873,7 +875,9 @@ class ApisixSagaHandlerTest {
         // (Hardening this to fail on drift is a separate operational-policy decision; see the
         // DELETE-tolerance discussion in the handler.)
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, times(3)).delete();
+        // Two slug routes + both per-dataset upstreams (FROST + map server) — all 404, all
+        // tolerated.
+        verify(mockBuilder, times(4)).delete();
       }
     }
 
@@ -904,13 +908,14 @@ class ApisixSagaHandlerTest {
                     payload));
 
         assertEquals("STEP_COMPLETED", result.type());
-        // Only the valid 'traffic' route + the shared upstream are deleted; the null-valued
+        // Only the valid 'traffic' route + both per-dataset upstreams are deleted; the null-valued
         // 'weather' entry is dropped rather than NPE-ing or aborting the step.
-        verify(mockBuilder, times(2)).delete();
+        verify(mockBuilder, times(3)).delete();
         ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
         verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
         assertTrue(pathCaptor.getAllValues().contains("/apisix/admin/routes/rid-traffic"));
         assertTrue(pathCaptor.getAllValues().contains("/apisix/admin/upstreams/ds-001"));
+        assertTrue(pathCaptor.getAllValues().contains("/apisix/admin/upstreams/ds-001-ows"));
       }
     }
   }
@@ -2660,6 +2665,8 @@ class ApisixSagaHandlerTest {
     when(mockConfig.getProperty("apisix.frost.basic.auth.password")).thenReturn("frost-pass");
     when(mockConfig.getProperty("apisix.frost.api.key.header", "X-API-Key"))
         .thenReturn("X-API-Key");
+    when(mockConfig.getProperty("apisix.geoserver.url", "http://localhost:8080/geoserver"))
+        .thenReturn("http://civitas-geoserver:8080/geoserver");
     when(mockConfig.getProperty("apisix.proxy.rewrite.headers.remove"))
         .thenReturn(csvHeadersToRemove);
     handler.initialize(mockConfig);
@@ -2680,6 +2687,8 @@ class ApisixSagaHandlerTest {
     when(mockConfig.getProperty("apisix.frost.api.key")).thenReturn(apiKey);
     when(mockConfig.getProperty("apisix.frost.api.key.header", "X-API-Key"))
         .thenReturn(apiKeyHeader);
+    when(mockConfig.getProperty("apisix.geoserver.url", "http://localhost:8080/geoserver"))
+        .thenReturn("http://civitas-geoserver:8080/geoserver");
     handler.initialize(mockConfig);
 
     wireMockClient(handler);
@@ -2700,6 +2709,8 @@ class ApisixSagaHandlerTest {
     when(mockConfig.getProperty("apisix.frost.basic.auth.password")).thenReturn("frost-pass");
     when(mockConfig.getProperty("apisix.frost.api.key.header", "X-API-Key"))
         .thenReturn("X-API-Key");
+    when(mockConfig.getProperty("apisix.geoserver.url", "http://localhost:8080/geoserver"))
+        .thenReturn("http://civitas-geoserver:8080/geoserver");
     handler.initialize(mockConfig);
 
     wireMockClient(handler);
