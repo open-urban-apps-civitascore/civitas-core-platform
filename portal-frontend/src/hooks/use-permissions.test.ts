@@ -63,6 +63,41 @@ describe('usePermissions', () => {
   })
 })
 
+describe('hasPermissionInScope', () => {
+  it('returns true when user has permission in the specified scope type', () => {
+    mockCurrentUser([PERMISSION_NAMES.DATAPOOL_CREATE])
+    const { result } = renderHook(() => usePermissions())
+    expect(result.current.hasPermissionInScope(PERMISSION_NAMES.DATAPOOL_CREATE, 'TENANT')).toBe(true)
+  })
+
+  it('returns false when user has permission only in a different scope type', () => {
+    vi.mocked(useGetCurrentUser).mockReturnValue({
+      data: {
+        username: 'test',
+        email: 'test@test.com',
+        title: 'MR' as const,
+        firstName: 'Test',
+        lastName: 'User',
+        assignments: [{ scopeType: 'DATAPOOL', scopeId: 'dp1', permissions: [PERMISSION_NAMES.DATAPOOL_CREATE] }],
+      },
+    } as ReturnType<typeof useGetCurrentUser>)
+    const { result } = renderHook(() => usePermissions())
+    expect(result.current.hasPermissionInScope(PERMISSION_NAMES.DATAPOOL_CREATE, 'TENANT')).toBe(false)
+  })
+
+  it('returns false when user lacks the permission entirely', () => {
+    mockCurrentUser([PERMISSION_NAMES.DATAPOOL_READ])
+    const { result } = renderHook(() => usePermissions())
+    expect(result.current.hasPermissionInScope(PERMISSION_NAMES.DATAPOOL_CREATE, 'TENANT')).toBe(false)
+  })
+
+  it('returns false when currentUser is undefined', () => {
+    vi.mocked(useGetCurrentUser).mockReturnValue({ data: undefined } as ReturnType<typeof useGetCurrentUser>)
+    const { result } = renderHook(() => usePermissions())
+    expect(result.current.hasPermissionInScope(PERMISSION_NAMES.DATAPOOL_CREATE, 'TENANT')).toBe(false)
+  })
+})
+
 describe('hasAnyPermission', () => {
   it('returns true when user has at least one of the listed permissions', () => {
     mockCurrentUser([PERMISSION_NAMES.USER_READ])
@@ -124,5 +159,50 @@ describe('hasScopedPermission', () => {
     vi.mocked(useGetCurrentUser).mockReturnValue({ data: undefined } as ReturnType<typeof useGetCurrentUser>)
     const { result } = renderHook(() => usePermissions())
     expect(result.current.hasScopedPermission(PERMISSION_NAMES.DATASET_READ, 'DATASET', 'abc-123')).toBe(false)
+  })
+
+  it('returns true for DATASET permission via DATAPOOL assignment when datapoolId matches', () => {
+    vi.mocked(useGetCurrentUser).mockReturnValue({
+      data: {
+        username: 'test',
+        email: 'test@test.com',
+        title: 'MR' as const,
+        firstName: 'Test',
+        lastName: 'User',
+        assignments: [{ scopeType: 'DATAPOOL', scopeId: 'pool-1', permissions: [PERMISSION_NAMES.DATASET_UPDATE] }],
+      },
+    } as ReturnType<typeof useGetCurrentUser>)
+    const { result } = renderHook(() => usePermissions())
+    expect(result.current.hasScopedPermission(PERMISSION_NAMES.DATASET_UPDATE, 'DATASET', 'ds-1', 'pool-1')).toBe(true)
+  })
+
+  it('returns false for DATASET permission via DATAPOOL assignment when datapoolId does not match', () => {
+    vi.mocked(useGetCurrentUser).mockReturnValue({
+      data: {
+        username: 'test',
+        email: 'test@test.com',
+        title: 'MR' as const,
+        firstName: 'Test',
+        lastName: 'User',
+        assignments: [{ scopeType: 'DATAPOOL', scopeId: 'pool-1', permissions: [PERMISSION_NAMES.DATASET_UPDATE] }],
+      },
+    } as ReturnType<typeof useGetCurrentUser>)
+    const { result } = renderHook(() => usePermissions())
+    expect(result.current.hasScopedPermission(PERMISSION_NAMES.DATASET_UPDATE, 'DATASET', 'ds-1', 'pool-2')).toBe(false)
+  })
+
+  it('returns false for DATASET permission via DATAPOOL assignment when datapoolId is not provided', () => {
+    vi.mocked(useGetCurrentUser).mockReturnValue({
+      data: {
+        username: 'test',
+        email: 'test@test.com',
+        title: 'MR' as const,
+        firstName: 'Test',
+        lastName: 'User',
+        assignments: [{ scopeType: 'DATAPOOL', scopeId: 'pool-1', permissions: [PERMISSION_NAMES.DATASET_UPDATE] }],
+      },
+    } as ReturnType<typeof useGetCurrentUser>)
+    const { result } = renderHook(() => usePermissions())
+    expect(result.current.hasScopedPermission(PERMISSION_NAMES.DATASET_UPDATE, 'DATASET', 'ds-1')).toBe(false)
   })
 })

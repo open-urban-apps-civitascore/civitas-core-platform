@@ -11,7 +11,6 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
-import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -24,7 +23,6 @@ import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
-import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.UserRepository;
@@ -61,7 +59,6 @@ class DataSetControllerIntegrationTest
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private DistributionRepository distributionRepository;
-  @Autowired private DataSpaceRepository dataSpaceRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private DataSetService dataSetService;
@@ -167,16 +164,6 @@ class DataSetControllerIntegrationTest
     dataSet.setFormat("JSON");
     dataSet.setOpenDataAccess(false);
     dataSet.setOwner(owner);
-    dataSet = dataSetRepository.save(dataSet);
-
-    // Create a DataSpace for the dataset
-    DataSpace dataSpace = new DataSpace();
-    dataSpace.setName("test_dataspace_" + System.currentTimeMillis());
-    dataSpace.setDescription("Test data space for dataset");
-    dataSpace = dataSpaceRepository.save(dataSpace);
-
-    // Associate dataset with dataspace
-    dataSet.getDataSpaces().add(dataSpace);
     dataSet = dataSetRepository.save(dataSet);
 
     // Create data sources for the pipelines

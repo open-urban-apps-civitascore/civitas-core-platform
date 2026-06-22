@@ -78,10 +78,13 @@
       "datastructures": "Data structures",
       "datastructure": "Data structure",
       "datastructureVersion": "Version",
-      "assignments": "Assignments"
+      "assignments": "Assignments",
+      "datapool": "Data pool",
+      "datapools": "Data pools"
     },
     "messages": {
       "updateSuccess": "{item} has been successfully updated",
+      "updateError": "An error occurred while updating {item}.",
       "createSuccess": "{item} has been successfully created",
       "deleteSuccess": "{item} has been successfully deleted"
     },
@@ -198,7 +201,8 @@
     "datasources": "Data sources",
     "datastructures": "Data structures",
     "access-management": "Access management",
-    "apis": "APIs"
+    "apis": "APIs",
+    "datapools": "Data pools"
   },
   "datasets": {
     "title": "Datasets",
@@ -210,29 +214,46 @@
       "createdBy": "Created by",
       "lastUpdated": "Last Updated",
       "status": "Status",
-      "action": "Action"
+      "action": "Action",
+      "datapool": "Data pool"
     },
+    "anonymousDatapool": "Anonymous",
     "tableValues": {
       "draft": "Draft",
       "available": "Available",
       "ready": "Ready",
       "yesterday": "Yesterday"
     },
+    "form": {
+      "title": "Basic Information",
+      "subtitle": "The name can be adjusted later.",
+      "name": "Name",
+      "datapoolSelect": "Data pool",
+      "datapoolSelectPlaceholder": "No data pool",
+      "description": "Description",
+      "descriptionHint": "max. 150 characters"
+    },
+    "changeDatapoolModal": {
+      "title": "Really change Data pool?",
+      "description": "The Dataset will be assigned to a different Data pool. This change may affect access.",
+      "consequences": {
+        "permissions": "Permissions may change",
+        "access": "Access to this Dataset may be lost",
+        "otherUsers": "Other users may gain or lose access to this Dataset"
+      },
+      "warnings": {
+        "inheritance": "If permissions are currently inherited from the Data pool, they may not apply in the new Data pool.",
+        "checkPermissions": "Before making this change, the permissions in the selected Data pool should be reviewed."
+      },
+      "confirmButton": "Change Data pool"
+    },
     "create": {
       "title": "New Dataset",
-      "subtitle": "New Datasets are only visible internally.",
-      "form": {
-        "title": "Basic Information",
-        "subtitle": "The name can be adjusted later.",
-        "name": "Name"
-      }
+      "subtitle": "New Datasets are only visible internally."
     },
     "overview": {
       "info": {
-        "title": "Base Information",
-        "name": "Name",
-        "description": "Description",
-        "descriptionHint": "max. 150 characters"
+        "title": "Base Information"
       },
       "completion": {
         "title": "Creation Progress",
@@ -523,7 +544,8 @@
         "platformWide": "Platform-wide",
         "datasets": "Datasets",
         "datasources": "Data sources",
-        "datastructures": "Data structures"
+        "datastructures": "Data structures",
+        "datapools": "Data pools"
       },
       "columns": {
         "name": "Name",
@@ -546,7 +568,8 @@
       "scopedInfoBanner": {
         "dataset": "Dataset-related assignments are made at the respective Dataset.",
         "datasource": "Data source-related assignments are made at the respective Data source.",
-        "datastructure": "Data structure-related assignments are made at the respective Data structure."
+        "datastructure": "Data structure-related assignments are made at the respective Data structure.",
+        "datapool": "Data pool-related assignments are made at the respective Data pool."
       },
       "disabledHint": "Assigned roles can be viewed after saving the user."
     },
@@ -601,7 +624,8 @@
         "platform": "Platform-wide",
         "datasets": "Datasets",
         "datasources": "Data sources",
-        "datastructures": "Data structures"
+        "datastructures": "Data structures",
+        "datapools": "Data pools"
       },
       "scopePlatform": "Platform",
       "addRole": "Add Role",
@@ -619,7 +643,8 @@
       "scopedInfoBanner": {
         "DATASET": "Dataset-related assignments are made at the respective Dataset.",
         "DATASOURCE": "Data source-related assignments are made at the respective Data source.",
-        "DATASTRUCTURE": "Data structure-related assignments are made at the respective Data structure."
+        "DATASTRUCTURE": "Data structure-related assignments are made at the respective Data structure.",
+        "DATAPOOL": "Data pool-related assignments are made at the respective Data pool."
       },
       "columns": {
         "name": "Name",
@@ -718,6 +743,7 @@
       "DATASET_PAYLOAD": "Dataset Payload",
       "DATASOURCE": "Data source",
       "DATASTRUCTURE": "Data structure",
+      "DATAPOOL": "Data pool",
       "GROUP": "Group",
       "PERMISSION": "Permission",
       "ROLE": "Role",
@@ -805,6 +831,7 @@
         "datasetPayload": "Dataset Payload",
         "datasource": "Data source",
         "datastructure": "Data structure",
+        "datapool": "Data pool",
         "read": "Read",
         "create": "Create",
         "update": "Update",
@@ -833,18 +860,21 @@
         "platformWide": "Platform-wide",
         "dataset": "Dataset",
         "datasource": "Data source",
-        "datastructure": "Data structure"
+        "datastructure": "Data structure",
+        "datapool": "Data pool"
       },
       "scopeLabels": {
         "TENANT": "Platform-wide",
         "DATASET": "Dataset",
         "DATASOURCE": "Data source",
-        "DATASTRUCTURE": "Data structure"
+        "DATASTRUCTURE": "Data structure",
+        "DATAPOOL": "Data pool"
       },
       "infoBox": "Groups that are assigned here, get the type 'platform-wide' (permissions to all Data-related elements inside the platform)",
       "scopeReadOnlyMessageDATASET": "Dataset-related assignments happen at the corresponding Dataset",
       "scopeReadOnlyMessageDATASOURCE": "Data source-related assignments happen at the corresponding Data source",
       "scopeReadOnlyMessageDATASTRUCTURE": "Data structure-related assignments happen at the corresponding Data structure",
+      "scopeReadOnlyMessageDATAPOOL": "Data pool-related assignments happen at the corresponding Data pool",
       "modal": {
         "title": "Add Group",
         "description": "to Role {roleName}",
@@ -918,7 +948,8 @@
       "basicInfo": "Base Information",
       "connector": "Connector",
       "dataStructure": "Data structure",
-      "accessManagement": "Access Management"
+      "accessManagement": "Access Management",
+      "datapools": "Data pools"
     },
     "form": {
       "name": "Name",
@@ -957,6 +988,39 @@
     "accessManagementTab": {
       "infoBoxes": {
         "firstBox": "Groups that have platform-wide permissions on all Data-related elements have access to this Data source."
+      }
+    },
+    "datapoolsTab": {
+      "addDatapool": "Add Data pool",
+      "allDatapoolsSwitch": "Approve for all Data pools*",
+      "allDatapoolsInfo": "*This feature also includes Datasets without a Data pool assignment.",
+      "noDataPage": {
+        "title": "Not approved for any Data pools",
+        "description": "This Data source is currently not approved for any Data pool and therefore cannot be used in any Datasets."
+      },
+      "allDatapoolsPage": {
+        "title": "Approved for all Data pools",
+        "description": "This Data source can be used in Datasets of all Data pools as well as in Datasets without a Data pool assignment."
+      },
+      "table": {
+        "title": "Approved Data pools",
+        "subtitle": "The use of this Data source is approved for the selected Data pools.",
+        "tableHeaders": {
+          "name": "Name",
+          "description": "Description",
+          "contactPerson": "Contact person",
+          "action": "Action"
+        },
+        "noContact": "None"
+      },
+      "addDatapoolModal": {
+        "title": "Add Data pools",
+        "description": "Select the Data pools for which this Data source should be approved.",
+        "selectedDatapools": "{number} selected",
+        "tableHeaders": {
+          "name": "Name",
+          "description": "Description"
+        }
       }
     }
   },
@@ -1203,7 +1267,8 @@
       "validationFailed": "Validation failed for: {names}",
       "duplicateNames": "Duplicate pipeline names: {names}",
       "saveFailed": "Failed to save: {names}",
-      "saveSuccess": "Pipeline \"{name}\" saved successfully"
+      "saveSuccess": "Pipeline \"{name}\" saved successfully",
+      "datasourceScopeViolation": "Cannot save \"{name}\": one or more datasources are not permitted for this datapool."
     },
     "tabs": {
       "closeTab": "Close tab",
@@ -1306,6 +1371,94 @@
     "export": {
       "success": "Diagram exported successfully",
       "error": "Failed to export diagram. Please try again."
+    }
+  },
+  "datapools": {
+    "title": "Data pools",
+    "searchDatapools": "Search Data pools",
+    "addDatapool": "Create Data pool",
+    "noContact": "None",
+    "tableHeaders": {
+      "name": "Name",
+      "description": "Description",
+      "contact": "Contact Person",
+      "datasets": "Datasets",
+      "action": "Action"
+    },
+    "deleteModal": {
+      "title": "Delete Data pool?",
+      "description": "This action cannot be undone. This will permanently delete the Data pool and all associated data."
+    },
+    "infoModal": {
+      "title": "Data pool cannot be deleted",
+      "description": "All Dataset assignments must be removed first."
+    },
+    "create": {
+      "title": "New Data pool"
+    },
+    "form": {
+      "title": "Basic Information",
+      "subtitle": "The name can be changed later.",
+      "name": "Name",
+      "namePlaceholder": "Name of the Data pool",
+      "description": "Description",
+      "descriptionPlaceholder": "Add a description",
+      "contact": "Contact Person",
+      "contactPlaceholder": "Search by name or email"
+    },
+    "overview": {
+      "tabs": {
+        "basicInfo": "Base Information",
+        "accessManagement": "Access",
+        "datasets": "Datasets",
+        "datasources": "Data Sources"
+      },
+      "datasourcesTab": {
+        "title": "Shared Data Sources",
+        "subtitle": "Data sources shared with this Datapool. Changes are managed in the respective Data source.",
+        "noDatasources": "No Data sources shared",
+        "noDatasourcesSubTitle": "No Data sources have been shared with this Datapool yet. Sharing is managed in the respective Data source.",
+        "search": "Search data sources",
+        "tableHeaders": {
+          "name": "Name",
+          "description": "Description",
+          "connector": "Connector",
+          "lastActive": "Last updated",
+          "status": "Status"
+        },
+        "status": {
+          "DRAFT": "Draft",
+          "AVAILABLE": "Available"
+        }
+      },
+      "datasetsTab": {
+        "title": "Datasets",
+        "addDataset": "Create Dataset",
+        "noDatasets": "No datasets available",
+        "noDatasetsSubTitle": "No datasets have been added to this data pool yet.",
+        "tableHeader": {
+          "name": "Name",
+          "createdBy": "Contact Person",
+          "modifiedAt": "Updated",
+          "datasetStatus": "Status"
+        }
+      }
+    },
+    "accessManagementTab": {
+      "title": "Access to Data pool and Datasets",
+      "subtitle": "Here, permissions for the data pool and optionally for all contained datasets are defined.",
+      "infoBoxes": {
+        "firstBox": "Groups that have platform-wide permissions on all data-related elements have access to this Data pool and all contained datasets."
+      },
+      "noDataPage": {
+        "subtitle": "No group has permissions for this data pool or optionally for all contained datasets."
+      }
+    },
+    "errors": {
+      "groupsWithoutRoles": "Groups without assigned roles have not been saved.",
+      "createError": "An error occurred while creating the Data pool.",
+      "updateError": "An error occurred while updating the Data pool.",
+      "deleteError": "An error occurred while deleting the Data pool."
     }
   }
 }

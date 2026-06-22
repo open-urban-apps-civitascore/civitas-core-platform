@@ -1,4 +1,5 @@
 import { act, render } from '@testing-library/react'
+import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios'
 import React from 'react'
 import { toast } from 'sonner'
 
@@ -159,6 +160,11 @@ let mockDeleteMutate: ReturnType<typeof vi.fn>
 beforeEach(() => {
   vi.clearAllMocks()
   contextRef.current = null
+
+  vi.mocked(buildDatasinkPayloads).mockReturnValue([])
+  vi.mocked(getRemovedDatasinkIds).mockReturnValue([])
+  vi.mocked(hasDatasinkChanged).mockReturnValue(false)
+  vi.mocked(updateNodeEntityId).mockImplementation((pipeline: unknown) => pipeline as never)
 
   mockCreatePipelineMutateAsync = vi.fn().mockResolvedValue({ data: { id: 'created-id' } })
   mockUpdatePipelineMutateAsync = vi.fn().mockResolvedValue({})
@@ -768,93 +774,6 @@ describe('PipelineEditorProviderComponent', () => {
       expect(mockCreatePipelineMutateAsync).not.toHaveBeenCalled()
     })
 
-    it('returns false without API calls when sessions share the same pipeline name', async () => {
-      const session1 = makeSession({
-        id: 'session-a',
-        isDirty: true,
-        pipeline: { ...createEmptyPipeline('Shared Name') },
-      })
-      const session2 = makeSession({
-        id: 'session-b',
-        isDirty: true,
-        pipeline: { ...createEmptyPipeline('Shared Name') },
-      })
-
-      renderProviderWithSessions([session1, session2])
-
-      let result: boolean | undefined
-      await act(async () => {
-        result = await contextRef.current?.saveAllPipelines()
-      })
-
-      expect(result).toBe(false)
-      expect(mockCreatePipelineMutateAsync).not.toHaveBeenCalled()
-      expect(mockUpdatePipelineMutateAsync).not.toHaveBeenCalled()
-    })
-
-    it('returns false without API calls when a dirty pipeline fails validation', async () => {
-      vi.mocked(validatePipelineWithNodeStatus).mockReturnValue({
-        isValid: false,
-        errors: [{ id: 'err-1', type: 'structure', messageKey: 'test.error', severity: 'error' }],
-        warnings: [],
-        nodeStatuses: new Map(),
-      })
-
-      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: undefined } }))
-
-      let result: boolean | undefined
-      await act(async () => {
-        result = await contextRef.current?.saveAllPipelines()
-      })
-
-      expect(result).toBe(false)
-      expect(mockCreatePipelineMutateAsync).not.toHaveBeenCalled()
-    })
-
-    it('returns false when the API call throws', async () => {
-      mockCreatePipelineMutateAsync.mockRejectedValue(new Error('Network error'))
-
-      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: undefined } }))
-
-      let result: boolean | undefined
-      await act(async () => {
-        result = await contextRef.current?.saveAllPipelines()
-      })
-
-      expect(result).toBe(false)
-    })
-
-    it('calls deleteDatasink for removed persistence nodes before saving', async () => {
-      const mockDeleteDatasinkMutateAsync = vi.fn().mockResolvedValue({})
-      vi.mocked(useDeleteDataSink).mockReturnValue({
-        mutate: vi.fn(),
-        mutateAsync: mockDeleteDatasinkMutateAsync,
-        isPending: false,
-      } as unknown as ReturnType<typeof useDeleteDataSink>)
-
-      vi.mocked(getRemovedDatasinkIds).mockReturnValue(['removed-datasink-1', 'removed-datasink-2'])
-
-      const session = makeSession({
-        isDirty: true,
-        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' },
-      })
-      renderProvider(session)
-
-      await act(async () => {
-        await contextRef.current?.saveAllPipelines()
-      })
-
-      expect(mockDeleteDatasinkMutateAsync).toHaveBeenCalledTimes(2)
-      expect(mockDeleteDatasinkMutateAsync).toHaveBeenCalledWith({
-        datasetId: 'dataset-1',
-        datasinkId: 'removed-datasink-1',
-      })
-      expect(mockDeleteDatasinkMutateAsync).toHaveBeenCalledWith({
-        datasetId: 'dataset-1',
-        datasinkId: 'removed-datasink-2',
-      })
-    })
-
     it('calls createDatasink when a persistence node has no entityId', async () => {
       const mockCreateDatasinkMutateAsync = vi.fn().mockResolvedValue({ data: { id: 'new-datasink-id' } })
       vi.mocked(useCreateDataSink).mockReturnValue({
@@ -997,10 +916,19 @@ describe('PipelineEditorProviderComponent', () => {
       expect(mockUpdateDatasinkMutateAsync).not.toHaveBeenCalled()
     })
 
-    it('shows a success toast with the pipeline name after save', async () => {
+    it('calls deleteDatasink for removed persistence nodes before saving', async () => {
+      const mockDeleteDatasinkMutateAsync = vi.fn().mockResolvedValue({})
+      vi.mocked(useDeleteDataSink).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockDeleteDatasinkMutateAsync,
+        isPending: false,
+      } as unknown as ReturnType<typeof useDeleteDataSink>)
+
+      vi.mocked(getRemovedDatasinkIds).mockReturnValue(['removed-datasink-1', 'removed-datasink-2'])
+
       const session = makeSession({
         isDirty: true,
-        pipeline: { ...createEmptyPipeline('My Pipeline'), id: 'pipeline-1' },
+        pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' },
       })
       renderProvider(session)
 
@@ -1008,7 +936,15 @@ describe('PipelineEditorProviderComponent', () => {
         await contextRef.current?.saveAllPipelines()
       })
 
-      expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('saveSuccess'))
+      expect(mockDeleteDatasinkMutateAsync).toHaveBeenCalledTimes(2)
+      expect(mockDeleteDatasinkMutateAsync).toHaveBeenCalledWith({
+        datasetId: 'dataset-1',
+        datasinkId: 'removed-datasink-1',
+      })
+      expect(mockDeleteDatasinkMutateAsync).toHaveBeenCalledWith({
+        datasetId: 'dataset-1',
+        datasinkId: 'removed-datasink-2',
+      })
     })
 
     it('executes datasink deletes before datasink creates and pipeline save', async () => {
@@ -1059,6 +995,20 @@ describe('PipelineEditorProviderComponent', () => {
       })
 
       expect(callOrder).toEqual(['deleteDatasink', 'createDatasink', 'updatePipeline'])
+    })
+
+    it('shows a success toast with the pipeline name after save', async () => {
+      const session = makeSession({
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('My Pipeline'), id: 'pipeline-1' },
+      })
+      renderProvider(session)
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('saveSuccess'))
     })
 
     it('does not save the pipeline when datasink creation fails', async () => {
@@ -1286,6 +1236,114 @@ describe('PipelineEditorProviderComponent', () => {
       expect(result).toBe(false)
       expect(mockUpdatePipelineMutateAsync).toHaveBeenCalledOnce()
       expect(toast.error).toHaveBeenCalled()
+    })
+
+    it('returns false without API calls when sessions share the same pipeline name', async () => {
+      const session1 = makeSession({
+        id: 'session-a',
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Shared Name') },
+      })
+      const session2 = makeSession({
+        id: 'session-b',
+        isDirty: true,
+        pipeline: { ...createEmptyPipeline('Shared Name') },
+      })
+
+      renderProviderWithSessions([session1, session2])
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(false)
+      expect(mockCreatePipelineMutateAsync).not.toHaveBeenCalled()
+      expect(mockUpdatePipelineMutateAsync).not.toHaveBeenCalled()
+    })
+
+    it('returns false without API calls when a dirty pipeline fails validation', async () => {
+      vi.mocked(validatePipelineWithNodeStatus).mockReturnValue({
+        isValid: false,
+        errors: [{ id: 'err-1', type: 'structure', messageKey: 'test.error', severity: 'error' }],
+        warnings: [],
+        nodeStatuses: new Map(),
+      })
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: undefined } }))
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(false)
+      expect(mockCreatePipelineMutateAsync).not.toHaveBeenCalled()
+    })
+
+    it('returns false when the API call throws a generic error', async () => {
+      mockCreatePipelineMutateAsync.mockRejectedValue(new Error('Network error'))
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: undefined } }))
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(false)
+    })
+
+    it('shows a scope violation toast with the pipeline name on a 422 error', async () => {
+      const axiosError = new AxiosError(
+        'Unprocessable Entity',
+        undefined,
+        { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
+        undefined,
+        {
+          status: 422,
+          statusText: 'Unprocessable Entity',
+          headers: new AxiosHeaders(),
+          config: { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
+          data: { detail: 'DataSource "My DS" is not permitted for this datapool' },
+        },
+      )
+      mockCreatePipelineMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: undefined } }))
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.datasourceScopeViolation')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith(expect.stringContaining('header.saveFailed'))
+    })
+
+    it('returns false on a 422 error', async () => {
+      const axiosError = new AxiosError(
+        'Unprocessable Entity',
+        undefined,
+        { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
+        undefined,
+        {
+          status: 422,
+          statusText: 'Unprocessable Entity',
+          headers: new AxiosHeaders(),
+          config: { headers: new AxiosHeaders(), method: 'POST', url: '/pipelines' } as InternalAxiosRequestConfig,
+          data: { detail: 'DataSource "My DS" is not permitted for this datapool' },
+        },
+      )
+      mockCreatePipelineMutateAsync.mockRejectedValue(axiosError)
+
+      renderProvider(makeSession({ isDirty: true, pipeline: { ...createEmptyPipeline('Test'), id: undefined } }))
+
+      let result: boolean | undefined
+      await act(async () => {
+        result = await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(result).toBe(false)
     })
   })
 

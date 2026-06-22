@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -23,6 +24,7 @@ import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.flowable.FlowableTestSupport;
 import de.civitascore.configadapter.flowable.bpmn.BpmnProcessDeployer;
 import de.civitascore.configadapter.flowable.common.SagaHandlerRegistry;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.flowable.engine.ProcessEngine;
@@ -34,13 +36,12 @@ import org.mockito.ArgumentCaptor;
 /**
  * Exercises the {@code DATASET_DELETE} teardown end-to-end through {@link FlowableTriggerConsumer}
  * against a real (H2) engine, so the {@code hasGeoSink} derivation and the delete saga's
- * conditional GeoServer teardown are tested together from a realistic trigger payload — not from a
- * preset process variable.
+ * conditional GeoServer/PostGIS teardown are tested together from a realistic trigger payload — not
+ * from a preset process variable.
  *
- * <p>Because the teardown is gated on {@code hasGeoSink} (derived from {@code dataSinks}), the
- * delete trigger must carry the geo sink for the workspace to be removed. A delete trigger without
- * {@code dataSinks} (today's backend payload) therefore skips the GeoServer step — the backend must
- * include the geo sink in the delete trigger, symmetric with create/update, for teardown to run.
+ * <p>The teardown is gated on {@code hasGeoSink} (derived from {@code datasinks}): a delete trigger
+ * carrying the POSTGIS sink runs workspace removal and sink deprovisioning, while a trigger without
+ * {@code datasinks} (e.g. from a backend predating the field) skips the geo branch.
  */
 class DatasetDeleteTriggerTest {
 
@@ -52,6 +53,7 @@ class DatasetDeleteTriggerTest {
   private SagaCommandHandler apisix;
   private SagaCommandHandler redpanda;
   private SagaCommandHandler geoserver;
+  private SagaCommandHandler postgis;
 
   @BeforeEach
   void setUp() {
@@ -59,12 +61,15 @@ class DatasetDeleteTriggerTest {
     apisix = FlowableTestSupport.mockHandler("apisix");
     redpanda = FlowableTestSupport.mockHandler("redpanda");
     geoserver = FlowableTestSupport.mockHandler("geoserver");
+    postgis = FlowableTestSupport.mockHandler("postgis");
     stubStepSuccess(frost, "delete-project");
     stubStepSuccess(apisix, "delete-route");
     stubStepSuccess(redpanda, "delete-pipelines");
     stubStepSuccess(geoserver, "delete-workspace");
+    stubStepSuccess(postgis, "deprovision-sink");
 
-    SagaHandlerRegistry registry = FlowableTestSupport.registry(frost, apisix, redpanda, geoserver);
+    SagaHandlerRegistry registry =
+        FlowableTestSupport.registry(frost, apisix, redpanda, geoserver, postgis);
     engine = FlowableTestSupport.createTestEngine(Map.of("sagaHandlerRegistry", registry));
     BpmnProcessDeployer.deploy(engine.getRepositoryService());
     consumer = new FlowableTriggerConsumer(engine.getRuntimeService(), engine.getHistoryService());
@@ -79,31 +84,48 @@ class DatasetDeleteTriggerTest {
 
   @Test
   void deleteWithoutDataSinksSkipsGeoServerTeardown() throws Exception {
-    // Mirrors today's backend DatasetDelete payload: no dataSinks → hasGeoSink derives false.
+    // No datasinks in the trigger → hasGeoSink derives false → the whole geo branch is skipped.
     TriggerTestSupport.processTrigger(consumer, deleteTrigger(false));
     FlowableTestSupport.executeAllJobs(engine);
 
     verify(apisix).handle(any());
     verify(frost).handle(any());
     verify(geoserver, never()).handle(any());
+    verify(postgis, never()).handle(any());
   }
 
   @Test
-  void deleteWithPostgisSinkTearsDownWorkspace() throws Exception {
-    // Required contract once geo is live: the delete trigger carries the POSTGIS sink, so
-    // hasGeoSink derives true and the workspace is torn down.
+  void deleteWithPostgisSinkTearsDownWorkspaceAndSink() throws Exception {
+    // The delete trigger carries the POSTGIS sink (symmetric with create/update), so hasGeoSink
+    // derives true: the workspace is removed and the sink deprovisioned — each exactly once.
     TriggerTestSupport.processTrigger(consumer, deleteTrigger(true));
     FlowableTestSupport.executeAllJobs(engine);
 
-    ArgumentCaptor<SagaCommandMessage> captor = ArgumentCaptor.forClass(SagaCommandMessage.class);
-    verify(geoserver).handle(captor.capture());
-    assertEquals("DELETE_WORKSPACE", captor.getValue().operation());
-    assertEquals("ds-456", captor.getValue().payload().get("datasetId"));
+    ArgumentCaptor<SagaCommandMessage> geoCaptor =
+        ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(geoserver, times(1)).handle(geoCaptor.capture());
+    assertEquals("DELETE_WORKSPACE", geoCaptor.getValue().operation());
+    assertEquals("ds-456", geoCaptor.getValue().payload().get("datasetId"));
+
+    ArgumentCaptor<SagaCommandMessage> sinkCaptor =
+        ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(postgis, times(1)).handle(sinkCaptor.capture());
+    SagaCommandMessage sinkCommand = sinkCaptor.getValue();
+    assertEquals("DEPROVISION_SINK", sinkCommand.operation());
+    List<?> datasinks = (List<?>) sinkCommand.payload().get("datasinks");
+    Map<?, ?> sink = (Map<?, ?>) datasinks.get(0);
+    assertEquals("POSTGIS", sink.get("type"));
+    assertEquals(
+        "observations",
+        ((Map<?, ?>) sink.get("configuration")).get("tableName"),
+        "the sink configuration must reach the handler so it knows which table to drop");
+
+    verify(frost, times(1)).handle(any());
   }
 
   private byte[] deleteTrigger(boolean withGeoSink) throws Exception {
     Map<String, Object> trigger =
-        new java.util.HashMap<>(
+        new HashMap<>(
             Map.of(
                 "sagaType", "DATASET_DELETE",
                 "datasetId", "ds-456",
@@ -111,7 +133,14 @@ class DatasetDeleteTriggerTest {
                 "serviceId", "svc-1",
                 "pipelineIds", List.of()));
     if (withGeoSink) {
-      trigger.put("dataSinks", List.of(Map.of("dataSinkType", "POSTGIS")));
+      trigger.put(
+          "datasinks",
+          List.of(
+              Map.of(
+                  "type",
+                  "POSTGIS",
+                  "configuration",
+                  Map.of("schema", "ds_456", "tableName", "observations"))));
     }
     return objectMapper.writeValueAsBytes(trigger);
   }

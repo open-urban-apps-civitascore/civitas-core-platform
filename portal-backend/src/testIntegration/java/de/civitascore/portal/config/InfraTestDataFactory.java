@@ -4,6 +4,7 @@ import de.civitascore.configadapter.crypto.CredentialEncryptor;
 import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.ConnectorType;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
@@ -169,6 +170,27 @@ public class InfraTestDataFactory {
                     injectDatasourceId(
                         loadPipelineConfig("pipelines/mqtt-pipeline-config.json"),
                         dataSource.getId().toString())));
+  }
+
+  /**
+   * Creates a generate pipeline carrying a POSTGIS sink whose data-structure version carries the
+   * given JSON Schema {@code model}. The saga publisher reads this persisted model and ships it on
+   * the sink payload at release.
+   */
+  public Pipeline createGeoPipeline(
+      DataSet dataSet, DataSource dataSource, String tableName, Map<String, Object> model) {
+    Pipeline pipeline = createGeneratePipeline(dataSet, dataSource, "geo");
+    var dataStructure = portalData.dataStructure();
+    var version = portalData.dataStructureVersion(dataStructure, b -> b.model(model));
+    portalData.dataSink(
+        dataSet,
+        pipeline,
+        sink -> {
+          sink.setDataSinkType(DataSinkType.POSTGIS);
+          sink.setConfiguration(
+              Map.of("tableName", tableName, "dataStructureVersionId", version.getId().toString()));
+        });
+    return pipeline;
   }
 
   /** Creates a Group, Role (DATA type), and Assignment scoped to the given DataSet. */

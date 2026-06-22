@@ -39,11 +39,20 @@ export const PERMISSION_NAMES = {
   DATASTRUCTURE_UPDATE: 'DATASTRUCTURE_UPDATE',
   DATASTRUCTURE_DELETE: 'DATASTRUCTURE_DELETE',
   DATASTRUCTURE_RELEASE: 'DATASTRUCTURE_RELEASE',
+  DATAPOOL_CREATE: 'DATAPOOL_CREATE',
+  DATAPOOL_READ: 'DATAPOOL_READ',
+  DATAPOOL_UPDATE: 'DATAPOOL_UPDATE',
+  DATAPOOL_DELETE: 'DATAPOOL_DELETE',
 } as const
 
 export type PermissionName = (typeof PERMISSION_NAMES)[keyof typeof PERMISSION_NAMES]
 
-export type ScopedPermissionCheck = (permission: PermissionName, scopeType: AssignmentScope, scopeId: string) => boolean
+export type ScopedPermissionCheck = (
+  permission: PermissionName,
+  scopeType: AssignmentScope,
+  scopeId: string,
+  datapoolId?: string | null,
+) => boolean
 
 export type MeAssignment = {
   scopeType: AssignmentScope

@@ -1,0 +1,38 @@
+meta {
+  name: Create Dataset without datapoolId
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/datasets
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Dataset Missing DataPool",
+    "description": "Dataset created without a datapool reference",
+    "openDataAccess": false,
+    "assignments": []
+  }
+}
+
+tests {
+  test("Status code is 201 — datapoolId is optional", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Has id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+  test("datapool is null — no silent default assignment", function() {
+    expect(res.body.datapool).to.be.null;
+  });
+}
+
+docs {
+  **Purpose:** Verifies that `datapoolId` is optional. A dataset created without it is accepted (201) and has `datapool: null` — there is no implicit assignment to a default datapool.
+
+  **Expected Response:** 201 Created, `datapool` field is null.
+}

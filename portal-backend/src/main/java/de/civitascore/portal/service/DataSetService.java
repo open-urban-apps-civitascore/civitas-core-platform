@@ -6,11 +6,13 @@ import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
+import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
@@ -47,6 +49,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   private final DataSetRepository dataSetRepository;
   private final DataSetMapper dataSetMapper;
+  private final DataPoolRepository dataPoolRepository;
 
   private final AssignmentFactory assignmentFactory;
 
@@ -55,10 +58,12 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   public DataSetService(
       DataSetRepository dataSetRepository,
       DataSetMapper dataSetMapper,
+      DataPoolRepository dataPoolRepository,
       AssignmentFactory assignmentFactory,
       DataSetSagaPublisher sagaPublisher) {
     this.dataSetRepository = dataSetRepository;
     this.dataSetMapper = dataSetMapper;
+    this.dataPoolRepository = dataPoolRepository;
     this.assignmentFactory = assignmentFactory;
     this.sagaPublisher = sagaPublisher;
   }
@@ -117,6 +122,16 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    */
   @Override
   protected DataSet postConvertToEntity(DataSet entity, DataSetInputDTO input) {
+    if (input.getDatapoolId() != null) {
+      DataPool dataPool =
+          dataPoolRepository
+              .findById(input.getDatapoolId())
+              .orElseThrow(() -> new ResourceNotFoundException("DataPool", input.getDatapoolId()));
+      entity.setDataPool(dataPool);
+    } else {
+      entity.setDataPool(null);
+    }
+
     List<NamedApiInputDTO> incoming = input.getNamedApis();
     if (incoming != null) {
       // Validate slug uniqueness up front (before touching the entity): two NamedApi rows with the

@@ -1,0 +1,30 @@
+meta {
+  name: Get DataPool Assignments
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/datapools/:id/assignments
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataPoolId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns assignment list", function() {
+    expect(res.body).to.be.an('array');
+  });
+}
+
+docs {
+  **Precondition:** `dataPoolId` is set.
+
+  **Expected Response:** 200 OK, body contains the list of role assignments scoped to this datapool.
+}

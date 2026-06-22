@@ -1,10 +1,13 @@
 package de.civitascore.portal.model.output.assembler;
 
+import de.civitascore.portal.mapper.DataPoolMapper;
 import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.mapper.UserMapper;
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.GroupOutputDTO;
+import de.civitascore.portal.service.AssignmentService;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -21,7 +24,9 @@ public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, UUID
 
   private final GroupMapper groupMapper;
   private final UserMapper userMapper;
+  private final DataPoolMapper dataPoolMapper;
   private final AssignmentAssembler assignmentAssembler;
+  private final AssignmentService assignmentService;
 
   /** {@inheritDoc} Maps group fields including contact user, members, and assignment summaries. */
   @Override
@@ -47,6 +52,10 @@ public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, UUID
               .collect(Collectors.toList());
       output.setAssignments(assignments);
     }
+
+    output.setDatapools(
+        dataPoolMapper.toDataPoolSummaries(
+            assignmentService.findAllByGroupIdAndScopeType(entity.getId(), ScopeType.DATAPOOL)));
 
     return output;
   }

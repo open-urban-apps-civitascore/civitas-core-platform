@@ -22,11 +22,13 @@ import org.mapstruct.ReportingPolicy;
 @Mapper(
     componentModel = "spring",
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
+    uses = {
+      DataPoolMapper.class,
+    },
     unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputDTO, DataSet> {
   @Mapping(target = "owner", ignore = true)
   @Mapping(target = "dataSetSeries", ignore = true)
-  @Mapping(target = "dataSpaces", ignore = true)
   @Mapping(target = "agents", ignore = true)
   @Mapping(target = "distributions", ignore = true)
   @Mapping(target = "catalogs", ignore = true)
@@ -40,15 +42,18 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Mapping(target = "assignments", ignore = true)
   // namedApis is reconciled by DataSetService.postConvertToEntity (slug-keyed replace).
   @Mapping(target = "namedApis", ignore = true)
+  @Mapping(target = "dataPool", ignore = true)
   @Override
   DataSet toEntity(DataSetInputDTO input);
 
   @Mapping(target = "createdBy", ignore = true)
+  @Mapping(source = "dataPool", target = "datapool")
   @Override
   DataSetOutputDTO toOutput(DataSet entity);
 
   @Mapping(target = "assignments", ignore = true)
   @Mapping(target = "namedApis", ignore = true)
+  @Mapping(source = "dataPool.id", target = "datapoolId")
   @Override
   DataSetInputDTO toInput(DataSet entity);
 
@@ -63,7 +68,6 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "owner", ignore = true)
   @Mapping(target = "dataSetSeries", ignore = true)
-  @Mapping(target = "dataSpaces", ignore = true)
   @Mapping(target = "agents", ignore = true)
   @Mapping(target = "distributions", ignore = true)
   @Mapping(target = "catalogs", ignore = true)
@@ -76,6 +80,7 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Mapping(target = "pipelineIds", ignore = true)
   @Mapping(target = "pendingSagaType", ignore = true)
   @Mapping(target = "namedApis", ignore = true)
+  @Mapping(target = "dataPool", ignore = true)
   @Override
   void updateEntity(@MappingTarget DataSet entity, DataSetInputDTO input);
 

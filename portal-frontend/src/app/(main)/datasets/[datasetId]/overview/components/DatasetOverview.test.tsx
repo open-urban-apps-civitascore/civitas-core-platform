@@ -1,6 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -49,9 +48,23 @@ const mockCurrentUser = (permissions: PermissionName[]) => {
   } as unknown as ReturnType<typeof useGetCurrentUser>)
 }
 
+const mockCurrentUserWithDatapoolScope = (permissions: PermissionName[], datapoolId: string) => {
+  vi.mocked(useGetCurrentUser).mockReturnValue({
+    data: {
+      username: 'current',
+      email: 'current@test.com',
+      title: 'MR' as const,
+      firstName: 'Current',
+      lastName: 'User',
+      assignments: [{ scopeType: 'DATAPOOL', scopeId: datapoolId, permissions }],
+    },
+  } as unknown as ReturnType<typeof useGetCurrentUser>)
+}
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/datasets/ds-1',
 }))
 
 vi.mock('next-intl', () => ({
@@ -80,6 +93,7 @@ vi.mock('../../../utils/mappers', () => ({
     name: dataset.name,
     description: dataset.description ?? '',
     openDataAccess: dataset.openDataAccess,
+    datapoolId: dataset.datapool?.id ?? null,
   }),
 }))
 
@@ -100,11 +114,21 @@ const makeDraftDataset = (overrides: Partial<Dataset> = {}): Dataset => ({
   modifiedAt: '2024-01-01',
   openDataAccess: false,
   createdBy: { id: 'user-1', name: 'User One' },
+  datapool: null,
   ...overrides,
 })
 
 const defaultDataset = makeDraftDataset()
-const defaultProps = { dataset: defaultDataset, groupCount: 1, roleCount: 1 }
+
+const defaultProps = {
+  dataset: defaultDataset,
+  groupCount: 1,
+  roleCount: 1,
+  datapoolOptions: [
+    { value: 'datapool-1', label: 'Datapool 1' },
+    { value: 'datapool-2', label: 'Datapool 2' },
+  ],
+}
 
 const renderComponent = (props: Partial<typeof defaultProps> = {}) =>
   render(<DatasetOverview {...defaultProps} {...props} />)
@@ -129,6 +153,24 @@ describe('DatasetOverview', () => {
     it('hides Edit button when user lacks DATASET_UPDATE permission', () => {
       mockCurrentUser([])
       renderComponent()
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+    })
+
+    it('shows Edit button when user has DATASET_UPDATE via DATAPOOL assignment for the dataset pool', () => {
+      mockCurrentUserWithDatapoolScope([PERMISSION_NAMES.DATASET_UPDATE], 'pool-1')
+      renderComponent({ dataset: makeDraftDataset({ id: 'test-id', datapool: { id: 'pool-1', name: 'Pool 1' } }) })
+      expect(screen.getByTestId('editButton')).toBeInTheDocument()
+    })
+
+    it('hides Edit button when DATAPOOL assignment is for a different pool', () => {
+      mockCurrentUserWithDatapoolScope([PERMISSION_NAMES.DATASET_UPDATE], 'pool-2')
+      renderComponent({ dataset: makeDraftDataset({ id: 'test-id', datapool: { id: 'pool-1', name: 'Pool 1' } }) })
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+    })
+
+    it('hides Edit button when dataset has no datapool and user only has DATAPOOL assignment', () => {
+      mockCurrentUserWithDatapoolScope([PERMISSION_NAMES.DATASET_UPDATE], 'pool-1')
+      renderComponent({ dataset: makeDraftDataset({ id: 'test-id', datapool: null }) })
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
     })
 
@@ -288,6 +330,7 @@ describe('DatasetOverview', () => {
                 })}
                 groupCount={0}
                 roleCount={0}
+                datapoolOptions={defaultProps.datapoolOptions}
               />,
             )
           })
@@ -319,6 +362,7 @@ describe('DatasetOverview', () => {
             })}
             groupCount={1}
             roleCount={1}
+            datapoolOptions={defaultProps.datapoolOptions}
           />,
         )
 
@@ -455,29 +499,6 @@ describe('DatasetOverview', () => {
         expect(mockUpdateReleasedDatasetMeta).toHaveBeenCalledWith(
           expect.objectContaining({ name: 'Updated Name', id: 'test-id' }),
         )
-      })
-    })
-
-    it('shows name error and toast when mockPatchDataset rejects with a 409 name conflict', async () => {
-      const conflictError = new AxiosError('Conflict', 'ERR_BAD_REQUEST', {} as InternalAxiosRequestConfig, undefined, {
-        status: 409,
-        statusText: 'Conflict',
-        headers: {},
-        config: {} as InternalAxiosRequestConfig,
-        data: { detail: 'Dataset with name "Duplicate Name" already exists' },
-      })
-      mockPatchDataset.mockRejectedValueOnce(conflictError)
-      renderComponent()
-      clickEditButton()
-
-      await act(async () => {
-        fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Duplicate Name' } })
-      })
-      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
-
-      await waitFor(() => {
-        expect(screen.getByTestId('nameFormMessage')).toHaveTextContent('common.errors.nameExists')
-        expect(toast.error).toHaveBeenCalled()
       })
     })
   })

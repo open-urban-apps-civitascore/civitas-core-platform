@@ -67,7 +67,17 @@ public class DataSetController
         name = "q",
         description = "Search in name or description (partial match, case-insensitive).",
         in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "sensor"))
+        schema = @Schema(type = "string", example = "sensor")),
+    @Parameter(
+        name = "datapoolIds",
+        description =
+            "Filter by datapool IDs (comma-separated UUIDs, IN-clause). Returns datasets assigned to any of the listed datapools.",
+        in = ParameterIn.QUERY,
+        schema =
+            @Schema(
+                type = "string",
+                example =
+                    "550e8400-e29b-41d4-a716-446655440000,3fa85f64-5717-4562-b3fc-2c963f66afa6"))
   })
   /**
    * Retrieves a paginated list of datasets with optional filtering by name, description, or

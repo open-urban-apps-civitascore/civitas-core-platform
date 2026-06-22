@@ -179,6 +179,7 @@ class BpmnVsCodedEquivalenceTest {
     SagaCommandHandler frost = FlowableTestSupport.mockHandler("frost");
     SagaCommandHandler apisix = FlowableTestSupport.mockHandler("apisix");
     SagaCommandHandler geoserver = FlowableTestSupport.mockHandler("geoserver");
+    SagaCommandHandler postgis = FlowableTestSupport.mockHandler("postgis");
 
     when(frost.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(
@@ -190,12 +191,14 @@ class BpmnVsCodedEquivalenceTest {
     when(apisix.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(
             SagaCommandResult.success("s", "create-route", Map.of("routeId", "r1"), Map.of()));
+    when(postgis.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+        .thenReturn(SagaCommandResult.success("s", "provision-sink", Map.of(), Map.of()));
     when(geoserver.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(
             SagaCommandResult.success(
                 "s", "create-workspace", Map.of("workspaceName", "ds"), Map.of()));
 
-    SagaHandlerRegistry reg = FlowableTestSupport.registry(frost, apisix, geoserver);
+    SagaHandlerRegistry reg = FlowableTestSupport.registry(frost, apisix, geoserver, postgis);
     ProcessEngine engine = createEngine(useBpmn, reg);
 
     try {
@@ -203,8 +206,8 @@ class BpmnVsCodedEquivalenceTest {
       vars.put("hasGeoSink", true);
       vars.put("hasLayers", true);
       vars.put(
-          "dataSinks",
-          List.of(Map.of("dataSinkType", "POSTGIS", "configuration", Map.of("tableName", "t1"))));
+          "datasinks",
+          List.of(Map.of("type", "POSTGIS", "configuration", Map.of("tableName", "t1"))));
       vars.put("layers", List.of(Map.of("layerName", "t1", "crs", "EPSG:4326")));
 
       ProcessInstance instance =
@@ -213,10 +216,11 @@ class BpmnVsCodedEquivalenceTest {
 
       FlowableTestSupport.assertProcessCompleted(engine.getHistoryService(), instance.getId());
 
-      // Order across adapters: FROST → APISIX → GeoServer (3 geo steps).
-      var inOrder = inOrder(frost, apisix, geoserver);
+      // Order across adapters: FROST → APISIX → PostGIS sink → GeoServer (3 geo steps).
+      var inOrder = inOrder(frost, apisix, postgis, geoserver);
       inOrder.verify(frost).handle(any());
       inOrder.verify(apisix).handle(any());
+      inOrder.verify(postgis).handle(any());
       inOrder.verify(geoserver, times(3)).handle(any());
 
       // ...and the exact operations dispatched — BPMN and coded must produce the same sequence,
@@ -236,6 +240,71 @@ class BpmnVsCodedEquivalenceTest {
       assertEquals(
           List.of("CREATE_WORKSPACE", "CREATE_DATASTORE", "PROVISION_LAYERS"),
           geoCmd.getAllValues().stream().map(SagaCommandMessage::operation).toList());
+    } finally {
+      engine.close();
+    }
+  }
+
+  @ParameterizedTest(name = "{0}: Dataset Delete with geo sink tears down each step exactly once")
+  @MethodSource("approaches")
+  void datasetDeleteWithGeoSink(String approach, boolean useBpmn) {
+    SagaCommandHandler frost = FlowableTestSupport.mockHandler("frost");
+    SagaCommandHandler apisix = FlowableTestSupport.mockHandler("apisix");
+    SagaCommandHandler geoserver = FlowableTestSupport.mockHandler("geoserver");
+    SagaCommandHandler postgis = FlowableTestSupport.mockHandler("postgis");
+
+    when(apisix.handle(any()))
+        .thenReturn(SagaCommandResult.success("s", "delete-route", Map.of(), Map.of()));
+    when(geoserver.handle(any()))
+        .thenReturn(SagaCommandResult.success("s", "delete-workspace", Map.of(), Map.of()));
+    when(postgis.handle(any()))
+        .thenReturn(SagaCommandResult.success("s", "deprovision-sink", Map.of(), Map.of()));
+    when(frost.handle(any()))
+        .thenReturn(SagaCommandResult.success("s", "delete-project", Map.of(), Map.of()));
+
+    SagaHandlerRegistry reg = FlowableTestSupport.registry(frost, apisix, geoserver, postgis);
+    ProcessEngine engine = createEngine(useBpmn, reg);
+
+    try {
+      Map<String, Object> vars = new HashMap<>();
+      vars.put("sagaId", "s");
+      vars.put("datasetId", "ds");
+      vars.put("projectId", "p1");
+      vars.put("routeId", "r1");
+      vars.put("serviceId", "s1");
+      vars.put("hasPipelines", false);
+      vars.put("hasGeoSink", true);
+      vars.put(
+          "datasinks",
+          List.of(Map.of("type", "POSTGIS", "configuration", Map.of("tableName", "t1"))));
+
+      ProcessInstance instance =
+          engine.getRuntimeService().startProcessInstanceByKey("dataset-delete", vars);
+      FlowableTestSupport.executeAllJobs(engine);
+
+      FlowableTestSupport.assertProcessFinished(engine.getHistoryService(), instance.getId());
+
+      // Order across adapters — and each teardown step must run exactly once: duplicate
+      // outgoing sequence flows would fork the process and dispatch FROST twice.
+      var inOrder = inOrder(apisix, geoserver, postgis, frost);
+      inOrder.verify(apisix, times(1)).handle(any());
+      inOrder.verify(geoserver, times(1)).handle(any());
+      inOrder.verify(postgis, times(1)).handle(any());
+      inOrder.verify(frost, times(1)).handle(any());
+
+      ArgumentCaptor<SagaCommandMessage> geoCmd = ArgumentCaptor.forClass(SagaCommandMessage.class);
+      verify(geoserver).handle(geoCmd.capture());
+      assertEquals("DELETE_WORKSPACE", geoCmd.getValue().operation());
+
+      ArgumentCaptor<SagaCommandMessage> sinkCmd =
+          ArgumentCaptor.forClass(SagaCommandMessage.class);
+      verify(postgis).handle(sinkCmd.capture());
+      assertEquals("DEPROVISION_SINK", sinkCmd.getValue().operation());
+
+      ArgumentCaptor<SagaCommandMessage> frostCmd =
+          ArgumentCaptor.forClass(SagaCommandMessage.class);
+      verify(frost).handle(frostCmd.capture());
+      assertEquals("DELETE_PROJECT", frostCmd.getValue().operation());
     } finally {
       engine.close();
     }

@@ -9,6 +9,7 @@
 import { useCallback, useMemo } from 'react'
 
 import { useGetDatasources } from '@/app/services/api/datasources/clientRequests'
+import { DATASOURCE_FILTER_PARAMS } from '@/const/searchParams'
 import type { Datasource } from '@/types/datasources'
 import { DATASOURCE_STATUS_TYPES } from '@/types/datasources'
 
@@ -47,15 +48,20 @@ export interface UseEntityResult<T extends SelectableEntity> {
  * Uses the real datasources API.
  *
  */
-export const useDataSourceEntities = (opts?: { isEnabled?: boolean }): UseEntityResult<Datasource> => {
+export const useDataSourceEntities = (opts?: {
+  isEnabled?: boolean
+  datapoolId?: string | null
+}): UseEntityResult<Datasource> => {
   const isEnabled = opts?.isEnabled ?? true
+  const datapoolId = opts?.datapoolId
 
   const params = useMemo(() => {
     const p = new URLSearchParams()
     p.set('dataSourceStatus', DATASOURCE_STATUS_TYPES.AVAILABLE)
     p.set('size', '2000')
+    if (datapoolId) p.set(DATASOURCE_FILTER_PARAMS.datapoolId, datapoolId)
     return p
-  }, [])
+  }, [datapoolId])
 
   const { data: response, isLoading, isError, error } = useGetDatasources({ params, isEnabled })
 

@@ -12,6 +12,7 @@ import { SearchHeader } from '@/components/search-area/SearchArea'
 import { Button } from '@/components/ui/button'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useTableSearchParams } from '@/hooks/use-table-search-params'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { STATUS_TYPES } from '@/types/common'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Datasource } from '@/types/datasources'
@@ -44,7 +45,7 @@ export const DatasourcesList = ({
   const [datasourceToDelete, setDatasourceToDelete] = useState<Datasource | null>(null)
   const deleteDatasource = useDeleteDatasource()
   const { handleSortingChange, handlePaginationChange, handleSearchChange } = useTableSearchParams()
-  const { hasPermission } = usePermissions()
+  const { hasPermissionInScope } = usePermissions()
 
   const handleDeleteConfirm = () => {
     if (datasourceToDelete) {
@@ -55,7 +56,7 @@ export const DatasourcesList = ({
     setDatasourceToDelete(null)
   }
 
-  const CustomElement = hasPermission(PERMISSION_NAMES.DATASOURCE_CREATE) ? (
+  const CustomElement = hasPermissionInScope(PERMISSION_NAMES.DATASOURCE_CREATE, ASSIGNMENT_SCOPE_TYPES.TENANT) ? (
     <Button data-testid="addDatasourceButton" onClick={() => router.push('/datasources/create')}>
       <Plus />
       {t('newDatasource')}

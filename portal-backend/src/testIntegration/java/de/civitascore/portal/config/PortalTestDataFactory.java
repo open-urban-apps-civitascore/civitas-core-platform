@@ -12,11 +12,11 @@ import de.civitascore.portal.model.entity.Activity;
 import de.civitascore.portal.model.entity.Agent;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Catalog;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSetSeries;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
-import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Distribution;
@@ -31,11 +31,11 @@ import de.civitascore.portal.repository.ActivityRepository;
 import de.civitascore.portal.repository.AgentRepository;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.CatalogRepository;
+import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSetSeriesRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
-import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.DistributionRepository;
@@ -46,6 +46,8 @@ import de.civitascore.portal.repository.ResourceRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.StyleRepository;
 import de.civitascore.portal.repository.UserRepository;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -79,7 +81,7 @@ public class PortalTestDataFactory {
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private StyleRepository styleRepository;
   @Autowired private CatalogRepository catalogRepository;
-  @Autowired private DataSpaceRepository dataSpaceRepository;
+  @Autowired private DataPoolRepository dataPoolRepository;
   @Autowired private DistributionRepository distributionRepository;
   @Autowired private ResourceRepository resourceRepository;
   @Autowired private AgentRepository agentRepository;
@@ -166,13 +168,13 @@ public class PortalTestDataFactory {
     return assignmentRepository.save(a);
   }
 
-  public Assignment assignment(Group group, Role role, DataSpace scope) {
+  public Assignment assignment(Group group, Role role, Catalog scope) {
     Assignment a = Assignment.builder().group(group).role(role).build();
     a.setScope(scope);
     return assignmentRepository.save(a);
   }
 
-  public Assignment assignment(Group group, Role role, Catalog scope) {
+  public Assignment assignment(Group group, Role role, DataPool scope) {
     Assignment a = Assignment.builder().group(group).role(role).build();
     a.setScope(scope);
     return assignmentRepository.save(a);
@@ -258,6 +260,15 @@ public class PortalTestDataFactory {
     return dataStructureVersionRepository.save(builder.build());
   }
 
+  /** A minimal, well-formed JSON Schema document suitable for a data structure version's model. */
+  public Map<String, Object> dataStructureVersionModel(String title) {
+    Map<String, Object> schema = new HashMap<>();
+    schema.put("$id", "urn:core:datastructure:" + title);
+    schema.put("title", title);
+    schema.put("type", "object");
+    return schema;
+  }
+
   // ---------------------------------------------------------------------------
   // Pipeline (required parent: DataSet)
   // ---------------------------------------------------------------------------
@@ -280,10 +291,15 @@ public class PortalTestDataFactory {
   // ---------------------------------------------------------------------------
 
   public DataSink dataSink(DataSet dataSet, Pipeline pipeline) {
+    return dataSink(dataSet, pipeline, sink -> {});
+  }
+
+  public DataSink dataSink(DataSet dataSet, Pipeline pipeline, Consumer<DataSink> customizer) {
     DataSink sink = new DataSink();
     sink.setDataSet(dataSet);
     sink.setPipeline(pipeline);
     sink.setDataSinkType(DataSinkType.FROST);
+    customizer.accept(sink);
     return dataSinkRepository.save(sink);
   }
 
@@ -321,6 +337,20 @@ public class PortalTestDataFactory {
   }
 
   // ---------------------------------------------------------------------------
+  // DataPool
+  // ---------------------------------------------------------------------------
+
+  public DataPool dataPool() {
+    return dataPool(b -> {});
+  }
+
+  public DataPool dataPool(Consumer<DataPool.DataPoolBuilder<?, ?>> customizer) {
+    var builder = DataPool.builder().name("datapool-" + nextSeq());
+    customizer.accept(builder);
+    return dataPoolRepository.save(builder.build());
+  }
+
+  // ---------------------------------------------------------------------------
   // Catalog
   // ---------------------------------------------------------------------------
 
@@ -332,20 +362,6 @@ public class PortalTestDataFactory {
     var builder = Catalog.builder().name("catalog-" + nextSeq());
     customizer.accept(builder);
     return catalogRepository.save(builder.build());
-  }
-
-  // ---------------------------------------------------------------------------
-  // DataSpace
-  // ---------------------------------------------------------------------------
-
-  public DataSpace dataSpace() {
-    return dataSpace(b -> {});
-  }
-
-  public DataSpace dataSpace(Consumer<DataSpace.DataSpaceBuilder<?, ?>> customizer) {
-    var builder = DataSpace.builder().name("dataspace-" + nextSeq());
-    customizer.accept(builder);
-    return dataSpaceRepository.save(builder.build());
   }
 
   // ---------------------------------------------------------------------------
@@ -441,7 +457,7 @@ public class PortalTestDataFactory {
     agentRepository.deleteAll();
     resourceRepository.deleteAll();
     dataSetSeriesRepository.deleteAll();
-    dataSpaceRepository.deleteAll();
+    dataPoolRepository.deleteAll();
     groupRepository.deleteAll();
     roleRepository.deleteAll();
     userRepository.deleteAll();

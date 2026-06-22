@@ -8,6 +8,7 @@ import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.assignment.AssignmentGroupInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
+import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
@@ -32,6 +33,7 @@ public class AssignmentFactory {
   private final DataSetRepository dataSetRepository;
   private final DataStructureRepository dataStructureRepository;
   private final DataSourceRepository dataSourceRepository;
+  private final DataPoolRepository dataPoolRepository;
 
   /**
    * Build a new assignment from a scoped input DTO (used by BaseDataEntityService). Only resolves
@@ -109,6 +111,11 @@ public class AssignmentFactory {
 
   private Assignment setScope(Assignment assignment, ScopeType scopeType, UUID scopeId) {
     assignment.setScopeType(scopeType);
+    assignment.setDataset(null);
+    assignment.setDataStructure(null);
+    assignment.setDataSource(null);
+    assignment.setDataPool(null);
+    assignment.setCatalog(null);
 
     if (scopeType == null) {
       return assignment;
@@ -136,7 +143,12 @@ public class AssignmentFactory {
               dataSourceRepository
                   .findById(scopeId)
                   .orElseThrow(() -> new ResourceNotFoundException("DataSource", scopeId)));
-      case DATASPACE, CATALOG ->
+      case DATAPOOL ->
+          assignment.setDataPool(
+              dataPoolRepository
+                  .findById(scopeId)
+                  .orElseThrow(() -> new ResourceNotFoundException("DataPool", scopeId)));
+      case CATALOG ->
           throw new InvalidInputException(
               "Assignment",
               scopeType.name(),

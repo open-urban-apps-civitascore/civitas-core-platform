@@ -27,6 +27,7 @@ import {
   useUpdatePipeline,
 } from '@/app/services/api/pipelines/clientRequests'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
+import { isDatapoolScopeViolationError } from '@/utils/errors'
 
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
 import {
@@ -418,6 +419,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
     setIsSavingAll(true)
     const saveFailedNames: string[] = []
+    const scopeViolationNames: string[] = []
     try {
       // Serialize saves to avoid concurrent mutation state issues
       for (const session of dirtySessions) {
@@ -458,13 +460,22 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
           sessionManager.markSessionClean(session.id)
           datasinkSnapshotsRef.current[session.id] = createDatasinkSnapshot(currentPipeline)
           toast.success(t('header.saveSuccess', { name: currentPipeline.name }))
-        } catch {
-          saveFailedNames.push(session.name)
+        } catch (error) {
+          if (isDatapoolScopeViolationError(error)) {
+            scopeViolationNames.push(session.name)
+          } else {
+            saveFailedNames.push(session.name)
+          }
         }
       }
 
+      if (scopeViolationNames.length > 0) {
+        toast.error(t('header.datasourceScopeViolation', { name: scopeViolationNames.join(', ') }))
+      }
       if (saveFailedNames.length > 0) {
         toast.error(t('header.saveFailed', { names: saveFailedNames.join(', ') }))
+      }
+      if (scopeViolationNames.length > 0 || saveFailedNames.length > 0) {
         return false
       }
 

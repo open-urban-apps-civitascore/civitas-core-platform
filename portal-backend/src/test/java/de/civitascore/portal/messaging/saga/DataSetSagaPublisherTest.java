@@ -13,11 +13,11 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
-import de.civitascore.portal.service.DataStructureVersionService;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -49,7 +49,6 @@ class DataSetSagaPublisherTest {
   @Mock private KafkaTemplate<String, String> kafkaTemplate;
   @Mock private DataSinkRepository dataSinkRepository;
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
-  @Mock private DataStructureVersionService dataStructureVersionService;
 
   private DataSetSagaPublisher publisher;
 
@@ -61,8 +60,7 @@ class DataSetSagaPublisherTest {
             new JsonMapper(),
             new SagaProperties("test.saga.trigger", 5),
             dataSinkRepository,
-            dataStructureVersionRepository,
-            dataStructureVersionService);
+            dataStructureVersionRepository);
   }
 
   private DataSource dataSource(UUID id, ConnectorType type) {
@@ -143,9 +141,8 @@ class DataSetSagaPublisherTest {
     }
 
     @Test
-    @DisplayName(
-        "resolves the referenced DSV JSON Schema from Model Atlas and carries it on the sink")
-    void resolvesSchemaFromModelAtlas() throws Exception {
+    @DisplayName("carries the referenced DSV's persisted model (JSON Schema) on the sink")
+    void carriesPersistedModelOnSink() throws Exception {
       UUID dsvId = UUID.randomUUID();
       UUID sinkId = UUID.randomUUID();
       Pipeline pipeline = pipeline(UUID.randomUUID());
@@ -153,20 +150,17 @@ class DataSetSagaPublisherTest {
       DataSet dataSet = datasetWithPipeline(pipeline);
 
       DataStructureVersion version = new DataStructureVersion();
-      version.setModelAtlasUri("atlas://dsv/" + dsvId);
+      version.setModel(
+          Map.<String, Object>of(
+              "$id",
+              "urn:core:datastructure:" + dsvId,
+              "title",
+              "Observation",
+              "definitions",
+              Map.of("Observation", Map.of("type", "object"))));
 
       when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
       when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
-      when(dataStructureVersionService.resolveJsonSchemaByAtlasUri("atlas://dsv/" + dsvId))
-          .thenReturn(
-              Optional.of(
-                  Map.of(
-                      "$id",
-                      "urn:core:datastructure:" + dsvId,
-                      "title",
-                      "Observation",
-                      "definitions",
-                      Map.of("Observation", Map.of("type", "object")))));
 
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
       when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
@@ -205,6 +199,39 @@ class DataSetSagaPublisherTest {
     }
 
     @Test
+    @DisplayName("fails the publish when a referenced DSV carries no model")
+    void failsWhenReferencedVersionHasNoModel() {
+      UUID dsvId = UUID.randomUUID();
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      DataSink sink = postgisSink(UUID.randomUUID(), dsvId, "sensor_observations");
+
+      DataStructureVersion version = new DataStructureVersion(); // model is null
+      DataSet dataSet = datasetWithPipeline(pipeline);
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
+      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class);
+    }
+
+    @Test
+    @DisplayName("fails the publish when a referenced DSV carries an empty model")
+    void failsWhenReferencedVersionHasEmptyModel() {
+      UUID dsvId = UUID.randomUUID();
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      DataSink sink = postgisSink(UUID.randomUUID(), dsvId, "sensor_observations");
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setModel(Map.of());
+      DataSet dataSet = datasetWithPipeline(pipeline);
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
+      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class);
+    }
+
+    @Test
     @DisplayName("FROST sink without a DSV reference carries a null dataStructure, no failure")
     void frostSinkHasNoSchema() throws Exception {
       UUID sinkId = UUID.randomUUID();
@@ -230,6 +257,173 @@ class DataSetSagaPublisherTest {
       assertThat(ds.get("dataStructure").isNull())
           .as("FROST sink carries a null dataStructure")
           .isTrue();
+    }
+
+    @Test
+    @DisplayName("DELETE trigger carries datasinks so the saga can tear down the PostGIS sink")
+    void deleteTriggerCarriesDatasinks() throws Exception {
+      UUID dsvId = UUID.randomUUID();
+      UUID sinkId = UUID.randomUUID();
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      DataSink sink = postgisSink(sinkId, dsvId, "sensor_observations");
+      DataSet dataSet = datasetWithPipeline(pipeline);
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setModel(Map.<String, Object>of("$id", "urn:core:datastructure:" + dsvId));
+
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
+      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
+
+      ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
+      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
+          .thenReturn(
+              CompletableFuture.completedFuture(
+                  new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
+
+      publisher.publishDeleteRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var datasinks = payload.get("datasinks");
+      assertThat(datasinks).isNotNull();
+      assertThat(datasinks.size()).isEqualTo(1);
+      var ds = datasinks.get(0);
+      assertThat(ds.get("id").asString()).isEqualTo(sinkId.toString());
+      assertThat(ds.get("type").asString()).isEqualTo("POSTGIS");
+      assertThat(ds.get("configuration").get("tableName").asString())
+          .isEqualTo("sensor_observations");
+    }
+  }
+
+  @Nested
+  @DisplayName("buildLayers() native-name resolution")
+  class BuildLayersTests {
+
+    private DataSink postgisSink(UUID id, String tableName) {
+      DataSink sink = new DataSink();
+      sink.setId(id);
+      sink.setDataSinkType(DataSinkType.POSTGIS);
+      Map<String, Object> cfg = new HashMap<>();
+      cfg.put("tableName", tableName);
+      sink.setConfiguration(cfg);
+      return sink;
+    }
+
+    private DataSink frostSink(UUID id) {
+      DataSink sink = new DataSink();
+      sink.setId(id);
+      sink.setDataSinkType(DataSinkType.FROST);
+      return sink;
+    }
+
+    private Layer layer(UUID id, String layerName, String crs, DataSink sink) {
+      Layer layer = new Layer();
+      layer.setId(id);
+      layer.setLayerName(layerName);
+      layer.setCrs(crs);
+      layer.setDataSink(sink);
+      return layer;
+    }
+
+    private ArgumentCaptor<String> stubKafkaSend() {
+      ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
+      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
+          .thenReturn(
+              CompletableFuture.completedFuture(
+                  new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
+      return jsonCaptor;
+    }
+
+    @Test
+    @DisplayName("CREATE trigger carries a layer with nativeName from its POSTGIS sink's tableName")
+    void createTriggerCarriesLayerWithPostgisTableName() throws Exception {
+      UUID sinkId = UUID.randomUUID();
+      UUID layerId = UUID.randomUUID();
+      DataSink sink = postgisSink(sinkId, "my_table");
+      Layer l = layer(layerId, "layer1", "EPSG:4326", sink);
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setLayers(Set.of(l));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var layers = payload.get("layers");
+      assertThat(layers).as("layers must be present in CREATE trigger").isNotNull();
+      assertThat(layers.size()).isEqualTo(1);
+      var entry = layers.get(0);
+      assertThat(entry.get("id").asString()).isEqualTo(layerId.toString());
+      assertThat(entry.get("layerName").asString()).isEqualTo("layer1");
+      assertThat(entry.get("nativeName").asString()).isEqualTo("my_table");
+      assertThat(entry.get("crs").asString()).isEqualTo("EPSG:4326");
+    }
+
+    @Test
+    @DisplayName("Layer on a non-POSTGIS sink carries a null nativeName (adapter falls back)")
+    void layerOnNonPostgisSinkHasNullNativeName() throws Exception {
+      DataSink sink = frostSink(UUID.randomUUID());
+      Layer l = layer(UUID.randomUUID(), "frost-layer", null, sink);
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setLayers(Set.of(l));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var entry = payload.get("layers").get(0);
+      assertThat(entry.get("layerName").asString()).isEqualTo("frost-layer");
+      assertThat(entry.get("nativeName").isNull())
+          .as("non-POSTGIS sink → null nativeName for adapter fallback")
+          .isTrue();
+    }
+
+    @Test
+    @DisplayName("Empty layers is omitted from the trigger JSON (NON_NULL)")
+    void emptyLayersOmitted() throws Exception {
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.has("layers"))
+          .as("empty layers should be omitted from the JSON via @JsonInclude(NON_NULL)")
+          .isFalse();
+    }
+
+    @Test
+    @DisplayName("UPDATE trigger also carries layers")
+    void updateTriggerCarriesLayers() throws Exception {
+      DataSink sink = postgisSink(UUID.randomUUID(), "events");
+      Layer l = layer(UUID.randomUUID(), "events-layer", "EPSG:3857", sink);
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setProjectId("proj-1");
+      dataSet.setServiceId("svc-1");
+      dataSet.setPipelines(Set.of());
+      dataSet.setLayers(Set.of(l));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishUpdateRequested(dataSet, Set.of());
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var layers = payload.get("layers");
+      assertThat(layers).isNotNull();
+      assertThat(layers.size()).isEqualTo(1);
+      assertThat(layers.get(0).get("nativeName").asString()).isEqualTo("events");
     }
   }
 

@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -29,4 +30,7 @@ public class DataSetInputDTO extends BaseDataEntityInputDTO {
           "Named API endpoints exposed by this dataset. Each entry produces one APISIX route"
               + " after release.")
   private List<NamedApiInputDTO> namedApis = null;
+
+  @Schema(description = "ID of the datapool this dataset belongs to.")
+  private UUID datapoolId;
 }
