@@ -1,14 +1,26 @@
 import { useCallback, useMemo } from 'react'
 
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
-import { AssignmentScope } from '@/types/assignments'
+import { ASSIGNMENT_SCOPE_TYPES, AssignmentScope } from '@/types/assignments'
 import { MeAssignment, PermissionName, ScopedPermissionCheck } from '@/types/currentUser'
+
+// Scope types whose permissions are valid on a DATAPOOL-scoped assignment.
+// A DATAPOOL assignment may carry DATASET_* permissions to express that those
+// permissions apply to all datasets inside the pool.
+const DATAPOOL_ALLOWED_PREFIXES = ['DATAPOOL', 'DATASET']
 
 // Filters permissions per assignment so that non-TENANT scoped assignments
 // only retain permissions matching their scope type (e.g. a DATASOURCE-scoped
-// assignment only keeps DATASOURCE_* permissions).
+// assignment only keeps DATASOURCE_* permissions). DATAPOOL-scoped assignments
+// additionally allow DATASET_* permissions (pool → dataset cascade).
 const filterAssignmentPermissions = (assignment: MeAssignment): MeAssignment => {
-  if (!assignment.scopeType || assignment.scopeType === 'TENANT') return assignment
+  if (!assignment.scopeType || assignment.scopeType === ASSIGNMENT_SCOPE_TYPES.TENANT) return assignment
+  if (assignment.scopeType === ASSIGNMENT_SCOPE_TYPES.DATAPOOL) {
+    return {
+      ...assignment,
+      permissions: assignment.permissions.filter(p => DATAPOOL_ALLOWED_PREFIXES.some(prefix => p.startsWith(prefix))),
+    }
+  }
   const prefix = assignment.scopeType
   return {
     ...assignment,
@@ -46,12 +58,17 @@ export const usePermissions = () => {
   )
 
   const hasScopedPermission = useCallback<ScopedPermissionCheck>(
-    (permission, scopeType, scopeId) => {
+    (permission, scopeType, scopeId, datapoolId?) => {
       if (!permissions.has(permission)) return false
       return filteredAssignments.some(
         a =>
           a.permissions.includes(permission) &&
-          (a.scopeType === 'TENANT' || (a.scopeType === scopeType && a.scopeId === scopeId)),
+          (a.scopeType === ASSIGNMENT_SCOPE_TYPES.TENANT ||
+            (a.scopeType === scopeType && a.scopeId === scopeId) ||
+            (scopeType === ASSIGNMENT_SCOPE_TYPES.DATASET &&
+              datapoolId != null &&
+              a.scopeType === ASSIGNMENT_SCOPE_TYPES.DATAPOOL &&
+              a.scopeId === datapoolId)),
       )
     },
     [permissions, filteredAssignments],

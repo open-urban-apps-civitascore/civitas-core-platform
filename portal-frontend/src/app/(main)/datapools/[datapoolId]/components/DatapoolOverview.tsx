@@ -21,6 +21,7 @@ import { Form } from '@/components/ui/form'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Datapool, DatapoolFormData, DatapoolFormSchema, DatapoolTab, DatapoolTabValues } from '@/types/datapools'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
@@ -65,7 +66,7 @@ export const DatapoolOverview = (props: DatapoolOverviewProps) => {
   const [assignedGroups, setAssignedGroups] = useState<GroupRoleAssignmentTable[]>(initialAssignments)
 
   const { hasScopedPermission } = usePermissions()
-  const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATAPOOL_UPDATE, 'DATAPOOL', datapool.id)
+  const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATAPOOL_UPDATE, ASSIGNMENT_SCOPE_TYPES.DATAPOOL, datapool.id)
 
   const { mutateAsync: createDatapool, isPending: isCreating } = useCreateDatapool()
   const { mutate: updateDatapool, isPending: isUpdating } = usePatchDatapool()

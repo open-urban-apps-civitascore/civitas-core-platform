@@ -15,6 +15,7 @@ import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Form } from '@/components/ui/form'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
   Datastructure,
@@ -58,8 +59,16 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
 
   const tCommon = useTranslations('common')
   const { hasScopedPermission } = usePermissions()
-  const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_UPDATE, 'DATASTRUCTURE', datastructure.id)
-  const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_RELEASE, 'DATASTRUCTURE', datastructure.id)
+  const canUpdate = hasScopedPermission(
+    PERMISSION_NAMES.DATASTRUCTURE_UPDATE,
+    ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+    datastructure.id,
+  )
+  const canRelease = hasScopedPermission(
+    PERMISSION_NAMES.DATASTRUCTURE_RELEASE,
+    ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+    datastructure.id,
+  )
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit')

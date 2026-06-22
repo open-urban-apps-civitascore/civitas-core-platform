@@ -16,6 +16,7 @@ import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Dataset } from '@/types/datasets'
 
@@ -45,7 +46,7 @@ const DatasetsList = (props: DatasetsListProps) => {
   } = useQueryParams()
 
   const { hasPermissionInScope } = usePermissions()
-  const canCreateDataset = hasPermissionInScope(PERMISSION_NAMES.DATASET_CREATE, 'TENANT')
+  const canCreateDataset = hasPermissionInScope(PERMISSION_NAMES.DATASET_CREATE, ASSIGNMENT_SCOPE_TYPES.TENANT)
 
   const [datasetToDelete, setDatasetToDelete] = useState<string | null>(null)
   const [isWarningOpen, setIsWarningOpen] = useState(false)

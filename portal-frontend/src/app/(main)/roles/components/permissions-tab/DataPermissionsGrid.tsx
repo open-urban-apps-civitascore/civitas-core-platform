@@ -12,6 +12,7 @@ const DATA_PERMISSION_ROWS = [
   { key: 'datasetPayload', prefix: 'DATASET_PAYLOAD' },
   { key: 'datasource', prefix: 'DATASOURCE' },
   { key: 'datastructure', prefix: 'DATASTRUCTURE' },
+  { key: 'datapool', prefix: 'DATAPOOL' },
 ] as const
 
 const DATA_PERMISSION_COLUMNS = ['READ', 'CREATE', 'UPDATE', 'DELETE', 'RELEASE'] as const
