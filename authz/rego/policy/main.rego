@@ -102,7 +102,10 @@ evaluate_request := result if {
 		"allow": true,
 		"reason": "permission_granted",
 		"required_permissions": permission_eval.required_permissions,
-		"headers": {"X-Allowed-Scope-Ids": allowed_scope_ids_header},
+		"headers": object.union(
+			{"X-Allowed-Scope-Ids": allowed_scope_ids_header},
+			pool_ids_header,
+		),
 	}
 }
 
@@ -184,6 +187,7 @@ has_tenant_scoped_permission(perm) if {
 is_unscoped_only if {
 	not has_tenant_scope
 	count(specific_scope_ids) == 0
+	count(allowed_pool_ids) == 0
 }
 
 # Collect specific scope IDs where user has ALL required permissions (AND semantics)
@@ -212,6 +216,14 @@ scope_has_permission(perm, target_scope_id) if {
 	assignment.scopeId == target_scope_id
 }
 
+# DATAPOOL scope IDs the user may use for the dataset COLLECTION (Epic 1 union).
+# Single source of truth: permission_eval.qualifying_datapool_ids (a pool must
+# carry ALL required permissions), so the X-Allowed-Pool-Ids header and the
+# allow-decision can never diverge. The backend ORs these into its list filter
+# (datapool_id IN (...)), so OPA passes only the small set of granted pool ids —
+# never an enumerated list of dataset ids.
+allowed_pool_ids := permission_eval.qualifying_datapool_ids
+
 # Generate the header value based on user's scopes
 default allowed_scope_ids_header := ""
 
@@ -224,6 +236,21 @@ allowed_scope_ids_header := "*" if {
 allowed_scope_ids_header := concat(",", sort(specific_scope_ids)) if {
 	not has_tenant_scope
 	count(specific_scope_ids) > 0
+}
+
+# X-Allowed-Pool-Ids header (Epic 1 union, collection filtering).
+# Present only when the user has dataset-relevant DATAPOOL grants; the backend
+# ORs it into the collection filter as `datapool_id IN (<ids>)`. Built as a
+# separate object so the header is OMITTED ENTIRELY when there are no pool grants.
+# This omission is security-relevant: emitting an empty "X-Allowed-Pool-Ids: ""
+# instead would cause AllowedScopesFilter to mark the request scoped, flipping a
+# pool-less user from unscoped to scoped-with-no-pools. Keep the omit semantics.
+pool_ids_header := {"X-Allowed-Pool-Ids": concat(",", sort(allowed_pool_ids))} if {
+	count(allowed_pool_ids) > 0
+}
+
+pool_ids_header := {} if {
+	count(allowed_pool_ids) == 0
 }
 
 # =============================================================================

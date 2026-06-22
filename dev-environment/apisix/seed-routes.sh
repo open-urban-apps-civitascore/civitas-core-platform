@@ -71,18 +71,21 @@ curl -sf -X PUT "$ADMIN_URL/apisix/admin/services/svc-frost-server" \
 # 3. Create plugin config
 if [ "$MODE" = "allowall" ]; then
   echo "Creating plugin config: allow-all (wildcard scope)..."
+  # Wildcard scope short-circuits pool filtering in the backend, but strip a
+  # client-supplied X-Allowed-Pool-Ids anyway for parity/defense-in-depth.
   PROXY_REWRITE='{
     "headers": {
       "set": {
         "X-Allowed-Scope-Ids": "*"
-      }
+      },
+      "remove": ["X-Allowed-Pool-Ids"]
     }
   }'
 else
   echo "Creating plugin config: full authz (OPA scope filtering)..."
   PROXY_REWRITE='{
     "headers": {
-      "remove": ["X-Allowed-Scope-Ids"]
+      "remove": ["X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids"]
     }
   }'
 fi
@@ -108,7 +111,7 @@ curl -sf -X PUT "$ADMIN_URL/apisix/admin/plugin_configs/1" \
         \"with_route\": true,
         \"with_service\": true,
         \"with_consumer\": false,
-        \"send_headers_upstream\": [\"X-Allowed-Scope-Ids\"]
+        \"send_headers_upstream\": [\"X-Allowed-Scope-Ids\", \"X-Allowed-Pool-Ids\"]
       },
       \"proxy-rewrite\": $PROXY_REWRITE,
       \"request-id\": {

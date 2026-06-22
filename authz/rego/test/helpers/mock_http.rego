@@ -24,7 +24,10 @@ import rego.v1
 
 # All tests must provide data.config with authz_repository_url (no hardcoded default).
 # Use: with data.config as mock_http.test_config
-mock_config := {"authz_repository_url": "http://test-authz-repo:8091/api/v1/user-context"}
+mock_config := {
+	"authz_repository_url": "http://test-authz-repo:8091/api/v1/user-context",
+	"dataset_pool_membership_url": "http://test-authz-repo:8091/api/v1/dataset-pool",
+}
 
 # =============================================================================
 # USERINFO HEADER ENCODING

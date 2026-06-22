@@ -851,3 +851,63 @@ test_unscoped_system_role_wrong_permission if {
 	result.allow == false
 	result.reason == "permission_denied"
 }
+
+# =============================================================================
+# DATAPOOL UNION — COLLECTION FILTERING HEADER (X-Allowed-Pool-Ids)
+# =============================================================================
+
+# User holds DATASET_READ only via a DATAPOOL grant on pool-1
+mock_send_pool_only(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_READ"], "DATAPOOL", "pool-1")}
+
+# User holds DATASET_READ via BOTH a direct DATASET grant and a DATAPOOL grant
+mock_send_dataset_and_pool(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
+	{"perms": ["DATASET_READ"], "scope_type": "DATASET", "scope_id": "dataset-x"},
+	{"perms": ["DATASET_READ"], "scope_type": "DATAPOOL", "scope_id": "pool-1"},
+])}
+
+# Pool-only user can list datasets; pool ids are conveyed via X-Allowed-Pool-Ids,
+# and the user is NOT treated as unscoped (no direct dataset scope → empty scope ids).
+test_pool_only_dataset_collection_header if {
+	result := authz.decision with http.send as mock_send_pool_only
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.headers["X-Allowed-Pool-Ids"] == "pool-1"
+	result.headers["X-Allowed-Scope-Ids"] == ""
+}
+
+# Union: direct dataset scope and pool grant are both conveyed (backend ORs them)
+test_dataset_and_pool_headers if {
+	result := authz.decision with http.send as mock_send_dataset_and_pool
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets")
+	result.allow == true
+	result.headers["X-Allowed-Scope-Ids"] == "dataset-x"
+	result.headers["X-Allowed-Pool-Ids"] == "pool-1"
+}
+
+# No pool grant → X-Allowed-Pool-Ids header is omitted entirely
+test_no_pool_header_without_pool_grant if {
+	result := authz.decision with http.send as mock_send_dataset_scope
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets")
+	result.allow == true
+	not result.headers["X-Allowed-Pool-Ids"]
+}
+
+# A pool that does NOT carry the required permission is excluded from
+# X-Allowed-Pool-Ids (qualifying_datapool_ids requires the pool to hold the perm).
+# pool-1 has DATASET_READ, pool-2 only DATASET_CREATE; GET /datasets needs READ.
+mock_send_two_pools_one_qualifies(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
+	{"perms": ["DATASET_READ"], "scope_type": "DATAPOOL", "scope_id": "pool-1"},
+	{"perms": ["DATASET_CREATE"], "scope_type": "DATAPOOL", "scope_id": "pool-2"},
+])}
+
+test_pool_header_excludes_pool_without_required_permission if {
+	result := authz.decision with http.send as mock_send_two_pools_one_qualifies
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets")
+	result.allow == true
+	result.headers["X-Allowed-Pool-Ids"] == "pool-1"
+}

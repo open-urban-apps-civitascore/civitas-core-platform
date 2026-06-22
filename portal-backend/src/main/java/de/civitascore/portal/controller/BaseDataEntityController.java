@@ -90,8 +90,20 @@ public abstract class BaseDataEntityController<
     if (scopes.isWildcard()) {
       return spec;
     }
-    Specification<E> scopeFilter = ScopeFilteringSpecification.baseEntityById(scopes.getScopeIds());
+    Specification<E> scopeFilter = scopeSpecification(scopes);
     return spec == null ? scopeFilter : spec.and(scopeFilter);
+  }
+
+  /**
+   * Builds the scope-filter specification for this entity type. The default filters by directly
+   * authorized scope IDs; subclasses may widen it (e.g. {@code DataSetController} ORs in datapool
+   * membership for Epic 1 union inheritance). Called only for non-wildcard, scoped requests.
+   *
+   * @param scopes the resolved per-request scope information
+   * @return the specification restricting the collection to authorized entities
+   */
+  protected Specification<E> scopeSpecification(AllowedScopes scopes) {
+    return ScopeFilteringSpecification.baseEntityById(scopes.getScopeIds());
   }
 
   /**
