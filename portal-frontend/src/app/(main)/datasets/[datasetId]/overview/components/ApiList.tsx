@@ -93,7 +93,7 @@ export const ApiList = ({ datasetId, apis, pipelines, canEdit, isPublished, isOp
               api={api}
               datasetId={datasetId}
               existingApis={apis}
-              canEdit={canEdit}
+              canEdit={canEdit && !isPublished}
               isOpenDataAccess={isOpenDataAccess}
             />
           ))}
