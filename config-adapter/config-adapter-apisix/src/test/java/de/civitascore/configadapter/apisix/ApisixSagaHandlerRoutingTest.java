@@ -19,6 +19,7 @@ import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AppConfig;
 import de.civitascore.configadapter.model.dataset.NamedApiHelper;
+import de.civitascore.configadapter.model.dataset.WorkspaceNames;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -389,6 +390,79 @@ class ApisixSagaHandlerRoutingTest extends AbstractApisixIntegrationTest {
           "/FROST-Server/v1.1/Projects(1)/Things",
           echoed.get("path").asText(),
           "proxy-rewrite must still map onto the FROST upstream path with service_id present");
+    }
+  }
+
+  @Test
+  void shouldRouteOwsToGeoServerWorkspaceOwsPath() throws Exception {
+    String datasetId = "ows-" + UUID.randomUUID();
+    String workspace = WorkspaceNames.fromDatasetId(datasetId);
+    String owsSlug = "map";
+
+    // A handler whose map-server upstream is the stub container (standing in for GeoServer).
+    Map<String, Object> props = new HashMap<>();
+    props.put("apisix.admin.url", adminApiUrl);
+    props.put("apisix.admin.key", ADMIN_API_KEY);
+    props.put("apisix.api.host", API_HOST);
+    props.put("apisix.api.public.url", API_PUBLIC_URL);
+    props.put("apisix.plugin.config.id", "auth-plugin-default");
+    props.put("apisix.proxy.rewrite.headers.remove", "X-Allowed-Scope-Ids");
+    props.put("apisix.frost.basic.auth.username", FROST_USER);
+    props.put("apisix.frost.basic.auth.password", FROST_PASS);
+    props.put("apisix.geoserver.url", "http://" + STUB_ALIAS + ":" + STUB_PORT + "/geoserver");
+
+    try (ApisixSagaHandler owsHandler = new ApisixSagaHandler()) {
+      owsHandler.initialize(new AppConfig(new MapConfiguration(props)));
+
+      SagaCommandResult result =
+          owsHandler.handle(
+              new SagaCommandMessage(
+                  "EXECUTE_STEP",
+                  "msg-" + datasetId,
+                  "saga-" + datasetId,
+                  "create-route",
+                  "apisix",
+                  "CREATE_ROUTE",
+                  Map.of(
+                      "datasetId",
+                      datasetId,
+                      // FROST upstreamUrl is always carried by the saga even for a map-only
+                      // dataset;
+                      // here it is unused because the only named API is OWS.
+                      "upstreamUrl",
+                      "http://" + STUB_ALIAS + ":" + STUB_PORT + "/FROST-Server/v1.1/Projects(1)",
+                      "openDataAccess",
+                      true,
+                      "namedApis",
+                      List.of(Map.of("slug", owsSlug, "standard", "OWS")))));
+      assertEquals("STEP_COMPLETED", result.type());
+
+      String mapRouteId = NamedApiHelper.derive(datasetId, owsSlug);
+      await()
+          .atMost(10, SECONDS)
+          .pollInterval(200, java.util.concurrent.TimeUnit.MILLISECONDS)
+          .ignoreExceptions()
+          .untilAsserted(() -> assertTrue(getRouteFromApisix(mapRouteId).has("value")));
+
+      // A single OWS route serves both WFS and WMS; the OGC service= query param selects it.
+      HttpResponse<String> response =
+          sendGatewayRequest(
+              "/v1/datasets/" + datasetId + "/" + owsSlug + "?service=WFS&request=GetCapabilities",
+              API_HOST);
+
+      assertEquals(
+          200,
+          response.statusCode(),
+          "OWS route must proxy to the GeoServer stub — body: " + response.body());
+      JsonNode echoed = objectMapper.readTree(response.body());
+      assertEquals(
+          "/geoserver/" + workspace + "/ows",
+          echoed.get("path").asText(),
+          "proxy-rewrite must map the OWS named API onto the dataset's workspace OWS endpoint");
+      JsonNode query = echoed.get("query");
+      assertEquals(
+          "WFS", query.get("service").asText(), "OGC service query parameter must be preserved");
+      assertEquals("GetCapabilities", query.get("request").asText());
     }
   }
 

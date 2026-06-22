@@ -23,6 +23,12 @@ import java.util.List;
  * to proxy private datasets ({@code apisix.frost.api.key} or {@code
  * apisix.frost.basic.auth.username}/{@code .password}).
  *
+ * <p>{@code apisix.geoserver.url} (the gateway-reachable GeoServer base, e.g. {@code
+ * http://civitas-geoserver:8080/geoserver}) is the upstream target for {@code OWS} (map services)
+ * named-API routes. It is <b>not</b> required at startup — only datasets publishing an OWS named
+ * API need it — so it carries a default and its presence is validated lazily in {@code
+ * CREATE_ROUTE} when an OWS slug is actually routed.
+ *
  * @param adminApiUrl APISIX Admin API base URL ({@code apisix.admin.url})
  * @param adminApiKey APISIX Admin API key ({@code apisix.admin.key}, required)
  * @param pluginConfigId shared plugin_config enforcing OIDC/OPA on protected routes (required)
@@ -30,6 +36,8 @@ import java.util.List;
  * @param apiHost virtual host saga routes are pinned to (required, issue #1368)
  * @param apiPublicUrl public base URL reported back to the portal (required, trailing slash
  *     stripped)
+ * @param geoserverUrl gateway-reachable GeoServer base for OWS map-service routes ({@code
+ *     apisix.geoserver.url}, trailing slash stripped)
  * @param frostAuth FROST upstream credentials injected on protected routes (required)
  * @param proxyRewriteHeadersToRemove client-supplied headers stripped from every saga route —
  *     always contains {@link #ALWAYS_STRIPPED_HEADERS} plus the configured list
@@ -41,10 +49,18 @@ record ApisixHandlerSettings(
     String serviceId,
     String apiHost,
     String apiPublicUrl,
+    String geoserverUrl,
     FrostUpstreamAuth frostAuth,
     List<String> proxyRewriteHeadersToRemove) {
 
   static final String ADMIN_URL_DEFAULT = "http://localhost:9180";
+
+  /**
+   * Default GeoServer base used when {@code apisix.geoserver.url} is unset. Mirrors the
+   * config-adapter-geoserver default; real deployments override it with the in-cluster,
+   * gateway-reachable address (e.g. {@code http://civitas-geoserver:8080/geoserver}).
+   */
+  static final String GEOSERVER_URL_DEFAULT = "http://localhost:8080/geoserver";
 
   /**
    * Internal trust headers stripped from every saga route regardless of configuration. {@code
@@ -94,6 +110,7 @@ record ApisixHandlerSettings(
         config.getProperty(PREFIX + "service.id"),
         apiHost,
         stripTrailingSlash(apiPublicUrl),
+        stripTrailingSlash(config.getProperty(PREFIX + "geoserver.url", GEOSERVER_URL_DEFAULT)),
         frostAuth,
         headersToRemove(config.getProperty(PREFIX + "proxy.rewrite.headers.remove")));
   }

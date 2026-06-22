@@ -33,8 +33,8 @@ import org.slf4j.LoggerFactory;
  * @param routeIds slug-keyed APISIX route ids persisted by the portal-backend from the prior
  *     CREATE_ROUTE result (null-keyed/-valued entries are dropped and logged)
  * @param previousOpenBySlug per-slug open-data state captured by UPDATE_ROUTE for RESTORE_ROUTE
- * @param standardBySlug per-slug API standard ({@code STA}/{@code WFS}/{@code WMS}) gating
- *     routability in CREATE_ROUTE
+ * @param standardBySlug per-slug API standard ({@code STA}/{@code OWS}/{@code CUSTOM}) gating
+ *     routability in CREATE_ROUTE and selecting the upstream (see {@link RouteUpstreamKind})
  */
 record RoutePayload(
     List<String> slugs,
@@ -53,15 +53,29 @@ record RoutePayload(
   }
 
   /**
-   * Whether a named API's standard can be routed by the current (FROST-only) data plane. Every saga
-   * route binds to the dataset's FROST-project upstream, so only {@code STA} (SensorThings) is
-   * routable; {@code WFS}/{@code WMS} will route to a separate GeoServer upstream that is not wired
-   * yet. A null/blank standard is treated as STA for backward compatibility (the production saga
-   * always sends STA). Non-STA standards fail fast in CREATE_ROUTE rather than producing a FROST
-   * route behind a WFS/WMS public URL — that is the seam GeoServer support plugs into.
+   * Resolves each named API's routing kind from its standard (see {@link RouteUpstreamKind}),
+   * failing fast on a non-routable standard (CUSTOM/unknown) so CREATE_ROUTE rejects it before
+   * creating any gateway state. STA (and a null/blank standard) routes to the dataset's
+   * FROST-project upstream; OWS routes to the dataset's map-server upstream.
    */
-  static boolean isRoutableStandard(String standard) {
-    return standard == null || standard.isBlank() || "STA".equalsIgnoreCase(standard);
+  Map<String, RouteUpstreamKind> routingKinds() {
+    Map<String, RouteUpstreamKind> kinds = new LinkedHashMap<>();
+    for (String slug : slugs) {
+      String standard = standardBySlug.get(slug);
+      RouteUpstreamKind kind =
+          RouteUpstreamKind.fromStandard(standard)
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "named API '"
+                              + slug
+                              + "' has standard '"
+                              + standard
+                              + "' which is not routable — only STA (FROST/SensorThings) and OWS"
+                              + " (GeoServer WFS/WMS) named APIs are supported"));
+      kinds.put(slug, kind);
+    }
+    return kinds;
   }
 
   /**

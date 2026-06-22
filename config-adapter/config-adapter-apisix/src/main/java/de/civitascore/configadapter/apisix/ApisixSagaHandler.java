@@ -15,7 +15,7 @@ import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.model.dataset.NamedApiHelper;
 import jakarta.ws.rs.client.Client;
-import java.net.URI;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,20 +27,22 @@ import org.owasp.encoder.Encode;
  * dataset provisioning:
  *
  * <ul>
- *   <li>{@code CREATE_ROUTE} — creates one shared dataset upstream + one route per named-API slug
+ *   <li>{@code CREATE_ROUTE} — creates the dataset's upstream(s) and one route per named-API slug,
+ *       each bound to the upstream its standard selects (see {@link RouteUpstreams})
  *   <li>{@code UPDATE_ROUTE} — updates each slug route's configuration (plugin_config_id for auth)
- *   <li>{@code DELETE_ROUTE} — deletes each slug route + the shared upstream
+ *   <li>{@code DELETE_ROUTE} — deletes each slug route + the dataset's upstream(s)
  *   <li>{@code RESTORE_ROUTE} — restores each slug route to its previous auth config (compensation)
  * </ul>
  *
  * <p>Per the per-NamedApi route model (#1311/#1379) the saga provisions one route per slug at
  * {@code /v1/datasets/{id}/{slug}} with a deterministic id ({@code NamedApiHelper.derive(id,
- * slug)}) bound to a single per-dataset upstream (keyed by {@code datasetId}); it returns a
- * slug-keyed {@code routeIds} map. A command with no {@code namedApis} provisions NO data-plane
- * route (a dataset with no named APIs has nothing to publish — the old dataset-level fallback was
- * removed). Uses PUT with deterministic IDs for idempotent operations; DELETE/RESTORE tolerate an
- * already-absent route (404) so compensation is idempotent. Compensation: {@code DELETE_ROUTE} for
- * create rollback, {@code RESTORE_ROUTE} for update rollback.
+ * slug)}), bound to the per-dataset upstream its standard selects — the FROST-project upstream for
+ * {@code STA} and/or the map-server upstream for {@code OWS}; it returns a slug-keyed {@code
+ * routeIds} map. A command with no {@code namedApis} provisions NO data-plane route (a dataset with
+ * no named APIs has nothing to publish — the old dataset-level fallback was removed). Uses PUT with
+ * deterministic IDs for idempotent operations; DELETE/RESTORE tolerate an already-absent route
+ * (404) so compensation is idempotent. Compensation: {@code DELETE_ROUTE} for create rollback,
+ * {@code RESTORE_ROUTE} for update rollback.
  *
  * <p><b>Drift between {@code namedApis} and the persisted {@code routeIds} map</b> (MR !547 review
  * findings 2 and 5) is handled per the established philosophy "UPDATE atomic-fail, DELETE stays
@@ -74,6 +76,7 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
   private ApisixHandlerSettings settings;
   private ApisixAdminClient adminClient;
   private RouteAuthConfigurer authConfigurer;
+  private RouteUpstreams upstreams;
 
   /** No-arg constructor for ServiceLoader discovery. Call {@link #initialize} before use. */
   public ApisixSagaHandler() {
@@ -91,11 +94,14 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     this.adminClient =
         new ApisixAdminClient(this::client, settings.adminApiUrl(), settings.adminApiKey());
     this.authConfigurer = new RouteAuthConfigurer(settings);
+    this.upstreams = new RouteUpstreams(settings.geoserverUrl());
 
     log.info(
-        "ApisixSagaHandler initialized for: {} (api host: {}, frost upstream auth header: {})",
+        "ApisixSagaHandler initialized for: {} (api host: {}, geoserver url: {}, frost upstream"
+            + " auth header: {})",
         Encode.forJava(settings.adminApiUrl()),
         Encode.forJava(settings.apiHost()),
+        Encode.forJava(settings.geoserverUrl()),
         Encode.forJava(settings.frostAuth().headerName()));
   }
 
@@ -114,12 +120,13 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     };
   }
 
-  // The generic catch is a deliberate cleanup boundary: ANY runtime failure (HTTP, network,
-  // serialization) mid-provisioning must trigger the best-effort rollback before propagating.
-  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   private SagaCommandResult handleCreateRoute(SagaCommandMessage command) {
     String datasetId = requireString(command, "datasetId");
-    UpstreamTarget upstream = UpstreamTarget.parse(requireString(command, "upstreamUrl"));
+    // The FROST upstream URL is always carried by the saga (the FROST project is provisioned for
+    // every dataset). Parsed up front so a malformed value fails the step before any gateway state
+    // is touched; the FROST upstream itself is only created when an STA named API actually uses it.
+    RouteUpstreams.Target frostUpstream =
+        RouteUpstreams.frost(requireString(command, "upstreamUrl"));
     boolean openDataAccess =
         Boolean.TRUE.equals(command.payload().getOrDefault("openDataAccess", false));
 
@@ -141,52 +148,11 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
       return SagaCommandResult.success(command.sagaId(), command.stepId(), empty, empty);
     }
 
-    // GeoServer seam (WFS/WMS): validate every standard BEFORE provisioning anything, so a
-    // non-routable named API fails fast without creating gateway state that needs cleanup.
-    requireRoutableStandards(routePayload);
-
-    // One upstream per dataset (the dataset's FROST project), shared by every named-API route.
-    adminClient.putUpstream(
-        datasetId,
-        Map.of(
-            "type", "roundrobin", "scheme", upstream.scheme(), "nodes", Map.of(upstream.node(), 1)),
-        "CREATE upstream");
-
-    // Per-named-API model (#1311/#1379): one route per slug at /v1/datasets/{id}/{slug}, all
-    // bound to the shared dataset upstream. The slug-keyed routeIds map is the saga contract the
-    // portal-backend persists onto each NamedApi entity.
-    //
-    // The loop is a non-atomic sequence of PUTs. If a later route fails after earlier ones (and the
-    // shared upstream) were created, a failed saga step records no compensation data, so the
-    // orchestrator cannot roll back this step's partial state. We therefore best-effort clean up
-    // what this step already created before propagating the failure, leaving no orphaned routes or
-    // upstream behind.
-    Map<String, String> routeIds = new LinkedHashMap<>();
-    try {
-      for (String slug : slugs) {
-        String routeId = NamedApiHelper.derive(datasetId, slug);
-        adminClient.putRoute(
-            routeId,
-            authConfigurer.newRouteBody(
-                DATASETS_PATH_PREFIX + datasetId + "/" + slug,
-                datasetId,
-                openDataAccess,
-                upstream.path()),
-            "CREATE route");
-        routeIds.put(slug, routeId);
-      }
-    } catch (RuntimeException e) {
-      // A failed saga step records no compensation data, so the orchestrator cannot roll back this
-      // step's partial state — clean up best-effort before propagating the original failure.
-      log.warn(
-          "CREATE_ROUTE failed mid-provisioning — cleaning up partial state: datasetId={},"
-              + " routes={}, saga={}",
-          Encode.forJava(datasetId),
-          Encode.forJava(String.join(",", routeIds.values())),
-          Encode.forJava(command.sagaId()));
-      adminClient.bestEffortCleanup(datasetId, routeIds.values(), command.sagaId());
-      throw e;
-    }
+    // Resolve every slug's routing kind up front (standard → upstream); a non-routable standard
+    // (CUSTOM/unknown) fails fast here, before any gateway state is created.
+    Map<String, RouteUpstreamKind> kindBySlug = routePayload.routingKinds();
+    Map<String, String> routeIds =
+        provisionRoutes(command, datasetId, openDataAccess, slugs, kindBySlug, frostUpstream);
 
     String publicUrl = settings.apiPublicUrl() + DATASETS_PATH_PREFIX + datasetId;
     Map<String, Object> resultData =
@@ -202,6 +168,73 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
 
     return SagaCommandResult.success(
         command.sagaId(), command.stepId(), resultData, compensationData);
+  }
+
+  /**
+   * Provisions the dataset's upstream(s) and one route per slug, each bound to the upstream
+   * selected by its standard (STA → the FROST-project upstream, OWS → the map-server upstream).
+   * Only the upstreams actually used by a slug are created. The slug-keyed routeIds map is the saga
+   * contract the portal-backend persists onto each NamedApi entity.
+   */
+  // The generic catch is a deliberate cleanup boundary: a failed saga step records no compensation
+  // data, so the orchestrator cannot roll back this step's partial state. ANY runtime failure
+  // (HTTP, network, serialization) mid-provisioning must trigger the best-effort rollback of what
+  // this step already created before propagating, leaving no orphaned routes or upstreams behind.
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
+  private Map<String, String> provisionRoutes(
+      SagaCommandMessage command,
+      String datasetId,
+      boolean openDataAccess,
+      List<String> slugs,
+      Map<String, RouteUpstreamKind> kindBySlug,
+      RouteUpstreams.Target frostUpstream) {
+    boolean hasSta = kindBySlug.containsValue(RouteUpstreamKind.STA);
+    boolean hasOws = kindBySlug.containsValue(RouteUpstreamKind.OWS);
+    RouteUpstreams.Target mapUpstream = hasOws ? upstreams.map(datasetId) : null;
+
+    List<String> createdUpstreamIds = new ArrayList<>();
+    Map<String, String> routeIds = new LinkedHashMap<>();
+    try {
+      if (hasSta) {
+        adminClient.putUpstream(datasetId, RouteUpstreams.body(frostUpstream), "CREATE upstream");
+        createdUpstreamIds.add(datasetId);
+      }
+      if (hasOws) {
+        String owsUpstreamId = RouteUpstreams.owsUpstreamId(datasetId);
+        adminClient.putUpstream(
+            owsUpstreamId, RouteUpstreams.body(mapUpstream), "CREATE map upstream");
+        createdUpstreamIds.add(owsUpstreamId);
+      }
+      for (String slug : slugs) {
+        RouteUpstreamKind kind = kindBySlug.get(slug);
+        RouteUpstreams.Target upstream =
+            kind == RouteUpstreamKind.OWS ? mapUpstream : frostUpstream;
+        String upstreamId =
+            kind == RouteUpstreamKind.OWS ? RouteUpstreams.owsUpstreamId(datasetId) : datasetId;
+        String routeId = NamedApiHelper.derive(datasetId, slug);
+        adminClient.putRoute(
+            routeId,
+            authConfigurer.newRouteBody(
+                DATASETS_PATH_PREFIX + datasetId + "/" + slug,
+                upstreamId,
+                openDataAccess,
+                upstream.path(),
+                kind),
+            "CREATE route");
+        routeIds.put(slug, routeId);
+      }
+    } catch (RuntimeException e) {
+      log.warn(
+          "CREATE_ROUTE failed mid-provisioning — cleaning up partial state: datasetId={},"
+              + " routes={}, upstreams={}, saga={}",
+          Encode.forJava(datasetId),
+          Encode.forJava(String.join(",", routeIds.values())),
+          Encode.forJava(String.join(",", createdUpstreamIds)),
+          Encode.forJava(command.sagaId()));
+      adminClient.bestEffortCleanup(createdUpstreamIds, routeIds.values(), command.sagaId());
+      throw e;
+    }
+    return routeIds;
   }
 
   private SagaCommandResult handleUpdateRoute(SagaCommandMessage command) {
@@ -309,44 +342,6 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * GeoServer seam (WFS/WMS): every saga route binds to the dataset's FROST-project upstream, so
-   * only STA (SensorThings) named APIs are routable today. A non-STA standard fails fast rather
-   * than silently provisioning a FROST route behind a WFS/WMS public URL. When GeoServer routing
-   * lands, this is where upstream + path-rewrite get selected by standard.
-   */
-  private static void requireRoutableStandards(RoutePayload payload) {
-    for (String slug : payload.slugs()) {
-      String standard = payload.standardBySlug().get(slug);
-      if (!RoutePayload.isRoutableStandard(standard)) {
-        throw new IllegalStateException(
-            "named API '"
-                + slug
-                + "' has standard '"
-                + standard
-                + "' which is not yet routable — only STA (FROST/SensorThings) is supported;"
-                + " WFS/WMS routing via GeoServer is not implemented");
-      }
-    }
-  }
-
-  /**
-   * Upstream URL split into the APISIX node ({@code host[:port]}), path and scheme, e.g. {@code
-   * http://civitas-frost:8080/FROST-Server/v1.1/Projects(1)} → node {@code civitas-frost:8080},
-   * path {@code /FROST-Server/v1.1/Projects(1)}.
-   */
-  private record UpstreamTarget(String node, String path, String scheme) {
-
-    static UpstreamTarget parse(String upstreamUrl) {
-      URI uri = URI.create(upstreamUrl);
-      String node = uri.getPort() > 0 ? uri.getHost() + ":" + uri.getPort() : uri.getHost();
-      return new UpstreamTarget(
-          node,
-          uri.getPath() != null ? uri.getPath() : "/",
-          uri.getScheme() != null ? uri.getScheme() : "http");
-    }
-  }
-
-  /**
    * Phase 2 of UPDATE_ROUTE — applies the requested auth state to every loaded route, capturing
    * each route's previous open/protected state so RESTORE_ROUTE can roll each one back
    * individually. A slug missing from {@code loadedRoutes} is reachable only on a compensation
@@ -413,7 +408,7 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
               + " saga={}",
           Encode.forJava(command.sagaId()));
     } else {
-      // Per-named-API model: delete every slug route, then the shared dataset upstream.
+      // Per-named-API model: delete every slug route, then the dataset upstream(s).
       payload.logRouteIdDivergence(serviceId, command.sagaId());
       int routesRemoved = 0;
       for (Map.Entry<String, String> entry : routeIds.entrySet()) {
@@ -421,7 +416,11 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
           routesRemoved++;
         }
       }
+      // The DELETE payload carries no per-slug standard, so attempt both the FROST and the
+      // map-server upstream; deletes are 404-tolerant, so the one that was never created is a
+      // no-op.
       adminClient.deleteUpstream(serviceId, "DELETE upstream");
+      adminClient.deleteUpstream(RouteUpstreams.owsUpstreamId(serviceId), "DELETE map upstream");
       log.info(
           "APISIX routes deleted: serviceId={}, slugs={}, removed={}/{}, saga={}",
           Encode.forJava(serviceId),
