@@ -9,11 +9,10 @@ import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
-import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
+import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
-import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.Map;
@@ -32,7 +31,7 @@ class DataSinkServiceTest {
 
   @Mock private DataSinkRepository dataSinkRepository;
   @Mock private DataSinkMapper dataSinkMapper;
-  @Mock private PipelineRepository pipelineRepository;
+  @Mock private DataSetRepository dataSetRepository;
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
 
   @InjectMocks private DataSinkService dataSinkService;
@@ -44,30 +43,19 @@ class DataSinkServiceTest {
     return ds;
   }
 
-  private Pipeline pipeline(UUID id, DataSet dataSet) {
-    Pipeline p = new Pipeline();
-    p.setId(id);
-    p.setName("pl");
-    p.setDataSet(dataSet);
-    return p;
-  }
-
   @Nested
   @DisplayName("findByIdAndDataSetOrThrow()")
   class FindByIdAndDataSet {
 
     @Test
-    @DisplayName("Should return sink when its pipeline belongs to the requested dataset")
+    @DisplayName("Should return sink when it belongs to the requested dataset")
     void shouldReturnSinkForMatchingDataset() {
       UUID dataSetId = UUID.randomUUID();
       UUID sinkId = UUID.randomUUID();
 
-      DataSet dataSet = dataSet(dataSetId);
-      Pipeline pipeline = pipeline(UUID.randomUUID(), dataSet);
-
       DataSink sink = new DataSink();
       sink.setId(sinkId);
-      sink.setPipeline(pipeline);
+      sink.setDataSet(dataSet(dataSetId));
 
       when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(sink));
 
@@ -77,17 +65,13 @@ class DataSinkServiceTest {
     }
 
     @Test
-    @DisplayName(
-        "Should throw ResourceNotFoundException when sink's pipeline belongs to a different dataset")
+    @DisplayName("Should throw ResourceNotFoundException when the sink's dataset does not match")
     void shouldThrowWhenDatasetMismatch() {
       UUID sinkId = UUID.randomUUID();
 
-      DataSet otherDataSet = dataSet(UUID.randomUUID());
-      Pipeline pipeline = pipeline(UUID.randomUUID(), otherDataSet);
-
       DataSink sink = new DataSink();
       sink.setId(sinkId);
-      sink.setPipeline(pipeline);
+      sink.setDataSet(dataSet(UUID.randomUUID()));
 
       when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(sink));
 
@@ -101,43 +85,41 @@ class DataSinkServiceTest {
   class PostConvertToEntity {
 
     @Test
-    @DisplayName("Should resolve pipeline from input and set it on the entity")
-    void shouldResolvePipeline() {
+    @DisplayName("Should resolve dataSet from input and set it on the entity")
+    void shouldResolveDataSet() {
       UUID dataSetId = UUID.randomUUID();
-      UUID pipelineId = UUID.randomUUID();
-
       DataSet dataSet = dataSet(dataSetId);
-      Pipeline pipeline = pipeline(pipelineId, dataSet);
 
       DataSinkInputDTO input = new DataSinkInputDTO();
-      input.setPipelineId(pipelineId);
+      input.setDataSetId(dataSetId);
       input.setDataSinkType(DataSinkType.FROST);
       input.setConfiguration(Map.of());
 
       DataSink entity = new DataSink();
 
       when(dataSinkMapper.toEntity(any())).thenReturn(entity);
-      when(pipelineRepository.findById(pipelineId)).thenReturn(Optional.of(pipeline));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
       when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSink result = dataSinkService.create(input);
 
-      assertThat(result.getPipeline()).isSameAs(pipeline);
+      assertThat(result.getDataSet()).isSameAs(dataSet);
+      assertThat(result.getPipeline()).isNull();
     }
 
     @Test
-    @DisplayName("Should throw ResourceNotFoundException when pipeline is not found")
-    void shouldThrowWhenPipelineNotFound() {
-      UUID pipelineId = UUID.randomUUID();
+    @DisplayName("Should throw ResourceNotFoundException when dataSet is not found")
+    void shouldThrowWhenDataSetNotFound() {
+      UUID dataSetId = UUID.randomUUID();
 
       DataSinkInputDTO input = new DataSinkInputDTO();
-      input.setPipelineId(pipelineId);
+      input.setDataSetId(dataSetId);
       input.setDataSinkType(DataSinkType.FROST);
       input.setConfiguration(Map.of());
 
       DataSink entity = new DataSink();
       when(dataSinkMapper.toEntity(any())).thenReturn(entity);
-      when(pipelineRepository.findById(pipelineId)).thenReturn(Optional.empty());
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.empty());
 
       assertThatThrownBy(() -> dataSinkService.create(input))
           .isInstanceOf(ResourceNotFoundException.class);
@@ -152,19 +134,15 @@ class DataSinkServiceTest {
     @DisplayName("Should throw InvalidInputException when FROST config is non-empty")
     void shouldThrowWhenFrostConfigNonEmpty() {
       UUID dataSetId = UUID.randomUUID();
-      UUID pipelineId = UUID.randomUUID();
-
-      DataSet dataSet = dataSet(dataSetId);
-      Pipeline pipeline = pipeline(pipelineId, dataSet);
 
       DataSinkInputDTO input = new DataSinkInputDTO();
-      input.setPipelineId(pipelineId);
+      input.setDataSetId(dataSetId);
       input.setDataSinkType(DataSinkType.FROST);
       input.setConfiguration(Map.of("unexpected", "value"));
 
       DataSink entity = new DataSink();
       when(dataSinkMapper.toEntity(any())).thenReturn(entity);
-      when(pipelineRepository.findById(pipelineId)).thenReturn(Optional.of(pipeline));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
 
       assertThatThrownBy(() -> dataSinkService.create(input))
           .isInstanceOf(InvalidInputException.class);
@@ -175,31 +153,28 @@ class DataSinkServiceTest {
   @DisplayName("validateConfiguration() — POSTGIS")
   class PostgisValidation {
 
-    private DataSinkInputDTO basePostgisInput(UUID pipelineId) {
+    private DataSinkInputDTO basePostgisInput(UUID dataSetId) {
       DataSinkInputDTO input = new DataSinkInputDTO();
-      input.setPipelineId(pipelineId);
+      input.setDataSetId(dataSetId);
       input.setDataSinkType(DataSinkType.POSTGIS);
       return input;
     }
 
-    private void stubPipeline(UUID dataSetId, UUID pipelineId) {
-      DataSet dataSet = dataSet(dataSetId);
-      Pipeline pipeline = pipeline(pipelineId, dataSet);
+    private void stubDataSet(UUID dataSetId) {
       when(dataSinkMapper.toEntity(any())).thenReturn(new DataSink());
-      when(pipelineRepository.findById(pipelineId)).thenReturn(Optional.of(pipeline));
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
     }
 
     @Test
     @DisplayName("Should throw InvalidInputException when tableName is not a String")
     void shouldThrowWhenTableNameIsNotAString() {
       UUID dataSetId = UUID.randomUUID();
-      UUID pipelineId = UUID.randomUUID();
 
-      DataSinkInputDTO input = basePostgisInput(pipelineId);
+      DataSinkInputDTO input = basePostgisInput(dataSetId);
       input.setConfiguration(
           Map.of("tableName", 42, "dataStructureVersionId", UUID.randomUUID().toString()));
 
-      stubPipeline(dataSetId, pipelineId);
+      stubDataSet(dataSetId);
 
       assertThatThrownBy(() -> dataSinkService.create(input))
           .isInstanceOf(InvalidInputException.class);
@@ -209,13 +184,12 @@ class DataSinkServiceTest {
     @DisplayName("Should throw InvalidInputException when tableName is blank")
     void shouldThrowWhenTableNameBlank() {
       UUID dataSetId = UUID.randomUUID();
-      UUID pipelineId = UUID.randomUUID();
 
-      DataSinkInputDTO input = basePostgisInput(pipelineId);
+      DataSinkInputDTO input = basePostgisInput(dataSetId);
       input.setConfiguration(
           Map.of("tableName", "  ", "dataStructureVersionId", UUID.randomUUID().toString()));
 
-      stubPipeline(dataSetId, pipelineId);
+      stubDataSet(dataSetId);
 
       assertThatThrownBy(() -> dataSinkService.create(input))
           .isInstanceOf(InvalidInputException.class);
@@ -225,12 +199,11 @@ class DataSinkServiceTest {
     @DisplayName("Should throw InvalidInputException when dataStructureVersionId is missing")
     void shouldThrowWhenDsvIdMissing() {
       UUID dataSetId = UUID.randomUUID();
-      UUID pipelineId = UUID.randomUUID();
 
-      DataSinkInputDTO input = basePostgisInput(pipelineId);
+      DataSinkInputDTO input = basePostgisInput(dataSetId);
       input.setConfiguration(Map.of("tableName", "sensor_readings"));
 
-      stubPipeline(dataSetId, pipelineId);
+      stubDataSet(dataSetId);
 
       assertThatThrownBy(() -> dataSinkService.create(input))
           .isInstanceOf(InvalidInputException.class);
@@ -240,14 +213,13 @@ class DataSinkServiceTest {
     @DisplayName("Should throw InvalidInputException when DataStructureVersion is not found")
     void shouldThrowWhenDsvNotFound() {
       UUID dataSetId = UUID.randomUUID();
-      UUID pipelineId = UUID.randomUUID();
       UUID dsvId = UUID.randomUUID();
 
-      DataSinkInputDTO input = basePostgisInput(pipelineId);
+      DataSinkInputDTO input = basePostgisInput(dataSetId);
       input.setConfiguration(
           Map.of("tableName", "sensor_readings", "dataStructureVersionId", dsvId.toString()));
 
-      stubPipeline(dataSetId, pipelineId);
+      stubDataSet(dataSetId);
       when(dataStructureVersionRepository.existsById(dsvId)).thenReturn(false);
 
       assertThatThrownBy(() -> dataSinkService.create(input))

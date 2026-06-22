@@ -1,4 +1,4 @@
-import { Datasource } from '@/types/datasources'
+import { DATAPOOL_SCOPE_TYPES, Datasource } from '@/types/datasources'
 
 export const mockDatasources: Datasource[] = [
   {
@@ -12,6 +12,7 @@ export const mockDatasources: Datasource[] = [
     configuration: null,
     dataStructureVersion: null,
     inUse: false,
+    datapoolScope: { type: DATAPOOL_SCOPE_TYPES.NONE },
   },
   {
     id: '00000000-0000-0000-0000-000000000002',
@@ -24,6 +25,7 @@ export const mockDatasources: Datasource[] = [
     configuration: null,
     dataStructureVersion: null,
     inUse: false,
+    datapoolScope: { type: DATAPOOL_SCOPE_TYPES.NONE },
   },
   {
     id: '00000000-0000-0000-0000-000000000003',
@@ -36,5 +38,6 @@ export const mockDatasources: Datasource[] = [
     configuration: null,
     dataStructureVersion: null,
     inUse: false,
+    datapoolScope: { type: DATAPOOL_SCOPE_TYPES.NONE },
   },
 ]

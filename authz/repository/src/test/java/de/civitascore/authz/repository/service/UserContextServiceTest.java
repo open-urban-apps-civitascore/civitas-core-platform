@@ -173,7 +173,7 @@ class UserContextServiceTest {
       Role role = createRoleWithId(roleId, "DataEditor", RoleType.DATA);
       Permission datasetWrite = createPermission("dataset:write");
       when(role.getPermissions()).thenReturn(Set.of(datasetWrite));
-      Assignment assignment = createAssignment(group, role, ScopeType.DATASPACE, SCOPE_ID_1);
+      Assignment assignment = createAssignment(group, role, ScopeType.DATAPOOL, SCOPE_ID_1);
       when(group.getAssignments()).thenReturn(Set.of(assignment));
       when(user.getGroups()).thenReturn(Set.of(group));
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.of(user));
@@ -185,7 +185,7 @@ class UserContextServiceTest {
       assertThat(assignmentContext.getRoleId()).isEqualTo(roleId);
       assertThat(assignmentContext.getRoleName()).isEqualTo("DataEditor");
       assertThat(assignmentContext.getRoleType()).isEqualTo("DATA");
-      assertThat(assignmentContext.getScopeType()).isEqualTo("DATASPACE");
+      assertThat(assignmentContext.getScopeType()).isEqualTo("DATAPOOL");
       assertThat(assignmentContext.getScopeId()).isEqualTo(SCOPE_ID_1.toString());
       assertThat(assignmentContext.getPermissions()).containsExactly("dataset:write");
     }
@@ -221,7 +221,7 @@ class UserContextServiceTest {
       when(role1.getPermissions()).thenReturn(Set.of(dataRead));
       when(role2.getPermissions()).thenReturn(Set.of(dataWrite));
       Assignment assignment1 = createAssignment(group, role1, ScopeType.TENANT, SCOPE_ID_1);
-      Assignment assignment2 = createAssignment(group, role2, ScopeType.DATASPACE, SCOPE_ID_2);
+      Assignment assignment2 = createAssignment(group, role2, ScopeType.DATAPOOL, SCOPE_ID_2);
       when(group.getAssignments()).thenReturn(Set.of(assignment1, assignment2));
       when(user.getGroups()).thenReturn(Set.of(group));
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.of(user));

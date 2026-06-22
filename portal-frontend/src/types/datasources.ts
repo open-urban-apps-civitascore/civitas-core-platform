@@ -7,7 +7,7 @@ import { MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, MIN_NAME_LENGTH, STATUS_TYPES,
 import { ConnectorApiToFormSchema, ConnectorLooseSchema, ConnectorStrictSchema } from './connectors'
 import { DatastructureVersionSummaryApiResponseSchema } from './datastructures'
 
-export type DatasourceTab = 'basicInfo' | 'connector' | 'dataStructure' | 'accessManagement'
+export type DatasourceTab = 'basicInfo' | 'connector' | 'dataStructure' | 'datapools' | 'accessManagement'
 
 export const DATASOURCE_STATUS_TYPES = {
   DRAFT: 'DRAFT',
@@ -36,6 +36,22 @@ export type ConnectorField = {
   expert?: boolean
 }
 
+export const DATAPOOL_SCOPE_TYPES = {
+  NONE: 'NONE',
+  ALL: 'ALL',
+  SPECIFIC: 'SPECIFIC',
+} as const
+
+export type DatapoolScopeType = (typeof DATAPOOL_SCOPE_TYPES)[keyof typeof DATAPOOL_SCOPE_TYPES]
+
+export const DatapoolScopeSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal(DATAPOOL_SCOPE_TYPES.NONE) }),
+  z.object({ type: z.literal(DATAPOOL_SCOPE_TYPES.ALL) }),
+  z.object({ type: z.literal(DATAPOOL_SCOPE_TYPES.SPECIFIC), datapoolIds: z.array(z.string()) }),
+])
+
+export type DatapoolScope = z.infer<typeof DatapoolScopeSchema>
+
 export const DatasourceApiResponseSchema = z.object({
   id: z.string(),
   createdAt: z.string(),
@@ -47,6 +63,7 @@ export const DatasourceApiResponseSchema = z.object({
   configuration: z.record(z.string(), z.unknown()).nullable(),
   dataStructureVersion: DatastructureVersionSummaryApiResponseSchema.nullable(),
   inUse: z.boolean(),
+  datapoolScope: DatapoolScopeSchema,
 })
 
 export type Datasource = z.infer<typeof DatasourceApiResponseSchema>
@@ -64,6 +81,7 @@ export const DatasourceBaseFormSchema = z.object({
   connectorType: ConnectorTypeSchema.optional(),
   configuration: z.record(z.string(), z.unknown()).optional(),
   dataStructureVersionId: z.string().trim().min(1, 'datasources.errors.required').nullable(),
+  datapoolScope: DatapoolScopeSchema.optional(),
 })
 
 export type DatasourceBaseFormData = z.infer<typeof DatasourceBaseFormSchema>
@@ -95,7 +113,7 @@ export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.extend({
 export type DatasourceFormDraft = z.input<typeof DatasourceFormDraftSchema>
 
 export const DatasourceApiToFormSchema = DatasourceApiResponseSchema.transform(
-  ({ id, name, description, dataSourceStatus, dataStructureVersion, connectorType, configuration }) => {
+  ({ id, name, description, dataSourceStatus, dataStructureVersion, connectorType, configuration, datapoolScope }) => {
     const connectorParsed =
       connectorType && configuration ? ConnectorApiToFormSchema.safeParse({ connectorType, configuration }) : null
     if (connectorParsed && !connectorParsed.success) {
@@ -107,6 +125,7 @@ export const DatasourceApiToFormSchema = DatasourceApiResponseSchema.transform(
       description: description ?? '',
       dataSourceStatus,
       dataStructureVersionId: dataStructureVersion?.id,
+      datapoolScope,
       ...(connectorParsed?.success ? connectorParsed.data : {}),
     } as DatasourceFormDraft
   },

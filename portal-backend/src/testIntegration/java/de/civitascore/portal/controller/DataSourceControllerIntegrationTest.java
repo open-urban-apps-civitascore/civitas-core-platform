@@ -8,6 +8,8 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.DatapoolScopeType;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
@@ -20,6 +22,7 @@ import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -1253,6 +1256,114 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<String> response = performUnreleaseExpectingError(dataSource.getId());
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+  }
+
+  @Nested
+  @DisplayName("DataPool ID Filter Tests")
+  class DatapoolIdFilterTests {
+
+    @Test
+    @DisplayName("No datapoolId param returns all DataSources")
+    void noFilterReturnsAll() {
+      DataSource dsAll = portalData.dataSource(b -> b.datapoolScopeType(DatapoolScopeType.ALL));
+      DataSource dsNone = portalData.dataSource(b -> b.datapoolScopeType(DatapoolScopeType.NONE));
+
+      RestPage<DataSourceOutputDTO> page = getAllWithDatapoolId(null);
+
+      assertThat(page.getTotalElements()).isEqualTo(2);
+      assertThat(page.getContent())
+          .extracting(DataSourceOutputDTO::getId)
+          .containsExactlyInAnyOrder(dsAll.getId(), dsNone.getId());
+      assertThat(page.getContent())
+          .extracting(dto -> dto.getDatapoolScope().getType())
+          .containsExactlyInAnyOrder(DatapoolScopeType.ALL, DatapoolScopeType.NONE);
+    }
+
+    @Test
+    @DisplayName("scope=ALL is always included")
+    void scopeAllIsAlwaysIncluded() {
+      DataPool pool = portalData.dataPool();
+      DataSource dsAll = portalData.dataSource(b -> b.datapoolScopeType(DatapoolScopeType.ALL));
+
+      RestPage<DataSourceOutputDTO> page = getAllWithDatapoolId(pool.getId());
+
+      assertThat(page.getContent()).extracting(DataSourceOutputDTO::getId).contains(dsAll.getId());
+    }
+
+    @Test
+    @DisplayName("scope=SPECIFIC with matching pool is included")
+    void scopeSpecificMatchingPoolIsIncluded() {
+      DataPool pool = portalData.dataPool();
+      DataSource dsSpecific =
+          portalData.dataSource(
+              b ->
+                  b.datapoolScopeType(DatapoolScopeType.SPECIFIC)
+                      .scopedDataPools(new HashSet<>(Set.of(pool))));
+
+      RestPage<DataSourceOutputDTO> page = getAllWithDatapoolId(pool.getId());
+
+      assertThat(page.getContent())
+          .extracting(DataSourceOutputDTO::getId)
+          .contains(dsSpecific.getId());
+    }
+
+    @Test
+    @DisplayName("scope=SPECIFIC with non-matching pool is excluded")
+    void scopeSpecificNonMatchingPoolIsExcluded() {
+      DataPool poolA = portalData.dataPool();
+      DataPool poolB = portalData.dataPool();
+      DataSource dsSpecificB =
+          portalData.dataSource(
+              b ->
+                  b.datapoolScopeType(DatapoolScopeType.SPECIFIC)
+                      .scopedDataPools(new HashSet<>(Set.of(poolB))));
+
+      RestPage<DataSourceOutputDTO> page = getAllWithDatapoolId(poolA.getId());
+
+      assertThat(page.getContent())
+          .extracting(DataSourceOutputDTO::getId)
+          .doesNotContain(dsSpecificB.getId());
+    }
+
+    @Test
+    @DisplayName("scope=NONE is always excluded")
+    void scopeNoneIsAlwaysExcluded() {
+      DataPool pool = portalData.dataPool();
+      DataSource dsNone = portalData.dataSource(b -> b.datapoolScopeType(DatapoolScopeType.NONE));
+
+      RestPage<DataSourceOutputDTO> page = getAllWithDatapoolId(pool.getId());
+
+      assertThat(page.getContent())
+          .extracting(DataSourceOutputDTO::getId)
+          .doesNotContain(dsNone.getId());
+    }
+
+    @Test
+    @DisplayName("Multiple SPECIFIC DataSources scoped to same pool produce no duplicate rows")
+    void noDuplicatesWithMultipleScopedDataSources() {
+      DataPool pool = portalData.dataPool();
+      for (int i = 0; i < 3; i++) {
+        portalData.dataSource(
+            b ->
+                b.datapoolScopeType(DatapoolScopeType.SPECIFIC)
+                    .scopedDataPools(new HashSet<>(Set.of(pool))));
+      }
+
+      RestPage<DataSourceOutputDTO> page = getAllWithDatapoolId(pool.getId());
+
+      long distinctIds =
+          page.getContent().stream().map(DataSourceOutputDTO::getId).distinct().count();
+      assertThat(distinctIds).isEqualTo(page.getContent().size());
+    }
+
+    private RestPage<DataSourceOutputDTO> getAllWithDatapoolId(UUID datapoolId) {
+      Map<String, String> params =
+          datapoolId != null ? Map.of("datapoolId", datapoolId.toString()) : Map.of();
+      ResponseEntity<RestPage<DataSourceOutputDTO>> response = performGetAll(params);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      return response.getBody();
     }
   }
 }

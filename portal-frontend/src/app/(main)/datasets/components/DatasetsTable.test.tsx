@@ -6,6 +6,7 @@ import { mappedDatasets } from '@/__mocks__/datasets/mappedDatasets.mock'
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import messages from '@/messages/de.json'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
+import { DatasetTableData } from '@/types/datasets'
 
 import { DatasetsTable } from './DatasetsTable'
 
@@ -55,7 +56,7 @@ describe('DatasetsTable', () => {
   })
 
   it('renders the header and header content correctly', async () => {
-    ;['Name', 'Erstellt von', 'Aktualisiert', 'Status', 'Aktion'].forEach(headerText => {
+    ;['Name', 'Datenpool', 'Erstellt von', 'Aktualisiert', 'Status', 'Aktion'].forEach(headerText => {
       expect(screen.getByRole('columnheader', { name: headerText })).toBeDefined()
     })
     expect(screen.queryByRole('columnheader', { name: 'id' })).toBeNull()
@@ -69,17 +70,17 @@ describe('DatasetsTable', () => {
     const cells1 = within(dataRow1).getAllByRole('cell')
 
     expect(cells1[0]).toHaveTextContent(mappedDatasets[0].name)
-    expect(cells1[1]).toHaveTextContent(mappedDatasets[0].createdBy.name)
-    expect(cells1[2]).toHaveTextContent('10.09.2023')
-    expect(cells1[3]).toHaveTextContent('Entwurf')
+    expect(cells1[2]).toHaveTextContent(mappedDatasets[0].createdBy.name)
+    expect(cells1[3]).toHaveTextContent('10.09.2023')
+    expect(cells1[4]).toHaveTextContent('Entwurf')
 
     const dataRow2 = rows[2]
     const cells2 = within(dataRow2).getAllByRole('cell')
 
     expect(cells2[0]).toHaveTextContent(mappedDatasets[1].name)
-    expect(cells2[1]).toHaveTextContent(mappedDatasets[1].createdBy.name)
-    expect(cells2[2]).toHaveTextContent('01.01.2023')
-    expect(cells2[3]).toHaveTextContent('Verfügbar')
+    expect(cells2[2]).toHaveTextContent(mappedDatasets[1].createdBy.name)
+    expect(cells2[3]).toHaveTextContent('01.01.2023')
+    expect(cells2[4]).toHaveTextContent('Verfügbar')
   })
 })
 
@@ -118,5 +119,73 @@ describe('DatasetsTable — Permission gating', () => {
     mockCurrentUser([PERMISSION_NAMES.DATASET_READ, PERMISSION_NAMES.DATASET_DELETE])
     renderTable()
     expect(screen.getAllByRole('button', { name: 'Open menu' })).toHaveLength(2)
+  })
+
+  describe('Datapool column permission guards', () => {
+    const datasetsWithDatapool: DatasetTableData[] = [
+      {
+        ...mappedDatasets[0],
+        datapool: { id: 'dp1', name: 'Datapool 1' },
+      },
+    ]
+
+    const renderTableWithDatapool = (
+      permissions: PermissionName[],
+      scopeType: 'TENANT' | 'DATAPOOL' = 'TENANT',
+      scopeId: string | null = null,
+    ) => {
+      vi.mocked(useGetCurrentUser).mockReturnValue({
+        data: {
+          username: 'test',
+          email: 'test@test.com',
+          title: 'MR' as const,
+          firstName: 'Test',
+          lastName: 'User',
+          assignments: [{ scopeType, scopeId, permissions }],
+        },
+      } as ReturnType<typeof useGetCurrentUser>)
+
+      return render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <DatasetsTable
+            datasets={datasetsWithDatapool}
+            rowCount={1}
+            pageIndex={0}
+            pageSize={5}
+            setPageIndex={() => null}
+            setPageSize={() => null}
+            sorting={[]}
+            setSorting={() => null}
+            totalPages={1}
+            onPaginationChange={() => null}
+            onSortingChange={() => null}
+          />
+        </NextIntlClientProvider>,
+      )
+    }
+
+    it('shows the datapool name as a link when user has TENANT-scoped DATAPOOL_READ', () => {
+      renderTableWithDatapool([PERMISSION_NAMES.DATAPOOL_READ])
+      expect(screen.getByText('Datapool 1')).toBeInTheDocument()
+      expect(screen.queryByText(messages.datasets.anonymousDatapool)).not.toBeInTheDocument()
+    })
+
+    it('shows the datapool name as a link when user has scoped DATAPOOL_READ for this datapool', () => {
+      renderTableWithDatapool([PERMISSION_NAMES.DATAPOOL_READ], 'DATAPOOL', 'dp1')
+      expect(screen.getByText('Datapool 1')).toBeInTheDocument()
+      expect(screen.queryByText(messages.datasets.anonymousDatapool)).not.toBeInTheDocument()
+    })
+
+    it('shows "Anonym" when user has no DATAPOOL_READ permission', () => {
+      renderTableWithDatapool([PERMISSION_NAMES.DATASET_READ])
+      expect(screen.getByText(messages.datasets.anonymousDatapool)).toBeInTheDocument()
+      expect(screen.queryByText('Datapool 1')).not.toBeInTheDocument()
+    })
+
+    it('shows "Anonym" when user has DATAPOOL_READ only for a different datapool', () => {
+      renderTableWithDatapool([PERMISSION_NAMES.DATAPOOL_READ], 'DATAPOOL', 'dp-other')
+      expect(screen.getByText(messages.datasets.anonymousDatapool)).toBeInTheDocument()
+      expect(screen.queryByText('Datapool 1')).not.toBeInTheDocument()
+    })
   })
 })

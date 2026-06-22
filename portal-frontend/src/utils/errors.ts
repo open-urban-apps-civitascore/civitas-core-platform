@@ -31,6 +31,11 @@ export const isPermissionsError = (error: unknown) => {
   return error.status === 403
 }
 
+export const isDatapoolScopeViolationError = (error: unknown) => {
+  if (!isAxiosError(error)) return false
+  return error.status === 422
+}
+
 export const isLayerNameError = (error: unknown) => {
   if (!isAxiosError(error)) return false
   const isConflictError = error.status === 409

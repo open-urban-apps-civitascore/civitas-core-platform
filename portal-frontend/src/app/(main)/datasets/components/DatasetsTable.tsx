@@ -3,10 +3,10 @@ import { CheckIcon, CircleDashed, UserCheck } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
+import { ContactCell } from '@/components/table/contact-cell/ContactCell'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { usePermissions } from '@/hooks/use-permissions'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { DatasetTableData } from '@/types/datasets'
@@ -70,30 +70,29 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
         },
       },
     }),
+    columnHelper.accessor('datapool', {
+      header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.datapool')} />,
+      cell: info =>
+        info.getValue()?.id ? (
+          hasScopedPermission(PERMISSION_NAMES.DATAPOOL_READ, 'DATAPOOL', info.getValue()!.id) ? (
+            <LinkCell href={`datapools/${info.getValue()?.id}`}>{info.getValue()?.name || ''}</LinkCell>
+          ) : (
+            <span>{t('anonymousDatapool')}</span>
+          )
+        ) : (
+          '-'
+        ),
+      meta: {
+        truncate: true,
+        style: {
+          width: '25%',
+        },
+      },
+    }),
     columnHelper.accessor('createdBy', {
       header: t('tableHeaders.createdBy'),
       cell: info => {
-        const user = info.getValue()
-        const userNameParts = user?.name.split(' ') || []
-        const firstName = userNameParts[0] || ''
-        const lastName = userNameParts[userNameParts.length - 1] || ''
-
-        return (
-          <LinkCell href={`users/${info.getValue()?.id}`}>
-            <div className="flex items-center gap-2">
-              {firstName && lastName ? (
-                <Avatar className="size-8 rounded-lg">
-                  <AvatarImage src="" alt={user?.name || ''} />
-                  <AvatarFallback className="rounded-lg">
-                    {`${firstName.charAt(0)}${lastName.charAt(0)}` || ''}
-                  </AvatarFallback>
-                </Avatar>
-              ) : null}
-
-              {info.getValue()?.name}
-            </div>
-          </LinkCell>
-        )
+        return <ContactCell user={info.getValue()} />
       },
       meta: {
         style: {

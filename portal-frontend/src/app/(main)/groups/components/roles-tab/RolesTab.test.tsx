@@ -67,7 +67,7 @@ const dataAssignment: Assignment = {
   scope: null,
 }
 
-const scopedAssignment: Assignment = {
+const scopedAssignmentDataset: Assignment = {
   id: 'a3',
   createdAt: '',
   modifiedAt: '',
@@ -77,15 +77,26 @@ const scopedAssignment: Assignment = {
   scope: { id: 'ds1', name: 'My Dataset' },
 }
 
+const scopedAssignmentDatapool: Assignment = {
+  id: 'a4',
+  createdAt: '',
+  modifiedAt: '',
+  group: { id: 'g1', name: 'Test Group' },
+  role: { id: 'r4', name: 'Datapool Consumer', roleType: 'DATA', description: 'Datapool role', readonly: false },
+  scopeType: 'DATAPOOL',
+  scope: { id: 'dp1', name: 'My Datapool' },
+}
+
 const mockGroup: Group = {
   id: 'g1',
   name: 'Test Group',
   description: 'A test group',
-  assignments: [systemAssignment, dataAssignment, scopedAssignment],
+  assignments: [systemAssignment, dataAssignment, scopedAssignmentDataset, scopedAssignmentDatapool],
   members: [],
   contactUser: null,
   createdAt: '',
   modifiedAt: '',
+  roles: [],
 }
 
 const assignmentsFromGroup = (group: Group): AssignmentFormData[] =>
@@ -152,13 +163,14 @@ describe('RolesTab', () => {
     return render(<TestWrapper {...props} />)
   }
 
-  it('renders all four scope tabs', () => {
+  it('renders all five scope tabs', () => {
     renderTab()
 
     expect(screen.getByText('roles.scopeTabs.platform')).toBeInTheDocument()
     expect(screen.getByText('roles.scopeTabs.datasets')).toBeInTheDocument()
     expect(screen.getByText('roles.scopeTabs.datasources')).toBeInTheDocument()
     expect(screen.getByText('roles.scopeTabs.datastructures')).toBeInTheDocument()
+    expect(screen.getByText('roles.scopeTabs.datapools')).toBeInTheDocument()
   })
 
   it('shows platform assignments (null + TENANT scopeType) on platform tab', () => {
@@ -182,6 +194,19 @@ describe('RolesTab', () => {
     })
   })
 
+  it('shows only DATAPOOL-scoped assignments on datapools tab', async () => {
+    renderTab()
+
+    fireEvent.click(screen.getByText('roles.scopeTabs.datapools'))
+
+    await waitFor(() => {
+      expect(screen.getByRole('cell', { name: 'Datapool Consumer' })).toBeInTheDocument()
+      expect(screen.queryByRole('cell', { name: 'Admin Role' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('cell', { name: 'Data Editor' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('cell', { name: 'Dataset Viewer' })).not.toBeInTheDocument()
+    })
+  })
+
   it('shows info banner on scoped tabs but not on platform tab', async () => {
     renderTab()
 
@@ -192,6 +217,12 @@ describe('RolesTab', () => {
 
     await waitFor(() => {
       expect(screen.getByText('roles.scopedInfoBanner.DATASET')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText('roles.scopeTabs.datapools'))
+
+    await waitFor(() => {
+      expect(screen.getByText('roles.scopedInfoBanner.DATAPOOL')).toBeInTheDocument()
     })
   })
 
@@ -249,15 +280,14 @@ describe('RolesTab', () => {
       id: 'r-new',
       name: 'New Pending Role',
       description: 'A newly assigned role',
-      type: 'SYSTEM',
-      tenant: 't1',
+      roleType: 'SYSTEM',
       permissions: [],
-      users: [],
+      userCount: 0,
+      groupCount: 0,
       createdAt: '',
-      lastUpdated: null,
-      updatedBy: null,
-      groups: [],
-      roleOrigin: 'custom',
+      modifiedAt: null,
+      modifiedBy: null,
+      readonly: false,
     }
 
     const pendingFormAssignment: AssignmentFormData = {
@@ -282,7 +312,7 @@ describe('RolesTab', () => {
         ...pendingRole,
         id: 'r-data-new',
         name: 'New Data Role',
-        type: 'DATA',
+        roleType: 'DATA',
       }
 
       renderTab({
@@ -347,10 +377,10 @@ describe('RolesTab', () => {
 
       fireEvent.click(screen.getByText('actions.remove'))
 
-      // Form should now have fewer assignments
+      // Form should now have fewer assignments than the initial 4
       await waitFor(() => {
         const assignments = formRef.current?.getValues('assignments') ?? []
-        expect(assignments.length).toBeLessThan(3)
+        expect(assignments.length).toBeLessThan(4)
       })
     })
 
@@ -361,15 +391,14 @@ describe('RolesTab', () => {
         id: 'r-pending-remove',
         name: 'Remove Me',
         description: 'Will be removed',
-        type: 'SYSTEM',
-        tenant: 't1',
+        roleType: 'SYSTEM',
+        readonly: false,
         permissions: [],
-        users: [],
+        userCount: 0,
+        groupCount: 0,
         createdAt: '',
-        lastUpdated: null,
-        updatedBy: null,
-        groups: [],
-        roleOrigin: 'custom',
+        modifiedAt: null,
+        modifiedBy: null,
       }
 
       const emptyGroup: Group = {

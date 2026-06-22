@@ -3,22 +3,24 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.mapper.PipelineMapper;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
+import de.civitascore.portal.model.embedded.DatapoolScopeType;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Pipeline;
-import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.PipelineInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -120,7 +122,6 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
    */
   @Override
   protected Pipeline postConvertToEntity(Pipeline entity, PipelineInputDTO input) {
-    // Set the DataSet relationship
     Optional.ofNullable(input.getDataSetId())
         .flatMap(dataSetRepository::findById)
         .ifPresentOrElse(
@@ -137,30 +138,10 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
             "Pipeline", "dataSourceIds", "One or more DataSource IDs not found");
       }
       dataSources.forEach(this::validateDataSourceLinkable);
+      validateDataSourcesInScope(dataSources, entity.getDataSet());
       entity.setDataSources(new HashSet<>(dataSources));
     } else {
       entity.setDataSources(null);
-    }
-
-    if (input.getDataSinks() != null) {
-      UUID currentPipelineId = entity.getId();
-      List<UUID> existingSinkIds =
-          input.getDataSinks().stream()
-              .map(DataSinkInputDTO::getId)
-              .filter(Objects::nonNull)
-              .toList();
-      if (!existingSinkIds.isEmpty()) {
-        dataSinkRepository.findAllById(existingSinkIds).stream()
-            .filter(existing -> !existing.getPipeline().getId().equals(currentPipelineId))
-            .findFirst()
-            .ifPresent(
-                sink -> {
-                  throw new InvalidInputException(
-                      "DataSink",
-                      sink.getId(),
-                      "DataSink does not belong to this pipeline and cannot be moved");
-                });
-      }
     }
 
     return super.postConvertToEntity(entity, input);
@@ -185,37 +166,82 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
   }
 
   /**
-   * Syncs nested DataSinks after the pipeline is persisted. DataSinks with an id are updated; those
-   * without an id are created; existing DataSinks absent from the input are deleted.
+   * Rewires the {@code pipeline_id} FK on the DataSinks listed in {@code input.dataSinkIds}: any
+   * DataSink previously linked to this pipeline that is no longer in the list is detached; any
+   * DataSink in the list that is not yet linked to this pipeline is attached. Cross-dataset and
+   * cross-pipeline references are rejected.
    */
   @Override
   protected Pipeline postSave(Pipeline saved, PipelineInputDTO input) {
-    List<DataSinkInputDTO> dataSinks =
-        input.getDataSinks() != null ? input.getDataSinks() : List.of();
-
+    Set<UUID> requestedIds =
+        input.getDataSinkIds() != null ? new HashSet<>(input.getDataSinkIds()) : Set.of();
     UUID pipelineId = saved.getId();
+    UUID dataSetId = saved.getDataSet().getId();
 
-    Set<UUID> inputIds =
-        dataSinks.stream()
-            .map(DataSinkInputDTO::getId)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
-
-    dataSinkRepository.findByPipelineId(pipelineId).stream()
-        .map(DataSink::getId)
-        .filter(id -> !inputIds.contains(id))
-        .forEach(dataSinkService::deleteById);
-
-    for (DataSinkInputDTO sinkInput : dataSinks) {
-      sinkInput.setPipelineId(pipelineId);
-      if (sinkInput.getId() == null) {
-        dataSinkService.create(sinkInput);
-      } else {
-        dataSinkService.update(sinkInput.getId(), sinkInput);
+    if (!requestedIds.isEmpty()) {
+      List<DataSink> requested = dataSinkRepository.findAllById(requestedIds);
+      if (requested.size() != requestedIds.size()) {
+        throw new InvalidInputException(
+            "Pipeline", "dataSinkIds", "One or more DataSink IDs not found");
+      }
+      for (DataSink sink : requested) {
+        if (!dataSetId.equals(sink.getDataSet().getId())) {
+          throw new InvalidInputException(
+              "Pipeline",
+              "dataSinkIds",
+              "DataSink " + sink.getId() + " belongs to a different DataSet");
+        }
+        if (sink.getPipeline() != null && !pipelineId.equals(sink.getPipeline().getId())) {
+          throw new InvalidInputException(
+              "Pipeline",
+              "dataSinkIds",
+              "DataSink " + sink.getId() + " is already attached to another Pipeline");
+        }
+      }
+      for (DataSink sink : requested) {
+        if (sink.getPipeline() == null) {
+          sink.setPipeline(saved);
+          dataSinkRepository.save(sink);
+        }
       }
     }
 
+    dataSinkRepository.findByPipelineId(pipelineId).stream()
+        .filter(sink -> !requestedIds.contains(sink.getId()))
+        .forEach(
+            sink -> {
+              sink.setPipeline(null);
+              dataSinkRepository.save(sink);
+            });
+
     return saved;
+  }
+
+  private void validateDataSourcesInScope(List<DataSource> dataSources, DataSet dataSet) {
+    List<DataSource> offendingDataSources =
+        new ArrayList<>(
+            dataSources.stream()
+                .filter(ds -> ds.getDatapoolScopeType() == DatapoolScopeType.NONE)
+                .toList());
+
+    DataPool dataPool = dataSet.getDataPool();
+    if (dataPool != null) {
+      offendingDataSources.addAll(
+          dataSources.stream().filter(ds -> !isPermittedForDataPool(ds, dataPool)).toList());
+    }
+
+    if (!offendingDataSources.isEmpty()) {
+      throw new DataSourceScopeViolationException(
+          offendingDataSources.stream().map(DataSource::getId).collect(Collectors.toList()));
+    }
+  }
+
+  private boolean isPermittedForDataPool(DataSource dataSource, DataPool dataPool) {
+    if (dataSource.getDatapoolScopeType() != DatapoolScopeType.SPECIFIC) {
+      return true;
+    }
+    return dataSource.getScopedDataPools().stream()
+        .anyMatch(scopedPool -> scopedPool.getId().equals(dataPool.getId()));
   }
 
   private void validateDataSourceLinkable(DataSource dataSource) {
@@ -245,7 +271,8 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
   }
 
   /**
-   * Prevents deletion of pipelines that belong to a non-DRAFT dataset.
+   * Prevents deletion of pipelines that belong to a non-DRAFT dataset. Detaches associated
+   * DataSinks (they survive the pipeline deletion).
    *
    * @param id the pipeline ID to delete
    * @return the pipeline entity to be deleted
@@ -265,7 +292,7 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
           "Cannot delete pipeline associated with a dataset that is not in DRAFT status.");
     }
 
-    dataSinkService.deleteByPipelineId(id);
+    dataSinkService.unlinkByPipelineId(id);
 
     return pipeline;
   }

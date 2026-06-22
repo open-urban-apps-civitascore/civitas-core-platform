@@ -31,4 +31,7 @@ public class DataSourceInputDTO extends BaseDataEntityInputDTO {
 
   @Schema(description = "ID of the data structure version to associate")
   private UUID dataStructureVersionId;
+
+  @Schema(description = "Datapool scope configuration. Defaults to ALL if omitted on create.")
+  private DatapoolScopeInputDTO datapoolScope;
 }

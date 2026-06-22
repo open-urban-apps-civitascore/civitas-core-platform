@@ -1,0 +1,60 @@
+meta {
+  name: Create DataPool
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/datapools
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "City Mobility DataPool",
+    "description": "Groups all mobility-related datasets under one governance boundary",
+    "contactPersonId": "{{userId}}",
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataPoolId', res.body.id);
+    bru.setVar('scopeType', 'DATAPOOL');
+    bru.setVar('scopeId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Has id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+  test("Has name", function() {
+    expect(res.body.name).to.be.a('string');
+  });
+  test("Has contactPerson reference", function() {
+    expect(res.body.contactPerson).to.be.an('object');
+    expect(res.body.contactPerson.id).to.equal(bru.getVar('userId'));
+  });
+}
+
+docs {
+  **Precondition:** `userId` is set (e.g. via `00-setup/00-find-existing-user`).
+  
+  **Expected Response:** 201 Created, body contains `id` and an inline `contactPerson` summary.
+  
+  **Post-condition:** Saves `dataPoolId`, `scopeType` and `scopeId`.
+  
+  **System Impact:**
+  
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataPool record created in `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

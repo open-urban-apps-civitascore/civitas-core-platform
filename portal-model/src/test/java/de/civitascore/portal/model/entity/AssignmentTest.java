@@ -53,13 +53,6 @@ class AssignmentTest {
     return ds;
   }
 
-  private static DataSpace newDataSpace() {
-    DataSpace ds = new DataSpace();
-    ds.setId(UUID.randomUUID());
-    ds.setName("TestDataSpace");
-    return ds;
-  }
-
   private static Catalog newCatalog() {
     Catalog c = new Catalog();
     c.setId(UUID.randomUUID());
@@ -123,16 +116,6 @@ class AssignmentTest {
       Assignment a = baseAssignment(RoleType.DATA);
       a.setScopeType(ScopeType.DATASTRUCTURE);
       a.setDataStructure(newDataStructure());
-
-      assertThatNoException().isThrownBy(a::validateScope);
-    }
-
-    @Test
-    @DisplayName("Should pass for DATASPACE scopeType with dataSpace set")
-    void shouldPassForDataspaceScopeWithDataspace() {
-      Assignment a = baseAssignment(RoleType.DATA);
-      a.setScopeType(ScopeType.DATASPACE);
-      a.setDataSpace(newDataSpace());
 
       assertThatNoException().isThrownBy(a::validateScope);
     }
@@ -300,16 +283,6 @@ class AssignmentTest {
     }
 
     @Test
-    @DisplayName("Should return DataSpace when dataSpace is set")
-    void shouldReturnDataSpace() {
-      Assignment a = new Assignment();
-      DataSpace dataSpace = newDataSpace();
-      a.setDataSpace(dataSpace);
-
-      assertThat(a.getScope()).isSameAs(dataSpace);
-    }
-
-    @Test
     @DisplayName("Should return Catalog when catalog is set")
     void shouldReturnCatalog() {
       Assignment a = new Assignment();
@@ -368,18 +341,6 @@ class AssignmentTest {
 
       assertThat(a.getDataSource()).isSameAs(ds);
       assertThat(a.getScopeType()).isEqualTo(ScopeType.DATASOURCE);
-    }
-
-    @Test
-    @DisplayName("setScope(DataSpace) should set entity and DATASPACE scopeType")
-    void shouldSetDataSpaceScope() {
-      Assignment a = new Assignment();
-      DataSpace ds = newDataSpace();
-
-      a.setScope(ds);
-
-      assertThat(a.getDataSpace()).isSameAs(ds);
-      assertThat(a.getScopeType()).isEqualTo(ScopeType.DATASPACE);
     }
 
     @Test

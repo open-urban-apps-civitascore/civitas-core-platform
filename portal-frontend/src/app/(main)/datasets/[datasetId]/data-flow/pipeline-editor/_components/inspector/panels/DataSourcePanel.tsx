@@ -7,8 +7,10 @@
  * Allows selecting a datasource entity and displays its metadata.
  *
  */
+import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
+import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import { usePermissions } from '@/hooks/use-permissions'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 
@@ -25,7 +27,17 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
   const t = useTranslations('pipelineEditor')
   const { hasPermission } = usePermissions()
   const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
-  const { entities, isLoading, isError, getEntityById } = useDataSourceEntities({ isEnabled: canReadDatasources })
+  const { datasetId } = useParams<{ datasetId: string }>()
+  const {
+    data: datasetResponse,
+    isLoading: isDatasetLoading,
+    isError: isDatasetError,
+  } = useGetDataset({ id: datasetId })
+  const datapoolId = datasetResponse?.data?.datapool?.id ?? null
+  const { entities, isLoading, isError, getEntityById } = useDataSourceEntities({
+    isEnabled: canReadDatasources && !isDatasetLoading && !isDatasetError,
+    datapoolId,
+  })
 
   const selectedEntity = data.entityId !== undefined ? getEntityById(data.entityId) : undefined
 
@@ -57,8 +69,8 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
         placeholder={canReadDatasources ? t('dataSourcePanel.placeholder') : t('dataSourcePanel.noPermission')}
         entities={selectableEntities}
         selectedId={data.entityId}
-        isLoading={isLoading}
-        isError={isError}
+        isLoading={isLoading || isDatasetLoading}
+        isError={isError || isDatasetError}
         onChange={handleEntityChange}
         isDisabled={!canReadDatasources}
       />

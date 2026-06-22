@@ -1,41 +1,28 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
-import { UseFormReturn } from 'react-hook-form'
+import { PathValue, UseFormReturn } from 'react-hook-form'
 
-import { useGetUsers } from '@/app/services/api/users/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
-import { AutoComplete, SelectItem } from '@/components/form/fields/AutoComplete'
+import { AutoComplete } from '@/components/form/fields/AutoComplete'
 import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
-import { useDebounce } from '@/hooks/use-debounce'
+import { useContactAutocomplete } from '@/hooks/use-contact-autocomplete'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { usePermissions } from '@/hooks/use-permissions'
 import { cn } from '@/lib/utils'
 import { ItemType } from '@/types/common'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { GroupBaseFormData } from '@/types/groups'
-import { Contact } from '@/types/users'
 
-const MIN_LENGTH = 3
-
-const getContactListItems = (contacts: Contact[]) =>
-  contacts.map(contact => ({
-    value: contact.id,
-    label: (
-      <div>
-        <p>{contact.displayName}</p>
-        <p className="font-xs opacity-60">{contact.email}</p>
-      </div>
-    ),
-  }))
 interface BaseInfoTabProps {
   form: UseFormReturn<GroupBaseFormData>
   isReadOnly: boolean
   initialContactUser: ItemType | null
 }
+
+const MIN_LENGTH = 3
 
 export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const { form, isReadOnly, initialContactUser } = props
@@ -45,65 +32,31 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const canReadUsers = hasPermission(PERMISSION_NAMES.USER_READ)
   const isContactDisabled = isReadOnly || !canReadUsers
 
-  const [isContactListOpen, setIsContactListOpen] = useState(false)
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
-  const [contacts, setContacts] = useState<Contact[]>([])
-  const [contactListItems, setContactListItems] = useState<SelectItem[]>([])
-  const [contactInput, setContactInput] = useState(initialContactUser?.name || '')
-  const debouncedInput = useDebounce(contactInput, 300)
-  const getUsersParams = new URLSearchParams({ q: debouncedInput })
-
-  useEffect(() => {
-    setContactInput(initialContactUser?.name || '')
-  }, [initialContactUser])
-  const { data: contactsData, isLoading: isLoadingContacts } = useGetUsers({
-    params: getUsersParams,
-    isEnabled: debouncedInput.trim().length >= MIN_LENGTH,
+  const {
+    contacts,
+    contactInput,
+    isContactListOpen,
+    isLoadingContacts,
+    setIsContactListOpen,
+    handleContactInputChange,
+    handleSelectContact,
+    handleAutocompleteBlur,
+  } = useContactAutocomplete({
+    form,
+    fieldName: 'contactUserId',
+    initialContact: initialContactUser,
+    emptyValue: '' as PathValue<GroupBaseFormData, 'contactUserId'>,
   })
 
-  useEffect(() => {
-    const contacts =
-      contactsData?.data.map(contact => ({
-        id: contact.id,
-        displayName: `${contact.firstName} ${contact.lastName}`,
-        email: contact.email,
-      })) || []
-    setContacts(contacts)
-    setContactListItems(getContactListItems(contacts))
-  }, [contactsData?.data])
-
-  useEffect(() => {
-    form.setValue('contactUserId', selectedContact?.id || '')
-  }, [selectedContact, form])
-
-  useEffect(() => {
-    if (debouncedInput.trim().length < MIN_LENGTH) {
-      form.setValue('contactUserId', '')
-      setSelectedContact(null)
-      setContacts([])
-      setContactListItems([])
-    }
-  }, [debouncedInput, form])
-
-  const handleContactInputChange = async (value: string) => {
-    setIsContactListOpen(true)
-    setContactInput(value)
-  }
-
-  const handleSelectContact = (newSelection: SelectItem) => {
-    form.setValue('contactUserId', newSelection.value, { shouldDirty: true })
-    const selectedContact = contacts.find(contact => contact.id === newSelection.value)
-    if (selectedContact) {
-      setSelectedContact(selectedContact)
-      setContactInput(selectedContact.displayName)
-    }
-  }
-
-  const handleAutocompleteBlur = () => {
-    if (selectedContact && contactInput !== selectedContact?.displayName) {
-      setContactInput(selectedContact?.displayName)
-    }
-  }
+  const contactListItems = contacts.map(c => ({
+    value: c.id,
+    label: (
+      <div>
+        <p>{c.displayName}</p>
+        <p className="font-xs opacity-60">{c.email}</p>
+      </div>
+    ),
+  }))
 
   return (
     <ContentCard>
@@ -149,7 +102,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           minLength={MIN_LENGTH}
           onOpenChange={setIsContactListOpen}
           onInputChange={handleContactInputChange}
-          onSelectItem={handleSelectContact}
+          onSelectItem={item => handleSelectContact(item.value)}
           onBlur={handleAutocompleteBlur}
           isLoading={isLoadingContacts}
           disabled={isContactDisabled}

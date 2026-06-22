@@ -49,7 +49,7 @@ import org.owasp.encoder.Encode;
  * </ul>
  *
  * <p>Input contract (process variables forwarded from the saga trigger): {@code datasetId} (the
- * workspace name is derived from it), an optional {@code dataSinks} list whose {@code POSTGIS}
+ * workspace name is derived from it), an optional {@code datasinks} list whose {@code POSTGIS}
  * sinks carry {@code configuration.tableName}, and a {@code layers} list of {@code {layerName,
  * nativeName?, crs?}} describing the feature types to publish. A layer's native PostGIS table is
  * its {@code nativeName}; if omitted it defaults to the single {@code POSTGIS} sink table (or the
@@ -445,8 +445,8 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   /** Distinct {@code tableName}s across the {@code POSTGIS} data sinks, in encounter order. */
   private static List<String> sinkTableNames(SagaCommandMessage command) {
     List<String> tables = new ArrayList<>();
-    for (Map<String, Object> sink : mapList(command, "dataSinks")) {
-      if (!DATASINK_TYPE_POSTGIS.equals(sink.get("dataSinkType"))) {
+    for (Map<String, Object> sink : mapList(command, "datasinks")) {
+      if (!DATASINK_TYPE_POSTGIS.equals(sink.get("type"))) {
         continue;
       }
       Map<String, Object> configuration = mapValue(sink, "configuration");

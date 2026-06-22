@@ -6,16 +6,11 @@ import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
-import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
-import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
-import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.PipelineInputDTO;
-import de.civitascore.portal.model.output.DataSinkOutputDTO;
 import de.civitascore.portal.model.output.PipelineOutputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
@@ -177,7 +172,7 @@ class PipelineControllerIntegrationTest
           .isEqualTo(input.getDescription());
       assertThat(output.getStyles()).as("Styles should match input").isEqualTo(input.getStyles());
       assertThat(output.getModel()).as("Model should match input").isEqualTo(input.getModel());
-      assertThat(output.getDataSinks()).as("DataSinks should be empty").isEmpty();
+      assertThat(output.getDataSinkIds()).as("DataSink IDs should be empty").isEmpty();
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
     }
 
@@ -700,12 +695,13 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should delete all DataSinks belonging to the pipeline when pipeline is deleted")
-    void shouldDeleteDataSinksWhenPipelineIsDeleted() {
+    @DisplayName("Should detach (not delete) DataSinks when pipeline is deleted")
+    void shouldDetachDataSinksWhenPipelineIsDeleted() {
       UUID pipelineId = createTestEntity();
       Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
 
       DataSink sink = new DataSink();
+      sink.setDataSet(pipeline.getDataSet());
       sink.setPipeline(pipeline);
       sink.setDataSinkType(DataSinkType.FROST);
       DataSink savedSink = dataSinkRepository.save(sink);
@@ -714,7 +710,11 @@ class PipelineControllerIntegrationTest
       ResponseEntity<Void> deleteResponse = performDelete(pipelineId);
       assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
-      assertThat(dataSinkRepository.findById(savedSink.getId())).isEmpty();
+      assertThat(dataSinkRepository.findById(savedSink.getId()))
+          .as("DataSink survives pipeline deletion")
+          .isPresent()
+          .get()
+          .satisfies(s -> assertThat(s.getPipeline()).isNull());
     }
 
     @Test
@@ -858,16 +858,16 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should handle null dataSinks (treated as empty — no DataSinks created)")
-    void shouldHandleNullDataSinks() {
+    @DisplayName("Should handle null dataSinkIds (treated as empty — no DataSinks linked)")
+    void shouldHandleNullDataSinkIds() {
       PipelineInputDTO input = createValidInput();
-      input.setDataSinks(null);
+      input.setDataSinkIds(null);
 
       ResponseEntity<PipelineOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDataSinks()).isEmpty();
+      assertThat(response.getBody().getDataSinkIds()).isEmpty();
     }
 
     @Test
@@ -1175,21 +1175,25 @@ class PipelineControllerIntegrationTest
   }
 
   @Nested
-  @DisplayName("Nested DataSink Tests")
-  class NestedDataSinkTests {
+  @DisplayName("DataSink linkage via dataSinkIds")
+  class DataSinkLinkageTests {
 
-    private DataSinkInputDTO frostSinkInput() {
-      DataSinkInputDTO sink = new DataSinkInputDTO();
+    private DataSink saveFreeSink(DataSet dataSet) {
+      DataSink sink = new DataSink();
+      sink.setDataSet(dataSet);
       sink.setDataSinkType(DataSinkType.FROST);
-      sink.setConfiguration(Map.of());
-      return sink;
+      return dataSinkRepository.save(sink);
     }
 
     @Test
-    @DisplayName("Creating a pipeline with DataSinks persists them")
-    void shouldCreatePipelineWithDataSinks() {
+    @DisplayName("Creating a pipeline with dataSinkIds attaches existing DataSinks")
+    void shouldAttachDataSinksOnCreate() {
+      getEndpointPath();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      DataSink sink = saveFreeSink(dataSet);
+
       PipelineInputDTO input = createValidInput();
-      input.setDataSinks(List.of(frostSinkInput()));
+      input.setDataSinkIds(Set.of(sink.getId()));
 
       ResponseEntity<PipelineOutputDTO> response = performCreate(input);
 
@@ -1197,117 +1201,60 @@ class PipelineControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       UUID pipelineId = response.getBody().getId();
 
-      assertThat(dataSinkRepository.findByPipelineId(pipelineId)).hasSize(1);
-      assertThat(response.getBody().getDataSinks()).hasSize(1);
+      assertThat(response.getBody().getDataSinkIds()).containsExactly(sink.getId());
+      assertThat(dataSinkRepository.findByPipelineId(pipelineId))
+          .extracting(DataSink::getId)
+          .containsExactly(sink.getId());
     }
 
     @Test
-    @DisplayName("Updating a pipeline with empty dataSinks removes existing DataSinks")
-    void shouldDeleteDataSinksOnPutWithEmptyList() {
+    @DisplayName("Updating a pipeline with empty dataSinkIds detaches but preserves DataSinks")
+    void shouldDetachDataSinksOnEmptyList() {
       UUID pipelineId = createTestEntity();
       Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
+      DataSet dataSet = pipeline.getDataSet();
 
-      DataSink sink = new DataSink();
+      DataSink sink = saveFreeSink(dataSet);
       sink.setPipeline(pipeline);
-      sink.setDataSinkType(DataSinkType.FROST);
       dataSinkRepository.save(sink);
+      UUID sinkId = sink.getId();
       assertThat(dataSinkRepository.findByPipelineId(pipelineId)).hasSize(1);
 
       PipelineInputDTO updateInput = createUpdateInput();
-      updateInput.setDataSinks(List.of());
+      updateInput.setDataSinkIds(Set.of());
 
       ResponseEntity<PipelineOutputDTO> response = performUpdate(pipelineId, updateInput);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(dataSinkRepository.findByPipelineId(pipelineId)).isEmpty();
+      assertThat(dataSinkRepository.findById(sinkId))
+          .as("DataSink should survive pipeline detachment")
+          .isPresent();
     }
 
     @Test
-    @DisplayName("Updating a pipeline with an existing DataSink ID updates it")
-    void shouldUpdateExistingDataSinkViaNestedInput() {
+    @DisplayName("GET pipeline includes its dataSinkIds in the response")
+    void shouldReturnDataSinkIdsInGetResponse() {
       UUID pipelineId = createTestEntity();
       Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
+      DataSet dataSet = pipeline.getDataSet();
 
-      DataSink sink = new DataSink();
+      DataSink sink = saveFreeSink(dataSet);
       sink.setPipeline(pipeline);
-      sink.setDataSinkType(DataSinkType.FROST);
-      DataSink savedSink = dataSinkRepository.save(sink);
-
-      DataSinkInputDTO sinkUpdate = new DataSinkInputDTO();
-      sinkUpdate.setId(savedSink.getId());
-      sinkUpdate.setDataSinkType(DataSinkType.FROST);
-      sinkUpdate.setConfiguration(Map.of());
-
-      PipelineInputDTO updateInput = createUpdateInput();
-      updateInput.setDataSinks(List.of(sinkUpdate));
-
-      ResponseEntity<PipelineOutputDTO> response = performUpdate(pipelineId, updateInput);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      List<DataSink> sinks = dataSinkRepository.findByPipelineId(pipelineId);
-      assertThat(sinks).hasSize(1);
-      assertThat(sinks.getFirst().getId()).isEqualTo(savedSink.getId());
-    }
-
-    @Test
-    @DisplayName("Should return 400 when creating a pipeline with a DataSink missing dataSinkType")
-    void shouldRejectCreateWithDataSinkMissingType() {
-      DataSinkInputDTO invalidSink = new DataSinkInputDTO();
-      // dataSinkType intentionally null
-      invalidSink.setConfiguration(Map.of());
-
-      PipelineInputDTO input = createValidInput();
-      input.setDataSinks(List.of(invalidSink));
-
-      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName("Should return 400 when creating a pipeline with a DataSink missing configuration")
-    void shouldRejectCreateWithDataSinkMissingConfiguration() {
-      DataSinkInputDTO invalidSink = new DataSinkInputDTO();
-      invalidSink.setDataSinkType(DataSinkType.FROST);
-      // configuration intentionally null
-
-      PipelineInputDTO input = createValidInput();
-      input.setDataSinks(List.of(invalidSink));
-
-      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName("GET pipeline includes its DataSinks in the response")
-    void shouldReturnDataSinksInGetResponse() {
-      UUID pipelineId = createTestEntity();
-      Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
-
-      DataSink sink = new DataSink();
-      sink.setPipeline(pipeline);
-      sink.setDataSinkType(DataSinkType.FROST);
-      dataSinkRepository.save(sink);
+      DataSink saved = dataSinkRepository.save(sink);
 
       ResponseEntity<PipelineOutputDTO> response = performGetById(pipelineId);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDataSinks()).hasSize(1);
-      DataSinkOutputDTO sinkDto = response.getBody().getDataSinks().getFirst();
-      assertThat(sinkDto.getDataSinkType()).isEqualTo(DataSinkType.FROST);
+      assertThat(response.getBody().getDataSinkIds()).containsExactly(saved.getId());
     }
 
     @Test
-    @DisplayName("Should reject FROST DataSink with non-empty configuration")
-    void shouldRejectFrostDataSinkWithNonEmptyConfig() {
-      DataSinkInputDTO invalidSink = new DataSinkInputDTO();
-      invalidSink.setDataSinkType(DataSinkType.FROST);
-      invalidSink.setConfiguration(Map.of("unexpected", "value"));
-
+    @DisplayName("Should reject create when dataSinkIds includes an unknown UUID")
+    void shouldRejectUnknownDataSinkId() {
       PipelineInputDTO input = createValidInput();
-      input.setDataSinks(List.of(invalidSink));
+      input.setDataSinkIds(Set.of(UUID.randomUUID()));
 
       ResponseEntity<PipelineOutputDTO> response = performCreate(input);
 
@@ -1315,43 +1262,14 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName(
-        "Should create pipeline with POSTGIS DataSink and populate dataSetId on the response")
-    void shouldCreatePostgisDataSink() {
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
-      DataStructureVersion dsv =
-          portalData.dataStructureVersion(
-              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
-
-      DataSinkInputDTO postgisSink = new DataSinkInputDTO();
-      postgisSink.setDataSinkType(DataSinkType.POSTGIS);
-      postgisSink.setConfiguration(
-          Map.of("tableName", "sensor_data", "dataStructureVersionId", dsv.getId().toString()));
+    @DisplayName("Should reject create when a DataSink belongs to a different dataset")
+    void shouldRejectCrossDatasetDataSink() {
+      getEndpointPath();
+      DataSet otherDataSet = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT));
+      DataSink crossSink = saveFreeSink(otherDataSet);
 
       PipelineInputDTO input = createValidInput();
-      input.setDataSinks(List.of(postgisSink));
-
-      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDataSinks()).hasSize(1);
-      DataSinkOutputDTO sinkDto = response.getBody().getDataSinks().getFirst();
-      assertThat(sinkDto.getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
-      assertThat(sinkDto.getDataSetId()).isEqualTo(response.getBody().getDataSetId());
-    }
-
-    @Test
-    @DisplayName("Should reject POSTGIS DataSink with non-existent dataStructureVersionId")
-    void shouldRejectPostgisDataSinkWithInvalidDsvId() {
-      DataSinkInputDTO invalidSink = new DataSinkInputDTO();
-      invalidSink.setDataSinkType(DataSinkType.POSTGIS);
-      invalidSink.setConfiguration(
-          Map.of(
-              "tableName", "sensor_data", "dataStructureVersionId", UUID.randomUUID().toString()));
-
-      PipelineInputDTO input = createValidInput();
-      input.setDataSinks(List.of(invalidSink));
+      input.setDataSinkIds(Set.of(crossSink.getId()));
 
       ResponseEntity<PipelineOutputDTO> response = performCreate(input);
 
@@ -1359,49 +1277,48 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should reject POSTGIS DataSink without tableName")
-    void shouldRejectPostgisDataSinkWithoutTableName() {
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
-      DataStructureVersion dsv =
-          portalData.dataStructureVersion(
-              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
-
-      DataSinkInputDTO invalidSink = new DataSinkInputDTO();
-      invalidSink.setDataSinkType(DataSinkType.POSTGIS);
-      invalidSink.setConfiguration(Map.of("dataStructureVersionId", dsv.getId().toString()));
-
-      PipelineInputDTO input = createValidInput();
-      input.setDataSinks(List.of(invalidSink));
-
-      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName("Should reject update when DataSink ID belongs to a different pipeline")
-    void shouldRejectDataSinkFromAnotherPipeline() {
+    @DisplayName("Should reject update when a DataSink is already attached to another pipeline")
+    void shouldRejectDataSinkAttachedElsewhere() {
       UUID pipelineId = createTestEntity();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
 
-      // DataSink belonging to a different pipeline
-      DataSet otherDs = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT));
-      Pipeline otherPipeline = portalData.pipeline(otherDs);
-      DataSink foreignSink = new DataSink();
-      foreignSink.setPipeline(otherPipeline);
-      foreignSink.setDataSinkType(DataSinkType.FROST);
-      UUID foreignSinkId = dataSinkRepository.save(foreignSink).getId();
-
-      DataSinkInputDTO hijackAttempt = new DataSinkInputDTO();
-      hijackAttempt.setId(foreignSinkId);
-      hijackAttempt.setDataSinkType(DataSinkType.FROST);
-      hijackAttempt.setConfiguration(Map.of());
+      Pipeline otherPipeline =
+          pipelineRepository.save(
+              Pipeline.builder()
+                  .name("other-pipeline-" + UUID.randomUUID())
+                  .dataSet(dataSet)
+                  .build());
+      DataSink sink = saveFreeSink(dataSet);
+      sink.setPipeline(otherPipeline);
+      dataSinkRepository.save(sink);
 
       PipelineInputDTO updateInput = createUpdateInput();
-      updateInput.setDataSinks(List.of(hijackAttempt));
+      updateInput.setDataSinkIds(Set.of(sink.getId()));
 
       ResponseEntity<PipelineOutputDTO> response = performUpdate(pipelineId, updateInput);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Deleting a pipeline detaches its DataSinks but does not delete them")
+    void deletingPipelineDetachesDataSinks() {
+      UUID pipelineId = createTestEntity();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
+
+      DataSink sink = saveFreeSink(dataSet);
+      sink.setPipeline(pipeline);
+      DataSink saved = dataSinkRepository.save(sink);
+
+      ResponseEntity<Void> response = performDelete(pipelineId);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+      assertThat(dataSinkRepository.findById(saved.getId()))
+          .as("DataSink should survive pipeline deletion")
+          .isPresent()
+          .get()
+          .satisfies(s -> assertThat(s.getPipeline()).isNull());
     }
   }
 }

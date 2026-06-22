@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { useCreateDataset } from '@/app/services/api/datasets/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
+import { FormSelect } from '@/components/form/fields/FormSelect'
 import { TextField } from '@/components/form/fields/TextField'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -19,15 +20,23 @@ import { Form } from '@/components/ui/form'
 import { useError } from '@/hooks/use-error'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
+import { SelectOption } from '@/types/common'
 import { DatasetCreateFormData, DatasetCreateFormSchema } from '@/types/datasets'
-import { isNameConflictError } from '@/utils/errors'
 
-export const DatasetCreateForm = () => {
+type DatasetCreateFormProps = {
+  datapoolOptions?: SelectOption[]
+}
+
+export const DatasetCreateForm = (props: DatasetCreateFormProps) => {
+  const { datapoolOptions } = props
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
 
   const router = useRouter()
   const searchParams = useSearchParams()
+
+  const datapoolId = searchParams.get('datapoolId') ?? null
+  const sourceParam = searchParams.get('source')
 
   const createDataset = useCreateDataset()
   const isLoading = createDataset.isPending
@@ -36,27 +45,25 @@ export const DatasetCreateForm = () => {
     resolver: zodResolver(DatasetCreateFormSchema),
     defaultValues: {
       name: '',
+      datapoolId: datapoolId,
     },
   })
 
-  const { handleFormValidationError, handleNameError } = useError()
+  const { handleFormValidationError } = useError()
 
   const handleCreateDataset = async (formData: DatasetCreateFormData): Promise<boolean> => {
     try {
       const { data } = await createDataset.mutateAsync({
         name: formData.name,
+        ...(formData.datapoolId && { datapoolId: formData.datapoolId }),
       })
       toast.success(t('messages.createSuccess'))
       router.push(`/datasets/${data.id}?mode=edit`)
       return true
-    } catch (error) {
-      if (isNameConflictError(error)) {
-        handleNameError(form, form.getValues('name'))
-      } else {
-        toast.error(tCommon('errors.unexpectedError'))
-      }
-      return false
+    } catch {
+      toast.error(tCommon('errors.unexpectedError'))
     }
+    return false
   }
 
   const handleSave = async (): Promise<boolean> => {
@@ -78,6 +85,10 @@ export const DatasetCreateForm = () => {
   useRegisterUnsavedChanges(form.formState.isDirty, handleSave)
 
   const handleCancel = () => {
+    if (sourceParam === 'datapools') {
+      router.push(`/datapools/${datapoolId}?subtab=datasets`)
+      return
+    }
     router.push(`/datasets?${searchParams.toString()}`)
   }
 
@@ -111,24 +122,39 @@ export const DatasetCreateForm = () => {
             >
               <DetailsFieldContainer className="pt-0 border-b-0">
                 <SubHeader
-                  title={t('create.form.title')}
+                  title={t('create.title')}
                   titleClassName="text-2xl leading-none font-bold"
-                  subtitle={t('create.form.subtitle')}
+                  subtitle={t('create.subtitle')}
                 />
               </DetailsFieldContainer>
               {isLoading ? (
                 <LoadingSpinner className="h-[120px]" />
               ) : (
-                <DetailsFieldContainer className="max-w-300">
-                  <TextField
-                    id="datasetTitle"
-                    form={form}
-                    label={t('create.form.name')}
-                    name="name"
-                    placeholder={t('create.form.name')}
-                    required
-                  />
-                </DetailsFieldContainer>
+                <>
+                  <DetailsFieldContainer className="max-w-300">
+                    <TextField
+                      id="datasetTitle"
+                      form={form}
+                      label={t('form.name')}
+                      name="name"
+                      placeholder={t('form.name')}
+                      required
+                    />
+                  </DetailsFieldContainer>
+                  {datapoolId ? (
+                    <DetailsFieldContainer className="max-w-300">
+                      <FormSelect
+                        id="datasetDatapool"
+                        placeholder={t('form.datapoolSelectPlaceholder')}
+                        label={t('form.datapoolSelect')}
+                        options={datapoolOptions ?? []}
+                        form={form}
+                        name="datapoolId"
+                        data-testid="datapoolSelect"
+                      />
+                    </DetailsFieldContainer>
+                  ) : null}
+                </>
               )}
             </form>
           </Form>
