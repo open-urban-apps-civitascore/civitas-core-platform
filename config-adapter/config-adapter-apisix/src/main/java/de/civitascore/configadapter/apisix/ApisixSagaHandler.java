@@ -97,9 +97,11 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     this.upstreams = new RouteUpstreams(settings.geoserverUrl());
 
     log.info(
-        "ApisixSagaHandler initialized for: {} (api host: {}, frost upstream auth header: {})",
+        "ApisixSagaHandler initialized for: {} (api host: {}, geoserver url: {}, frost upstream"
+            + " auth header: {})",
         Encode.forJava(settings.adminApiUrl()),
         Encode.forJava(settings.apiHost()),
+        Encode.forJava(settings.geoserverUrl()),
         Encode.forJava(settings.frostAuth().headerName()));
   }
 

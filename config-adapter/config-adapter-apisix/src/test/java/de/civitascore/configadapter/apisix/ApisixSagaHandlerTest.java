@@ -1359,6 +1359,76 @@ class ApisixSagaHandlerTest {
         assertFalse(captor.getValue().getEntity().containsKey("plugin_config_id"));
       }
     }
+
+    @Test
+    @DisplayName("restoring an OWS route applies the gateway gate but injects no FROST credential")
+    void shouldNotInjectFrostCredentialWhenRestoringOwsRoute() {
+      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
+        Response getResp = mock(Response.class);
+        when(getResp.getStatus()).thenReturn(200);
+        // The route read back from APISIX carries the OWS standard marker the handler wrote at
+        // CREATE, so the compensation knows it is a map-service route (the standard is not in the
+        // RESTORE payload).
+        when(getResp.readEntity(Map.class))
+            .thenAnswer(
+                inv -> {
+                  Map<String, Object> value = new HashMap<>();
+                  value.put("uri", "/v1/datasets/ds-001/map");
+                  value.put("upstream_id", "ds-001-ows");
+                  Map<String, Object> labels = new HashMap<>();
+                  labels.put("civitas-named-api-standard", "OWS");
+                  value.put("labels", labels);
+                  Map<String, Object> proxyRewrite = new HashMap<>();
+                  proxyRewrite.put(
+                      "regex_uri",
+                      new String[] {"^/v1/datasets/ds-001/map(/.*)?$", "/geoserver/ds_001/ows$1"});
+                  Map<String, Object> plugins = new HashMap<>();
+                  plugins.put("proxy-rewrite", proxyRewrite);
+                  value.put("plugins", plugins);
+                  Map<String, Object> envelope = new HashMap<>();
+                  envelope.put("value", value);
+                  return envelope;
+                });
+        when(mockBuilder.get()).thenReturn(getResp);
+        Response putResp = mock(Response.class);
+        when(putResp.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(putResp);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("routeIds", Map.of("map", "rid-map"));
+        payload.put("serviceId", "ds-001");
+        // Restore to the previous protected state: compensation must re-apply the gate without ever
+        // injecting a FROST credential onto a GeoServer route.
+        payload.put("previousOpenDataAccess", Map.of("map", false));
+
+        SagaCommandResult result =
+            handler.handle(
+                new SagaCommandMessage(
+                    "COMPENSATE_STEP",
+                    "m",
+                    "saga-001",
+                    "restore-route",
+                    "apisix",
+                    "RESTORE_ROUTE",
+                    payload));
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
+            ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder).put(entityCaptor.capture());
+        Map<String, Object> routeBody = entityCaptor.getValue().getEntity();
+
+        // Protected → the gateway gate applies to OWS too...
+        assertEquals("auth-plugin-1", routeBody.get("plugin_config_id"));
+        // ...but the map-service route never gets a FROST credential or its tracking label.
+        assertNull(authSetHeadersOf(routeBody), "OWS restore must not inject a FROST credential");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> labels = (Map<String, Object>) routeBody.get("labels");
+        assertFalse(labels.containsKey("civitas-frost-upstream-auth-header"));
+        assertEquals("OWS", labels.get("civitas-named-api-standard"));
+      }
+    }
   }
 
   @Nested
