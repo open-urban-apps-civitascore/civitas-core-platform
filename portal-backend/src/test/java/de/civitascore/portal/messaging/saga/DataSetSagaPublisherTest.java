@@ -16,6 +16,7 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
@@ -424,6 +425,178 @@ class DataSetSagaPublisherTest {
       assertThat(layers).isNotNull();
       assertThat(layers.size()).isEqualTo(1);
       assertThat(layers.get(0).get("nativeName").asString()).isEqualTo("events");
+    }
+  }
+
+  @Nested
+  @DisplayName("buildStyles() and per-layer style references")
+  class BuildStylesTests {
+
+    private DataSink postgisSink(UUID id, String tableName) {
+      DataSink sink = new DataSink();
+      sink.setId(id);
+      sink.setDataSinkType(DataSinkType.POSTGIS);
+      Map<String, Object> cfg = new HashMap<>();
+      cfg.put("tableName", tableName);
+      sink.setConfiguration(cfg);
+      return sink;
+    }
+
+    private Layer layer(UUID id, String layerName, String crs, DataSink sink) {
+      Layer layer = new Layer();
+      layer.setId(id);
+      layer.setLayerName(layerName);
+      layer.setCrs(crs);
+      layer.setDataSink(sink);
+      return layer;
+    }
+
+    private Style style(String name, String sld) {
+      Style s = new Style();
+      s.setId(UUID.randomUUID());
+      s.setName(name);
+      s.setSldContent(sld);
+      return s;
+    }
+
+    private ArgumentCaptor<String> stubKafkaSend() {
+      ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
+      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
+          .thenReturn(
+              CompletableFuture.completedFuture(
+                  new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
+      return jsonCaptor;
+    }
+
+    @Test
+    @DisplayName("CREATE trigger carries dataset styles[] and per-layer style references")
+    void createTriggerCarriesStylesAndLayerReferences() throws Exception {
+      Style def = style("civitas_default_point", "<sld>default</sld>");
+      Style alt = style("civitas_heat", "<sld>heat</sld>");
+
+      DataSink sink = postgisSink(UUID.randomUUID(), "my_table");
+      Layer l = layer(UUID.randomUUID(), "layer1", "EPSG:4326", sink);
+      l.setDefaultStyle(def);
+      l.setAlternativeStyles(Set.of(alt));
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setStyles(Set.of(def, alt));
+      dataSet.setLayers(Set.of(l));
+
+      var jsonCaptor = stubKafkaSend();
+      publisher.publishCreateRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+
+      var styles = payload.get("styles");
+      assertThat(styles).as("styles must be present in CREATE trigger").isNotNull();
+      assertThat(styles.size()).isEqualTo(2);
+      Map<String, String> sldByName = new HashMap<>();
+      styles.forEach(n -> sldByName.put(n.get("name").asString(), n.get("sldContent").asString()));
+      assertThat(sldByName).containsEntry("civitas_default_point", "<sld>default</sld>");
+      assertThat(sldByName).containsEntry("civitas_heat", "<sld>heat</sld>");
+
+      var entry = payload.get("layers").get(0);
+      assertThat(entry.get("defaultStyle").asString()).isEqualTo("civitas_default_point");
+      var altList = entry.get("alternativeStyles");
+      assertThat(altList).isNotNull();
+      assertThat(altList.size()).isEqualTo(1);
+      assertThat(altList.get(0).asString()).isEqualTo("civitas_heat");
+    }
+
+    @Test
+    @DisplayName("UPDATE trigger also carries styles[] and per-layer references")
+    void updateTriggerCarriesStylesAndLayerReferences() throws Exception {
+      Style def = style("civitas_default_point", "<sld/>");
+
+      DataSink sink = postgisSink(UUID.randomUUID(), "events");
+      Layer l = layer(UUID.randomUUID(), "events-layer", "EPSG:3857", sink);
+      l.setDefaultStyle(def);
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setProjectId("proj-1");
+      dataSet.setServiceId("svc-1");
+      dataSet.setPipelines(Set.of());
+      dataSet.setStyles(Set.of(def));
+      dataSet.setLayers(Set.of(l));
+
+      var jsonCaptor = stubKafkaSend();
+      publisher.publishUpdateRequested(dataSet, Set.of());
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.get("styles").size()).isEqualTo(1);
+      assertThat(payload.get("layers").get(0).get("defaultStyle").asString())
+          .isEqualTo("civitas_default_point");
+    }
+
+    @Test
+    @DisplayName("Dataset without styles omits styles field; layer style refs are null")
+    void emptyStylesOmittedFromTrigger() throws Exception {
+      DataSink sink = postgisSink(UUID.randomUUID(), "my_table");
+      Layer l = layer(UUID.randomUUID(), "layer1", null, sink);
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setLayers(Set.of(l));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.has("styles"))
+          .as("empty styles should be omitted from the JSON via @JsonInclude(NON_NULL)")
+          .isFalse();
+      var entry = payload.get("layers").get(0);
+      assertThat(entry.get("defaultStyle").isNull()).isTrue();
+      assertThat(entry.get("alternativeStyles").isNull()).isTrue();
+    }
+
+    @Test
+    @DisplayName("alternativeStyles names are emitted in deterministic (sorted) order")
+    void alternativeStylesAreSorted() throws Exception {
+      Style sA = style("civitas_a", "<sld/>");
+      Style sM = style("civitas_m", "<sld/>");
+      Style sZ = style("civitas_z", "<sld/>");
+      Style def = style("civitas_default", "<sld/>");
+
+      DataSink sink = postgisSink(UUID.randomUUID(), "my_table");
+      Layer l = layer(UUID.randomUUID(), "layer1", null, sink);
+      l.setDefaultStyle(def);
+      // Insert in non-alphabetical order; the publisher must still emit them sorted.
+      Set<Style> alts = new LinkedHashSet<>();
+      alts.add(sZ);
+      alts.add(sA);
+      alts.add(sM);
+      l.setAlternativeStyles(alts);
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setStyles(Set.of(sA, sM, sZ, def));
+      dataSet.setLayers(Set.of(l));
+
+      var jsonCaptor = stubKafkaSend();
+      publisher.publishCreateRequested(dataSet);
+
+      var altList =
+          new JsonMapper()
+              .readTree(jsonCaptor.getValue())
+              .get("layers")
+              .get(0)
+              .get("alternativeStyles");
+      assertThat(altList.size()).isEqualTo(3);
+      assertThat(altList.get(0).asString()).isEqualTo("civitas_a");
+      assertThat(altList.get(1).asString()).isEqualTo("civitas_m");
+      assertThat(altList.get(2).asString()).isEqualTo("civitas_z");
     }
   }
 

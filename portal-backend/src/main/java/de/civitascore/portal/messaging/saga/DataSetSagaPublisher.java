@@ -11,8 +11,10 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.saga.DataSinkPayload;
 import de.civitascore.portal.model.saga.LayerPayload;
+import de.civitascore.portal.model.saga.StylePayload;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
@@ -78,7 +80,7 @@ public class DataSetSagaPublisher {
             buildDatasources(dataset),
             buildDatasinks(dataset),
             buildLayers(dataset),
-            null,
+            buildStyles(dataset),
             buildPipelines(dataset.getPipelines(), PipelineAction.ADD),
             buildNamedApis(dataset));
     sendTrigger(trigger);
@@ -103,7 +105,7 @@ public class DataSetSagaPublisher {
             buildDatasources(dataset),
             buildDatasinks(dataset),
             buildLayers(dataset),
-            null,
+            buildStyles(dataset),
             buildPipelineDiff(previousPipelines, dataset.getPipelines()),
             buildNamedApis(dataset));
     sendTrigger(trigger);
@@ -182,8 +184,35 @@ public class DataSetSagaPublisher {
         layer.getLayerName(),
         resolveNativeName(layer),
         layer.getCrs(),
-        null,
-        null);
+        layer.getDefaultStyle() != null ? layer.getDefaultStyle().getName() : null,
+        buildAlternativeStyleNames(layer));
+  }
+
+  /**
+   * Sorted list of style names a layer references in addition to its default. Sorted so the JSON
+   * output is stable across runs (the underlying {@link java.util.Set} has no defined iteration
+   * order). Returns {@code null} when empty so {@code @JsonInclude(NON_NULL)} drops the field.
+   */
+  private List<String> buildAlternativeStyleNames(Layer layer) {
+    if (layer.getAlternativeStyles() == null || layer.getAlternativeStyles().isEmpty()) {
+      return null;
+    }
+    return layer.getAlternativeStyles().stream().map(Style::getName).sorted().toList();
+  }
+
+  /**
+   * All SLD styles attached to the dataset, mapped to the payload shape. Carried once at the
+   * dataset level; layers reference these by name. Returns {@code null} when the dataset has no
+   * styles so {@code @JsonInclude(NON_NULL)} drops the field — keeps {@code hasStyles=false} on the
+   * consumer side.
+   */
+  private List<StylePayload> buildStyles(DataSet dataset) {
+    if (dataset.getStyles() == null || dataset.getStyles().isEmpty()) {
+      return null;
+    }
+    return dataset.getStyles().stream()
+        .map(s -> new StylePayload(s.getName(), s.getSldContent()))
+        .toList();
   }
 
   /**
