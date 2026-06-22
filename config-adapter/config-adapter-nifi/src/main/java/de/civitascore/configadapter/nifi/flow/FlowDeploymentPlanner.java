@@ -22,14 +22,14 @@ import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
-import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.ReplacementStrategy;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Turns one resolved pipeline (graph + source + sink) into a {@link DeploymentPlan}: it compiles
@@ -41,6 +41,10 @@ public class FlowDeploymentPlanner {
 
   private static final String MQTT_PROCESSOR = "ConsumeMQTT";
   private static final String DBCP = "PostGISConnectionPool";
+
+  /** A plain seconds value, optionally with a seconds unit suffix (e.g. {@code 5}, {@code 5s}). */
+  private static final Pattern SECONDS =
+      Pattern.compile("(\\d+)\\s*(?:s|sec|secs|second|seconds)?", Pattern.CASE_INSENSITIVE);
 
   private final ObjectMapper mapper = new ObjectMapper();
   private final GraphParser graphParser;
@@ -94,7 +98,6 @@ public class FlowDeploymentPlanner {
     Optional<MappingConfig> mapping = parseMapping(graph);
     List<UpdateRecordProperty> mappingProperties =
         mapping.map(recordPathCompiler::compile).orElseGet(List::of);
-    requireUniformStrategy(mappingProperties);
 
     Datasource source = request.source();
     if (source == null) {
@@ -128,26 +131,25 @@ public class FlowDeploymentPlanner {
   }
 
   private Optional<MappingConfig> parseMapping(PipelineGraph graph) throws FatalAdapterException {
-    Optional<GraphNode> mappingNode = graph.mappingNode();
+    Optional<GraphNode> mappingNode;
+    try {
+      mappingNode = graph.transformNode();
+    } catch (IllegalStateException e) {
+      // an unbuildable graph topology (unsupported node kind, multiple/disconnected mapping nodes)
+      throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, e, e.getMessage());
+    }
     if (mappingNode.isEmpty()) {
       return Optional.empty();
     }
     Object rawConfig = mappingNode.get().data().get("mappingConfig");
     if (rawConfig == null) {
-      return Optional.empty();
+      // A wired mapping node must carry a config; a missing one is a corrupted payload that would
+      // otherwise deploy untransformed. (A pipeline with no mapping node at all is fine — handled
+      // above by the empty Optional.)
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR, "mapping node has no mappingConfig");
     }
     return Optional.of(mappingConfigParser.parse(mapper.valueToTree(rawConfig)));
-  }
-
-  private void requireUniformStrategy(List<UpdateRecordProperty> properties)
-      throws FatalAdapterException {
-    Set<ReplacementStrategy> strategies =
-        properties.stream().map(UpdateRecordProperty::strategy).collect(Collectors.toSet());
-    if (strategies.size() > 1) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_MAPPING_ERROR,
-          "a single UpdateRecord cannot mix literal and record-path values");
-    }
   }
 
   private void bindSource(
@@ -159,15 +161,105 @@ public class FlowDeploymentPlanner {
     Map<String, Object> original = source.getAdditionalProperties();
     Map<String, Object> decrypted = credentialResolver.decrypt(original);
     if (sourceType == SourceType.MQTT) {
-      putIfPresent(sourceProperties, "Broker URI", decrypted.get("brokerUrl"));
-      putIfPresent(sourceProperties, "Topic Filter", decrypted.get("topic"));
-      putIfPresent(sourceProperties, "Username", decrypted.get("username"));
-      if (isEncrypted(original.get("password"))) {
-        sensitive
-            .computeIfAbsent(MQTT_PROCESSOR, k -> new LinkedHashMap<>())
-            .put("Password", String.valueOf(decrypted.get("password")));
-      }
+      bindMqttSource(decrypted, original, sourceProperties, sensitive);
     }
+  }
+
+  /**
+   * Binds an MQTT datasource to ConsumeMQTT, using the portal's connector field names ({@code
+   * urls}/{@code topics} as lists, {@code user}, {@code client_id}, {@code qos}). Broker URI and
+   * Topic Filter are required — without them ConsumeMQTT would fall back to the fragment's demo
+   * broker/topic and silently consume from the wrong source, so a missing value fails the deploy.
+   */
+  private void bindMqttSource(
+      Map<String, Object> decrypted,
+      Map<String, Object> original,
+      Map<String, String> sourceProperties,
+      Map<String, Map<String, String>> sensitive)
+      throws FatalAdapterException {
+    // NiFi's Broker URI accepts a comma-separated list; Topic Filter is a single filter, so one
+    // ConsumeMQTT cannot subscribe to multiple distinct topics — reject rather than mis-build.
+    List<String> brokers = trimmedNonBlank(decrypted.get("urls"));
+    List<String> topics = trimmedNonBlank(decrypted.get("topics"));
+    if (brokers.isEmpty() || topics.isEmpty()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "MQTT source requires non-empty 'urls' and 'topics'");
+    }
+    rejectTlsSource(decrypted.get("tls"), brokers);
+    if (topics.size() > 1) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "multiple MQTT topics are not supported (one ConsumeMQTT subscribes to a single topic"
+              + " filter): "
+              + topics);
+    }
+    sourceProperties.put("Broker URI", String.join(",", brokers));
+    sourceProperties.put("Topic Filter", topics.get(0));
+    putIfPresent(sourceProperties, "Username", decrypted.get("user"));
+    putIfPresent(sourceProperties, "Client ID", decrypted.get("client_id"));
+    putIfPresent(sourceProperties, "Quality of Service", decrypted.get("qos"));
+    bindSeconds(sourceProperties, "Connection Timeout", decrypted.get("connect_timeout"));
+    bindSeconds(sourceProperties, "Keep Alive", decrypted.get("keepalive"));
+    if (isEncrypted(original.get("password"))) {
+      sensitive
+          .computeIfAbsent(MQTT_PROCESSOR, k -> new LinkedHashMap<>())
+          .put("Password", String.valueOf(decrypted.get("password")));
+    }
+  }
+
+  /**
+   * Rejects a TLS MQTT source: NiFi requires an SSL Context Service for a TLS broker, which this
+   * adapter does not provision, so deploying would silently fall back to a plaintext connection.
+   * Both an explicit {@code tls.enabled=true} and a TLS broker scheme ({@code ssl://}/{@code
+   * mqtts://}/{@code wss://}) are rejected.
+   */
+  private void rejectTlsSource(Object tls, List<String> brokers) throws FatalAdapterException {
+    boolean tlsEnabled =
+        tls instanceof Map<?, ?> map && "true".equalsIgnoreCase(String.valueOf(map.get("enabled")));
+    boolean tlsScheme =
+        brokers.stream()
+            .map(b -> b.toLowerCase(Locale.ROOT))
+            .anyMatch(
+                b -> b.startsWith("ssl://") || b.startsWith("mqtts://") || b.startsWith("wss://"));
+    if (tlsEnabled || tlsScheme) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "MQTT TLS is not supported yet (needs a NiFi SSL Context Service)");
+    }
+  }
+
+  /** A scalar or list value as trimmed, non-blank strings (empty for null/all-blank). */
+  private static List<String> trimmedNonBlank(Object value) {
+    List<String> raw =
+        value instanceof List<?> list
+            ? list.stream().map(String::valueOf).toList()
+            : value == null ? List.of() : List.of(String.valueOf(value));
+    return raw.stream().map(String::trim).filter(s -> !s.isEmpty()).toList();
+  }
+
+  /**
+   * Binds a portal duration (the connector sends e.g. {@code "5s"}/{@code "30s"}) to a NiFi
+   * property as the plain integer seconds it expects. An absent/blank value is skipped; a non-blank
+   * value that is not a simple seconds duration is rejected rather than silently dropped (which
+   * would leave NiFi's default).
+   */
+  private void bindSeconds(Map<String, String> properties, String nifiKey, Object value)
+      throws FatalAdapterException {
+    if (value == null) {
+      return;
+    }
+    String text = String.valueOf(value).trim();
+    if (text.isEmpty()) {
+      return;
+    }
+    Matcher matcher = SECONDS.matcher(text);
+    if (!matcher.matches()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "MQTT '" + nifiKey + "' is not a valid seconds duration: " + text);
+    }
+    properties.put(nifiKey, matcher.group(1));
   }
 
   private void bindSink(
@@ -178,7 +270,13 @@ public class FlowDeploymentPlanner {
       throws FatalAdapterException {
     switch (sink.type()) {
       case POSTGIS -> {
-        putIfPresent(sinkProperties, "Table Name", sink.tableName());
+        if (sink.tableName() == null || sink.tableName().isBlank()) {
+          // Without a table name PutDatabaseRecord has no target — the flow would deploy but every
+          // record would fail to write. Reject up front instead of shipping a broken pipeline.
+          throw new FatalAdapterException(
+              AdapterErrorCode.NIFI_TEMPLATE_ERROR, "POSTGIS sink requires a target table name");
+        }
+        sinkProperties.put("Table Name", sink.tableName());
         bindPlatformDbcp(controllerServiceProperties, sensitive);
       }
       case FROST -> bindFrost(sinkProperties);

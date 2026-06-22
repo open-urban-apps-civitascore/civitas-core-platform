@@ -204,7 +204,7 @@ All DDL for a single event runs in one JDBC transaction; on failure the transact
 
 ## Saga Participation
 
-Besides the event-driven `PostgisAdapter`, the module ships a `PostgisSagaHandler` — a `SagaCommandHandler` (ServiceLoader-registered under `META-INF/services/de.civitascore.configadapter.adapter.SagaCommandHandler`) discovered by the application and registered in the saga orchestrator (Flowable or custom). It lets PostGIS participate as a compensable step in any saga, mirroring the FROST / APISIX / RedPanda handlers but executing DDL over JDBC instead of HTTP.
+Besides the event-driven `PostgisAdapter`, the module ships a `PostgisSagaHandler` — a `SagaCommandHandler` (ServiceLoader-registered under `META-INF/services/de.civitascore.configadapter.adapter.SagaCommandHandler`) discovered by the application and registered in the saga orchestrator (Flowable or custom). It lets PostGIS participate as a compensable step in any saga, mirroring the FROST / APISIX / NiFi handlers but executing DDL over JDBC instead of HTTP.
 
 Forward operations and their compensations:
 

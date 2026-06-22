@@ -44,21 +44,21 @@ class DatasetUpdateBpmnTest {
 
   private SagaCommandHandler frostHandler;
   private SagaCommandHandler apisixHandler;
-  private SagaCommandHandler redpandaHandler;
+  private SagaCommandHandler pipelineHandler;
 
   @BeforeEach
   void setUp() {
     frostHandler = mock(SagaCommandHandler.class);
     apisixHandler = mock(SagaCommandHandler.class);
-    redpandaHandler = mock(SagaCommandHandler.class);
+    pipelineHandler = mock(SagaCommandHandler.class);
     when(frostHandler.adapter()).thenReturn("frost");
     when(apisixHandler.adapter()).thenReturn("apisix");
-    when(redpandaHandler.adapter()).thenReturn("nifi");
+    when(pipelineHandler.adapter()).thenReturn("nifi");
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
     registry.register(apisixHandler);
-    registry.register(redpandaHandler);
+    registry.register(pipelineHandler);
 
     processEngine = FlowableTestSupport.createTestEngine(Map.of("sagaHandlerRegistry", registry));
     runtimeService = processEngine.getRuntimeService();
@@ -82,21 +82,21 @@ class DatasetUpdateBpmnTest {
   void shouldCompleteHappyPathWithPipelines() {
     stubFrostSuccess();
     stubApisixSuccess();
-    stubRedpandaSuccess();
+    stubPipelineSuccess();
 
     ProcessInstance instance = startProcess(true);
     executeAllJobs();
 
     assertProcessCompleted(instance.getId());
 
-    var inOrder = inOrder(frostHandler, apisixHandler, redpandaHandler);
+    var inOrder = inOrder(frostHandler, apisixHandler, pipelineHandler);
     inOrder.verify(frostHandler).handle(any());
     inOrder.verify(apisixHandler).handle(any());
-    inOrder.verify(redpandaHandler).handle(any());
+    inOrder.verify(pipelineHandler).handle(any());
   }
 
   @Test
-  void shouldSkipRedpandaWhenNoPipelines() {
+  void shouldSkipPipelineWhenNoPipelines() {
     stubFrostSuccess();
     stubApisixSuccess();
 
@@ -108,7 +108,7 @@ class DatasetUpdateBpmnTest {
     var inOrder = inOrder(frostHandler, apisixHandler);
     inOrder.verify(frostHandler).handle(any());
     inOrder.verify(apisixHandler).handle(any());
-    verify(redpandaHandler, never()).handle(any());
+    verify(pipelineHandler, never()).handle(any());
   }
 
   @Test
@@ -138,10 +138,10 @@ class DatasetUpdateBpmnTest {
   }
 
   @Test
-  void shouldCompensateInReverseOrderWhenRedpandaFails() {
+  void shouldCompensateInReverseOrderWhenPipelineFails() {
     stubFrostSuccess();
     stubApisixSuccess();
-    stubRedpandaFailure("Pipeline update failed");
+    stubPipelineFailure("Pipeline update failed");
     when(apisixHandler.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "update-route"));
     when(frostHandler.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
@@ -223,8 +223,8 @@ class DatasetUpdateBpmnTest {
                 Map.of("routeId", "r-1", "previousOpenDataAccess", true)));
   }
 
-  private void stubRedpandaSuccess() {
-    when(redpandaHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+  private void stubPipelineSuccess() {
+    when(pipelineHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(
             SagaCommandResult.success(
                 "saga-test-123",
@@ -238,8 +238,8 @@ class DatasetUpdateBpmnTest {
         .thenReturn(SagaCommandResult.failure("saga-test-123", "update-route", error));
   }
 
-  private void stubRedpandaFailure(String error) {
-    when(redpandaHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+  private void stubPipelineFailure(String error) {
+    when(pipelineHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.failure("saga-test-123", "update-pipelines", error));
   }
 }

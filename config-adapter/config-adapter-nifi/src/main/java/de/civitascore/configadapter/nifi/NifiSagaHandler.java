@@ -16,6 +16,7 @@ import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
+import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner;
@@ -33,6 +34,7 @@ import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -276,7 +278,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       return datasources.get(0);
     }
     throw new FatalAdapterException(
-        de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+        AdapterErrorCode.NIFI_TEMPLATE_ERROR,
         "expected exactly one datasource per pipeline, got " + datasources.size());
   }
 
@@ -291,7 +293,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     }
     if (datasinks.size() != 1) {
       throw new FatalAdapterException(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           "expected at most one datasink per pipeline, got " + datasinks.size());
     }
     Map<String, Object> sink = datasinks.get(0);
@@ -300,7 +302,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
             .orElseThrow(
                 () ->
                     new FatalAdapterException(
-                        de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+                        AdapterErrorCode.NIFI_TEMPLATE_ERROR,
                         "unsupported sink type: " + sink.get("type")));
     String tableName = null;
     if (sink.get("configuration") instanceof Map<?, ?> config) {
@@ -323,9 +325,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
         result.add(PayloadConverter.fromValue(raw, Datasource.class));
       } catch (IllegalArgumentException e) {
         throw new FatalAdapterException(
-            de.civitascore.configadapter.model.AdapterErrorCode.INVALID_PAYLOAD,
-            e,
-            "invalid datasource entry");
+            AdapterErrorCode.INVALID_PAYLOAD, e, "invalid datasource entry");
       }
     }
     return result;
@@ -393,14 +393,14 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       TrustManager[] trustAll = {
         new X509TrustManager() {
           @Override
-          public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String type) {}
+          public void checkClientTrusted(X509Certificate[] chain, String type) {}
 
           @Override
-          public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String type) {}
+          public void checkServerTrusted(X509Certificate[] chain, String type) {}
 
           @Override
-          public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-            return new java.security.cert.X509Certificate[0];
+          public X509Certificate[] getAcceptedIssuers() {
+            return new X509Certificate[0];
           }
         }
       };

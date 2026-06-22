@@ -25,7 +25,7 @@ import java.util.Set;
  * @param messageId unique message identifier
  * @param sagaId saga instance identifier (from payload)
  * @param stepId saga step identifier
- * @param adapter target adapter name (e.g. {@code "frost"}, {@code "apisix"}, {@code "redpanda"})
+ * @param adapter target adapter name (e.g. {@code "frost"}, {@code "apisix"}, {@code "nifi"})
  * @param operation adapter-specific operation (e.g. {@code "CREATE_PROJECT"}, {@code
  *     "DELETE_ROUTE"})
  * @param payload remaining fields (datasetId, datasetName, description, etc.)

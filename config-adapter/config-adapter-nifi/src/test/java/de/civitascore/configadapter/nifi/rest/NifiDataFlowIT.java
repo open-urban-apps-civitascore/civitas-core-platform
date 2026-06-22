@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.nifi.rest;
 
 import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -25,6 +26,7 @@ import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
+import jakarta.ws.rs.core.Response;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -69,6 +71,10 @@ class NifiDataFlowIT {
   private static final String USER = "admin";
   private static final String PASSWORD = "ctsNiFiTestPassword123";
   private static final String TOPIC = "civitas/it/data";
+  private static final String DLQ_TOPIC = "civitas/it/dlq";
+  private static final String DLQ_SINK_PATH = "/dlq-observations";
+  private static final String CONST_TOPIC = "civitas/it/const";
+  private static final String CONST_SINK_PATH = "/const-observations";
 
   private static Network network;
   private static GenericContainer<?> mosquitto;
@@ -192,7 +198,7 @@ class NifiDataFlowIT {
 
     // Publish a known message and wait until NiFi posts the *transformed* record to the sink.
     String brokerUrl = "tcp://localhost:" + mosquitto.getMappedPort(1883);
-    try (MqttPublisher publisher = new MqttPublisher(brokerUrl)) {
+    try (MqttPublisher publisher = new MqttPublisher(brokerUrl, "civitas-it-publisher")) {
       await()
           .atMost(Duration.ofSeconds(90))
           .pollInterval(Duration.ofSeconds(3))
@@ -203,6 +209,177 @@ class NifiDataFlowIT {
                 return sinkReceivedTransformedRecord();
               });
     }
+  }
+
+  @Test
+  void deployedFlowAppliesConstAlongsideCopy() throws Exception {
+    // A mapping that mixes a copy (station_id) and a const (unit="celsius") in ONE UpdateRecord —
+    // proves the const-as-RecordPath-literal rendering actually evaluates on real NiFi.
+    MappingConfigParser parser = new MappingConfigParser();
+    RecordPathCompiler compiler = new RecordPathCompiler();
+    List<UpdateRecordProperty> mapping =
+        compiler.compile(
+            parser.parse(
+                mapper.readTree(
+                    """
+                    { "fields": {
+                        "$.station_id": "$.station_id",
+                        "$.unit": { "op": "const", "value": "celsius" }
+                    } }
+                    """)));
+
+    String snapshot =
+        new NifiFlowBuilder()
+            .build(
+                new FlowBuildSpec(
+                    "pipeline-const-it",
+                    SourceType.MQTT,
+                    Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", CONST_TOPIC),
+                    SinkType.FROST,
+                    Map.of(
+                        "HTTP Method",
+                        "POST",
+                        "HTTP URL",
+                        "http://sink:8080" + CONST_SINK_PATH,
+                        "Request Content-Type",
+                        "application/json"),
+                    mapping,
+                    Map.of()));
+
+    client.deployFlow(new DeploymentPlan("pipeline-const-it", snapshot, Map.of()));
+
+    String brokerUrl = "tcp://localhost:" + mosquitto.getMappedPort(1883);
+    try (MqttPublisher publisher = new MqttPublisher(brokerUrl, "civitas-it-const-publisher")) {
+      await()
+          .atMost(Duration.ofSeconds(90))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(
+              () -> {
+                publisher.publish(CONST_TOPIC, "{\"station_id\":\"S2\"}");
+                return sinkReceivedConstAndCopy();
+              });
+    }
+  }
+
+  /** Asserts the sink got the copied station_id AND the injected const unit. */
+  private boolean sinkReceivedConstAndCopy() throws Exception {
+    HttpResponse<String> response =
+        http.send(
+            HttpRequest.newBuilder()
+                .uri(
+                    URI.create(
+                        "http://localhost:" + sink.getMappedPort(8080) + "/__admin/requests"))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    for (JsonNode entry : mapper.readTree(response.body()).path("requests")) {
+      JsonNode request = entry.path("request");
+      if (!request.path("url").asText().contains(CONST_SINK_PATH)) {
+        continue;
+      }
+      String body = request.path("body").asText();
+      assertTrue(body.contains("\"station_id\":\"S2\""), "copy missing in: " + body);
+      assertTrue(body.contains("\"unit\":\"celsius\""), "const not injected in: " + body);
+      return true;
+    }
+    return false;
+  }
+
+  @Test
+  void malformedRecordIsRoutedToErrorSinkNotToTheRealSink() throws Exception {
+    // A copy-only mapping; the point of this test is the failure path, not the transform.
+    MappingConfigParser parser = new MappingConfigParser();
+    RecordPathCompiler compiler = new RecordPathCompiler();
+    List<UpdateRecordProperty> mapping =
+        compiler.compile(
+            parser.parse(
+                mapper.readTree("{ \"fields\": { \"$.station_id\": \"$.station_id\" } }")));
+
+    String snapshot =
+        new NifiFlowBuilder()
+            .build(
+                new FlowBuildSpec(
+                    "pipeline-dlq-it",
+                    SourceType.MQTT,
+                    Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", DLQ_TOPIC),
+                    SinkType.FROST,
+                    Map.of(
+                        "HTTP Method",
+                        "POST",
+                        "HTTP URL",
+                        "http://sink:8080" + DLQ_SINK_PATH,
+                        "Request Content-Type",
+                        "application/json"),
+                    mapping,
+                    Map.of()));
+
+    client.deployFlow(new DeploymentPlan("pipeline-dlq-it", snapshot, Map.of()));
+
+    String brokerUrl = "tcp://localhost:" + mosquitto.getMappedPort(1883);
+    try (MqttPublisher publisher = new MqttPublisher(brokerUrl, "civitas-it-dlq-publisher")) {
+      // A non-JSON payload fails JSON record conversion in ConvertRecord; its 'failure'
+      // relationship must route to the LogMessage error sink (which raises a WARN bulletin),
+      // NOT be dropped silently.
+      await()
+          .atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(
+              () -> {
+                publisher.publish(DLQ_TOPIC, "this-is-not-valid-json");
+                return errorSinkRaisedABulletin();
+              });
+    }
+
+    // ...and the malformed record never reached the real (HTTP) sink.
+    assertFalse(
+        sinkReceivedRequestTo(DLQ_SINK_PATH),
+        "a record that fails conversion must not be delivered to the sink");
+  }
+
+  /** Queries the NiFi bulletin board for a WARN bulletin emitted by the LogMessage error sink. */
+  private boolean errorSinkRaisedABulletin() throws Exception {
+    String token = client.authenticate();
+    try (Response response =
+        httpClient
+            .target("https://localhost:" + HOST_PORT + "/nifi-api/flow/bulletin-board")
+            .request()
+            .header("Authorization", "Bearer " + token)
+            .get()) {
+      JsonNode bulletins =
+          mapper
+              .readTree(response.readEntity(String.class))
+              .path("bulletinBoard")
+              .path("bulletins");
+      for (JsonNode entry : bulletins) {
+        JsonNode bulletin = entry.path("bulletin");
+        if (bulletin.path("sourceName").asText().contains("LogMessage")
+            || bulletin.path("message").asText().contains("civitas-pipeline-dlq")) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Whether the WireMock sink journal recorded any request to the given path. */
+  private boolean sinkReceivedRequestTo(String path) throws Exception {
+    HttpResponse<String> response =
+        http.send(
+            HttpRequest.newBuilder()
+                .uri(
+                    URI.create(
+                        "http://localhost:" + sink.getMappedPort(8080) + "/__admin/requests"))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    for (JsonNode entry : mapper.readTree(response.body()).path("requests")) {
+      if (entry.path("request").path("url").asText().contains(path)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Queries the WireMock request journal and asserts a posted body carries the mapped fields. */
@@ -235,8 +412,8 @@ class NifiDataFlowIT {
   private static final class MqttPublisher implements AutoCloseable {
     private final MqttClient mqtt;
 
-    MqttPublisher(String brokerUrl) throws Exception {
-      mqtt = new MqttClient(brokerUrl, "civitas-it-publisher", new MemoryPersistence());
+    MqttPublisher(String brokerUrl, String clientId) throws Exception {
+      mqtt = new MqttClient(brokerUrl, clientId, new MemoryPersistence());
       MqttConnectOptions options = new MqttConnectOptions();
       options.setCleanSession(true);
       mqtt.connect(options);

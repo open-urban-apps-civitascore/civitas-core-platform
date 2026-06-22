@@ -141,7 +141,7 @@ geoserver.postgis.password=secret
 
 Passwords (`geoserver.admin.password`, `geoserver.postgis.password`, and the `passwd` of an
 incoming `DataStoreConfig`) may be supplied encrypted as `ENC(<base64>)` values, following the same
-AES-256-GCM scheme as the RedPanda adapter. They are decrypted in-memory only when needed; plaintext
+project-wide AES-256-GCM credential scheme. They are decrypted in-memory only when needed; plaintext
 values are accepted unchanged for backward compatibility. The master key is read from the
 `CIVITAS_MASTER_KEY` environment variable, and encrypted values must be produced with the
 `portal-backend:datasource-connector` credential context. If `CIVITAS_MASTER_KEY` is not set,

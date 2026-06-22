@@ -140,6 +140,18 @@
             <version>${paho.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- PostgreSQL container + JDBC driver for the cross-adapter POSTGIS data-flow IT
+             (the driver jar is also mounted into the NiFi container for its DBCP service) -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
 
         <!-- Architecture tests -->
         <dependency>

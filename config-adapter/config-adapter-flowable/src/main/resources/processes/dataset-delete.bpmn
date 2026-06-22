@@ -8,7 +8,7 @@
     </startEvent>
     <exclusiveGateway id="pipeline-gateway" name="Has Pipelines?" default="flow-gateway-skip">
       <incoming>flow-start</incoming>
-      <outgoing>flow-gateway-redpanda</outgoing>
+      <outgoing>flow-gateway-pipeline</outgoing>
       <outgoing>flow-gateway-skip</outgoing>
     </exclusiveGateway>
     <serviceTask id="delete-pipelines" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Delete Pipelines">
@@ -17,11 +17,11 @@
         <flowable:field xsi:type="xs:anyType" name="operation" stringValue="DELETE_PIPELINES"/>
         <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="delete-pipelines"/>
       </extensionElements>
-      <incoming>flow-gateway-redpanda</incoming>
-      <outgoing>flow-redpanda-apisix</outgoing>
+      <incoming>flow-gateway-pipeline</incoming>
+      <outgoing>flow-pipeline-apisix</outgoing>
     </serviceTask>
-    <boundaryEvent id="redpanda-error" name="Step Failed" attachedToRef="delete-pipelines">
-      <outgoing>flow-redpanda-error</outgoing>
+    <boundaryEvent id="pipeline-error" name="Step Failed" attachedToRef="delete-pipelines">
+      <outgoing>flow-pipeline-error</outgoing>
       <errorEventDefinition id="ErrorEventDefinition_1" errorRef="stepFailedError"/>
     </boundaryEvent>
     <serviceTask id="delete-route" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Delete APISIX Route">
@@ -31,8 +31,8 @@
         <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="delete-route"/>
       </extensionElements>
       <incoming>flow-gateway-skip</incoming>
-      <incoming>flow-redpanda-apisix</incoming>
-      <incoming>flow-redpanda-error</incoming>
+      <incoming>flow-pipeline-apisix</incoming>
+      <incoming>flow-pipeline-error</incoming>
       <outgoing>flow-apisix-geo</outgoing>
     </serviceTask>
     <boundaryEvent id="apisix-error" name="Step Failed" attachedToRef="delete-route">
@@ -113,11 +113,11 @@
       <incoming>flow-publish-failure-end</incoming>
     </endEvent>
     <sequenceFlow id="flow-start" sourceRef="start" targetRef="pipeline-gateway"/>
-    <sequenceFlow id="flow-gateway-redpanda" name="yes" sourceRef="pipeline-gateway" targetRef="delete-pipelines">
+    <sequenceFlow id="flow-gateway-pipeline" name="yes" sourceRef="pipeline-gateway" targetRef="delete-pipelines">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_1">${hasPipelines == true}</conditionExpression>
     </sequenceFlow>
     <sequenceFlow id="flow-gateway-skip" name="no" sourceRef="pipeline-gateway" targetRef="delete-route"/>
-    <sequenceFlow id="flow-redpanda-apisix" sourceRef="delete-pipelines" targetRef="delete-route"/>
+    <sequenceFlow id="flow-pipeline-apisix" sourceRef="delete-pipelines" targetRef="delete-route"/>
     <sequenceFlow id="flow-apisix-geo" sourceRef="delete-route" targetRef="geo-gateway"/>
     <sequenceFlow id="flow-geo-workspace" name="yes" sourceRef="geo-gateway" targetRef="delete-workspace">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_2">${execution.getVariable('hasGeoSink') == true}</conditionExpression>
@@ -132,7 +132,7 @@
     <sequenceFlow id="flow-result-success" name="ok" sourceRef="result-gateway" targetRef="publish-success"/>
     <sequenceFlow id="flow-publish-success-end" sourceRef="publish-success" targetRef="end"/>
     <sequenceFlow id="flow-publish-failure-end" sourceRef="publish-failure" targetRef="end"/>
-    <sequenceFlow id="flow-redpanda-error" sourceRef="redpanda-error" targetRef="delete-route"/>
+    <sequenceFlow id="flow-pipeline-error" sourceRef="pipeline-error" targetRef="delete-route"/>
     <sequenceFlow id="flow-apisix-error" sourceRef="apisix-error" targetRef="geo-gateway"/>
     <sequenceFlow id="SequenceFlow_3" sourceRef="frost-error" targetRef="result-gateway"/>
     <sequenceFlow id="SequenceFlow_4" sourceRef="delete-project" targetRef="result-gateway"/>
@@ -212,7 +212,7 @@
           <dc:Bounds height="14.0" width="62.0" x="422.0" y="243.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_1" bpmnElement="redpanda-error">
+      <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_1" bpmnElement="pipeline-error">
         <dc:Bounds height="36.0" width="36.0" x="270.0" y="207.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_31" labelStyle="BPMNLabelStyle_1">
           <dc:Bounds height="14.0" width="62.0" x="257.0" y="243.0"/>
@@ -248,7 +248,7 @@
         <di:waypoint xsi:type="dc:Point" x="136.0" y="200.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_13"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_2" bpmnElement="flow-gateway-redpanda" sourceElement="BPMNShape_ExclusiveGateway_1" targetElement="BPMNShape_ServiceTask_1">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_2" bpmnElement="flow-gateway-pipeline" sourceElement="BPMNShape_ExclusiveGateway_1" targetElement="BPMNShape_ServiceTask_1">
         <di:waypoint xsi:type="dc:Point" x="186.0" y="200.0"/>
         <di:waypoint xsi:type="dc:Point" x="210.0" y="200.0"/>
         <di:waypoint xsi:type="dc:Point" x="234.0" y="200.0"/>
@@ -265,14 +265,14 @@
           <dc:Bounds height="14.0" width="14.0" x="302.0" y="147.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_4" bpmnElement="flow-redpanda-apisix" sourceElement="BPMNShape_ServiceTask_1" targetElement="BPMNShape_ServiceTask_2">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_4" bpmnElement="flow-pipeline-apisix" sourceElement="BPMNShape_ServiceTask_1" targetElement="BPMNShape_ServiceTask_2">
         <di:waypoint xsi:type="dc:Point" x="344.0" y="200.0"/>
         <di:waypoint xsi:type="dc:Point" x="371.0" y="200.0"/>
         <di:waypoint xsi:type="dc:Point" x="371.0" y="191.0"/>
         <di:waypoint xsi:type="dc:Point" x="399.0" y="191.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_16"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_5" bpmnElement="flow-redpanda-error" sourceElement="BPMNShape_BoundaryEvent_1" targetElement="BPMNShape_ServiceTask_2">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_5" bpmnElement="flow-pipeline-error" sourceElement="BPMNShape_BoundaryEvent_1" targetElement="BPMNShape_ServiceTask_2">
         <di:waypoint xsi:type="dc:Point" x="288.0" y="243.0"/>
         <di:waypoint xsi:type="dc:Point" x="288.0" y="268.0"/>
         <di:waypoint xsi:type="dc:Point" x="371.0" y="268.0"/>

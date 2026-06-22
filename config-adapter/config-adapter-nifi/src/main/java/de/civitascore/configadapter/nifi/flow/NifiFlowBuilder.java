@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.ReplacementStrategy;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import java.io.IOException;
 import java.io.InputStream;
@@ -133,14 +134,20 @@ public class NifiFlowBuilder {
           controllerServices, "dbcp_connection_pool", pgId, DBCP, csIdByName, spec);
     }
 
-    // Processor chain: source -> convert -> [mapping] -> sink.
+    // Processor chain: source -> convert -> [mapping...] -> sink. A mapping may need more than one
+    // UpdateRecord because a single processor allows only one Replacement Value Strategy, so const
+    // (literal-value) fields and record-path fields land on separate processors.
+    Processor source =
+        loadProcessor(sourceFragment(spec.sourceType()), pgId, csIdByName, "Message");
+    Processor convert = loadProcessor("convert_record", pgId, csIdByName, "success");
+    List<Processor> mappingProcessors = buildMappingProcessors(spec, pgId, csIdByName);
+    Processor sink = loadProcessor(sinkFragment(spec.sinkType()), pgId, csIdByName, null);
+
     List<Processor> chain = new ArrayList<>();
-    chain.add(loadProcessor(sourceFragment(spec.sourceType()), pgId, csIdByName, "Message"));
-    chain.add(loadProcessor("convert_record", pgId, csIdByName, "success"));
-    if (!spec.mappingProperties().isEmpty()) {
-      chain.add(loadProcessor("update_record", pgId, csIdByName, "success"));
-    }
-    chain.add(loadProcessor(sinkFragment(spec.sinkType()), pgId, csIdByName, null));
+    chain.add(source);
+    chain.add(convert);
+    chain.addAll(mappingProcessors);
+    chain.add(sink);
 
     bindProperties(chain, spec);
 
@@ -150,6 +157,8 @@ public class NifiFlowBuilder {
         connections.add(connection(pgId, chain.get(i - 1), chain.get(i)));
       }
     }
+
+    wireErrorSink(pgId, csIdByName, processors, connections, convert, mappingProcessors);
 
     ObjectNode root = mapper.createObjectNode();
     root.set("flowContents", flow);
@@ -174,6 +183,8 @@ public class NifiFlowBuilder {
     ObjectNode node = loadFragment(fragment);
     node.put("identifier", deterministicId(pgId + ":cs:" + friendlyName));
     node.put("groupIdentifier", pgId);
+    // stamp the friendly name so the REST client can match sensitive properties by name post-upload
+    node.put("name", friendlyName);
     ObjectNode props = (ObjectNode) node.get("properties");
     spec.controllerServiceProperties().getOrDefault(friendlyName, Map.of()).forEach(props::put);
     target.add(node);
@@ -183,8 +194,23 @@ public class NifiFlowBuilder {
   private Processor loadProcessor(
       String fragment, String pgId, Map<String, String> csIdByName, String outRelationship)
       throws FatalAdapterException {
+    return loadProcessor(fragment, pgId, csIdByName, outRelationship, "");
+  }
+
+  /**
+   * Loads a processor fragment with a deterministic id. The {@code discriminator} keeps ids unique
+   * when the same fragment is instantiated more than once (e.g. one UpdateRecord per strategy).
+   */
+  private Processor loadProcessor(
+      String fragment,
+      String pgId,
+      Map<String, String> csIdByName,
+      String outRelationship,
+      String discriminator)
+      throws FatalAdapterException {
     ObjectNode node = loadFragment(fragment);
-    String id = deterministicId(pgId + ":proc:" + fragment);
+    String seed = pgId + ":proc:" + fragment + (discriminator.isEmpty() ? "" : ":" + discriminator);
+    String id = deterministicId(seed);
     node.put("identifier", id);
     node.put("groupIdentifier", pgId);
     resolveControllerServiceReferences(node, csIdByName);
@@ -230,21 +256,46 @@ public class NifiFlowBuilder {
 
   // ─── Property binding ───────────────────────────────────────────────────────
 
+  /**
+   * One {@code UpdateRecord} per replacement-value strategy, in first-seen order. NiFi allows a
+   * single strategy per processor, so a mapping that mixes {@code const} (literal-value) with
+   * copies/concats (record-path-value) is split across processors chained in sequence.
+   */
+  private List<Processor> buildMappingProcessors(
+      FlowBuildSpec spec, String pgId, Map<String, String> csIdByName)
+      throws FatalAdapterException {
+    Map<ReplacementStrategy, List<UpdateRecordProperty>> byStrategy = new LinkedHashMap<>();
+    for (UpdateRecordProperty property : spec.mappingProperties()) {
+      byStrategy.computeIfAbsent(property.strategy(), k -> new ArrayList<>()).add(property);
+    }
+    List<Processor> result = new ArrayList<>();
+    for (Map.Entry<ReplacementStrategy, List<UpdateRecordProperty>> group : byStrategy.entrySet()) {
+      Processor processor =
+          loadProcessor("update_record", pgId, csIdByName, "success", group.getKey().name());
+      applyMapping(
+          (ObjectNode) processor.node().get("properties"), group.getKey(), group.getValue());
+      result.add(processor);
+    }
+    return result;
+  }
+
   private void bindProperties(List<Processor> chain, FlowBuildSpec spec) {
     for (Processor processor : chain) {
       String type = processor.node().path("type").asText();
       ObjectNode props = (ObjectNode) processor.node().get("properties");
       if (type.endsWith("ConsumeMQTT")) {
         spec.sourceProperties().forEach(props::put);
-      } else if (type.endsWith("UpdateRecord")) {
-        applyMapping(props, spec.mappingProperties());
       } else if (type.endsWith("PutDatabaseRecord") || type.endsWith("InvokeHTTP")) {
         spec.sinkProperties().forEach(props::put);
       }
+      // UpdateRecord properties are applied in buildMappingProcessors (per strategy group).
     }
   }
 
-  private void applyMapping(ObjectNode props, List<UpdateRecordProperty> mappingProperties) {
+  private void applyMapping(
+      ObjectNode props,
+      ReplacementStrategy strategy,
+      List<UpdateRecordProperty> mappingProperties) {
     List<String> stale = new ArrayList<>();
     props
         .fieldNames()
@@ -255,20 +306,50 @@ public class NifiFlowBuilder {
               }
             });
     stale.forEach(props::remove);
-    if (!mappingProperties.isEmpty()) {
-      props.put(STRATEGY_PROPERTY, mappingProperties.get(0).strategy().nifiValue());
-      for (UpdateRecordProperty property : mappingProperties) {
-        props.put(property.recordPath(), property.value());
-      }
+    props.put(STRATEGY_PROPERTY, strategy.nifiValue());
+    for (UpdateRecordProperty property : mappingProperties) {
+      props.put(property.recordPath(), property.value());
+    }
+  }
+
+  // ─── Error routing ──────────────────────────────────────────────────────────
+
+  /**
+   * Routes the {@code failure} relationships of the record processors to a LogMessage sink (WARN +
+   * bulletin) instead of auto-terminating them. Otherwise a malformed message or an unmappable
+   * record would be dropped silently — invisible, undiagnosable data loss. The graph shape is
+   * intentionally stable: swapping LogMessage for a durable/recoverable dead-letter sink is a
+   * later, isolated change.
+   */
+  private void wireErrorSink(
+      String pgId,
+      Map<String, String> csIdByName,
+      ArrayNode processors,
+      ArrayNode connections,
+      Processor convert,
+      List<Processor> mappingProcessors)
+      throws FatalAdapterException {
+    Processor errorSink = loadProcessor("log_message", pgId, csIdByName, null);
+    processors.add(errorSink.node());
+    connections.add(connection(pgId, convert, errorSink, "failure"));
+    for (Processor mapping : mappingProcessors) {
+      connections.add(connection(pgId, mapping, errorSink, "failure"));
     }
   }
 
   // ─── Connections ────────────────────────────────────────────────────────────
 
   private ObjectNode connection(String pgId, Processor source, Processor destination) {
+    return connection(pgId, source, destination, source.outRelationship());
+  }
+
+  private ObjectNode connection(
+      String pgId, Processor source, Processor destination, String relationship) {
     ObjectNode connection = mapper.createObjectNode();
     connection.put(
-        "identifier", deterministicId(pgId + ":conn:" + source.id() + "->" + destination.id()));
+        "identifier",
+        deterministicId(
+            pgId + ":conn:" + source.id() + ":" + relationship + "->" + destination.id()));
     ObjectNode src = connection.putObject("source");
     src.put("id", source.id());
     src.put("type", "PROCESSOR");
@@ -279,7 +360,7 @@ public class NifiFlowBuilder {
     dst.put("groupId", pgId);
     connection.put("groupIdentifier", pgId);
     ArrayNode rels = connection.putArray("selectedRelationships");
-    rels.add(source.outRelationship());
+    rels.add(relationship);
     connection.put("backPressureObjectThreshold", 10_000);
     connection.put("backPressureDataSizeThreshold", "1 GB");
     connection.put("flowFileExpiration", "0 sec");

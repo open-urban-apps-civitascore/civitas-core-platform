@@ -65,12 +65,13 @@ class NifiFlowBuilderTest {
     JsonNode flow = build(mqttToPostgis(mapping()));
 
     assertEquals("pipeline-abc", flow.get("flowContents").get("name").asText());
-    // 4 processors: ConsumeMQTT -> ConvertRecord -> UpdateRecord(mapping) -> PutDatabaseRecord
-    assertEquals(4, flow.get("flowContents").get("processors").size());
+    // 5 processors: ConsumeMQTT -> ConvertRecord -> UpdateRecord(mapping) -> PutDatabaseRecord,
+    // plus the LogMessage error sink that the convert/mapping failure relationships feed
+    assertEquals(5, flow.get("flowContents").get("processors").size());
     // 3 controller services: reader, writer, dbcp
     assertEquals(3, flow.get("flowContents").get("controllerServices").size());
-    // 3 connections chaining the 4 processors
-    assertEquals(3, flow.get("flowContents").get("connections").size());
+    // 5 connections: 3 chaining the happy path + 2 failure edges into the LogMessage sink
+    assertEquals(5, flow.get("flowContents").get("connections").size());
   }
 
   @Test
@@ -130,10 +131,78 @@ class NifiFlowBuilderTest {
   }
 
   @Test
+  void routesConversionAndMappingFailuresToLogSink() throws Exception {
+    JsonNode flow = build(mqttToPostgis(mapping()));
+
+    JsonNode log = component(flow, "processors", "LogMessage");
+    String logId = log.get("identifier").asText();
+    // the log sink terminates its own 'success' — it is the end of the error path
+    assertTrue(autoTerminates(log, "success"), "LogMessage terminates its own success");
+
+    JsonNode convert = component(flow, "processors", "ConvertRecord");
+    JsonNode update = component(flow, "processors", "UpdateRecord");
+    // records that fail JSON conversion or RecordPath mapping are no longer dropped silently...
+    assertFalse(
+        autoTerminates(convert, "failure"), "ConvertRecord must not auto-terminate failure");
+    assertFalse(autoTerminates(update, "failure"), "UpdateRecord must not auto-terminate failure");
+    // ...they are routed to the LogMessage sink instead
+    assertTrue(
+        hasConnection(flow, convert.get("identifier").asText(), logId, "failure"),
+        "ConvertRecord failure must be routed to the LogMessage sink");
+    assertTrue(
+        hasConnection(flow, update.get("identifier").asText(), logId, "failure"),
+        "UpdateRecord failure must be routed to the LogMessage sink");
+  }
+
+  private boolean autoTerminates(JsonNode processor, String relationship) {
+    for (JsonNode rel : processor.path("autoTerminatedRelationships")) {
+      if (relationship.equals(rel.asText())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean hasConnection(
+      JsonNode flow, String sourceId, String destId, String relationship) {
+    for (JsonNode conn : flow.get("flowContents").get("connections")) {
+      boolean matchesRelationship = false;
+      for (JsonNode rel : conn.get("selectedRelationships")) {
+        if (relationship.equals(rel.asText())) {
+          matchesRelationship = true;
+        }
+      }
+      if (matchesRelationship
+          && sourceId.equals(conn.path("source").path("id").asText())
+          && destId.equals(conn.path("destination").path("id").asText())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Test
   void omitsMappingProcessorWhenNoMapping() throws Exception {
     JsonNode flow = build(mqttToPostgis(List.of()));
-    // 3 processors: ConsumeMQTT -> ConvertRecord -> PutDatabaseRecord (no UpdateRecord)
-    assertEquals(3, flow.get("flowContents").get("processors").size());
+    // 4 processors: ConsumeMQTT -> ConvertRecord -> PutDatabaseRecord (no UpdateRecord),
+    // plus the LogMessage error sink for ConvertRecord's failure relationship
+    assertEquals(4, flow.get("flowContents").get("processors").size());
+  }
+
+  @Test
+  void wiresErrorSinkEvenWithoutMappingProcessor() throws Exception {
+    // even with no mapping (no UpdateRecord), ConvertRecord's failure must still route to the
+    // LogMessage sink rather than being dropped
+    JsonNode flow = build(mqttToPostgis(List.of()));
+
+    JsonNode log = component(flow, "processors", "LogMessage");
+    String logId = log.get("identifier").asText();
+    JsonNode convert = component(flow, "processors", "ConvertRecord");
+    assertFalse(
+        autoTerminates(convert, "failure"), "ConvertRecord must not auto-terminate failure");
+    assertTrue(
+        hasConnection(flow, convert.get("identifier").asText(), logId, "failure"),
+        "ConvertRecord failure must route to the LogMessage sink even without a mapping processor");
   }
 
   @Test
@@ -168,8 +237,8 @@ class NifiFlowBuilderTest {
             Map.of());
 
     JsonNode flow = build(spec);
-    // ConsumeMQTT -> ConvertRecord -> UpdateRecord -> InvokeHTTP
-    assertEquals(4, flow.get("flowContents").get("processors").size());
+    // ConsumeMQTT -> ConvertRecord -> UpdateRecord -> InvokeHTTP, plus the LogMessage error sink
+    assertEquals(5, flow.get("flowContents").get("processors").size());
     // only reader + writer (no DBCP for a FROST/HTTP sink)
     assertEquals(2, flow.get("flowContents").get("controllerServices").size());
 

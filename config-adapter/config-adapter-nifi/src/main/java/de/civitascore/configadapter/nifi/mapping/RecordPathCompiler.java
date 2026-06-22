@@ -29,7 +29,13 @@ import java.util.Map;
  */
 public class RecordPathCompiler {
 
-  /** The NiFi {@code UpdateRecord} "Replacement Value Strategy" for a property. */
+  /**
+   * The NiFi {@code UpdateRecord} "Replacement Value Strategy" for a property. A {@code const} uses
+   * {@code literal-value} (a bare RecordPath literal is not evaluated as a value by UpdateRecord);
+   * everything else is a {@code record-path-value} expression. A single processor allows only one
+   * strategy, so the flow builder emits one {@code UpdateRecord} per strategy when a mapping mixes
+   * both.
+   */
   public enum ReplacementStrategy {
     RECORD_PATH_VALUE("record-path-value"),
     LITERAL_VALUE("literal-value");
@@ -77,6 +83,9 @@ public class RecordPathCompiler {
 
   private UpdateRecordProperty compileField(String destination, ValueNode node) {
     if (node instanceof ConstNode constant) {
+      // A bare RecordPath literal is not evaluated as a value by UpdateRecord, so a const must use
+      // the literal-value strategy. The builder groups properties by strategy into separate
+      // UpdateRecord processors.
       return new UpdateRecordProperty(
           destination, String.valueOf(constant.value()), ReplacementStrategy.LITERAL_VALUE);
     }

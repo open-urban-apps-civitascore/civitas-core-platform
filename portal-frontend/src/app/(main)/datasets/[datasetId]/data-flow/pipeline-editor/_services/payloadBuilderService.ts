@@ -7,7 +7,7 @@
  * Extracts:
  * - Entity IDs from configured nodes
  * - React Flow styles (viewport + positions) for frontend reload
- * - RedPandaConnect model from the graph
+ * - The engine-neutral pipeline graph (React-Flow nodes/edges) forwarded to the config-adapter as-is
  */
 
 import { DATASINK_TYPES, type PipelineDatasink } from '@/types/datasinks'

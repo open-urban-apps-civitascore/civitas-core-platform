@@ -41,10 +41,10 @@ class PublishFailureDoesNotReplayStepsTest {
   void setUp() {
     frostHandler = FlowableTestSupport.mockHandler("frost");
     apisixHandler = FlowableTestSupport.mockHandler("apisix");
-    SagaCommandHandler redpandaHandler = FlowableTestSupport.mockHandler("nifi");
+    SagaCommandHandler pipelineHandler = FlowableTestSupport.mockHandler("nifi");
 
     SagaHandlerRegistry registry =
-        FlowableTestSupport.registry(frostHandler, apisixHandler, redpandaHandler);
+        FlowableTestSupport.registry(frostHandler, apisixHandler, pipelineHandler);
     resultPublisher = mock(FlowableResultPublisher.class);
 
     processEngine =

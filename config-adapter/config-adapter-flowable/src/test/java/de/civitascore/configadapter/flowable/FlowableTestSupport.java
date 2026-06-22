@@ -153,7 +153,7 @@ public final class FlowableTestSupport {
     return switch (adapter) {
       case "apisix" -> Map.of("baseUrl", "upstreamUrl");
       // The NiFi pipeline adapter declares no field aliases (its sink target is platform-managed,
-      // not derived from the FROST baseUrl as the former RedPanda adapter required).
+      // not derived from the FROST baseUrl as the former pipeline adapter required).
       default -> Map.of();
     };
   }

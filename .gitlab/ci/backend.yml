@@ -175,7 +175,8 @@ integration-test-backend:
       junit: portal-backend/target/failsafe-reports/TEST-*.xml
 
 # Saga E2E integration tests — cross-module tests validating the full dataset saga workflow
-# (portal-backend + config-adapter orchestrator in-process, with real FROST, Kafka, Redpanda Connect).
+# (portal-backend + Flowable saga engine in-process, with real FROST, Kafka, Redpanda Connect —
+#  pipeline-engine migration to NiFi still pending, see WI 1622).
 # Auto-runs on main/develop, manual trigger on MRs (heavy: ~2 min, 6+ containers).
 saga-e2e-test-backend:
   image: maven:3.9-eclipse-temurin-25

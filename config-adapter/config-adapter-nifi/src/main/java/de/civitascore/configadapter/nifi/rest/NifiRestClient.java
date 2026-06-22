@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.nifi.rest;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -23,8 +24,14 @@ import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.Form;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Supplier;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
 import org.glassfish.jersey.media.multipart.file.StreamDataBodyPart;
@@ -52,7 +59,7 @@ public class NifiRestClient implements AutoCloseable {
   private final String password;
   private final Client client;
   private final ObjectMapper mapper = new ObjectMapper();
-  private String token;
+  private volatile String token;
 
   /**
    * Creates a client.
@@ -187,6 +194,27 @@ public class NifiRestClient implements AutoCloseable {
     WebTarget target =
         target(API + "/process-groups/" + rootId + "/process-groups/upload")
             .register(MultiPartFeature.class);
+    byte[] body = snapshotJson.getBytes(StandardCharsets.UTF_8);
+    try (Response response =
+        sendAuthorized(() -> postUploadMultipart(target, rootId, pgName, body))) {
+      check(response, "upload snapshot");
+      return requireId(
+          mapper.readTree(response.readEntity(String.class)).path("id").asText(),
+          "uploaded process group");
+    } catch (ProcessingException e) {
+      throw network("upload snapshot", e);
+    } catch (IOException e) {
+      throw new FatalAdapterException(AdapterErrorCode.NIFI_FLOW_ERROR, e, "upload snapshot");
+    }
+  }
+
+  /**
+   * Builds a FRESH multipart body for each call. The snapshot stream is single-use, so the {@link
+   * #sendAuthorized} 401-replay must rebuild it — replaying the original, already-consumed stream
+   * would upload an empty body.
+   */
+  private Response postUploadMultipart(
+      WebTarget target, String rootId, String pgName, byte[] body) {
     try (FormDataMultiPart multipart = new FormDataMultiPart()) {
       multipart.field("id", rootId);
       multipart.field("groupName", pgName);
@@ -196,21 +224,13 @@ public class NifiRestClient implements AutoCloseable {
       multipart.bodyPart(
           new StreamDataBodyPart(
               "file",
-              new java.io.ByteArrayInputStream(
-                  snapshotJson.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+              new ByteArrayInputStream(body),
               pgName + ".json",
               MediaType.APPLICATION_JSON_TYPE));
-      try (Response response =
-          authorized(target).post(Entity.entity(multipart, multipart.getMediaType()))) {
-        check(response, "upload snapshot");
-        return requireId(
-            mapper.readTree(response.readEntity(String.class)).path("id").asText(),
-            "uploaded process group");
-      }
-    } catch (ProcessingException e) {
-      throw network("upload snapshot", e);
-    } catch (java.io.IOException e) {
-      throw new FatalAdapterException(AdapterErrorCode.NIFI_FLOW_ERROR, e, "upload snapshot");
+      return authorized(target).post(Entity.entity(multipart, multipart.getMediaType()));
+    } catch (IOException e) {
+      // FormDataMultiPart.close() (in-memory body) — surface as a transient transport error.
+      throw new ProcessingException("upload multipart", e);
     }
   }
 
@@ -219,31 +239,80 @@ public class NifiRestClient implements AutoCloseable {
     if (sensitiveByComponent.isEmpty()) {
       return;
     }
+    // Secrets may target controller services (e.g. a DBCP pool's Password) OR processors (e.g.
+    // ConsumeMQTT's Password). Patch the controller services first, then — only if any secret is
+    // still unplaced — the processors. A secret that matches neither must fail the deploy rather
+    // than be dropped silently (a missing source password would otherwise surface much later as an
+    // opaque connection failure).
+    Set<String> remaining = new HashSet<>(sensitiveByComponent.keySet());
+    patchControllerServiceSecrets(pgId, sensitiveByComponent, remaining);
+    if (!remaining.isEmpty()) {
+      patchProcessorSecrets(pgId, sensitiveByComponent, remaining);
+    }
+    if (!remaining.isEmpty()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_FLOW_ERROR,
+          "sensitive properties target no controller service or processor in the flow: "
+              + remaining);
+    }
+  }
+
+  private void patchControllerServiceSecrets(
+      String pgId, Map<String, Map<String, String>> sensitiveByComponent, Set<String> remaining)
+      throws FatalAdapterException, RetryableAdapterException {
     JsonNode services =
         getJson(API + "/flow/process-groups/" + pgId + "/controller-services", "list services")
             .path("controllerServices");
     for (JsonNode service : services) {
-      String type = service.path("component").path("type").asText();
-      String simpleType = type.substring(type.lastIndexOf('.') + 1);
-      Map<String, String> props = matchSensitive(sensitiveByComponent, simpleType);
+      // Match the controller service to its secret bundle by its friendly NAME (which the builder
+      // stamps onto each CS), not by a fuzzy type substring — so a second service of the same type
+      // (e.g. another DBCP pool) can never be force-matched to the wrong secrets.
+      String name = service.path("component").path("name").asText();
+      Map<String, String> props = sensitiveByComponent.get(name);
       if (props != null) {
         patchService(
             new ControllerServiceRef(
                 service.path("id").asText(),
-                type,
+                service.path("component").path("type").asText(),
                 service.path("revision").path("version").asLong()),
             props);
+        remaining.remove(name);
       }
     }
   }
 
-  private Map<String, String> matchSensitive(
-      Map<String, Map<String, String>> sensitiveByComponent, String serviceType) {
-    // Components are keyed by friendly name; map common controller-service types onto them.
-    if (serviceType.contains("DBCPConnectionPool")) {
-      return sensitiveByComponent.get("PostGISConnectionPool");
+  private void patchProcessorSecrets(
+      String pgId, Map<String, Map<String, String>> sensitiveByComponent, Set<String> remaining)
+      throws FatalAdapterException, RetryableAdapterException {
+    JsonNode processors =
+        getJson(API + "/process-groups/" + pgId + "/processors", "list processors")
+            .path("processors");
+    for (JsonNode processor : processors) {
+      String name = processor.path("component").path("name").asText();
+      Map<String, String> props = sensitiveByComponent.get(name);
+      if (props != null) {
+        patchProcessor(
+            processor.path("id").asText(),
+            processor.path("revision").path("version").asLong(),
+            props);
+        remaining.remove(name);
+      }
     }
-    return sensitiveByComponent.get(serviceType);
+  }
+
+  private void patchProcessor(String id, long version, Map<String, String> sensitiveProps)
+      throws FatalAdapterException, RetryableAdapterException {
+    ObjectNode body = mapper.createObjectNode();
+    ObjectNode revision = body.putObject("revision");
+    revision.put("version", version);
+    revision.put("clientId", CLIENT_ID);
+    ObjectNode component = body.putObject("component");
+    component.put("id", id);
+    // A processor's properties live under component.config.properties (controller services put
+    // them directly under component.properties).
+    ObjectNode properties = component.putObject("config").putObject("properties");
+    sensitiveProps.forEach(properties::put);
+    put(API + "/processors/" + id, body, "patch processor");
   }
 
   private void patchService(ControllerServiceRef service, Map<String, String> sensitiveProps)
@@ -266,20 +335,6 @@ public class NifiRestClient implements AutoCloseable {
     body.put("state", "ENABLED");
     body.put("disconnectedNodeAcknowledged", false);
     put(API + "/flow/process-groups/" + pgId + "/controller-services", body, "enable services");
-  }
-
-  /**
-   * Returns whether every controller service in the process group is ENABLED. Controller-service
-   * enabling is asynchronous, so callers (e.g. before starting the group) may need to poll on this.
-   *
-   * @param pgId the process-group id
-   * @return true if all controller services report state ENABLED
-   * @throws FatalAdapterException on a non-retryable error
-   * @throws RetryableAdapterException on a transient error
-   */
-  boolean controllerServicesAllEnabled(String pgId)
-      throws FatalAdapterException, RetryableAdapterException {
-    return controllerServicesAllInState(pgId, "ENABLED", false);
   }
 
   /**
@@ -375,11 +430,13 @@ public class NifiRestClient implements AutoCloseable {
     awaitControllerServicesState(group.id(), "DISABLED", true);
 
     try (Response response =
-        authorized(
-                target(API + "/process-groups/" + group.id())
-                    .queryParam("version", group.version())
-                    .queryParam("clientId", CLIENT_ID))
-            .delete()) {
+        sendAuthorized(
+            () ->
+                authorized(
+                        target(API + "/process-groups/" + group.id())
+                            .queryParam("version", group.version())
+                            .queryParam("clientId", CLIENT_ID))
+                    .delete())) {
       if (response.getStatus() != 404) {
         check(response, "delete process group");
       }
@@ -392,12 +449,12 @@ public class NifiRestClient implements AutoCloseable {
 
   private JsonNode getJson(String path, String description)
       throws FatalAdapterException, RetryableAdapterException {
-    try (Response response = authorized(target(path)).get()) {
+    try (Response response = sendAuthorized(() -> authorized(target(path)).get())) {
       check(response, description);
       return mapper.readTree(response.readEntity(String.class));
     } catch (ProcessingException e) {
       throw network(description, e);
-    } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+    } catch (JsonProcessingException e) {
       throw new FatalAdapterException(AdapterErrorCode.NIFI_FLOW_ERROR, e, description);
     }
   }
@@ -405,11 +462,39 @@ public class NifiRestClient implements AutoCloseable {
   private void put(String path, JsonNode body, String description)
       throws FatalAdapterException, RetryableAdapterException {
     try (Response response =
-        authorized(target(path)).put(Entity.entity(body.toString(), MediaType.APPLICATION_JSON))) {
+        sendAuthorized(
+            () ->
+                authorized(target(path))
+                    .put(Entity.entity(body.toString(), MediaType.APPLICATION_JSON)))) {
       check(response, description);
     } catch (ProcessingException e) {
       throw network(description, e);
     }
+  }
+
+  /**
+   * Executes an authorized request and, if NiFi answers 401 (the bearer token expired mid-saga),
+   * re-authenticates once and replays it — the replayed request rebuilds the {@code Authorization}
+   * header from the refreshed {@link #token}.
+   */
+  private Response sendAuthorized(Supplier<Response> request)
+      throws FatalAdapterException, RetryableAdapterException {
+    Response response = request.get();
+    if (response.getStatus() == 401) {
+      response.close();
+      LOG.info("NiFi returned 401 — re-authenticating and retrying once");
+      authenticate();
+      response = request.get();
+      if (response.getStatus() == 401) {
+        response.close();
+        // Re-authentication did not clear the 401 (e.g. NiFi restarting, credentials momentarily
+        // rejected). That is a transient condition — surface it as retryable so the saga layer can
+        // back off and redeliver, rather than letting check() map the 4xx to a fatal DLQ error.
+        throw new RetryableAdapterException(
+            AdapterErrorCode.NIFI_ERROR, "re-authentication did not clear HTTP 401");
+      }
+    }
+    return response;
   }
 
   private WebTarget target(String path) {

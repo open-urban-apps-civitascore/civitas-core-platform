@@ -157,17 +157,17 @@ class SagaStepDelegateTest {
   }
 
   @Test
-  void shouldApplyAdapterMappingBaseUrlToTargetUrlForRedpanda() {
-    SagaCommandHandler redpandaHandler = mock(SagaCommandHandler.class);
-    when(redpandaHandler.adapter()).thenReturn("nifi");
-    when(redpandaHandler.fieldAliases()).thenReturn(Map.of("baseUrl", "targetUrl"));
-    registry.register(redpandaHandler);
+  void shouldApplyAdapterMappingBaseUrlToTargetUrlForPipeline() {
+    SagaCommandHandler pipelineHandler = mock(SagaCommandHandler.class);
+    when(pipelineHandler.adapter()).thenReturn("nifi");
+    when(pipelineHandler.fieldAliases()).thenReturn(Map.of("baseUrl", "targetUrl"));
+    registry.register(pipelineHandler);
 
-    SagaStepDelegate redpandaDelegate = new SagaStepDelegate();
-    redpandaDelegate.setAdapterName(mockExpression("nifi"));
-    redpandaDelegate.setOperation(mockExpression("DEPLOY_PIPELINES"));
-    redpandaDelegate.setStepId(mockExpression("deploy-pipelines"));
-    redpandaDelegate.setSagaHandlerRegistry(registry);
+    SagaStepDelegate pipelineDelegate = new SagaStepDelegate();
+    pipelineDelegate.setAdapterName(mockExpression("nifi"));
+    pipelineDelegate.setOperation(mockExpression("DEPLOY_PIPELINES"));
+    pipelineDelegate.setStepId(mockExpression("deploy-pipelines"));
+    pipelineDelegate.setSagaHandlerRegistry(registry);
 
     Map<String, Object> variables = new HashMap<>();
     variables.put("sagaId", "saga-123");
@@ -178,12 +178,12 @@ class SagaStepDelegateTest {
     SagaCommandResult result =
         SagaCommandResult.success(
             "saga-123", "deploy-pipelines", Map.of("pipelineIds", "p-1"), Map.of());
-    when(redpandaHandler.handle(any())).thenReturn(result);
+    when(pipelineHandler.handle(any())).thenReturn(result);
 
-    redpandaDelegate.execute(execution);
+    pipelineDelegate.execute(execution);
 
     ArgumentCaptor<SagaCommandMessage> captor = ArgumentCaptor.forClass(SagaCommandMessage.class);
-    verify(redpandaHandler).handle(captor.capture());
+    verify(pipelineHandler).handle(captor.capture());
 
     assertEquals("http://frost/v1.1/Projects(1)", captor.getValue().payload().get("targetUrl"));
   }

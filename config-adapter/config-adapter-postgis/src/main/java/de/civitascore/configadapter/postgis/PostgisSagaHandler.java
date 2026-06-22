@@ -39,7 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Saga command handler for PostGIS, mirroring the FROST / APISIX / RedPanda handlers but executing
+ * Saga command handler for PostGIS, mirroring the FROST / APISIX / NiFi handlers but executing
  * DDL over JDBC instead of HTTP. Discovered via {@link java.util.ServiceLoader} and registered in
  * the saga orchestrator's handler registry.
  *

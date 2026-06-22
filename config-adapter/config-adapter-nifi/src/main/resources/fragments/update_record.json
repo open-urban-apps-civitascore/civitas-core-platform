@@ -80,9 +80,7 @@
   "bulletinLevel": "WARN",
   "runDurationMillis": 0,
   "concurrentlySchedulableTaskCount": 1,
-  "autoTerminatedRelationships": [
-    "failure"
-  ],
+  "autoTerminatedRelationships": [],
   "scheduledState": "ENABLED",
   "retryCount": 10,
   "retriedRelationships": [],

@@ -53,6 +53,8 @@ class RecordPathCompilerTest {
 
   @Test
   void constStringIsLiteralValue() throws Exception {
+    // a bare RecordPath literal is not evaluated as a value by UpdateRecord, so const uses the
+    // literal-value strategy (the builder isolates it in its own UpdateRecord)
     var props = byPath(compile("{ \"$.unit\": { \"op\": \"const\", \"value\": \"celsius\" } }"));
 
     UpdateRecordProperty p = props.get("/unit");

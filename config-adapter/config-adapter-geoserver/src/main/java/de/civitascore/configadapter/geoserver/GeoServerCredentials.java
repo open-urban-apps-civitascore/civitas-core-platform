@@ -15,8 +15,8 @@ import java.security.GeneralSecurityException;
 import java.util.Map;
 
 /**
- * Credential handling for the GeoServer adapter, mirroring the pattern used by the RedPanda
- * adapter: credentials may be supplied encrypted as {@code ENC(...)} values and are decrypted
+ * Credential handling for the GeoServer adapter, following the project credential convention:
+ * credentials may be supplied encrypted as {@code ENC(...)} values and are decrypted
  * in-memory only at the moment they are needed. Plaintext values pass through unchanged for
  * backward compatibility.
  *

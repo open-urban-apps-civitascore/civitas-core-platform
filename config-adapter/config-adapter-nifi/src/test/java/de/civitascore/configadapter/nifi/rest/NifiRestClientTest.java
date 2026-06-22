@@ -13,6 +13,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.put;
 import static com.github.tomakehurst.wiremock.client.WireMock.putRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
@@ -75,7 +76,8 @@ class NifiRestClientTest {
             .willReturn(
                 json(
                     "{ \"controllerServices\": [ { \"id\": \"cs-1\","
-                        + " \"component\": { \"type\": \"org.apache.nifi.dbcp.DBCPConnectionPool\","
+                        + " \"component\": { \"name\": \"PostGISConnectionPool\","
+                        + " \"type\": \"org.apache.nifi.dbcp.DBCPConnectionPool\","
                         + " \"state\": \"ENABLED\" },"
                         + " \"revision\": { \"version\": 3 } } ] }")));
     server.stubFor(put(urlEqualTo("/nifi-api/controller-services/cs-1")).willReturn(json("{}")));
@@ -176,6 +178,217 @@ class NifiRestClientTest {
             "pipeline-x", "{ \"flowContents\": { \"name\": \"pipeline-x\" } }", Map.of());
 
     assertThrows(RetryableAdapterException.class, () -> client.deployFlow(plan));
+  }
+
+  @Test
+  void reauthenticatesAndRetriesOnceOn401() throws Exception {
+    stubAuth(); // token endpoint always issues a token
+    // first GET is rejected (expired token), then succeeds after re-authentication
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .inScenario("reauth")
+            .whenScenarioStateIs("Started")
+            .willReturn(aResponse().withStatus(401))
+            .willSetStateTo("reauthed"));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .inScenario("reauth")
+            .whenScenarioStateIs("reauthed")
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+
+    client.authenticate();
+    String rootId = client.getRootProcessGroupId(); // 401 → re-auth → retry → 200
+
+    assertEquals("root-1", rootId);
+    // token endpoint hit twice: the initial authenticate() + the re-auth triggered by the 401
+    server.verify(2, postRequestedFor(urlEqualTo("/nifi-api/access/token")));
+  }
+
+  @Test
+  void persistent401AfterReauthIsRetryable() throws Exception {
+    stubAuth(); // token endpoint always issues a token
+    // every call to root is rejected, even after re-authentication (e.g. NiFi restarting)
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root")).willReturn(aResponse().withStatus(401)));
+
+    client.authenticate();
+    // first 401 → re-auth → still 401 → must surface as retryable (transient), not fatal
+    assertThrows(RetryableAdapterException.class, client::getRootProcessGroupId);
+    // re-authentication was attempted: initial authenticate() + the one triggered by the 401
+    server.verify(2, postRequestedFor(urlEqualTo("/nifi-api/access/token")));
+  }
+
+  @Test
+  void uploadResendsSnapshotBodyAfterReauthOn401() throws Exception {
+    stubAuth();
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/root-1"))
+            .willReturn(json("{ \"processGroupFlow\": { \"flow\": { \"processGroups\": [] } } }")));
+    // the upload is rejected once (token expired mid-upload), then accepted after re-auth
+    server.stubFor(
+        post(urlPathEqualTo("/nifi-api/process-groups/root-1/process-groups/upload"))
+            .inScenario("upload-reauth")
+            .whenScenarioStateIs("Started")
+            .willReturn(aResponse().withStatus(401))
+            .willSetStateTo("reauthed"));
+    server.stubFor(
+        post(urlPathEqualTo("/nifi-api/process-groups/root-1/process-groups/upload"))
+            .inScenario("upload-reauth")
+            .whenScenarioStateIs("reauthed")
+            .willReturn(json("{ \"id\": \"pg-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(
+                json(
+                    "{ \"controllerServices\": [ { \"id\": \"cs-1\", \"component\": { \"name\":"
+                        + " \"JsonTreeReader\", \"type\": \"t\", \"state\": \"ENABLED\" },"
+                        + " \"revision\": { \"version\": 1 } } ] }")));
+    server.stubFor(
+        put(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json("{}")));
+    server.stubFor(put(urlEqualTo("/nifi-api/flow/process-groups/pg-1")).willReturn(json("{}")));
+
+    DeploymentPlan plan =
+        new DeploymentPlan(
+            "pipeline-x", "{ \"flowContents\": { \"name\": \"pipeline-x\" } }", Map.of());
+
+    assertEquals("pg-1", client.deployFlow(plan));
+    // the REPLAYED upload (after re-auth) must carry the snapshot body, not an exhausted/empty
+    // stream — the multipart is rebuilt per attempt
+    server.verify(
+        postRequestedFor(urlPathEqualTo("/nifi-api/process-groups/root-1/process-groups/upload"))
+            .withRequestBody(containing("pipeline-x")));
+  }
+
+  @Test
+  void patchesOnlyTheNameMatchedControllerService() throws Exception {
+    stubAuth();
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/root-1"))
+            .willReturn(json("{ \"processGroupFlow\": { \"flow\": { \"processGroups\": [] } } }")));
+    server.stubFor(
+        post(urlPathEqualTo("/nifi-api/process-groups/root-1/process-groups/upload"))
+            .willReturn(json("{ \"id\": \"pg-1\" }")));
+    // two controller services of the SAME type; only the name-matched one must be patched
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(
+                json(
+                    "{ \"controllerServices\": ["
+                        + " { \"id\": \"cs-1\", \"component\": { \"name\":"
+                        + " \"PostGISConnectionPool\", \"type\":"
+                        + " \"org.apache.nifi.dbcp.DBCPConnectionPool\", \"state\": \"ENABLED\" },"
+                        + " \"revision\": { \"version\": 1 } },"
+                        + " { \"id\": \"cs-2\", \"component\": { \"name\": \"OtherPool\","
+                        + " \"type\": \"org.apache.nifi.dbcp.DBCPConnectionPool\", \"state\":"
+                        + " \"ENABLED\" }, \"revision\": { \"version\": 1 } } ] }")));
+    server.stubFor(put(urlEqualTo("/nifi-api/controller-services/cs-1")).willReturn(json("{}")));
+    server.stubFor(put(urlEqualTo("/nifi-api/controller-services/cs-2")).willReturn(json("{}")));
+    server.stubFor(
+        put(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json("{}")));
+    server.stubFor(put(urlEqualTo("/nifi-api/flow/process-groups/pg-1")).willReturn(json("{}")));
+
+    DeploymentPlan plan =
+        new DeploymentPlan(
+            "pipeline-x",
+            "{ \"flowContents\": { \"name\": \"pipeline-x\" } }",
+            Map.of("PostGISConnectionPool", Map.of("Password", "db-secret")));
+
+    client.deployFlow(plan);
+
+    server.verify(
+        putRequestedFor(urlEqualTo("/nifi-api/controller-services/cs-1"))
+            .withRequestBody(containing("db-secret")));
+    // the wrong-named service of the same type is never patched
+    server.verify(0, putRequestedFor(urlEqualTo("/nifi-api/controller-services/cs-2")));
+  }
+
+  @Test
+  void patchesSensitivePropertyOnAProcessorNotJustControllerServices() throws Exception {
+    // A ConsumeMQTT *processor* carries a sensitive Password — it is NOT a controller service, so
+    // the post-upload secret push must also patch processors, else authenticated MQTT sources
+    // deploy without a password.
+    stubAuth();
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/root-1"))
+            .willReturn(json("{ \"processGroupFlow\": { \"flow\": { \"processGroups\": [] } } }")));
+    server.stubFor(
+        post(urlPathEqualTo("/nifi-api/process-groups/root-1/process-groups/upload"))
+            .willReturn(json("{ \"id\": \"pg-1\" }")));
+    // no controller service carries the secret (FROST sink: reader + writer only)
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(
+                json(
+                    "{ \"controllerServices\": [ { \"id\": \"cs-r\", \"component\": { \"name\":"
+                        + " \"JsonTreeReader\", \"type\": \"t\", \"state\": \"ENABLED\" },"
+                        + " \"revision\": { \"version\": 1 } } ] }")));
+    // the ConsumeMQTT processor is where the Password lives
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/pg-1/processors"))
+            .willReturn(
+                json(
+                    "{ \"processors\": [ { \"id\": \"proc-1\", \"component\": { \"name\":"
+                        + " \"ConsumeMQTT\" }, \"revision\": { \"version\": 4 } } ] }")));
+    server.stubFor(put(urlEqualTo("/nifi-api/processors/proc-1")).willReturn(json("{}")));
+    server.stubFor(
+        put(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json("{}")));
+    server.stubFor(put(urlEqualTo("/nifi-api/flow/process-groups/pg-1")).willReturn(json("{}")));
+
+    DeploymentPlan plan =
+        new DeploymentPlan(
+            "pipeline-x",
+            "{ \"flowContents\": { \"name\": \"pipeline-x\" } }",
+            Map.of("ConsumeMQTT", Map.of("Password", "mqtt-secret")));
+
+    client.deployFlow(plan);
+
+    // the processor secret is pushed under component.config.properties, with the revision echoed
+    server.verify(
+        putRequestedFor(urlEqualTo("/nifi-api/processors/proc-1"))
+            .withRequestBody(containing("mqtt-secret"))
+            .withRequestBody(containing("\"version\":4")));
+  }
+
+  @Test
+  void unmatchedSensitivePropertyFailsLoudlyInsteadOfDroppingTheSecret() throws Exception {
+    // A secret whose target component exists in neither the controller services nor the processors
+    // must fail the deploy, not silently vanish.
+    stubAuth();
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/root-1"))
+            .willReturn(json("{ \"processGroupFlow\": { \"flow\": { \"processGroups\": [] } } }")));
+    server.stubFor(
+        post(urlPathEqualTo("/nifi-api/process-groups/root-1/process-groups/upload"))
+            .willReturn(json("{ \"id\": \"pg-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json("{ \"controllerServices\": [] }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/pg-1/processors"))
+            .willReturn(json("{ \"processors\": [] }")));
+
+    DeploymentPlan plan =
+        new DeploymentPlan(
+            "pipeline-x",
+            "{ \"flowContents\": { \"name\": \"pipeline-x\" } }",
+            Map.of("NoSuchComponent", Map.of("Password", "orphan-secret")));
+
+    assertThrows(FatalAdapterException.class, () -> client.deployFlow(plan));
   }
 
   @Test

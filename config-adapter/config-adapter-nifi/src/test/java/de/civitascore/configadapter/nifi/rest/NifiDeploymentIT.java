@@ -33,6 +33,7 @@ import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import java.security.SecureRandom;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -119,18 +120,24 @@ class NifiDeploymentIT {
     Datasource source = new Datasource();
     source.setId("ds-it");
     source.setType("MQTT");
-    source.handleUnknownProperty("brokerUrl", "tcp://localhost:1883");
-    source.handleUnknownProperty("topic", "sensors/+/temp");
+    source.handleUnknownProperty("urls", List.of("tcp://localhost:1883"));
+    source.handleUnknownProperty("topics", List.of("sensors/+/temp"));
 
     SinkSpec sink = new SinkSpec(SinkType.POSTGIS, "sensor_observations");
 
     Map<String, Object> graph =
         map(
             """
-            { "nodes": [ { "id": "m", "type": "mapping",
-                "data": { "mappingConfig": { "fields": {
-                  "$.station_id": "$.station_id",
-                  "$.temperature": "$.temperature" } } } } ], "edges": [] }
+            { "nodes": [
+                { "id": "s", "type": "start", "data": {} },
+                { "id": "m", "type": "mapping",
+                  "data": { "mappingConfig": { "fields": {
+                    "$.station_id": "$.station_id",
+                    "$.temperature": "$.temperature" } } } },
+                { "id": "e", "type": "end", "data": {} } ],
+              "edges": [
+                { "id": "e1", "source": "s", "target": "m" },
+                { "id": "e2", "source": "m", "target": "e" } ] }
             """);
 
     FlowDeploymentPlanner planner =
@@ -190,14 +197,20 @@ class NifiDeploymentIT {
     Datasource source = new Datasource();
     source.setId("ds-frost");
     source.setType("MQTT");
-    source.handleUnknownProperty("brokerUrl", "tcp://localhost:1883");
-    source.handleUnknownProperty("topic", "sensors/+/temp");
+    source.handleUnknownProperty("urls", List.of("tcp://localhost:1883"));
+    source.handleUnknownProperty("topics", List.of("sensors/+/temp"));
 
     Map<String, Object> graph =
         map(
             """
-            { "nodes": [ { "id": "m", "type": "mapping",
-                "data": { "mappingConfig": { "fields": { "$.id": "$.id" } } } } ], "edges": [] }
+            { "nodes": [
+                { "id": "s", "type": "start", "data": {} },
+                { "id": "m", "type": "mapping",
+                  "data": { "mappingConfig": { "fields": { "$.id": "$.id" } } } },
+                { "id": "e", "type": "end", "data": {} } ],
+              "edges": [
+                { "id": "e1", "source": "s", "target": "m" },
+                { "id": "e2", "source": "m", "target": "e" } ] }
             """);
 
     FlowDeploymentPlanner planner =

@@ -98,7 +98,7 @@
       <incoming>flow-geo-skip</incoming>
       <incoming>flow-layers-skip</incoming>
       <incoming>flow-layers-pipeline</incoming>
-      <outgoing>flow-gateway-redpanda</outgoing>
+      <outgoing>flow-gateway-pipeline</outgoing>
       <outgoing>flow-gateway-skip</outgoing>
     </exclusiveGateway>
     <serviceTask id="deploy-pipelines" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Deploy Pipelines">
@@ -107,17 +107,17 @@
         <flowable:field xsi:type="xs:anyType" name="operation" stringValue="DEPLOY_PIPELINES"/>
         <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="deploy-pipelines"/>
       </extensionElements>
-      <incoming>flow-gateway-redpanda</incoming>
-      <outgoing>flow-redpanda-success</outgoing>
+      <incoming>flow-gateway-pipeline</incoming>
+      <outgoing>flow-pipeline-success</outgoing>
     </serviceTask>
-    <boundaryEvent id="redpanda-error" name="Step Failed" attachedToRef="deploy-pipelines">
-      <outgoing>flow-redpanda-error</outgoing>
+    <boundaryEvent id="pipeline-error" name="Step Failed" attachedToRef="deploy-pipelines">
+      <outgoing>flow-pipeline-error</outgoing>
       <errorEventDefinition id="ErrorEventDefinition_3" errorRef="stepFailedError"/>
     </boundaryEvent>
-    <exclusiveGateway id="redpanda-comp-gateway" name="Compensate GeoServer?" default="flow-redpanda-comp-apisix">
-      <incoming>flow-redpanda-error</incoming>
-      <outgoing>flow-redpanda-comp-geo</outgoing>
-      <outgoing>flow-redpanda-comp-apisix</outgoing>
+    <exclusiveGateway id="pipeline-comp-gateway" name="Compensate GeoServer?" default="flow-pipeline-comp-apisix">
+      <incoming>flow-pipeline-error</incoming>
+      <outgoing>flow-pipeline-comp-geo</outgoing>
+      <outgoing>flow-pipeline-comp-apisix</outgoing>
     </exclusiveGateway>
     <serviceTask id="compensate-geoserver" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate" name="Compensate: Delete GeoServer Workspace">
       <extensionElements>
@@ -128,7 +128,7 @@
       <incoming>flow-workspace-error</incoming>
       <incoming>flow-datastore-error</incoming>
       <incoming>flow-layers-error</incoming>
-      <incoming>flow-redpanda-comp-geo</incoming>
+      <incoming>flow-pipeline-comp-geo</incoming>
       <outgoing>flow-comp-geoserver-sink</outgoing>
     </serviceTask>
     <serviceTask id="compensate-sink" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate" name="Compensate: Deprovision PostGIS Sink">
@@ -147,7 +147,7 @@
         <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="create-route"/>
       </extensionElements>
       <incoming>flow-comp-sink-apisix</incoming>
-      <incoming>flow-redpanda-comp-apisix</incoming>
+      <incoming>flow-pipeline-comp-apisix</incoming>
       <incoming>flow-sink-error</incoming>
       <outgoing>flow-comp-apisix-frost</outgoing>
     </serviceTask>
@@ -166,7 +166,7 @@
         <flowable:field xsi:type="xs:anyType" name="resultType" stringValue="success"/>
       </extensionElements>
       <incoming>flow-gateway-skip</incoming>
-      <incoming>flow-redpanda-success</incoming>
+      <incoming>flow-pipeline-success</incoming>
       <outgoing>flow-publish-success-end</outgoing>
     </serviceTask>
     <serviceTask id="publish-failure" flowable:async="true" flowable:class="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate" name="Publish Failure Result">
@@ -198,22 +198,22 @@
     </sequenceFlow>
     <sequenceFlow id="flow-layers-skip" name="no" sourceRef="layers-gateway" targetRef="pipeline-gateway"/>
     <sequenceFlow id="flow-layers-pipeline" sourceRef="provision-layers" targetRef="pipeline-gateway"/>
-    <sequenceFlow id="flow-gateway-redpanda" name="yes" sourceRef="pipeline-gateway" targetRef="deploy-pipelines">
+    <sequenceFlow id="flow-gateway-pipeline" name="yes" sourceRef="pipeline-gateway" targetRef="deploy-pipelines">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_3">${hasPipelines == true}</conditionExpression>
     </sequenceFlow>
     <sequenceFlow id="flow-gateway-skip" name="no" sourceRef="pipeline-gateway" targetRef="publish-success"/>
-    <sequenceFlow id="flow-redpanda-success" sourceRef="deploy-pipelines" targetRef="publish-success"/>
+    <sequenceFlow id="flow-pipeline-success" sourceRef="deploy-pipelines" targetRef="publish-success"/>
     <sequenceFlow id="flow-publish-success-end" sourceRef="publish-success" targetRef="end"/>
     <sequenceFlow id="flow-frost-error" sourceRef="frost-error" targetRef="publish-failure"/>
     <sequenceFlow id="flow-apisix-error" sourceRef="apisix-error" targetRef="compensate-frost"/>
     <sequenceFlow id="flow-workspace-error" sourceRef="workspace-error" targetRef="compensate-geoserver"/>
     <sequenceFlow id="flow-datastore-error" sourceRef="datastore-error" targetRef="compensate-geoserver"/>
     <sequenceFlow id="flow-layers-error" sourceRef="layers-error" targetRef="compensate-geoserver"/>
-    <sequenceFlow id="flow-redpanda-error" sourceRef="redpanda-error" targetRef="redpanda-comp-gateway"/>
-    <sequenceFlow id="flow-redpanda-comp-geo" sourceRef="redpanda-comp-gateway" targetRef="compensate-geoserver">
+    <sequenceFlow id="flow-pipeline-error" sourceRef="pipeline-error" targetRef="pipeline-comp-gateway"/>
+    <sequenceFlow id="flow-pipeline-comp-geo" sourceRef="pipeline-comp-gateway" targetRef="compensate-geoserver">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_4">${execution.getVariable('hasGeoSink') == true}</conditionExpression>
     </sequenceFlow>
-    <sequenceFlow id="flow-redpanda-comp-apisix" sourceRef="redpanda-comp-gateway" targetRef="compensate-apisix"/>
+    <sequenceFlow id="flow-pipeline-comp-apisix" sourceRef="pipeline-comp-gateway" targetRef="compensate-apisix"/>
     <sequenceFlow id="flow-comp-geoserver-sink" sourceRef="compensate-geoserver" targetRef="compensate-sink"/>
     <sequenceFlow id="flow-comp-sink-apisix" sourceRef="compensate-sink" targetRef="compensate-apisix"/>
     <sequenceFlow id="flow-sink-error" sourceRef="provision-sink-error" targetRef="compensate-apisix"/>
@@ -325,7 +325,7 @@
           <dc:Bounds height="14.0" width="66.0" x="158.0" y="706.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="BPMNShape_ExclusiveGateway_4" bpmnElement="redpanda-comp-gateway" isMarkerVisible="true">
+      <bpmndi:BPMNShape id="BPMNShape_ExclusiveGateway_4" bpmnElement="pipeline-comp-gateway" isMarkerVisible="true">
         <dc:Bounds height="50.0" width="50.0" x="920.0" y="663.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_48" labelStyle="BPMNLabelStyle_1">
           <dc:Bounds height="28.0" width="76.0" x="907.0" y="713.0"/>
@@ -373,7 +373,7 @@
           <dc:Bounds height="14.0" width="62.0" x="914.0" y="468.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_6" bpmnElement="redpanda-error">
+      <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_6" bpmnElement="pipeline-error">
         <dc:Bounds height="36.0" width="36.0" x="1519.0" y="432.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_47" labelStyle="BPMNLabelStyle_1">
           <dc:Bounds height="14.0" width="62.0" x="1506.0" y="468.0"/>
@@ -487,7 +487,7 @@
         <di:waypoint xsi:type="dc:Point" x="1000.0" y="586.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_32"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_16" bpmnElement="flow-gateway-redpanda" sourceElement="BPMNShape_ExclusiveGateway_3" targetElement="BPMNShape_ServiceTask_6">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_16" bpmnElement="flow-gateway-pipeline" sourceElement="BPMNShape_ExclusiveGateway_3" targetElement="BPMNShape_ServiceTask_6">
         <di:waypoint xsi:type="dc:Point" x="1454.0" y="425.0"/>
         <di:waypoint xsi:type="dc:Point" x="1468.0" y="425.0"/>
         <di:waypoint xsi:type="dc:Point" x="1483.0" y="425.0"/>
@@ -505,14 +505,14 @@
           <dc:Bounds height="14.0" width="14.0" x="1534.0" y="479.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_18" bpmnElement="flow-redpanda-success" sourceElement="BPMNShape_ServiceTask_6" targetElement="BPMNShape_ServiceTask_10">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_18" bpmnElement="flow-pipeline-success" sourceElement="BPMNShape_ServiceTask_6" targetElement="BPMNShape_ServiceTask_10">
         <di:waypoint xsi:type="dc:Point" x="1593.0" y="425.0"/>
         <di:waypoint xsi:type="dc:Point" x="1613.0" y="425.0"/>
         <di:waypoint xsi:type="dc:Point" x="1613.0" y="416.0"/>
         <di:waypoint xsi:type="dc:Point" x="1634.0" y="416.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_35"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_19" bpmnElement="flow-redpanda-error" sourceElement="BPMNShape_BoundaryEvent_6" targetElement="BPMNShape_ExclusiveGateway_4">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_19" bpmnElement="flow-pipeline-error" sourceElement="BPMNShape_BoundaryEvent_6" targetElement="BPMNShape_ExclusiveGateway_4">
         <di:waypoint xsi:type="dc:Point" x="1537.0" y="468.0"/>
         <di:waypoint xsi:type="dc:Point" x="1537.0" y="688.0"/>
         <di:waypoint xsi:type="dc:Point" x="970.0" y="688.0"/>
@@ -548,13 +548,13 @@
         <di:waypoint xsi:type="dc:Point" x="191.0" y="670.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_41"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_25" bpmnElement="flow-redpanda-comp-geo" sourceElement="BPMNShape_ExclusiveGateway_4" targetElement="BPMNShape_ServiceTask_7">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_25" bpmnElement="flow-pipeline-comp-geo" sourceElement="BPMNShape_ExclusiveGateway_4" targetElement="BPMNShape_ServiceTask_7">
         <di:waypoint xsi:type="dc:Point" x="945.0" y="663.0"/>
         <di:waypoint xsi:type="dc:Point" x="945.0" y="642.0"/>
         <di:waypoint xsi:type="dc:Point" x="945.0" y="620.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_49"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_26" bpmnElement="flow-redpanda-comp-apisix" sourceElement="BPMNShape_ExclusiveGateway_4" targetElement="BPMNShape_ServiceTask_8">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_26" bpmnElement="flow-pipeline-comp-apisix" sourceElement="BPMNShape_ExclusiveGateway_4" targetElement="BPMNShape_ServiceTask_8">
         <di:waypoint xsi:type="dc:Point" x="920.0" y="688.0"/>
         <di:waypoint xsi:type="dc:Point" x="526.0" y="688.0"/>
         <di:waypoint xsi:type="dc:Point" x="526.0" y="620.0"/>

@@ -72,7 +72,7 @@ class NifiSagaHandlerTest {
               "adapter": "nifi",
               "operation": "DEPLOY_PIPELINES",
               "datasources": [
-                { "id": "ds-1", "type": "MQTT", "brokerUrl": "tcp://m:1883", "topic": "t/+" }
+                { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] }
               ],
               "datasinks": [
                 { "id": "sk-1", "type": "POSTGIS",
@@ -82,8 +82,14 @@ class NifiSagaHandlerTest {
               ],
               "dataPipelines": [
                 { "id": "p-1", "version": "1", "action": "ADD",
-                  "data": { "nodes": [ { "id": "m", "type": "mapping",
-                      "data": { "mappingConfig": { "fields": { "$.id": "$.id" } } } } ], "edges": [] } }
+                  "data": { "nodes": [
+                      { "id": "s", "type": "start", "data": {} },
+                      { "id": "m", "type": "mapping",
+                        "data": { "mappingConfig": { "fields": { "$.id": "$.id" } } } },
+                      { "id": "e", "type": "end", "data": {} } ],
+                    "edges": [
+                      { "id": "e1", "source": "s", "target": "m" },
+                      { "id": "e2", "source": "m", "target": "e" } ] } }
               ]
             }
             """);
@@ -128,11 +134,17 @@ class NifiSagaHandlerTest {
             """
             { "type": "EXECUTE_STEP", "sagaId": "saga-frost", "stepId": "deploy-pipelines",
               "adapter": "nifi", "operation": "DEPLOY_PIPELINES",
-              "datasources": [ { "id": "ds-1", "type": "MQTT", "brokerUrl": "tcp://m:1883", "topic": "t/+" } ],
+              "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
               "datasinks": [],
               "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
-                "data": { "nodes": [ { "id": "m", "type": "mapping",
-                    "data": { "mappingConfig": { "fields": { "$.id": "$.id" } } } } ], "edges": [] } } ] }
+                "data": { "nodes": [
+                    { "id": "s", "type": "start", "data": {} },
+                    { "id": "m", "type": "mapping",
+                      "data": { "mappingConfig": { "fields": { "$.id": "$.id" } } } },
+                    { "id": "e", "type": "end", "data": {} } ],
+                  "edges": [
+                    { "id": "e1", "source": "s", "target": "m" },
+                    { "id": "e2", "source": "m", "target": "e" } ] } } ] }
             """);
 
     SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
