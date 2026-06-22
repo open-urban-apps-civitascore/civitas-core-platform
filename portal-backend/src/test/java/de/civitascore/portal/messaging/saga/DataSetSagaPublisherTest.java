@@ -269,12 +269,10 @@ class DataSetSagaPublisherTest {
       DataSet dataSet = datasetWithPipeline(pipeline);
 
       DataStructureVersion version = new DataStructureVersion();
-      version.setModelAtlasUri("atlas://dsv/" + dsvId);
+      version.setModel(Map.<String, Object>of("$id", "urn:core:datastructure:" + dsvId));
 
       when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
       when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
-      when(dataStructureVersionService.resolveJsonSchemaByAtlasUri("atlas://dsv/" + dsvId))
-          .thenReturn(Optional.of(Map.of("$id", "urn:core:datastructure:" + dsvId)));
 
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
       when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
