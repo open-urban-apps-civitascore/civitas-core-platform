@@ -105,7 +105,7 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
       onReactFlowSelectionChange={onReactFlowSelectionChange}
       isValidConnection={connection => validateConnection(connection as Connection)}
       connectionMode={ConnectionMode.Loose}
-      snapToGrid={CANVAS_CONFIG.snapToGrid}
+      shouldSnapToGrid={CANVAS_CONFIG.snapToGrid}
       snapGrid={[CANVAS_CONFIG.gridSize, CANVAS_CONFIG.gridSize]}
       minZoom={CANVAS_CONFIG.minZoom}
       maxZoom={CANVAS_CONFIG.maxZoom}
@@ -114,7 +114,7 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
       backgroundGap={CANVAS_CONFIG.gridSize}
       multiSelectionKeyCode={['Meta', 'Ctrl']}
       panActivationKeyCode={null}
-      useNativeDeleteKey
+      hasNativeDeleteKey
       deleteKeyCode={['Delete', 'Backspace']}
       className={`bg-muted/10 ${className}`}
     />

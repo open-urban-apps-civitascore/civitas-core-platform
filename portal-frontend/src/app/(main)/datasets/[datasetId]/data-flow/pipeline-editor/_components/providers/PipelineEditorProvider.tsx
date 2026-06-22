@@ -24,6 +24,7 @@ import {
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { isDatapoolScopeViolationError } from '@/utils/errors'
 
+import { getNodeDef } from '../../_config/nodeRegistry'
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
 import { buildPipelinePayload, syncDatasinkIds } from '../../_services/payloadBuilderService'
 import {
@@ -41,7 +42,6 @@ import {
   validatePipelineWithNodeStatus,
   type ValidationResultWithNodeStatus,
 } from '../../_services/validationService'
-import { getNodeDef } from '../../_config/nodeRegistry'
 import type { ActivePipelineContextValue, PipelineStats } from '../../_types/context'
 import type { PipelineNodeData } from '../../_types/nodes'
 import type { NodeCreationContext, Pipeline, PipelineEdge, PipelineNode, PipelineNodeType } from '../../_types/pipeline'

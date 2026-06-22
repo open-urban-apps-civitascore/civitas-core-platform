@@ -47,11 +47,11 @@ export interface CanvasScaffoldProps {
    * Flow's own deleteKeyCode handles deletion (used by the pipeline editor whose provider
    * reducer reacts to node/edge changes).
    */
-  useNativeDeleteKey?: boolean
+  hasNativeDeleteKey?: boolean
   multiSelectionKeyCode?: string | string[] | null
   panActivationKeyCode?: string | string[] | null
   connectionMode?: ConnectionMode
-  snapToGrid?: boolean
+  shouldSnapToGrid?: boolean
   snapGrid?: [number, number]
   minZoom?: number
   maxZoom?: number
@@ -67,7 +67,7 @@ const CanvasInner = (props: CanvasScaffoldProps) => {
   const { screenToFlowPosition, getNodes, getEdges, deleteElements } = useReactFlow()
 
   const onDeleteSelected = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (props.useNativeDeleteKey) return
+    if (props.hasNativeDeleteKey) return
     if (e.key !== 'Delete' && e.key !== 'Backspace') return
     const selectedNodes = getNodes().filter(n => n.selected)
     const selectedEdges = getEdges().filter(ed => ed.selected)
@@ -115,12 +115,12 @@ const CanvasInner = (props: CanvasScaffoldProps) => {
         onNodeClick={(_, node) => props.onSelectionChange?.(node.id)}
         onPaneClick={() => props.onSelectionChange?.(null)}
         connectionMode={props.connectionMode}
-        snapToGrid={props.snapToGrid}
+        snapToGrid={props.shouldSnapToGrid}
         snapGrid={props.snapGrid}
         minZoom={props.minZoom}
         maxZoom={props.maxZoom}
         defaultViewport={props.defaultViewport}
-        deleteKeyCode={props.useNativeDeleteKey ? (props.deleteKeyCode ?? ['Delete', 'Backspace']) : null}
+        deleteKeyCode={props.hasNativeDeleteKey ? (props.deleteKeyCode ?? ['Delete', 'Backspace']) : null}
         multiSelectionKeyCode={props.multiSelectionKeyCode}
         panActivationKeyCode={props.panActivationKeyCode}
         fitView
