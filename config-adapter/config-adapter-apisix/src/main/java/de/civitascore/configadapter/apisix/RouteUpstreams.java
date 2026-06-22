@@ -41,6 +41,13 @@ final class RouteUpstreams {
 
     static Target parse(String url) {
       URI uri = URI.create(url);
+      if (uri.getHost() == null || uri.getHost().isBlank()) {
+        // A host-less URL (missing scheme/authority) would yield a "null"/"null:port" node and a
+        // silently-unreachable upstream APISIX accepts without complaint — fail fast instead. The
+        // raw URL is not echoed: a FROST upstream URL may carry credentials in its userinfo.
+        throw new IllegalArgumentException(
+            "upstream URL has no host (scheme=" + uri.getScheme() + ")");
+      }
       String node = uri.getPort() > 0 ? uri.getHost() + ":" + uri.getPort() : uri.getHost();
       return new Target(
           node,
@@ -61,7 +68,7 @@ final class RouteUpstreams {
   }
 
   /** The FROST (STA) upstream target, parsed from the per-command upstream URL. */
-  Target frost(String upstreamUrl) {
+  static Target frost(String upstreamUrl) {
     return Target.parse(upstreamUrl);
   }
 

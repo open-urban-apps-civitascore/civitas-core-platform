@@ -123,7 +123,8 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     // The FROST upstream URL is always carried by the saga (the FROST project is provisioned for
     // every dataset). Parsed up front so a malformed value fails the step before any gateway state
     // is touched; the FROST upstream itself is only created when an STA named API actually uses it.
-    RouteUpstreams.Target sensorUpstream = upstreams.frost(requireString(command, "upstreamUrl"));
+    RouteUpstreams.Target frostUpstream =
+        RouteUpstreams.frost(requireString(command, "upstreamUrl"));
     boolean openDataAccess =
         Boolean.TRUE.equals(command.payload().getOrDefault("openDataAccess", false));
 
@@ -149,7 +150,7 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     // (CUSTOM/unknown) fails fast here, before any gateway state is created.
     Map<String, RouteUpstreamKind> kindBySlug = routePayload.routingKinds();
     Map<String, String> routeIds =
-        provisionRoutes(command, datasetId, openDataAccess, slugs, kindBySlug, sensorUpstream);
+        provisionRoutes(command, datasetId, openDataAccess, slugs, kindBySlug, frostUpstream);
 
     String publicUrl = settings.apiPublicUrl() + DATASETS_PATH_PREFIX + datasetId;
     Map<String, Object> resultData =
@@ -184,19 +185,19 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
       boolean openDataAccess,
       List<String> slugs,
       Map<String, RouteUpstreamKind> kindBySlug,
-      RouteUpstreams.Target sensorUpstream) {
-    boolean hasSensor = kindBySlug.containsValue(RouteUpstreamKind.SENSOR);
-    boolean hasMap = kindBySlug.containsValue(RouteUpstreamKind.MAP);
-    RouteUpstreams.Target mapUpstream = hasMap ? upstreams.map(datasetId) : null;
+      RouteUpstreams.Target frostUpstream) {
+    boolean hasSta = kindBySlug.containsValue(RouteUpstreamKind.STA);
+    boolean hasOws = kindBySlug.containsValue(RouteUpstreamKind.OWS);
+    RouteUpstreams.Target mapUpstream = hasOws ? upstreams.map(datasetId) : null;
 
     List<String> createdUpstreamIds = new ArrayList<>();
     Map<String, String> routeIds = new LinkedHashMap<>();
     try {
-      if (hasSensor) {
-        adminClient.putUpstream(datasetId, RouteUpstreams.body(sensorUpstream), "CREATE upstream");
+      if (hasSta) {
+        adminClient.putUpstream(datasetId, RouteUpstreams.body(frostUpstream), "CREATE upstream");
         createdUpstreamIds.add(datasetId);
       }
-      if (hasMap) {
+      if (hasOws) {
         String owsUpstreamId = RouteUpstreams.owsUpstreamId(datasetId);
         adminClient.putUpstream(
             owsUpstreamId, RouteUpstreams.body(mapUpstream), "CREATE map upstream");
@@ -205,9 +206,9 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
       for (String slug : slugs) {
         RouteUpstreamKind kind = kindBySlug.get(slug);
         RouteUpstreams.Target upstream =
-            kind == RouteUpstreamKind.MAP ? mapUpstream : sensorUpstream;
+            kind == RouteUpstreamKind.OWS ? mapUpstream : frostUpstream;
         String upstreamId =
-            kind == RouteUpstreamKind.MAP ? RouteUpstreams.owsUpstreamId(datasetId) : datasetId;
+            kind == RouteUpstreamKind.OWS ? RouteUpstreams.owsUpstreamId(datasetId) : datasetId;
         String routeId = NamedApiHelper.derive(datasetId, slug);
         adminClient.putRoute(
             routeId,

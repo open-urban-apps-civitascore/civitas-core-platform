@@ -9,6 +9,9 @@
  */
 package de.civitascore.configadapter.model.dataset;
 
+import java.util.Locale;
+import java.util.regex.Pattern;
+
 /**
  * Derives the GeoServer workspace name for a dataset from its id.
  *
@@ -24,6 +27,8 @@ package de.civitascore.configadapter.model.dataset;
  */
 public final class WorkspaceNames {
 
+  private static final Pattern NON_WORKSPACE_CHAR = Pattern.compile("[^a-z0-9_]");
+
   private WorkspaceNames() {}
 
   /**
@@ -38,6 +43,6 @@ public final class WorkspaceNames {
     if (datasetId == null || datasetId.isBlank()) {
       throw new IllegalArgumentException("datasetId must not be blank");
     }
-    return datasetId.toLowerCase().replaceAll("[^a-z0-9_]", "_");
+    return NON_WORKSPACE_CHAR.matcher(datasetId.toLowerCase(Locale.ROOT)).replaceAll("_");
   }
 }
