@@ -173,15 +173,15 @@ public class InfraTestDataFactory {
   }
 
   /**
-   * Creates a generate pipeline carrying a POSTGIS sink whose data-structure version resolves via
-   * Model Atlas (the saga publisher fetches the JSON Schema from {@code modelAtlasUri} at release).
+   * Creates a generate pipeline carrying a POSTGIS sink whose data-structure version carries the
+   * given JSON Schema {@code model}. The saga publisher reads this persisted model and ships it on
+   * the sink payload at release.
    */
   public Pipeline createGeoPipeline(
-      DataSet dataSet, DataSource dataSource, String tableName, String modelAtlasUri) {
+      DataSet dataSet, DataSource dataSource, String tableName, Map<String, Object> model) {
     Pipeline pipeline = createGeneratePipeline(dataSet, dataSource, "geo");
     var dataStructure = portalData.dataStructure();
-    var version =
-        portalData.dataStructureVersion(dataStructure, b -> b.modelAtlasUri(modelAtlasUri));
+    var version = portalData.dataStructureVersion(dataStructure, b -> b.model(model));
     portalData.dataSink(
         dataSet,
         pipeline,

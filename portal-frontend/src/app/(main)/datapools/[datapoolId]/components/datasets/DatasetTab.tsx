@@ -12,7 +12,10 @@ import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { DATASET_FILTER_PARAMS } from '@/const/searchParams'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { BaseDatasetTableData, Dataset } from '@/types/datasets'
 
 import { DatasetTable } from './DatasetTable'
@@ -34,6 +37,12 @@ const toDatasetTableData = (dataset: Dataset): BaseDatasetTableData => ({
 export const DatasetTab = (props: DatasetTabProps) => {
   const { datapoolId, isReadOnly, isCreateMode = false } = props
   const t = useTranslations('datapools.overview.datasetsTab')
+  const { hasScopedPermission } = usePermissions()
+  const canCreateDataset = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_CREATE,
+    ASSIGNMENT_SCOPE_TYPES.DATAPOOL,
+    datapoolId,
+  )
 
   const {
     pageIndex,
@@ -61,7 +70,7 @@ export const DatasetTab = (props: DatasetTabProps) => {
   }, [rowCount, pageSize, setTotalPages])
 
   const addDatasetButton =
-    !isLoading && !isReadOnly ? (
+    !isLoading && !isReadOnly && canCreateDataset ? (
       <GuardedLink href={`/datasets/create?datapoolId=${datapoolId}&source=datapools`}>
         <Button type="button">{t('addDataset')}</Button>
       </GuardedLink>

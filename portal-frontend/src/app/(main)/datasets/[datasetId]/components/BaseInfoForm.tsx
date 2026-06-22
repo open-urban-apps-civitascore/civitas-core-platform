@@ -11,6 +11,7 @@ import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { usePermissions } from '@/hooks/use-permissions'
 import { cn } from '@/lib/utils'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { SelectOption } from '@/types/common'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { DatasetFormDraft } from '@/types/datasets'
@@ -37,7 +38,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
   const datapoolId = form.watch('datapoolId')
 
   const isAssignedDatapoolAnonymous =
-    !!datapoolId && !hasScopedPermission(PERMISSION_NAMES.DATAPOOL_READ, 'DATAPOOL', datapoolId)
+    !!datapoolId && !hasScopedPermission(PERMISSION_NAMES.DATAPOOL_READ, ASSIGNMENT_SCOPE_TYPES.DATAPOOL, datapoolId)
 
   const permissionGuardedDatapoolOptions = isAssignedDatapoolAnonymous
     ? [{ value: datapoolId, label: t('anonymousDatapool') }, ...datapoolOptions.filter(o => o.value !== datapoolId)]

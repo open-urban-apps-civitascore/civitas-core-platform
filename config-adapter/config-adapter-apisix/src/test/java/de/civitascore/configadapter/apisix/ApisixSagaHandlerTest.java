@@ -148,6 +148,8 @@ class ApisixSagaHandlerTest {
         when(config.getProperty("apisix.frost.api.key")).thenReturn("test-api-key");
         when(config.getProperty("apisix.frost.api.key.header", "X-API-Key"))
             .thenReturn("X-API-Key");
+        when(config.getProperty("apisix.geoserver.url", "http://localhost:8080/geoserver"))
+            .thenReturn("http://civitas-geoserver:8080/geoserver");
 
         h.initialize(config);
       }
@@ -393,9 +395,8 @@ class ApisixSagaHandlerTest {
     }
 
     @Test
-    @DisplayName(
-        "fails (STEP_FAILED) for a non-STA standard — WFS/WMS not yet routable (GeoServer)")
-    void shouldFailForNonStaStandard() {
+    @DisplayName("fails (STEP_FAILED) for a non-routable standard (CUSTOM/unknown)")
+    void shouldFailForNonRoutableStandard() {
       try (ApisixSagaHandler handler = createHandler()) {
         Response ok = mock(Response.class);
         when(ok.getStatus()).thenReturn(200);
@@ -404,17 +405,15 @@ class ApisixSagaHandlerTest {
 
         SagaCommandResult result =
             handler.handle(
-                createPerApiCommand(true, List.of(Map.of("slug", "map", "standard", "WFS"))));
+                createPerApiCommand(true, List.of(Map.of("slug", "custom", "standard", "CUSTOM"))));
 
-        // Non-STA fails fast rather than provisioning a FROST route behind a WFS public URL; the
-        // error names the offending standard so the cause is attributable.
+        // Only STA (FROST) and OWS (GeoServer) are routable; a non-routable standard fails fast and
+        // the error names the offending standard so the cause is attributable.
         assertEquals("STEP_FAILED", result.type());
-        assertTrue(
-            result.error().contains("WFS") || result.error().contains("GeoServer"),
-            "error should name the unsupported standard / GeoServer gap");
+        assertTrue(result.error().contains("CUSTOM"), "error should name the unsupported standard");
 
-        // Standards are validated BEFORE provisioning, so neither a route nor the shared upstream
-        // is ever created — no gateway state, no cleanup needed.
+        // Standards are validated BEFORE provisioning, so neither a route nor an upstream is ever
+        // created — no gateway state, no cleanup needed.
         verify(mockBuilder, never()).put(any(Entity.class));
         verify(mockBuilder, never()).delete();
       }
@@ -571,6 +570,159 @@ class ApisixSagaHandlerTest {
             paths.contains("/apisix/admin/upstreams/ds-001"),
             "shared upstream should be cleaned up");
         verify(mockBuilder, atLeastOnce()).delete();
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "OWS named API routes to the per-dataset map-server upstream and the workspace /ows path")
+    void shouldRouteOwsToMapUpstream() {
+      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(201);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+
+        SagaCommandResult result =
+            handler.handle(
+                createPerApiCommand(false, List.of(Map.of("slug", "map", "standard", "OWS"))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // OWS-only dataset: one map-server upstream + one route, and NO FROST upstream.
+        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
+        List<String> paths = pathCaptor.getAllValues();
+        assertTrue(
+            paths.contains("/apisix/admin/upstreams/ds-001-ows"),
+            "per-dataset map-server upstream");
+        assertFalse(
+            paths.contains("/apisix/admin/upstreams/ds-001"),
+            "no FROST upstream for an OWS-only dataset");
+        assertTrue(
+            paths.contains("/apisix/admin/routes/" + NamedApiHelper.derive("ds-001", "map")));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
+            ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder, times(2)).put(entityCaptor.capture()); // map upstream + route
+        Map<String, Object> upstreamBody = entityCaptor.getAllValues().get(0).getEntity();
+        Map<String, Object> routeBody = entityCaptor.getAllValues().get(1).getEntity();
+
+        // Upstream points at the configured GeoServer host:port.
+        assertEquals(Map.of("civitas-geoserver:8080", 1), upstreamBody.get("nodes"));
+
+        // Route binds to the map upstream and rewrites to /geoserver/{workspace}/ows. The dataset
+        // id "ds-001" normalizes to the workspace "ds_001".
+        assertEquals("ds-001-ows", routeBody.get("upstream_id"));
+        assertArrayEquals(
+            new String[] {"^/v1/datasets/ds-001/map(/.*)?$", "/geoserver/ds_001/ows$1"},
+            (String[]) proxyRewriteOf(routeBody).get("regex_uri"));
+        // Protected → gateway gate present.
+        assertEquals("auth-plugin-1", routeBody.get("plugin_config_id"));
+        // The route self-describes its standard but carries NO FROST upstream credential.
+        @SuppressWarnings("unchecked")
+        Map<String, Object> labels = (Map<String, Object>) routeBody.get("labels");
+        assertEquals("OWS", labels.get("civitas-named-api-standard"));
+        assertFalse(
+            labels.containsKey("civitas-frost-upstream-auth-header"),
+            "OWS route must not carry the FROST credential tracking label");
+        assertNull(authSetHeadersOf(routeBody), "OWS route must not inject a FROST credential");
+        // Internal trust header still stripped on the map-service route.
+        @SuppressWarnings("unchecked")
+        Map<String, Object> headers =
+            (Map<String, Object>) proxyRewriteOf(routeBody).get("headers");
+        assertNotNull(headers, "map route keeps a proxy-rewrite headers block for the strip list");
+        @SuppressWarnings("unchecked")
+        List<String> remove = (List<String>) headers.get("remove");
+        assertTrue(remove.contains("X-Allowed-Scope-Ids"));
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "open-data OWS route has read-only methods, no plugin_config_id, and no credential")
+    void shouldRouteOwsOpenData() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(201);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+
+        handler.handle(
+            createPerApiCommand(true, List.of(Map.of("slug", "map", "standard", "OWS"))));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
+            ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder, times(2)).put(entityCaptor.capture());
+        Map<String, Object> routeBody = entityCaptor.getAllValues().get(1).getEntity();
+
+        assertFalse(routeBody.containsKey("plugin_config_id"), "open data → no auth gate plugin");
+        assertEquals(List.of("GET", "HEAD", "OPTIONS"), routeBody.get("methods"));
+        assertEquals("ds-001-ows", routeBody.get("upstream_id"));
+        assertNull(authSetHeadersOf(routeBody), "open OWS route must not inject a credential");
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "a dataset with both STA and OWS named APIs provisions a FROST and a map-server upstream")
+    void shouldProvisionBothUpstreamsForMixedStandards() {
+      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(201);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
+
+        SagaCommandResult result =
+            handler.handle(
+                createPerApiCommand(
+                    false,
+                    List.of(
+                        Map.of("slug", "data", "standard", "STA"),
+                        Map.of("slug", "map", "standard", "OWS"))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // FROST upstream + map upstream + one route per slug.
+        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
+        List<String> paths = pathCaptor.getAllValues();
+        assertTrue(paths.contains("/apisix/admin/upstreams/ds-001"), "FROST upstream for STA slug");
+        assertTrue(
+            paths.contains("/apisix/admin/upstreams/ds-001-ows"), "map upstream for OWS slug");
+
+        // PUT order: FROST upstream, map upstream, then routes in slug order (data, map).
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
+            ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder, times(4)).put(entityCaptor.capture());
+        Map<String, Object> staRoute = entityCaptor.getAllValues().get(2).getEntity();
+        Map<String, Object> owsRoute = entityCaptor.getAllValues().get(3).getEntity();
+
+        assertArrayEquals(
+            new String[] {"/v1/datasets/ds-001/data", "/v1/datasets/ds-001/data/*"},
+            (String[]) staRoute.get("uris"));
+        assertArrayEquals(
+            new String[] {"/v1/datasets/ds-001/map", "/v1/datasets/ds-001/map/*"},
+            (String[]) owsRoute.get("uris"));
+        assertEquals("ds-001", staRoute.get("upstream_id"));
+        assertEquals("ds-001-ows", owsRoute.get("upstream_id"));
+        // The STA route injects the FROST credential; the OWS route never does.
+        assertNotNull(
+            authSetHeadersOf(staRoute), "STA protected route injects the FROST credential");
+        assertNull(authSetHeadersOf(owsRoute), "OWS route never carries a FROST credential");
+      }
+    }
+
+    @Test
+    @DisplayName("fails (STEP_FAILED) when apisix.geoserver.url is blank and an OWS route is asked")
+    void shouldFailWhenGeoserverUrlBlankForOws() {
+      try (ApisixSagaHandler handler = createHandlerWithGeoserverUrl("")) {
+        SagaCommandResult result =
+            handler.handle(
+                createPerApiCommand(true, List.of(Map.of("slug", "map", "standard", "OWS"))));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertTrue(
+            result.error().contains("apisix.geoserver.url"),
+            "error should name the missing map-server configuration");
       }
     }
   }
@@ -774,6 +926,72 @@ class ApisixSagaHandlerTest {
         verify(mockBuilder, never()).put(any(Entity.class));
       }
     }
+
+    @Test
+    @DisplayName("toggling an OWS route applies the gateway gate but injects no FROST credential")
+    void shouldNotInjectFrostCredentialWhenTogglingOwsRoute() {
+      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
+        Response getResp = mock(Response.class);
+        when(getResp.getStatus()).thenReturn(200);
+        // The route read back from APISIX carries the OWS standard marker the handler wrote at
+        // CREATE, so the toggle knows it is a map-service route.
+        when(getResp.readEntity(Map.class))
+            .thenAnswer(
+                inv -> {
+                  Map<String, Object> value = new HashMap<>();
+                  value.put("uri", "/v1/datasets/ds-001/map");
+                  value.put("upstream_id", "ds-001-ows");
+                  Map<String, Object> labels = new HashMap<>();
+                  labels.put("civitas-named-api-standard", "OWS");
+                  value.put("labels", labels);
+                  Map<String, Object> proxyRewrite = new HashMap<>();
+                  proxyRewrite.put(
+                      "regex_uri",
+                      new String[] {"^/v1/datasets/ds-001/map(/.*)?$", "/geoserver/ds_001/ows$1"});
+                  Map<String, Object> plugins = new HashMap<>();
+                  plugins.put("proxy-rewrite", proxyRewrite);
+                  value.put("plugins", plugins);
+                  Map<String, Object> envelope = new HashMap<>();
+                  envelope.put("value", value);
+                  return envelope;
+                });
+        when(mockBuilder.get()).thenReturn(getResp);
+        Response putResp = mock(Response.class);
+        when(putResp.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(putResp);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("routeIds", Map.of("map", "rid-map"));
+        payload.put("serviceId", "ds-001");
+        payload.put("openDataAccess", false); // toggle to protected
+        SagaCommandResult result =
+            handler.handle(
+                new SagaCommandMessage(
+                    "EXECUTE_STEP",
+                    "m",
+                    "saga-001",
+                    "update-route",
+                    "apisix",
+                    "UPDATE_ROUTE",
+                    payload));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
+            ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder).put(entityCaptor.capture());
+        Map<String, Object> routeBody = entityCaptor.getValue().getEntity();
+
+        // Protected → the gateway gate applies to OWS too...
+        assertEquals("auth-plugin-1", routeBody.get("plugin_config_id"));
+        // ...but the map-service route never gets a FROST credential or its tracking label.
+        assertNull(authSetHeadersOf(routeBody), "OWS toggle must not inject a FROST credential");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> labels = (Map<String, Object>) routeBody.get("labels");
+        assertFalse(labels.containsKey("civitas-frost-upstream-auth-header"));
+        assertEquals("OWS", labels.get("civitas-named-api-standard"));
+      }
+    }
   }
 
   @Nested
@@ -798,14 +1016,16 @@ class ApisixSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
-        // Two slug routes + one shared upstream.
-        verify(mockBuilder, times(3)).delete();
+        // Two slug routes + both per-dataset upstreams (FROST + map server). The DELETE payload
+        // carries no standard, so both upstreams are torn down (404-tolerant for the absent one).
+        verify(mockBuilder, times(4)).delete();
         ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
         verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
         List<String> paths = pathCaptor.getAllValues();
         assertTrue(paths.contains("/apisix/admin/routes/rid-traffic"));
         assertTrue(paths.contains("/apisix/admin/routes/rid-weather"));
         assertTrue(paths.contains("/apisix/admin/upstreams/ds-001"));
+        assertTrue(paths.contains("/apisix/admin/upstreams/ds-001-ows"));
       }
     }
 
@@ -818,8 +1038,8 @@ class ApisixSagaHandlerTest {
         Response notFound = mock(Response.class);
         when(notFound.getStatus()).thenReturn(404);
         when(notFound.readEntity(String.class)).thenReturn("Key not found");
-        // First delete is an already-gone route (404), the remaining route + upstream are present.
-        when(mockBuilder.delete()).thenReturn(notFound, ok, ok);
+        // First delete is an already-gone route (404), the remaining route + upstreams are present.
+        when(mockBuilder.delete()).thenReturn(notFound, ok, ok, ok);
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("traffic", "rid-traffic", "weather", "rid-weather"));
@@ -837,7 +1057,8 @@ class ApisixSagaHandlerTest {
 
         // Idempotent: a 404 on one slug route must not abort the per-slug teardown.
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, times(3)).delete();
+        // Two slug routes + both per-dataset upstreams (FROST + map server).
+        verify(mockBuilder, times(4)).delete();
       }
     }
 
@@ -873,7 +1094,9 @@ class ApisixSagaHandlerTest {
         // (Hardening this to fail on drift is a separate operational-policy decision; see the
         // DELETE-tolerance discussion in the handler.)
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, times(3)).delete();
+        // Two slug routes + both per-dataset upstreams (FROST + map server) — all 404, all
+        // tolerated.
+        verify(mockBuilder, times(4)).delete();
       }
     }
 
@@ -904,13 +1127,14 @@ class ApisixSagaHandlerTest {
                     payload));
 
         assertEquals("STEP_COMPLETED", result.type());
-        // Only the valid 'traffic' route + the shared upstream are deleted; the null-valued
+        // Only the valid 'traffic' route + both per-dataset upstreams are deleted; the null-valued
         // 'weather' entry is dropped rather than NPE-ing or aborting the step.
-        verify(mockBuilder, times(2)).delete();
+        verify(mockBuilder, times(3)).delete();
         ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
         verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
         assertTrue(pathCaptor.getAllValues().contains("/apisix/admin/routes/rid-traffic"));
         assertTrue(pathCaptor.getAllValues().contains("/apisix/admin/upstreams/ds-001"));
+        assertTrue(pathCaptor.getAllValues().contains("/apisix/admin/upstreams/ds-001-ows"));
       }
     }
   }
@@ -1133,6 +1357,76 @@ class ApisixSagaHandlerTest {
         verify(mockBuilder).put(captor.capture());
         // The valid "traffic"=true entry still applies → restored public.
         assertFalse(captor.getValue().getEntity().containsKey("plugin_config_id"));
+      }
+    }
+
+    @Test
+    @DisplayName("restoring an OWS route applies the gateway gate but injects no FROST credential")
+    void shouldNotInjectFrostCredentialWhenRestoringOwsRoute() {
+      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
+        Response getResp = mock(Response.class);
+        when(getResp.getStatus()).thenReturn(200);
+        // The route read back from APISIX carries the OWS standard marker the handler wrote at
+        // CREATE, so the compensation knows it is a map-service route (the standard is not in the
+        // RESTORE payload).
+        when(getResp.readEntity(Map.class))
+            .thenAnswer(
+                inv -> {
+                  Map<String, Object> value = new HashMap<>();
+                  value.put("uri", "/v1/datasets/ds-001/map");
+                  value.put("upstream_id", "ds-001-ows");
+                  Map<String, Object> labels = new HashMap<>();
+                  labels.put("civitas-named-api-standard", "OWS");
+                  value.put("labels", labels);
+                  Map<String, Object> proxyRewrite = new HashMap<>();
+                  proxyRewrite.put(
+                      "regex_uri",
+                      new String[] {"^/v1/datasets/ds-001/map(/.*)?$", "/geoserver/ds_001/ows$1"});
+                  Map<String, Object> plugins = new HashMap<>();
+                  plugins.put("proxy-rewrite", proxyRewrite);
+                  value.put("plugins", plugins);
+                  Map<String, Object> envelope = new HashMap<>();
+                  envelope.put("value", value);
+                  return envelope;
+                });
+        when(mockBuilder.get()).thenReturn(getResp);
+        Response putResp = mock(Response.class);
+        when(putResp.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(putResp);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("routeIds", Map.of("map", "rid-map"));
+        payload.put("serviceId", "ds-001");
+        // Restore to the previous protected state: compensation must re-apply the gate without ever
+        // injecting a FROST credential onto a GeoServer route.
+        payload.put("previousOpenDataAccess", Map.of("map", false));
+
+        SagaCommandResult result =
+            handler.handle(
+                new SagaCommandMessage(
+                    "COMPENSATE_STEP",
+                    "m",
+                    "saga-001",
+                    "restore-route",
+                    "apisix",
+                    "RESTORE_ROUTE",
+                    payload));
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
+            ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder).put(entityCaptor.capture());
+        Map<String, Object> routeBody = entityCaptor.getValue().getEntity();
+
+        // Protected → the gateway gate applies to OWS too...
+        assertEquals("auth-plugin-1", routeBody.get("plugin_config_id"));
+        // ...but the map-service route never gets a FROST credential or its tracking label.
+        assertNull(authSetHeadersOf(routeBody), "OWS restore must not inject a FROST credential");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> labels = (Map<String, Object>) routeBody.get("labels");
+        assertFalse(labels.containsKey("civitas-frost-upstream-auth-header"));
+        assertEquals("OWS", labels.get("civitas-named-api-standard"));
       }
     }
   }
@@ -1362,8 +1656,8 @@ class ApisixSagaHandlerTest {
                     payload));
 
         assertEquals("STEP_COMPLETED", result.type());
-        // Persisted route + derived route + shared upstream.
-        verify(mockBuilder, times(3)).delete();
+        // Persisted route + derived route + both per-dataset upstreams (FROST + map server).
+        verify(mockBuilder, times(4)).delete();
         ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
         verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
         List<String> paths = pathCaptor.getAllValues();
@@ -1372,6 +1666,7 @@ class ApisixSagaHandlerTest {
             paths.contains("/apisix/admin/routes/" + NamedApiHelper.derive("ds-001", "weather")),
             "the drifted slug's route must be deleted under its derived deterministic id");
         assertTrue(paths.contains("/apisix/admin/upstreams/ds-001"));
+        assertTrue(paths.contains("/apisix/admin/upstreams/ds-001-ows"));
       }
     }
   }
@@ -2660,6 +2955,8 @@ class ApisixSagaHandlerTest {
     when(mockConfig.getProperty("apisix.frost.basic.auth.password")).thenReturn("frost-pass");
     when(mockConfig.getProperty("apisix.frost.api.key.header", "X-API-Key"))
         .thenReturn("X-API-Key");
+    when(mockConfig.getProperty("apisix.geoserver.url", "http://localhost:8080/geoserver"))
+        .thenReturn("http://civitas-geoserver:8080/geoserver");
     when(mockConfig.getProperty("apisix.proxy.rewrite.headers.remove"))
         .thenReturn(csvHeadersToRemove);
     handler.initialize(mockConfig);
@@ -2680,6 +2977,8 @@ class ApisixSagaHandlerTest {
     when(mockConfig.getProperty("apisix.frost.api.key")).thenReturn(apiKey);
     when(mockConfig.getProperty("apisix.frost.api.key.header", "X-API-Key"))
         .thenReturn(apiKeyHeader);
+    when(mockConfig.getProperty("apisix.geoserver.url", "http://localhost:8080/geoserver"))
+        .thenReturn("http://civitas-geoserver:8080/geoserver");
     handler.initialize(mockConfig);
 
     wireMockClient(handler);
@@ -2700,10 +2999,49 @@ class ApisixSagaHandlerTest {
     when(mockConfig.getProperty("apisix.frost.basic.auth.password")).thenReturn("frost-pass");
     when(mockConfig.getProperty("apisix.frost.api.key.header", "X-API-Key"))
         .thenReturn("X-API-Key");
+    when(mockConfig.getProperty("apisix.geoserver.url", "http://localhost:8080/geoserver"))
+        .thenReturn("http://civitas-geoserver:8080/geoserver");
     handler.initialize(mockConfig);
 
     wireMockClient(handler);
     return handler;
+  }
+
+  private ApisixSagaHandler createHandlerWithGeoserverUrl(String geoserverUrl) {
+    ApisixSagaHandler handler = new ApisixSagaHandler();
+    AdapterConfig mockConfig = mock(AdapterConfig.class);
+    when(mockConfig.getProperty("apisix.admin.key")).thenReturn("test-admin-key");
+    when(mockConfig.getProperty("apisix.admin.url", "http://localhost:9180"))
+        .thenReturn("http://apisix:9180");
+    when(mockConfig.getProperty("apisix.plugin.config.id")).thenReturn("auth-plugin-default");
+    when(mockConfig.getProperty("apisix.service.id")).thenReturn("svc-frost-server");
+    when(mockConfig.getProperty("apisix.api.host")).thenReturn("api.example.test");
+    when(mockConfig.getProperty("apisix.api.public.url")).thenReturn("https://api.example.test");
+    when(mockConfig.getProperty("apisix.frost.basic.auth.username")).thenReturn("frost-user");
+    when(mockConfig.getProperty("apisix.frost.basic.auth.password")).thenReturn("frost-pass");
+    when(mockConfig.getProperty("apisix.frost.api.key.header", "X-API-Key"))
+        .thenReturn("X-API-Key");
+    when(mockConfig.getProperty("apisix.geoserver.url", "http://localhost:8080/geoserver"))
+        .thenReturn(geoserverUrl);
+    handler.initialize(mockConfig);
+    wireMockClient(handler);
+    return handler;
+  }
+
+  /** Extracts the {@code plugins.proxy-rewrite} block from a captured route body. */
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> proxyRewriteOf(Map<String, Object> routeBody) {
+    Map<String, Object> plugins = (Map<String, Object>) routeBody.get("plugins");
+    return (Map<String, Object>) plugins.get("proxy-rewrite");
+  }
+
+  /**
+   * Extracts {@code plugins.proxy-rewrite.headers.set} (the upstream-credential block), or null.
+   */
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> authSetHeadersOf(Map<String, Object> routeBody) {
+    Map<String, Object> headers = (Map<String, Object>) proxyRewriteOf(routeBody).get("headers");
+    return headers == null ? null : (Map<String, Object>) headers.get("set");
   }
 
   private void wireMockClient(ApisixSagaHandler handler) {

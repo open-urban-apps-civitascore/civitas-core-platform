@@ -8,6 +8,7 @@ import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { usePermissions } from '@/hooks/use-permissions'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { DatasetTableData } from '@/types/datasets'
 import { TableProps } from '@/types/table'
@@ -74,7 +75,7 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.datapool')} />,
       cell: info =>
         info.getValue()?.id ? (
-          hasScopedPermission(PERMISSION_NAMES.DATAPOOL_READ, 'DATAPOOL', info.getValue()!.id) ? (
+          hasScopedPermission(PERMISSION_NAMES.DATAPOOL_READ, ASSIGNMENT_SCOPE_TYPES.DATAPOOL, info.getValue()!.id) ? (
             <LinkCell href={`datapools/${info.getValue()?.id}`}>{info.getValue()?.name || ''}</LinkCell>
           ) : (
             <span>{t('anonymousDatapool')}</span>
@@ -135,7 +136,13 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
             id: 'actions',
             header: t('tableHeaders.action'),
             cell: (info: { row: { id: string | null; original: DatasetTableData } }) =>
-              info.row.id && hasScopedPermission(PERMISSION_NAMES.DATASET_DELETE, 'DATASET', info.row.id) ? (
+              info.row.id &&
+              hasScopedPermission(
+                PERMISSION_NAMES.DATASET_DELETE,
+                ASSIGNMENT_SCOPE_TYPES.DATASET,
+                info.row.id,
+                info.row.original.datapool?.id,
+              ) ? (
                 <TableDropdownMenu
                   menuItems={[{ label: tCommon('actions.delete'), onClick: () => onDeleteClick(info.row.id) }]}
                 />

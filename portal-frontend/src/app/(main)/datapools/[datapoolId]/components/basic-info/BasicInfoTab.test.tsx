@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useGetUsers } from '@/app/services/api/users/clientRequests'
 import { Form } from '@/components/ui/form'
 import { usePermissions } from '@/hooks/use-permissions'
+import { AssignmentScope } from '@/types/assignments'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 import { Datapool, DatapoolFormData, DatapoolFormSchema } from '@/types/datapools'
 
@@ -30,8 +31,9 @@ vi.mock('@/hooks/use-mobile', () => ({
 const mockPermissions = (permissions: PermissionName[]) => {
   vi.mocked(usePermissions).mockReturnValue({
     hasPermission: (p: PermissionName) => permissions.includes(p),
+    hasPermissionInScope: (_p: PermissionName, _scopeType: AssignmentScope) => false,
     hasAnyPermission: (...ps: PermissionName[]) => ps.some(p => permissions.includes(p)),
-    hasScopedPermission: () => false,
+    hasScopedPermission: (_p: PermissionName, _scopeType: AssignmentScope, _scopeId: string) => false,
   })
 }
 

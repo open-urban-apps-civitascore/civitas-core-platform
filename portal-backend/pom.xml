@@ -195,13 +195,6 @@
                 </exclusion>
             </exclusions>
         </dependency>
-        <!-- WireMock for mocking external HTTP services -->
-        <dependency>
-            <groupId>org.wiremock.integrations</groupId>
-            <artifactId>wiremock-spring-boot</artifactId>
-            <version>4.2.1</version>
-            <scope>test</scope>
-        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -354,7 +347,6 @@
                         <ignoredUsedUndeclaredDependency>org.apache.tomcat.embed:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>io.swagger.core.v3:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.awaitility:*</ignoredUsedUndeclaredDependency>
-                        <ignoredUsedUndeclaredDependency>org.wiremock:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.apache.logging.log4j:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.postgresql:*</ignoredUsedUndeclaredDependency>
                         <!-- Transitively pulled, used directly only in tests; versions
