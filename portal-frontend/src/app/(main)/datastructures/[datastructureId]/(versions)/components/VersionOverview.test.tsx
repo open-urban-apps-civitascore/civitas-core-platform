@@ -91,7 +91,6 @@ const mockVersion: DatastructureVersion = {
   dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
   dataStructureVersionSource: 'OWN',
   inUse: false,
-  modelAtlasUri: null,
   modelName: null,
   createdAt: '2024-01-01',
   modifiedAt: '2024-01-01',
@@ -102,7 +101,6 @@ const mockVersion: DatastructureVersion = {
 
 const mockVersionWithModel: DatastructureVersion = {
   ...mockVersion,
-  modelAtlasUri: `http://civitas.org/model/${mockDatastructure.id}/${mockVersion.version}`,
   modelName: 'Test Model',
   styles: {
     id: 'diagram-1',
@@ -460,7 +458,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       const availableVersionWithNoModel: DatastructureVersion = {
         ...mockVersion,
         dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
-        modelAtlasUri: null,
         modelName: null,
       }
       renderComponent({ version: availableVersionWithNoModel })
