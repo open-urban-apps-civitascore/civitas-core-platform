@@ -19,6 +19,7 @@ import { useError } from '@/hooks/use-error'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
   Datastructure,
@@ -65,8 +66,16 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const { setSubTabValueParam, subTabValue } = useQueryParams()
   const { handleFormValidationError } = useError()
   const { hasScopedPermission } = usePermissions()
-  const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_UPDATE, 'DATASTRUCTURE', datastructureId)
-  const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_RELEASE, 'DATASTRUCTURE', datastructureId)
+  const canUpdate = hasScopedPermission(
+    PERMISSION_NAMES.DATASTRUCTURE_UPDATE,
+    ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+    datastructureId,
+  )
+  const canRelease = hasScopedPermission(
+    PERMISSION_NAMES.DATASTRUCTURE_RELEASE,
+    ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+    datastructureId,
+  )
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')

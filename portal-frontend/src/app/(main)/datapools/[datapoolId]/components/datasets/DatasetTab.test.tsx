@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useGetDatasets } from '@/app/services/api/datasets/clientRequests'
+import { usePermissions } from '@/hooks/use-permissions'
 import { Dataset } from '@/types/datasets'
 
 import { DatasetTab } from './DatasetTab'
@@ -32,6 +33,19 @@ vi.mock('next-intl', () => ({
 vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   useGetDatasets: vi.fn(),
 }))
+
+vi.mock('@/hooks/use-permissions', () => ({
+  usePermissions: vi.fn(),
+}))
+
+const mockCanCreateDataset = (canCreate: boolean) => {
+  vi.mocked(usePermissions).mockReturnValue({
+    hasPermission: vi.fn(),
+    hasPermissionInScope: vi.fn(),
+    hasAnyPermission: vi.fn(),
+    hasScopedPermission: vi.fn().mockReturnValue(canCreate),
+  })
+}
 
 let mockSearch = ''
 
@@ -79,6 +93,7 @@ describe('DatasetTab', () => {
     vi.clearAllMocks()
     mockSearch = ''
     mockDatasets([])
+    mockCanCreateDataset(true)
   })
 
   describe('Rendering', () => {
@@ -218,6 +233,13 @@ describe('DatasetTab', () => {
       mockDatasets([])
       renderComponent('dp1', false)
       expect(screen.getByRole('button', { name: 'addDataset' })).not.toBeDisabled()
+    })
+
+    it('does not render the Add Dataset button when user lacks DATASET_CREATE permission on the datapool', () => {
+      mockCanCreateDataset(false)
+      mockDatasets([makeDataset()])
+      renderComponent('dp1', false)
+      expect(screen.queryByRole('button', { name: 'addDataset' })).not.toBeInTheDocument()
     })
   })
 

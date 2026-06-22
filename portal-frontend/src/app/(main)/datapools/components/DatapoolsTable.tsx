@@ -7,6 +7,7 @@ import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { usePermissions } from '@/hooks/use-permissions'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { DatapoolSummary, DatapoolTabValues } from '@/types/datapools'
 import { TableProps } from '@/types/table'
@@ -117,7 +118,11 @@ export const DatapoolsTable = (props: DatapoolsTableProps) => {
             },
             header: t('tableHeaders.action'),
             cell: ({ row }) => {
-              const canDelete = hasScopedPermission(PERMISSION_NAMES.DATAPOOL_DELETE, 'DATAPOOL', row.original.id)
+              const canDelete = hasScopedPermission(
+                PERMISSION_NAMES.DATAPOOL_DELETE,
+                ASSIGNMENT_SCOPE_TYPES.DATAPOOL,
+                row.original.id,
+              )
               return canDelete ? (
                 <TableDropdownMenu
                   menuItems={[

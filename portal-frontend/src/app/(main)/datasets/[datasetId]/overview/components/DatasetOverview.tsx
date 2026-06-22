@@ -30,6 +30,7 @@ import { useError } from '@/hooks/use-error'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { SelectOption } from '@/types/common'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
@@ -64,8 +65,18 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const tCommon = useTranslations('common')
 
   const { hasPermission, hasScopedPermission } = usePermissions()
-  const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASET_UPDATE, 'DATASET', dataset.id)
-  const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASET_RELEASE, 'DATASET', dataset.id)
+  const canUpdate = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_UPDATE,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
+  const canRelease = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_RELEASE,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
   const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
 
   const searchParams = useSearchParams()

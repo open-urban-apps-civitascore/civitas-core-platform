@@ -9,6 +9,7 @@ import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { usePermissions } from '@/hooks/use-permissions'
 import { AppLocale, DATE_LOCALES } from '@/i18n/locales'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Datasource, DATASOURCE_STATUS_TYPES } from '@/types/datasources'
 import { TableProps } from '@/types/table'
@@ -123,7 +124,11 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
           {
             id: 'actions',
             cell: ({ row }: { row: Row<Datasource> }) => {
-              const canDelete = hasScopedPermission(PERMISSION_NAMES.DATASOURCE_DELETE, 'DATASOURCE', row.original.id)
+              const canDelete = hasScopedPermission(
+                PERMISSION_NAMES.DATASOURCE_DELETE,
+                ASSIGNMENT_SCOPE_TYPES.DATASOURCE,
+                row.original.id,
+              )
               return canDelete ? (
                 <TableDropdownMenu
                   menuItems={[{ label: tCommon('actions.delete'), onClick: () => onDelete(row.original) }]}

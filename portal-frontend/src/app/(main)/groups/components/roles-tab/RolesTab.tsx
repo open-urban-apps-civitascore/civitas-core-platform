@@ -18,7 +18,7 @@ import { AlertBox } from '@/components/text-box/TextBox'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { usePermissions } from '@/hooks/use-permissions'
-import { Assignment } from '@/types/assignments'
+import { Assignment, ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { AssignmentFormData, Group, GroupBaseFormData } from '@/types/groups'
 import { Role, ROLE_TYPES } from '@/types/roles'
@@ -31,10 +31,10 @@ type ScopeTab = 'platform' | 'datasets' | 'datasources' | 'datastructures' | 'da
 
 const SCOPE_TAB_CONFIG: Record<ScopeTab, { scopeType: string | null }> = {
   platform: { scopeType: null },
-  datasets: { scopeType: 'DATASET' },
-  datasources: { scopeType: 'DATASOURCE' },
-  datastructures: { scopeType: 'DATASTRUCTURE' },
-  datapools: { scopeType: 'DATAPOOL' },
+  datasets: { scopeType: ASSIGNMENT_SCOPE_TYPES.DATASET },
+  datasources: { scopeType: ASSIGNMENT_SCOPE_TYPES.DATASOURCE },
+  datastructures: { scopeType: ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE },
+  datapools: { scopeType: ASSIGNMENT_SCOPE_TYPES.DATAPOOL },
 }
 
 interface RolesTabProps {
@@ -106,7 +106,7 @@ export const RolesTab = (props: RolesTabProps) => {
   const filteredAssignments = useMemo(() => {
     let filtered = displayAssignments.filter(a => {
       if (isPlatformTab) {
-        return a.scopeType === null || a.scopeType === 'TENANT'
+        return a.scopeType === null || a.scopeType === ASSIGNMENT_SCOPE_TYPES.TENANT
       }
       return a.scopeType === SCOPE_TAB_CONFIG[activeScopeTab].scopeType
     })
@@ -121,7 +121,7 @@ export const RolesTab = (props: RolesTabProps) => {
 
   const assignedRoleIds = useMemo(() => {
     return formAssignments
-      .filter(a => a.scopeType === null || a.scopeType === 'TENANT' || a.scopeType === undefined)
+      .filter(a => a.scopeType === null || a.scopeType === ASSIGNMENT_SCOPE_TYPES.TENANT || a.scopeType === undefined)
       .map(a => a.roleId)
   }, [formAssignments])
 
@@ -151,7 +151,7 @@ export const RolesTab = (props: RolesTabProps) => {
     const newAssignments: AssignmentFormData[] = selectedRoles.map(role => ({
       groupId: groupData.id,
       roleId: role.id,
-      scopeType: isDataRole ? ('TENANT' as const) : null,
+      scopeType: isDataRole ? ASSIGNMENT_SCOPE_TYPES.TENANT : null,
       scopeId: null,
     }))
     form.setValue('assignments', [...current, ...newAssignments], { shouldDirty: true })

@@ -48,6 +48,19 @@ const mockCurrentUser = (permissions: PermissionName[]) => {
   } as unknown as ReturnType<typeof useGetCurrentUser>)
 }
 
+const mockCurrentUserWithDatapoolScope = (permissions: PermissionName[], datapoolId: string) => {
+  vi.mocked(useGetCurrentUser).mockReturnValue({
+    data: {
+      username: 'current',
+      email: 'current@test.com',
+      title: 'MR' as const,
+      firstName: 'Current',
+      lastName: 'User',
+      assignments: [{ scopeType: 'DATAPOOL', scopeId: datapoolId, permissions }],
+    },
+  } as unknown as ReturnType<typeof useGetCurrentUser>)
+}
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
@@ -140,6 +153,24 @@ describe('DatasetOverview', () => {
     it('hides Edit button when user lacks DATASET_UPDATE permission', () => {
       mockCurrentUser([])
       renderComponent()
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+    })
+
+    it('shows Edit button when user has DATASET_UPDATE via DATAPOOL assignment for the dataset pool', () => {
+      mockCurrentUserWithDatapoolScope([PERMISSION_NAMES.DATASET_UPDATE], 'pool-1')
+      renderComponent({ dataset: makeDraftDataset({ id: 'test-id', datapool: { id: 'pool-1', name: 'Pool 1' } }) })
+      expect(screen.getByTestId('editButton')).toBeInTheDocument()
+    })
+
+    it('hides Edit button when DATAPOOL assignment is for a different pool', () => {
+      mockCurrentUserWithDatapoolScope([PERMISSION_NAMES.DATASET_UPDATE], 'pool-2')
+      renderComponent({ dataset: makeDraftDataset({ id: 'test-id', datapool: { id: 'pool-1', name: 'Pool 1' } }) })
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+    })
+
+    it('hides Edit button when dataset has no datapool and user only has DATAPOOL assignment', () => {
+      mockCurrentUserWithDatapoolScope([PERMISSION_NAMES.DATASET_UPDATE], 'pool-1')
+      renderComponent({ dataset: makeDraftDataset({ id: 'test-id', datapool: null }) })
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
     })
 

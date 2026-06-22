@@ -10,6 +10,7 @@ import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { AlertBox } from '@/components/text-box/TextBox'
 import { Button } from '@/components/ui/button'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 
 import { RolesAssignmentTable } from './RolesAssignmentTable'
 
@@ -17,13 +18,13 @@ type ScopeSegment = 'platformWide' | 'dataset' | 'datasource' | 'datastructure' 
 
 const SCOPE_SEGMENT_PARAMS: Record<ScopeSegment, string[][]> = {
   platformWide: [
-    ['scopeType', 'TENANT'],
+    ['scopeType', ASSIGNMENT_SCOPE_TYPES.TENANT],
     ['roleType', 'SYSTEM'],
   ],
-  dataset: [['scopeType', 'DATASET']],
-  datasource: [['scopeType', 'DATASOURCE']],
-  datastructure: [['scopeType', 'DATASTRUCTURE']],
-  datapool: [['scopeType', 'DATAPOOL']],
+  dataset: [['scopeType', ASSIGNMENT_SCOPE_TYPES.DATASET]],
+  datasource: [['scopeType', ASSIGNMENT_SCOPE_TYPES.DATASOURCE]],
+  datastructure: [['scopeType', ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE]],
+  datapool: [['scopeType', ASSIGNMENT_SCOPE_TYPES.DATAPOOL]],
 }
 
 interface RolesTabProps {

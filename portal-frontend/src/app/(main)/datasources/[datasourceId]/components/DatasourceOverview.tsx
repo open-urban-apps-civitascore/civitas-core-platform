@@ -18,6 +18,7 @@ import { Form } from '@/components/ui/form'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Datapool } from '@/types/datapools'
 import {
@@ -55,8 +56,16 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
   const { hasPermission, hasScopedPermission } = usePermissions()
-  const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASOURCE_UPDATE, 'DATASOURCE', datasource.id)
-  const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASOURCE_RELEASE, 'DATASOURCE', datasource.id)
+  const canUpdate = hasScopedPermission(
+    PERMISSION_NAMES.DATASOURCE_UPDATE,
+    ASSIGNMENT_SCOPE_TYPES.DATASOURCE,
+    datasource.id,
+  )
+  const canRelease = hasScopedPermission(
+    PERMISSION_NAMES.DATASOURCE_RELEASE,
+    ASSIGNMENT_SCOPE_TYPES.DATASOURCE,
+    datasource.id,
+  )
   const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
   const router = useRouter()
   const searchParams = useSearchParams()
