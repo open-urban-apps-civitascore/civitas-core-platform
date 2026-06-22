@@ -83,6 +83,12 @@ class NifiDataFlowIT {
   private static Client httpClient;
   private static NifiRestClient client;
 
+  /**
+   * Host on which published container ports are reachable. In CI the Docker daemon is remote
+   * (DinD), so this resolves to the Docker host rather than localhost.
+   */
+  private static String dockerHost;
+
   private final ObjectMapper mapper = new ObjectMapper();
   private final HttpClient http = HttpClient.newHttpClient();
 
@@ -91,6 +97,8 @@ class NifiDataFlowIT {
     assumeTrue(
         DockerClientFactory.instance().isDockerAvailable(),
         "Docker not available — skipping NiFi data-flow IT");
+
+    dockerHost = DockerClientFactory.instance().dockerHostIpAddress();
 
     network = Network.newNetwork();
 
@@ -118,7 +126,8 @@ class NifiDataFlowIT {
             .withEnv("SINGLE_USER_CREDENTIALS_USERNAME", USER)
             .withEnv("SINGLE_USER_CREDENTIALS_PASSWORD", PASSWORD)
             .withEnv("NIFI_WEB_HTTPS_PORT", "8443")
-            .withEnv("NIFI_WEB_PROXY_HOST", "localhost:" + HOST_PORT)
+            .withEnv(
+                "NIFI_WEB_PROXY_HOST", dockerHost + ":" + HOST_PORT + ",localhost:" + HOST_PORT)
             .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(5)));
     nifi.start();
 
@@ -127,7 +136,8 @@ class NifiDataFlowIT {
             .sslContext(trustAll())
             .hostnameVerifier((host, session) -> true)
             .build();
-    client = new NifiRestClient("https://localhost:" + HOST_PORT, USER, PASSWORD, httpClient);
+    client =
+        new NifiRestClient("https://" + dockerHost + ":" + HOST_PORT, USER, PASSWORD, httpClient);
 
     await()
         .atMost(Duration.ofMinutes(3))
@@ -197,7 +207,7 @@ class NifiDataFlowIT {
     client.deployFlow(new DeploymentPlan("pipeline-dataflow-it", snapshot, Map.of()));
 
     // Publish a known message and wait until NiFi posts the *transformed* record to the sink.
-    String brokerUrl = "tcp://localhost:" + mosquitto.getMappedPort(1883);
+    String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
     try (MqttPublisher publisher = new MqttPublisher(brokerUrl, "civitas-it-publisher")) {
       await()
           .atMost(Duration.ofSeconds(90))
@@ -248,7 +258,7 @@ class NifiDataFlowIT {
 
     client.deployFlow(new DeploymentPlan("pipeline-const-it", snapshot, Map.of()));
 
-    String brokerUrl = "tcp://localhost:" + mosquitto.getMappedPort(1883);
+    String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
     try (MqttPublisher publisher = new MqttPublisher(brokerUrl, "civitas-it-const-publisher")) {
       await()
           .atMost(Duration.ofSeconds(90))
@@ -269,7 +279,11 @@ class NifiDataFlowIT {
             HttpRequest.newBuilder()
                 .uri(
                     URI.create(
-                        "http://localhost:" + sink.getMappedPort(8080) + "/__admin/requests"))
+                        "http://"
+                            + dockerHost
+                            + ":"
+                            + sink.getMappedPort(8080)
+                            + "/__admin/requests"))
                 .GET()
                 .build(),
             HttpResponse.BodyHandlers.ofString());
@@ -316,7 +330,7 @@ class NifiDataFlowIT {
 
     client.deployFlow(new DeploymentPlan("pipeline-dlq-it", snapshot, Map.of()));
 
-    String brokerUrl = "tcp://localhost:" + mosquitto.getMappedPort(1883);
+    String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
     try (MqttPublisher publisher = new MqttPublisher(brokerUrl, "civitas-it-dlq-publisher")) {
       // A non-JSON payload fails JSON record conversion in ConvertRecord; its 'failure'
       // relationship must route to the LogMessage error sink (which raises a WARN bulletin),
@@ -343,7 +357,7 @@ class NifiDataFlowIT {
     String token = client.authenticate();
     try (Response response =
         httpClient
-            .target("https://localhost:" + HOST_PORT + "/nifi-api/flow/bulletin-board")
+            .target("https://" + dockerHost + ":" + HOST_PORT + "/nifi-api/flow/bulletin-board")
             .request()
             .header("Authorization", "Bearer " + token)
             .get()) {
@@ -370,7 +384,11 @@ class NifiDataFlowIT {
             HttpRequest.newBuilder()
                 .uri(
                     URI.create(
-                        "http://localhost:" + sink.getMappedPort(8080) + "/__admin/requests"))
+                        "http://"
+                            + dockerHost
+                            + ":"
+                            + sink.getMappedPort(8080)
+                            + "/__admin/requests"))
                 .GET()
                 .build(),
             HttpResponse.BodyHandlers.ofString());
@@ -389,7 +407,11 @@ class NifiDataFlowIT {
             HttpRequest.newBuilder()
                 .uri(
                     URI.create(
-                        "http://localhost:" + sink.getMappedPort(8080) + "/__admin/requests"))
+                        "http://"
+                            + dockerHost
+                            + ":"
+                            + sink.getMappedPort(8080)
+                            + "/__admin/requests"))
                 .GET()
                 .build(),
             HttpResponse.BodyHandlers.ofString());

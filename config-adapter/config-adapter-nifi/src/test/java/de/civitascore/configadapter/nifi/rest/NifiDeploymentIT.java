@@ -73,13 +73,20 @@ class NifiDeploymentIT {
         DockerClientFactory.instance().isDockerAvailable(),
         "Docker not available — skipping NiFi IT");
 
+    // In CI the Docker daemon is remote (DinD), so published ports are reachable on the resolved
+    // Docker host, not localhost. Use that host both for the client URL and for NiFi's
+    // proxy-host whitelist (Host-header check), so authenticate() does not get a connection
+    // refused.
+    String dockerHost = DockerClientFactory.instance().dockerHostIpAddress();
+
     nifi =
         new FixedHostPortGenericContainer<>("apache/nifi:2.9.0")
             .withFixedExposedPort(HOST_PORT, 8443)
             .withEnv("SINGLE_USER_CREDENTIALS_USERNAME", USER)
             .withEnv("SINGLE_USER_CREDENTIALS_PASSWORD", PASSWORD)
             .withEnv("NIFI_WEB_HTTPS_PORT", "8443")
-            .withEnv("NIFI_WEB_PROXY_HOST", "localhost:" + HOST_PORT)
+            .withEnv(
+                "NIFI_WEB_PROXY_HOST", dockerHost + ":" + HOST_PORT + ",localhost:" + HOST_PORT)
             .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(5)));
     nifi.start();
 
@@ -88,7 +95,8 @@ class NifiDeploymentIT {
             .sslContext(trustAll())
             .hostnameVerifier((host, session) -> true)
             .build();
-    client = new NifiRestClient("https://localhost:" + HOST_PORT, USER, PASSWORD, httpClient);
+    client =
+        new NifiRestClient("https://" + dockerHost + ":" + HOST_PORT, USER, PASSWORD, httpClient);
 
     // NiFi keeps initialising after the port opens; poll the REST API until it authenticates.
     await()

@@ -87,6 +87,12 @@ class NifiPostgisDataFlowIT {
   private static Client httpClient;
   private static NifiRestClient client;
 
+  /**
+   * Host on which published container ports are reachable. In CI the Docker daemon is remote
+   * (DinD), so this resolves to the Docker host rather than localhost.
+   */
+  private static String dockerHost;
+
   private final ObjectMapper mapper = new ObjectMapper();
 
   @BeforeAll
@@ -94,6 +100,8 @@ class NifiPostgisDataFlowIT {
     assumeTrue(
         DockerClientFactory.instance().isDockerAvailable(),
         "Docker not available — skipping NiFi/PostGIS data-flow IT");
+
+    dockerHost = DockerClientFactory.instance().dockerHostIpAddress();
 
     network = Network.newNetwork();
 
@@ -123,7 +131,8 @@ class NifiPostgisDataFlowIT {
             .withEnv("SINGLE_USER_CREDENTIALS_USERNAME", USER)
             .withEnv("SINGLE_USER_CREDENTIALS_PASSWORD", PASSWORD)
             .withEnv("NIFI_WEB_HTTPS_PORT", "8443")
-            .withEnv("NIFI_WEB_PROXY_HOST", "localhost:" + HOST_PORT)
+            .withEnv(
+                "NIFI_WEB_PROXY_HOST", dockerHost + ":" + HOST_PORT + ",localhost:" + HOST_PORT)
             // the DBCP fragment loads the driver from this path
             .withCopyFileToContainer(
                 MountableFile.forHostPath(postgresDriverJar()), "/opt/nifi/drivers/postgresql.jar")
@@ -135,7 +144,8 @@ class NifiPostgisDataFlowIT {
             .sslContext(trustAll())
             .hostnameVerifier((host, session) -> true)
             .build();
-    client = new NifiRestClient("https://localhost:" + HOST_PORT, USER, PASSWORD, httpClient);
+    client =
+        new NifiRestClient("https://" + dockerHost + ":" + HOST_PORT, USER, PASSWORD, httpClient);
 
     await()
         .atMost(Duration.ofMinutes(3))
@@ -208,7 +218,7 @@ class NifiPostgisDataFlowIT {
     client.deployFlow(plan);
 
     // publish a known message and wait until the typed row lands in PostgreSQL
-    String brokerUrl = "tcp://localhost:" + mosquitto.getMappedPort(1883);
+    String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
     try (MqttPublisher publisher = new MqttPublisher(brokerUrl)) {
       await()
           .atMost(Duration.ofSeconds(120))
