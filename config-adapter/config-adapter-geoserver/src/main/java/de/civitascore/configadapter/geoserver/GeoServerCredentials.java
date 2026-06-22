@@ -16,9 +16,9 @@ import java.util.Map;
 
 /**
  * Credential handling for the GeoServer adapter, following the project credential convention:
- * credentials may be supplied encrypted as {@code ENC(...)} values and are decrypted
- * in-memory only at the moment they are needed. Plaintext values pass through unchanged for
- * backward compatibility.
+ * credentials may be supplied encrypted as {@code ENC(...)} values and are decrypted in-memory only
+ * at the moment they are needed. Plaintext values pass through unchanged for backward
+ * compatibility.
  *
  * <p>The master key is read from the {@value #MASTER_KEY_ENV} environment variable. Encrypted
  * values must have been produced with the {@link CredentialEncryptor#DATASOURCE_CREDENTIAL_CONTEXT}
