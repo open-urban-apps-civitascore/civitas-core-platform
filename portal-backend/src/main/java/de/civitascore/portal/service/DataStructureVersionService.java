@@ -8,31 +8,22 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
-import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.owasp.encoder.Encode;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.JacksonException;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Service for managing {@link DataStructureVersion} entities through their lifecycle (DRAFT to
- * AVAILABLE). Handles model file synchronization with Model Atlas, unique version validation within
- * a data structure, and enforces constraints on versions that are in use by data sources.
+ * AVAILABLE). Persists the version's JSON Schema, enforces unique version strings within a data
+ * structure, and constrains versions that are in use by data sources.
  */
 @Slf4j
 @Service
@@ -40,19 +31,12 @@ import tools.jackson.databind.ObjectMapper;
 public class DataStructureVersionService
     extends BaseService<DataStructureVersion, DataStructureVersionInputDTO> {
 
-  private static final String MODEL_ATLAS_OBJECT_ID_FIELD = "objectId";
-  private static final String APPLICATION_SCHEMA_JSON_VALUE = "application/schema+json";
-  private static final TypeReference<Map<String, Object>> JSON_SCHEMA_TYPE =
-      new TypeReference<>() {};
-
   private final DataSourceRepository dataSourceRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
 
   private final DataStructureService dataStructureService;
-  private final ModelService modelService;
 
   private final DataStructureVersionMapper dataStructureVersionMapper;
-  private final ObjectMapper objectMapper;
 
   @Override
   protected DataStructureVersionRepository getRepository() {
@@ -67,54 +51,6 @@ public class DataStructureVersionService
   @Override
   protected String getEntityName() {
     return DataStructureVersion.class.getSimpleName();
-  }
-
-  /** Downloads model content from Model Atlas by its URI. Empty if the URI is blank. */
-  private Optional<String> download(String modelAtlasUri, String acceptType) {
-    return StringUtils.isBlank(modelAtlasUri)
-        ? Optional.empty()
-        : Optional.ofNullable(modelService.downloadModel(modelAtlasUri, acceptType));
-  }
-
-  /**
-   * Downloads the raw XMI model from Model Atlas. Lenient: swallows failures and returns empty
-   * (used as a retrievability check), so callers cannot distinguish "no model" from "Model Atlas
-   * down".
-   *
-   * @param modelAtlasUri the Model Atlas namespace URI
-   * @return the model XML content, or empty if unavailable
-   */
-  public Optional<String> findModelByAtlasUri(String modelAtlasUri) {
-    try {
-      return download(modelAtlasUri, MediaType.APPLICATION_XML_VALUE);
-    } catch (RuntimeException e) {
-      // error has already been logged in ModelRestClientRequestService, so just return empty here
-      return Optional.empty();
-    }
-  }
-
-  /**
-   * Fetches the data-structure version's JSON Schema from Model Atlas ({@code
-   * application/schema+json}). Unlike {@link #findModelByAtlasUri} (raw XMI), this does not swallow
-   * failures: an outage propagates as a 504/502 external-system exception, unparseable content as a
-   * 502. Empty only when the URI is blank or Model Atlas returns no content.
-   *
-   * @param modelAtlasUri the Model Atlas namespace URI
-   * @return the parsed JSON Schema, or empty if the URI is blank or no content exists
-   */
-  public Optional<Map<String, Object>> resolveJsonSchemaByAtlasUri(String modelAtlasUri) {
-    return download(modelAtlasUri, APPLICATION_SCHEMA_JSON_VALUE)
-        .filter(json -> !json.isBlank())
-        .map(json -> parseJsonSchema(json, modelAtlasUri));
-  }
-
-  private Map<String, Object> parseJsonSchema(String json, String modelAtlasUri) {
-    try {
-      return objectMapper.readValue(json, JSON_SCHEMA_TYPE);
-    } catch (JacksonException e) {
-      throw new ExternalSystemRejectionException(
-          "Model Atlas returned an unparseable JSON Schema for " + modelAtlasUri, e);
-    }
   }
 
   /**
@@ -143,58 +79,62 @@ public class DataStructureVersionService
   }
 
   /**
-   * Sets initial DRAFT status and validates model/modelAtlasUri consistency before creating a new
-   * data structure version.
+   * Sets initial DRAFT status before creating a new data structure version.
    *
    * @param input the creation input
    * @return the preprocessed input with DRAFT status set
-   * @throws InvalidInputException if model is provided without modelAtlasUri or vice versa
    */
   @Override
   protected DataStructureVersionInputDTO preProcessCreateInput(DataStructureVersionInputDTO input) {
     // Set DRAFT status for newly created data structure versions
     input.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-    validateModelAndAtlasUri(input);
 
     return super.preProcessCreateInput(input);
   }
 
   /**
    * Validates and constrains update input based on the version's current state. If the version is
-   * in use by a data source, structural fields (modelAtlasUri, version, styles, model) are locked
-   * and only description and modelName may change.
+   * in use by a data source, structural fields (model, version, styles) are locked and only
+   * description and modelName may change. A released version that is not in use may have its model
+   * replaced but never cleared — it must always retain a non-empty model.
    *
    * @param input the update input
    * @param existingEntity the current version entity
    * @return the preprocessed input with restricted fields preserved if in use
-   * @throws InvalidInputException if the version string is blank
+   * @throws InvalidInputException if the version string is blank, or if an update to a released
+   *     version would clear its model
    */
   @Override
   protected DataStructureVersionInputDTO preProcessUpdateInput(
       DataStructureVersionInputDTO input, DataStructureVersion existingEntity) {
-    try {
-      if (StringUtils.isBlank(input.getVersion())) {
-        throw new InvalidInputException(
-            "version", existingEntity.getId(), "Version cannot be null or blank");
-      }
-
-      if (existingEntity.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT
-          && dataSourceRepository.existsByDataStructureVersionId(existingEntity.getId())) {
-        // Version is in use: block all structural changes, allow only description and modelName
-        input.setModelAtlasUri(existingEntity.getModelAtlasUri());
-        input.setVersion(existingEntity.getVersion());
-        input.setStyles(
-            existingEntity.getStyles() != null
-                ? new HashMap<>(existingEntity.getStyles())
-                : new HashMap<>());
-        input.setModel(null);
-      } else {
-        validateModelForUpdate(input);
-      }
-
-    } catch (InvalidInputException e) {
-      throw e;
+    if (StringUtils.isBlank(input.getVersion())) {
+      throw new InvalidInputException(
+          "version", existingEntity.getId(), "Version cannot be null or blank");
     }
+
+    boolean isReleased =
+        existingEntity.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT;
+
+    if (isReleased && dataSourceRepository.existsByDataStructureVersionId(existingEntity.getId())) {
+      // Version is in use: block all structural changes, allow only description and modelName.
+      // Copy the maps so the update mapper does not clear the managed entity's own collections
+      // (MapStruct clears + putAll on the target map; sharing the reference would empty it).
+      input.setModel(
+          existingEntity.getModel() != null ? new HashMap<>(existingEntity.getModel()) : null);
+      input.setVersion(existingEntity.getVersion());
+      input.setStyles(
+          existingEntity.getStyles() != null
+              ? new HashMap<>(existingEntity.getStyles())
+              : new HashMap<>());
+    } else if (isReleased && (input.getModel() == null || input.getModel().isEmpty())) {
+      // Released but not in use: the model may be replaced, but never cleared — a released
+      // version must always retain a non-empty model.
+      throw new InvalidInputException(
+          "model",
+          existingEntity.getId(),
+          "Cannot clear the model of a released DataStructureVersion");
+    }
+
     return super.preProcessUpdateInput(input, existingEntity);
   }
 
@@ -210,89 +150,6 @@ public class DataStructureVersionService
   protected DataStructureVersion preSave(DataStructureVersion entity) {
     validateUniqueVersion(entity);
     return super.preSave(entity);
-  }
-
-  /**
-   * Uploads the model content to Model Atlas after persisting the entity and stores the returned
-   * external ID.
-   *
-   * @param entity the saved data structure version entity
-   * @param input the input DTO containing model content and atlas URI
-   * @return the entity, potentially updated with an external ID from Model Atlas
-   * @throws ExternalSystemRejectionException if the Model Atlas upload fails
-   */
-  @Override
-  protected DataStructureVersion postSave(
-      DataStructureVersion entity, DataStructureVersionInputDTO input) {
-    if (StringUtils.isNotBlank(input.getModel())
-        && StringUtils.isNotBlank(input.getModelAtlasUri())) {
-      try {
-        String response =
-            modelService.uploadModelString(input.getModel(), input.getModelAtlasUri());
-        parseAndSetExternalId(entity, response);
-      } catch (ExternalSystemRejectionException e) {
-        throw e;
-      } catch (RuntimeException e) {
-        throw new ExternalSystemRejectionException("Failed to upload model to Model Atlas", e);
-      }
-    }
-
-    return super.postSave(entity, input);
-  }
-
-  /**
-   * Deletes the associated model from Model Atlas after the version entity has been removed from
-   * the database. Failures are logged as warnings but do not propagate.
-   *
-   * @param entity the deleted data structure version entity
-   */
-  @Override
-  protected void postDelete(DataStructureVersion entity) {
-    if (entity != null && StringUtils.isNotBlank(entity.getModelAtlasUri())) {
-      try {
-        modelService.deleteModel(entity.getModelAtlasUri());
-      } catch (RuntimeException e) {
-        log.warn(
-            "Failed to delete model from Model Atlas for modelAtlasUri: {}",
-            Encode.forJava(entity.getModelAtlasUri()),
-            e);
-      }
-    }
-  }
-
-  private void deleteOldModelIfUriChanged(String oldUri, DataStructureVersionInputDTO input) {
-    String newUri = input.getModelAtlasUri();
-    if (StringUtils.isNotBlank(oldUri) && !Objects.equals(oldUri, newUri)) {
-      try {
-        modelService.deleteModel(oldUri);
-      } catch (RuntimeException e) {
-        log.warn(
-            "Failed to delete old model from Model Atlas for modelAtlasUri: {}",
-            Encode.forJava(oldUri),
-            e);
-      }
-    }
-  }
-
-  // externalId is non-critical metadata — modelAtlasUri is the authoritative reference for
-  // fetching models. If parsing fails, the model is already uploaded and accessible via
-  // modelAtlasUri; only the internal Atlas object reference is missing. This will become
-  // relevant once direct Model Atlas PUT calls replace the current upload workaround.
-  private void parseAndSetExternalId(DataStructureVersion entity, String uploadResponse) {
-    try {
-      JsonNode root = objectMapper.readTree(uploadResponse);
-      if (root == null) {
-        log.warn("Model Atlas upload response was null or empty");
-        return;
-      }
-      JsonNode objectIdNode = root.get(MODEL_ATLAS_OBJECT_ID_FIELD);
-      if (objectIdNode != null && !objectIdNode.isNull()) {
-        entity.setExternalId(objectIdNode.asString());
-        dataStructureVersionRepository.save(entity);
-      }
-    } catch (JacksonException e) {
-      log.warn("Failed to parse externalId from Model Atlas upload response", e);
-    }
   }
 
   private void validateUniqueVersion(DataStructureVersion entity) {
@@ -311,37 +168,6 @@ public class DataStructureVersionService
             });
   }
 
-  private void validateModelAndAtlasUri(DataStructureVersionInputDTO input) {
-    boolean hasModel = StringUtils.isNotBlank(input.getModel());
-    boolean hasModelAtlasUri = StringUtils.isNotBlank(input.getModelAtlasUri());
-
-    if (hasModel && !hasModelAtlasUri) {
-      throw new InvalidInputException(
-          "DataStructureVersion",
-          "modelAtlasUri",
-          "modelAtlasUri cannot be null or blank if model is provided");
-    }
-
-    if (!hasModel && hasModelAtlasUri) {
-      throw new InvalidInputException(
-          "DataStructureVersion",
-          "model",
-          "model cannot be null or blank if modelAtlasUri is provided");
-    }
-  }
-
-  private void validateModelForUpdate(DataStructureVersionInputDTO input) {
-    boolean hasModel = StringUtils.isNotBlank(input.getModel());
-    boolean hasModelAtlasUri = StringUtils.isNotBlank(input.getModelAtlasUri());
-
-    if (hasModel && !hasModelAtlasUri) {
-      throw new InvalidInputException(
-          "DataStructureVersion",
-          "modelAtlasUri",
-          "modelAtlasUri cannot be null or blank if model is provided");
-    }
-  }
-
   /**
    * Override update to ensure it can only be called for DRAFT versions. For released versions, use
    * updateReleasedMeta instead.
@@ -358,16 +184,13 @@ public class DataStructureVersionService
       throw new InvalidInputException(
           "dataStructureVersionStatus", id, "Cannot update non-DRAFT DataStructureVersion.");
     }
-    String oldModelAtlasUri = existingEntity.getModelAtlasUri();
-    DataStructureVersion result = super.update(id, input);
-    deleteOldModelIfUriChanged(oldModelAtlasUri, input);
-    return result;
+    return super.update(id, input);
   }
 
   /**
    * Updates a released data structure version. If the version is not in use by any DataSource, all
-   * fields (model, modelAtlasUri, version, styles, modelName, description) can be updated. If the
-   * version is in use, only description and modelName can be changed.
+   * fields (model, version, styles, modelName, description) can be updated. If the version is in
+   * use, only description and modelName can be changed.
    *
    * @param id the version ID
    * @param input the update input
@@ -385,19 +208,16 @@ public class DataStructureVersionService
           "Cannot update released metadata for a DRAFT DataStructureVersion.");
     }
 
-    String oldModelAtlasUri = existingEntity.getModelAtlasUri();
-    DataStructureVersion result = super.update(id, input);
-    deleteOldModelIfUriChanged(oldModelAtlasUri, input);
-    return result;
+    return super.update(id, input);
   }
 
   /**
-   * Releases a data structure version by validating it has a modelAtlasUri and setting status to
-   * AVAILABLE.
+   * Releases a data structure version by validating it has a model (JSON schema) and setting status
+   * to AVAILABLE.
    *
    * @param id the version ID
    * @return the released version
-   * @throws InvalidInputException if version has no modelAtlasUri or is already released
+   * @throws InvalidInputException if the version has no model or is already released
    */
   @Transactional
   public DataStructureVersion release(UUID id) {
@@ -409,21 +229,10 @@ public class DataStructureVersionService
           "dataStructureVersionStatus", id, "DataStructureVersion is already released");
     }
 
-    // Validate that version has a modelAtlasUri
-    if (StringUtils.isBlank(version.getModelAtlasUri())) {
+    // Validate that the version carries a model (JSON schema)
+    if (version.getModel() == null || version.getModel().isEmpty()) {
       throw new InvalidInputException(
-          "modelAtlasUri",
-          id,
-          "DataStructureVersion must contain a modelAtlasUri before releasing");
-    }
-
-    // Validate that the model is actually retrievable from Model Atlas
-    if (findModelByAtlasUri(version.getModelAtlasUri()).isEmpty()) {
-      throw new InvalidInputException(
-          "modelAtlasUri",
-          id,
-          "Cannot release: no model found in Model Atlas for modelAtlasUri "
-              + version.getModelAtlasUri());
+          "model", id, "DataStructureVersion must contain a model before releasing");
     }
 
     version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);

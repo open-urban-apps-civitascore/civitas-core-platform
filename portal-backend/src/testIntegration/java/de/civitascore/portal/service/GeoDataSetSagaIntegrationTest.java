@@ -2,7 +2,6 @@ package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.sun.net.httpserver.HttpServer;
 import de.civitascore.portal.config.FlowableSagaTestHelper;
 import de.civitascore.portal.config.InfraTestDataFactory;
 import de.civitascore.portal.config.SagaInfraVerifier;
@@ -11,15 +10,12 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.repository.DataSetRepository;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
@@ -35,14 +31,18 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * E2E saga test for a geo dataset: a released dataset with a POSTGIS sink runs the CREATE saga
  * through the production Flowable orchestrator with a real PostGIS handler — the sink table must
- * exist afterwards with the columns derived from the Model-Atlas JSON Schema.
+ * exist afterwards with the columns derived from the data-structure version's persisted JSON
+ * Schema.
  *
- * <p>Model Atlas is stubbed with a flat (sub-package-free) schema; the pipeline-engine and
- * GeoServer steps run as always-success stubs (see {@link FlowableSagaTestHelper}).
+ * <p>The data-structure version carries a flat (sub-package-free) JSON Schema persisted directly on
+ * the entity; the pipeline-engine and GeoServer steps run as always-success stubs (see {@link
+ * FlowableSagaTestHelper}).
  */
 @TestPropertySource(
     properties = {"kafka.enabled=true", "spring.kafka.listener.missing-topics-fatal=false"})
@@ -50,8 +50,6 @@ import org.testcontainers.utility.DockerImageName;
 @Slf4j
 @Import(InfraTestDataFactory.class)
 class GeoDataSetSagaIntegrationTest extends AbstractSagaIntegrationTest {
-
-  private static final String MODEL_ATLAS_URI = "http://test/geoprobe/1.0.0";
 
   /**
    * Flat schema the editor produces: root properties, with the geometry property referencing the
@@ -81,28 +79,10 @@ class GeoDataSetSagaIntegrationTest extends AbstractSagaIntegrationTest {
           .withUsername("geo")
           .withPassword("geo");
 
-  private static HttpServer modelAtlasStub;
   private static FlowableSagaTestHelper sagaHelper;
 
   static {
     sinkDb.start();
-    try {
-      modelAtlasStub = HttpServer.create(new InetSocketAddress(0), 0);
-      modelAtlasStub.createContext(
-          "/",
-          exchange -> {
-            exchange.getRequestBody().readAllBytes();
-            byte[] body = FLAT_SCHEMA.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "application/schema+json");
-            exchange.sendResponseHeaders(200, body.length);
-            try (OutputStream os = exchange.getResponseBody()) {
-              os.write(body);
-            }
-          });
-      modelAtlasStub.start();
-    } catch (IOException e) {
-      throw new IllegalStateException("Failed to start Model Atlas stub", e);
-    }
   }
 
   @Autowired private DataSetService dataSetService;
@@ -131,8 +111,6 @@ class GeoDataSetSagaIntegrationTest extends AbstractSagaIntegrationTest {
   @DynamicPropertySource
   static void configureSaga(DynamicPropertyRegistry registry) {
     registry.add("spring.kafka.bootstrap-servers", kafka::getBootstrapServers);
-    registry.add(
-        "model-atlas.baseUrl", () -> "http://localhost:" + modelAtlasStub.getAddress().getPort());
   }
 
   @BeforeEach
@@ -150,9 +128,6 @@ class GeoDataSetSagaIntegrationTest extends AbstractSagaIntegrationTest {
     if (sagaHelper != null) {
       sagaHelper.close();
     }
-    if (modelAtlasStub != null) {
-      modelAtlasStub.stop(0);
-    }
     sinkDb.stop();
   }
 
@@ -160,7 +135,8 @@ class GeoDataSetSagaIntegrationTest extends AbstractSagaIntegrationTest {
   void createSaga_withPostgisSink_provisionsSinkTableFromSchema() throws Exception {
     DataSource dataSource = data.createSqlDataSource();
     DataSet dataSet = data.createDataSet("Geo E2E Dataset");
-    data.createGeoPipeline(dataSet, dataSource, "sensor_observations", MODEL_ATLAS_URI);
+    Map<String, Object> model = new JsonMapper().readValue(FLAT_SCHEMA, new TypeReference<>() {});
+    data.createGeoPipeline(dataSet, dataSource, "sensor_observations", model);
     data.seedGroupAndAssignment(dataSet);
     UUID dataSetId = dataSet.getId();
 

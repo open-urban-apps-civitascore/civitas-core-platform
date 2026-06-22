@@ -8,7 +8,6 @@
    - [Database (PostgreSQL)](#11-database-postgresql)
    - [Keycloak / Security](#12-keycloak--security)
    - [Kafka](#13-kafka)
-   - [Model Atlas](#14-model-atlas)
    - [Data-Plane Base URL](#15-data-plane-base-url)
 2. [Optional / Tuning](#2-optional--tuning)
    - [Server](#21-server)
@@ -60,16 +59,6 @@
 | `KAFKA_BOOTSTRAP_SERVERS` | *(required)* | Sets both `spring.kafka.bootstrap-servers` and `kafka.bootstrap-servers` — only one env var needed |
 | `KAFKA_ENABLED` | `false` | **Must be `true`.** Enables the Kafka CloudEvent publisher. Without it, events are only logged, never sent. |
 | `KAFKA_RESULT_TOPIC` | `de.civitascore.config.results` | Topic on which config-adapter publishes processing results |
-
----
-
-### 1.4 Model Atlas
-
-| Property / Env Var | Default                   | Description |
-|---|---------------------------|---|
-| `MODEL_ATLAS_BASEURL` | `http://model-atlas:8080` | Model Atlas base URL |
-| `MODEL_ATLAS_SCOPE` | `civitas`                 | Scope for requests |
-| `MODEL_ATLAS_STAGE` | `draft`                   | Stage for requests |
 
 ---
 
@@ -269,11 +258,6 @@ environment:
   # Kafka
   KAFKA_BOOTSTRAP_SERVERS: kafka:9092
   KAFKA_ENABLED: "true"
-
-  # Model Atlas
-  MODEL_ATLAS_BASE_URL: http://model-atlas:8080
-  MODEL_ATLAS_SCOPE: default
-  MODEL_ATLAS_STAGE: draft
 
   # Optional
   APP_URL: https://api.example.com

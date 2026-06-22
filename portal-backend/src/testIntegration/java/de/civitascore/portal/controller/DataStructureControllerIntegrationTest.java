@@ -205,7 +205,7 @@ class DataStructureControllerIntegrationTest
               b.version("1.0.0")
                   .description("Version 1 Description")
                   .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
-                  .modelAtlasUri("http://modelatlas.example.com/models/1")
+                  .model(Map.<String, Object>of("$id", "http://modelatlas.example.com/models/1"))
                   .modelName("Test Model v1")
                   .styles(Map.of("color", "blue", "size", "large")));
 
@@ -215,7 +215,7 @@ class DataStructureControllerIntegrationTest
               b.version("2.0.0")
                   .description("Version 2 Description")
                   .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
-                  .modelAtlasUri("http://modelatlas.example.com/models/2")
+                  .model(Map.<String, Object>of("$id", "http://modelatlas.example.com/models/2"))
                   .modelName("Test Model v2")
                   .styles(Map.of("color", "red", "size", "medium")));
 
@@ -367,7 +367,9 @@ class DataStructureControllerIntegrationTest
           b ->
               b.version("1.0.0")
                   .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
-                  .modelAtlasUri("http://modelatlas.example.com/models/released")
+                  .model(
+                      Map.<String, Object>of(
+                          "$id", "http://modelatlas.example.com/models/released"))
                   .modelName("Released Model"));
 
       // Release via API
@@ -445,7 +447,9 @@ class DataStructureControllerIntegrationTest
           b ->
               b.version("1.0.0")
                   .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
-                  .modelAtlasUri("http://modelatlas.example.com/models/released")
+                  .model(
+                      Map.<String, Object>of(
+                          "$id", "http://modelatlas.example.com/models/released"))
                   .modelName("Released Model"));
     }
 
@@ -489,7 +493,8 @@ class DataStructureControllerIntegrationTest
           b ->
               b.version("1.0.0")
                   .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
-                  .modelAtlasUri("http://modelatlas.example.com/models/draft")
+                  .model(
+                      Map.<String, Object>of("$id", "http://modelatlas.example.com/models/draft"))
                   .modelName("Draft Model"));
 
       ResponseEntity<DataStructureOutputDTO> response =
@@ -582,7 +587,9 @@ class DataStructureControllerIntegrationTest
           b ->
               b.version("1.0.0")
                   .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
-                  .modelAtlasUri("http://modelatlas.example.com/models/released")
+                  .model(
+                      Map.<String, Object>of(
+                          "$id", "http://modelatlas.example.com/models/released"))
                   .modelName("Released Model"));
     }
 
@@ -681,7 +688,9 @@ class DataStructureControllerIntegrationTest
           b ->
               b.version("1.0.0")
                   .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
-                  .modelAtlasUri("http://modelatlas.example.com/models/released")
+                  .model(
+                      Map.<String, Object>of(
+                          "$id", "http://modelatlas.example.com/models/released"))
                   .modelName("Released Model"));
     }
 
@@ -958,7 +967,9 @@ class DataStructureControllerIntegrationTest
               b ->
                   b.version("1.0.0")
                       .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
-                      .modelAtlasUri("http://modelatlas.example.com/models/inuse")
+                      .model(
+                          Map.<String, Object>of(
+                              "$id", "http://modelatlas.example.com/models/inuse"))
                       .modelName("InUse Model"));
 
       portalData.dataSource(

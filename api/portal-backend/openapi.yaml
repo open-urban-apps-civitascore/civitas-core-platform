@@ -1470,7 +1470,7 @@ paths:
       summary: Update metadata of a released data structure version
       description: "Updates a released data structure version (AVAILABLE status).\
         \ If the version is not in use by any DataSource, all fields including model,\
-        \ modelAtlasUri, version, and styles can be updated. If the version is in\
+        \ version, and styles can be updated. If the version is in\
         \ use, only description and modelName can be changed. For DRAFT versions,\
         \ use PUT /datastructures/{dataStructureId}/versions/{versionId} instead."
       operationId: updateDataStructureVersionReleasedMeta
@@ -1576,21 +1576,6 @@ paths:
                     title: Conflict
                     status: 409
                     detail: Referenced entity does not exist
-                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/released/meta"
-        "502":
-          description: Model Atlas upload failed
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-              examples:
-                upstream_failure:
-                  summary: upstream_failure
-                  value:
-                    type: urn:civitas:error:UPSTREAM_FAILURE
-                    title: Bad Gateway
-                    status: 502
-                    detail: Model Atlas upload failed
                     instance: "/datastructures/{dataStructureId}/versions/{versionId}/released/meta"
         "401":
           $ref: "#/components/responses/Unauthorized"
@@ -1750,21 +1735,6 @@ paths:
                     title: Conflict
                     status: 409
                     detail: Referenced entity does not exist
-                    instance: "/datastructures/{dataStructureId}/versions/{id}"
-        "502":
-          description: Model Atlas upload failed
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-              examples:
-                upstream_failure:
-                  summary: upstream_failure
-                  value:
-                    type: urn:civitas:error:UPSTREAM_FAILURE
-                    title: Bad Gateway
-                    status: 502
-                    detail: Model Atlas upload failed
                     instance: "/datastructures/{dataStructureId}/versions/{id}"
         "401":
           $ref: "#/components/responses/Unauthorized"
@@ -1950,21 +1920,6 @@ paths:
                     title: Conflict
                     status: 409
                     detail: Referenced entity does not exist
-                    instance: "/datastructures/{dataStructureId}/versions/{id}"
-        "502":
-          description: Model Atlas upload failed
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-              examples:
-                upstream_failure:
-                  summary: upstream_failure
-                  value:
-                    type: urn:civitas:error:UPSTREAM_FAILURE
-                    title: Bad Gateway
-                    status: 502
-                    detail: Model Atlas upload failed
                     instance: "/datastructures/{dataStructureId}/versions/{id}"
         "401":
           $ref: "#/components/responses/Unauthorized"
@@ -4038,21 +3993,6 @@ paths:
                     status: 409
                     detail: Referenced entity does not exist
                     instance: "/datastructures/{dataStructureId}/versions"
-        "502":
-          description: Model Atlas upload failed
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-              examples:
-                upstream_failure:
-                  summary: upstream_failure
-                  value:
-                    type: urn:civitas:error:UPSTREAM_FAILURE
-                    title: Bad Gateway
-                    status: 502
-                    detail: Model Atlas upload failed
-                    instance: "/datastructures/{dataStructureId}/versions"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -4177,7 +4117,7 @@ paths:
       - Data Structure Versions
       summary: Release a data structure version
       description: Releases a data structure version by setting status to AVAILABLE.
-        Requires modelAtlasUri to be present.
+        Requires a model (JSON Schema) to be present.
       operationId: releaseDataStructureVersion
       parameters:
       - name: dataStructureId
@@ -4200,7 +4140,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/DataStructureVersionOutputDTO"
         "400":
-          description: Invalid input (e.g. already released or missing modelAtlasUri)
+          description: Invalid input (e.g. already released or missing model)
           content:
             application/problem+json:
               schema:
@@ -6211,14 +6151,12 @@ components:
           minLength: 1
         description:
           type: string
-        modelAtlasUri:
-          type: string
-          description: URI to the model in the atlas
         modelName:
           type: string
         model:
-          type: string
-          description: Data model definition (JSON schema)
+          type: object
+          additionalProperties: {}
+          description: Data model definition as a JSON Schema document
         styles:
           type: object
           additionalProperties: {}
@@ -6275,18 +6213,15 @@ components:
           description: "How this version was created (e.g. MANUAL, AUTO)"
           enum:
           - OWN
-        modelAtlasUri:
-          type: string
-          description: URI to the model in the atlas
-          readOnly: true
         modelName:
           type: string
         styles:
           type: object
           additionalProperties: {}
         model:
-          type: string
-          description: Data model definition (JSON schema)
+          type: object
+          additionalProperties: {}
+          description: Data model definition as a JSON Schema document
         inUse:
           type: boolean
           description: Whether this version is currently referenced by a data source
@@ -7274,14 +7209,12 @@ components:
           minLength: 1
         description:
           type: string
-        modelAtlasUri:
-          type: string
-          description: URI to the model in the atlas
         modelName:
           type: string
         model:
-          type: string
-          description: Data model definition (JSON schema)
+          type: object
+          additionalProperties: {}
+          description: Data model definition as a JSON Schema document
         styles:
           type: object
           additionalProperties: {}

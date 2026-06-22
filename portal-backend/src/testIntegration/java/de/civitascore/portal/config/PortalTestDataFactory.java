@@ -46,6 +46,8 @@ import de.civitascore.portal.repository.ResourceRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.StyleRepository;
 import de.civitascore.portal.repository.UserRepository;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -256,6 +258,15 @@ public class PortalTestDataFactory {
             .dataStructure(dataStructure);
     customizer.accept(builder);
     return dataStructureVersionRepository.save(builder.build());
+  }
+
+  /** A minimal, well-formed JSON Schema document suitable for a data structure version's model. */
+  public Map<String, Object> dataStructureVersionModel(String title) {
+    Map<String, Object> schema = new HashMap<>();
+    schema.put("$id", "urn:core:datastructure:" + title);
+    schema.put("title", title);
+    schema.put("type", "object");
+    return schema;
   }
 
   // ---------------------------------------------------------------------------

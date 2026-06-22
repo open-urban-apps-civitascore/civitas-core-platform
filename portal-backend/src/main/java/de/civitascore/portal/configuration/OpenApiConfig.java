@@ -556,11 +556,6 @@ public class OpenApiConfig {
                   "foreign_key_violation",
                   problemExample(
                       409, "FOREIGN_KEY_VIOLATION", "Referenced entity does not exist", path)));
-      case "502" ->
-          problemExamples(
-              orderedMap(
-                  "upstream_failure",
-                  problemExample(502, "UPSTREAM_FAILURE", "Model Atlas upload failed", path)));
       default -> null;
     };
   }

@@ -18,7 +18,6 @@ import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
-import de.civitascore.portal.service.DataStructureVersionService;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -50,7 +49,6 @@ class DataSetSagaPublisherTest {
   @Mock private KafkaTemplate<String, String> kafkaTemplate;
   @Mock private DataSinkRepository dataSinkRepository;
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
-  @Mock private DataStructureVersionService dataStructureVersionService;
 
   private DataSetSagaPublisher publisher;
 
@@ -62,8 +60,7 @@ class DataSetSagaPublisherTest {
             new JsonMapper(),
             new SagaProperties("test.saga.trigger", 5),
             dataSinkRepository,
-            dataStructureVersionRepository,
-            dataStructureVersionService);
+            dataStructureVersionRepository);
   }
 
   private DataSource dataSource(UUID id, ConnectorType type) {
@@ -144,9 +141,8 @@ class DataSetSagaPublisherTest {
     }
 
     @Test
-    @DisplayName(
-        "resolves the referenced DSV JSON Schema from Model Atlas and carries it on the sink")
-    void resolvesSchemaFromModelAtlas() throws Exception {
+    @DisplayName("carries the referenced DSV's persisted model (JSON Schema) on the sink")
+    void carriesPersistedModelOnSink() throws Exception {
       UUID dsvId = UUID.randomUUID();
       UUID sinkId = UUID.randomUUID();
       Pipeline pipeline = pipeline(UUID.randomUUID());
@@ -154,20 +150,17 @@ class DataSetSagaPublisherTest {
       DataSet dataSet = datasetWithPipeline(pipeline);
 
       DataStructureVersion version = new DataStructureVersion();
-      version.setModelAtlasUri("atlas://dsv/" + dsvId);
+      version.setModel(
+          Map.<String, Object>of(
+              "$id",
+              "urn:core:datastructure:" + dsvId,
+              "title",
+              "Observation",
+              "definitions",
+              Map.of("Observation", Map.of("type", "object"))));
 
       when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
       when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
-      when(dataStructureVersionService.resolveJsonSchemaByAtlasUri("atlas://dsv/" + dsvId))
-          .thenReturn(
-              Optional.of(
-                  Map.of(
-                      "$id",
-                      "urn:core:datastructure:" + dsvId,
-                      "title",
-                      "Observation",
-                      "definitions",
-                      Map.of("Observation", Map.of("type", "object")))));
 
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
       when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
@@ -200,6 +193,39 @@ class DataSetSagaPublisherTest {
 
       when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
       when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.empty());
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class);
+    }
+
+    @Test
+    @DisplayName("fails the publish when a referenced DSV carries no model")
+    void failsWhenReferencedVersionHasNoModel() {
+      UUID dsvId = UUID.randomUUID();
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      DataSink sink = postgisSink(UUID.randomUUID(), dsvId, "sensor_observations");
+
+      DataStructureVersion version = new DataStructureVersion(); // model is null
+      DataSet dataSet = datasetWithPipeline(pipeline);
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
+      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class);
+    }
+
+    @Test
+    @DisplayName("fails the publish when a referenced DSV carries an empty model")
+    void failsWhenReferencedVersionHasEmptyModel() {
+      UUID dsvId = UUID.randomUUID();
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      DataSink sink = postgisSink(UUID.randomUUID(), dsvId, "sensor_observations");
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setModel(Map.of());
+      DataSet dataSet = datasetWithPipeline(pipeline);
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
+      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
 
       assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
           .isInstanceOf(InvalidInputException.class);
@@ -243,12 +269,10 @@ class DataSetSagaPublisherTest {
       DataSet dataSet = datasetWithPipeline(pipeline);
 
       DataStructureVersion version = new DataStructureVersion();
-      version.setModelAtlasUri("atlas://dsv/" + dsvId);
+      version.setModel(Map.<String, Object>of("$id", "urn:core:datastructure:" + dsvId));
 
       when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
       when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
-      when(dataStructureVersionService.resolveJsonSchemaByAtlasUri("atlas://dsv/" + dsvId))
-          .thenReturn(Optional.of(Map.of("$id", "urn:core:datastructure:" + dsvId)));
 
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
       when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
