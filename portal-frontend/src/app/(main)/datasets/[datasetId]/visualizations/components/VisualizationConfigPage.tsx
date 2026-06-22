@@ -17,11 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { Dataset } from '@/types/datasets'
-import {
-  VisualizationFormData,
-  VisualizationTypeQuery,
-  visualizationFormSchema,
-} from '@/types/visualizations'
+import { VisualizationFormData, visualizationFormSchema, VisualizationTypeQuery } from '@/types/visualizations'
 
 import { VisualizationConfigForm } from './VisualizationConfigForm'
 
@@ -80,18 +76,16 @@ export const VisualizationConfigPage = ({ dataset, visualizationType, testId }: 
 
   const handleSave = async (): Promise<boolean> => {
     let isSaved = false
-    await form.handleSubmit(
-      async _data => {
-        try {
-          // TODO: call createVisualization mutation when API is available
-          toast.error(t('messages.saveError'))
-          isSaved = false
-        } catch {
-          toast.error(t('messages.saveError'))
-          isSaved = false
-        }
-      },
-    )()
+    await form.handleSubmit(async _data => {
+      try {
+        // TODO: call createVisualization mutation when API is available
+        toast.error(t('messages.saveError'))
+        isSaved = false
+      } catch {
+        toast.error(t('messages.saveError'))
+        isSaved = false
+      }
+    })()
     return isSaved
   }
 
@@ -149,9 +143,7 @@ export const VisualizationConfigPage = ({ dataset, visualizationType, testId }: 
             className="h-full"
           >
             <ContentCard>
-              {selectedTab === 'basicInfo' && (
-                <VisualizationConfigForm form={form} typeLabel={typeLabel} />
-              )}
+              {selectedTab === 'basicInfo' && <VisualizationConfigForm form={form} typeLabel={typeLabel} />}
             </ContentCard>
           </form>
         </Form>

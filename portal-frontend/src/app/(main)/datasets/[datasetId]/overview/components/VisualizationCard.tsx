@@ -1,6 +1,6 @@
 'use client'
 
-import { PieChart, MoreVertical, ExternalLink } from 'lucide-react'
+import { ExternalLink, MoreVertical, PieChart } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { ComponentType, useState } from 'react'
@@ -70,7 +70,9 @@ export const VisualizationCard = ({ visualization, datasetId, canEdit, isOpenDat
             </div>
             <span className="font-medium truncate group-hover:underline">{visualization.name}</span>
             {visualization.description ? (
-              <span className="text-sm font-normal text-muted-foreground line-clamp-2">{visualization.description}</span>
+              <span className="text-sm font-normal text-muted-foreground line-clamp-2">
+                {visualization.description}
+              </span>
             ) : (
               <span className="text-sm font-normal text-muted-foreground">{t('noDescription')}</span>
             )}
@@ -120,7 +122,6 @@ export const VisualizationCard = ({ visualization, datasetId, canEdit, isOpenDat
             </DropdownMenu>
           </div>
         </div>
-
       </div>
 
       <WarningModal
