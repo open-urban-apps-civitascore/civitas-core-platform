@@ -80,7 +80,6 @@ vi.mock('../../_services/payloadBuilderService', () => ({
   getRemovedDatasinkIds: vi.fn().mockReturnValue([]),
   hasDatasinkChanged: vi.fn().mockReturnValue(false),
   updateNodeEntityId: vi.fn().mockImplementation((pipeline: unknown) => pipeline),
-  syncDatasinkIds: vi.fn().mockImplementation((pipeline: unknown) => ({ pipeline, hasChanges: false })),
 }))
 
 const contextRef = { current: null as ReturnType<typeof useActivePipeline> | null }

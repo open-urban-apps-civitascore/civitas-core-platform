@@ -58,37 +58,6 @@ export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
   }
 }
 
-/**
- * Writes datasink IDs from a save response back into the matching pipeline nodes.
- * POSTGIS datasinks are matched by tableName.
- * Returns the updated pipeline and whether any entityId changed.
- */
-export const syncDatasinkIds = (
-  pipeline: Pipeline,
-  responseDatasinks: DataSinkPayload[],
-): { pipeline: Pipeline; hasChanges: boolean } => {
-  let hasChanges = false
-
-  const updatedNodes = pipeline.nodes.map(node => {
-    if (!isGeoPersistenceNodeData(node.data)) return node
-
-    const match = responseDatasinks.find(
-      d =>
-        d.dataSinkType === DATASINK_TYPES.POSTGIS && d.id != null && d.configuration.tableName === node.data.tableName,
-    )
-    if (match?.id != null && match.id !== node.data.entityId) {
-      hasChanges = true
-      return { ...node, data: { ...node.data, entityId: match.id } }
-    }
-    return node
-  })
-
-  return {
-    pipeline: hasChanges ? { ...pipeline, nodes: updatedNodes } : pipeline,
-    hasChanges,
-  }
-}
-
 // ============================================================================
 // Datasink Payload Extraction & Change Detection
 // ============================================================================
