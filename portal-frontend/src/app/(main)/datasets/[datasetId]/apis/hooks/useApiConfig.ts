@@ -193,13 +193,6 @@ export const useApiConfig = <TFormData extends FormData>({
   const handleSave = async (): Promise<boolean> => {
     const dirtyLayers = (form.formState.dirtyFields as Partial<Record<keyof OwsApiFormData, unknown>>).layers
     const layerValues = (form.getValues as () => OwsApiFormData)().layers
-    console.log(
-      '[dirty layer fields]',
-      (dirtyLayers as Record<string, unknown>[] | undefined)?.map((dirty, i) => ({
-        layerName: layerValues?.[i]?.layerName,
-        dirtyFields: dirty,
-      })),
-    )
     let isSaved = false
     await form.handleSubmit(
       async data => {
