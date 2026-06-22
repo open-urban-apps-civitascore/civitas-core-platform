@@ -206,10 +206,10 @@ class DataSetSagaPublisherTest {
       DataSink sink = postgisSink(UUID.randomUUID(), dsvId, "sensor_observations");
 
       DataStructureVersion version = new DataStructureVersion(); // model is null
-      when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
+      DataSet dataSet = datasetWithPipeline(pipeline);
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
       when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
 
-      DataSet dataSet = datasetWithPipeline(pipeline);
       assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
           .isInstanceOf(InvalidInputException.class);
     }
@@ -223,10 +223,10 @@ class DataSetSagaPublisherTest {
 
       DataStructureVersion version = new DataStructureVersion();
       version.setModel(Map.of());
-      when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
+      DataSet dataSet = datasetWithPipeline(pipeline);
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
       when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
 
-      DataSet dataSet = datasetWithPipeline(pipeline);
       assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
           .isInstanceOf(InvalidInputException.class);
     }
