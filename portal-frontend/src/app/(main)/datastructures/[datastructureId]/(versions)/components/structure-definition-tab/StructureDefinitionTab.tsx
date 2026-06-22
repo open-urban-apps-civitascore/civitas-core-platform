@@ -18,21 +18,12 @@ export const StructureDefinitionTab = (props: StructureDefinitionTabProps) => {
     if (isInUse && !isReadOnly) toast.info(t('messages.isInUseModelHint'))
   }, [isReadOnly, isInUse, t])
 
-  return isReadOnly || isInUse ? (
+  return (
     <UmlModeler
       isReadOnly={isReadOnly || isInUse}
       modelSessionManager={modelSessionManager}
       isMultiSessionMode={false}
-      canExportXmi={false}
-      canImportXmi={false}
-    />
-  ) : (
-    <UmlModeler
-      isReadOnly={isReadOnly || isInUse}
-      modelSessionManager={modelSessionManager}
-      isMultiSessionMode={false}
-      canExportXmi={false}
-      canImportXmi={false}
+      canExportModel={false}
     />
   )
 }

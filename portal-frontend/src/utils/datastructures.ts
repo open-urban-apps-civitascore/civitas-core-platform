@@ -71,7 +71,6 @@ export const mapDatastructureVersionApiToFormData = (version: DatastructureVersi
   description: version.description || '',
   dataStructureVersionStatus: version.dataStructureVersionStatus,
   dataStructureVersionSource: version.dataStructureVersionSource,
-  modelAtlasUri: version.modelAtlasUri,
   modelName: version.modelName,
   nodes: version.styles?.nodes || [],
   edges: version.styles?.edges || [],
@@ -80,7 +79,7 @@ export const mapDatastructureVersionApiToFormData = (version: DatastructureVersi
 export const mapDatastructureVersionFormToApiData = (
   version: DatastructureVersionFormData,
   sessionDiagram: UMLDiagram | null,
-  umlModel: string | null,
+  model: Record<string, unknown> | null,
 ): DatastructureVersionPutData => {
   return {
     id: version.id,
@@ -88,9 +87,8 @@ export const mapDatastructureVersionFormToApiData = (
     description: version.description,
     dataStructureVersionSource: version.dataStructureVersionSource,
     dataStructureVersionStatus: version.dataStructureVersionStatus,
-    modelAtlasUri: version.modelAtlasUri,
     modelName: version.modelName,
-    model: umlModel,
+    model,
     styles: sessionDiagram,
   }
 }

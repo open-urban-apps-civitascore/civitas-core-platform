@@ -55,7 +55,6 @@ const makeDatastructureVersion = (styles: DatastructureVersion['styles'] = null)
   description: null,
   dataStructureVersionStatus: STATUS_TYPES.AVAILABLE,
   dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
-  modelAtlasUri: null,
   modelName: null,
   model: null,
   styles,

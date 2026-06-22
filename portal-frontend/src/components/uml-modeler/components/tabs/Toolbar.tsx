@@ -2,7 +2,7 @@
 
 import { FileDown, Loader2, Save } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useCallback, useRef } from 'react'
+import { useCallback } from 'react'
 import { toast } from 'sonner'
 
 import { useCreateModel } from '@/app/services/api/models/clientRequests'
@@ -10,16 +10,14 @@ import { BasicDropdownMenu } from '@/components/dropdown-menu/BasicDropdownMenu'
 import { Button } from '@/components/ui/button'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
+import { downloadJsonSchema } from '../../services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '../../services/modelUploadService'
-import { downloadXmi } from '../../services/xmiExportService'
-import { importXmiFromFile } from '../../services/xmiImportService'
 
 interface ToolbarProps {
   onSave?: () => void
   hasUnsavedChanges?: boolean
   sessionName?: string
-  canExportXmi: boolean
-  canImportXmi: boolean
+  canExportModel: boolean
   onImportFromDatastructure?: () => void
 }
 
@@ -27,12 +25,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onSave,
   hasUnsavedChanges = false,
   sessionName,
-  canExportXmi,
-  canImportXmi,
+  canExportModel,
   onImportFromDatastructure,
 }) => {
-  const { diagram, dispatch } = useActiveDiagram()
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { diagram } = useActiveDiagram()
   const createModel = useCreateModel()
   const isSaving = createModel.isPending
   const t = useTranslations('umlModeler')
@@ -56,57 +52,17 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     })
   }, [diagram, isSaving, onSave, createModel, sessionName, t])
 
-  const handleExportXmi = useCallback(() => {
+  const handleExport = useCallback(() => {
     try {
-      downloadXmi(diagram)
+      downloadJsonSchema(diagram)
       toast.success(t('export.success'))
     } catch {
       toast.error(t('export.error'))
     }
   }, [diagram, t])
 
-  const handleImportClick = useCallback(() => {
-    fileInputRef.current?.click()
-  }, [])
-
-  const handleFileChange = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0]
-      if (!file) return
-
-      const result = await importXmiFromFile(file)
-
-      if (result.success && result.diagram) {
-        dispatch({ type: 'LOAD_DIAGRAM', payload: result.diagram })
-
-        if (result.warnings.length > 0) {
-          console.warn('Import warnings:', result.warnings)
-        }
-      } else {
-        console.error('Import failed:', result.errors)
-        alert(`Failed to import XMI file:\n${result.errors.join('\n')}`)
-      }
-
-      // Reset file input so the same file can be selected again
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-    },
-    [dispatch],
-  )
-
   return (
     <div className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">
-      {/* Hidden file input for import */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".xmi,.xml"
-        onChange={handleFileChange}
-        className="hidden"
-        aria-hidden="true"
-      />
-
       {/* File Operations */}
       <div className="flex items-center gap-1 mr-3">
         {onSave && (
@@ -123,37 +79,25 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </Button>
         )}
 
-        {(canImportXmi || onImportFromDatastructure) && (
+        {onImportFromDatastructure && (
           <BasicDropdownMenu
             title={t('import.title')}
             menuItems={[
-              ...(canImportXmi
-                ? [
-                    {
-                      label: t('import.fromFile'),
-                      onClick: () => handleImportClick(),
-                    },
-                  ]
-                : []),
-              ...(onImportFromDatastructure
-                ? [
-                    {
-                      label: t('import.fromPlatform'),
-                      onClick: () => onImportFromDatastructure(),
-                    },
-                  ]
-                : []),
+              {
+                label: t('import.fromPlatform'),
+                onClick: () => onImportFromDatastructure(),
+              },
             ]}
           />
         )}
 
-        {canExportXmi && (
+        {canExportModel && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleExportXmi}
+            onClick={handleExport}
             className="h-8 px-2"
-            title="Export diagram as XMI"
+            title="Export diagram as JSON Schema"
           >
             <FileDown className="h-4 w-4" />
             <span className="ml-1 text-xs">Export</span>
