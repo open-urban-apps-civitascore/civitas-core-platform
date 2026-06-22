@@ -78,6 +78,7 @@ public class DataSetSagaPublisher {
             buildDatasources(dataset),
             buildDatasinks(dataset),
             buildLayers(dataset),
+            null,
             buildPipelines(dataset.getPipelines(), PipelineAction.ADD),
             buildNamedApis(dataset));
     sendTrigger(trigger);
@@ -102,6 +103,7 @@ public class DataSetSagaPublisher {
             buildDatasources(dataset),
             buildDatasinks(dataset),
             buildLayers(dataset),
+            null,
             buildPipelineDiff(previousPipelines, dataset.getPipelines()),
             buildNamedApis(dataset));
     sendTrigger(trigger);
@@ -176,7 +178,12 @@ public class DataSetSagaPublisher {
 
   private LayerPayload toLayerPayload(Layer layer) {
     return new LayerPayload(
-        layer.getId().toString(), layer.getLayerName(), resolveNativeName(layer), layer.getCrs());
+        layer.getId().toString(),
+        layer.getLayerName(),
+        resolveNativeName(layer),
+        layer.getCrs(),
+        null,
+        null);
   }
 
   /**

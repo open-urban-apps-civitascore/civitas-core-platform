@@ -1,5 +1,7 @@
 package de.civitascore.portal.model.saga;
 
+import java.util.List;
+
 /**
  * A WFS/WMS layer carried in the dataset saga trigger payload. The config-adapter consumes these to
  * provision GeoServer feature types after the workspace and datastore exist.
@@ -16,6 +18,16 @@ package de.civitascore.portal.model.saga;
  *       POSTGIS table on the dataset, or to {@code layerName}.
  *   <li>{@code crs} — optional; the coordinate reference system identifier (e.g. {@code
  *       EPSG:4326}). {@code null} lets the adapter apply its {@code DEFAULT_CRS}.
+ *   <li>{@code defaultStyle} — optional; the name of a {@link StylePayload} carried on the same
+ *       trigger. {@code null} lets GeoServer fall back to its generic style.
+ *   <li>{@code alternativeStyles} — optional; further {@link StylePayload} names available on the
+ *       layer in addition to the default. {@code null} when none are set.
  * </ul>
  */
-public record LayerPayload(String id, String layerName, String nativeName, String crs) {}
+public record LayerPayload(
+    String id,
+    String layerName,
+    String nativeName,
+    String crs,
+    String defaultStyle,
+    List<String> alternativeStyles) {}
