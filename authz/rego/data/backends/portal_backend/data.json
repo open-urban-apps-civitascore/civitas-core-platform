@@ -94,6 +94,34 @@
     "/v1/datasets/{id}/apis": {
       "GET": "DATASET_READ"
     },
+    "/v1/datasets/{id}/datasinks": {
+      "GET": "DATASET_READ",
+      "POST": "DATASET_UPDATE"
+    },
+    "/v1/datasets/{id}/datasinks/{id}": {
+      "GET": "DATASET_READ",
+      "PUT": "DATASET_UPDATE",
+      "PATCH": "DATASET_UPDATE",
+      "DELETE": "DATASET_UPDATE"
+    },
+    "/v1/datasets/{id}/layers": {
+      "GET": "DATASET_READ",
+      "POST": "DATASET_UPDATE"
+    },
+    "/v1/datasets/{id}/layers/{id}": {
+      "GET": "DATASET_READ",
+      "PUT": "DATASET_UPDATE",
+      "DELETE": "DATASET_UPDATE"
+    },
+    "/v1/datasets/{id}/styles": {
+      "GET": "DATASET_READ",
+      "POST": "DATASET_UPDATE"
+    },
+    "/v1/datasets/{id}/styles/{id}": {
+      "GET": "DATASET_READ",
+      "PUT": "DATASET_UPDATE",
+      "DELETE": "DATASET_UPDATE"
+    },
     "/v1/datasets/{id}/pipelines": {
       "GET": "DATASET_READ",
       "POST": "DATASET_CREATE"
