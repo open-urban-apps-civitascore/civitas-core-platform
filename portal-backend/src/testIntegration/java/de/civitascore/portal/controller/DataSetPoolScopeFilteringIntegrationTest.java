@@ -8,6 +8,7 @@ import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.RestPage;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,6 +20,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 /**
@@ -275,6 +277,73 @@ class DataSetPoolScopeFilteringIntegrationTest
       ResponseEntity<String> response = createDatasetWithHeaders("ds-poolless", null, "", null);
 
       assertThat(response.getStatusCode().value()).isEqualTo(201);
+    }
+
+    @Test
+    @DisplayName(
+        "Updating a dataset WITHOUT changing its pool needs no pool authorization"
+            + " (regression: PATCH re-sends the existing datapoolId)")
+    void updateKeepingSamePoolNeedsNoPoolAuthorization() {
+      UUID pool1 = createDataPool("Pool-1");
+      UUID pool2 = createDataPool("Pool-2");
+
+      // Place a dataset into Pool-1 (caller authorized for Pool-1 here).
+      ResponseEntity<String> created =
+          createDatasetWithHeaders("ds-patch", pool1, "", pool1.toString());
+      assertThat(created.getStatusCode().value()).isEqualTo(201);
+      UUID datasetId = dataSetRepository.findAll().get(0).getId();
+
+      // PATCH only the description. The caller now holds NO authorization for Pool-1 (scope is not
+      // wildcard, pool header lists Pool-2 only). Because the pool is unchanged, this must still
+      // succeed — a direct dataset grant must be able to edit a pooled dataset without holding
+      // rights on its pool. Before the fix this returned 403, because PATCH re-sends the existing
+      // datapoolId and the target-pool check fired on the unchanged pool.
+      HttpHeaders headers = createAuthHeaders();
+      headers.setContentType(MediaType.APPLICATION_JSON);
+      headers.set(SCOPE_HEADER, "");
+      headers.set(POOL_HEADER, pool2.toString());
+
+      ResponseEntity<String> patched =
+          restTemplate.exchange(
+              DATASETS_ENDPOINT + "/" + datasetId,
+              HttpMethod.PATCH,
+              new HttpEntity<>(Map.of("description", "patched via regression test"), headers),
+              String.class);
+
+      assertThat(patched.getStatusCode().value()).isEqualTo(200);
+    }
+
+    @Test
+    @DisplayName("Moving a dataset INTO a pool the caller is NOT authorized for is still rejected")
+    void movingToUnauthorizedPoolStillForbidden() {
+      UUID pool1 = createDataPool("Pool-1");
+      UUID pool2 = createDataPool("Pool-2");
+
+      // Pool-less create needs no pool authorization.
+      ResponseEntity<String> created = createDatasetWithHeaders("ds-move", null, "", null);
+      assertThat(created.getStatusCode().value()).isEqualTo(201);
+      UUID datasetId = dataSetRepository.findAll().get(0).getId();
+
+      // PUT moving it INTO Pool-2 while authorized only for Pool-1 → the pool actually changes
+      // (null → Pool-2), so the target-pool check must still fire and reject with 403.
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("ds-move");
+      input.setDescription("moved");
+      input.setOpenDataAccess(false);
+      input.setDatapoolId(pool2);
+      HttpHeaders headers = createAuthHeaders();
+      headers.setContentType(MediaType.APPLICATION_JSON);
+      headers.set(SCOPE_HEADER, "");
+      headers.set(POOL_HEADER, pool1.toString());
+
+      ResponseEntity<String> moved =
+          restTemplate.exchange(
+              DATASETS_ENDPOINT + "/" + datasetId,
+              HttpMethod.PUT,
+              new HttpEntity<>(input, headers),
+              String.class);
+
+      assertThat(moved.getStatusCode().value()).isEqualTo(403);
     }
   }
 

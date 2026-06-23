@@ -148,12 +148,20 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    */
   @Override
   protected DataSet postConvertToEntity(DataSet entity, DataSetInputDTO input) {
+    UUID currentPoolId = entity.getDataPool() != null ? entity.getDataPool().getId() : null;
     if (input.getDatapoolId() != null) {
       DataPool dataPool =
           dataPoolRepository
               .findById(input.getDatapoolId())
               .orElseThrow(() -> new ResourceNotFoundException("DataPool", input.getDatapoolId()));
-      authorizeTargetPool(input.getDatapoolId());
+      // Authorize only when the dataset is actually being placed into a DIFFERENT pool. A PATCH
+      // re-sends the dataset's existing datapoolId (BaseController#patchInput merges the current
+      // state), so an update that leaves the pool unchanged must NOT require pool authorization —
+      // otherwise a caller holding a direct dataset grant (scope id) but no pool scope could no
+      // longer edit a dataset that happens to sit in a pool.
+      if (!input.getDatapoolId().equals(currentPoolId)) {
+        authorizeTargetPool(input.getDatapoolId());
+      }
       entity.setDataPool(dataPool);
     } else {
       entity.setDataPool(null);
