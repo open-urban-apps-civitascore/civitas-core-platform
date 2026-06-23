@@ -211,7 +211,7 @@ class DatasetCreateFlowableIT {
     assertEquals(
         List.of("create-project", "create-route"),
         tasks,
-        "Should execute FROST then APISIX (no pipelines = skip Redpanda)");
+        "Should execute FROST then APISIX (no pipelines = skip Pipeline)");
 
     Object projectId =
         historyService

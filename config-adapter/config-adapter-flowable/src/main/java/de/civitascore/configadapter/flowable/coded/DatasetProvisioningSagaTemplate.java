@@ -20,7 +20,7 @@ import org.flowable.bpmn.model.StartEvent;
 
 /**
  * Shared scaffold for the dataset provisioning sagas (Create and Update). Both share the same
- * activity sequence (FROST → APISIX → conditional GeoServer → conditional Redpanda) and the same
+ * activity sequence (FROST → APISIX → conditional GeoServer → conditional Pipeline) and the same
  * reverse-order compensation chain; only the step IDs and adapter operation codes differ. The
  * varying parts are captured in {@link OpVerbs}, the invariant wiring lives here.
  *
@@ -109,9 +109,9 @@ final class DatasetProvisioningSagaTemplate {
         saga.exclusiveGateway(ProcessBuilderUtils.GEO_GATEWAY_ID, "Has Geo Sink?");
     ExclusiveGateway pipelineGw =
         saga.exclusiveGateway(ProcessBuilderUtils.PIPELINE_GATEWAY_ID, "Has Pipelines?");
-    SagaStepRef redpanda =
+    SagaStepRef pipeline =
         saga.sagaStep(
-            v.pipelinesStepId(), v.pipelinesDisplayName(), "redpanda", v.pipelinesForwardOp());
+            v.pipelinesStepId(), v.pipelinesDisplayName(), "nifi", v.pipelinesForwardOp());
 
     // SQL sink provisioning (Create only): the PostGIS table the GeoServer datastore reads must
     // exist before the workspace/datastore/layers steps, so it runs first in the geo branch.
@@ -168,9 +168,9 @@ final class DatasetProvisioningSagaTemplate {
     // Happy path: frost → apisix → geo-gateway
     saga.flow(start, frost.task(), apisix.task(), geoGw);
     wireGeoBranch(saga, v, geoGw, sqlSink, geoSteps, pipelineGw);
-    saga.flow(pipelineGw, redpanda.task()).when("${hasPipelines == true}");
+    saga.flow(pipelineGw, pipeline.task()).when("${hasPipelines == true}");
     saga.flow(pipelineGw, publishOk).asDefault();
-    saga.flow(redpanda.task(), publishOk);
+    saga.flow(pipeline.task(), publishOk);
     saga.flow(publishOk, end);
 
     // Compensation: one reverse chain (geoserver → sink → apisix → frost), entered at the right
@@ -188,11 +188,11 @@ final class DatasetProvisioningSagaTemplate {
     }
     // A pipeline failure compensates the GeoServer branch only if it actually ran (hasGeoSink);
     // otherwise it skips straight to the APISIX/FROST compensation — no spurious DELETE_WORKSPACE.
-    ExclusiveGateway redpandaCompGw =
-        saga.exclusiveGateway("redpanda-comp-gateway", "Compensate GeoServer?");
-    saga.errorFlow(redpanda, redpandaCompGw);
-    saga.flow(redpandaCompGw, compGeoserver).when(HAS_GEO_SINK_CONDITION);
-    saga.flow(redpandaCompGw, compApisix).asDefault();
+    ExclusiveGateway pipelineCompGw =
+        saga.exclusiveGateway("pipeline-comp-gateway", "Compensate GeoServer?");
+    saga.errorFlow(pipeline, pipelineCompGw);
+    saga.flow(pipelineCompGw, compGeoserver).when(HAS_GEO_SINK_CONDITION);
+    saga.flow(pipelineCompGw, compApisix).asDefault();
     if (compSql != null) {
       saga.flow(compGeoserver, compSql, compApisix, compFrost, publishFail);
     } else {

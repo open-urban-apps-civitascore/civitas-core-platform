@@ -57,7 +57,7 @@ class BpmnVsCodedEquivalenceTest {
   void datasetCreateHappyPath(String approach, boolean useBpmn) {
     SagaCommandHandler frost = FlowableTestSupport.mockHandler("frost");
     SagaCommandHandler apisix = FlowableTestSupport.mockHandler("apisix");
-    SagaCommandHandler redpanda = FlowableTestSupport.mockHandler("redpanda");
+    SagaCommandHandler pipeline = FlowableTestSupport.mockHandler("nifi");
 
     when(frost.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(
@@ -70,12 +70,12 @@ class BpmnVsCodedEquivalenceTest {
         .thenReturn(
             SagaCommandResult.success(
                 "s", "create-route", Map.of("routeId", "r1"), Map.of("routeId", "r1")));
-    when(redpanda.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+    when(pipeline.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(
             SagaCommandResult.success(
                 "s", "deploy-pipelines", Map.of("pipelineIds", List.of("p1")), Map.of()));
 
-    SagaHandlerRegistry reg = FlowableTestSupport.registry(frost, apisix, redpanda);
+    SagaHandlerRegistry reg = FlowableTestSupport.registry(frost, apisix, pipeline);
     ProcessEngine engine = createEngine(useBpmn, reg);
 
     try {
@@ -86,21 +86,21 @@ class BpmnVsCodedEquivalenceTest {
       FlowableTestSupport.executeAllJobs(engine);
 
       FlowableTestSupport.assertProcessCompleted(engine.getHistoryService(), instance.getId());
-      var inOrder = inOrder(frost, apisix, redpanda);
+      var inOrder = inOrder(frost, apisix, pipeline);
       inOrder.verify(frost).handle(any());
       inOrder.verify(apisix).handle(any());
-      inOrder.verify(redpanda).handle(any());
+      inOrder.verify(pipeline).handle(any());
     } finally {
       engine.close();
     }
   }
 
-  @ParameterizedTest(name = "{0}: Dataset Create skip redpanda")
+  @ParameterizedTest(name = "{0}: Dataset Create skip pipeline")
   @MethodSource("approaches")
-  void datasetCreateSkipRedpanda(String approach, boolean useBpmn) {
+  void datasetCreateSkipPipeline(String approach, boolean useBpmn) {
     SagaCommandHandler frost = FlowableTestSupport.mockHandler("frost");
     SagaCommandHandler apisix = FlowableTestSupport.mockHandler("apisix");
-    SagaCommandHandler redpanda = FlowableTestSupport.mockHandler("redpanda");
+    SagaCommandHandler pipeline = FlowableTestSupport.mockHandler("nifi");
 
     when(frost.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(
@@ -113,7 +113,7 @@ class BpmnVsCodedEquivalenceTest {
         .thenReturn(
             SagaCommandResult.success("s", "create-route", Map.of("routeId", "r1"), Map.of()));
 
-    SagaHandlerRegistry reg = FlowableTestSupport.registry(frost, apisix, redpanda);
+    SagaHandlerRegistry reg = FlowableTestSupport.registry(frost, apisix, pipeline);
     ProcessEngine engine = createEngine(useBpmn, reg);
 
     try {
@@ -126,7 +126,7 @@ class BpmnVsCodedEquivalenceTest {
       var inOrder = inOrder(frost, apisix);
       inOrder.verify(frost).handle(any());
       inOrder.verify(apisix).handle(any());
-      verify(redpanda, never()).handle(any());
+      verify(pipeline, never()).handle(any());
     } finally {
       engine.close();
     }
@@ -137,16 +137,16 @@ class BpmnVsCodedEquivalenceTest {
   void datasetDeleteBestEffort(String approach, boolean useBpmn) {
     SagaCommandHandler frost = FlowableTestSupport.mockHandler("frost");
     SagaCommandHandler apisix = FlowableTestSupport.mockHandler("apisix");
-    SagaCommandHandler redpanda = FlowableTestSupport.mockHandler("redpanda");
+    SagaCommandHandler pipeline = FlowableTestSupport.mockHandler("nifi");
 
-    when(redpanda.handle(any()))
+    when(pipeline.handle(any()))
         .thenReturn(SagaCommandResult.success("s", "delete-pipelines", Map.of(), Map.of()));
     when(apisix.handle(any()))
         .thenReturn(SagaCommandResult.failure("s", "delete-route", "APISIX down"));
     when(frost.handle(any()))
         .thenReturn(SagaCommandResult.success("s", "delete-project", Map.of(), Map.of()));
 
-    SagaHandlerRegistry reg = FlowableTestSupport.registry(frost, apisix, redpanda);
+    SagaHandlerRegistry reg = FlowableTestSupport.registry(frost, apisix, pipeline);
     ProcessEngine engine = createEngine(useBpmn, reg);
 
     try {
@@ -163,8 +163,8 @@ class BpmnVsCodedEquivalenceTest {
           engine.getRuntimeService().startProcessInstanceByKey("dataset-delete", vars);
       FlowableTestSupport.executeAllJobs(engine);
 
-      var inOrder = inOrder(redpanda, apisix, frost);
-      inOrder.verify(redpanda).handle(any());
+      var inOrder = inOrder(pipeline, apisix, frost);
+      inOrder.verify(pipeline).handle(any());
       inOrder.verify(apisix).handle(any());
       inOrder.verify(frost).handle(any());
       FlowableTestSupport.assertProcessFinished(engine.getHistoryService(), instance.getId());

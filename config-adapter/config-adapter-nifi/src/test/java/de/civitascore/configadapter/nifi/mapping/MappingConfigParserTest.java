@@ -1,0 +1,254 @@
+/**
+ * <p>This work and the accompanying materials are made available under the terms of the European Union Public License (EU-PL) 1.2 which is available at https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
+ *
+ * <p>SPDX-License-Identifier: EUPL-1.2
+ *
+ * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to all the individual contributors:
+ * Copyright (c) 2012-2026 Civitas Connect e. V. and others.
+ *
+ */
+package de.civitascore.configadapter.nifi.mapping;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.nifi.mapping.ValueNode.ConcatNode;
+import de.civitascore.configadapter.nifi.mapping.ValueNode.ConstNode;
+import de.civitascore.configadapter.nifi.mapping.ValueNode.ConvertNode;
+import de.civitascore.configadapter.nifi.mapping.ValueNode.CopyNode;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class MappingConfigParserTest {
+
+  private final ObjectMapper mapper = new ObjectMapper();
+  private final MappingConfigParser parser = new MappingConfigParser();
+
+  private MappingConfig parse(String json) throws Exception {
+    JsonNode node = mapper.readTree(json);
+    return parser.parse(node);
+  }
+
+  @Test
+  void parsesSourceAndTarget() throws Exception {
+    MappingConfig mc =
+        parse(
+            """
+            {
+              "$schema": "https://civitasconnect.digital/core/mapping/v1",
+              "source": "urn:core:datastructure:src:v1",
+              "target": "urn:core:datastructure:tgt:v1",
+              "fields": { "$.a": "$.b" }
+            }
+            """);
+
+    assertEquals("urn:core:datastructure:src:v1", mc.source());
+    assertEquals("urn:core:datastructure:tgt:v1", mc.target());
+    assertEquals(1, mc.fields().size());
+  }
+
+  @Test
+  void shorthandStringIsCopy() throws Exception {
+    MappingConfig mc =
+        parse(
+            """
+        { "fields": { "$.title": "$.name" } }
+        """);
+
+    ValueNode v = mc.fields().get("$.title");
+    CopyNode copy = assertInstanceOf(CopyNode.class, v);
+    assertEquals("$.name", copy.sourcePath());
+  }
+
+  @Test
+  void explicitCopyOp() throws Exception {
+    MappingConfig mc =
+        parse(
+            """
+        { "fields": { "$.title": { "op": "copy", "sourcePath": "$.name" } } }
+        """);
+
+    CopyNode copy = assertInstanceOf(CopyNode.class, mc.fields().get("$.title"));
+    assertEquals("$.name", copy.sourcePath());
+  }
+
+  @Test
+  void constStringWithType() throws Exception {
+    MappingConfig mc =
+        parse(
+            """
+        { "fields": { "$.unit": { "op": "const", "value": "celsius", "valueType": "string" } } }
+        """);
+
+    ConstNode c = assertInstanceOf(ConstNode.class, mc.fields().get("$.unit"));
+    assertEquals("celsius", c.value());
+    assertEquals("string", c.valueType());
+  }
+
+  @Test
+  void constNumber() throws Exception {
+    MappingConfig mc =
+        parse(
+            """
+        { "fields": { "$.factor": { "op": "const", "value": 42 } } }
+        """);
+
+    ConstNode c = assertInstanceOf(ConstNode.class, mc.fields().get("$.factor"));
+    assertEquals(42, ((Number) c.value()).intValue());
+  }
+
+  @Test
+  void concatWithMixedInputs() throws Exception {
+    MappingConfig mc =
+        parse(
+            """
+        { "fields": { "$.geom": { "op": "concat", "separator": " ",
+            "inputs": [ "$.lon", { "op": "const", "value": "X" } ] } } }
+        """);
+
+    ConcatNode concat = assertInstanceOf(ConcatNode.class, mc.fields().get("$.geom"));
+    assertEquals(" ", concat.separator());
+    assertEquals(2, concat.inputs().size());
+    assertInstanceOf(CopyNode.class, concat.inputs().get(0));
+    assertInstanceOf(ConstNode.class, concat.inputs().get(1));
+  }
+
+  @Test
+  void toDateWithPattern() throws Exception {
+    MappingConfig mc =
+        parse(
+            """
+        { "fields": { "$.observed_at": { "op": "toDate", "input": "$.ts", "pattern": "yyyy-MM-dd" } } }
+        """);
+
+    ConvertNode conv = assertInstanceOf(ConvertNode.class, mc.fields().get("$.observed_at"));
+    assertEquals(ConversionOp.TO_DATE, conv.op());
+    assertEquals("yyyy-MM-dd", conv.pattern());
+    assertInstanceOf(CopyNode.class, conv.input());
+  }
+
+  @Test
+  void toStringWrapsNestedNode() throws Exception {
+    MappingConfig mc =
+        parse(
+            """
+        { "fields": { "$.s": { "op": "toString", "input": { "op": "copy", "sourcePath": "$.n" } } } }
+        """);
+
+    ConvertNode conv = assertInstanceOf(ConvertNode.class, mc.fields().get("$.s"));
+    assertEquals(ConversionOp.TO_STRING, conv.op());
+    CopyNode inner = assertInstanceOf(CopyNode.class, conv.input());
+    assertEquals("$.n", inner.sourcePath());
+  }
+
+  @Test
+  void nonDateOpWithStrayPatternIsRejected() {
+    // toInt does not take a pattern; a stray one is an illegal combination and must be rejected
+    // (not silently ignored), so it can never reach the RecordPath compiler.
+    assertThrows(
+        FatalAdapterException.class,
+        () ->
+            parse(
+                """
+        { "fields": { "$.i": { "op": "toInt", "input": "$.a", "pattern": "###" } } }
+        """));
+  }
+
+  @Test
+  void numericConversionOpsParse() throws Exception {
+    MappingConfig mc =
+        parse(
+            """
+        { "fields": {
+            "$.i": { "op": "toInt", "input": "$.a" },
+            "$.f": { "op": "toFloat", "input": "$.b" } } }
+        """);
+
+    assertEquals(
+        ConversionOp.TO_INT, assertInstanceOf(ConvertNode.class, mc.fields().get("$.i")).op());
+    assertEquals(
+        ConversionOp.TO_FLOAT, assertInstanceOf(ConvertNode.class, mc.fields().get("$.f")).op());
+  }
+
+  @Test
+  void fieldOrderIsPreserved() throws Exception {
+    MappingConfig mc =
+        parse(
+            """
+        { "fields": { "$.c": "$.x", "$.a": "$.y", "$.b": "$.z" } }
+        """);
+
+    assertEquals(List.of("$.c", "$.a", "$.b"), List.copyOf(mc.fields().keySet()));
+  }
+
+  @Test
+  void unknownOpIsRejected() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                parse(
+                    """
+            { "fields": { "$.x": { "op": "evalScript", "code": "system('rm -rf /')" } } }
+            """));
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+  }
+
+  @Test
+  void toDateWithoutPatternIsRejected() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                parse(
+                    """
+            { "fields": { "$.ts": { "op": "toDate", "input": "$.raw" } } }
+            """));
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+  }
+
+  @Test
+  void formatWithBlankPatternIsRejected() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                parse(
+                    """
+            { "fields": { "$.s": { "op": "format", "input": "$.d", "pattern": "  " } } }
+            """));
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+  }
+
+  @Test
+  void copyWithoutSourcePathIsRejected() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                parse(
+                    """
+            { "fields": { "$.x": { "op": "copy" } } }
+            """));
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+  }
+
+  @Test
+  void nonStringNonObjectFieldValueIsRejected() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                parse(
+                    """
+            { "fields": { "$.x": 123 } }
+            """));
+    assertTrue(ex.getErrorCode() == AdapterErrorCode.NIFI_MAPPING_ERROR);
+  }
+}

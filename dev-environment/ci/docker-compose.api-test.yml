@@ -365,7 +365,7 @@ services:
     image: ${CI_REGISTRY_IMAGE}/config-adapter:${IMAGE_TAG:-develop}
     environment:
       HEALTHCHECK_PORT: 8088
-      ADAPTERS: keycloak,apisix,frost # ,nifi (add after implementation)
+      ADAPTERS: keycloak,apisix,frost
       EVENTHANDLER_NAME: kafka
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_GROUP_ID: config-adapter-group
@@ -401,6 +401,11 @@ services:
       FROST_API_KEY_HEADER: X-API-Key
       FROST_TOPICS: de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
       NIFI_URL: https://nifi:8443
+      NIFI_USERNAME: admin
+      NIFI_PASSWORD: nifi-dev-password-1234567890
+      NIFI_TLS_INSECURE: "true"
+      # FROST SensorThings base URL the NiFi pipeline adapter posts observations to.
+      NIFI_FROST_URL: http://civitas-frost:8080/FROST-Server/v1.1
       NIFI_TOPICS: de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
       FLOWABLE_JDBC_URL: jdbc:postgresql://postgres-portal:5432/flowable
       FLOWABLE_JDBC_USERNAME: admin
