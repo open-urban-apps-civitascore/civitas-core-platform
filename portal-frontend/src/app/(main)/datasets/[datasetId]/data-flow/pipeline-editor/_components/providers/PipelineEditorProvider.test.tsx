@@ -55,7 +55,7 @@ vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
   useDeletePipeline: vi.fn(),
 }))
 
-vi.mock('@/app/services/api/datasets/dataSinks/clientRequests', () => ({
+vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
   useCreateDataSink: vi.fn(),
   useDeleteDataSink: vi.fn(),
   useUpdateDataSink: vi.fn(),
