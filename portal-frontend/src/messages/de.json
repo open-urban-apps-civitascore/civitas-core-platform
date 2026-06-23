@@ -328,6 +328,7 @@
             },
             "styles": {
               "title": "Stile",
+              "subtitle": "Stile werden hier erstellt und anschließend Layern zugeordnet",
               "addStyle": "Stil hinzufügen",
               "newStyle": "Neuer Stil {index}",
               "untitledStyle": "Unbenannter Stil {index}",
@@ -407,6 +408,7 @@
               },
               "style": {
                 "sectionTitle": "Layer-Stil",
+                "sectionSubtitle": "Stile werden im Tab \u201EStile\u201C erstellt und hier Layern zugewiesen",
                 "standardStyle": "Standardanzeige",
                 "default": "Standard (Geoserver default)",
                 "alternativeStyles": "Alternative Stile",
@@ -1253,7 +1255,7 @@
       "validationFailed": "Validierung fehlgeschlagen für: {names}",
       "duplicateNames": "Doppelte Pipeline-Namen: {names}",
       "saveFailed": "Speichern fehlgeschlagen: {names}",
-      "saveSucces": "Pipelines erfolgreich gespeichert",
+      "saveSuccess": "Pipeline \"{name}\" erfolgreich gespeichert",
       "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datapool nicht erlaubt."
     },
     "tabs": {

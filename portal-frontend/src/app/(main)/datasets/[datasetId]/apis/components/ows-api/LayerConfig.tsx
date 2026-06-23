@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input'
 import { UMLAttribute, UMLClass } from '@/components/uml-modeler/types/uml'
 import { crsOptions } from '@/const/crs'
 import { cn } from '@/lib/utils'
-import { Datasink } from '@/types/datasinks'
+import { DataSink } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
 import { OwsApiFormData, Style } from '@/types/namedApis'
 import { getEmptyLabelIndex, isNewItem } from '@/utils/common'
@@ -28,7 +28,7 @@ import { BoundingBoxConfig } from './BoundingBoxConfig'
 interface LayerConfigProps {
   form: UseFormReturn<OwsApiFormData>
   styles: Style[]
-  postgisDatasinks: Datasink[]
+  postgisDataSinks: DataSink[]
   postGisDatastructures: DatastructureVersion[]
   selectedLayerIndex: number | null
   isReadOnly: boolean
@@ -36,7 +36,7 @@ interface LayerConfigProps {
   onSelectLayer: (index: number) => void
   onAddLayer: () => void
   onDeleteLayer?: () => Promise<void>
-  onTableChange: (datasinkId: string) => void
+  onTableChange: (dataSinkId: string) => void
 }
 
 const getUmlClass = (
@@ -52,7 +52,7 @@ export const LayerConfig = (props: LayerConfigProps) => {
   const {
     form,
     styles,
-    postgisDatasinks,
+    postgisDataSinks,
     postGisDatastructures,
     selectedLayerIndex,
     isReadOnly,
@@ -110,12 +110,12 @@ export const LayerConfig = (props: LayerConfigProps) => {
 
   const styleOptions = styles.map(style => ({ value: style.id, label: style.name }))
 
-  const tableOptions = postgisDatasinks?.map(datasink => ({
-    value: datasink.id,
-    label: datasink.configuration.tableName,
+  const tableOptions = postgisDataSinks?.map(dataSink => ({
+    value: dataSink.id,
+    label: dataSink.configuration.tableName,
   }))
 
-  const currentDatastructureVersion = postgisDatasinks?.find(datasink => datasink.id === tableWatch)?.configuration
+  const currentDatastructureVersion = postgisDataSinks?.find(dataSink => dataSink.id === tableWatch)?.configuration
     .dataStructureVersion
 
   const umlClass = getUmlClass(postGisDatastructures, currentDatastructureVersion?.id)
@@ -310,7 +310,11 @@ export const LayerConfig = (props: LayerConfigProps) => {
                 </DetailsFieldContainer>
 
                 <DetailsFieldContainer isTitleField>
-                  <SubHeader title={t('style.sectionTitle')} titleClassName="text-2xl leading-none font-bold" />
+                  <SubHeader
+                    title={t('style.sectionTitle')}
+                    subtitle={t('style.sectionSubtitle')}
+                    titleClassName="mb-1"
+                  />
                 </DetailsFieldContainer>
                 <DetailsFieldContainer className="border-b-0 py-2 pt-6">
                   <FormSelect

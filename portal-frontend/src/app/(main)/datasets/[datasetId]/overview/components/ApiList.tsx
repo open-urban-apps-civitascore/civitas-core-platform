@@ -3,7 +3,7 @@
 import { ChevronDown } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
-import { useGetDatasinks } from '@/app/services/api/datasets/datasinks/clientRequests'
+import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -24,13 +24,13 @@ export const ApiList = ({ datasetId, apis, canEdit, isOpenDataAccess }: ApiListP
   const t = useTranslations('datasets.overview.completion.dataFlow.apis')
   const hasOws = hasApiType(apis, API_STANDARDS.OWS)
 
-  const { data: datasinksData } = useGetDatasinks(datasetId)
+  const { data: dataSinksData } = useGetDataSinks(datasetId)
 
-  const postgisDatasinks =
-    datasinksData?.data.filter(datasink => datasink.dataSinkType === DATASINK_TYPES.POSTGIS) || []
-  const hasPostgisDatasinks = postgisDatasinks.length > 0
+  const postgisDataSinks =
+    dataSinksData?.data.filter(dataSink => dataSink.dataSinkType === DATASINK_TYPES.POSTGIS) || []
+  const hasPostgisDataSinks = postgisDataSinks.length > 0
 
-  const canCreateOwsApi = !hasOws && hasPostgisDatasinks
+  const canCreateOwsApi = !hasOws && hasPostgisDataSinks
 
   return (
     <div className="py-3">

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { FormProvider, useForm } from 'react-hook-form'
 
 import { STATUS_TYPES } from '@/types/common'
-import { Datasink, DATASINK_TYPES } from '@/types/datasinks'
+import { DataSink, DATASINK_TYPES } from '@/types/datasinks'
 import { DATASTRUCTURE_VERSION_SOURCE, DatastructureVersion } from '@/types/datastructures'
 import { API_TYPE_QUERY, LayerFormData, OwsApiFormData, Style } from '@/types/namedApis'
 
@@ -20,7 +20,7 @@ const mockStyleList: Style[] = [
   },
 ]
 
-const mockDatasink: Datasink = {
+const mockDataSink: DataSink = {
   id: '00000000-0000-0000-0000-000000000003',
   datasetId: '00000000-0000-0000-0000-000000000002',
   pipelineId: '00000000-0000-0000-0000-000000000004',
@@ -95,7 +95,7 @@ interface WrapperProps {
   onSelectLayer?: (index: number) => void
   onAddLayer?: () => void
   onDeleteLayer?: () => Promise<void>
-  onTableChange?: (datasinkId: string) => void
+  onTableChange?: (dataSinkId: string) => void
 }
 
 const Wrapper = ({
@@ -121,7 +121,7 @@ const Wrapper = ({
         form={form}
         existingLayers={layers}
         styles={mockStyleList}
-        postgisDatasinks={[mockDatasink]}
+        postgisDataSinks={[mockDataSink]}
         postGisDatastructures={[mockDatastructureVersion]}
         selectedLayerIndex={selectedLayerIndex}
         isReadOnly={isReadOnly}
@@ -261,12 +261,12 @@ describe('LayerConfig', () => {
   })
 
   describe('Table selection', () => {
-    it('calls onTableChange with the datasink id when the table selection changes', () => {
+    it('calls onTableChange with the data sink id when the table selection changes', () => {
       const onTableChange = vi.fn()
       render(<Wrapper layers={[makeLayer({ dataSinkId: '' })]} selectedLayerIndex={0} onTableChange={onTableChange} />)
       fireEvent.click(screen.getByTestId('layers.0.dataSinkIdSelectTrigger'))
       fireEvent.click(screen.getByTestId('layers.0.dataSinkIdSelectItem0'))
-      expect(onTableChange).toHaveBeenCalledWith(mockDatasink.id)
+      expect(onTableChange).toHaveBeenCalledWith(mockDataSink.id)
     })
   })
 
