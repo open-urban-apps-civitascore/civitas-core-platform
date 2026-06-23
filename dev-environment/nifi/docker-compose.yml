@@ -22,7 +22,11 @@ services:
         required: false
     environment:
       NIFI_WEB_HTTPS_PORT: "8443"
-      NIFI_WEB_PROXY_HOST: "localhost:8443"
+      # Whitelist both the browser host (localhost) and the in-network service name the
+      # config-adapter connects to (civitas-nifi). NiFi rejects requests whose Host header is not
+      # listed here; without civitas-nifi:8443 the adapter's deploys are refused at the host-header
+      # check. Comma-separated, no spaces.
+      NIFI_WEB_PROXY_HOST: "localhost:8443,civitas-nifi:8443"
       NIFI_JVM_HEAP_INIT: "1g"
       NIFI_JVM_HEAP_MAX: "2g"
     volumes:
