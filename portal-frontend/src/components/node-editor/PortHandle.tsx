@@ -33,13 +33,12 @@ export const PortHandle = ({ id, portType, side, status = 'default' }: PortHandl
       top: 'auto',
       left: 'auto',
       right: 'auto',
-      width: 11,
-      height: 11,
-      background: '#fff',
+      width: portType === 'geometry' ? 9 : 11,
+      height: portType === 'geometry' ? 9 : 11,
+      background: portType === 'geometry' ? STATUS_COLOR[status] : '#fff',
       border: `2px solid ${STATUS_COLOR[status]}`,
-      transform: portType === 'object' ? 'rotate(45deg)' : 'none',
+      transform: portType === 'object' || portType === 'geometry' ? 'rotate(45deg)' : 'none',
       borderRadius: portType === 'scalar' ? '50%' : 2,
-      clipPath: portType === 'geometry' ? 'polygon(25% 6%, 75% 6%, 100% 50%, 75% 94%, 25% 94%, 0% 50%)' : undefined,
     }}
   />
 )
