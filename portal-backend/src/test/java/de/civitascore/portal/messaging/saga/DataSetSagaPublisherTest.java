@@ -626,6 +626,36 @@ class DataSetSagaPublisherTest {
           .hasMessageContaining(layerId.toString())
           .hasMessageContaining("civitas_stray");
     }
+
+    @Test
+    @DisplayName(
+        "Layer referencing a foreign Style with a matching name still fails (identity by UUID)")
+    void foreignStyleWithMatchingNameFailsPublish() {
+      // Two Style instances share the same name but have distinct UUIDs.
+      // localStyle is owned by the dataset; foreignStyle is a "look-alike" from another dataset
+      // attached to the layer. Name-based validation would silently accept this — UUID-based
+      // validation must reject it.
+      Style localStyle = style("civitas_shared", "<sld>local</sld>");
+      Style foreignStyle = style("civitas_shared", "<sld>foreign</sld>");
+
+      DataSink sink = postgisSink(UUID.randomUUID(), "my_table");
+      UUID layerId = UUID.randomUUID();
+      Layer l = layer(layerId, "layer1", null, sink);
+      l.setDefaultStyle(foreignStyle);
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setStyles(Set.of(localStyle));
+      dataSet.setLayers(Set.of(l));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining(layerId.toString())
+          .hasMessageContaining("not owned by dataset")
+          .hasMessageContaining("civitas_shared");
+    }
   }
 
   @Nested
