@@ -20,6 +20,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
@@ -130,6 +131,93 @@ class NifiRestClientTest {
           client.authenticate();
           client.getRootProcessGroupId();
         });
+  }
+
+  @Test
+  void conflictIsRetryable() {
+    // 409 is a transient optimistic-lock/component-starting condition, not a permanent failure —
+    // it must be retryable so a redelivery can complete the deploy rather than rolling it back.
+    stubAuth();
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .willReturn(aResponse().withStatus(409).withBody("revision conflict")));
+
+    assertThrows(
+        RetryableAdapterException.class,
+        () -> {
+          client.authenticate();
+          client.getRootProcessGroupId();
+        });
+  }
+
+  @Test
+  void tooManyRequestsIsRetryable() {
+    stubAuth();
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .willReturn(aResponse().withStatus(429).withBody("slow down")));
+
+    assertThrows(
+        RetryableAdapterException.class,
+        () -> {
+          client.authenticate();
+          client.getRootProcessGroupId();
+        });
+  }
+
+  @Test
+  void invalidControllerServiceFailsFatallyInsteadOfPollingForever() {
+    // A controller service whose configuration is INVALID will never reach ENABLED. The enable-wait
+    // must fail FATALLY (naming the service) rather than time out as retryable and loop forever.
+    stubAuth();
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/root-1"))
+            .willReturn(json("{ \"processGroupFlow\": { \"flow\": { \"processGroups\": [] } } }")));
+    server.stubFor(
+        post(urlPathEqualTo("/nifi-api/process-groups/root-1/process-groups/upload"))
+            .willReturn(json("{ \"id\": \"pg-1\" }")));
+    server.stubFor(
+        put(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json("{}")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(
+                json(
+                    "{ \"controllerServices\": [ { \"id\": \"cs-1\", \"component\": { \"name\":"
+                        + " \"PostGISConnectionPool\", \"state\": \"DISABLED\","
+                        + " \"validationStatus\": \"INVALID\", \"validationErrors\": [ \"'Database"
+                        + " Connection URL' is invalid\" ] } } ] }")));
+
+    DeploymentPlan plan =
+        new DeploymentPlan(
+            "pipeline-x", "{ \"flowContents\": { \"name\": \"pipeline-x\" } }", Map.of());
+
+    FatalAdapterException ex =
+        assertThrows(FatalAdapterException.class, () -> client.deployFlow(plan));
+    assertTrue(
+        ex.getMessage().contains("PostGISConnectionPool"),
+        "the fatal error must name the INVALID controller service");
+  }
+
+  @Test
+  void missingRevisionVersionIsFatal() {
+    // A matching group whose revision.version field is ABSENT must not be silently coerced to 0
+    // (which would be sent as a stale optimistic-lock version) — surface the malformed response.
+    stubAuth();
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/root-1"))
+            .willReturn(
+                json(
+                    "{ \"processGroupFlow\": { \"flow\": { \"processGroups\": [ { \"id\":"
+                        + " \"pg-old\", \"component\": { \"name\": \"pipeline-x\" } } ] } } }")));
+
+    assertThrows(FatalAdapterException.class, () -> client.deleteFlowByName("pipeline-x"));
   }
 
   @Test

@@ -148,6 +148,19 @@ class MappingConfigParserTest {
   }
 
   @Test
+  void nonDateOpWithStrayPatternIsRejected() {
+    // toInt does not take a pattern; a stray one is an illegal combination and must be rejected
+    // (not silently ignored), so it can never reach the RecordPath compiler.
+    assertThrows(
+        FatalAdapterException.class,
+        () ->
+            parse(
+                """
+        { "fields": { "$.i": { "op": "toInt", "input": "$.a", "pattern": "###" } } }
+        """));
+  }
+
+  @Test
   void numericConversionOpsParse() throws Exception {
     MappingConfig mc =
         parse(

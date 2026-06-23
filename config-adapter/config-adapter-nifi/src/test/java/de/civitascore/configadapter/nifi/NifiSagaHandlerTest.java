@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.nifi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -164,6 +165,45 @@ class NifiSagaHandlerTest {
 
     assertEquals("STEP_FAILED", result.type());
     assertTrue(result.error().contains("DEPLOY_PIPELINES failed"));
+  }
+
+  @Test
+  void publishedFailureCarriesOnlySafeExternalMessageNotInternalDetail() throws Exception {
+    // The internal message would leak NiFi's raw response (hostnames, DB URL, "Invalid SNI") into
+    // the published failure event. Only the safe external message may cross the trust boundary.
+    when(restClient.deployFlow(any()))
+        .thenThrow(
+            new de.civitascore.configadapter.exception.RetryableAdapterException(
+                de.civitascore.configadapter.model.AdapterErrorCode.NIFI_ERROR,
+                "authenticate: connect to civitas-nifi:8443 failed — Invalid SNI, db civitas-db:5432"));
+
+    SagaCommandResult result = handler.handle(deployCommand());
+
+    assertEquals("STEP_FAILED", result.type());
+    assertTrue(
+        result.error().contains("Pipeline service error"),
+        "published error must be the safe external message");
+    assertFalse(result.error().contains("civitas-nifi"), "internal host detail must not leak");
+    assertFalse(result.error().contains("Invalid SNI"), "internal NiFi body must not leak");
+    assertFalse(result.error().contains("civitas-db"), "internal DB detail must not leak");
+  }
+
+  @Test
+  void deleteWithNonStringPipelineIdFailsBeforeDeletingAnything() throws Exception {
+    // A malformed pipelineIds element must fail the step cleanly (INVALID_PAYLOAD) up front — never
+    // after some pipelines have already been deleted by a cast that blows up mid-loop.
+    Map<String, Object> payload =
+        map(
+            """
+            { "type": "EXECUTE_STEP", "sagaId": "s", "stepId": "delete",
+              "adapter": "nifi", "operation": "DELETE_PIPELINES",
+              "pipelineIds": ["p-1", 42] }
+            """);
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals("STEP_FAILED", result.type());
+    verify(restClient, times(0)).deleteFlowByName(any());
   }
 
   @Test

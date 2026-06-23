@@ -51,6 +51,19 @@ class NifiFlowBuilderTest {
                 "Database Connection URL", "jdbc:postgresql://db:5432/x", "Database User", "u")));
   }
 
+  private FlowBuildSpec frostSink() {
+    return new FlowBuildSpec(
+        "pipeline-frost",
+        SourceType.MQTT,
+        Map.of("Broker URI", "tcp://mosquitto:1883", "Topic Filter", "sensors/+/temp"),
+        SinkType.FROST,
+        Map.of(
+            "HTTP Method", "POST",
+            "HTTP URL", "http://frost:8080/FROST-Server/v1.1/Observations"),
+        mapping(),
+        Map.of());
+  }
+
   private JsonNode component(JsonNode flow, String array, String typeSuffix) {
     for (JsonNode c : flow.get("flowContents").get(array)) {
       if (c.path("type").asText().endsWith(typeSuffix)) {
@@ -70,8 +83,9 @@ class NifiFlowBuilderTest {
     assertEquals(5, flow.get("flowContents").get("processors").size());
     // 3 controller services: reader, writer, dbcp
     assertEquals(3, flow.get("flowContents").get("controllerServices").size());
-    // 5 connections: 3 chaining the happy path + 2 failure edges into the LogMessage sink
-    assertEquals(5, flow.get("flowContents").get("connections").size());
+    // 7 connections: 3 chaining the happy path + 2 transform-failure edges (ConvertRecord,
+    // UpdateRecord) + 2 sink write-failure edges (PutDatabaseRecord 'failure' + 'retry')
+    assertEquals(7, flow.get("flowContents").get("connections").size());
   }
 
   @Test
@@ -154,6 +168,46 @@ class NifiFlowBuilderTest {
         "UpdateRecord failure must be routed to the LogMessage sink");
   }
 
+  @Test
+  void routesPostgisSinkWriteFailuresToLogSink() throws Exception {
+    // A failed write to PostGIS must not be auto-terminated (silent loss): PutDatabaseRecord's
+    // 'failure' and 'retry' relationships route to the LogMessage sink.
+    JsonNode flow = build(mqttToPostgis(mapping()));
+
+    JsonNode sink = component(flow, "processors", "PutDatabaseRecord");
+    String logId = component(flow, "processors", "LogMessage").get("identifier").asText();
+    String sinkId = sink.get("identifier").asText();
+
+    assertFalse(
+        autoTerminates(sink, "failure"), "PutDatabaseRecord must not auto-terminate failure");
+    assertFalse(autoTerminates(sink, "retry"), "PutDatabaseRecord must not auto-terminate retry");
+    assertTrue(autoTerminates(sink, "success"), "a successful write is still terminated");
+    assertTrue(
+        hasConnection(flow, sinkId, logId, "failure"), "sink failure must route to the log sink");
+    assertTrue(
+        hasConnection(flow, sinkId, logId, "retry"), "sink retry must route to the log sink");
+  }
+
+  @Test
+  void routesFrostSinkWriteFailuresToLogSink() throws Exception {
+    JsonNode flow = build(frostSink());
+
+    JsonNode sink = component(flow, "processors", "InvokeHTTP");
+    String logId = component(flow, "processors", "LogMessage").get("identifier").asText();
+    String sinkId = sink.get("identifier").asText();
+
+    for (String relationship : List.of("Failure", "Retry", "No Retry")) {
+      assertFalse(
+          autoTerminates(sink, relationship), "InvokeHTTP must not auto-terminate " + relationship);
+      assertTrue(
+          hasConnection(flow, sinkId, logId, relationship),
+          "InvokeHTTP " + relationship + " must route to the log sink");
+    }
+    // the HTTP response itself is still discarded — only write failures are routed
+    assertTrue(autoTerminates(sink, "Response"), "InvokeHTTP Response stays terminated");
+    assertTrue(autoTerminates(sink, "Original"), "InvokeHTTP Original stays terminated");
+  }
+
   private boolean autoTerminates(JsonNode processor, String relationship) {
     for (JsonNode rel : processor.path("autoTerminatedRelationships")) {
       if (relationship.equals(rel.asText())) {
@@ -222,21 +276,7 @@ class NifiFlowBuilderTest {
 
   @Test
   void buildsFrostSinkChainWithoutDbcp() throws Exception {
-    FlowBuildSpec spec =
-        new FlowBuildSpec(
-            "pipeline-frost",
-            SourceType.MQTT,
-            Map.of("Broker URI", "tcp://mosquitto:1883", "Topic Filter", "sensors/+/temp"),
-            SinkType.FROST,
-            Map.of(
-                "HTTP Method",
-                "POST",
-                "HTTP URL",
-                "http://frost:8080/FROST-Server/v1.1/Observations"),
-            mapping(),
-            Map.of());
-
-    JsonNode flow = build(spec);
+    JsonNode flow = build(frostSink());
     // ConsumeMQTT -> ConvertRecord -> UpdateRecord -> InvokeHTTP, plus the LogMessage error sink
     assertEquals(5, flow.get("flowContents").get("processors").size());
     // only reader + writer (no DBCP for a FROST/HTTP sink)

@@ -20,6 +20,7 @@ import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
+import jakarta.ws.rs.client.Invocation;
 import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.Form;
 import jakarta.ws.rs.core.MediaType;
@@ -59,6 +60,15 @@ public class NifiRestClient implements AutoCloseable {
   private final String password;
   private final Client client;
   private final ObjectMapper mapper = new ObjectMapper();
+
+  /**
+   * The bearer token, refreshed in place on a 401. This single shared field is safe for the
+   * single-instance/concurrent-deploy contract ONLY because every deploy authenticates with the
+   * same configured credential: a concurrent refresh can at worst replace the token with an
+   * equivalent one. {@code volatile} guarantees visibility of that replacement across threads. If
+   * per-tenant or rotating credentials are ever introduced, this must become a guarded/atomic
+   * refresh.
+   */
   private volatile String token;
 
   /**
@@ -183,7 +193,7 @@ public class NifiRestClient implements AutoCloseable {
       if (name.equals(group.path("component").path("name").asText())) {
         return Optional.of(
             new ProcessGroupRef(
-                group.path("id").asText(), group.path("revision").path("version").asLong()));
+                group.path("id").asText(), requireRevisionVersion(group, "process group " + name)));
       }
     }
     return Optional.empty();
@@ -352,12 +362,43 @@ public class NifiRestClient implements AutoCloseable {
     if (services.isEmpty()) {
       return emptyMeansReady;
     }
+    boolean awaitingEnabled = "ENABLED".equals(state);
+    boolean allInState = true;
     for (JsonNode service : services) {
-      if (!state.equals(service.path("component").path("state").asText())) {
-        return false;
+      JsonNode component = service.path("component");
+      // A service whose configuration is INVALID will never reach ENABLED, so polling for it is
+      // pointless: fail fast and FATALLY (a retryable timeout would loop forever under redelivery).
+      if (awaitingEnabled && "INVALID".equals(component.path("validationStatus").asText())) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_FLOW_ERROR,
+            "controller service '"
+                + component.path("name").asText()
+                + "' is INVALID and will never enable: "
+                + validationErrors(component));
+      }
+      if (!state.equals(component.path("state").asText())) {
+        allInState = false;
       }
     }
-    return true;
+    return allInState;
+  }
+
+  /**
+   * Joins a controller service's NiFi validation error messages into a single diagnostic string.
+   */
+  private static String validationErrors(JsonNode component) {
+    JsonNode errors = component.path("validationErrors");
+    if (!errors.isArray() || errors.isEmpty()) {
+      return "no validation detail reported";
+    }
+    StringBuilder joined = new StringBuilder();
+    for (JsonNode error : errors) {
+      if (joined.length() > 0) {
+        joined.append("; ");
+      }
+      joined.append(error.asText());
+    }
+    return joined.toString();
   }
 
   /**
@@ -401,7 +442,33 @@ public class NifiRestClient implements AutoCloseable {
     }
     throw new RetryableAdapterException(
         AdapterErrorCode.NIFI_ERROR,
-        "controller services did not reach " + state + " state in time");
+        "controller services did not reach "
+            + state
+            + " state in time; current states: "
+            + describeServiceStates(pgId));
+  }
+
+  /** Lists each controller service as {@code name=state(validationStatus)} for diagnostics. */
+  private String describeServiceStates(String pgId)
+      throws FatalAdapterException, RetryableAdapterException {
+    JsonNode services =
+        getJson(API + "/flow/process-groups/" + pgId + "/controller-services", "list services")
+            .path("controllerServices");
+    StringBuilder description = new StringBuilder();
+    for (JsonNode service : services) {
+      JsonNode component = service.path("component");
+      if (description.length() > 0) {
+        description.append(", ");
+      }
+      description
+          .append(component.path("name").asText())
+          .append('=')
+          .append(component.path("state").asText())
+          .append('(')
+          .append(component.path("validationStatus").asText())
+          .append(')');
+    }
+    return description.toString();
   }
 
   private void awaitControllerServicesEnabled(String pgId)
@@ -501,7 +568,7 @@ public class NifiRestClient implements AutoCloseable {
     return client.target(baseUrl + path);
   }
 
-  private jakarta.ws.rs.client.Invocation.Builder authorized(WebTarget target) {
+  private Invocation.Builder authorized(WebTarget target) {
     return target.request(MediaType.APPLICATION_JSON).header("Authorization", "Bearer " + token);
   }
 
@@ -512,7 +579,11 @@ public class NifiRestClient implements AutoCloseable {
       return;
     }
     String body = safeBody(response);
-    if (status >= 500) {
+    // 5xx is transient; so are 409 (a component still starting, or a concurrent edit that moved the
+    // optimistic-lock revision) and 429 (rate limited). These are retryable — a permanent
+    // FatalAdapterException here would abort and roll back a deploy that a redelivery could
+    // complete.
+    if (status >= 500 || status == 409 || status == 429) {
       throw new RetryableAdapterException(
           AdapterErrorCode.NIFI_ERROR, description + ": HTTP " + status + " — " + body);
     }
@@ -535,6 +606,22 @@ public class NifiRestClient implements AutoCloseable {
           AdapterErrorCode.NIFI_FLOW_ERROR, "NiFi returned no id for " + description);
     }
     return id;
+  }
+
+  /**
+   * Returns the optimistic-locking revision version from a component entity, requiring the field to
+   * be present. {@code asLong()} alone yields {@code 0} for an absent field — indistinguishable
+   * from a legitimate version {@code 0} — which would later be sent as a stale lock version and
+   * rejected with a 409. A malformed-but-200 response is surfaced here instead.
+   */
+  private static long requireRevisionVersion(JsonNode entity, String description)
+      throws FatalAdapterException {
+    JsonNode version = entity.path("revision").path("version");
+    if (!version.isNumber()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_FLOW_ERROR, "NiFi returned no revision version for " + description);
+    }
+    return version.asLong();
   }
 
   private static RetryableAdapterException network(String description, ProcessingException e) {

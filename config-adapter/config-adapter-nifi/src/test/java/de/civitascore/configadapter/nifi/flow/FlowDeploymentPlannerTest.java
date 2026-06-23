@@ -210,26 +210,8 @@ class FlowDeploymentPlannerTest {
         de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }
 
-  @Test
-  void postgisSinkWithoutTableNameIsRejected() throws Exception {
-    // PutDatabaseRecord with no target table would deploy but fail every write — reject up front.
-    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
-      FatalAdapterException ex =
-          assertThrows(
-              FatalAdapterException.class,
-              () ->
-                  planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p-notable",
-                              graphWithMapping(),
-                              mqttSource(null),
-                              new SinkSpec(SinkType.POSTGIS, "  "))));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
-    }
-  }
+  // Note: rejection of a POSTGIS sink without a table name now happens at SinkSpec construction
+  // (the type rejects the invalid state) — see PipelineDeploymentRequestTest.
 
   @Test
   void mixedConstAndCopyMappingIsAccepted() throws Exception {

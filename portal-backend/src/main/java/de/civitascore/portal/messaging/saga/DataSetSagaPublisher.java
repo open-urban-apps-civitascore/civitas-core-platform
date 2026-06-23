@@ -326,8 +326,9 @@ public class DataSetSagaPublisher {
         String.valueOf(pipeline.getVersion()),
         action.name(),
         // `model` holds the editor-built, engine-neutral pipeline graph (React-Flow nodes/edges +
-        // inline mappingConfig) and is forwarded to the config-adapter as-is (WI 1513 contract /
-        // WI 1510 IR). The config-adapter (NiFi) is the only place engine specifics appear.
+        // inline mappingConfig) and is forwarded to the config-adapter as-is (the engine-neutral
+        // contract / intermediate representation). The config-adapter (NiFi) is the only place
+        // engine specifics appear.
         pipeline.getModel());
   }
 

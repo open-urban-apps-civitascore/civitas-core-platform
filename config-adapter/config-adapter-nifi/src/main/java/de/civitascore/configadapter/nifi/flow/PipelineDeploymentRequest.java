@@ -10,6 +10,8 @@
 package de.civitascore.configadapter.nifi.flow;
 
 import de.civitascore.configadapter.model.dataset.Datasource;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -29,6 +31,11 @@ public record PipelineDeploymentRequest(
       throw new IllegalArgumentException("pipelineId must be non-blank");
     }
     Objects.requireNonNull(sink, "sink");
+    // Defensively copy the caller's graph map so the record does not alias mutable external state
+    // (consistent with MappingConfig). A LinkedHashMap keeps node/edge order and tolerates the null
+    // values that arbitrary JSON graphs may carry; Map.copyOf would reject those.
+    graphData =
+        graphData == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(graphData));
   }
 
   /**
@@ -43,6 +50,12 @@ public record PipelineDeploymentRequest(
   public record SinkSpec(SinkType type, String tableName) {
     public SinkSpec {
       Objects.requireNonNull(type, "type");
+      // A PostGIS sink without a table name is an invalid state: PutDatabaseRecord would have no
+      // target and every write would fail. Reject it at construction so the invariant cannot be
+      // misrepresented (a FROST/HTTP sink legitimately carries no table name).
+      if (type == SinkType.POSTGIS && (tableName == null || tableName.isBlank())) {
+        throw new IllegalArgumentException("POSTGIS sink requires a non-blank tableName");
+      }
     }
   }
 }

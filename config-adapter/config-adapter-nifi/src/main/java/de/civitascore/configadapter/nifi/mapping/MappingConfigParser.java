@@ -119,8 +119,14 @@ public class MappingConfigParser {
       throw reject(op + " requires an 'input'");
     }
     String pattern = optionalText(node, "pattern");
-    if (conversion.get().requiresPattern() && (pattern == null || pattern.isBlank())) {
+    boolean requiresPattern = conversion.get().requiresPattern();
+    if (requiresPattern && (pattern == null || pattern.isBlank())) {
       throw reject(op + " requires a non-blank 'pattern'");
+    }
+    // The converse half of the ValueNode invariant: a non-date op must not carry a pattern. Reject
+    // a stray one here (a clean FatalAdapterException) rather than silently ignoring it downstream.
+    if (!requiresPattern && pattern != null) {
+      throw reject(op + " does not take a 'pattern'");
     }
     return new ConvertNode(conversion.get(), parseValue(input), pattern);
   }

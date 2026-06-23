@@ -14,6 +14,7 @@ import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.crypto.CryptoKeyLoader;
+import de.civitascore.configadapter.exception.AdapterException;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
@@ -346,10 +347,27 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     return result;
   }
 
-  @SuppressWarnings("unchecked")
-  private static List<String> extractStrings(SagaCommandMessage command, String key) {
+  private static List<String> extractStrings(SagaCommandMessage command, String key)
+      throws FatalAdapterException {
     Object value = command.payload().getOrDefault(key, List.of());
-    return value instanceof List<?> list ? (List<String>) list : List.of();
+    if (!(value instanceof List<?> list)) {
+      return List.of();
+    }
+    // Validate every element up front: an unchecked (List<String>) cast defers the
+    // ClassCastException to the consuming loop, which for DELETE would throw partway through after
+    // some pipelines are already gone. Fail cleanly with INVALID_PAYLOAD before any side effect.
+    List<String> result = new ArrayList<>(list.size());
+    for (Object item : list) {
+      if (!(item instanceof String s)) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.INVALID_PAYLOAD,
+            key
+                + " must contain only strings, got: "
+                + (item == null ? "null" : item.getClass().getSimpleName()));
+      }
+      result.add(s);
+    }
+    return result;
   }
 
   private static String requireString(Map<String, Object> map, String field) {
@@ -365,15 +383,19 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult pipelineError(
-      SagaCommandMessage command, String operation, boolean isCompensation, Exception e) {
-    String error = operation + " failed: " + e.getMessage();
+      SagaCommandMessage command, String operation, boolean isCompensation, AdapterException e) {
+    // The published failure event crosses the trust boundary, so it must carry only the safe
+    // external message — never e.getInternalMessage(), which for HTTP failures includes NiFi's raw
+    // response body (hostnames, the DB URL, validation detail). The full internal text stays in the
+    // local log below.
+    String error = operation + " failed: " + e.getSafeExternalMessage();
     // Pass the exception last so SLF4J logs the full cause chain (a FatalAdapterException often
     // wraps the underlying GeneralSecurityException/IOException that explains the real failure).
     log.error(
         "{} failed for saga {}: {}",
         operation,
         Encode.forJava(command.sagaId()),
-        Encode.forJava(e.getMessage()),
+        Encode.forJava(e.getInternalMessage()),
         e);
     return isCompensation
         ? SagaCommandResult.compensationFailure(command.sagaId(), command.stepId(), error)

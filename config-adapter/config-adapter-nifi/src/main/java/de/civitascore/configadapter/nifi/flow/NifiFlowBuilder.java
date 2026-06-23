@@ -158,7 +158,15 @@ public class NifiFlowBuilder {
       }
     }
 
-    wireErrorSink(pgId, csIdByName, processors, connections, convert, mappingProcessors);
+    wireErrorSink(
+        pgId,
+        csIdByName,
+        processors,
+        connections,
+        convert,
+        mappingProcessors,
+        sink,
+        spec.sinkType());
 
     ObjectNode root = mapper.createObjectNode();
     root.set("flowContents", flow);
@@ -315,11 +323,15 @@ public class NifiFlowBuilder {
   // ─── Error routing ──────────────────────────────────────────────────────────
 
   /**
-   * Routes the {@code failure} relationships of the record processors to a LogMessage sink (WARN +
-   * bulletin) instead of auto-terminating them. Otherwise a malformed message or an unmappable
-   * record would be dropped silently — invisible, undiagnosable data loss. The graph shape is
-   * intentionally stable: swapping LogMessage for a durable/recoverable dead-letter sink is a
-   * later, isolated change.
+   * Routes the {@code failure} relationships of the record processors AND the sink's own write
+   * failures to a LogMessage sink (WARN + bulletin) instead of auto-terminating them. Otherwise a
+   * malformed message, an unmappable record, or a failed write to FROST/PostGIS would be dropped
+   * silently — invisible, undiagnosable data loss, which is exactly what must not happen at the
+   * sink. The graph shape is intentionally stable: swapping LogMessage for a durable/recoverable
+   * dead-letter sink is a later, isolated change.
+   *
+   * <p>The source (ConsumeMQTT) is not wired here: it runs without a record reader, so it emits
+   * only {@code Message} and has no parse-failure relationship to route.
    */
   private void wireErrorSink(
       String pgId,
@@ -327,13 +339,44 @@ public class NifiFlowBuilder {
       ArrayNode processors,
       ArrayNode connections,
       Processor convert,
-      List<Processor> mappingProcessors)
+      List<Processor> mappingProcessors,
+      Processor sink,
+      SinkType sinkType)
       throws FatalAdapterException {
     Processor errorSink = loadProcessor("log_message", pgId, csIdByName, null);
     processors.add(errorSink.node());
     connections.add(connection(pgId, convert, errorSink, "failure"));
     for (Processor mapping : mappingProcessors) {
       connections.add(connection(pgId, mapping, errorSink, "failure"));
+    }
+    // The sink fragments auto-terminate their failure relationships by default; un-terminate them
+    // (NiFi forbids a relationship being both auto-terminated and connected) and route them to the
+    // same error sink so a failed write is logged, not lost.
+    for (String relationship : sinkFailureRelationships(sinkType)) {
+      removeAutoTerminated(sink.node(), relationship);
+      connections.add(connection(pgId, sink, errorSink, relationship));
+    }
+  }
+
+  /** The sink processor's failure-side relationships, by sink type. */
+  private static List<String> sinkFailureRelationships(SinkType sinkType) {
+    return switch (sinkType) {
+      // InvokeHTTP: Original/Response stay terminated (the HTTP response is not consumed).
+      case FROST -> List.of("Failure", "Retry", "No Retry");
+      // PutDatabaseRecord: success stays terminated (the record landed).
+      case POSTGIS -> List.of("failure", "retry");
+    };
+  }
+
+  /** Removes a relationship from a processor's {@code autoTerminatedRelationships}, if present. */
+  private static void removeAutoTerminated(ObjectNode processorNode, String relationship) {
+    JsonNode auto = processorNode.get("autoTerminatedRelationships");
+    if (auto instanceof ArrayNode array) {
+      for (int i = array.size() - 1; i >= 0; i--) {
+        if (relationship.equals(array.get(i).asText())) {
+          array.remove(i);
+        }
+      }
     }
   }
 

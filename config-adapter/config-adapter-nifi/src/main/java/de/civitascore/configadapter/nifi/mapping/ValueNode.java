@@ -54,8 +54,10 @@ public sealed interface ValueNode
 
   /**
    * Applies a type conversion to a nested input value. {@code toDate}/{@code format} require a
-   * non-blank pattern; the other ops must not carry one — these invariants are enforced here so an
-   * illegal combination can never reach the RecordPath compiler.
+   * non-blank pattern, which this constructor enforces. The converse half — a non-date op must not
+   * carry a pattern — is enforced upstream by {@code MappingConfigParser}, which rejects a stray
+   * pattern (with a user-facing error) before this node is constructed; together they keep an
+   * illegal combination from reaching the RecordPath compiler.
    *
    * @param op the conversion operation
    * @param input the value to convert

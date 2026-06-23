@@ -270,12 +270,8 @@ public class FlowDeploymentPlanner {
       throws FatalAdapterException {
     switch (sink.type()) {
       case POSTGIS -> {
-        if (sink.tableName() == null || sink.tableName().isBlank()) {
-          // Without a table name PutDatabaseRecord has no target — the flow would deploy but every
-          // record would fail to write. Reject up front instead of shipping a broken pipeline.
-          throw new FatalAdapterException(
-              AdapterErrorCode.NIFI_TEMPLATE_ERROR, "POSTGIS sink requires a target table name");
-        }
+        // SinkSpec guarantees a non-blank tableName for POSTGIS (the invalid state is rejected at
+        // construction), so PutDatabaseRecord always has a target here.
         sinkProperties.put("Table Name", sink.tableName());
         bindPlatformDbcp(controllerServiceProperties, sensitive);
       }

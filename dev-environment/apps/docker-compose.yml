@@ -67,7 +67,10 @@ services:
       NIFI_PASSWORD: nifi-dev-password-1234567890
       NIFI_TLS_INSECURE: "true"
       NIFI_FROST_URL: http://civitas-frost:8080/FROST-Server/v1.1
-      NIFI_TOPICS: de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
+      # PostGIS sink connection (read by bindPlatformDbcp); points at the same DB GeoServer/PostGIS use
+      NIFI_POSTGIS_URL: jdbc:postgresql://civitas-geoserver-db:5432/geoserver
+      NIFI_POSTGIS_USER: geoserver
+      NIFI_POSTGIS_PASSWORD: geoserver
       GEOSERVER_URL: http://civitas-geoserver:8080/geoserver
       GEOSERVER_ADMIN_USER: admin
       GEOSERVER_ADMIN_PASSWORD: geoserver
