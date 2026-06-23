@@ -31,12 +31,12 @@ import { isDatapoolScopeViolationError } from '@/utils/errors'
 
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
 import {
-  buildDatasinkPayloads,
+  buildDataSinkPayloads,
   buildPipelinePayload,
-  createDatasinkSnapshot,
-  type DatasinkSnapshot,
-  getRemovedDatasinkIds,
-  hasDatasinkChanged,
+  createDataSinkSnapshot,
+  type DataSinkSnapshot,
+  getRemovedDataSinkIds,
+  hasDataSinkChanged,
   updateNodeEntityId,
 } from '../../_services/payloadBuilderService'
 import {
@@ -99,12 +99,12 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const createPipelineMutation = useCreatePipeline(datasetId)
   const updatePipelineMutation = useUpdatePipeline(datasetId)
   const deletePipelineMutation = useDeletePipeline(datasetId)
-  const createDatasinkMutation = useCreateDataSink()
-  const deleteDatasinkMutation = useDeleteDataSink()
-  const updateDatasinkMutation = useUpdateDataSink()
+  const createDataSinkMutation = useCreateDataSink()
+  const deleteDataSinkMutation = useDeleteDataSink()
+  const updateDataSinkMutation = useUpdateDataSink()
 
-  // ===== Datasink snapshot for change detection =====
-  const datasinkSnapshotsRef = useRef<Record<string, DatasinkSnapshot>>({})
+  // ===== Data sink snapshot for change detection =====
+  const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
 
   // ===== Load pipelines from backend on mount =====
   useEffect(() => {
@@ -129,9 +129,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     // Load all sessions into the session manager
     sessionManager.loadSessions(sessions, activeSessionId)
 
-    // Create initial datasink snapshots for change detection
+    // Create initial data sink snapshots for change detection
     for (const session of sessions) {
-      datasinkSnapshotsRef.current[session.id] = createDatasinkSnapshot(session.pipeline)
+      dataSinkSnapshotsRef.current[session.id] = createDataSinkSnapshot(session.pipeline)
     }
   }, [pipelinesQuery.data, sessionManager, requestedPipelineId])
 
@@ -425,22 +425,22 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       for (const session of dirtySessions) {
         try {
           let currentPipeline = session.pipeline
-          const snapshot = datasinkSnapshotsRef.current[session.id] ?? {}
+          const snapshot = dataSinkSnapshotsRef.current[session.id] ?? {}
 
-          // Step 1: Delete datasinks for removed persistence nodes
-          const removedDatasinkIds = getRemovedDatasinkIds(currentPipeline, snapshot)
-          for (const datasinkId of removedDatasinkIds) {
-            await deleteDatasinkMutation.mutateAsync({ datasetId, datasinkId })
+          // Step 1: Delete data sinks for removed persistence nodes
+          const removedDataSinkIds = getRemovedDataSinkIds(currentPipeline, snapshot)
+          for (const dataSinkId of removedDataSinkIds) {
+            await deleteDataSinkMutation.mutateAsync({ datasetId, dataSinkId: dataSinkId })
           }
 
-          // Step 2: Save datasinks (create new / update changed)
-          const datasinkPayloads = buildDatasinkPayloads(currentPipeline)
-          for (const { nodeId, entityId, payload } of datasinkPayloads) {
+          // Step 2: Save data sinks (create new / update changed)
+          const dataSinkPayloads = buildDataSinkPayloads(currentPipeline)
+          for (const { nodeId, entityId, payload } of dataSinkPayloads) {
             if (!entityId) {
-              const response = await createDatasinkMutation.mutateAsync({ datasetId, data: payload })
+              const response = await createDataSinkMutation.mutateAsync({ datasetId, data: payload })
               currentPipeline = updateNodeEntityId(currentPipeline, nodeId, response.data.id)
-            } else if (hasDatasinkChanged(nodeId, payload, snapshot)) {
-              await updateDatasinkMutation.mutateAsync({ datasetId, datasinkId: entityId, data: payload })
+            } else if (hasDataSinkChanged(nodeId, payload, snapshot)) {
+              await updateDataSinkMutation.mutateAsync({ datasetId, dataSinkId: entityId, data: payload })
             }
           }
 
@@ -455,10 +455,10 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
             currentPipeline = { ...currentPipeline, id: response.data.id }
           }
 
-          // Step 3: Update session state and snapshot
+          // Step 4: Update session state and snapshot
           sessionManager.updateSessionPipeline(session.id, { ...currentPipeline, isDirty: false })
           sessionManager.markSessionClean(session.id)
-          datasinkSnapshotsRef.current[session.id] = createDatasinkSnapshot(currentPipeline)
+          dataSinkSnapshotsRef.current[session.id] = createDataSinkSnapshot(currentPipeline)
           toast.success(t('header.saveSuccess', { name: currentPipeline.name }))
         } catch (error) {
           if (isDatapoolScopeViolationError(error)) {
@@ -488,9 +488,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     sessionManager,
     createPipelineMutation,
     updatePipelineMutation,
-    createDatasinkMutation,
-    deleteDatasinkMutation,
-    updateDatasinkMutation,
+    createDataSinkMutation,
+    deleteDataSinkMutation,
+    updateDataSinkMutation,
     datasetId,
     t,
   ])

@@ -7,15 +7,15 @@ export const DATASINK_TYPES = {
   POSTGIS: 'POSTGIS',
 } as const
 
-export const DatasinkTypeEnum = enumFromConst(DATASINK_TYPES)
+export const DataSinkTypeEnum = enumFromConst(DATASINK_TYPES)
 
-export type DatasinkType = (typeof DATASINK_TYPES)[keyof typeof DATASINK_TYPES]
+export type DataSinkType = (typeof DATASINK_TYPES)[keyof typeof DATASINK_TYPES]
 
-export type Datasink = {
+export type DataSink = {
   id: string
   datasetId: string
   pipelineId: string
-  dataSinkType: DatasinkType
+  dataSinkType: DataSinkType
   configuration: {
     tableName: string
     dataStructureVersion: DatastructureVersionSummary
@@ -41,8 +41,8 @@ export type FrostDataSinkPayload = {
 
 export type DataSinkPayload = PostgisDataSinkPayload | FrostDataSinkPayload
 
-export type CreateDatasinkInput = { datasetId: string; data: DataSinkPayload }
+export type CreateDataSinkInput = { datasetId: string; data: DataSinkPayload }
 
-export type UpdateDatasinkInput = { datasetId: string; datasinkId: string; data: DataSinkPayload }
+export type UpdateDataSinkInput = { datasetId: string; dataSinkId: string; data: DataSinkPayload }
 
-export type DeleteDatasinkInput = { datasetId: string; datasinkId: string }
+export type DeleteDataSinkInput = { datasetId: string; dataSinkId: string }

@@ -116,7 +116,7 @@ export interface PipelinePayload {
   /** JSON-stringified PipelineStylesPayload — backend stores as opaque string */
   styles: PipelineStylesPayload
   dataSourceIds: string[] // IDs extracted from DataSource nodes
-  dataSinkIds: string[] // IDs of datasinks
+  dataSinkIds: string[] // IDs of data sinks
   model: object // Pipeline graph serialized in RedPandaConnect syntax
 }
 

@@ -7,7 +7,7 @@ import {
   useCreateDataSink,
   useDeleteDataSink,
   useUpdateDataSink,
-} from '@/app/services/api/datasets/datasinks/clientRequests'
+} from '@/app/services/api/datasets/dataSinks/clientRequests'
 import {
   useCreatePipeline,
   useDeletePipeline,
@@ -18,9 +18,9 @@ import {
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
 import { usePipelineSession } from '../../_hooks/use-pipeline-session'
 import {
-  buildDatasinkPayloads,
-  getRemovedDatasinkIds,
-  hasDatasinkChanged,
+  buildDataSinkPayloads,
+  getRemovedDataSinkIds,
+  hasDataSinkChanged,
   updateNodeEntityId,
 } from '../../_services/payloadBuilderService'
 import { createEmptyPipeline } from '../../_services/pipelineService'
@@ -55,7 +55,7 @@ vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
   useDeletePipeline: vi.fn(),
 }))
 
-vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
+vi.mock('@/app/services/api/datasets/dataSinks/clientRequests', () => ({
   useCreateDataSink: vi.fn(),
   useDeleteDataSink: vi.fn(),
   useUpdateDataSink: vi.fn(),
@@ -73,13 +73,13 @@ vi.mock('../../_services/payloadBuilderService', () => ({
     styles: { nodes: [], edges: [], nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
     dataSourceIds: [],
     apis: [],
-    datasinks: [],
+    dataSinks: [],
     model: {},
   }),
-  buildDatasinkPayloads: vi.fn().mockReturnValue([]),
-  createDatasinkSnapshot: vi.fn().mockReturnValue({}),
-  getRemovedDatasinkIds: vi.fn().mockReturnValue([]),
-  hasDatasinkChanged: vi.fn().mockReturnValue(false),
+  buildDataSinkPayloads: vi.fn().mockReturnValue([]),
+  createDataSinkSnapshot: vi.fn().mockReturnValue({}),
+  getRemovedDataSinkIds: vi.fn().mockReturnValue([]),
+  hasDataSinkChanged: vi.fn().mockReturnValue(false),
   updateNodeEntityId: vi.fn().mockImplementation((pipeline: unknown) => pipeline),
 }))
 
@@ -161,9 +161,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   contextRef.current = null
 
-  vi.mocked(buildDatasinkPayloads).mockReturnValue([])
-  vi.mocked(getRemovedDatasinkIds).mockReturnValue([])
-  vi.mocked(hasDatasinkChanged).mockReturnValue(false)
+  vi.mocked(buildDataSinkPayloads).mockReturnValue([])
+  vi.mocked(getRemovedDataSinkIds).mockReturnValue([])
+  vi.mocked(hasDataSinkChanged).mockReturnValue(false)
   vi.mocked(updateNodeEntityId).mockImplementation((pipeline: unknown) => pipeline as never)
 
   mockCreatePipelineMutateAsync = vi.fn().mockResolvedValue({ data: { id: 'created-id' } })
@@ -195,7 +195,7 @@ beforeEach(() => {
 
   vi.mocked(useCreateDataSink).mockReturnValue({
     mutate: vi.fn(),
-    mutateAsync: vi.fn().mockResolvedValue({ data: { id: 'datasink-id' } }),
+    mutateAsync: vi.fn().mockResolvedValue({ data: { id: 'dataSink-id' } }),
     isPending: false,
   } as unknown as ReturnType<typeof useCreateDataSink>)
 
@@ -774,15 +774,15 @@ describe('PipelineEditorProviderComponent', () => {
       expect(mockCreatePipelineMutateAsync).not.toHaveBeenCalled()
     })
 
-    it('calls createDatasink when a persistence node has no entityId', async () => {
-      const mockCreateDatasinkMutateAsync = vi.fn().mockResolvedValue({ data: { id: 'new-datasink-id' } })
+    it('calls createDataSink when a persistence node has no entityId', async () => {
+      const mockCreateDataSinkMutateAsync = vi.fn().mockResolvedValue({ data: { id: 'new-dataSink-id' } })
       vi.mocked(useCreateDataSink).mockReturnValue({
         mutate: vi.fn(),
-        mutateAsync: mockCreateDatasinkMutateAsync,
+        mutateAsync: mockCreateDataSinkMutateAsync,
         isPending: false,
       } as unknown as ReturnType<typeof useCreateDataSink>)
 
-      vi.mocked(buildDatasinkPayloads).mockReturnValue([
+      vi.mocked(buildDataSinkPayloads).mockReturnValue([
         { nodeId: 'persist-node-1', entityId: null, payload: { name: 'sink-1', type: 'postgres' } as never },
       ])
 
@@ -800,29 +800,29 @@ describe('PipelineEditorProviderComponent', () => {
         await contextRef.current?.saveAllPipelines()
       })
 
-      expect(mockCreateDatasinkMutateAsync).toHaveBeenCalledOnce()
-      expect(mockCreateDatasinkMutateAsync).toHaveBeenCalledWith({
+      expect(mockCreateDataSinkMutateAsync).toHaveBeenCalledOnce()
+      expect(mockCreateDataSinkMutateAsync).toHaveBeenCalledWith({
         datasetId: 'dataset-1',
         data: { name: 'sink-1', type: 'postgres' },
       })
     })
 
-    it('updates the node entityId after datasink creation', async () => {
-      const mockCreateDatasinkMutateAsync = vi.fn().mockResolvedValue({ data: { id: 'new-datasink-id' } })
+    it('updates the node entityId after dataSink creation', async () => {
+      const mockCreateDataSinkMutateAsync = vi.fn().mockResolvedValue({ data: { id: 'new-dataSink-id' } })
       vi.mocked(useCreateDataSink).mockReturnValue({
         mutate: vi.fn(),
-        mutateAsync: mockCreateDatasinkMutateAsync,
+        mutateAsync: mockCreateDataSinkMutateAsync,
         isPending: false,
       } as unknown as ReturnType<typeof useCreateDataSink>)
 
-      vi.mocked(buildDatasinkPayloads).mockReturnValue([
+      vi.mocked(buildDataSinkPayloads).mockReturnValue([
         { nodeId: 'persist-node-1', entityId: null, payload: { name: 'sink-1', type: 'postgres' } as never },
       ])
 
       const updatedPipeline = {
         ...createEmptyPipeline('Test'),
         id: 'pipeline-1',
-        nodes: [makeGeoPersistenceNode('persist-node-1', 'new-datasink-id')],
+        nodes: [makeGeoPersistenceNode('persist-node-1', 'new-dataSink-id')],
       }
       vi.mocked(updateNodeEntityId).mockReturnValue(updatedPipeline)
 
@@ -840,32 +840,32 @@ describe('PipelineEditorProviderComponent', () => {
         await contextRef.current?.saveAllPipelines()
       })
 
-      expect(updateNodeEntityId).toHaveBeenCalledWith(expect.anything(), 'persist-node-1', 'new-datasink-id')
+      expect(updateNodeEntityId).toHaveBeenCalledWith(expect.anything(), 'persist-node-1', 'new-dataSink-id')
     })
 
-    it('calls updateDatasink when a persistence node has changed', async () => {
-      const mockUpdateDatasinkMutateAsync = vi.fn().mockResolvedValue({})
+    it('calls updateDataSink when a persistence node has changed', async () => {
+      const mockUpdateDataSinkMutateAsync = vi.fn().mockResolvedValue({})
       vi.mocked(useUpdateDataSink).mockReturnValue({
         mutate: vi.fn(),
-        mutateAsync: mockUpdateDatasinkMutateAsync,
+        mutateAsync: mockUpdateDataSinkMutateAsync,
         isPending: false,
       } as unknown as ReturnType<typeof useUpdateDataSink>)
 
-      vi.mocked(buildDatasinkPayloads).mockReturnValue([
+      vi.mocked(buildDataSinkPayloads).mockReturnValue([
         {
           nodeId: 'persist-node-1',
-          entityId: 'existing-datasink-id',
+          entityId: 'existing-dataSink-id',
           payload: { name: 'sink-1', type: 'postgres' } as never,
         },
       ])
-      vi.mocked(hasDatasinkChanged).mockReturnValue(true)
+      vi.mocked(hasDataSinkChanged).mockReturnValue(true)
 
       const session = makeSession({
         isDirty: true,
         pipeline: {
           ...createEmptyPipeline('Test'),
           id: 'pipeline-1',
-          nodes: [makeGeoPersistenceNode('persist-node-1', 'existing-datasink-id')],
+          nodes: [makeGeoPersistenceNode('persist-node-1', 'existing-dataSink-id')],
         },
       })
       renderProvider(session)
@@ -874,37 +874,37 @@ describe('PipelineEditorProviderComponent', () => {
         await contextRef.current?.saveAllPipelines()
       })
 
-      expect(mockUpdateDatasinkMutateAsync).toHaveBeenCalledOnce()
-      expect(mockUpdateDatasinkMutateAsync).toHaveBeenCalledWith({
+      expect(mockUpdateDataSinkMutateAsync).toHaveBeenCalledOnce()
+      expect(mockUpdateDataSinkMutateAsync).toHaveBeenCalledWith({
         datasetId: 'dataset-1',
-        datasinkId: 'existing-datasink-id',
+        dataSinkId: 'existing-dataSink-id',
         data: { name: 'sink-1', type: 'postgres' },
       })
     })
 
-    it('does not call updateDatasink when datasink has not changed', async () => {
-      const mockUpdateDatasinkMutateAsync = vi.fn().mockResolvedValue({})
+    it('does not call updateDataSink when dataSink has not changed', async () => {
+      const mockUpdateDataSinkMutateAsync = vi.fn().mockResolvedValue({})
       vi.mocked(useUpdateDataSink).mockReturnValue({
         mutate: vi.fn(),
-        mutateAsync: mockUpdateDatasinkMutateAsync,
+        mutateAsync: mockUpdateDataSinkMutateAsync,
         isPending: false,
       } as unknown as ReturnType<typeof useUpdateDataSink>)
 
-      vi.mocked(buildDatasinkPayloads).mockReturnValue([
+      vi.mocked(buildDataSinkPayloads).mockReturnValue([
         {
           nodeId: 'persist-node-1',
-          entityId: 'existing-datasink-id',
+          entityId: 'existing-dataSink-id',
           payload: { name: 'sink-1', type: 'postgres' } as never,
         },
       ])
-      vi.mocked(hasDatasinkChanged).mockReturnValue(false)
+      vi.mocked(hasDataSinkChanged).mockReturnValue(false)
 
       const session = makeSession({
         isDirty: true,
         pipeline: {
           ...createEmptyPipeline('Test'),
           id: 'pipeline-1',
-          nodes: [makeGeoPersistenceNode('persist-node-1', 'existing-datasink-id')],
+          nodes: [makeGeoPersistenceNode('persist-node-1', 'existing-dataSink-id')],
         },
       })
       renderProvider(session)
@@ -913,18 +913,18 @@ describe('PipelineEditorProviderComponent', () => {
         await contextRef.current?.saveAllPipelines()
       })
 
-      expect(mockUpdateDatasinkMutateAsync).not.toHaveBeenCalled()
+      expect(mockUpdateDataSinkMutateAsync).not.toHaveBeenCalled()
     })
 
-    it('calls deleteDatasink for removed persistence nodes before saving', async () => {
-      const mockDeleteDatasinkMutateAsync = vi.fn().mockResolvedValue({})
+    it('calls deleteDataSink for removed persistence nodes before saving', async () => {
+      const mockDeleteDataSinkMutateAsync = vi.fn().mockResolvedValue({})
       vi.mocked(useDeleteDataSink).mockReturnValue({
         mutate: vi.fn(),
-        mutateAsync: mockDeleteDatasinkMutateAsync,
+        mutateAsync: mockDeleteDataSinkMutateAsync,
         isPending: false,
       } as unknown as ReturnType<typeof useDeleteDataSink>)
 
-      vi.mocked(getRemovedDatasinkIds).mockReturnValue(['removed-datasink-1', 'removed-datasink-2'])
+      vi.mocked(getRemovedDataSinkIds).mockReturnValue(['removed-dataSink-1', 'removed-dataSink-2'])
 
       const session = makeSession({
         isDirty: true,
@@ -936,37 +936,37 @@ describe('PipelineEditorProviderComponent', () => {
         await contextRef.current?.saveAllPipelines()
       })
 
-      expect(mockDeleteDatasinkMutateAsync).toHaveBeenCalledTimes(2)
-      expect(mockDeleteDatasinkMutateAsync).toHaveBeenCalledWith({
+      expect(mockDeleteDataSinkMutateAsync).toHaveBeenCalledTimes(2)
+      expect(mockDeleteDataSinkMutateAsync).toHaveBeenCalledWith({
         datasetId: 'dataset-1',
-        datasinkId: 'removed-datasink-1',
+        dataSinkId: 'removed-dataSink-1',
       })
-      expect(mockDeleteDatasinkMutateAsync).toHaveBeenCalledWith({
+      expect(mockDeleteDataSinkMutateAsync).toHaveBeenCalledWith({
         datasetId: 'dataset-1',
-        datasinkId: 'removed-datasink-2',
+        dataSinkId: 'removed-dataSink-2',
       })
     })
 
-    it('executes datasink deletes before datasink creates and pipeline save', async () => {
+    it('executes dataSink deletes before dataSink creates and pipeline save', async () => {
       const callOrder: string[] = []
 
-      const mockDeleteDatasinkAsync = vi.fn().mockImplementation(async () => {
-        callOrder.push('deleteDatasink')
+      const mockDeleteDataSinkAsync = vi.fn().mockImplementation(async () => {
+        callOrder.push('deleteDataSink')
         return {}
       })
       vi.mocked(useDeleteDataSink).mockReturnValue({
         mutate: vi.fn(),
-        mutateAsync: mockDeleteDatasinkAsync,
+        mutateAsync: mockDeleteDataSinkAsync,
         isPending: false,
       } as unknown as ReturnType<typeof useDeleteDataSink>)
 
-      const mockCreateDatasinkAsync = vi.fn().mockImplementation(async () => {
-        callOrder.push('createDatasink')
+      const mockCreateDataSinkAsync = vi.fn().mockImplementation(async () => {
+        callOrder.push('createDataSink')
         return { data: { id: 'new-sink-id' } }
       })
       vi.mocked(useCreateDataSink).mockReturnValue({
         mutate: vi.fn(),
-        mutateAsync: mockCreateDatasinkAsync,
+        mutateAsync: mockCreateDataSinkAsync,
         isPending: false,
       } as unknown as ReturnType<typeof useCreateDataSink>)
 
@@ -975,8 +975,8 @@ describe('PipelineEditorProviderComponent', () => {
         return {}
       })
 
-      vi.mocked(getRemovedDatasinkIds).mockReturnValue(['old-sink-1'])
-      vi.mocked(buildDatasinkPayloads).mockReturnValue([
+      vi.mocked(getRemovedDataSinkIds).mockReturnValue(['old-sink-1'])
+      vi.mocked(buildDataSinkPayloads).mockReturnValue([
         { nodeId: 'persist-new', entityId: null, payload: { name: 'new-sink' } as never },
       ])
 
@@ -994,7 +994,7 @@ describe('PipelineEditorProviderComponent', () => {
         await contextRef.current?.saveAllPipelines()
       })
 
-      expect(callOrder).toEqual(['deleteDatasink', 'createDatasink', 'updatePipeline'])
+      expect(callOrder).toEqual(['deleteDataSink', 'createDataSink', 'updatePipeline'])
     })
 
     it('shows a success toast with the pipeline name after save', async () => {
@@ -1011,15 +1011,15 @@ describe('PipelineEditorProviderComponent', () => {
       expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('saveSuccess'))
     })
 
-    it('does not save the pipeline when datasink creation fails', async () => {
-      const mockCreateDatasinkAsync = vi.fn().mockRejectedValue(new Error('Datasink creation failed'))
+    it('does not save the pipeline when dataSink creation fails', async () => {
+      const mockCreateDataSinkAsync = vi.fn().mockRejectedValue(new Error('DataSink creation failed'))
       vi.mocked(useCreateDataSink).mockReturnValue({
         mutate: vi.fn(),
-        mutateAsync: mockCreateDatasinkAsync,
+        mutateAsync: mockCreateDataSinkAsync,
         isPending: false,
       } as unknown as ReturnType<typeof useCreateDataSink>)
 
-      vi.mocked(buildDatasinkPayloads).mockReturnValue([
+      vi.mocked(buildDataSinkPayloads).mockReturnValue([
         { nodeId: 'persist-node', entityId: null, payload: { name: 'sink' } as never },
       ])
 
@@ -1038,20 +1038,20 @@ describe('PipelineEditorProviderComponent', () => {
         result = await contextRef.current?.saveAllPipelines()
       })
 
-      expect(mockCreateDatasinkAsync).toHaveBeenCalledOnce()
+      expect(mockCreateDataSinkAsync).toHaveBeenCalledOnce()
       expect(result).toBe(false)
       expect(mockUpdatePipelineMutateAsync).not.toHaveBeenCalled()
       expect(toast.error).toHaveBeenCalled()
     })
 
-    it('does not save the pipeline when datasink deletion fails', async () => {
+    it('does not save the pipeline when dataSink deletion fails', async () => {
       vi.mocked(useDeleteDataSink).mockReturnValue({
         mutate: vi.fn(),
-        mutateAsync: vi.fn().mockRejectedValue(new Error('Datasink deletion failed')),
+        mutateAsync: vi.fn().mockRejectedValue(new Error('DataSink deletion failed')),
         isPending: false,
       } as unknown as ReturnType<typeof useDeleteDataSink>)
 
-      vi.mocked(getRemovedDatasinkIds).mockReturnValue(['old-sink-1'])
+      vi.mocked(getRemovedDataSinkIds).mockReturnValue(['old-sink-1'])
 
       const session = makeSession({
         isDirty: true,
@@ -1069,17 +1069,17 @@ describe('PipelineEditorProviderComponent', () => {
       expect(toast.error).toHaveBeenCalled()
     })
 
-    it('does not save the pipeline when datasink update fails', async () => {
+    it('does not save the pipeline when dataSink update fails', async () => {
       vi.mocked(useUpdateDataSink).mockReturnValue({
         mutate: vi.fn(),
-        mutateAsync: vi.fn().mockRejectedValue(new Error('Datasink update failed')),
+        mutateAsync: vi.fn().mockRejectedValue(new Error('DataSink update failed')),
         isPending: false,
       } as unknown as ReturnType<typeof useUpdateDataSink>)
 
-      vi.mocked(buildDatasinkPayloads).mockReturnValue([
+      vi.mocked(buildDataSinkPayloads).mockReturnValue([
         { nodeId: 'persist-node', entityId: 'existing-sink', payload: { name: 'sink' } as never },
       ])
-      vi.mocked(hasDatasinkChanged).mockReturnValue(true)
+      vi.mocked(hasDataSinkChanged).mockReturnValue(true)
 
       const session = makeSession({
         isDirty: true,
@@ -1101,27 +1101,27 @@ describe('PipelineEditorProviderComponent', () => {
       expect(toast.error).toHaveBeenCalled()
     })
 
-    it('handles multiple datasink creates and updates in one save', async () => {
-      const mockCreateDatasinkAsync = vi.fn().mockResolvedValue({ data: { id: 'new-sink-id' } })
-      const mockUpdateDatasinkAsync = vi.fn().mockResolvedValue({})
+    it('handles multiple dataSink creates and updates in one save', async () => {
+      const mockCreateDataSinkAsync = vi.fn().mockResolvedValue({ data: { id: 'new-sink-id' } })
+      const mockUpdateDataSinkAsync = vi.fn().mockResolvedValue({})
 
       vi.mocked(useCreateDataSink).mockReturnValue({
         mutate: vi.fn(),
-        mutateAsync: mockCreateDatasinkAsync,
+        mutateAsync: mockCreateDataSinkAsync,
         isPending: false,
       } as unknown as ReturnType<typeof useCreateDataSink>)
 
       vi.mocked(useUpdateDataSink).mockReturnValue({
         mutate: vi.fn(),
-        mutateAsync: mockUpdateDatasinkAsync,
+        mutateAsync: mockUpdateDataSinkAsync,
         isPending: false,
       } as unknown as ReturnType<typeof useUpdateDataSink>)
 
-      vi.mocked(buildDatasinkPayloads).mockReturnValue([
+      vi.mocked(buildDataSinkPayloads).mockReturnValue([
         { nodeId: 'persist-new', entityId: null, payload: { name: 'new-sink' } as never },
         { nodeId: 'persist-existing', entityId: 'existing-sink-id', payload: { name: 'updated-sink' } as never },
       ])
-      vi.mocked(hasDatasinkChanged).mockReturnValue(true)
+      vi.mocked(hasDataSinkChanged).mockReturnValue(true)
 
       const session = makeSession({
         isDirty: true,
@@ -1140,27 +1140,27 @@ describe('PipelineEditorProviderComponent', () => {
         await contextRef.current?.saveAllPipelines()
       })
 
-      expect(mockCreateDatasinkAsync).toHaveBeenCalledOnce()
-      expect(mockCreateDatasinkAsync).toHaveBeenCalledWith({
+      expect(mockCreateDataSinkAsync).toHaveBeenCalledOnce()
+      expect(mockCreateDataSinkAsync).toHaveBeenCalledWith({
         datasetId: 'dataset-1',
         data: { name: 'new-sink' },
       })
-      expect(mockUpdateDatasinkAsync).toHaveBeenCalledOnce()
-      expect(mockUpdateDatasinkAsync).toHaveBeenCalledWith({
+      expect(mockUpdateDataSinkAsync).toHaveBeenCalledOnce()
+      expect(mockUpdateDataSinkAsync).toHaveBeenCalledWith({
         datasetId: 'dataset-1',
-        datasinkId: 'existing-sink-id',
+        dataSinkId: 'existing-sink-id',
         data: { name: 'updated-sink' },
       })
     })
 
-    it('saves pipeline with updated entityIds from datasink creation responses', async () => {
+    it('saves pipeline with updated entityIds from dataSink creation responses', async () => {
       vi.mocked(useCreateDataSink).mockReturnValue({
         mutate: vi.fn(),
         mutateAsync: vi.fn().mockResolvedValue({ data: { id: 'backend-sink-id' } }),
         isPending: false,
       } as unknown as ReturnType<typeof useCreateDataSink>)
 
-      vi.mocked(buildDatasinkPayloads).mockReturnValue([
+      vi.mocked(buildDataSinkPayloads).mockReturnValue([
         { nodeId: 'persist-node', entityId: null, payload: { name: 'sink' } as never },
       ])
 
@@ -1189,19 +1189,19 @@ describe('PipelineEditorProviderComponent', () => {
       expect(mockUpdatePipelineMutateAsync).toHaveBeenCalledOnce()
     })
 
-    it('continues saving other pipelines when one fails due to datasink error', async () => {
-      const mockCreateDatasinkAsync = vi
+    it('continues saving other pipelines when one fails due to dataSink error', async () => {
+      const mockCreateDataSinkAsync = vi
         .fn()
         .mockRejectedValueOnce(new Error('Sink creation failed'))
         .mockResolvedValueOnce({ data: { id: 'new-sink-id' } })
 
       vi.mocked(useCreateDataSink).mockReturnValue({
         mutate: vi.fn(),
-        mutateAsync: mockCreateDatasinkAsync,
+        mutateAsync: mockCreateDataSinkAsync,
         isPending: false,
       } as unknown as ReturnType<typeof useCreateDataSink>)
 
-      vi.mocked(buildDatasinkPayloads).mockReturnValue([
+      vi.mocked(buildDataSinkPayloads).mockReturnValue([
         { nodeId: 'persist-node', entityId: null, payload: { name: 'sink' } as never },
       ])
 
