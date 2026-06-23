@@ -71,6 +71,7 @@ public class DataSetSagaPublisher {
    * protected datasets.
    */
   public void publishCreateRequested(DataSet dataset) {
+    verifyLayerStyleReferences(dataset);
     var trigger =
         SagaTrigger.DatasetCreate.of(
             dataset.getId().toString(),
@@ -92,6 +93,7 @@ public class DataSetSagaPublisher {
    * and the APISIX auth-plugin attachment.
    */
   public void publishUpdateRequested(DataSet dataset, Set<Pipeline> previousPipelines) {
+    verifyLayerStyleReferences(dataset);
     var trigger =
         SagaTrigger.DatasetUpdate.of(
             dataset.getId().toString(),
@@ -213,6 +215,40 @@ public class DataSetSagaPublisher {
     return dataset.getStyles().stream()
         .map(s -> new StylePayload(s.getName(), s.getSldContent()))
         .toList();
+  }
+
+  /**
+   * Fails the publish if a layer references a style name that is not in the dataset's {@code
+   * styles} set. The saga contract requires every per-layer style reference (default and
+   * alternatives) to resolve against the dataset's top-level styles; the DB does not enforce this
+   * cross-table invariant, so this check is defense-in-depth. Failing here propagates as an {@link
+   * InvalidInputException} before the trigger is serialized or sent to Kafka.
+   */
+  private void verifyLayerStyleReferences(DataSet dataset) {
+    if (dataset.getLayers() == null || dataset.getLayers().isEmpty()) {
+      return;
+    }
+    Set<String> known =
+        dataset.getStyles() == null
+            ? Set.of()
+            : dataset.getStyles().stream().map(Style::getName).collect(Collectors.toSet());
+    for (Layer layer : dataset.getLayers()) {
+      if (layer.getDefaultStyle() != null) {
+        checkStyleRef(layer, layer.getDefaultStyle().getName(), known, "defaultStyle");
+      }
+      if (layer.getAlternativeStyles() != null) {
+        for (Style s : layer.getAlternativeStyles()) {
+          checkStyleRef(layer, s.getName(), known, "alternativeStyles");
+        }
+      }
+    }
+  }
+
+  private void checkStyleRef(Layer layer, String name, Set<String> known, String field) {
+    if (!known.contains(name)) {
+      throw new InvalidInputException(
+          "Layer", field, "Layer " + layer.getId() + " references unknown style: " + name);
+    }
   }
 
   /**

@@ -598,6 +598,58 @@ class DataSetSagaPublisherTest {
       assertThat(altList.get(1).asString()).isEqualTo("civitas_m");
       assertThat(altList.get(2).asString()).isEqualTo("civitas_z");
     }
+
+    @Test
+    @DisplayName("Layer referencing an unknown defaultStyle fails the publish")
+    void unknownDefaultStyleFailsPublish() {
+      Style known = style("civitas_known", "<sld/>");
+      Style stray = style("civitas_stray", "<sld/>"); // NOT in dataset.styles
+
+      DataSink sink = postgisSink(UUID.randomUUID(), "my_table");
+      UUID layerId = UUID.randomUUID();
+      Layer l = layer(layerId, "layer1", null, sink);
+      l.setDefaultStyle(stray);
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setStyles(Set.of(known));
+      dataSet.setLayers(Set.of(l));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining(layerId.toString())
+          .hasMessageContaining("civitas_stray");
+    }
+
+    @Test
+    @DisplayName("Layer referencing an unknown alternativeStyle fails the publish (UPDATE path)")
+    void unknownAlternativeStyleFailsUpdatePublish() {
+      Style def = style("civitas_default", "<sld/>");
+      Style stray = style("civitas_stray", "<sld/>"); // NOT in dataset.styles
+
+      DataSink sink = postgisSink(UUID.randomUUID(), "my_table");
+      UUID layerId = UUID.randomUUID();
+      Layer l = layer(layerId, "layer1", null, sink);
+      l.setDefaultStyle(def);
+      l.setAlternativeStyles(Set.of(stray));
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setProjectId("proj-1");
+      dataSet.setServiceId("svc-1");
+      dataSet.setPipelines(Set.of());
+      dataSet.setStyles(Set.of(def));
+      dataSet.setLayers(Set.of(l));
+
+      assertThatThrownBy(() -> publisher.publishUpdateRequested(dataSet, Set.of()))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining(layerId.toString())
+          .hasMessageContaining("civitas_stray");
+    }
   }
 
   @Nested
