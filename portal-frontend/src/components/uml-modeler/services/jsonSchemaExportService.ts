@@ -16,17 +16,12 @@
  * - Associations/aggregation/composition map to a `$ref` property (an array
  *   `$ref` for many multiplicities).
  *
- * Root selection (composition/aggregation hierarchy): the class that is not
- * contained by any other class via composition (filled diamond) or aggregation
- * is the root of the document; every other class is emitted under `$defs` and
- * linked via `$ref`. When ambiguous, the class matching the diagram name is
- * preferred, falling back to the first class node.
- *
- * Multiple disconnected roots: when the diagram contains more than one
- * unconnected component (i.e. multiple root classes), the export uses a
- * type-library layout — all classes are placed in `$defs` and the document
- * root carries only `$id`, `$schema`, and `title`. This avoids arbitrarily
- * promoting one class to the document root while silently orphaning the others.
+ * Root selection: the diagram is always exported as a single JSON Schema
+ * document (one root class plus `$defs`). The root is the class that is not
+ * contained by any other class via composition, aggregation, inheritance, or
+ * realization; every other class is emitted under `$defs` and linked via
+ * `$ref`. When ambiguous, the class matching the diagram name is preferred,
+ * falling back to the first class node.
  */
 
 import type { UMLDiagram } from '../types/diagram'
@@ -250,19 +245,18 @@ const buildClassSchema = (
 }
 
 /**
- * Returns all root elements of the diagram's class hierarchy.
- * A root is a non-enumeration class that is not the target of any composition,
- * aggregation, inheritance, or realization edge. When every non-enumeration
- * class is contained (a fully circular hierarchy), all non-enumeration classes
- * are treated as roots.
- *
- * Returning more than one root means the diagram has multiple disconnected
- * components and should be exported as a type-library schema.
+ * Selects the single root element of the diagram's class hierarchy.
+ * A root candidate is a non-enumeration class that is not the target of any
+ * composition, aggregation, inheritance, or realization edge. Among candidates
+ * the class whose name matches the diagram name is preferred, otherwise the
+ * first candidate is used. When no candidate exists (e.g. a fully circular
+ * hierarchy or an enumeration-only diagram), the first element is used.
  */
-const findRootElements = (diagram: UMLDiagram, elements: UMLElement[]): UMLElement[] => {
-  if (elements.length === 0) return []
+const selectRootElement = (diagram: UMLDiagram, elements: UMLElement[]): UMLElement | undefined => {
+  if (elements.length === 0) return undefined
 
-  // An element is "contained" if it is the target of a composition/aggregation.
+  // An element is "contained" if it is the target of a composition, aggregation,
+  // inheritance, or realization edge.
   const containedIds = new Set<string>()
   for (const edge of diagram.edges) {
     const rel = edge.data.relationship
@@ -278,9 +272,9 @@ const findRootElements = (diagram: UMLDiagram, elements: UMLElement[]): UMLEleme
 
   const candidates = elements.filter(element => element.type !== 'enumeration' && !containedIds.has(element.id))
   const pool = candidates.length > 0 ? candidates : elements.filter(e => e.type !== 'enumeration')
-  if (pool.length === 0) return elements.slice(0, 1)
+  if (pool.length === 0) return elements[0]
 
-  return pool
+  return pool.find(element => element.name === diagram.name) ?? pool[0]
 }
 
 /**
@@ -307,7 +301,7 @@ export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): Json
   const sanitizedName = sanitizeName(diagram.name) || 'untitled'
   const id = modelUri || `${BASE_MODEL_URI}/${sanitizedName}`
 
-  const rootElements = findRootElements(diagram, elements)
+  const rootElement = selectRootElement(diagram, elements)
 
   const schema: JsonSchemaObject = {
     $id: id,
@@ -316,31 +310,13 @@ export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): Json
     type: 'object',
   }
 
-  if (rootElements.length === 0) {
+  if (!rootElement) {
     schema.properties = {}
     return schema
   }
 
-  // Multiple disconnected roots: use a type-library layout. All classes go into
-  // $defs and the document root carries only the envelope fields ($id, $schema,
-  // title). This prevents arbitrarily promoting one class to the document root
-  // while silently orphaning the others as unreferenced $defs entries.
-  if (rootElements.length > 1) {
-    delete schema.type
-    const defs: JsonSchemaObject = {}
-    for (const element of elements) {
-      const defKey = classDefKeyById.get(element.id)
-      if (!defKey) continue
-      defs[defKey] = buildClassSchema(element, diagram, classDefKeyById)
-    }
-    schema.$defs = defs
-    return schema
-  }
-
-  // Single root: merge the root class schema into the document root.
-  // The root class keeps its own title rather than being overwritten by the
-  // diagram name.
-  const rootElement = rootElements[0]
+  // Merge the root class schema into the document root. The root class keeps its
+  // own title rather than being overwritten by the diagram name.
   const rootSchema = buildClassSchema(rootElement, diagram, classDefKeyById)
   Object.assign(schema, rootSchema)
   // buildClassSchema does not emit `type` for enumerations, so the
