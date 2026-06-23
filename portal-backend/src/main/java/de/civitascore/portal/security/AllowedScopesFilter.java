@@ -43,8 +43,8 @@ public class AllowedScopesFilter extends OncePerRequestFilter {
 
   /**
    * Extracts the {@value HEADER_NAME} and {@value HEADER_NAME_POOL} headers from the request and
-   * populates the request-scoped {@link AllowedScopes} bean with wildcard, specific scope IDs and/or
-   * datapool IDs.
+   * populates the request-scoped {@link AllowedScopes} bean with wildcard, specific scope IDs
+   * and/or datapool IDs.
    *
    * @param request the incoming HTTP request
    * @param response the HTTP response

@@ -1,0 +1,46 @@
+meta {
+  name: 10. Create DataSet in Pool A
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/datasets
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Scope Test Dataset {{scopeRunId}}",
+    "description": "Dataset in Pool A; SPECIFIC datasource (Pool B) must be rejected",
+    "openDataAccess": false,
+    "assignments": [],
+    "namedApis": [
+      { "name": "Scope Test API", "slug": "scopetest", "standard": "STA", "version": "1.1", "description": "Scope test named API." }
+    ],
+    "datapoolId": "{{scopePoolAId}}"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('scopeDataSetId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("scopeDataSetId is set", function() {
+    expect(bru.getVar('scopeDataSetId')).to.be.a('string');
+  });
+  test("Dataset belongs to Pool A", function() {
+    expect(res.body.datapool.id).to.equal(bru.getVar('scopePoolAId'));
+  });
+}
+
+docs {
+  **Precondition:** `scopePoolAId` set. **Post-condition:** saves `scopeDataSetId`.
+}

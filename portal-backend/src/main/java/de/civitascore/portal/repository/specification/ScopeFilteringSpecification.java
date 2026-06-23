@@ -53,8 +53,7 @@ public final class ScopeFilteringSpecification {
    * @param poolIds authorized datapool IDs whose datasets are visible (may be empty)
    * @return specification combining both access paths
    */
-  public static Specification<DataSet> dataSetByScopeOrPool(
-      Set<UUID> scopeIds, Set<UUID> poolIds) {
+  public static Specification<DataSet> dataSetByScopeOrPool(Set<UUID> scopeIds, Set<UUID> poolIds) {
     return (root, query, cb) -> {
       List<Predicate> orPredicates = new ArrayList<>();
       if (scopeIds != null && !scopeIds.isEmpty()) {

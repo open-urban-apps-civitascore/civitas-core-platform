@@ -112,7 +112,8 @@ public class DataSetController
    */
   @Override
   protected Specification<DataSet> scopeSpecification(AllowedScopes scopes) {
-    return ScopeFilteringSpecification.dataSetByScopeOrPool(scopes.getScopeIds(), scopes.getPoolIds());
+    return ScopeFilteringSpecification.dataSetByScopeOrPool(
+        scopes.getScopeIds(), scopes.getPoolIds());
   }
 
   /** {@inheritDoc} */

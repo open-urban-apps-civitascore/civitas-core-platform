@@ -1,0 +1,26 @@
+meta {
+  name: 18. Teardown - delete Pool B
+  type: http
+  seq: 19
+}
+
+delete {
+  url: {{baseUrl}}/datapools/{{scopePoolBId}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: in [200, 204, 400, 404, 409]
+}
+
+tests {
+  test("Pool B cleanup tolerated", function() {
+    expect([200, 204, 400, 404, 409]).to.include(res.getStatus());
+  });
+}
+
+docs {
+  Datapool delete returns 409 while datasets are still assigned — run after the dataset (12)
+  and datasource (14) are gone.
+}

@@ -28,11 +28,11 @@ import org.springframework.http.ResponseEntity;
  * filters the dataset collection: a user sees datasets directly scoped to them OR datasets in an
  * authorized datapool ({@code id IN (scopeIds) OR datapool_id IN (poolIds)}).
  *
- * <p>Exercises the full path against the real database:
- * AllowedScopesFilter → AllowedScopes bean → DataSetController.scopeSpecification() →
- * ScopeFilteringSpecification.dataSetByScopeOrPool() → SQL. In particular it confirms that accessing
- * {@code dataPool.id} resolves to the foreign-key column (no inner join), so datasets WITHOUT a pool
- * are not wrongly dropped from the scope-id branch of the OR.
+ * <p>Exercises the full path against the real database: AllowedScopesFilter → AllowedScopes bean →
+ * DataSetController.scopeSpecification() → ScopeFilteringSpecification.dataSetByScopeOrPool() →
+ * SQL. In particular it confirms that accessing {@code dataPool.id} resolves to the foreign-key
+ * column (no inner join), so datasets WITHOUT a pool are not wrongly dropped from the scope-id
+ * branch of the OR.
  */
 @DisplayName("Dataset Pool-Union Scope Filtering Integration Tests")
 class DataSetPoolScopeFilteringIntegrationTest
@@ -116,9 +116,7 @@ class DataSetPoolScopeFilteringIntegrationTest
 
       RestPage<DataSetOutputDTO> page = getDataSets("", pool1.toString());
 
-      assertThat(page.getContent())
-          .extracting(DataSetOutputDTO::getId)
-          .containsExactly(dsInPool1);
+      assertThat(page.getContent()).extracting(DataSetOutputDTO::getId).containsExactly(dsInPool1);
     }
 
     @Test
@@ -147,9 +145,7 @@ class DataSetPoolScopeFilteringIntegrationTest
 
       RestPage<DataSetOutputDTO> page = getDataSets(dsNoPool.toString(), pool1.toString());
 
-      assertThat(page.getContent())
-          .extracting(DataSetOutputDTO::getId)
-          .containsExactly(dsNoPool);
+      assertThat(page.getContent()).extracting(DataSetOutputDTO::getId).containsExactly(dsNoPool);
     }
 
     @Test
@@ -195,9 +191,73 @@ class DataSetPoolScopeFilteringIntegrationTest
           .extracting(DataSetOutputDTO::getId)
           .containsExactlyInAnyOrder(dsInPool1, dsNoPool);
     }
+
+    @Test
+    @DisplayName("Wildcard dominates an incidental pool header: unscoped+pool user sees all")
+    void wildcardDominatesIncidentalPoolHeader() {
+      // P1: a tenant-wide (unscoped) reader with an incidental pool grant gets
+      // X-Allowed-Scope-Ids:"*" AND X-Allowed-Pool-Ids; the wildcard must dominate so the
+      // user sees ALL datasets — not just the pool's, and not a 403 from a missing header.
+      UUID pool1 = createDataPool("Pool-1");
+      UUID dsInPool1 = createDataSetInPool("DS-in-1", pool1);
+      UUID dsNoPool = createDataSet("DS-no-pool");
+
+      RestPage<DataSetOutputDTO> page = getDataSets("*", pool1.toString());
+
+      assertThat(page.getContent())
+          .extracting(DataSetOutputDTO::getId)
+          .containsExactlyInAnyOrder(dsInPool1, dsNoPool);
+    }
+  }
+
+  @Nested
+  @DisplayName("Datapool Union Resource Endpoints (P2)")
+  class PoolUnionResourceEndpoints {
+
+    @Test
+    @DisplayName("Pool-inherited access to a dataset resource endpoint returns 200, not 404")
+    void poolInheritedResourceAccessAllowed() {
+      UUID pool1 = createDataPool("Pool-1");
+      UUID dsInPool1 = createDataSetInPool("DS-in-1", pool1);
+
+      // Pool-only header (no direct scope id): OPA now emits X-Allowed-Pool-Ids for resource
+      // endpoints reached via DATAPOOL inheritance, and the backend must honor it (P2 fix) —
+      // otherwise a legitimately-readable dataset 404s.
+      ResponseEntity<String> response = getNamedApis(dsInPool1, "", pool1.toString());
+
+      assertThat(response.getStatusCode().value()).isEqualTo(200);
+    }
+
+    @Test
+    @DisplayName("Resource access to a dataset outside the authorized pool is 404")
+    void resourceOutsidePoolReturns404() {
+      UUID pool1 = createDataPool("Pool-1");
+      UUID pool2 = createDataPool("Pool-2");
+      UUID dsInPool2 = createDataSetInPool("DS-in-2", pool2);
+
+      ResponseEntity<String> response = getNamedApis(dsInPool2, "", pool1.toString());
+
+      assertThat(response.getStatusCode().value()).isEqualTo(404);
+    }
   }
 
   // --- Helpers ---
+
+  private ResponseEntity<String> getNamedApis(
+      UUID id, String scopeHeaderValue, String poolHeaderValue) {
+    HttpHeaders headers = createAuthHeaders();
+    if (scopeHeaderValue != null) {
+      headers.set(SCOPE_HEADER, scopeHeaderValue);
+    }
+    if (poolHeaderValue != null) {
+      headers.set(POOL_HEADER, poolHeaderValue);
+    }
+    return restTemplate.exchange(
+        DATASETS_ENDPOINT + "/" + id + "/apis",
+        HttpMethod.GET,
+        new HttpEntity<>(headers),
+        String.class);
+  }
 
   private UUID createDataPool(String name) {
     return dataPoolRepository.save(DataPool.builder().name(name).build()).getId();
@@ -230,8 +290,7 @@ class DataSetPoolScopeFilteringIntegrationTest
     HttpEntity<Void> request = new HttpEntity<>(headers);
 
     ResponseEntity<RestPage<DataSetOutputDTO>> response =
-        restTemplate.exchange(
-            DATASETS_ENDPOINT, HttpMethod.GET, request, getPageTypeReference());
+        restTemplate.exchange(DATASETS_ENDPOINT, HttpMethod.GET, request, getPageTypeReference());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody()).isNotNull();

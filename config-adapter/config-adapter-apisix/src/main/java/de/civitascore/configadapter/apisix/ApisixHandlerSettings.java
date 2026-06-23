@@ -48,12 +48,17 @@ record ApisixHandlerSettings(
 
   /**
    * Internal trust headers stripped from every saga route regardless of configuration. {@code
-   * X-Allowed-Scope-Ids} is set by OPA ({@code send_headers_upstream}) and trusted downstream — a
+   * X-Allowed-Scope-Ids} and {@code X-Allowed-Pool-Ids} are set by OPA ({@code
+   * send_headers_upstream}) and trusted downstream for scope/datapool collection filtering — a
    * client-supplied value must never pass the gateway. The configured {@code
    * apisix.proxy.rewrite.headers.remove} list is merged ON TOP of this baseline; it cannot disable
-   * it (secure-by-default, MR !547 review finding 3).
+   * it (secure-by-default, MR !547 review finding 3). Because saga routes carry a route-level
+   * {@code proxy-rewrite} that overrides the plugin-config strip list (APISIX Route &gt;
+   * PluginConfig precedence), this baseline MUST mirror the headers OPA emits — keep it in sync
+   * with the gateway plugin-config strip list (dev-environment/apisix/apisix_conf/apisix.yaml).
    */
-  static final List<String> ALWAYS_STRIPPED_HEADERS = List.of("X-Allowed-Scope-Ids");
+  static final List<String> ALWAYS_STRIPPED_HEADERS =
+      List.of("X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids");
 
   private static final String PREFIX = "apisix.";
 

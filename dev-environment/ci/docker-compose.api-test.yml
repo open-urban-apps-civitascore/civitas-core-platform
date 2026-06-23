@@ -196,7 +196,7 @@ services:
         RUN find /staging/data/backends -name '*.json' \
             -exec sed -i 's/: *"[A-Z][A-Z_]*"/: null/g; s/: *\[.*\]/: null/g' {} +
         RUN mkdir -p /staging/data/config && \
-            printf '{"authz_repository_url":"http://authz-repository:8091/api/v1/user-context","authz_cache_duration_seconds":0}\n' \
+            printf '{"authz_repository_url":"http://authz-repository:8091/api/v1/user-context","dataset_pool_membership_url":"http://authz-repository:8091/api/v1/dataset-pool","authz_cache_duration_seconds":0}\n'\
             > /staging/data/config/config.json
         FROM openpolicyagent/opa:1.14.0-static
         COPY --from=prep /staging/policies /policies
@@ -390,7 +390,7 @@ services:
       APISIX_SERVICE_ID: svc-frost-server
       # Headers the saga's route-level proxy-rewrite must strip in lieu of plugin_config 1
       # (Route-over-PluginConfig precedence overrides plugin_config's proxy-rewrite).
-      APISIX_PROXY_REWRITE_HEADERS_REMOVE: X-Allowed-Scope-Ids
+      APISIX_PROXY_REWRITE_HEADERS_REMOVE: X-Allowed-Scope-Ids,X-Allowed-Pool-Ids
       # FROST upstream auth that APISIX forwards to private projects (mirrors FROST_* below).
       APISIX_FROST_API_KEY: dev-frost-api-key
       APISIX_FROST_API_KEY_HEADER: X-API-Key

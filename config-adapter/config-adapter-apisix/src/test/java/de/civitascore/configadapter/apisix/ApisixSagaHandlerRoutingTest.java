@@ -249,6 +249,7 @@ class ApisixSagaHandlerRoutingTest extends AbstractApisixIntegrationTest {
             .uri(URI.create(gatewayBaseUrl + "/v1/datasets/" + datasetId + "/" + SLUG + "/Things"))
             .header("Host", API_HOST)
             .header("X-Allowed-Scope-Ids", "malicious-bypass-attempt-*")
+            .header("X-Allowed-Pool-Ids", "malicious-pool-bypass-attempt")
             .GET()
             .timeout(Duration.ofSeconds(10))
             .build();
@@ -262,6 +263,13 @@ class ApisixSagaHandlerRoutingTest extends AbstractApisixIntegrationTest {
         headers.get("x-allowed-scope-ids"),
         "client-supplied X-Allowed-Scope-Ids must be stripped before reaching the upstream"
             + " regardless of openDataAccess — strip is a general saga-route protection — got"
+            + " headers: "
+            + headers);
+    assertEquals(
+        null,
+        headers.get("x-allowed-pool-ids"),
+        "client-supplied X-Allowed-Pool-Ids must also be stripped — the backend trusts it for"
+            + " datapool collection filtering, so a spoofed value would bypass pool scoping — got"
             + " headers: "
             + headers);
   }

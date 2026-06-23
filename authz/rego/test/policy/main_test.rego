@@ -543,7 +543,7 @@ test_scope_header_structure if {
 # Test: AND-permission with TENANT scope returns wildcard header
 # User has both TENANT and DATASET scoped assignments with both AND-permissions.
 # Permission check passes via DATASET scope (matching resource), but scope header
-# shows "*" because has_tenant_scope finds all required perms at TENANT scope.
+# shows "*" because has_wildcard_scope finds all required perms at TENANT scope.
 test_scope_header_and_tenant_wildcard if {
 	result := authz.decision with http.send as mock_send_tenant_and_perms
 		with data.config as mock_http.mock_config
@@ -798,14 +798,14 @@ test_unscoped_system_role_resource if {
 	result.reason == "permission_granted"
 }
 
-# Test: Unscoped SYSTEM role does not produce a scope header
-# SYSTEM roles operate on TENANT-scoped resources (users, groups, roles) which
-# don't use scope filtering, so no header is set.
-test_unscoped_system_role_no_scope_header if {
+# Test: Unscoped (SYSTEM / tenant-wide) role emits the WILDCARD scope header.
+# Unscoped == tenant-wide, so OPA must emit "X-Allowed-Scope-Ids: *" — NOT omit it:
+# the backend rejects a DataEntity request that arrives without the header with 403.
+test_unscoped_system_role_wildcard_scope_header if {
 	result := authz.decision with http.send as mock_send_unscoped_admin
 		with data.config as mock_http.mock_config
 		with input as portal_request("GET", "/v1/users")
-	not result.headers
+	result.headers["X-Allowed-Scope-Ids"] == "*"
 }
 
 # Test: Mixed groups — unscoped SYSTEM + scoped DATA — both work
@@ -818,12 +818,13 @@ test_mixed_unscoped_and_scoped_system_endpoint if {
 	result.reason == "permission_granted"
 }
 
-# Test: Mixed user accessing unscoped endpoint omits scope header
-test_mixed_unscoped_and_scoped_system_endpoint_no_header if {
+# Test: Mixed user (unscoped SYSTEM + scoped DATA) on a system endpoint emits "*"
+# (the unscoped SYSTEM grant carries USER_READ tenant-wide).
+test_mixed_unscoped_and_scoped_system_endpoint_wildcard if {
 	result := authz.decision with http.send as mock_send_unscoped_and_data
 		with data.config as mock_http.mock_config
 		with input as portal_request("GET", "/v1/users")
-	not result.headers
+	result.headers["X-Allowed-Scope-Ids"] == "*"
 }
 
 test_mixed_unscoped_and_scoped_data_endpoint if {
@@ -910,4 +911,43 @@ test_pool_header_excludes_pool_without_required_permission if {
 		with input as portal_request("GET", "/v1/datasets")
 	result.allow == true
 	result.headers["X-Allowed-Pool-Ids"] == "pool-1"
+}
+
+# P1 fix: an UNSCOPED (tenant-wide) grant dominates an incidental DATAPOOL grant.
+# The reader must see ALL datasets, so OPA emits the WILDCARD "X-Allowed-Scope-Ids: *"
+# — NOT an omitted header (the backend 403s without it) and NOT a pool-narrowing.
+mock_send_unscoped_and_pool(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
+	{"perms": ["DATASET_READ"], "scope_type": null, "scope_id": null},
+	{"perms": ["DATASET_READ"], "scope_type": "DATAPOOL", "scope_id": "pool-1"},
+])}
+
+test_unscoped_dominates_incidental_pool_grant if {
+	result := authz.decision with http.send as mock_send_unscoped_and_pool
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.headers["X-Allowed-Scope-Ids"] == "*"
+}
+
+# P2 fix: a dataset RESOURCE endpoint reached purely via DATAPOOL inheritance must
+# also carry X-Allowed-Pool-Ids, otherwise the backend's scope-OR-pool filter sees
+# no pool id and 404s a legitimately-readable dataset. Two http.send targets mocked
+# by URL (user-context fetch + dataset→pool membership lookup).
+mock_resource_union_in_pool(req) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_READ"], "DATAPOOL", "pool-1")} if {
+	contains(req.url, "user-context")
+}
+
+mock_resource_union_in_pool(req) := {"status_code": 200, "body": {"poolId": "pool-1"}} if {
+	contains(req.url, "dataset-pool")
+}
+
+test_resource_pool_inheritance_emits_pool_header if {
+	result := authz.decision with http.send as mock_resource_union_in_pool
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets/ds-99/apis")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.headers["X-Allowed-Pool-Ids"] == "pool-1"
+	result.headers["X-Allowed-Scope-Ids"] == ""
 }

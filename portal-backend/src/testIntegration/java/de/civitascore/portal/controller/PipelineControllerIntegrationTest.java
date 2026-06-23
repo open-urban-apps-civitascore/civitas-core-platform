@@ -6,6 +6,8 @@ import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
+import de.civitascore.portal.model.embedded.DatapoolScopeType;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
@@ -1171,6 +1173,157 @@ class PipelineControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
       assertThat(response.getBody()).contains("AVAILABLE status");
+    }
+  }
+
+  @Nested
+  @DisplayName("DataSource Scope Violation Tests (Epic 3 / Schicht C)")
+  class DataSourceScopeViolationTests {
+
+    /** Creates an AVAILABLE DataSource with the given datapool scope type and scoped pools. */
+    private DataSource availableScopedDataSource(DatapoolScopeType scopeType, DataPool... pools) {
+      return portalData.dataSource(
+          b ->
+              b.description("scope test datasource")
+                  .dataSourceStatus(DataSourceStatus.AVAILABLE)
+                  .datapoolScopeType(scopeType)
+                  .scopedDataPools(new HashSet<>(Set.of(pools))));
+    }
+
+    /** Points the endpoint at a fresh DRAFT dataset that belongs to the given pool. */
+    private void useDatasetInPool(DataPool pool) {
+      DataSet dataset =
+          portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT).dataPool(pool));
+      testDataSetId = dataset.getId();
+    }
+
+    private ResponseEntity<String> postPipelineWith(Set<UUID> dataSourceIds) {
+      PipelineInputDTO input = createValidInput();
+      input.setDataSourceIds(dataSourceIds);
+      return restTemplate.exchange(
+          getEndpointPath(),
+          HttpMethod.POST,
+          new HttpEntity<>(input, createAuthHeaders()),
+          String.class);
+    }
+
+    @Test
+    @DisplayName("Should reject NONE-scope DataSource (dataset without pool)")
+    void shouldRejectNoneScopeDataSource() {
+      // Endpoint lazily creates a pool-less dataset; NONE is rejected regardless of pool.
+      DataSource noneDs = availableScopedDataSource(DatapoolScopeType.NONE);
+
+      ResponseEntity<String> response = postPipelineWith(Set.of(noneDs.getId()));
+
+      assertThat(response.getStatusCode().value()).isEqualTo(422);
+      assertThat(response.getBody())
+          .contains("offendingDataSourceIds")
+          .contains(noneDs.getId().toString());
+    }
+
+    @Test
+    @DisplayName("Should reject SPECIFIC DataSource when DataSet's pool is not in scopedDataPools")
+    void shouldRejectSpecificDataSourcePoolMismatch() {
+      DataPool poolA = portalData.dataPool(b -> {});
+      DataPool poolB = portalData.dataPool(b -> {});
+      useDatasetInPool(poolA);
+      DataSource specificDs = availableScopedDataSource(DatapoolScopeType.SPECIFIC, poolB);
+
+      ResponseEntity<String> response = postPipelineWith(Set.of(specificDs.getId()));
+
+      assertThat(response.getStatusCode().value()).isEqualTo(422);
+      assertThat(response.getBody()).contains(specificDs.getId().toString());
+    }
+
+    @Test
+    @DisplayName("Should allow SPECIFIC DataSource when DataSet's pool matches scopedDataPools")
+    void shouldAllowSpecificDataSourceMatchingPool() {
+      DataPool poolA = portalData.dataPool(b -> {});
+      useDatasetInPool(poolA);
+      DataSource specificDs = availableScopedDataSource(DatapoolScopeType.SPECIFIC, poolA);
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSourceIds(Set.of(specificDs.getId()));
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      Pipeline saved = pipelineRepository.findById(response.getBody().getId()).orElseThrow();
+      assertThat(saved.getDataSources())
+          .extracting(DataSource::getId)
+          .containsExactly(specificDs.getId());
+    }
+
+    @Test
+    @DisplayName("Should allow ALL-scope DataSource regardless of DataSet's pool")
+    void shouldAllowAllScopeDataSource() {
+      DataPool poolA = portalData.dataPool(b -> {});
+      useDatasetInPool(poolA);
+      DataSource allDs = availableScopedDataSource(DatapoolScopeType.ALL);
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSourceIds(Set.of(allDs.getId()));
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    @DisplayName("Should allow SPECIFIC DataSource when DataSet has no pool")
+    void shouldAllowSpecificDataSourceWhenDatasetHasNoPool() {
+      // Endpoint lazily creates a pool-less dataset; SPECIFIC is unrestricted without a pool.
+      DataPool poolB = portalData.dataPool(b -> {});
+      DataSource specificDs = availableScopedDataSource(DatapoolScopeType.SPECIFIC, poolB);
+
+      PipelineInputDTO input = createValidInput();
+      input.setDataSourceIds(Set.of(specificDs.getId()));
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    @DisplayName("Should report all offending DataSources without fail-fast")
+    void shouldReportAllOffendingDataSources() {
+      DataPool poolA = portalData.dataPool(b -> {});
+      DataPool poolB = portalData.dataPool(b -> {});
+      useDatasetInPool(poolA);
+      DataSource noneDs = availableScopedDataSource(DatapoolScopeType.NONE);
+      DataSource specificMismatch = availableScopedDataSource(DatapoolScopeType.SPECIFIC, poolB);
+
+      ResponseEntity<String> response =
+          postPipelineWith(Set.of(noneDs.getId(), specificMismatch.getId()));
+
+      assertThat(response.getStatusCode().value()).isEqualTo(422);
+      assertThat(response.getBody())
+          .contains(noneDs.getId().toString())
+          .contains(specificMismatch.getId().toString());
+    }
+
+    @Test
+    @DisplayName("Should reject PUT that adds an offending DataSource to an existing pipeline")
+    void shouldRejectUpdateIntroducingOffendingDataSource() {
+      // Pool-less dataset; create a valid pipeline with an ALL-scope datasource.
+      DataSource allDs = availableScopedDataSource(DatapoolScopeType.ALL);
+      PipelineInputDTO createInput = createValidInput();
+      createInput.setDataSourceIds(Set.of(allDs.getId()));
+      ResponseEntity<PipelineOutputDTO> createResponse = performCreate(createInput);
+      assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      UUID pipelineId = createResponse.getBody().getId();
+
+      // PUT adding a NONE-scope datasource must be rejected.
+      DataSource noneDs = availableScopedDataSource(DatapoolScopeType.NONE);
+      PipelineInputDTO updateInput = createUpdateInput();
+      updateInput.setDataSourceIds(Set.of(allDs.getId(), noneDs.getId()));
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpointPath() + "/" + pipelineId,
+              HttpMethod.PUT,
+              new HttpEntity<>(updateInput, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode().value()).isEqualTo(422);
+      assertThat(response.getBody()).contains(noneDs.getId().toString());
     }
   }
 

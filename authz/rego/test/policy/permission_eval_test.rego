@@ -315,6 +315,30 @@ test_tenant_allows_datapool_collection_create if {
 	result == true
 }
 
+# A DATAPOOL/TENANT user with DATAPOOL_UPDATE
+mock_send_datapool_update(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATAPOOL_UPDATE"], "DATAPOOL", "pool-1")}
+mock_send_tenant_datapool_update(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATAPOOL_UPDATE"], "TENANT", "tenant-1")}
+
+# Scenario 2 regression: a DATAPOOL-scoped user can UPDATE their pool (PATCH /datapools/{id}).
+# In develop the "datapools" resource_scope_type mapping was MISSING → expected_scope_type was
+# undefined → the resource scope rules (incl. the TENANT/unscoped cascade, which require
+# expected_scope_type != "TENANT") never fired → has_permission=false → OPA 403. With the
+# mapping ("datapools":"DATAPOOL") the DATAPOOL-scope match grants the update.
+test_datapool_scoped_allows_update_matching_pool if {
+	result := permission_eval.has_permission with http.send as mock_send_datapool_update
+		with data.config as mock_http.mock_config
+		with input as portal_request("PATCH", "/v1/datapools/pool-1")
+	result == true
+}
+
+# Scenario 2 regression: TENANT cascade also grants the datapool UPDATE (was 403 in develop).
+test_tenant_cascades_to_datapool_update if {
+	result := permission_eval.has_permission with http.send as mock_send_tenant_datapool_update
+		with data.config as mock_http.mock_config
+		with input as portal_request("PATCH", "/v1/datapools/pool-1")
+	result == true
+}
+
 # =============================================================================
 # DATAPOOL → DATASET UNION INHERITANCE TESTS (Epic 1)
 # =============================================================================

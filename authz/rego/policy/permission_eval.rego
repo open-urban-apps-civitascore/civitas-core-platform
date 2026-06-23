@@ -292,14 +292,17 @@ user_has_permission(permission) if {
 	datapool_has_permission(permission, pool_id)
 }
 
-# DATAPOOL scope IDs that carry ALL required permissions for the dataset
-# collection (Epic 1 union). Single source of truth shared with main.rego's
-# X-Allowed-Pool-Ids header, so the allow-decision and the collection filter can
-# never diverge (e.g. a perm split across two pools must not grant unfiltered
-# access).
+# DATAPOOL scope IDs that carry ALL required permissions for a dataset endpoint
+# (Epic 1 union). Single source of truth shared with main.rego's X-Allowed-Pool-Ids
+# header, so the allow-decision and the backend filter can never diverge (e.g. a
+# perm split across two pools must not grant unfiltered access).
+#
+# Computed for BOTH collection AND resource dataset endpoints: a resource request
+# (e.g. GET /datasets/{id}/apis) granted purely via DATAPOOL inheritance must also
+# carry the pool header, otherwise the backend's scope-OR-pool filter sees no pool
+# id and 404s a dataset the user is legitimately allowed to read.
 qualifying_datapool_ids contains pool_id if {
 	count(required_permissions) > 0
-	resource_mapping.is_collection_endpoint
 	resource_mapping.expected_scope_type == "DATASET"
 	some group in user_context_fetcher.user_context.groups
 	some assignment in group.assignments
