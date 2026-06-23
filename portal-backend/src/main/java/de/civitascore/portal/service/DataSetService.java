@@ -14,6 +14,7 @@ import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -27,6 +28,8 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.encoder.Encode;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,17 +58,40 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   private final DataSetSagaPublisher sagaPublisher;
 
+  private final ObjectProvider<AllowedScopes> allowedScopesProvider;
+
   public DataSetService(
       DataSetRepository dataSetRepository,
       DataSetMapper dataSetMapper,
       DataPoolRepository dataPoolRepository,
       AssignmentFactory assignmentFactory,
-      DataSetSagaPublisher sagaPublisher) {
+      DataSetSagaPublisher sagaPublisher,
+      ObjectProvider<AllowedScopes> allowedScopesProvider) {
     this.dataSetRepository = dataSetRepository;
     this.dataSetMapper = dataSetMapper;
     this.dataPoolRepository = dataPoolRepository;
     this.assignmentFactory = assignmentFactory;
     this.sagaPublisher = sagaPublisher;
+    this.allowedScopesProvider = allowedScopesProvider;
+  }
+
+  /**
+   * Authorizes placing a dataset into the given target datapool (F4). OPA grants the dataset write
+   * but cannot authorize the TARGET pool — it never sees the request body — so the backend enforces
+   * it here using the per-request {@link AllowedScopes}: a TENANT (wildcard) caller may use any
+   * pool, otherwise the target pool must be among the caller's authorized pools
+   * (X-Allowed-Pool-Ids).
+   *
+   * @param datapoolId the target datapool the dataset is being placed into (non-null)
+   * @throws AccessDeniedException if the caller is not authorized for the target pool
+   */
+  private void authorizeTargetPool(UUID datapoolId) {
+    AllowedScopes scopes = allowedScopesProvider.getObject();
+    if (scopes.isWildcard() || scopes.getPoolIds().contains(datapoolId)) {
+      return;
+    }
+    throw new AccessDeniedException(
+        "Not authorized to place a dataset into datapool " + datapoolId);
   }
 
   @Override
@@ -127,6 +153,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           dataPoolRepository
               .findById(input.getDatapoolId())
               .orElseThrow(() -> new ResourceNotFoundException("DataPool", input.getDatapoolId()));
+      authorizeTargetPool(input.getDatapoolId());
       entity.setDataPool(dataPool);
     } else {
       entity.setDataPool(null);

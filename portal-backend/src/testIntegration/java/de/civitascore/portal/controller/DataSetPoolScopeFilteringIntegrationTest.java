@@ -241,7 +241,60 @@ class DataSetPoolScopeFilteringIntegrationTest
     }
   }
 
+  @Nested
+  @DisplayName("Target-Pool Authorization on Writes (F4)")
+  class TargetPoolAuthorization {
+
+    @Test
+    @DisplayName("Create in an authorized pool succeeds")
+    void createInAuthorizedPool() {
+      UUID pool1 = createDataPool("Pool-1");
+
+      ResponseEntity<String> response =
+          createDatasetWithHeaders("ds-auth", pool1, "", pool1.toString());
+
+      assertThat(response.getStatusCode().value()).isEqualTo(201);
+    }
+
+    @Test
+    @DisplayName("Create in a pool the caller is NOT authorized for is rejected with 403")
+    void createInUnauthorizedPoolForbidden() {
+      UUID pool1 = createDataPool("Pool-1");
+      UUID pool2 = createDataPool("Pool-2");
+
+      // Caller is authorized for Pool-1 only (X-Allowed-Pool-Ids), but targets Pool-2.
+      ResponseEntity<String> response =
+          createDatasetWithHeaders("ds-unauth", pool2, "", pool1.toString());
+
+      assertThat(response.getStatusCode().value()).isEqualTo(403);
+    }
+
+    @Test
+    @DisplayName("A pool-less create needs no target-pool authorization")
+    void poolLessCreateNeedsNoPoolAuthorization() {
+      ResponseEntity<String> response = createDatasetWithHeaders("ds-poolless", null, "", null);
+
+      assertThat(response.getStatusCode().value()).isEqualTo(201);
+    }
+  }
+
   // --- Helpers ---
+
+  private ResponseEntity<String> createDatasetWithHeaders(
+      String name, UUID datapoolId, String scopeHeaderValue, String poolHeaderValue) {
+    DataSetInputDTO input = new DataSetInputDTO();
+    input.setName(name);
+    input.setDescription("F4 target-pool test");
+    input.setOpenDataAccess(false);
+    input.setDatapoolId(datapoolId);
+    HttpHeaders headers = createAuthHeaders();
+    headers.set(SCOPE_HEADER, scopeHeaderValue); // override the default "*"
+    if (poolHeaderValue != null) {
+      headers.set(POOL_HEADER, poolHeaderValue);
+    }
+    return restTemplate.exchange(
+        DATASETS_ENDPOINT, HttpMethod.POST, new HttpEntity<>(input, headers), String.class);
+  }
 
   private ResponseEntity<String> getNamedApis(
       UUID id, String scopeHeaderValue, String poolHeaderValue) {

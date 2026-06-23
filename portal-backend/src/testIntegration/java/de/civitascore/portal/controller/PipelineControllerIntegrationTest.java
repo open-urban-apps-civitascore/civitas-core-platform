@@ -1268,17 +1268,17 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should allow SPECIFIC DataSource when DataSet has no pool")
-    void shouldAllowSpecificDataSourceWhenDatasetHasNoPool() {
-      // Endpoint lazily creates a pool-less dataset; SPECIFIC is unrestricted without a pool.
+    @DisplayName("Should reject SPECIFIC DataSource when DataSet has no pool")
+    void shouldRejectSpecificDataSourceWhenDatasetHasNoPool() {
+      // Endpoint lazily creates a pool-less dataset; a SPECIFIC datasource is confined to its pools
+      // and must NOT be usable in a pool-less dataset (would defeat the confinement, F3).
       DataPool poolB = portalData.dataPool(b -> {});
       DataSource specificDs = availableScopedDataSource(DatapoolScopeType.SPECIFIC, poolB);
 
-      PipelineInputDTO input = createValidInput();
-      input.setDataSourceIds(Set.of(specificDs.getId()));
-      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
+      ResponseEntity<String> response = postPipelineWith(Set.of(specificDs.getId()));
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getStatusCode().value()).isEqualTo(422);
+      assertThat(response.getBody()).contains(specificDs.getId().toString());
     }
 
     @Test

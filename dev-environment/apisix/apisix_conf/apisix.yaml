@@ -60,7 +60,9 @@ plugin_configs:
         bearer_only: true
         use_jwks: true
         # DEV-ONLY: ssl_verify disabled for local HTTP Keycloak.
-        # PRODUCTION MUST use ssl_verify: true (see TEAM3-AUTHZ-DEPLOYMENT.md).
+        # PRODUCTION MUST use ssl_verify: true — see the "Gateway Trust Model"
+        # section in portal-backend/DEPLOYMENT.md (prod ssl_verify + F1 header
+        # forward/strip + F2 backend NetworkPolicy isolation).
         ssl_verify: false
         # Pass decoded JWT claims to OPA via X-Userinfo header
         set_userinfo_header: true

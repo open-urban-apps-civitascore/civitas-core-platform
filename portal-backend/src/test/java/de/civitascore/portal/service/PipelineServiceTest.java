@@ -436,24 +436,25 @@ class PipelineServiceTest {
     }
 
     @Test
-    @DisplayName("Should allow DataSource with scope SPECIFIC when DataSet has no DataPool")
-    void shouldAllowDataSourceWithScopeSpecificWhenDataSetHasNoDataPool() {
+    @DisplayName("Should reject DataSource with scope SPECIFIC when DataSet has no DataPool")
+    void shouldRejectDataSourceWithScopeSpecificWhenDataSetHasNoDataPool() {
+      // A pool-less dataset is in no datapool, so a SPECIFIC (pool-confined) datasource must be
+      // rejected here — otherwise its confined data could be routed into a pool-less dataset.
       UUID dataSetId = UUID.randomUUID();
       UUID dsId = UUID.randomUUID();
       DataSet dataSet = dataSetWithoutDataPool(dataSetId);
       DataSource specificDs = availableDataSource(dsId, DatapoolScopeType.SPECIFIC);
-      Pipeline pipeline = pipelineEntity(dataSet);
 
-      when(pipelineMapper.toEntity(any())).thenReturn(pipeline);
+      when(pipelineMapper.toEntity(any())).thenReturn(pipelineEntity(dataSet));
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
       when(dataSourceRepository.findAllById(Set.of(dsId))).thenReturn(List.of(specificDs));
-      when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
-      when(pipelineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-      when(dataSinkRepository.findByPipelineId(any())).thenReturn(List.of());
 
-      Pipeline result = pipelineService.create(createInput(dataSetId, dsId));
-
-      assertThat(result.getDataSources()).hasSize(1);
+      assertThatThrownBy(() -> pipelineService.create(createInput(dataSetId, dsId)))
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(dsId));
     }
 
     @Test
