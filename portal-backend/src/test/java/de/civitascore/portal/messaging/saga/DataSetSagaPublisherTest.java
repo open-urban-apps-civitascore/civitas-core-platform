@@ -380,9 +380,9 @@ class DataSetSagaPublisherTest {
       var payload = new JsonMapper().readTree(jsonCaptor.getValue());
       var entry = payload.get("layers").get(0);
       assertThat(entry.get("layerName").asString()).isEqualTo("frost-layer");
-      assertThat(entry.get("nativeName").isNull())
-          .as("non-POSTGIS sink → null nativeName for adapter fallback")
-          .isTrue();
+      assertThat(entry.has("nativeName"))
+          .as("non-POSTGIS sink → nativeName omitted via @JsonInclude(NON_NULL)")
+          .isFalse();
     }
 
     @Test
@@ -527,8 +527,12 @@ class DataSetSagaPublisherTest {
           .as("empty styles should be omitted from the JSON via @JsonInclude(NON_NULL)")
           .isFalse();
       var entry = payload.get("layers").get(0);
-      assertThat(entry.get("defaultStyle").isNull()).isTrue();
-      assertThat(entry.get("alternativeStyles").isNull()).isTrue();
+      assertThat(entry.has("defaultStyle"))
+          .as("no defaultStyle → field omitted via @JsonInclude(NON_NULL)")
+          .isFalse();
+      assertThat(entry.has("alternativeStyles"))
+          .as("no alternativeStyles → field omitted via @JsonInclude(NON_NULL)")
+          .isFalse();
     }
 
     @Test

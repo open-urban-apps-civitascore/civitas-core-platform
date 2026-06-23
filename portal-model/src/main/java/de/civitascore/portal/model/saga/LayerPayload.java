@@ -1,5 +1,6 @@
 package de.civitascore.portal.model.saga;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 
 /**
@@ -8,6 +9,12 @@ import java.util.List;
  *
  * <p>This type lives in portal-model so it can be shared by both the portal-backend (which produces
  * the trigger) and the config-adapter (which consumes it).
+ *
+ * <p>{@code @JsonInclude(NON_NULL)} is required on this nested record: the same annotation on the
+ * outer {@link de.civitascore.portal.messaging.saga.SagaTrigger SagaTrigger} records only filters
+ * the top-level fields, so null components here would otherwise serialize as literal {@code null}.
+ * The config-adapter rejects a literal {@code null} on {@code alternativeStyles} (it must be either
+ * absent or a list), so this annotation is load-bearing.
  *
  * <ul>
  *   <li>{@code id} — the layer's portal-backend UUID, used for diagnostic correlation.
@@ -24,6 +31,7 @@ import java.util.List;
  *       layer in addition to the default. {@code null} when none are set.
  * </ul>
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record LayerPayload(
     String id,
     String layerName,
