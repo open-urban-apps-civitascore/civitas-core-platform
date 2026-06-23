@@ -7,7 +7,7 @@ import {
   useCreateDataSink,
   useDeleteDataSink,
   useUpdateDataSink,
-} from '@/app/services/api/datasets/dataSinks/clientRequests'
+} from '@/app/services/api/datasets/datasinks/clientRequests'
 import {
   useCreatePipeline,
   useDeletePipeline,
