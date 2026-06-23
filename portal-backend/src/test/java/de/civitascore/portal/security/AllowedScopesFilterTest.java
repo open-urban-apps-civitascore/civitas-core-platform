@@ -169,6 +169,7 @@ class AllowedScopesFilterTest {
     setupScopesProvider();
     UUID p1 = UUID.randomUUID();
     UUID p2 = UUID.randomUUID();
+    when(request.getHeader(AllowedScopesFilter.HEADER_NAME)).thenReturn(null);
     when(request.getHeader(AllowedScopesFilter.HEADER_NAME_POOL)).thenReturn(p1 + "," + p2);
 
     filter.doFilterInternal(request, response, filterChain);
@@ -183,6 +184,7 @@ class AllowedScopesFilterTest {
   void shouldHandlePoolOnlyAccess() throws Exception {
     setupScopesProvider();
     UUID p1 = UUID.randomUUID();
+    when(request.getHeader(AllowedScopesFilter.HEADER_NAME)).thenReturn(null);
     when(request.getHeader(AllowedScopesFilter.HEADER_NAME_POOL)).thenReturn(p1.toString());
 
     filter.doFilterInternal(request, response, filterChain);
