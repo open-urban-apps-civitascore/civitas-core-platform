@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 
+import { ContentCard } from '@/components/content-card/ContentCard'
 import { Form } from '@/components/ui/form'
 import { Dataset } from '@/types/datasets'
 import { API_TYPE_QUERY, DEFAULTS_BY_TYPE, NamedApi, StaApiFormData, StaApiFormSchema } from '@/types/namedApis'
@@ -100,15 +101,17 @@ export const StaApiConfigPage = ({ dataset, existingApi, testId }: StaApiConfigP
       onSubmit={handleSubmit}
     >
       <Form {...form}>
-        <BaseInfoForm
-          form={form}
-          apiType={apiType}
-          isReadOnly={isReadOnly}
-          datasetId={dataset.id}
-          typeLabel={typeLabel}
-          urlPreviewSlug={urlPreviewSlug}
-          onSlugBlur={handleSlugBlur}
-        />
+        <ContentCard>
+          <BaseInfoForm
+            form={form}
+            apiType={apiType}
+            isReadOnly={isReadOnly}
+            datasetId={dataset.id}
+            typeLabel={typeLabel}
+            urlPreviewSlug={urlPreviewSlug}
+            onSlugBlur={handleSlugBlur}
+          />
+        </ContentCard>
       </Form>
     </ApiConfigWrapper>
   )

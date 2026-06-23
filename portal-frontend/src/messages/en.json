@@ -329,6 +329,7 @@
             },
             "styles": {
               "title": "Styles",
+              "subtitle": "Styles are created here and then assigned to layers",
               "addStyle": "Add Style",
               "newStyle": "New Style {index}",
               "untitledStyle": "Untitled Style {index}",
@@ -408,6 +409,7 @@
               },
               "style": {
                 "sectionTitle": "Layer-Style",
+                "sectionSubtitle": "Styles are created in the \"Styles\" tab and assigned to layers here",
                 "standardStyle": "Standard Style",
                 "default": "Standard (Geoserver default)",
                 "alternativeStyles": "Alternative Styles",
@@ -1265,7 +1267,7 @@
       "validationFailed": "Validation failed for: {names}",
       "duplicateNames": "Duplicate pipeline names: {names}",
       "saveFailed": "Failed to save: {names}",
-      "saveSucces": "Pipelines saved successfully",
+      "saveSuccess": "Pipeline \"{name}\" saved successfully",
       "datasourceScopeViolation": "Cannot save \"{name}\": one or more datasources are not permitted for this datapool."
     },
     "tabs": {

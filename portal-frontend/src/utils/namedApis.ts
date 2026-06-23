@@ -2,7 +2,7 @@ import proj4 from 'proj4'
 
 import { UMLClass } from '@/components/uml-modeler/types/uml'
 import { crsOptions } from '@/const/crs'
-import { Datasink } from '@/types/datasinks'
+import { DataSink } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
 import {
   ApiStandard,
@@ -100,13 +100,13 @@ export const buildOwsPayload = (data: OwsApiFormData): NamedApiPayload => ({
   description: data.baseInfo.description || undefined,
 })
 
-export const getNativeCRSFromDatasink = (
-  datasinkId: string,
-  postgisDatasinks: Datasink[],
+export const getNativeCRSFromDataSink = (
+  dataSinkId: string,
+  postgisDataSinks: DataSink[],
   postgisDatastructures: DatastructureVersion[],
 ): string => {
-  const datasink = postgisDatasinks.find(d => d.id === datasinkId)
-  const datastructure = postgisDatastructures.find(d => d.id === datasink?.configuration.dataStructureVersion.id)
+  const dataSink = postgisDataSinks.find(d => d.id === dataSinkId)
+  const datastructure = postgisDatastructures.find(d => d.id === dataSink?.configuration.dataStructureVersion.id)
   const umlClass = datastructure?.styles?.nodes?.[0]?.data?.element as UMLClass | undefined
   return umlClass?.attributes?.find(a => a.meta?.gisInfo?.crs)?.meta?.gisInfo?.crs ?? ''
 }
