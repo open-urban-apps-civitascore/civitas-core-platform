@@ -1819,7 +1819,7 @@ class ApisixSagaHandlerTest {
                 + " (MR !547 finding 3 — secure-by-default)");
         assertFalse(
             headers.containsKey("set"), "public routes must NOT carry FROST upstream credentials");
-        assertEquals(List.of("X-Allowed-Scope-Ids"), headers.get("remove"));
+        assertEquals(List.of("X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids"), headers.get("remove"));
       }
     }
 
@@ -1837,7 +1837,7 @@ class ApisixSagaHandlerTest {
         Map<String, Object> headers = (Map<String, Object>) proxyRewrite.get("headers");
         Object remove = headers.get("remove");
         assertEquals(
-            List.of("X-Allowed-Scope-Ids", "X-Some-Other"),
+            List.of("X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids", "X-Some-Other"),
             remove instanceof String[] arr ? Arrays.asList(arr) : remove,
             "route-level proxy-rewrite must strip the configured headers (Finding P1 — plugin"
                 + " config's proxy-rewrite is overridden by route precedence)");
@@ -1861,7 +1861,7 @@ class ApisixSagaHandlerTest {
                 + " strip is a general saga-route protection, not auth-specific)");
         Object remove = headers.get("remove");
         assertEquals(
-            List.of("X-Allowed-Scope-Ids"),
+            List.of("X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids"),
             remove instanceof String[] arr ? Arrays.asList(arr) : remove);
         assertFalse(
             headers.containsKey("set"),
@@ -1982,7 +1982,7 @@ class ApisixSagaHandlerTest {
         assertFalse(
             headers.containsKey("set"), "the FROST credential must be removed on the public flip");
         assertEquals(
-            List.of("X-Allowed-Scope-Ids"),
+            List.of("X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids"),
             headers.get("remove"),
             "the hard-coded trust-header strip stays in place on public routes");
       }

@@ -1,0 +1,70 @@
+meta {
+  name: 11. Pipeline write must be rejected (422)
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{scopeDataSetId}}
+}
+
+body:json {
+  {
+    "name": "Scope Violation Pipeline {{scopeRunId}}",
+    "description": "Links a Pool-B-scoped datasource into a Pool-A dataset",
+    "dataSourceIds": ["{{scopeDataSourceId}}"],
+    "model": {
+      "viewport": { "x": 0, "y": 0, "zoom": 1 },
+      "nodes": [
+        {
+          "id": "33333333-3333-4000-8000-000000000001",
+          "type": "start",
+          "position": { "x": 0, "y": 0 },
+          "data": { "nodeType": "start", "label": "Start", "configured": true },
+          "measured": { "width": 32, "height": 32 }
+        },
+        {
+          "id": "33333333-3333-4000-8000-000000000002",
+          "type": "end",
+          "position": { "x": 200, "y": 0 },
+          "data": { "nodeType": "end", "label": "End", "configured": true },
+          "measured": { "width": 32, "height": 32 }
+        }
+      ],
+      "edges": [
+        { "id": "33333333-3333-4000-8000-0000000000e1", "source": "33333333-3333-4000-8000-000000000001", "target": "33333333-3333-4000-8000-000000000002", "type": "smoothstep", "data": { "label": "" } }
+      ]
+    }
+  }
+}
+
+tests {
+  test("Status code is 422 (DataSource scope violation)", function() {
+    expect(res.getStatus()).to.equal(422);
+  });
+  test("Reports the offending datasource id", function() {
+    expect(res.body.offendingDataSourceIds).to.be.an('array');
+    expect(res.body.offendingDataSourceIds).to.include(bru.getVar('scopeDataSourceId'));
+  });
+  test("No pipeline id returned", function() {
+    expect(res.body.id).to.be.undefined;
+  });
+}
+
+docs {
+  **The assertion of this scenario.**
+
+  The DataSource is `SPECIFIC`-scoped to Pool B, the DataSet belongs to Pool A → the backend's
+  `PipelineService.validateDataSourcesInScope` must reject the write with **HTTP 422**
+  (`DataSourceScopeViolationException`), and the ProblemDetail `offendingDataSourceIds` must contain
+  the datasource id. No pipeline is persisted.
+
+  Note: the user (`api.testuser`) is authorized for the action at the OPA/gateway layer; this 422 is
+  the **backend enforcement** of the data rule (PEP), not an authorization denial (which would be 403).
+}

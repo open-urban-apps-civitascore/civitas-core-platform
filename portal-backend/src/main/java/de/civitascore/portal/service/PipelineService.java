@@ -228,6 +228,15 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
     if (dataPool != null) {
       offendingDataSources.addAll(
           dataSources.stream().filter(ds -> !isPermittedForDataPool(ds, dataPool)).toList());
+    } else {
+      // A pool-less dataset belongs to no datapool, so a SPECIFIC-scoped datasource (confined to
+      // its
+      // scopedDataPools) must NOT be usable here — otherwise its pool-confined data could be routed
+      // into a pool-less (and possibly openDataAccess=public) dataset, defeating the restriction.
+      offendingDataSources.addAll(
+          dataSources.stream()
+              .filter(ds -> ds.getDatapoolScopeType() == DatapoolScopeType.SPECIFIC)
+              .toList());
     }
 
     if (!offendingDataSources.isEmpty()) {
