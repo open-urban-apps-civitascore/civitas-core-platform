@@ -311,8 +311,8 @@ api-test-backend:
     # Run Bruno API tests from a container on the same Compose network
     - docker run -d --name bruno-runner --network api-test-net node:22-alpine sleep infinity
     - docker cp api/portal-backend/bruno-api/. bruno-runner:/tests/
-    # The NiFi pipeline adapter is now wired into the CI stack (ADAPTERS includes nifi), so the
-    # requires-nifi saga steps run as the end-to-end acceptance gate.
+    # The NiFi + GeoServer adapters are wired into the CI stack, so the dataset-saga Bruno
+    # lifecycles run as the end-to-end acceptance gate.
     - |
       docker exec bruno-runner sh -c '
         npm install -g @usebruno/cli 2>/dev/null

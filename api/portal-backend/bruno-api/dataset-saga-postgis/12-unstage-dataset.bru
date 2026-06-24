@@ -2,9 +2,6 @@ meta {
   name: 12. Unstage DataSet
   type: http
   seq: 20
-  tags: [
-    requires-nifi
-  ]
 }
 
 post {
@@ -18,10 +15,10 @@ params:path {
 }
 
 tests {
-  test("Unstaged or already draft", function() {
+  test("Unstaged", function() {
     const status = res.getStatus();
-    // 200=unstaged, 400=pending saga or already DRAFT
-    expect(status === 200 || status === 400).to.be.true;
+    // 200=unstaged (READY → DRAFT); 11a already cleared the saga, so a non-200 is a real failure.
+    expect(status).to.equal(200);
   });
 }
 

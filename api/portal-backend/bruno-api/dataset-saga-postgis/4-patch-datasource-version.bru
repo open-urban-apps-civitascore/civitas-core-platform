@@ -2,9 +2,6 @@ meta {
   name: 4. Patch DataSource with Source Version
   type: http
   seq: 10
-  tags: [
-    requires-nifi
-  ]
 }
 
 patch {
@@ -24,10 +21,10 @@ body:json {
 }
 
 tests {
-  test("DataSource patched or already configured", function() {
+  test("DataSource patched", function() {
     const status = res.getStatus();
-    // 200=patched, 400=invalid state
-    expect(status === 200 || status === 400).to.be.true;
+    // 200=patched
+    expect(status).to.equal(200);
   });
 }
 

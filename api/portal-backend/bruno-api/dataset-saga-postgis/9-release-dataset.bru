@@ -2,9 +2,6 @@ meta {
   name: 9. Release DataSet (triggers PostGIS saga)
   type: http
   seq: 16
-  tags: [
-    requires-nifi
-  ]
 }
 
 post {
@@ -18,10 +15,10 @@ params:path {
 }
 
 tests {
-  test("Released or already released", function() {
+  test("Released", function() {
     const status = res.getStatus();
-    // 202=saga triggered, 400=already AVAILABLE or not in READY state
-    expect(status === 202 || status === 400).to.be.true;
+    // 202=saga triggered
+    expect(status).to.equal(202);
   });
 }
 

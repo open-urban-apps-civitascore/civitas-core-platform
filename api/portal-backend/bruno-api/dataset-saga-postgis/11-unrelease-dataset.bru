@@ -2,9 +2,6 @@ meta {
   name: 11. Unrelease DataSet (triggers delete saga)
   type: http
   seq: 18
-  tags: [
-    requires-nifi
-  ]
 }
 
 post {
@@ -18,10 +15,10 @@ params:path {
 }
 
 tests {
-  test("Unreleased or already not released", function() {
+  test("Unreleased", function() {
     const status = res.getStatus();
-    // 202=delete saga triggered, 400=not in AVAILABLE state
-    expect(status === 202 || status === 400).to.be.true;
+    // 202=delete saga triggered
+    expect(status).to.equal(202);
   });
 }
 

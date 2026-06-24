@@ -2,9 +2,6 @@ meta {
   name: 18. Cleanup - Delete Source DataStructure
   type: http
   seq: 26
-  tags: [
-    requires-nifi
-  ]
 }
 
 delete {
@@ -20,8 +17,8 @@ params:path {
 tests {
   test("Source DataStructure deleted or already gone", function() {
     const status = res.getStatus();
-    // 204=deleted, 404=already gone, 400=wrong state (still released), 409=still referenced
-    expect(status === 204 || status === 404 || status === 400 || status === 409).to.be.true;
+    // 204=deleted, 404=already gone
+    expect(status === 204 || status === 404).to.be.true;
   });
 }
 

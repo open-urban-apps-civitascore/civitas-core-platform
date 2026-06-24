@@ -2,9 +2,6 @@ meta {
   name: 6. Create POSTGIS DataSink
   type: http
   seq: 13
-  tags: [
-    requires-nifi
-  ]
 }
 
 post {
@@ -34,10 +31,11 @@ script:post-response {
 }
 
 tests {
-  test("DataSink created or already exists", function() {
+  test("DataSink created", function() {
     const status = res.getStatus();
-    // 201=created, 409=already exists from previous run
-    expect(status === 201 || status === 409).to.be.true;
+    // 201=created. This collection assumes a clean DB per run (CI uses an ephemeral stack); a 409
+    // would mean a previous run leaked — fail loudly rather than carry a stale id downstream.
+    expect(status).to.equal(201);
   });
 
   test("Has POSTGIS type", function() {

@@ -2,9 +2,6 @@ meta {
   name: 8. Stage DataSet
   type: http
   seq: 15
-  tags: [
-    requires-nifi
-  ]
 }
 
 post {
@@ -18,10 +15,10 @@ params:path {
 }
 
 tests {
-  test("Staged or already staged", function() {
+  test("Staged", function() {
     const status = res.getStatus();
-    // 200=staged, 400=not in DRAFT state (already staged or released)
-    expect(status === 200 || status === 400).to.be.true;
+    // 200=staged
+    expect(status).to.equal(200);
   });
 }
 

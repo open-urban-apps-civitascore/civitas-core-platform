@@ -2,9 +2,6 @@ meta {
   name: 11a. Verify DELETE saga complete
   type: http
   seq: 19
-  tags: [
-    requires-nifi
-  ]
 }
 
 get {
@@ -51,7 +48,8 @@ script:pre-request {
       }
     );
     if (resp.status === 404) break; // already deleted by a previous run
-    if (resp.status === 200 && resp.data && resp.data.pendingSagaType === null) {
+    if (resp.status === 200 && resp.data && resp.data.pendingSagaType === null
+        && resp.data.dataSetStatus === 'READY') {
       break;
     }
     await new Promise(r => setTimeout(r, 2000));
@@ -65,9 +63,10 @@ tests {
     expect(status === 200 || status === 404).to.be.true;
   });
 
-  test("DELETE saga completed (pendingSagaType cleared)", function() {
+  test("DELETE saga completed (pendingSagaType cleared, status READY)", function() {
     if (res.getStatus() === 200) {
       expect(res.body.pendingSagaType).to.be.null;
+      expect(res.body.dataSetStatus).to.equal('READY');
     }
   });
 }

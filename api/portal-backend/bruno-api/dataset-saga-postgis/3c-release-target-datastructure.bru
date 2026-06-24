@@ -2,9 +2,6 @@ meta {
   name: 3c. Release Target DataStructure
   type: http
   seq: 9
-  tags: [
-    requires-nifi
-  ]
 }
 
 post {
@@ -18,10 +15,10 @@ params:path {
 }
 
 tests {
-  test("Released or already released", function() {
+  test("Released", function() {
     const status = res.getStatus();
-    // 200=released, 400=not in DRAFT state (already released)
-    expect(status === 200 || status === 400).to.be.true;
+    // 200=released
+    expect(status).to.equal(200);
   });
 }
 
