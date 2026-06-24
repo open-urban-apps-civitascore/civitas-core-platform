@@ -142,12 +142,10 @@ public class RecordPathCompiler {
   }
 
   /**
-   * Renders a {@code geoPoint} for the target sink. For a PostGIS sink the value is a WKT literal
-   * {@code POINT(<lon> <lat>)} assembled with {@code concat}; the geometry column parses it on
-   * insert and stamps its own SRID, so no {@code SRID=} prefix is emitted (a fixed one would clash
-   * with a non-4326 column). GeoJSON (FROST) cannot be produced as a RecordPath value — RecordPath
-   * has no object constructor and emitting a JSON string would be double-encoded — so it is
-   * rejected until a dedicated FROST geometry path exists.
+   * Renders a {@code geoPoint} per encoding. {@code WKT} (PostGIS): {@code POINT(lon lat)} via
+   * {@code concat}, with no {@code SRID=} prefix — the geometry column stamps its own SRID (a fixed
+   * one would clash with a non-4326 column). {@code GEOJSON} (FROST): rejected — RecordPath has no
+   * object constructor, so a GeoJSON object cannot be built (deferred to a dedicated FROST path).
    */
   private String renderGeoPoint(GeoPointNode geoPoint, GeometryEncoding geometryEncoding)
       throws FatalAdapterException {

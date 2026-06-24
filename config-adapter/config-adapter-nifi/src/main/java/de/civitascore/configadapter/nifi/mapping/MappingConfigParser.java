@@ -90,10 +90,8 @@ public class MappingConfigParser {
     if (lon == null || lat == null) {
       throw reject("geoPoint requires a 'lon' and a 'lat'");
     }
-    // Each operand is itself a value (a source-path shorthand or a nested op such as toFloat), so
-    // recurse — this keeps the grammar closed and lets a coordinate be converted inline. A geometry
-    // operand (a Point built from a Point) is nonsensical and would render to malformed WKT, so it
-    // is rejected here rather than failing late in PostGIS.
+    // Each operand is itself a value — a source path or a nested scalar op (e.g. toFloat); a nested
+    // geometry is rejected as a non-scalar.
     ValueNode lonNode = requireScalarOperand(parseValue(lon), "geoPoint 'lon'");
     ValueNode latNode = requireScalarOperand(parseValue(lat), "geoPoint 'lat'");
     return new GeoPointNode(lonNode, latNode);
@@ -150,11 +148,9 @@ public class MappingConfigParser {
   }
 
   /**
-   * Wraps a source path into a {@link CopyNode}, rejecting a blank path. A blank (empty/whitespace)
-   * path resolves to the record root {@code /} in {@link JsonPaths}, which silently copies the
-   * whole record into the target field — and for a geometry coordinate produces structurally-valid
-   * but garbage WKT that only fails far downstream in PostGIS. Rejecting it here turns a late NiFi
-   * row failure into a clean deploy-time error.
+   * Wraps a source path into a {@link CopyNode}, rejecting a blank one: a blank path resolves to
+   * the record root {@code /} (copying the whole record), which only fails far downstream — so it
+   * is caught at parse time instead.
    */
   private CopyNode copyOf(String sourcePath) throws FatalAdapterException {
     if (sourcePath.isBlank()) {
@@ -164,10 +160,9 @@ public class MappingConfigParser {
   }
 
   /**
-   * Rejects a geometry-producing operand ({@code geoPoint}) where only a scalar is meaningful — a
-   * coordinate of another {@code geoPoint}, a {@code concat} input, or a conversion input. A nested
-   * geometry would render to malformed WKT ({@code concat('POINT(', concat('POINT(', …), …)}); it
-   * is knowable at parse time, so it is rejected rather than failing late in PostGIS.
+   * Rejects a {@code geoPoint} operand where only a scalar is meaningful (a coordinate, a {@code
+   * concat} input, or a conversion input): a nested geometry renders to malformed WKT, so it is
+   * caught at parse time rather than late in PostGIS.
    */
   private ValueNode requireScalarOperand(ValueNode node, String where)
       throws FatalAdapterException {

@@ -351,15 +351,11 @@ services:
       start_period: 5s
 
   # ── GeoServer Cloud (minimal: catalog REST for the PostGIS-sink saga) ─────
-  # A POSTGIS sink sets the saga's hasGeoSink flag, which runs CREATE_WORKSPACE +
-  # CREATE_DATASTORE against GeoServer's REST API. This is the smallest geoserver-cloud
-  # set that serves those catalog ops: geoserverdb (pgconfig catalog) + rabbitmq + config
-  # + discovery + gateway + restconfig — the rest service does not depend on wfs/wms for
-  # catalog writes. Mirrors dev-environment/geoserver/docker-compose.yaml, single-network
-  # and ephemeral (no volumes/ports/init). Service names config / discovery / rabbitmq are
-  # load-bearing: the images resolve the config server, Eureka registry and event bus at
-  # those bare hostnames. Every geoservercloud image ships a built-in :8081/actuator/health
-  # check, so `up --wait` gates on them.
+  # A POSTGIS sink triggers the saga's CREATE_WORKSPACE/CREATE_DATASTORE (GeoServer REST). Minimal
+  # set for those catalog ops (rest needs no wfs/wms): geoserverdb (pgconfig) + rabbitmq + config +
+  # discovery + gateway + restconfig. Mirrors dev-environment/geoserver/docker-compose.yaml,
+  # single-network/ephemeral. Service names config/discovery/rabbitmq are load-bearing (images
+  # resolve them by bare hostname); each image has a built-in :8081 healthcheck for `up --wait`.
 
   # pgconfig catalog DB for GeoServer Cloud — separate from postgres-sink (the DATA db the
   # datastore reads). The postgis image auto-creates the PostGIS extension.

@@ -347,14 +347,11 @@ public class FlowDeploymentPlanner {
   }
 
   /**
-   * Ensures the PostGIS JDBC URL carries {@code stringtype=unspecified}. PutDatabaseRecord binds a
-   * geoPoint's WKT as a string parameter; with PgJDBC's default ({@code stringtype=VARCHAR}) a
-   * varchar value does not coerce into a {@code geometry} column — PostgreSQL has no {@code
-   * varchar→geometry} cast — so the insert fails with a type mismatch. {@code unspecified} sends
-   * the value untyped, letting the server parse the WKT via its implicit {@code text→geometry} cast
-   * (and stamp the column SRID). Benign for the table's non-geometry columns. Package-private so
-   * the branch behaviour (no-query-string, existing query, idempotency, null/blank) is
-   * unit-testable without a live database.
+   * Ensures the PostGIS JDBC URL carries {@code stringtype=unspecified}, so PutDatabaseRecord's
+   * string-bound WKT reaches a {@code geometry} column. With PgJDBC's default ({@code VARCHAR}) the
+   * value is sent as {@code varchar}, which has no implicit cast to {@code geometry} →
+   * type-mismatch error; {@code unspecified} sends it untyped so the server parses the WKT. Benign
+   * for non-geometry columns. Package-private for unit testing.
    */
   static String withStringtypeUnspecified(String url) {
     if (url == null || url.isBlank() || url.contains("stringtype=")) {
