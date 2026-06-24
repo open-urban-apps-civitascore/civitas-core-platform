@@ -17,7 +17,7 @@
     "Max Total Connections": "8",
     "Validation Query": null,
     "Database Password Provider": null,
-    "Database Connection URL": "jdbc:postgresql://civitas-nifi-demo-postgis:5432/nifi_demo?stringtype=unspecified",
+    "Database Connection URL": "jdbc:postgresql://civitas-nifi-demo-postgis:5432/nifi_demo",
     "Password Source": "PASSWORD",
     "Time Between Eviction Runs": "-1",
     "Database User": "nifi",
