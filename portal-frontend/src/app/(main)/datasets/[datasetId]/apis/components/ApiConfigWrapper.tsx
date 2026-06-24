@@ -64,7 +64,7 @@ export const ApiConfigWrapper = (props: ApiConfigWrapperProps) => {
   const tCommon = useTranslations('common')
   const t = useTranslations('datasets.overview.completion.apis.config')
 
-  const { hasPermission, hasScopedPermission } = usePermissions()
+  const { hasScopedPermission } = usePermissions()
   const canEdit = hasScopedPermission(
     PERMISSION_NAMES.DATASET_UPDATE,
     ASSIGNMENT_SCOPE_TYPES.DATASET,

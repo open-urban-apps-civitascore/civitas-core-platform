@@ -65,13 +65,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
 
-  const { hasPermission, hasScopedPermission } = usePermissions()
-  const canCreate = hasScopedPermission(
-    PERMISSION_NAMES.DATASET_CREATE,
-    ASSIGNMENT_SCOPE_TYPES.DATASET,
-    dataset.id,
-    dataset.datapool?.id,
-  )
+  const { hasScopedPermission } = usePermissions()
 
   const canUpdate = hasScopedPermission(
     PERMISSION_NAMES.DATASET_UPDATE,
@@ -86,7 +80,6 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     dataset.id,
     dataset.datapool?.id,
   )
-  const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
 
   const { canEdit: canEditPipeline } = usePipelinePermissions(dataset.id)
 
