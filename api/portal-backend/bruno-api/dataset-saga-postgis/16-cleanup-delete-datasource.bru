@@ -1,7 +1,7 @@
 meta {
   name: 16. Cleanup - Delete DataSource
   type: http
-  seq: 24
+  seq: 25
 }
 
 delete {
@@ -25,9 +25,9 @@ tests {
 docs {
   **PostGIS saga step 16** — Delete the datasource (cleanup).
 
-  Removes the MQTT datasource created in step 1. The pipeline must have been deleted first (step 14); a 409 is returned if linked pipelines still exist.
+  Removes the MQTT datasource created in step 1. The pipeline must have been deleted first (step 14) and the datasource unreleased to `DRAFT` (step 15b) — a released (`AVAILABLE`) datasource cannot be deleted.
 
-  **Expected Response:** 204 No Content. 404 if already deleted. 409 if linked pipelines still exist. 400 if wrong state.
+  **Expected Response:** 204 No Content. 404 if already deleted.
 
   **System Impact:**
 

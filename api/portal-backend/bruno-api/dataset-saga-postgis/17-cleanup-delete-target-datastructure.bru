@@ -1,7 +1,7 @@
 meta {
   name: 17. Cleanup - Delete Target DataStructure
   type: http
-  seq: 25
+  seq: 26
 }
 
 delete {
@@ -25,9 +25,9 @@ tests {
 docs {
   **PostGIS saga step 17** — Delete the target (geometry) DataStructure (cleanup).
 
-  Deletes the target structure created in step 3. Must run after the DataSink (step 13) and dataset (step 15) are gone, since the POSTGIS DataSink referenced this structure's version.
+  Deletes the target structure created in step 3. Must run after the DataSink (step 13) and dataset (step 15) are gone, since the POSTGIS DataSink referenced this structure's version. Deleting a released structure cascades its versions (no unrelease needed).
 
-  **Expected Response:** 204 No Content. 404 if already deleted. 400 if still released. 409 if still referenced.
+  **Expected Response:** 204 No Content. 404 if already deleted.
 
   **Post-condition:** Target DataStructure record removed from `portal_backend` DB.
 }
