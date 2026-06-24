@@ -78,12 +78,10 @@ public sealed interface ValueNode
   }
 
   /**
-   * Builds a geometry point from two scalar inputs (longitude, latitude). Unlike the other ops this
-   * one is compiled <em>sink-dependently</em>: a PostGIS sink needs a WKT value its geometry column
-   * can parse, while a FROST sink needs a GeoJSON object — so the rendering is selected by the
-   * {@link GeometryEncoding} passed to the RecordPath compiler, not fixed here. The two operands
-   * are named ({@code lon}/{@code lat}) rather than positional, so this is its own node kind rather
-   * than a {@link ConvertNode} (single input) or {@link ConcatNode} (an ordered list).
+   * Builds a geometry point from two named scalar operands ({@code lon}/{@code lat}) — named rather
+   * than positional, so it is its own node kind, not a {@link ConvertNode} (single input) or {@link
+   * ConcatNode} (ordered list). Rendered sink-dependently by the compiler (see {@link
+   * GeometryEncoding}).
    *
    * @param lon the longitude value (X)
    * @param lat the latitude value (Y)
