@@ -52,8 +52,8 @@ public class NifiRestClient implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(NifiRestClient.class);
   private static final String API = "/nifi-api";
   private static final String CLIENT_ID = "config-adapter-nifi";
-  private static final int ENABLE_POLL_ATTEMPTS = 30;
-  private static final long ENABLE_POLL_INTERVAL_MS = 1000L;
+  private static final int POLL_ATTEMPTS = 30;
+  private static final long POLL_INTERVAL_MS = 1000L;
 
   private final String baseUrl;
   private final String username;
@@ -428,12 +428,12 @@ public class NifiRestClient implements AutoCloseable {
    */
   private void awaitControllerServicesState(String pgId, String state, boolean emptyMeansReady)
       throws FatalAdapterException, RetryableAdapterException {
-    for (int attempt = 0; attempt < ENABLE_POLL_ATTEMPTS; attempt++) {
+    for (int attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
       if (controllerServicesAllInState(pgId, state, emptyMeansReady)) {
         return;
       }
       try {
-        Thread.sleep(ENABLE_POLL_INTERVAL_MS);
+        Thread.sleep(POLL_INTERVAL_MS);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new RetryableAdapterException(
@@ -492,6 +492,12 @@ public class NifiRestClient implements AutoCloseable {
     stop.put("disconnectedNodeAcknowledged", false);
     put(API + "/flow/process-groups/" + group.id(), stop, "stop process group");
 
+    // Stopping is asynchronous: NiFi rejects the delete below with HTTP 409 ("Processor is
+    // running")
+    // while any processor is still scheduled or draining a thread (e.g. ConsumeMQTT closing its
+    // broker connection). Wait until the group is fully stopped before deleting.
+    awaitProcessGroupStopped(group.id());
+
     // A process group cannot be deleted while its controller services are enabled.
     disableControllerServices(group.id());
     awaitControllerServicesState(group.id(), "DISABLED", true);
@@ -510,6 +516,38 @@ public class NifiRestClient implements AutoCloseable {
     } catch (ProcessingException e) {
       throw network("delete process group", e);
     }
+  }
+
+  /**
+   * Blocks until the process group is fully stopped — no scheduled processors ({@code runningCount}
+   * == 0) and no active threads. Stopping a group is asynchronous, and NiFi refuses to delete it
+   * while a processor is still running or draining (HTTP 409), so this must complete before the
+   * delete in {@link #stopAndDeleteProcessGroup}.
+   *
+   * @param pgId the process-group id
+   * @throws FatalAdapterException on a non-retryable error
+   * @throws RetryableAdapterException if the group does not stop in time
+   */
+  private void awaitProcessGroupStopped(String pgId)
+      throws FatalAdapterException, RetryableAdapterException {
+    for (int attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
+      JsonNode group = getJson(API + "/process-groups/" + pgId, "read process group state");
+      int running = group.path("runningCount").asInt(0);
+      int activeThreads =
+          group.path("status").path("aggregateSnapshot").path("activeThreadCount").asInt(0);
+      if (running == 0 && activeThreads == 0) {
+        return;
+      }
+      try {
+        Thread.sleep(POLL_INTERVAL_MS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RetryableAdapterException(
+            AdapterErrorCode.NIFI_ERROR, e, "interrupted while waiting for process group to stop");
+      }
+    }
+    throw new RetryableAdapterException(
+        AdapterErrorCode.NIFI_ERROR, "process group " + pgId + " did not stop in time");
   }
 
   // ─── HTTP helpers ──────────────────────────────────────────────────────────

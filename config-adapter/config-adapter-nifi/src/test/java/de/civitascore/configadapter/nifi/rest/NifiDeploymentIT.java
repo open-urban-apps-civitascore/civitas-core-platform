@@ -185,7 +185,7 @@ class NifiDeploymentIT {
     // Enabling controller services and starting the group additionally require the runtime
     // environment (PostgreSQL JDBC driver mounted into NiFi, a reachable MQTT broker and database)
     // which a bare NiFi container does not provide — the DBCP would stay INVALID. That full runtime
-    // lifecycle is exercised by the 37 requires-nifi Bruno tests against the complete CI stack.
+    // lifecycle is exercised by the dataset-saga Bruno lifecycles against the complete CI stack.
     // This
     // IT validates the deploy/upload REST contract (auth, root lookup, snapshot upload,
     // process-group

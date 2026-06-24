@@ -18,7 +18,11 @@ import java.util.Objects;
  * compiler exhaustively pattern-match over the rule kinds.
  */
 public sealed interface ValueNode
-    permits ValueNode.CopyNode, ValueNode.ConstNode, ValueNode.ConcatNode, ValueNode.ConvertNode {
+    permits ValueNode.CopyNode,
+        ValueNode.ConstNode,
+        ValueNode.ConcatNode,
+        ValueNode.ConvertNode,
+        ValueNode.GeoPointNode {
 
   /**
    * Copies the value at {@code sourcePath} (a source JSONPath) into the target field. This is also
@@ -70,6 +74,22 @@ public sealed interface ValueNode
       if (op.requiresPattern() && (pattern == null || pattern.isBlank())) {
         throw new IllegalArgumentException(op.rawOp() + " requires a non-blank pattern");
       }
+    }
+  }
+
+  /**
+   * Builds a geometry point from two named scalar operands ({@code lon}/{@code lat}) — named rather
+   * than positional, so it is its own node kind, not a {@link ConvertNode} (single input) or {@link
+   * ConcatNode} (ordered list). Rendered sink-dependently by the compiler (see {@link
+   * GeometryEncoding}).
+   *
+   * @param lon the longitude value (X)
+   * @param lat the latitude value (Y)
+   */
+  record GeoPointNode(ValueNode lon, ValueNode lat) implements ValueNode {
+    public GeoPointNode {
+      Objects.requireNonNull(lon, "lon");
+      Objects.requireNonNull(lat, "lat");
     }
   }
 }
