@@ -90,6 +90,12 @@ describe('useDataQuery', () => {
       )
     })
 
+    it('always passes method GET to apiRequest', async () => {
+      renderHook(() => useDataQuery({ key: 'items', errorMessage: 'Error' }))
+      await lastQueryOptions().queryFn!({} as never)
+      expect(vi.mocked(apiRequest)).toHaveBeenCalledWith(expect.objectContaining({ method: 'GET' }))
+    })
+
     it('forwards params to apiRequest', async () => {
       const params = new URLSearchParams({ page: '1', size: '10' })
       renderHook(() => useDataQuery({ key: 'items', params, errorMessage: 'Error' }))
