@@ -89,6 +89,12 @@ export interface PipelineNodeDef<D extends PipelineNodeData = PipelineNodeData> 
   createDefaultData: () => D
   /** Narrowing type-guard for this node's data. */
   isData: (data: PipelineNodeData) => data is D
+  /**
+   * Optional sublabel shown under the node title on the canvas for configured nodes.
+   * Most nodes have none; nodes opt in by implementing this.
+   */
+  getSublabel?: (data: D) => string | undefined
+
   /** Inspector panel rendered when a node of this type is selected. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- panels are typed per-node; the union is widened here
   InspectorPanel: ComponentType<NodeInspectorPanelProps<any>>
@@ -161,6 +167,10 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
     }),
     isData: (data): data is DataSourceNodeData =>
       'entityType' in data && (data as DataSourceNodeData).entityType === ENTITY_TYPES.Datasource,
+    getSublabel: data => {
+      const d = data as DataSourceNodeData
+      return d.entityId !== undefined ? d.entityName : undefined
+    },
     InspectorPanel: DataSourcePanel,
   },
 
@@ -219,6 +229,7 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
     }),
     isData: (data): data is GeoPersistenceNodeData =>
       'entityType' in data && (data as GeoPersistenceNodeData).entityType === ENTITY_TYPES.Persistence,
+    getSublabel: data => (data as GeoPersistenceNodeData).tableName || undefined,
     InspectorPanel: GeoPersistencePanel,
   },
 
@@ -236,6 +247,10 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
       mappingConfig: emptyMappingConfig(),
     }),
     isData: (data): data is MappingNodeData => 'mappingConfig' in data,
+    getSublabel: data => {
+      const d = data as MappingNodeData
+      return d.sourceName && d.targetName ? `${d.sourceName} → ${d.targetName}` : undefined
+    },
     InspectorPanel: MappingPanel,
   },
 ]
