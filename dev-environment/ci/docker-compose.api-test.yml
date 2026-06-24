@@ -350,6 +350,99 @@ services:
       retries: 5
       start_period: 5s
 
+  # ── GeoServer Cloud (minimal: catalog REST for the PostGIS-sink saga) ─────
+  # A POSTGIS sink sets the saga's hasGeoSink flag, which runs CREATE_WORKSPACE +
+  # CREATE_DATASTORE against GeoServer's REST API. This is the smallest geoserver-cloud
+  # set that serves those catalog ops: geoserverdb (pgconfig catalog) + rabbitmq + config
+  # + discovery + gateway + restconfig — the rest service does not depend on wfs/wms for
+  # catalog writes. Mirrors dev-environment/geoserver/docker-compose.yaml, single-network
+  # and ephemeral (no volumes/ports/init). Service names config / discovery / rabbitmq are
+  # load-bearing: the images resolve the config server, Eureka registry and event bus at
+  # those bare hostnames. Every geoservercloud image ships a built-in :8081/actuator/health
+  # check, so `up --wait` gates on them.
+
+  # pgconfig catalog DB for GeoServer Cloud — separate from postgres-sink (the DATA db the
+  # datastore reads). The postgis image auto-creates the PostGIS extension.
+  geoserverdb:
+    image: postgis/postgis:16-3.4-alpine
+    platform: linux/amd64
+    environment:
+      POSTGRES_DB: geoserver
+      POSTGRES_USER: geoserver
+      POSTGRES_PASSWORD: geoserver
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U geoserver -d geoserver"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13.3-alpine
+    tmpfs:
+      - /var/lib/rabbitmq:size=256m,mode=1777
+    healthcheck:
+      test: rabbitmq-diagnostics is_running
+      start_period: 10s
+      interval: 15s
+      timeout: 30s
+      retries: 3
+
+  config:
+    image: geoservercloud/geoserver-cloud-config:2.28.3.0
+    environment:
+      SPRING_PROFILES_ACTIVE: native
+      SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL: v2.28.3.0
+      SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_HOST: geoserverdb
+      SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_PORT: 5432
+      SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_DATABASE: geoserver
+      SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_USERNAME: geoserver
+      SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_PASSWORD: geoserver
+      SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_SCHEMA: pgconfig
+      SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_INITIALIZE: "true"
+
+  discovery:
+    image: geoservercloud/geoserver-cloud-discovery:2.28.3.0
+    depends_on:
+      - config
+
+  gateway:
+    image: geoservercloud/geoserver-cloud-gateway:2.28.3.0
+    environment:
+      GEOSERVER_BASE_PATH: /geoserver
+    depends_on:
+      discovery:
+        condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - civitas-geoserver
+
+  restconfig:
+    image: geoservercloud/geoserver-cloud-rest:2.28.3.0
+    environment:
+      SPRING_PROFILES_ACTIVE: pgconfig
+      GEOWEBCACHE_CACHE_DIR: /data/geowebcache
+      PGCONFIG_HOST: geoserverdb
+      PGCONFIG_PORT: 5432
+      PGCONFIG_DATABASE: geoserver
+      PGCONFIG_USERNAME: geoserver
+      PGCONFIG_PASSWORD: geoserver
+      PGCONFIG_SCHEMA: pgconfig
+      PGCONFIG_INITIALIZE: "true"
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      discovery:
+        condition: service_healthy
+      config:
+        condition: service_healthy
+      geoserverdb:
+        condition: service_healthy
+
   # ── Application ──────────────────────────────────────────
 
   portal-backend:
@@ -448,6 +541,17 @@ services:
       FLOWABLE_JDBC_URL: jdbc:postgresql://postgres-portal:5432/flowable
       FLOWABLE_JDBC_USERNAME: admin
       FLOWABLE_JDBC_PASSWORD: admin
+      # GeoServer Cloud REST (via the gateway): the dataset saga runs CREATE_WORKSPACE /
+      # CREATE_DATASTORE for any POSTGIS sink. The datastore points GeoServer at the
+      # postgres-sink data DB (the same DB the NiFi flow writes to).
+      GEOSERVER_URL: http://civitas-geoserver:8080/geoserver
+      GEOSERVER_ADMIN_USER: admin
+      GEOSERVER_ADMIN_PASSWORD: geoserver
+      GEOSERVER_POSTGIS_HOST: postgres-sink
+      GEOSERVER_POSTGIS_PORT: 5432
+      GEOSERVER_POSTGIS_DATABASE: geosink
+      GEOSERVER_POSTGIS_USER: geosink
+      GEOSERVER_POSTGIS_PASSWORD: geosink
     depends_on:
       # Flowable's JDBC URL targets postgres-portal — wait until it is healthy before boot.
       postgres-portal:
@@ -458,6 +562,11 @@ services:
       kafka:
         condition: service_healthy
       keycloak:
+        condition: service_healthy
+      # The saga's GeoServer steps hit the gateway → rest service; wait for both healthy.
+      gateway:
+        condition: service_healthy
+      restconfig:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/health/ready"]
