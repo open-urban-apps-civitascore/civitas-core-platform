@@ -5,14 +5,18 @@ import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.model.dataset.NamedApi;
 import de.civitascore.portal.configuration.SagaProperties;
 import de.civitascore.portal.model.datasink.PostgisConfiguration;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.PipelineAction;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
+import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.saga.DataSinkPayload;
+import de.civitascore.portal.model.saga.LayerPayload;
+import de.civitascore.portal.model.saga.StylePayload;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
-import de.civitascore.portal.service.DataStructureVersionService;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -46,21 +50,18 @@ public class DataSetSagaPublisher {
   private final SagaProperties sagaProperties;
   private final DataSinkRepository dataSinkRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
-  private final DataStructureVersionService dataStructureVersionService;
 
   public DataSetSagaPublisher(
       KafkaTemplate<String, String> eventKafkaTemplate,
       ObjectMapper objectMapper,
       SagaProperties sagaProperties,
       DataSinkRepository dataSinkRepository,
-      DataStructureVersionRepository dataStructureVersionRepository,
-      DataStructureVersionService dataStructureVersionService) {
+      DataStructureVersionRepository dataStructureVersionRepository) {
     this.eventKafkaTemplate = eventKafkaTemplate;
     this.objectMapper = objectMapper;
     this.sagaProperties = sagaProperties;
     this.dataSinkRepository = dataSinkRepository;
     this.dataStructureVersionRepository = dataStructureVersionRepository;
-    this.dataStructureVersionService = dataStructureVersionService;
   }
 
   /**
@@ -70,6 +71,7 @@ public class DataSetSagaPublisher {
    * protected datasets.
    */
   public void publishCreateRequested(DataSet dataset) {
+    verifyLayerStyleReferences(dataset);
     var trigger =
         SagaTrigger.DatasetCreate.of(
             dataset.getId().toString(),
@@ -78,6 +80,8 @@ public class DataSetSagaPublisher {
             dataset.getOpenDataAccess(),
             buildDatasources(dataset),
             buildDatasinks(dataset),
+            buildLayers(dataset),
+            buildStyles(dataset),
             buildPipelines(dataset.getPipelines(), PipelineAction.ADD),
             buildNamedApis(dataset));
     sendTrigger(trigger);
@@ -89,6 +93,7 @@ public class DataSetSagaPublisher {
    * and the APISIX auth-plugin attachment.
    */
   public void publishUpdateRequested(DataSet dataset, Set<Pipeline> previousPipelines) {
+    verifyLayerStyleReferences(dataset);
     var trigger =
         SagaTrigger.DatasetUpdate.of(
             dataset.getId().toString(),
@@ -101,6 +106,8 @@ public class DataSetSagaPublisher {
             dataset.getPipelineIds(),
             buildDatasources(dataset),
             buildDatasinks(dataset),
+            buildLayers(dataset),
+            buildStyles(dataset),
             buildPipelineDiff(previousPipelines, dataset.getPipelines()),
             buildNamedApis(dataset));
     sendTrigger(trigger);
@@ -162,9 +169,113 @@ public class DataSetSagaPublisher {
   }
 
   /**
-   * Resolves the sink's referenced data-structure JSON Schema from Model Atlas. {@code null} when
-   * no version is referenced (e.g. FROST); throws {@link InvalidInputException} if a referenced
-   * version cannot be resolved, failing the publish. The id is already validated at sink save time.
+   * All WFS/WMS layers attached to the dataset, mapped to the payload shape. Returns {@code null}
+   * when the dataset has no layers so {@code @JsonInclude(NON_NULL)} drops the field — keeps {@code
+   * hasLayers=false} on the consumer side when no layers are configured.
+   */
+  private List<LayerPayload> buildLayers(DataSet dataset) {
+    if (dataset.getLayers() == null || dataset.getLayers().isEmpty()) {
+      return null;
+    }
+    return dataset.getLayers().stream().map(this::toLayerPayload).toList();
+  }
+
+  private LayerPayload toLayerPayload(Layer layer) {
+    return new LayerPayload(
+        layer.getId().toString(),
+        layer.getLayerName(),
+        resolveNativeName(layer),
+        layer.getCrs(),
+        layer.getDefaultStyle() != null ? layer.getDefaultStyle().getName() : null,
+        buildAlternativeStyleNames(layer));
+  }
+
+  /**
+   * Sorted list of style names a layer references in addition to its default. Sorted so the JSON
+   * output is stable across runs (the underlying {@link java.util.Set} has no defined iteration
+   * order). Returns {@code null} when empty so {@code @JsonInclude(NON_NULL)} drops the field.
+   */
+  private List<String> buildAlternativeStyleNames(Layer layer) {
+    if (layer.getAlternativeStyles() == null || layer.getAlternativeStyles().isEmpty()) {
+      return null;
+    }
+    return layer.getAlternativeStyles().stream().map(Style::getName).sorted().toList();
+  }
+
+  /**
+   * All SLD styles attached to the dataset, mapped to the payload shape. Carried once at the
+   * dataset level; layers reference these by name. Returns {@code null} when the dataset has no
+   * styles so {@code @JsonInclude(NON_NULL)} drops the field — keeps {@code hasStyles=false} on the
+   * consumer side.
+   */
+  private List<StylePayload> buildStyles(DataSet dataset) {
+    if (dataset.getStyles() == null || dataset.getStyles().isEmpty()) {
+      return null;
+    }
+    return dataset.getStyles().stream()
+        .map(s -> new StylePayload(s.getName(), s.getSldContent()))
+        .toList();
+  }
+
+  /**
+   * Fails the publish if a layer references a style that is not owned by the same dataset. Identity
+   * is checked by {@code Style.id} (not name) so a layer cannot pick up a style from another
+   * dataset that happens to share a name. The DB does not enforce this cross-table invariant, so
+   * this check is defense-in-depth. Failing here propagates as an {@link InvalidInputException}
+   * before the trigger is serialized or sent to Kafka.
+   */
+  private void verifyLayerStyleReferences(DataSet dataset) {
+    if (dataset.getLayers() == null || dataset.getLayers().isEmpty()) {
+      return;
+    }
+    Set<UUID> ownedStyleIds =
+        dataset.getStyles() == null
+            ? Set.of()
+            : dataset.getStyles().stream().map(Style::getId).collect(Collectors.toSet());
+    for (Layer layer : dataset.getLayers()) {
+      if (layer.getDefaultStyle() != null) {
+        checkStyleOwnership(layer, layer.getDefaultStyle(), ownedStyleIds, "defaultStyle");
+      }
+      if (layer.getAlternativeStyles() != null) {
+        for (Style s : layer.getAlternativeStyles()) {
+          checkStyleOwnership(layer, s, ownedStyleIds, "alternativeStyles");
+        }
+      }
+    }
+  }
+
+  private void checkStyleOwnership(
+      Layer layer, Style style, Set<UUID> ownedStyleIds, String field) {
+    if (style.getId() == null || !ownedStyleIds.contains(style.getId())) {
+      throw new InvalidInputException(
+          "Layer",
+          field,
+          "Layer " + layer.getId() + " references style not owned by dataset: " + style.getName());
+    }
+  }
+
+  /**
+   * Resolves the PostGIS table name for a layer attached to a POSTGIS sink. Returns {@code null}
+   * for layers on non-POSTGIS sinks; the adapter then falls back to the sole POSTGIS table on the
+   * dataset or to the layer name.
+   */
+  private String resolveNativeName(Layer layer) {
+    DataSink sink = layer.getDataSink();
+    if (sink == null
+        || sink.getDataSinkType() != DataSinkType.POSTGIS
+        || sink.getConfiguration() == null) {
+      return null;
+    }
+    return objectMapper
+        .convertValue(sink.getConfiguration(), PostgisConfiguration.class)
+        .getTableName();
+  }
+
+  /**
+   * Resolves the sink's referenced data-structure model (JSON Schema) persisted on the {@code
+   * DataStructureVersion}. {@code null} when no version is referenced (e.g. FROST); throws {@link
+   * InvalidInputException} if a referenced version is missing or carries no model, failing the
+   * publish. The id is already validated at sink save time.
    */
   private Map<String, Object> resolveDataStructure(DataSink sink) {
     if (sink.getConfiguration() == null) {
@@ -186,16 +297,14 @@ public class DataSetSagaPublisher {
                         "DataSink",
                         "configuration.dataStructureVersionId",
                         "DataStructureVersion not found: " + dsvId));
-    return dataStructureVersionService
-        .resolveJsonSchemaByAtlasUri(version.getModelAtlasUri())
-        .filter(schema -> !schema.isEmpty())
-        .orElseThrow(
-            () ->
-                new InvalidInputException(
-                    "DataSink",
-                    "configuration.dataStructureVersionId",
-                    "Cannot resolve JSON Schema from Model Atlas for DataStructureVersion "
-                        + dsvId));
+    Map<String, Object> model = version.getModel();
+    if (model == null || model.isEmpty()) {
+      throw new InvalidInputException(
+          "DataSink",
+          "configuration.dataStructureVersionId",
+          "DataStructureVersion " + dsvId + " has no model");
+    }
+    return model;
   }
 
   private List<DataPipeline> buildPipelines(Set<Pipeline> pipelines, PipelineAction action) {
@@ -291,6 +400,10 @@ public class DataSetSagaPublisher {
         pipeline.getId().toString(),
         String.valueOf(pipeline.getVersion()),
         action.name(),
+        // `model` holds the editor-built, engine-neutral pipeline graph (React-Flow nodes/edges +
+        // inline mappingConfig) and is forwarded to the config-adapter as-is (the engine-neutral
+        // contract / intermediate representation). The config-adapter (NiFi) is the only place
+        // engine specifics appear.
         pipeline.getModel());
   }
 

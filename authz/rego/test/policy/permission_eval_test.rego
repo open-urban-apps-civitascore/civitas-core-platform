@@ -263,3 +263,136 @@ test_user_has_permission_tenant_cascades_to_dataset if {
 		with input as portal_request("GET", "/v1/datasets/some-dataset-id")
 	result == true
 }
+
+# =============================================================================
+# DATAPOOL SCOPE ENFORCEMENT TESTS
+# =============================================================================
+
+# DATAPOOL-scoped user, granted on pool-1
+mock_send_datapool_read(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATAPOOL_READ"], "DATAPOOL", "pool-1")}
+
+# TENANT-scoped user with a datapool permission
+mock_send_tenant_datapool_read(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATAPOOL_READ"], "TENANT", "tenant-1")}
+mock_send_tenant_datapool_create(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATAPOOL_CREATE"], "TENANT", "tenant-1")}
+
+# DATAPOOL-scoped access to the SAME pool is allowed (scopeId matches resource_id)
+test_datapool_scoped_allows_matching_pool if {
+	result := permission_eval.has_permission with http.send as mock_send_datapool_read
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datapools/pool-1")
+	result == true
+}
+
+# DATAPOOL-scoped access to a DIFFERENT pool is denied (scopeId mismatch — fail-secure)
+test_datapool_scoped_denies_other_pool if {
+	result := permission_eval.has_permission with http.send as mock_send_datapool_read
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datapools/pool-2")
+	result == false
+}
+
+# DATAPOOL-scoped read also covers the pool's sub-resource (/{id}/assignments)
+test_datapool_scoped_allows_assignments_subresource if {
+	result := permission_eval.has_permission with http.send as mock_send_datapool_read
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datapools/pool-1/assignments")
+	result == true
+}
+
+# TENANT scope cascades down to a DATAPOOL resource endpoint (inheritance)
+test_tenant_cascades_to_datapool if {
+	result := permission_eval.has_permission with http.send as mock_send_tenant_datapool_read
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datapools/pool-1")
+	result == true
+}
+
+# Collection create on /v1/datapools is allowed via TENANT-scoped DATAPOOL_CREATE
+test_tenant_allows_datapool_collection_create if {
+	result := permission_eval.has_permission with http.send as mock_send_tenant_datapool_create
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datapools")
+	result == true
+}
+
+# A DATAPOOL/TENANT user with DATAPOOL_UPDATE
+mock_send_datapool_update(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATAPOOL_UPDATE"], "DATAPOOL", "pool-1")}
+mock_send_tenant_datapool_update(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATAPOOL_UPDATE"], "TENANT", "tenant-1")}
+
+# Scenario 2 regression: a DATAPOOL-scoped user can UPDATE their pool (PATCH /datapools/{id}).
+# In develop the "datapools" resource_scope_type mapping was MISSING → expected_scope_type was
+# undefined → the resource scope rules (incl. the TENANT/unscoped cascade, which require
+# expected_scope_type != "TENANT") never fired → has_permission=false → OPA 403. With the
+# mapping ("datapools":"DATAPOOL") the DATAPOOL-scope match grants the update.
+test_datapool_scoped_allows_update_matching_pool if {
+	result := permission_eval.has_permission with http.send as mock_send_datapool_update
+		with data.config as mock_http.mock_config
+		with input as portal_request("PATCH", "/v1/datapools/pool-1")
+	result == true
+}
+
+# Scenario 2 regression: TENANT cascade also grants the datapool UPDATE (was 403 in develop).
+test_tenant_cascades_to_datapool_update if {
+	result := permission_eval.has_permission with http.send as mock_send_tenant_datapool_update
+		with data.config as mock_http.mock_config
+		with input as portal_request("PATCH", "/v1/datapools/pool-1")
+	result == true
+}
+
+# =============================================================================
+# DATAPOOL → DATASET UNION INHERITANCE TESTS (Epic 1)
+# =============================================================================
+# User holds DATASET_READ via a DATAPOOL-scoped grant on pool-1.
+# Two http.send targets are mocked by URL: the user-context fetch and the
+# dataset→pool membership lookup.
+
+# Membership says the requested dataset is in pool-1 (the user's granted pool)
+mock_union_in_pool(req) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_READ"], "DATAPOOL", "pool-1")} if {
+	contains(req.url, "user-context")
+}
+
+mock_union_in_pool(req) := {"status_code": 200, "body": {"poolId": "pool-1"}} if {
+	contains(req.url, "dataset-pool")
+}
+
+# Membership says the requested dataset is in a DIFFERENT pool (pool-2)
+mock_union_other_pool(req) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_READ"], "DATAPOOL", "pool-1")} if {
+	contains(req.url, "user-context")
+}
+
+mock_union_other_pool(req) := {"status_code": 200, "body": {"poolId": "pool-2"}} if {
+	contains(req.url, "dataset-pool")
+}
+
+# Single dataset in the user's granted pool → access granted via union
+test_union_allows_dataset_in_granted_pool if {
+	result := permission_eval.has_permission with http.send as mock_union_in_pool
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets/ds-99")
+	result == true
+}
+
+# Single dataset in a different pool → denied (fail-secure)
+test_union_denies_dataset_in_other_pool if {
+	result := permission_eval.has_permission with http.send as mock_union_other_pool
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets/ds-99")
+	result == false
+}
+
+# Dataset collection: a DATAPOOL grant grants list access (filtering via header)
+test_union_allows_dataset_collection if {
+	result := permission_eval.has_permission with http.send as mock_union_in_pool
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets")
+	result == true
+}
+
+# No pool lookup is needed/used for users without DATAPOOL grants:
+# a direct DATASET grant still works and never depends on the membership service.
+test_union_does_not_break_direct_dataset_grant if {
+	result := permission_eval.has_permission with http.send as mock_send_read_dataset
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets/dataset-1")
+	result == true
+}

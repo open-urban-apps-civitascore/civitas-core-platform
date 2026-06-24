@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 
-export type PortType = 'scalar' | 'array' | 'object'
+export type PortType = 'scalar' | 'geometry' | 'array' | 'object'
 
 export interface PortDef {
   id: string

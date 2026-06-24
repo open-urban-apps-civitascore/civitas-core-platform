@@ -1,0 +1,25 @@
+meta {
+  name: 13. Teardown - unrelease datasource
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/datasources/{{scopeDataSourceId}}/unrelease
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: in [200, 400, 404, 409]
+}
+
+tests {
+  test("DataSource unrelease tolerated", function() {
+    expect([200, 400, 404, 409]).to.include(res.getStatus());
+  });
+}
+
+docs {
+  An AVAILABLE datasource must be reverted to DRAFT before it can be deleted (step 14).
+}

@@ -93,14 +93,15 @@ describe('buildUMLModelPayload', () => {
     expect(payload.styles.viewport).toBeUndefined()
   })
 
-  it('should produce valid XMI in the model field', () => {
+  it('should produce a JSON Schema object in the model field', () => {
     const diagram = createTestDiagram()
     const payload = buildUMLModelPayload(diagram)
 
-    expect(payload.model).toContain('<?xml version="1.0" encoding="UTF-8"?>')
-    expect(payload.model).toContain('uml:Model')
-    expect(payload.model).toContain('MyClass')
-    expect(payload.model).toContain('MyInterface')
+    expect(typeof payload.model).toBe('object')
+    expect(payload.model.$schema).toBe('https://json-schema.org/draft/2020-12/schema')
+    expect(payload.model.type).toBe('object')
+    // Title is the root class name (Option A), not the diagram name.
+    expect(payload.model.title).toBe('MyClass')
   })
 
   it('should handle an empty diagram', () => {
@@ -109,13 +110,14 @@ describe('buildUMLModelPayload', () => {
 
     expect(payload.name).toBe('Test Diagram')
     expect(payload.styles.nodePositions).toEqual({})
-    expect(payload.model).toContain('uml:Model')
+    expect(payload.model.type).toBe('object')
+    expect(payload.model.properties).toEqual({})
   })
 
-  it('should pass modelUri through to XMI export', () => {
+  it('should pass modelUri through to the JSON Schema $id', () => {
     const diagram = createTestDiagram()
     const payload = buildUMLModelPayload(diagram, 'http://example.org/model')
 
-    expect(payload.model).toContain('URI="http://example.org/model"')
+    expect(payload.model.$id).toBe('http://example.org/model')
   })
 })

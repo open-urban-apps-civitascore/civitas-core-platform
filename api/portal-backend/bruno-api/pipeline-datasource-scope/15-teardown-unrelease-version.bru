@@ -1,0 +1,21 @@
+meta {
+  name: 15. Teardown - unrelease datastructure version
+  type: http
+  seq: 16
+}
+
+post {
+  url: {{baseUrl}}/datastructures/{{scopeDataStructureId}}/versions/{{scopeVersionId}}/unrelease
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: in [200, 400, 404, 409]
+}
+
+tests {
+  test("Version unrelease tolerated", function() {
+    expect([200, 400, 404, 409]).to.include(res.getStatus());
+  });
+}

@@ -12,17 +12,15 @@ package de.civitascore.configadapter.model.saga;
 /** Saga workflow types. Each type defines a distinct step ordering and compensation strategy. */
 public enum SagaType {
 
-  /** Dataset provisioning: FROST → APISIX → Redpanda (conditional). */
+  /** Dataset provisioning: FROST → APISIX → NiFi (conditional). */
   DATASET_CREATE("dataset-create"),
 
-  /**
-   * Dataset update: FROST → APISIX → Redpanda (conditional). Compensation restores previous state.
-   */
+  /** Dataset update: FROST → APISIX → NiFi (conditional). Compensation restores previous state. */
   DATASET_UPDATE("dataset-update"),
 
   /**
-   * Dataset deletion: Redpanda (conditional) → APISIX → FROST (reverse order). Best-effort
-   * execution, no compensation.
+   * Dataset deletion: NiFi (conditional) → APISIX → FROST (reverse order). Best-effort execution,
+   * no compensation.
    */
   DATASET_DELETE("dataset-delete");
 

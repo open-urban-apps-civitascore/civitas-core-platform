@@ -1,0 +1,47 @@
+meta {
+  name: 00. Init run id + find user
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/users?search=api.testuser
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  // Unique suffix so resource names don't collide across re-runs (no find-first needed).
+  bru.setVar('scopeRunId', String(Date.now()));
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const match = res.body.content.find(u => u.email === 'api.testuser@example.com');
+    if (match) {
+      bru.setVar('userId', match.id);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("userId is set", function() {
+    expect(bru.getVar('userId')).to.be.a('string');
+  });
+}
+
+docs {
+  **Scenario: DataSource DataPool-scope violation on pipeline write (Epic 3 / Schicht C).**
+
+  End-to-end variant of `dataset-saga-workflow`: builds an AVAILABLE DataSource scoped to
+  DataPool B (`SPECIFIC`), a DataSet in DataPool A, then attempts a pipeline write linking that
+  DataSource — which the backend must reject with **HTTP 422** (`DataSourceScopeViolationException`).
+
+  Runs linearly against the backend (no APISIX/OPA); the OPA user-authorization is orthogonal —
+  the scope rule is enforced in `PipelineService.validateDataSourcesInScope`.
+
+  **Step 00:** seeds `scopeRunId` (unique name suffix) and resolves `userId` (DataPool contact person).
+}

@@ -172,7 +172,7 @@ apisix.plugin.config.id=1
 # so any proxy-rewrite.headers.remove in the shared plugin_config is silently overridden.
 # Mirror the strip list from plugin_config here so e.g. client-supplied X-Allowed-Scope-Ids
 # (used by OPA for collection filtering) cannot bypass authorization. Comma-separated.
-apisix.proxy.rewrite.headers.remove=X-Allowed-Scope-Ids
+apisix.proxy.rewrite.headers.remove=X-Allowed-Scope-Ids,X-Allowed-Pool-Ids
 
 # FROST upstream auth — required. APISIX injects credentials into proxy-rewrite when forwarding
 # to private FROST projects. Configure ONE of the two schemes (mirroring the FROST adapter):
@@ -213,7 +213,7 @@ APISIX_ADMIN_KEY=your-api-key
 APISIX_API_HOST=api.core.example.org
 APISIX_API_PUBLIC_URL=https://api.core.example.org
 APISIX_PLUGIN_CONFIG_ID=1
-APISIX_PROXY_REWRITE_HEADERS_REMOVE=X-Allowed-Scope-Ids
+APISIX_PROXY_REWRITE_HEADERS_REMOVE=X-Allowed-Scope-Ids,X-Allowed-Pool-Ids
 # Pick ONE FROST upstream auth scheme:
 APISIX_FROST_BASIC_AUTH_USERNAME=frost-admin
 APISIX_FROST_BASIC_AUTH_PASSWORD=changeme

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import { STATUS_TYPES } from '@/types/common'
-import { Datasink, DATASINK_TYPES } from '@/types/datasinks'
+import { DataSink, DATASINK_TYPES } from '@/types/datasinks'
 import { DATASTRUCTURE_VERSION_SOURCE, DatastructureVersion } from '@/types/datastructures'
 import { LayerFormData } from '@/types/namedApis'
 
-import { getNativeCRSFromDatasink, mapFormLayerToPayload } from './namedApis'
+import { getNativeCRSFromDataSink, mapFormLayerToPayload } from './namedApis'
 
 const makeLayer = (overrides: Partial<LayerFormData> = {}): LayerFormData => ({
   id: '00000000-0000-0000-0000-000000000001',
@@ -27,7 +27,7 @@ const makeLayer = (overrides: Partial<LayerFormData> = {}): LayerFormData => ({
   ...overrides,
 })
 
-const makeDatasink = (): Datasink => ({
+const makeDataSink = (): DataSink => ({
   id: '00000000-0000-0000-0000-000000000010',
   datasetId: '00000000-0000-0000-0000-000000000020',
   pipelineId: '00000000-0000-0000-0000-000000000030',
@@ -55,7 +55,6 @@ const makeDatastructureVersion = (styles: DatastructureVersion['styles'] = null)
   description: null,
   dataStructureVersionStatus: STATUS_TYPES.AVAILABLE,
   dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
-  modelAtlasUri: null,
   modelName: null,
   model: null,
   styles,
@@ -132,27 +131,27 @@ describe('mapFormLayerToPayload', () => {
   })
 })
 
-describe('getNativeCRSFromDatasink', () => {
-  it('returns the CRS from the matching datasink and datastructure', () => {
-    const result = getNativeCRSFromDatasink(
+describe('getNativeCRSFromDataSink', () => {
+  it('returns the CRS from the matching data sink and datastructure', () => {
+    const result = getNativeCRSFromDataSink(
       '00000000-0000-0000-0000-000000000010',
-      [makeDatasink()],
+      [makeDataSink()],
       [makeDatastructureVersion(stylesWithCRS)],
     )
     expect(result).toBe('EPSG:25832')
   })
 
-  it('returns empty string when datasinkId has no match', () => {
-    const result = getNativeCRSFromDatasink(
+  it('returns empty string when dataSinkId has no match', () => {
+    const result = getNativeCRSFromDataSink(
       '00000000-0000-0000-0000-000000000099',
-      [makeDatasink()],
+      [makeDataSink()],
       [makeDatastructureVersion(stylesWithCRS)],
     )
     expect(result).toBe('')
   })
 
-  it('returns empty string when no datastructure matches the datasink', () => {
-    const result = getNativeCRSFromDatasink('00000000-0000-0000-0000-000000000010', [makeDatasink()], [])
+  it('returns empty string when no datastructure matches the data sink', () => {
+    const result = getNativeCRSFromDataSink('00000000-0000-0000-0000-000000000010', [makeDataSink()], [])
     expect(result).toBe('')
   })
 
@@ -180,9 +179,9 @@ describe('getNativeCRSFromDatasink', () => {
       ],
     } as unknown as DatastructureVersion['styles']
 
-    const result = getNativeCRSFromDatasink(
+    const result = getNativeCRSFromDataSink(
       '00000000-0000-0000-0000-000000000010',
-      [makeDatasink()],
+      [makeDataSink()],
       [makeDatastructureVersion(stylesWithoutCRS)],
     )
     expect(result).toBe('')

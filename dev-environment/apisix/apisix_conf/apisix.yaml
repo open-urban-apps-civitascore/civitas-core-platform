@@ -60,14 +60,17 @@ plugin_configs:
         bearer_only: true
         use_jwks: true
         # DEV-ONLY: ssl_verify disabled for local HTTP Keycloak.
-        # PRODUCTION MUST use ssl_verify: true (see TEAM3-AUTHZ-DEPLOYMENT.md).
+        # PRODUCTION MUST use ssl_verify: true — see the "Gateway Trust Model"
+        # section in portal-backend/DEPLOYMENT.md (prod ssl_verify + F1 header
+        # forward/strip + F2 backend NetworkPolicy isolation).
         ssl_verify: false
         # Pass decoded JWT claims to OPA via X-Userinfo header
         set_userinfo_header: true
 
       # 2. OPA authorization - calls OPA for permission decision
       # M5.5: send_headers_upstream passes OPA response headers to backend.
-      # OPA returns X-Allowed-Scope-Ids for collection filtering.
+      # OPA returns X-Allowed-Scope-Ids for collection filtering and
+      # X-Allowed-Pool-Ids for dataset datapool-union filtering (Epic 1).
       opa:
         host: "http://civitas-opa:8181"
         policy: "civitas/authz/decision"
@@ -76,11 +79,12 @@ plugin_configs:
         with_consumer: false
         send_headers_upstream:
           - "X-Allowed-Scope-Ids"
+          - "X-Allowed-Pool-Ids"
 
       # 3. Strip client-supplied scope headers before OPA sets them.
       # APISIX forwards all client headers by default — without this, a
-      # malicious client could send X-Allowed-Scope-Ids: * and bypass
-      # collection-level authorization filtering in the backend.
+      # malicious client could send X-Allowed-Scope-Ids/X-Allowed-Pool-Ids and
+      # bypass collection-level authorization filtering in the backend.
       #
       # NOTE: Saga-created dataset routes (managed by the APISIX adapter) define their own
       # route-level proxy-rewrite for path rewriting + FROST upstream auth. Per APISIX
@@ -92,6 +96,7 @@ plugin_configs:
         headers:
           remove:
             - "X-Allowed-Scope-Ids"
+            - "X-Allowed-Pool-Ids"
 
       # 4. Request ID for tracing
       request-id:

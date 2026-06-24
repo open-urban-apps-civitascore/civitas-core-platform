@@ -121,7 +121,7 @@ export const StylesConfig = (props: StylesConfigProps) => {
       ) : (
         <ContentCard>
           <DetailsFieldContainer className="pt-0 pb-3">
-            <SubHeader title={t('title')} titleClassName="text-2xl leading-none font-bold" />
+            <SubHeader title={t('title')} subtitle={t('subtitle')} titleClassName="mb-1" />
           </DetailsFieldContainer>
           <div className="flex gap-6">
             <SidebarList

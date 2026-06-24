@@ -8,8 +8,8 @@
    - [Database (PostgreSQL)](#11-database-postgresql)
    - [Keycloak / Security](#12-keycloak--security)
    - [Kafka](#13-kafka)
-   - [Model Atlas](#14-model-atlas)
    - [Data-Plane Base URL](#15-data-plane-base-url)
+   - [Gateway Trust Model (APISIX / OPA)](#16-gateway-trust-model-apisix--opa)
 2. [Optional / Tuning](#2-optional--tuning)
    - [Server](#21-server)
    - [Event Publishing & Config-Adapter](#22-event-publishing--config-adapter)
@@ -63,16 +63,6 @@
 
 ---
 
-### 1.4 Model Atlas
-
-| Property / Env Var | Default                   | Description |
-|---|---------------------------|---|
-| `MODEL_ATLAS_BASEURL` | `http://model-atlas:8080` | Model Atlas base URL |
-| `MODEL_ATLAS_SCOPE` | `civitas`                 | Scope for requests |
-| `MODEL_ATLAS_STAGE` | `draft`                   | Stage for requests |
-
----
-
 ### 1.5 Data-Plane Base URL
 
 | Property / Env Var | Example Value | Description |
@@ -80,6 +70,50 @@
 | `CIVITAS_API_BASE_URL` | `https://api.core.civitasconnect.digital` | Public data-plane base URL used to build the per-named-API `previewUrl` returned on GET `/datasets/{id}`. MUST point at the data-plane host (the host APISIX exposes for `/v1/datasets/{id}/{slug}`), not the management host. Fully-qualified HTTPS URL with no path and no trailing slash. No default — startup fails with a `ConstraintViolationException` if missing or malformed. |
 
 > Validation rejects: missing/empty value, non-`https` scheme, paths, trailing slashes (e.g. `https://api.example.com/` or `https://api.example.com/v1`).
+
+---
+
+### 1.6 Gateway Trust Model (APISIX / OPA)
+
+The backend has **no authorization logic of its own** — it *trusts* two HTTP headers that OPA
+sets at the APISIX gateway and that decide which datasets a request may see:
+
+| Header | Meaning |
+|---|---|
+| `X-Allowed-Scope-Ids` | dataset ids the caller may see (`*` = tenant-wide / unscoped) |
+| `X-Allowed-Pool-Ids`  | datapool ids whose datasets the caller may see (datapool-union) |
+
+Because these headers grant data visibility, the deployment **MUST** guarantee they can only ever
+originate from OPA — never from a client. That guarantee rests on three infrastructure properties
+that live in the **`civitas-core-deployment`** repo (owned by Team 3), **not** in this backend's
+container config. They are listed here so the backend's trust assumptions are documented in one
+place; the dev-environment equivalents are in `dev-environment/apisix/apisix_conf/apisix.yaml`.
+
+1. **TLS to Keycloak** — the prod `openid-connect` plugin MUST set `ssl_verify: true`
+   (the dev config disables it for local HTTP Keycloak only).
+
+2. **Header forward + strip at the gateway (review finding F1).** In the prod APISIX config
+   (`components/portal/apisix-plugins.yaml`):
+   - `opa.send_headers_upstream` MUST list **both** `X-Allowed-Scope-Ids` and `X-Allowed-Pool-Ids`,
+     otherwise OPA's decision is dropped and scope/pool filtering silently does nothing.
+   - `proxy-rewrite.headers.remove` MUST strip both client-supplied copies, otherwise a spoofed
+     header is trusted (authorization bypass). The strip list and the saga-route caveat (route-level
+     `proxy-rewrite` overrides the shared one, so the list must be mirrored via
+     `APISIX_PROXY_REWRITE_HEADERS_REMOVE`) are documented in
+     `config-adapter/config-adapter-apisix/README.md`.
+   - The dev side of this contract is guarded by the automated test
+     `TrustedHeaderGatewayContractTest`; there is **no in-repo guard for the prod config** — keep it
+     in sync by hand.
+
+3. **Backend network isolation (review finding F2).** The backend `NetworkPolicy` MUST allow
+   ingress **only from the APISIX gateway**, not directly from the frontend. The frontend reaches the
+   backend exclusively through APISIX (see `portal-frontend/.env.local.template`); a direct
+   frontend→backend path would bypass the header strip in (2) and let the frontend spoof the trusted
+   headers.
+
+> **Deploy F1 and F2 together.** Tightening the `NetworkPolicy` (F2) before the gateway forwards the
+> headers (F1), or vice versa, either locks out the frontend or opens the spoofing window. Roll them
+> out as one coordinated change.
 
 ---
 
@@ -269,11 +303,6 @@ environment:
   # Kafka
   KAFKA_BOOTSTRAP_SERVERS: kafka:9092
   KAFKA_ENABLED: "true"
-
-  # Model Atlas
-  MODEL_ATLAS_BASE_URL: http://model-atlas:8080
-  MODEL_ATLAS_SCOPE: default
-  MODEL_ATLAS_STAGE: draft
 
   # Optional
   APP_URL: https://api.example.com

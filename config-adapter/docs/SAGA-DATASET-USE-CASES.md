@@ -1,6 +1,15 @@
 # Saga Orchestrator: Dataset Lifecycle Use Cases
 
-> **Status**: Design Proposal
+> ⚠️ **Legacy / superseded.** This document describes the original **event-driven custom orchestrator**
+> (Kafka `dataset.<adapter>.execute`/`.compensate` messages) with **RedPanda Connect** as the pipeline
+> engine. Both have since been replaced: orchestration now runs **in-process via the embedded Flowable
+> saga engine** (see [`config-adapter-flowable`](../config-adapter-flowable/README.md)), and the
+> pipeline engine is now **Apache NiFi** (see [`config-adapter-nifi`](../config-adapter-nifi)). The
+> per-adapter Kafka event protocol and the RedPanda references below no longer reflect the
+> implementation; the high-level saga **ordering and compensation semantics** (FROST → APISIX →
+> pipeline, reverse-order rollback) still hold. Kept for historical reference.
+
+> **Status**: Design Proposal (legacy)
 > **Scope**: All orchestrated saga flows for `dataset.create`, `dataset.update`, and `dataset.delete`
 > **Execution model**: Strictly sequential (no parallel steps, no parallel compensation)
 

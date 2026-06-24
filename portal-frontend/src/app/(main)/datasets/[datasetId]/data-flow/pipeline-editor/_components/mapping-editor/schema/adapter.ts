@@ -33,10 +33,8 @@ const isGeometry = (type: string): type is GeometryType => (GEOMETRY as Set<stri
 
 const STRUCTURAL = new Set<UMLRelationship['type']>(['association', 'aggregation', 'composition'])
 
-// Geometries are scalar-like: a Point port matches another Point port the same way
-// int matches int, so they render as scalar handles rather than object handles.
 const portTypeFor = (type: FieldType): PortType =>
-  type === 'array' ? 'array' : type === 'object' ? 'object' : 'scalar'
+  type === 'array' ? 'array' : type === 'object' ? 'object' : isGeometry(type) ? 'geometry' : 'scalar'
 
 const isMany = (multiplicity?: string): boolean => !!multiplicity && multiplicity.includes('*')
 

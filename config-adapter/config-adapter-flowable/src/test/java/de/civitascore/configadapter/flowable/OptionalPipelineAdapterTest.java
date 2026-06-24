@@ -33,7 +33,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * Verifies that the pipeline adapter (redpanda) is optional: the engine runs without it, a
+ * Verifies that the pipeline adapter (pipeline) is optional: the engine runs without it, a
  * pipeline-free saga completes, and a saga that does need it fails gracefully (saga failure +
  * compensation) instead of crashing. Run across both the BPMN-XML and coded process variants.
  */
@@ -48,7 +48,7 @@ class OptionalPipelineAdapterTest {
     return Stream.of(Arguments.of("BPMN", true), Arguments.of("Coded", false));
   }
 
-  /** Builds an engine with ONLY frost + apisix registered — no redpanda/pipeline handler. */
+  /** Builds an engine with ONLY frost + apisix registered — no pipeline/pipeline handler. */
   void setUp(boolean useBpmn) {
     frostHandler = FlowableTestSupport.mockHandler("frost");
     apisixHandler = FlowableTestSupport.mockHandler("apisix");
@@ -78,7 +78,7 @@ class OptionalPipelineAdapterTest {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("de.civitascore.configadapter.flowable.OptionalPipelineAdapterTest#approaches")
-  void noPipelineSaga_completesWithoutRedpandaHandler(String label, boolean useBpmn) {
+  void noPipelineSaga_completesWithoutPipelineHandler(String label, boolean useBpmn) {
     setUp(useBpmn);
     stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1", "baseUrl", "http://f"));
     stubSuccess(apisixHandler, "create-route", Map.of("routeId", "r1"));
@@ -91,7 +91,7 @@ class OptionalPipelineAdapterTest {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("de.civitascore.configadapter.flowable.OptionalPipelineAdapterTest#approaches")
-  void pipelineSaga_withoutRedpandaHandler_failsGracefully(String label, boolean useBpmn) {
+  void pipelineSaga_withoutPipelineHandler_failsGracefully(String label, boolean useBpmn) {
     setUp(useBpmn);
     stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1", "baseUrl", "http://f"));
     stubSuccess(apisixHandler, "create-route", Map.of("routeId", "r1"));

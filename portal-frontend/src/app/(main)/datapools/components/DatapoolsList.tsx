@@ -17,6 +17,7 @@ import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { DatapoolSummary } from '@/types/datapools'
 
@@ -53,7 +54,7 @@ const DatapoolsList = (props: DatapoolsListProps) => {
   const { mutate: deleteDatapool } = useDeleteDatapool()
 
   const { hasPermissionInScope } = usePermissions()
-  const canCreate = hasPermissionInScope(PERMISSION_NAMES.DATAPOOL_CREATE, 'TENANT')
+  const canCreate = hasPermissionInScope(PERMISSION_NAMES.DATAPOOL_CREATE, ASSIGNMENT_SCOPE_TYPES.TENANT)
 
   const handleDeleteClick = (datapool: DatapoolSummary) => {
     setDatapoolToDelete(datapool.id)

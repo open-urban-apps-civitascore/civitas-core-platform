@@ -40,7 +40,7 @@ public class FlowableSagaOrchestrator implements AutoCloseable {
   private static final String PROP_APPROACH = "flowable.approach";
 
   // Only the unconditional saga steps require a handler at startup. The pipeline adapter
-  // (redpanda/nifi) is conditional — it runs only when hasPipelines==true — so it is resolved
+  // (pipeline/nifi) is conditional — it runs only when hasPipelines==true — so it is resolved
   // lazily per step and a saga that has no pipelines runs fine without it. See SagaStepDelegate.
   private static final Set<String> REQUIRED_HANDLERS = Set.of("frost", "apisix");
 

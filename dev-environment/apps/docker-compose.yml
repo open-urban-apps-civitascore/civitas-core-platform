@@ -20,7 +20,7 @@ services:
     environment:
       SERVER_PORT: 8088
       HEALTHCHECK_PORT: 8088
-      ADAPTERS: keycloak,apisix,frost # ,nifi (add after implementation)
+      ADAPTERS: keycloak,apisix,frost
       EVENTHANDLER_NAME: kafka
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_GROUP_ID: config-adapter-group
@@ -50,10 +50,12 @@ services:
       APISIX_SERVICE_ID: svc-frost-server
       # Headers the saga's route-level proxy-rewrite must strip in lieu of plugin_config 1
       # (Route-over-PluginConfig precedence overrides plugin_config's proxy-rewrite).
-      APISIX_PROXY_REWRITE_HEADERS_REMOVE: X-Allowed-Scope-Ids
+      APISIX_PROXY_REWRITE_HEADERS_REMOVE: X-Allowed-Scope-Ids,X-Allowed-Pool-Ids
       # FROST upstream auth APISIX injects when proxying private dataset routes.
       APISIX_FROST_API_KEY: dev-frost-api-key
       APISIX_FROST_API_KEY_HEADER: X-API-Key
+      # Gateway-reachable GeoServer base for OWS (map services) named-API routes.
+      APISIX_GEOSERVER_URL: http://civitas-geoserver:8080/geoserver
       APISIX_TOPICS: de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted
       FROST_URL: http://civitas-frost:8080/FROST-Server/v1.1
       FROST_PUBLIC_URL: http://civitas-frost:8080/FROST-Server/v1.1
@@ -61,7 +63,14 @@ services:
       FROST_API_KEY_HEADER: X-API-Key
       FROST_TOPICS: de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
       NIFI_URL: https://civitas-nifi:8443
-      NIFI_TOPICS: de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
+      NIFI_USERNAME: admin
+      NIFI_PASSWORD: nifi-dev-password-1234567890
+      NIFI_TLS_INSECURE: "true"
+      NIFI_FROST_URL: http://civitas-frost:8080/FROST-Server/v1.1
+      # PostGIS sink connection (read by bindPlatformDbcp); points at the same DB GeoServer/PostGIS use
+      NIFI_POSTGIS_URL: jdbc:postgresql://civitas-geoserver-db:5432/geoserver
+      NIFI_POSTGIS_USER: geoserver
+      NIFI_POSTGIS_PASSWORD: geoserver
       GEOSERVER_URL: http://civitas-geoserver:8080/geoserver
       GEOSERVER_ADMIN_USER: admin
       GEOSERVER_ADMIN_PASSWORD: geoserver

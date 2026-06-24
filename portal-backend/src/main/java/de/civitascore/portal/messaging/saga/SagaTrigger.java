@@ -6,6 +6,8 @@ import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.model.dataset.NamedApi;
 import de.civitascore.configadapter.model.saga.SagaType;
 import de.civitascore.portal.model.saga.DataSinkPayload;
+import de.civitascore.portal.model.saga.LayerPayload;
+import de.civitascore.portal.model.saga.StylePayload;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -47,6 +49,8 @@ public sealed interface SagaTrigger
       boolean openDataAccess,
       List<Datasource> datasources,
       List<DataSinkPayload> datasinks,
+      List<LayerPayload> layers,
+      List<StylePayload> styles,
       List<DataPipeline> dataPipelines,
       List<NamedApi> namedApis)
       implements SagaTrigger {
@@ -66,6 +70,8 @@ public sealed interface SagaTrigger
         boolean openDataAccess,
         List<Datasource> datasources,
         List<DataSinkPayload> datasinks,
+        List<LayerPayload> layers,
+        List<StylePayload> styles,
         List<DataPipeline> dataPipelines,
         List<NamedApi> namedApis) {
       return new DatasetCreate(
@@ -76,6 +82,8 @@ public sealed interface SagaTrigger
           openDataAccess,
           datasources,
           datasinks,
+          layers,
+          styles,
           dataPipelines,
           namedApis);
     }
@@ -94,6 +102,8 @@ public sealed interface SagaTrigger
       List<String> pipelineIds,
       List<Datasource> datasources,
       List<DataSinkPayload> datasinks,
+      List<LayerPayload> layers,
+      List<StylePayload> styles,
       List<DataPipeline> dataPipelines,
       List<NamedApi> namedApis)
       implements SagaTrigger {
@@ -117,6 +127,8 @@ public sealed interface SagaTrigger
         List<String> pipelineIds,
         List<Datasource> datasources,
         List<DataSinkPayload> datasinks,
+        List<LayerPayload> layers,
+        List<StylePayload> styles,
         List<DataPipeline> dataPipelines,
         List<NamedApi> namedApis) {
       return new DatasetUpdate(
@@ -131,6 +143,8 @@ public sealed interface SagaTrigger
           pipelineIds,
           datasources,
           datasinks,
+          layers,
+          styles,
           dataPipelines,
           namedApis);
     }

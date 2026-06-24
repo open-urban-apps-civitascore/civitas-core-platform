@@ -43,7 +43,7 @@
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <apache-jena.version>5.6.0</apache-jena.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
-        <config-adapter.version>1.0.2-MR-561-SNAPSHOT</config-adapter.version>
+        <config-adapter.version>1.0.2-MR-586-SNAPSHOT</config-adapter.version>
         <portal-model.version>1.0.0</portal-model.version>
     </properties>
 
@@ -194,13 +194,6 @@
                     <artifactId>jackson-module-scala_2.13</artifactId>
                 </exclusion>
             </exclusions>
-        </dependency>
-        <!-- WireMock for mocking external HTTP services -->
-        <dependency>
-            <groupId>org.wiremock.integrations</groupId>
-            <artifactId>wiremock-spring-boot</artifactId>
-            <version>4.2.1</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -354,7 +347,6 @@
                         <ignoredUsedUndeclaredDependency>org.apache.tomcat.embed:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>io.swagger.core.v3:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.awaitility:*</ignoredUsedUndeclaredDependency>
-                        <ignoredUsedUndeclaredDependency>org.wiremock:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.apache.logging.log4j:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.postgresql:*</ignoredUsedUndeclaredDependency>
                         <!-- Transitively pulled, used directly only in tests; versions
