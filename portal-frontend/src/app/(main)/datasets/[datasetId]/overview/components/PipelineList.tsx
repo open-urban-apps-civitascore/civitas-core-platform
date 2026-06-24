@@ -43,10 +43,10 @@ const getPipelineBadges = (dto: PipelineOutputDTO, datasourceConnectors: Map<str
 interface PipelineListProps {
   datasetId: string
   pipelines: PipelineBasicInfo[]
-  canAdd: boolean
+  canEditPipeline: boolean
 }
 
-export const PipelineList = ({ datasetId, pipelines, canAdd }: PipelineListProps) => {
+export const PipelineList = ({ datasetId, pipelines, canEditPipeline }: PipelineListProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.pipelines')
   const { data: pipelinesData } = useGetPipelines(datasetId)
   const { data: datasourcesData } = useGetDatasources()
@@ -71,7 +71,7 @@ export const PipelineList = ({ datasetId, pipelines, canAdd }: PipelineListProps
     <div className="py-3 mb-6">
       <div className="flex items-center justify-between gap-4">
         <h4 className="font-semibold">{t('title')}</h4>
-        {canAdd && (
+        {canEditPipeline && (
           <Button asChild variant="outline">
             <GuardedLink href={`/datasets/${datasetId}/data-flow/pipeline-editor`}>{t('addButton')}</GuardedLink>
           </Button>

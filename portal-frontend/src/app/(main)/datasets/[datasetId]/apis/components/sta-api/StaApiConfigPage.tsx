@@ -82,6 +82,7 @@ export const StaApiConfigPage = ({ dataset, existingApi, testId }: StaApiConfigP
 
   return (
     <ApiConfigWrapper
+      dataset={dataset}
       isReadOnly={isReadOnly}
       hasUnsavedChanges={form.formState.isDirty}
       isFormValid={form.formState.isValid}

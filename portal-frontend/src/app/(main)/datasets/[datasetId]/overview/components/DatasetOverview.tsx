@@ -65,12 +65,20 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const tCommon = useTranslations('common')
 
   const { hasPermission, hasScopedPermission } = usePermissions()
+  const canCreate = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_CREATE,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
+
   const canUpdate = hasScopedPermission(
     PERMISSION_NAMES.DATASET_UPDATE,
     ASSIGNMENT_SCOPE_TYPES.DATASET,
     dataset.id,
     dataset.datapool?.id,
   )
+
   const canRelease = hasScopedPermission(
     PERMISSION_NAMES.DATASET_RELEASE,
     ASSIGNMENT_SCOPE_TYPES.DATASET,
@@ -320,7 +328,11 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       buttons: [],
       content: (
         <>
-          <PipelineList datasetId={dataset.id} pipelines={pipelineList} canAdd={canUpdate && canReadDatasources} />
+          <PipelineList
+            datasetId={dataset.id}
+            pipelines={pipelineList}
+            canEditPipeline={canCreate && canUpdate && canReadDatasources}
+          />
           <div className="border-t" />
           <ApiList
             datasetId={dataset.id}

@@ -93,10 +93,13 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
   const { data: layersData, isPending: isLayersLoading } = useGetLayers(dataset.id)
   const { data: stylesData, isPending: isStylesLoading } = useGetStyles(dataset.id)
 
-  const postgisDataSinks = useMemo(
-    () => (dataSinksData?.data || []).filter(dataSink => dataSink.dataSinkType === DATASINK_TYPES.POSTGIS),
-    [dataSinksData],
-  )
+  const postgisDataSinks = useMemo(() => {
+    const currentPipelineIds = dataset.pipelines.map(pipeline => pipeline.id)
+    return (dataSinksData?.data || []).filter(
+      dataSink => dataSink.dataSinkType === DATASINK_TYPES.POSTGIS && currentPipelineIds.includes(dataSink.pipelineId),
+    )
+  }, [dataSinksData, dataset.pipelines])
+
   const datastructuresToFetch = postgisDataSinks?.map(dataSink => ({
     datastructureId: dataSink.configuration.dataStructureVersion.dataStructureId,
     versionId: dataSink.configuration.dataStructureVersion.id,
@@ -296,6 +299,7 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
 
   return (
     <ApiConfigWrapper
+      dataset={dataset}
       isReadOnly={isReadOnly}
       hasUnsavedChanges={form.formState.isDirty}
       isFormValid={form.formState.isValid}

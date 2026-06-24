@@ -119,7 +119,6 @@ const Wrapper = ({
     <FormProvider {...form}>
       <LayerConfig
         form={form}
-        existingLayers={layers}
         styles={mockStyleList}
         postgisDataSinks={[mockDataSink]}
         postGisDatastructures={[mockDatastructureVersion]}
