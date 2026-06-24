@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ApiStandard, NamedApi, namedApiPathPrefix, NamedApiPayload } from '@/types/namedApis'
+import { cn } from '@/lib/utils'
 
 const STANDARD_ICONS: Record<ApiStandard, ComponentType<{ className?: string }>> = {
   STA: Timer,
@@ -25,10 +26,11 @@ interface ApiCardProps {
   datasetId: string
   existingApis: NamedApi[]
   canEdit: boolean
+  canView: boolean
   isOpenDataAccess: boolean
 }
 
-export const ApiCard = ({ api, datasetId, existingApis, canEdit, isOpenDataAccess }: ApiCardProps) => {
+export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpenDataAccess }: ApiCardProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.apis.card')
   const tStandard = useTranslations('datasets.overview.completion.dataFlow.apis.standardLabels')
   const tApis = useTranslations('datasets.overview.completion.dataFlow.apis')
@@ -79,8 +81,11 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, isOpenDataAcces
     <>
       <div
         data-testid={`apiCard-${api.slug}`}
-        className="flex flex-col bg-white border rounded-sm overflow-hidden group cursor-pointer"
-        onClick={goToView}
+        className={cn(
+          'flex flex-col bg-white border rounded-sm overflow-hidden group ',
+          canView || (canEdit && 'cursor-pointer'),
+        )}
+        onClick={canView ? goToView : undefined}
       >
         <div className="flex items-start gap-3 p-5">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted">
@@ -101,7 +106,9 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, isOpenDataAcces
                 </Tooltip>
               )}
             </div>
-            <span className="font-medium truncate group-hover:underline">{api.name}</span>
+            <span className={cn('font-medium truncate ', canView || (canEdit && 'group-hover:underline'))}>
+              {api.name}
+            </span>
             {api.description ? (
               <span className="text-sm font-normal text-muted-foreground line-clamp-2">{api.description}</span>
             ) : (
@@ -134,15 +141,18 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, isOpenDataAcces
                   {t('actions.edit')}
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem
-                onClick={e => {
-                  e.stopPropagation()
-                  goToView()
-                }}
-                data-testid={`apiCardMenuView-${api.slug}`}
-              >
-                {t('actions.view')}
-              </DropdownMenuItem>
+              {canView ||
+                (canEdit && (
+                  <DropdownMenuItem
+                    onClick={e => {
+                      e.stopPropagation()
+                      goToView()
+                    }}
+                    data-testid={`apiCardMenuView-${api.slug}`}
+                  >
+                    {t('actions.view')}
+                  </DropdownMenuItem>
+                ))}
               <DropdownMenuItem
                 onClick={e => {
                   e.stopPropagation()

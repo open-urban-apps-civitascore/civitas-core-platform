@@ -17,10 +17,11 @@ interface ApiListProps {
   datasetId: string
   apis: NamedApi[]
   canEdit: boolean
+  canView: boolean
   isOpenDataAccess: boolean
 }
 
-export const ApiList = ({ datasetId, apis, canEdit, isOpenDataAccess }: ApiListProps) => {
+export const ApiList = ({ datasetId, apis, canEdit, canView, isOpenDataAccess }: ApiListProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.apis')
   const hasOws = hasApiType(apis, API_STANDARDS.OWS)
 
@@ -79,6 +80,7 @@ export const ApiList = ({ datasetId, apis, canEdit, isOpenDataAccess }: ApiListP
               datasetId={datasetId}
               existingApis={apis}
               canEdit={canEdit}
+              canView={canView}
               isOpenDataAccess={isOpenDataAccess}
             />
           ))}
