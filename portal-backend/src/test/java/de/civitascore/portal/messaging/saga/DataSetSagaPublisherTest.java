@@ -1006,4 +1006,106 @@ class DataSetSagaPublisherTest {
       assertThat(roundTripped.routeIds()).isNull();
     }
   }
+
+  @Nested
+  @DisplayName("geoPoint pipeline carries its mapping and the geometry sink schema")
+  class GeoPointContractTests {
+
+    private DataSink postgisGeoSink(UUID sinkId, UUID dsvId) {
+      DataSink sink = new DataSink();
+      sink.setId(sinkId);
+      sink.setDataSinkType(DataSinkType.POSTGIS);
+      sink.setConfiguration(
+          Map.of("tableName", "sensor_observations", "dataStructureVersionId", dsvId.toString()));
+      return sink;
+    }
+
+    @Test
+    @DisplayName(
+        "trigger carries the geoPoint op in dataPipelines[].data and the geometry $ref + crs on the"
+            + " sink dataStructure")
+    void carriesGeoPointMappingAndGeometrySinkSchema() {
+      UUID dsvId = UUID.randomUUID();
+      UUID sinkId = UUID.randomUUID();
+
+      // Pipeline model as the editor ships it: a mapping node with an inline geoPoint
+      // mappingConfig.
+      // The publisher forwards this graph verbatim, so the config-adapter can compile geoPoint
+      // sink-dependently.
+      Map<String, Object> mappingConfig =
+          Map.of(
+              "$schema",
+              "https://civitasconnect.digital/core/mapping/v1",
+              "fields",
+              Map.of("$.geo", Map.of("op", "geoPoint", "lon", "$.lon", "lat", "$.lat")));
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      pipeline.setModel(
+          Map.of(
+              "nodes",
+              List.of(
+                  Map.of(
+                      "id",
+                      "mapping-1",
+                      "type",
+                      "mapping",
+                      "data",
+                      Map.of("mappingConfig", mappingConfig)))));
+
+      // The geometry target lives on the sink's data-structure version as a GeoJSON $ref + crs —
+      // the schema the PostGIS adapter turns into a GEOMETRY(POINT, 25832) column.
+      DataStructureVersion version = new DataStructureVersion();
+      version.setModel(
+          Map.of(
+              "title",
+              "GeoProbe",
+              "properties",
+              Map.of(
+                  "station_id",
+                  Map.of("type", "string"),
+                  "location",
+                  Map.of("$ref", "https://geojson.org/schema/Point.json", "crs", "EPSG:25832"))));
+
+      DataSink sink = postgisGeoSink(sinkId, dsvId);
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("geo");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setPipelines(Set.of(pipeline));
+
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
+      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+
+      // 1) The geoPoint op survives intact in the forwarded pipeline graph (under `data`).
+      var dataPipelines = payload.get("dataPipelines");
+      assertThat(dataPipelines).as("dataPipelines present").isNotNull();
+      assertThat(dataPipelines.size()).isEqualTo(1);
+      var geo =
+          dataPipelines
+              .get(0)
+              .get("data")
+              .get("nodes")
+              .get(0)
+              .get("data")
+              .get("mappingConfig")
+              .get("fields")
+              .get("$.geo");
+      assertThat(geo).as("geoPoint field carried in pipeline model").isNotNull();
+      assertThat(geo.get("op").asString()).isEqualTo("geoPoint");
+      assertThat(geo.get("lon").asString()).isEqualTo("$.lon");
+      assertThat(geo.get("lat").asString()).isEqualTo("$.lat");
+
+      // 2) The geometry sink schema (the $ref + crs the adapter needs) rides on the sink payload.
+      var location =
+          payload.get("datasinks").get(0).get("dataStructure").get("properties").get("location");
+      assertThat(location).as("geometry property carried on sink dataStructure").isNotNull();
+      assertThat(location.get("$ref").asString())
+          .isEqualTo("https://geojson.org/schema/Point.json");
+      assertThat(location.get("crs").asString()).isEqualTo("EPSG:25832");
+    }
+  }
 }

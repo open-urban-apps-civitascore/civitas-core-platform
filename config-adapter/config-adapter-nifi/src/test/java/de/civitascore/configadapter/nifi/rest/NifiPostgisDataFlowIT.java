@@ -76,6 +76,7 @@ class NifiPostgisDataFlowIT {
   private static final String USER = "admin";
   private static final String PASSWORD = "ctsNiFiTestPassword123";
   private static final String TOPIC = "civitas/it/postgis";
+  private static final String GEO_TOPIC = "civitas/it/postgis-geo";
   private static final String DB = "nifi_demo";
   private static final String DB_USER = "nifi";
   private static final String DB_PASSWORD = "nifi-db-secret";
@@ -115,7 +116,9 @@ class NifiPostgisDataFlowIT {
     mosquitto.start();
 
     postgres =
-        new PostgreSQLContainer<>(DockerImageName.parse("postgres:16"))
+        new PostgreSQLContainer<>(
+                DockerImageName.parse("postgis/postgis:16-3.4-alpine")
+                    .asCompatibleSubstituteFor("postgres"))
             .withNetwork(network)
             .withNetworkAliases("postgres")
             .withDatabaseName(DB)
@@ -234,6 +237,64 @@ class NifiPostgisDataFlowIT {
     }
   }
 
+  @Test
+  void deployedFlowWritesGeometryFromGeoPoint() throws Exception {
+    // The geoPoint op builds a Point from two scalar coordinate fields. For a PostGIS sink it must
+    // compile to WKT (POINT(lon lat)) that PutDatabaseRecord binds into the geometry column —
+    // exercising the sink-dependent geometry path AND the stringtype=unspecified DBCP fix end to
+    // end
+    // on real NiFi + PostGIS.
+    Map<String, Object> graph =
+        map(
+            """
+            { "nodes": [
+                { "id": "s", "type": "start", "data": {} },
+                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
+                    "fields": { "$.stationid": "$.stationid",
+                                "$.geom": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" } } } } },
+                { "id": "e", "type": "end", "data": {} } ],
+              "edges": [
+                { "id": "e1", "source": "s", "target": "m" },
+                { "id": "e2", "source": "m", "target": "e" } ] }
+            """);
+
+    Datasource source = new Datasource();
+    source.setId("ds-pg-geo-it");
+    source.setType("MQTT");
+    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
+    source.handleUnknownProperty("topics", List.of(GEO_TOPIC));
+
+    FlowDeploymentPlanner planner =
+        new FlowDeploymentPlanner(
+            new GraphParser(),
+            new MappingConfigParser(),
+            new RecordPathCompiler(),
+            new NifiFlowBuilder(),
+            new CredentialResolver(new byte[0]),
+            new PlatformSinkConfig("jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
+            null);
+    DeploymentPlan plan =
+        planner.plan(
+            new PipelineDeploymentRequest(
+                "pg-geo-it", graph, source, new SinkSpec(SinkType.POSTGIS, "geo_observation")));
+
+    client.deployFlow(plan);
+
+    String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
+    try (MqttPublisher publisher = new MqttPublisher(brokerUrl)) {
+      await()
+          .atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(
+              () -> {
+                publisher.publish(
+                    GEO_TOPIC, "{\"stationid\":\"S2\",\"lon\":\"8.4\",\"lat\":\"49.0\"}");
+                return geometryRowLanded();
+              });
+    }
+  }
+
   /** Queries PostgreSQL and asserts the row is present with the int column correctly coerced. */
   private boolean rowLanded() throws Exception {
     try (Connection c = dbConnection();
@@ -255,10 +316,33 @@ class NifiPostgisDataFlowIT {
     }
   }
 
+  /**
+   * Asserts the geoPoint landed as a real PostGIS Point with the column's SRID and right coords.
+   */
+  private boolean geometryRowLanded() throws Exception {
+    try (Connection c = dbConnection();
+        Statement st = c.createStatement();
+        ResultSet rs =
+            st.executeQuery(
+                "SELECT ST_X(geom) AS x, ST_Y(geom) AS y, ST_SRID(geom) AS srid"
+                    + " FROM geo_observation WHERE stationid = 'S2'")) {
+      if (!rs.next()) {
+        return false;
+      }
+      assertEquals(8.4, rs.getDouble("x"), 1e-9);
+      assertEquals(49.0, rs.getDouble("y"), 1e-9);
+      // the WKT carried no SRID; the geometry(Point,4326) column stamps 4326 on insert
+      assertEquals(4326, rs.getInt("srid"));
+      return true;
+    }
+  }
+
   private static void createTable() throws Exception {
     try (Connection c = dbConnection();
         Statement st = c.createStatement()) {
+      st.execute("CREATE EXTENSION IF NOT EXISTS postgis");
       st.execute("CREATE TABLE observation (stationid text, count integer, meta jsonb)");
+      st.execute("CREATE TABLE geo_observation (stationid text, geom geometry(Point,4326))");
     }
   }
 
