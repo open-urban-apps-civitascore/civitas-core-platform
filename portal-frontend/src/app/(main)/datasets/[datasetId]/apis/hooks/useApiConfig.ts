@@ -12,15 +12,8 @@ import { useCreateStyle, useUpdateStyle } from '@/app/services/api/datasets/styl
 import { useError } from '@/hooks/use-error'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { Dataset } from '@/types/datasets'
-import {
-  API_TYPE_QUERY,
-  LayerApiPayload,
-  LayerFormData,
-  NamedApi,
-  NamedApiPayload,
-  OwsApiFormData,
-  StaApiFormData,
-} from '@/types/namedApis'
+import { LayerApiPayload, LayerFormData } from '@/types/layers'
+import { API_TYPE_QUERY, NamedApi, NamedApiPayload, OwsApiFormData, StaApiFormData } from '@/types/namedApis'
 import { StyleFormData } from '@/types/styles'
 import { isLayerNameError, LayerSaveError } from '@/utils/errors'
 import { hasDirtyField } from '@/utils/form'

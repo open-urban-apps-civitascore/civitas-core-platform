@@ -4,13 +4,10 @@ import { UMLClass } from '@/components/uml-modeler/types/uml'
 import { crsOptions } from '@/const/crs'
 import { DataSink } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
+import { BoundingBox, Layer, LayerApiPayload, LayerFormData } from '@/types/layers'
 import {
   ApiStandard,
-  BoundingBox,
   DEFAULTS_BY_TYPE,
-  Layer,
-  LayerApiPayload,
-  LayerFormData,
   NamedApi,
   NamedApiPayload,
   OwsApiFormData,
