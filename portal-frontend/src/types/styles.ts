@@ -13,11 +13,11 @@ export const StyleSchema = z.object({
 export type Style = z.infer<typeof StyleSchema>
 
 export const StyleInputSchema = z.object({
-  name: z.string().trim().min(1, 'common.errors.required'),
-  sldContent: z
+  name: z
     .string()
     .min(1, 'common.errors.required')
     .regex(/^[A-Za-z0-9_-]+$/, 'common.errors.invalidCharacters'),
+  sldContent: z.string().trim().min(1, 'common.errors.required'),
 })
 
 export type StyleInput = z.infer<typeof StyleInputSchema>
