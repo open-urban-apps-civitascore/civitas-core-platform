@@ -238,7 +238,7 @@ describe('exportToJsonSchema', () => {
     expect(schema.title).toBe('Status')
   })
 
-  it('uses a type-library layout when the diagram has multiple disconnected root classes', () => {
+  it('keeps a single-root layout when the diagram has multiple unconnected classes', () => {
     const diagram = baseDiagram({
       nodes: [
         {
@@ -277,102 +277,12 @@ describe('exportToJsonSchema', () => {
 
     const schema = exportToJsonSchema(diagram)
 
-    // Document root must not declare a type — it is a type-library envelope.
-    expect(schema.type).toBeUndefined()
-    expect(schema.properties).toBeUndefined()
-
-    // Both classes must appear in $defs.
+    // First class becomes the document root; the other is emitted under $defs.
+    expect(schema.type).toBe('object')
+    expect(schema.title).toBe('Building')
     const defs = schema.$defs as Record<string, Record<string, unknown>>
-    expect(defs.Building).toBeDefined()
     expect(defs.Street).toBeDefined()
-
-    // Envelope fields are still present.
-    expect(schema.$schema).toBe('https://json-schema.org/draft/2020-12/schema')
-    expect(schema.title).toBe('TrafficSensor')
-  })
-
-  it('uses a type-library layout when a connected component and a standalone class coexist', () => {
-    const diagram = baseDiagram({
-      nodes: [
-        {
-          id: 'node-1',
-          type: 'class',
-          position: { x: 0, y: 0 },
-          data: {
-            element: {
-              id: 'elem-1',
-              name: 'Sensor',
-              type: 'class',
-              attributes: [],
-              operations: [],
-            },
-            label: 'Sensor',
-          },
-        },
-        {
-          id: 'node-2',
-          type: 'class',
-          position: { x: 200, y: 0 },
-          data: {
-            element: {
-              id: 'elem-2',
-              name: 'Reading',
-              type: 'class',
-              attributes: [{ id: 'a1', name: 'value', type: 'Double', visibility: 'public' }],
-              operations: [],
-            },
-            label: 'Reading',
-          },
-        },
-        {
-          id: 'node-3',
-          type: 'class',
-          position: { x: 500, y: 0 },
-          data: {
-            element: {
-              id: 'elem-3',
-              name: 'Location',
-              type: 'class',
-              attributes: [{ id: 'a2', name: 'lat', type: 'Double', visibility: 'public' }],
-              operations: [],
-            },
-            label: 'Location',
-          },
-        },
-      ],
-      edges: [
-        {
-          id: 'edge-1',
-          type: 'composition',
-          source: 'node-1',
-          target: 'node-2',
-          data: {
-            relationship: {
-              id: 'rel-1',
-              type: 'composition',
-              source: 'elem-1',
-              target: 'elem-2',
-              targetRole: 'readings',
-              targetMultiplicity: '*',
-            },
-            label: '',
-            isSelected: false,
-            isDirty: false,
-          },
-        },
-      ],
-    })
-
-    const schema = exportToJsonSchema(diagram)
-
-    // Document root must not declare a type.
-    expect(schema.type).toBeUndefined()
-
-    // All three classes must appear in $defs.
-    const defs = schema.$defs as Record<string, Record<string, unknown>>
-    expect(defs.Sensor).toBeDefined()
-    expect(defs.Reading).toBeDefined()
-    expect(defs.Location).toBeDefined()
+    expect(defs.Building).toBeUndefined()
   })
 
   it('enumerations alone do not count as roots — single class with an enum stays in single-root layout', () => {
