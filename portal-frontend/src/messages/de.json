@@ -1338,6 +1338,9 @@
               "label": "Muster"
             }
           }
+        },
+        "geoPoint": {
+          "description": "Längengrad + Breitengrad → Point"
         }
       }
     }

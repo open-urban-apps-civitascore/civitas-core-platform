@@ -1350,6 +1350,9 @@
               "label": "Pattern"
             }
           }
+        },
+        "geoPoint": {
+          "description": "longitude + latitude → Point"
         }
       }
     }
