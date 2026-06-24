@@ -13,6 +13,8 @@ import type { LucideIcon } from 'lucide-react'
 import { GripVertical } from 'lucide-react'
 import { useCallback } from 'react'
 
+import { cn } from '@/lib/utils'
+
 import type { PipelineNodeType } from '../../_types/pipeline'
 
 // ============================================================================
@@ -28,6 +30,8 @@ interface PaletteItemProps {
   icon: LucideIcon
   /** Short description (shown in tooltip) */
   description: string
+  /** When true, the item cannot be dragged and is rendered as visually disabled. */
+  isDisabled?: boolean
 }
 
 // ============================================================================
@@ -39,7 +43,7 @@ interface PaletteItemProps {
  * Drag to the canvas to create a new node.
  *
  */
-export const PaletteItem: React.FC<PaletteItemProps> = ({ nodeType, label, icon, description }) => {
+export const PaletteItem: React.FC<PaletteItemProps> = ({ nodeType, label, icon, description, isDisabled = false }) => {
   // Rename for JSX - React components must be PascalCase
   const IconComponent = icon
 
@@ -57,9 +61,13 @@ export const PaletteItem: React.FC<PaletteItemProps> = ({ nodeType, label, icon,
 
   return (
     <div
-      draggable
-      onDragStart={onDragStart}
-      className="group flex cursor-move items-center gap-2 rounded-md border border-border bg-background p-2 transition-colors hover:border-primary/50 hover:bg-muted/50"
+      draggable={!isDisabled}
+      onDragStart={isDisabled ? undefined : onDragStart}
+      aria-disabled={isDisabled}
+      className={cn(
+        'group flex items-center gap-2 rounded-md border border-border bg-background p-2 transition-colors',
+        isDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-move hover:border-primary/50 hover:bg-muted/50',
+      )}
       title={description}
     >
       {/* Icon */}
@@ -74,9 +82,11 @@ export const PaletteItem: React.FC<PaletteItemProps> = ({ nodeType, label, icon,
       </div>
 
       {/* Drag Handle Indicator */}
-      <div className="flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
-        <GripVertical className="h-4 w-4 text-muted-foreground" />
-      </div>
+      {!isDisabled && (
+        <div className="flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
+      )}
     </div>
   )
 }

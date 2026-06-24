@@ -28,6 +28,7 @@ import { useCallback, useMemo } from 'react'
 
 import { CANVAS_CONFIG } from '../../_constants/pipelineStyles'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
+import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 import type { PipelineNodeType } from '../../_types/pipeline'
 import { pipelineEdgeTypes } from '../edges/edgeTypes'
 import { pipelineNodeTypes } from '../nodes/nodeTypes'
@@ -53,6 +54,8 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
   const t = useTranslations('pipelineEditor')
   const { pipeline, dispatch, addNode, addEdge, validateConnection, hideValidationPanel } = useActivePipeline()
   const { screenToFlowPosition } = useReactFlow()
+  const { isReadOnly } = useReadOnly()
+  const canEdit = !isReadOnly
 
   // Node types registry - maps node type strings to React components
   const nodeTypes = useMemo(() => pipelineNodeTypes, [])
@@ -85,20 +88,26 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
    */
   const onConnect = useCallback(
     (connection: Connection) => {
+      if (!canEdit) {
+        return
+      }
       if (validateConnection(connection)) {
         addEdge(connection)
       }
     },
-    [validateConnection, addEdge],
+    [canEdit, validateConnection, addEdge],
   )
 
   /**
    * Handles drag over event for drop zone.
    */
-  const onDragOver = useCallback((event: React.DragEvent) => {
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'move'
-  }, [])
+  const onDragOver = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault()
+      event.dataTransfer.dropEffect = canEdit ? 'move' : 'none'
+    },
+    [canEdit],
+  )
 
   /**
    * Handles drop event from palette.
@@ -107,6 +116,10 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault()
+
+      if (!canEdit) {
+        return
+      }
 
       const nodeType = event.dataTransfer.getData('application/reactflow') as PipelineNodeType
 
@@ -126,7 +139,7 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
         position,
       })
     },
-    [screenToFlowPosition, addNode],
+    [canEdit, screenToFlowPosition, addNode],
   )
 
   /**
@@ -166,6 +179,9 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
         onDrop={onDrop}
         onDragOver={onDragOver}
         connectionMode={ConnectionMode.Loose}
+        nodesDraggable={canEdit}
+        nodesConnectable={canEdit}
+        edgesReconnectable={canEdit}
         fitView
         fitViewOptions={{ padding: CANVAS_CONFIG.fitViewPadding }}
         snapToGrid={CANVAS_CONFIG.snapToGrid}
@@ -173,13 +189,13 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
         minZoom={CANVAS_CONFIG.minZoom}
         maxZoom={CANVAS_CONFIG.maxZoom}
         defaultViewport={CANVAS_CONFIG.defaultViewport}
-        deleteKeyCode={['Delete', 'Backspace']}
+        deleteKeyCode={canEdit ? ['Delete', 'Backspace'] : null}
         multiSelectionKeyCode={['Meta', 'Ctrl']}
         panActivationKeyCode={null}
         className="bg-muted/10"
       >
         <Background variant={BackgroundVariant.Dots} gap={CANVAS_CONFIG.gridSize} size={1} color="hsl(var(--border))" />
-        <Controls position="bottom-left" showZoom showFitView showInteractive />
+        <Controls position="bottom-left" showZoom showFitView showInteractive={canEdit} />
       </ReactFlow>
     </div>
   )

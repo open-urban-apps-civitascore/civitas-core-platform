@@ -13,6 +13,7 @@ import { useState } from 'react'
 
 import { PIPELINE_PALETTE_CATEGORIES } from '../../_constants/paletteItems'
 import { LAYOUT_DIMENSIONS } from '../../_constants/pipelineStyles'
+import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 import type { PipelineNodeType } from '../../_types/pipeline'
 import { PaletteCategory } from './PaletteCategory'
 import { PaletteItem } from './PaletteItem'
@@ -53,6 +54,7 @@ const NODE_TYPE_TO_TRANSLATION_KEY: Record<PipelineNodeType, string> = {
  */
 export const PipelinePalette: React.FC<PipelinePaletteProps> = ({ className = '' }) => {
   const t = useTranslations('pipelineEditor')
+  const { isReadOnly } = useReadOnly()
 
   // Track expanded state for each category
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>(() => {
@@ -111,6 +113,7 @@ export const PipelinePalette: React.FC<PipelinePaletteProps> = ({ className = ''
                       label={translatedLabel}
                       icon={item.icon}
                       description={translatedDescription}
+                      isDisabled={isReadOnly}
                     />
                   )
                 })}

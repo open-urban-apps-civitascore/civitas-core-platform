@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { LAYOUT_DIMENSIONS } from '../../_constants/pipelineStyles'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
+import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 import type { PipelineNodeData } from '../../_types/nodes'
 import {
   isControlNodeData,
@@ -47,6 +48,7 @@ interface PipelineInspectorProps {
 export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className = '' }) => {
   const t = useTranslations('pipelineEditor')
   const { selectedNode, selectedEdge, updateNode, shouldShowValidationPanel, validationResult } = useActivePipeline()
+  const { isReadOnly } = useReadOnly()
 
   // Resizable width state
   const [width, setWidth] = useState<number>(LAYOUT_DIMENSIONS.inspectorWidth)
@@ -90,11 +92,12 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
 
   const handleNodeUpdate = useCallback(
     (data: Partial<PipelineNodeData>) => {
+      if (isReadOnly) return
       if (selectedNode) {
         updateNode(selectedNode.id, data)
       }
     },
-    [selectedNode, updateNode],
+    [isReadOnly, selectedNode, updateNode],
   )
 
   // Render the appropriate panel based on node type
@@ -103,26 +106,35 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
 
     const { data } = selectedNode
 
+    // Display-only panels (no editing regardless of permissions).
     if (isControlNodeData(data)) {
       return <ControlPanel data={data} />
-    }
-    if (isDataSourceNodeData(data)) {
-      return <DataSourcePanel data={data} onUpdate={handleNodeUpdate} />
-    }
-    if (isCronNodeData(data)) {
-      return <CronPanel data={data} onUpdate={handleNodeUpdate} />
     }
     if (isFrostNodeData(data)) {
       return <FrostPanel data={data} />
     }
-    if (isGeoPersistenceNodeData(data)) {
-      return <GeoPersistencePanel data={data} onUpdate={handleNodeUpdate} />
-    }
-    if (isMappingNodeData(data)) {
-      return <MappingPanel data={data} onUpdate={handleNodeUpdate} />
-    }
 
-    return null
+    // Editable panels — receive onUpdate. In read-only mode they are dimmed and
+    // non-interactive; handleNodeUpdate additionally no-ops as a safeguard.
+    const editablePanel = isDataSourceNodeData(data) ? (
+      <DataSourcePanel data={data} onUpdate={handleNodeUpdate} />
+    ) : isCronNodeData(data) ? (
+      <CronPanel data={data} onUpdate={handleNodeUpdate} />
+    ) : isGeoPersistenceNodeData(data) ? (
+      <GeoPersistencePanel data={data} onUpdate={handleNodeUpdate} />
+    ) : isMappingNodeData(data) ? (
+      <MappingPanel data={data} onUpdate={handleNodeUpdate} />
+    ) : null
+
+    if (!editablePanel) return null
+
+    return isReadOnly ? (
+      <div className="pointer-events-none opacity-60" aria-disabled>
+        {editablePanel}
+      </div>
+    ) : (
+      editablePanel
+    )
   }
 
   return (

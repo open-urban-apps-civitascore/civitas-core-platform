@@ -8,6 +8,7 @@
  *
  */
 
+import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -17,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+import { usePipelinePermissions } from '../../../_hooks/use-pipeline-permissions'
 import type { GeoPersistenceNodeData } from '../../../_types/nodes'
 import { EntityMetadata } from '../components/EntityMetadata'
 
@@ -37,6 +39,8 @@ interface GeoPersistencePanelProps {
 
 export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, onUpdate }) => {
   const t = useTranslations('pipelineEditor')
+  const { datasetId } = useParams<{ datasetId: string }>()
+  const { canReadDatastructures } = usePipelinePermissions(datasetId)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
 
@@ -110,7 +114,7 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
               { label: t('geoPersistencePanel.versionNumber'), value: data.versionNumber },
             ]}
           />
-          {parseCompositeKey(data.dataStructureVersionId) && (
+          {canReadDatastructures && parseCompositeKey(data.dataStructureVersionId) && (
             <button
               onClick={() =>
                 window.open(
@@ -118,7 +122,7 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
                   '_blank',
                 )
               }
-              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
               {t('dataSourcePanel.showDataStructure')}
             </button>
@@ -126,13 +130,15 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
         </>
       )}
 
-      <DataModelImportModal
-        open={isImportModalOpen}
-        onOpenChange={setIsImportModalOpen}
-        selectedVersion={data.dataStructureVersionId ?? null}
-        datasourceTitle={data.tableName || t('geoPersistencePanel.title')}
-        onSelectVersion={handleSelectVersion}
-      />
+      {canReadDatastructures && (
+        <DataModelImportModal
+          open={isImportModalOpen}
+          onOpenChange={setIsImportModalOpen}
+          selectedVersion={data.dataStructureVersionId ?? null}
+          datasourceTitle={data.tableName || t('geoPersistencePanel.title')}
+          onSelectVersion={handleSelectVersion}
+        />
+      )}
     </div>
   )
 }

@@ -49,6 +49,7 @@ import { pickDirtyValues } from '@/utils/form'
 import { mapDatasetToFormData } from '../../../utils/mappers'
 import { BaseInfoForm } from '../../components/BaseInfoForm'
 import { CompletionStep } from '../../components/CompletionStep'
+import { usePipelinePermissions } from '../../data-flow/pipeline-editor/_hooks/use-pipeline-permissions'
 import { ApiList } from './ApiList'
 import { PipelineList } from './PipelineList'
 
@@ -86,6 +87,8 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     dataset.datapool?.id,
   )
   const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
+
+  const { canEdit: canEditPipeline } = usePipelinePermissions(dataset.id)
 
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
@@ -328,11 +331,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       buttons: [],
       content: (
         <>
-          <PipelineList
-            datasetId={dataset.id}
-            pipelines={pipelineList}
-            canEditPipeline={canCreate && canUpdate && canReadDatasources}
-          />
+          <PipelineList datasetId={dataset.id} pipelines={pipelineList} canEditPipeline={canEditPipeline} />
           <div className="border-t" />
           <ApiList
             datasetId={dataset.id}
