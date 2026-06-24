@@ -12,7 +12,8 @@ import type { NodeProps } from '@xyflow/react'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
 import type { DataSourceNodeData, GeoPersistenceNodeData, MappingNodeData, PipelineNodeData } from '../../_types/nodes'
-import type { PipelineNodeType } from '../../_types/pipeline'
+import { PIPELINE_NODE_TYPES, type PipelineNodeType } from '../../_types/pipeline'
+
 import { BasePipelineNode } from './base/BasePipelineNode'
 import { ControlNode } from './base/ControlNode'
 
@@ -23,18 +24,19 @@ import { ControlNode } from './base/ControlNode'
  */
 const getSublabel = (type: PipelineNodeType, data: PipelineNodeData): string | undefined => {
   switch (type) {
-    case 'dataSource': {
+    case PIPELINE_NODE_TYPES.DataSource: {
       const d = data as DataSourceNodeData
       return d.entityId !== undefined ? d.entityName : undefined
     }
-    case 'geoPersistence': {
+    case PIPELINE_NODE_TYPES.GeoPersistence: {
       const d = data as GeoPersistenceNodeData
       return d.tableName || undefined
     }
-    case 'mapping': {
+    case PIPELINE_NODE_TYPES.Mapping: {
       const d = data as MappingNodeData
       return d.sourceName && d.targetName ? `${d.sourceName} → ${d.targetName}` : undefined
     }
+
     default:
       return undefined
   }
