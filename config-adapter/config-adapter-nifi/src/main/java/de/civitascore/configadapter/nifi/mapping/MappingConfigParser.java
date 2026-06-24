@@ -62,7 +62,7 @@ public class MappingConfigParser {
 
   private ValueNode parseValue(JsonNode node) throws FatalAdapterException {
     if (node.isTextual()) {
-      return new CopyNode(node.asText());
+      return copyOf(node.asText());
     }
     if (!node.isObject()) {
       throw reject(
@@ -91,8 +91,12 @@ public class MappingConfigParser {
       throw reject("geoPoint requires a 'lon' and a 'lat'");
     }
     // Each operand is itself a value (a source-path shorthand or a nested op such as toFloat), so
-    // recurse — this keeps the grammar closed and lets a coordinate be converted inline.
-    return new GeoPointNode(parseValue(lon), parseValue(lat));
+    // recurse — this keeps the grammar closed and lets a coordinate be converted inline. A geometry
+    // operand (a Point built from a Point) is nonsensical and would render to malformed WKT, so it
+    // is rejected here rather than failing late in PostGIS.
+    ValueNode lonNode = requireScalarOperand(parseValue(lon), "geoPoint 'lon'");
+    ValueNode latNode = requireScalarOperand(parseValue(lat), "geoPoint 'lat'");
+    return new GeoPointNode(lonNode, latNode);
   }
 
   private ValueNode parseCopy(JsonNode node) throws FatalAdapterException {
@@ -100,7 +104,7 @@ public class MappingConfigParser {
     if (sourcePath == null || !sourcePath.isTextual()) {
       throw reject("copy requires a textual 'sourcePath'");
     }
-    return new CopyNode(sourcePath.asText());
+    return copyOf(sourcePath.asText());
   }
 
   private ValueNode parseConst(JsonNode node) throws FatalAdapterException {
@@ -117,7 +121,7 @@ public class MappingConfigParser {
     }
     List<ValueNode> parsed = new ArrayList<>();
     for (JsonNode input : inputs) {
-      parsed.add(parseValue(input));
+      parsed.add(requireScalarOperand(parseValue(input), "concat input"));
     }
     return new ConcatNode(optionalText(node, "separator"), List.copyOf(parsed));
   }
@@ -141,7 +145,36 @@ public class MappingConfigParser {
     if (!requiresPattern && pattern != null) {
       throw reject(op + " does not take a 'pattern'");
     }
-    return new ConvertNode(conversion.get(), parseValue(input), pattern);
+    return new ConvertNode(
+        conversion.get(), requireScalarOperand(parseValue(input), op + " input"), pattern);
+  }
+
+  /**
+   * Wraps a source path into a {@link CopyNode}, rejecting a blank path. A blank (empty/whitespace)
+   * path resolves to the record root {@code /} in {@link JsonPaths}, which silently copies the
+   * whole record into the target field — and for a geometry coordinate produces structurally-valid
+   * but garbage WKT that only fails far downstream in PostGIS. Rejecting it here turns a late NiFi
+   * row failure into a clean deploy-time error.
+   */
+  private CopyNode copyOf(String sourcePath) throws FatalAdapterException {
+    if (sourcePath.isBlank()) {
+      throw reject("a source path must be non-blank");
+    }
+    return new CopyNode(sourcePath);
+  }
+
+  /**
+   * Rejects a geometry-producing operand ({@code geoPoint}) where only a scalar is meaningful — a
+   * coordinate of another {@code geoPoint}, a {@code concat} input, or a conversion input. A nested
+   * geometry would render to malformed WKT ({@code concat('POINT(', concat('POINT(', …), …)}); it
+   * is knowable at parse time, so it is rejected rather than failing late in PostGIS.
+   */
+  private ValueNode requireScalarOperand(ValueNode node, String where)
+      throws FatalAdapterException {
+    if (node instanceof GeoPointNode) {
+      throw reject(where + " must be a scalar value, not a geoPoint geometry");
+    }
+    return node;
   }
 
   private static Object jsonToValue(JsonNode node) {

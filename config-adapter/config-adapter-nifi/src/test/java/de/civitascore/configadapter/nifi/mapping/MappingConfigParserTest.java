@@ -178,6 +178,50 @@ class MappingConfigParserTest {
   }
 
   @Test
+  void blankShorthandSourcePathIsRejected() {
+    // A blank path would resolve to the record root '/' and silently copy the whole record — for a
+    // coordinate that yields garbage WKT, so it must fail at parse time.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                parse(
+                    """
+            { "fields": { "$.geo": { "op": "geoPoint", "lon": "", "lat": "$.lat" } } }
+            """));
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+  }
+
+  @Test
+  void blankExplicitCopySourcePathIsRejected() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                parse(
+                    """
+            { "fields": { "$.x": { "op": "copy", "sourcePath": "   " } } }
+            """));
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+  }
+
+  @Test
+  void nestedGeoPointOperandIsRejected() {
+    // A geoPoint coordinate must be a scalar; a geometry nested as an operand would render to
+    // malformed WKT, so it is rejected at parse time.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                parse(
+                    """
+            { "fields": { "$.geo": { "op": "geoPoint",
+                "lon": { "op": "geoPoint", "lon": "$.a", "lat": "$.b" }, "lat": "$.lat" } } }
+            """));
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+  }
+
+  @Test
   void nonDateOpWithStrayPatternIsRejected() {
     // toInt does not take a pattern; a stray one is an illegal combination and must be rejected
     // (not silently ignored), so it can never reach the RecordPath compiler.

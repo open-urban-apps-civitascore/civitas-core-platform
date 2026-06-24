@@ -11,6 +11,7 @@ package de.civitascore.configadapter.nifi.flow;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -68,6 +69,26 @@ class FlowDeploymentPlannerTest {
                   "$.station_id": "$.station_id",
                   "$.temperature": "$.temperature",
                   "$.observed_at": { "op": "toDate", "input": "$.ts", "pattern": "yyyy-MM-dd" }
+                } } } },
+            { "id": "n-end", "type": "end", "data": {} }
+          ],
+          "edges": [
+            { "id": "e1", "source": "n-start", "target": "n-map" },
+            { "id": "e2", "source": "n-map", "target": "n-end" }
+          ]
+        }
+        """);
+  }
+
+  private Map<String, Object> graphWithGeoPoint() throws Exception {
+    return map(
+        """
+        {
+          "nodes": [
+            { "id": "n-start", "type": "start", "data": {} },
+            { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
+                "fields": {
+                  "$.location": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" }
                 } } } },
             { "id": "n-end", "type": "end", "data": {} }
           ],
@@ -466,6 +487,63 @@ class FlowDeploymentPlannerTest {
           de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           ex.getErrorCode());
     }
+  }
+
+  @Test
+  void geoPointMappingOnPostgisSinkCompilesToWkt() throws Exception {
+    // Positive path: geometryEncoding(POSTGIS)=WKT propagates through plan(); the deployed snapshot
+    // carries the WKT concat that the geometry column parses on insert.
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-pg-geo", graphWithGeoPoint(), mqttSource(null), postgisSink()))
+              .snapshotJson();
+      assertTrue(snapshot.contains("concat('POINT(', /lon, ' ', /lat, ')')"));
+    }
+  }
+
+  @Test
+  void geoPointMappingOnFrostSinkIsRejected() throws Exception {
+    // geometryEncoding(FROST)=GEOJSON, and geoPoint cannot be rendered as a GeoJSON object via
+    // RecordPath, so compile() — and therefore plan() — must reject before deploying. The standard
+    // planner has a FROST URL, proving the rejection is the encoding, not a missing URL.
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-frost-geo",
+                              graphWithGeoPoint(),
+                              mqttSource(null),
+                              new SinkSpec(SinkType.FROST, null))));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_MAPPING_ERROR,
+          ex.getErrorCode());
+    }
+  }
+
+  @Test
+  void withStringtypeUnspecifiedCoversAllBranches() {
+    // no query string → append with '?'
+    assertEquals(
+        "jdbc:postgresql://db:5432/civitas?stringtype=unspecified",
+        FlowDeploymentPlanner.withStringtypeUnspecified("jdbc:postgresql://db:5432/civitas"));
+    // existing query string → append with '&'
+    assertEquals(
+        "jdbc:postgresql://db:5432/civitas?ssl=true&stringtype=unspecified",
+        FlowDeploymentPlanner.withStringtypeUnspecified(
+            "jdbc:postgresql://db:5432/civitas?ssl=true"));
+    // already present → unchanged (idempotent, no double-append)
+    String already = "jdbc:postgresql://db:5432/civitas?stringtype=unspecified";
+    assertEquals(already, FlowDeploymentPlanner.withStringtypeUnspecified(already));
+    // null / blank pass through untouched
+    assertNull(FlowDeploymentPlanner.withStringtypeUnspecified(null));
+    assertEquals("", FlowDeploymentPlanner.withStringtypeUnspecified(""));
   }
 
   @Test

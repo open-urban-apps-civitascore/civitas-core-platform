@@ -12,10 +12,9 @@ package de.civitascore.configadapter.nifi.mapping;
 /**
  * How a geometry-producing mapping op (currently {@code geoPoint}) must be rendered for the target
  * sink. This is the one axis on which mapping compilation is sink-dependent: a PostGIS column
- * parses a {@code WKT}/EWKT string, whereas a FROST sink expects a {@code GEOJSON} object. Kept in
- * the mapping package (rather than referencing the {@code flow.SinkType} enum) so the compiler
- * stays free of any sink/flow dependency; the deployment planner translates the sink type to an
- * encoding.
+ * parses a {@code WKT} string, whereas a FROST sink expects a {@code GEOJSON} object. Kept in the
+ * mapping package (rather than referencing the {@code flow.SinkType} enum) so the compiler stays
+ * free of any sink/flow dependency; the deployment planner translates the sink type to an encoding.
  */
 public enum GeometryEncoding {
   /**

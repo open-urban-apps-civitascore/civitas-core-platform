@@ -98,10 +98,8 @@ public class FlowDeploymentPlanner {
     PipelineGraph graph = graphParser.parse(request.graphData());
     Optional<MappingConfig> mapping = parseMapping(graph);
     SinkSpec sink = request.sink();
-    // The mapping is compiled sink-dependently: a geoPoint renders to WKT for a PostGIS column or
-    // GeoJSON for FROST. compile() may reject an op it cannot render for the sink, so this is not
-    // an
-    // Optional.map — the mapping function cannot propagate the checked FatalAdapterException.
+    // compile() throws a checked FatalAdapterException (an op may be unrenderable for the sink),
+    // which a lambda in Optional.map() cannot propagate — hence the explicit isPresent() branch.
     List<UpdateRecordProperty> mappingProperties =
         mapping.isPresent()
             ? recordPathCompiler.compile(mapping.get(), geometryEncoding(sink.type()))
@@ -311,6 +309,8 @@ public class FlowDeploymentPlanner {
           "POSTGIS sink configured but no platform database connection URL is available");
     }
     Map<String, String> dbcp = new LinkedHashMap<>();
+    // Intentionally applied to every PostGIS sink (not only geoPoint flows): unspecified is benign
+    // for non-geometry columns and is what lets a geoPoint WKT bind into a geometry column.
     putIfPresent(
         dbcp, "Database Connection URL", withStringtypeUnspecified(platformSink.postgisUrl()));
     putIfPresent(dbcp, "Database User", platformSink.postgisUser());
@@ -352,12 +352,14 @@ public class FlowDeploymentPlanner {
    * varchar value does not coerce into a {@code geometry} column — PostgreSQL has no {@code
    * varchar→geometry} cast — so the insert fails with a type mismatch. {@code unspecified} sends
    * the value untyped, letting the server parse the WKT via its implicit {@code text→geometry} cast
-   * (and stamp the column SRID). Benign for the table's non-geometry columns.
+   * (and stamp the column SRID). Benign for the table's non-geometry columns. Package-private so
+   * the branch behaviour (no-query-string, existing query, idempotency, null/blank) is
+   * unit-testable without a live database.
    */
-  private static String withStringtypeUnspecified(String url) {
+  static String withStringtypeUnspecified(String url) {
     if (url == null || url.isBlank() || url.contains("stringtype=")) {
       return url;
     }
-    return url + (url.indexOf('?') >= 0 ? '&' : '?') + "stringtype=unspecified";
+    return url + (url.contains("?") ? '&' : '?') + "stringtype=unspecified";
   }
 }

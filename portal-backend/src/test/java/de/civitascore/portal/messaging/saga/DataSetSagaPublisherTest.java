@@ -1037,7 +1037,7 @@ class DataSetSagaPublisherTest {
               "$schema",
               "https://civitasconnect.digital/core/mapping/v1",
               "fields",
-              Map.of("$.geo", Map.of("op", "geoPoint", "lon", "$.lon", "lat", "$.lat")));
+              Map.of("$.location", Map.of("op", "geoPoint", "lon", "$.lon", "lat", "$.lat")));
       Pipeline pipeline = pipeline(UUID.randomUUID());
       pipeline.setModel(
           Map.of(
@@ -1084,7 +1084,7 @@ class DataSetSagaPublisherTest {
       var dataPipelines = payload.get("dataPipelines");
       assertThat(dataPipelines).as("dataPipelines present").isNotNull();
       assertThat(dataPipelines.size()).isEqualTo(1);
-      var geo =
+      var geoField =
           dataPipelines
               .get(0)
               .get("data")
@@ -1093,11 +1093,11 @@ class DataSetSagaPublisherTest {
               .get("data")
               .get("mappingConfig")
               .get("fields")
-              .get("$.geo");
-      assertThat(geo).as("geoPoint field carried in pipeline model").isNotNull();
-      assertThat(geo.get("op").asString()).isEqualTo("geoPoint");
-      assertThat(geo.get("lon").asString()).isEqualTo("$.lon");
-      assertThat(geo.get("lat").asString()).isEqualTo("$.lat");
+              .get("$.location");
+      assertThat(geoField).as("geoPoint field carried in pipeline model").isNotNull();
+      assertThat(geoField.get("op").asString()).isEqualTo("geoPoint");
+      assertThat(geoField.get("lon").asString()).isEqualTo("$.lon");
+      assertThat(geoField.get("lat").asString()).isEqualTo("$.lat");
 
       // 2) The geometry sink schema (the $ref + crs the adapter needs) rides on the sink payload.
       var location =

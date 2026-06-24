@@ -77,6 +77,7 @@ class NifiPostgisDataFlowIT {
   private static final String PASSWORD = "ctsNiFiTestPassword123";
   private static final String TOPIC = "civitas/it/postgis";
   private static final String GEO_TOPIC = "civitas/it/postgis-geo";
+  private static final String GEO_25832_TOPIC = "civitas/it/postgis-geo-25832";
   private static final String DB = "nifi_demo";
   private static final String DB_USER = "nifi";
   private static final String DB_PASSWORD = "nifi-db-secret";
@@ -295,6 +296,87 @@ class NifiPostgisDataFlowIT {
     }
   }
 
+  @Test
+  void deployedFlowWritesGeometryToNon4326Column() throws Exception {
+    // The platform's typical CRS is EPSG:25832. geoPoint emits a SRID-less POINT(lon lat); the
+    // geometry(Point,25832) column stamps its own SRID on insert — this proves the non-4326 path
+    // end to end (the scenario RecordPathCompiler's "no SRID prefix would clash with a non-4326
+    // column" comment exists for), not just the 4326 default.
+    Map<String, Object> graph =
+        map(
+            """
+            { "nodes": [
+                { "id": "s", "type": "start", "data": {} },
+                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
+                    "fields": { "$.stationid": "$.stationid",
+                                "$.geom": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" } } } } },
+                { "id": "e", "type": "end", "data": {} } ],
+              "edges": [
+                { "id": "e1", "source": "s", "target": "m" },
+                { "id": "e2", "source": "m", "target": "e" } ] }
+            """);
+
+    Datasource source = new Datasource();
+    source.setId("ds-pg-geo25832-it");
+    source.setType("MQTT");
+    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
+    source.handleUnknownProperty("topics", List.of(GEO_25832_TOPIC));
+
+    FlowDeploymentPlanner planner =
+        new FlowDeploymentPlanner(
+            new GraphParser(),
+            new MappingConfigParser(),
+            new RecordPathCompiler(),
+            new NifiFlowBuilder(),
+            new CredentialResolver(new byte[0]),
+            new PlatformSinkConfig("jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
+            null);
+    DeploymentPlan plan =
+        planner.plan(
+            new PipelineDeploymentRequest(
+                "pg-geo25832-it",
+                graph,
+                source,
+                new SinkSpec(SinkType.POSTGIS, "geo_observation_25832")));
+
+    client.deployFlow(plan);
+
+    String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
+    try (MqttPublisher publisher = new MqttPublisher(brokerUrl)) {
+      await()
+          .atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(
+              () -> {
+                // 25832-style easting/northing in metres (the values are stamped, not reprojected)
+                publisher.publish(
+                    GEO_25832_TOPIC,
+                    "{\"stationid\":\"S3\",\"lon\":\"500000.0\",\"lat\":\"5400000.0\"}");
+                return geometry25832RowLanded();
+              });
+    }
+  }
+
+  /** Asserts the geoPoint landed in the 25832 column with the column SRID stamped onto it. */
+  private boolean geometry25832RowLanded() throws Exception {
+    try (Connection c = dbConnection();
+        Statement st = c.createStatement();
+        ResultSet rs =
+            st.executeQuery(
+                "SELECT ST_X(geom) AS x, ST_Y(geom) AS y, ST_SRID(geom) AS srid"
+                    + " FROM geo_observation_25832 WHERE stationid = 'S3'")) {
+      if (!rs.next()) {
+        return false;
+      }
+      assertEquals(500000.0, rs.getDouble("x"), 1e-6);
+      assertEquals(5400000.0, rs.getDouble("y"), 1e-6);
+      // the WKT carried no SRID; the geometry(Point,25832) column stamps 25832 — the platform's CRS
+      assertEquals(25832, rs.getInt("srid"));
+      return true;
+    }
+  }
+
   /** Queries PostgreSQL and asserts the row is present with the int column correctly coerced. */
   private boolean rowLanded() throws Exception {
     try (Connection c = dbConnection();
@@ -343,6 +425,7 @@ class NifiPostgisDataFlowIT {
       st.execute("CREATE EXTENSION IF NOT EXISTS postgis");
       st.execute("CREATE TABLE observation (stationid text, count integer, meta jsonb)");
       st.execute("CREATE TABLE geo_observation (stationid text, geom geometry(Point,4326))");
+      st.execute("CREATE TABLE geo_observation_25832 (stationid text, geom geometry(Point,25832))");
     }
   }
 

@@ -61,7 +61,7 @@ class FrontendMappingFixtureTest {
   }
 
   @Test
-  void geoPointMappingFromTicketCompilesToWktForPostgis() throws Exception {
+  void geoPointWithSwappedLonLatSourcesIsPreservedVerbatim() throws Exception {
     var root =
         mapper.readTree(
             getClass()
@@ -74,8 +74,8 @@ class FrontendMappingFixtureTest {
     Map<String, UpdateRecordProperty> byPath =
         props.stream().collect(Collectors.toMap(UpdateRecordProperty::recordPath, p -> p));
 
-    // The op renders lon first, then lat, into POINT(lon lat). The fixture wires lon←$.lat and
-    // lat←$.long verbatim from the ticket, so the compiler faithfully preserves that wiring — the
+    // The op renders lon first, then lat, into POINT(lon lat). This fixture deliberately wires
+    // lon←$.lat and lat←$.long, so the compiler faithfully preserves the author's wiring — the
     // lon/lat source mapping is the author's responsibility, not the compiler's to second-guess.
     assertEquals("concat('POINT(', /lat, ' ', /long, ')')", byPath.get("/geo").value());
     assertEquals(ReplacementStrategy.RECORD_PATH_VALUE, byPath.get("/geo").strategy());
