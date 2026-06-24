@@ -10,7 +10,7 @@
  */
 
 import { useTranslations } from 'next-intl'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 
 import { PaletteCategory } from '@/components/node-editor/palette/PaletteCategory'
 import { PaletteItem } from '@/components/node-editor/palette/PaletteItem'
@@ -18,6 +18,25 @@ import { PaletteItem } from '@/components/node-editor/palette/PaletteItem'
 import { PIPELINE_NODE_DEFS, type PipelineNodeDef } from '../../_config/nodeRegistry'
 import { NODE_CATEGORY_ORDER, type NodeCategory } from '../../_constants/nodeCategories'
 import { LAYOUT_DIMENSIONS } from '../../_constants/pipelineStyles'
+
+// ============================================================================
+// Derived data
+// ============================================================================
+
+// Group registry node defs by category, preserving the configured category order.
+// Depends only on module-level constants, so it is computed once at module load.
+const PALETTE_CATEGORIES = (() => {
+  const byCategory = new Map<NodeCategory, PipelineNodeDef[]>()
+  for (const def of PIPELINE_NODE_DEFS) {
+    const list = byCategory.get(def.category) ?? []
+    list.push(def)
+    byCategory.set(def.category, list)
+  }
+  return NODE_CATEGORY_ORDER.filter(id => byCategory.has(id)).map(id => ({
+    id,
+    defs: byCategory.get(id) ?? [],
+  }))
+})()
 
 // ============================================================================
 // Props
@@ -39,23 +58,9 @@ interface PipelinePaletteProps {
 export const PipelinePalette: React.FC<PipelinePaletteProps> = ({ className = '' }) => {
   const t = useTranslations('pipelineEditor')
 
-  // Group registry node defs by category, preserving the configured category order.
-  const categories = useMemo(() => {
-    const byCategory = new Map<NodeCategory, PipelineNodeDef[]>()
-    for (const def of PIPELINE_NODE_DEFS) {
-      const list = byCategory.get(def.category) ?? []
-      list.push(def)
-      byCategory.set(def.category, list)
-    }
-    return NODE_CATEGORY_ORDER.filter(id => byCategory.has(id)).map(id => ({
-      id,
-      defs: byCategory.get(id) ?? [],
-    }))
-  }, [])
-
   // Track expanded state for each category (all expanded by default)
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(categories.map(c => [c.id, true])),
+    Object.fromEntries(PALETTE_CATEGORIES.map(c => [c.id, true])),
   )
 
   const toggleCategory = (categoryId: string) => {
@@ -77,7 +82,7 @@ export const PipelinePalette: React.FC<PipelinePaletteProps> = ({ className = ''
 
       {/* Categories */}
       <div className="flex-1 overflow-y-auto">
-        {categories.map(category => (
+        {PALETTE_CATEGORIES.map(category => (
           <PaletteCategory
             key={category.id}
             isCollapsible
