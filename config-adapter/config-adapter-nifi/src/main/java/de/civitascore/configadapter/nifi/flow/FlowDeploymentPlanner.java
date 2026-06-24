@@ -19,6 +19,7 @@ import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec
 import de.civitascore.configadapter.nifi.graph.GraphParser;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
+import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
@@ -96,8 +97,15 @@ public class FlowDeploymentPlanner {
   public DeploymentPlan plan(PipelineDeploymentRequest request) throws FatalAdapterException {
     PipelineGraph graph = graphParser.parse(request.graphData());
     Optional<MappingConfig> mapping = parseMapping(graph);
+    SinkSpec sink = request.sink();
+    // The mapping is compiled sink-dependently: a geoPoint renders to WKT for a PostGIS column or
+    // GeoJSON for FROST. compile() may reject an op it cannot render for the sink, so this is not
+    // an
+    // Optional.map — the mapping function cannot propagate the checked FatalAdapterException.
     List<UpdateRecordProperty> mappingProperties =
-        mapping.map(recordPathCompiler::compile).orElseGet(List::of);
+        mapping.isPresent()
+            ? recordPathCompiler.compile(mapping.get(), geometryEncoding(sink.type()))
+            : List.of();
 
     Datasource source = request.source();
     if (source == null) {
@@ -105,7 +113,6 @@ public class FlowDeploymentPlanner {
     }
     SourceType sourceType =
         SourceType.fromRaw(source.getType()).orElseThrow(() -> template(source.getType()));
-    SinkSpec sink = request.sink();
 
     Map<String, String> sourceProperties = new LinkedHashMap<>();
     Map<String, String> sinkProperties = new LinkedHashMap<>();
@@ -304,7 +311,8 @@ public class FlowDeploymentPlanner {
           "POSTGIS sink configured but no platform database connection URL is available");
     }
     Map<String, String> dbcp = new LinkedHashMap<>();
-    putIfPresent(dbcp, "Database Connection URL", platformSink.postgisUrl());
+    putIfPresent(
+        dbcp, "Database Connection URL", withStringtypeUnspecified(platformSink.postgisUrl()));
     putIfPresent(dbcp, "Database User", platformSink.postgisUser());
     if (!dbcp.isEmpty()) {
       controllerServiceProperties.put(DBCP, dbcp);
@@ -328,5 +336,28 @@ public class FlowDeploymentPlanner {
 
   private static FatalAdapterException template(String combination) {
     return new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, combination);
+  }
+
+  /** The geometry encoding a sink expects: PostGIS parses WKT, FROST expects GeoJSON. */
+  private static GeometryEncoding geometryEncoding(SinkType sinkType) {
+    return switch (sinkType) {
+      case POSTGIS -> GeometryEncoding.WKT;
+      case FROST -> GeometryEncoding.GEOJSON;
+    };
+  }
+
+  /**
+   * Ensures the PostGIS JDBC URL carries {@code stringtype=unspecified}. PutDatabaseRecord binds a
+   * geoPoint's WKT as a string parameter; with PgJDBC's default ({@code stringtype=VARCHAR}) a
+   * varchar value does not coerce into a {@code geometry} column — PostgreSQL has no {@code
+   * varchar→geometry} cast — so the insert fails with a type mismatch. {@code unspecified} sends
+   * the value untyped, letting the server parse the WKT via its implicit {@code text→geometry} cast
+   * (and stamp the column SRID). Benign for the table's non-geometry columns.
+   */
+  private static String withStringtypeUnspecified(String url) {
+    if (url == null || url.isBlank() || url.contains("stringtype=")) {
+      return url;
+    }
+    return url + (url.indexOf('?') >= 0 ? '&' : '?') + "stringtype=unspecified";
   }
 }

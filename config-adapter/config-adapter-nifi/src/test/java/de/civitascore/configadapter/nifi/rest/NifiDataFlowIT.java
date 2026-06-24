@@ -21,6 +21,7 @@ import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
+import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
@@ -184,7 +185,8 @@ class NifiDataFlowIT {
                         "$.label": { "op": "concat",
                           "inputs": [ "$.station_id", { "op": "const", "value": "-" }, "$.sensor" ] }
                     } }
-                    """)));
+                    """)),
+            GeometryEncoding.WKT);
 
     String snapshot =
         new NifiFlowBuilder()
@@ -236,7 +238,8 @@ class NifiDataFlowIT {
                         "$.station_id": "$.station_id",
                         "$.unit": { "op": "const", "value": "celsius" }
                     } }
-                    """)));
+                    """)),
+            GeometryEncoding.WKT);
 
     String snapshot =
         new NifiFlowBuilder()
@@ -307,8 +310,8 @@ class NifiDataFlowIT {
     RecordPathCompiler compiler = new RecordPathCompiler();
     List<UpdateRecordProperty> mapping =
         compiler.compile(
-            parser.parse(
-                mapper.readTree("{ \"fields\": { \"$.station_id\": \"$.station_id\" } }")));
+            parser.parse(mapper.readTree("{ \"fields\": { \"$.station_id\": \"$.station_id\" } }")),
+            GeometryEncoding.WKT);
 
     String snapshot =
         new NifiFlowBuilder()

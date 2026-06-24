@@ -10,8 +10,11 @@
 package de.civitascore.configadapter.nifi.mapping;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.ReplacementStrategy;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import java.util.List;
@@ -26,8 +29,13 @@ class RecordPathCompilerTest {
   private final RecordPathCompiler compiler = new RecordPathCompiler();
 
   private List<UpdateRecordProperty> compile(String fieldsJson) throws Exception {
+    return compile(fieldsJson, GeometryEncoding.WKT);
+  }
+
+  private List<UpdateRecordProperty> compile(String fieldsJson, GeometryEncoding encoding)
+      throws Exception {
     MappingConfig mc = parser.parse(mapper.readTree("{ \"fields\": " + fieldsJson + " }"));
-    return compiler.compile(mc);
+    return compiler.compile(mc, encoding);
   }
 
   private Map<String, UpdateRecordProperty> byPath(List<UpdateRecordProperty> props) {
@@ -141,6 +149,47 @@ class RecordPathCompilerTest {
     var props = byPath(compile("{ \"$.v\": { \"op\": \"toFloat\", \"input\": \"$.raw\" } }"));
 
     assertEquals("/raw", props.get("/v").value());
+  }
+
+  @Test
+  void geoPointForPostgisBecomesWktConcat() throws Exception {
+    var props =
+        byPath(
+            compile(
+                "{ \"$.geo\": { \"op\": \"geoPoint\", \"lon\": \"$.lon\", \"lat\": \"$.lat\" } }",
+                GeometryEncoding.WKT));
+
+    UpdateRecordProperty p = props.get("/geo");
+    // WKT is POINT(lon lat); no SRID prefix — the geometry column stamps its own SRID on insert.
+    assertEquals("concat('POINT(', /lon, ' ', /lat, ')')", p.value());
+    assertEquals(ReplacementStrategy.RECORD_PATH_VALUE, p.strategy());
+  }
+
+  @Test
+  void geoPointPreservesLonLatOrderAndInlinesConversions() throws Exception {
+    // lon must come first (POINT(lon lat)); a per-coordinate conversion is inlined transparently.
+    var props =
+        byPath(
+            compile(
+                "{ \"$.geo\": { \"op\": \"geoPoint\", \"lon\": \"$.x\","
+                    + " \"lat\": { \"op\": \"toFloat\", \"input\": \"$.y\" } } }",
+                GeometryEncoding.WKT));
+
+    assertEquals("concat('POINT(', /x, ' ', /y, ')')", props.get("/geo").value());
+  }
+
+  @Test
+  void geoPointForFrostIsRejectedUntilGeoJsonSupported() {
+    // FROST needs a GeoJSON object, which RecordPath cannot construct — reject rather than emit a
+    // double-encoded JSON string.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compile(
+                    "{ \"$.geo\": { \"op\": \"geoPoint\", \"lon\": \"$.lon\", \"lat\": \"$.lat\" } }",
+                    GeometryEncoding.GEOJSON));
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
   }
 
   @Test

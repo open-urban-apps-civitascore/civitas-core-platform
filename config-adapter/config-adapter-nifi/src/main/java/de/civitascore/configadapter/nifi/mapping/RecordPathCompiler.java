@@ -9,10 +9,13 @@
  */
 package de.civitascore.configadapter.nifi.mapping;
 
+import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConcatNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConstNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConvertNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.CopyNode;
+import de.civitascore.configadapter.nifi.mapping.ValueNode.GeoPointNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -70,18 +73,24 @@ public class RecordPathCompiler {
    * Compiles all field rules of a mapping into ordered {@code UpdateRecord} properties.
    *
    * @param mapping the parsed mapping
+   * @param geometryEncoding how a geometry op ({@code geoPoint}) must be rendered for the target
+   *     sink (WKT for PostGIS, GeoJSON for FROST)
    * @return the properties, one per target field, in mapping order
+   * @throws FatalAdapterException if an op cannot be rendered for the requested encoding
    */
-  public List<UpdateRecordProperty> compile(MappingConfig mapping) {
+  public List<UpdateRecordProperty> compile(
+      MappingConfig mapping, GeometryEncoding geometryEncoding) throws FatalAdapterException {
     List<UpdateRecordProperty> properties = new ArrayList<>();
     for (Map.Entry<String, ValueNode> field : mapping.fields().entrySet()) {
       String destination = JsonPaths.toRecordPath(field.getKey());
-      properties.add(compileField(destination, field.getValue()));
+      properties.add(compileField(destination, field.getValue(), geometryEncoding));
     }
     return List.copyOf(properties);
   }
 
-  private UpdateRecordProperty compileField(String destination, ValueNode node) {
+  private UpdateRecordProperty compileField(
+      String destination, ValueNode node, GeometryEncoding geometryEncoding)
+      throws FatalAdapterException {
     if (node instanceof ConstNode constant) {
       // A bare RecordPath literal is not evaluated as a value by UpdateRecord, so a const must use
       // the literal-value strategy. The builder groups properties by strategy into separate
@@ -90,19 +99,22 @@ public class RecordPathCompiler {
           destination, String.valueOf(constant.value()), ReplacementStrategy.LITERAL_VALUE);
     }
     return new UpdateRecordProperty(
-        destination, render(node), ReplacementStrategy.RECORD_PATH_VALUE);
+        destination, render(node, geometryEncoding), ReplacementStrategy.RECORD_PATH_VALUE);
   }
 
-  private String render(ValueNode node) {
+  private String render(ValueNode node, GeometryEncoding geometryEncoding)
+      throws FatalAdapterException {
     return switch (node) {
       case CopyNode copy -> JsonPaths.toRecordPath(copy.sourcePath());
       case ConstNode constant -> literal(constant.value());
-      case ConcatNode concat -> renderConcat(concat);
-      case ConvertNode convert -> renderConvert(convert);
+      case ConcatNode concat -> renderConcat(concat, geometryEncoding);
+      case ConvertNode convert -> renderConvert(convert, geometryEncoding);
+      case GeoPointNode geoPoint -> renderGeoPoint(geoPoint, geometryEncoding);
     };
   }
 
-  private String renderConcat(ConcatNode concat) {
+  private String renderConcat(ConcatNode concat, GeometryEncoding geometryEncoding)
+      throws FatalAdapterException {
     String separator = concat.separator();
     StringBuilder builder = new StringBuilder("concat(");
     List<ValueNode> inputs = concat.inputs();
@@ -113,18 +125,51 @@ public class RecordPathCompiler {
           builder.append(quote(separator)).append(", ");
         }
       }
-      builder.append(render(inputs.get(i)));
+      builder.append(render(inputs.get(i), geometryEncoding));
     }
     return builder.append(')').toString();
   }
 
-  private String renderConvert(ConvertNode convert) {
-    String inner = render(convert.input());
+  private String renderConvert(ConvertNode convert, GeometryEncoding geometryEncoding)
+      throws FatalAdapterException {
+    String inner = render(convert.input(), geometryEncoding);
     return switch (convert.op()) {
       case TO_DATE -> "toDate(" + inner + ", " + quote(convert.pattern()) + ")";
       case FORMAT -> "format(" + inner + ", " + quote(convert.pattern()) + ")";
       case TO_STRING -> "toString(" + inner + ")";
       case TO_INT, TO_FLOAT -> inner;
+    };
+  }
+
+  /**
+   * Renders a {@code geoPoint} for the target sink. For a PostGIS sink the value is a WKT literal
+   * {@code POINT(<lon> <lat>)} assembled with {@code concat}; the geometry column parses it on
+   * insert and stamps its own SRID, so no {@code SRID=} prefix is emitted (a fixed one would clash
+   * with a non-4326 column). GeoJSON (FROST) cannot be produced as a RecordPath value — RecordPath
+   * has no object constructor and emitting a JSON string would be double-encoded — so it is
+   * rejected until a dedicated FROST geometry path exists.
+   */
+  private String renderGeoPoint(GeoPointNode geoPoint, GeometryEncoding geometryEncoding)
+      throws FatalAdapterException {
+    String lon = render(geoPoint.lon(), geometryEncoding);
+    String lat = render(geoPoint.lat(), geometryEncoding);
+    return switch (geometryEncoding) {
+      case WKT ->
+          "concat("
+              + quote("POINT(")
+              + ", "
+              + lon
+              + ", "
+              + quote(" ")
+              + ", "
+              + lat
+              + ", "
+              + quote(")")
+              + ")";
+      case GEOJSON ->
+          throw new FatalAdapterException(
+              AdapterErrorCode.NIFI_MAPPING_ERROR,
+              "geoPoint is not yet supported for GeoJSON (FROST) sinks");
     };
   }
 

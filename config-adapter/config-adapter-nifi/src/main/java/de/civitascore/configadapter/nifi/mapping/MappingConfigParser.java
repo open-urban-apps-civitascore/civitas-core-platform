@@ -16,6 +16,7 @@ import de.civitascore.configadapter.nifi.mapping.ValueNode.ConcatNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConstNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConvertNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.CopyNode;
+import de.civitascore.configadapter.nifi.mapping.ValueNode.GeoPointNode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -78,8 +79,20 @@ public class MappingConfigParser {
       case "copy" -> parseCopy(node);
       case "const" -> parseConst(node);
       case "concat" -> parseConcat(node);
+      case "geoPoint" -> parseGeoPoint(node);
       default -> parseConversionOrReject(op, node);
     };
+  }
+
+  private ValueNode parseGeoPoint(JsonNode node) throws FatalAdapterException {
+    JsonNode lon = node.get("lon");
+    JsonNode lat = node.get("lat");
+    if (lon == null || lat == null) {
+      throw reject("geoPoint requires a 'lon' and a 'lat'");
+    }
+    // Each operand is itself a value (a source-path shorthand or a nested op such as toFloat), so
+    // recurse — this keeps the grammar closed and lets a coordinate be converted inline.
+    return new GeoPointNode(parseValue(lon), parseValue(lat));
   }
 
   private ValueNode parseCopy(JsonNode node) throws FatalAdapterException {
