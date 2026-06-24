@@ -1,59 +1,22 @@
 /**
- * Node Types Registry
+ * Node Types Registry (derived)
  *
- * Maps pipeline node type identifiers to their React components.
- * This registry is used by React Flow to render custom nodes.
- *
+ * Maps pipeline node type identifiers to their React component. Every pipeline node
+ * now renders through the single registry-driven `ActivityNode`, so this map is
+ * generated from the node registry — there is no longer a file per node type.
  */
 
 import type { NodeTypes } from '@xyflow/react'
 
-import { PIPELINE_NODE_TYPES } from '../../_types/pipeline'
-import { EndNode } from './control/EndNode'
-import { StartNode } from './control/StartNode'
-import { DataSourceNode } from './source/DataSourceNode'
-import { FrostNode } from './storage/FrostNode'
-import { GeoPersistenceNode } from './storage/GeoPersistenceNode'
-import { MappingNode } from './transform/MappingNode'
-import { CronNode } from './trigger/CronNode'
-
-// ============================================================================
-// Node Types Registry
-// ============================================================================
+import { PIPELINE_NODE_DEFS } from '../../_config/nodeRegistry'
+import { createActivityNode } from './ActivityNode'
 
 /**
- * Node types mapping for React Flow.
- * Keys must match the PipelineNodeType values.
- *
+ * Node types mapping for React Flow, derived from the node registry.
+ * Keys match the PipelineNodeType values.
  */
-export const pipelineNodeTypes: NodeTypes = {
-  // Control nodes
-  [PIPELINE_NODE_TYPES.Start]: StartNode,
-  [PIPELINE_NODE_TYPES.End]: EndNode,
-
-  // Trigger nodes
-  [PIPELINE_NODE_TYPES.Cron]: CronNode,
-
-  // Source nodes
-  [PIPELINE_NODE_TYPES.DataSource]: DataSourceNode,
-
-  // Storage nodes
-  [PIPELINE_NODE_TYPES.Frost]: FrostNode,
-  [PIPELINE_NODE_TYPES.GeoPersistence]: GeoPersistenceNode,
-
-  // Transform nodes
-  [PIPELINE_NODE_TYPES.Mapping]: MappingNode,
-}
-
-// ============================================================================
-// Re-exports for convenience
-// ============================================================================
+export const pipelineNodeTypes: NodeTypes = Object.fromEntries(
+  PIPELINE_NODE_DEFS.map(def => [def.type, createActivityNode(def.type)]),
+)
 
 export { BasePipelineNode } from './base/BasePipelineNode'
-export { EndNode } from './control/EndNode'
-export { StartNode } from './control/StartNode'
-export { DataSourceNode } from './source/DataSourceNode'
-export { FrostNode } from './storage/FrostNode'
-export { GeoPersistenceNode } from './storage/GeoPersistenceNode'
-export { MappingNode } from './transform/MappingNode'
-export { CronNode } from './trigger/CronNode'
