@@ -20,8 +20,8 @@ import {
   NamedApiPayload,
   OwsApiFormData,
   StaApiFormData,
-  StyleFormData,
 } from '@/types/namedApis'
+import { StyleFormData } from '@/types/styles'
 import { isLayerNameError, LayerSaveError } from '@/utils/errors'
 import { hasDirtyField } from '@/utils/form'
 import { buildOwsPayload, buildStaPayloadData, mapFormLayerToPayload, mapFormStyleToPayload } from '@/utils/namedApis'

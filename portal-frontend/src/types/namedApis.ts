@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { StyleFormSchema } from './styles'
 export const SLUG_MAX_LENGTH = 32
 export const NAMED_API_DESCRIPTION_MAX_LENGTH = 150
 
@@ -255,37 +256,6 @@ export type UpdateLayerInput = {
   layerId: string
   data: LayerApiPayload
 }
-
-// ============================================================================
-// Types for Style
-// ============================================================================
-
-export const StyleSchema = z.object({
-  id: z.uuid(),
-  datasetId: z.uuid(),
-  name: z.string(),
-  sldContent: z.string(),
-  inUse: z.boolean(),
-  createdAt: z.string(),
-  modifiedAt: z.string(),
-})
-
-export type Style = z.infer<typeof StyleSchema>
-
-export const StyleFormSchema = z.object({
-  id: z.string(),
-  name: z.string().trim().min(1, 'common.errors.required'),
-  sldContent: z.string().trim().min(1, 'common.errors.required'),
-})
-
-export const StylePayloadSchema = z.object({
-  name: z.string().trim().min(1),
-  sldContent: z.string(),
-})
-
-export type StyleFormData = z.infer<typeof StyleFormSchema>
-export type StyleApiPayload = z.infer<typeof StylePayloadSchema>
-
 // ============================================================================
 // Types for OWS-API
 // ============================================================================

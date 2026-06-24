@@ -17,7 +17,8 @@ import { Button } from '@/components/ui/button'
 import { FormItem, FormLabel } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { OwsApiFormData, StyleFormData } from '@/types/namedApis'
+import { OwsApiFormData } from '@/types/namedApis'
+import { StyleFormData } from '@/types/styles'
 import { getEmptyLabelIndex, isNewItem } from '@/utils/common'
 
 interface StylesConfigProps {

@@ -5,6 +5,7 @@ import { STATUS_TYPES } from '@/types/common'
 import { DataSink, DATASINK_TYPES } from '@/types/datasinks'
 import { DATASTRUCTURE_VERSION_SOURCE, DatastructureVersion } from '@/types/datastructures'
 import { API_TYPE_QUERY, LayerFormData, OwsApiFormData, Style } from '@/types/namedApis'
+import { Style } from '@/types/styles'
 
 import { LayerConfig } from './LayerConfig'
 
@@ -119,7 +120,6 @@ const Wrapper = ({
     <FormProvider {...form}>
       <LayerConfig
         form={form}
-        existingLayers={layers}
         styles={mockStyleList}
         postgisDataSinks={[mockDataSink]}
         postGisDatastructures={[mockDatastructureVersion]}

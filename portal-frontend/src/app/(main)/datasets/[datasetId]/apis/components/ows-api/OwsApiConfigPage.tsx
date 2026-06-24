@@ -25,8 +25,8 @@ import {
   OwsApiFormData,
   OwsApiFormSchema,
   StaApiFormData,
-  StyleFormData,
 } from '@/types/namedApis'
+import { StyleFormData } from '@/types/styles'
 import { getNativeCRSFromDataSink, mapApiLayerToFormData, mapApiStyleToFormData } from '@/utils/namedApis'
 
 import { useApiConfig } from '../../hooks/useApiConfig'
