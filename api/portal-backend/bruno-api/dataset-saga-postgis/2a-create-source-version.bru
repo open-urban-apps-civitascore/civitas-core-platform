@@ -1,0 +1,76 @@
+meta {
+  name: 2a. Create Source DataStructure Version
+  type: http
+  seq: 3
+  tags: [
+    requires-nifi
+  ]
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{pgSourceDataStructureId}}
+}
+
+body:json {
+  {
+    "dataStructureVersionSource": "OWN",
+    "version": "1.0.0",
+    "description": "Source version with scalar lon/lat for geoPoint input",
+    "modelName": "GeoSensorSource",
+    "model": {
+      "$id": "http://civitas.org/model/GeoSensorSource/1.0.0",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "GeoSensorSource",
+      "type": "object",
+      "properties": {
+        "stationid": { "type": "string" },
+        "lon": { "type": "number" },
+        "lat": { "type": "number" }
+      },
+      "required": ["stationid"]
+    },
+    "styles": {}
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('pgSourceVersionId', res.body.id);
+  }
+}
+
+tests {
+  test("Version created or already exists", function() {
+    const status = res.getStatus();
+    // 201=created, 409=already exists from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+
+  test("Has id", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.id).to.be.a('string');
+    }
+  });
+}
+
+docs {
+  **PostGIS saga step 2a** — Precondition: `pgSourceDataStructureId` is set (step 2).
+
+  Creates version 1.0.0 of the source structure. The model is a JSON Schema with scalar `lon`/`lat`/`stationid` fields (no geometry) — this is the input shape the `geoPoint` op consumes.
+
+  **Expected Response:** 201 Created, body contains `id`. 409 if it already exists.
+
+  **Post-condition:** Saves `pgSourceVersionId` from `body.id` (used by step 4a to configure the datasource and as the mapping `source` URN version in step 7).
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Version record created in `portal_backend` DB, linked to the source DataStructure |
+}

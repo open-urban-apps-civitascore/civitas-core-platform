@@ -1,0 +1,68 @@
+meta {
+  name: 6. Create POSTGIS DataSink
+  type: http
+  seq: 13
+  tags: [
+    requires-nifi
+  ]
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{pgDataSetId}}
+}
+
+body:json {
+  {
+    "dataSinkType": "POSTGIS",
+    "configuration": {
+      "tableName": "saga_geo_observations",
+      "dataStructureVersionId": "{{pgTargetVersionId}}"
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('pgDataSinkId', res.body.id);
+  }
+}
+
+tests {
+  test("DataSink created or already exists", function() {
+    const status = res.getStatus();
+    // 201=created, 409=already exists from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+
+  test("Has POSTGIS type", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.dataSinkType).to.equal('POSTGIS');
+    }
+  });
+}
+
+docs {
+  **PostGIS saga step 6** — Prerequisites: dataset created (step 5), target version released (step 3b).
+
+  Creates a POSTGIS DataSink nested under the dataset. The sink is associated with the dataset via the path `dataSetId` (the input DTO's `dataSetId` is `@JsonIgnore`/path-derived, never sent in the body). It is **not** linked via a pipeline id — the pipeline (step 7) declares this sink in its `dataSinkIds`, which is an optional convenience link; the saga discovers sinks by dataset id regardless.
+
+  The `configuration` map carries the two POSTGIS-required fields validated by the backend: `tableName` (non-blank) and `dataStructureVersionId` (must be an existing, released version). The adapter derives the sink table's columns — including `geo` as `GEOMETRY(POINT,4326)` — from that version's JSON Schema.
+
+  **Expected Response:** 201 Created, body contains `id` and `dataSinkType: "POSTGIS"`. 409 if a previous run already created it.
+
+  **Post-condition:** Save `pgDataSinkId` from `body.id` (referenced by the pipeline in step 7 and deleted in cleanup step 13).
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSink record created in `portal_backend` DB, FK `dataset_id` → this dataset |
+  | Config Adapter | — (table is provisioned only when the DATASET_CREATE saga runs in step 9) |
+  | External System | — |
+}

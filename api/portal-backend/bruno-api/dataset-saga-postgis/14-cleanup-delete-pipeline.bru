@@ -1,0 +1,42 @@
+meta {
+  name: 14. Cleanup - Delete Pipeline
+  type: http
+  seq: 22
+  tags: [
+    requires-nifi
+  ]
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{pgDataSetId}}
+  id: {{pgPipelineId}}
+}
+
+tests {
+  test("Pipeline deleted or already gone", function() {
+    const status = res.getStatus();
+    // 204=deleted, 404=already gone, 400=invalid ID (unset var on first run)
+    expect(status === 204 || status === 404 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **PostGIS saga step 14** — Delete the pipeline (cleanup).
+
+  Removes the pipeline created in step 7. The DataSink (step 13) must already be deleted, since it references `pipeline_id`. The DATASET_DELETE saga (step 11) has already undeployed the NiFi flow.
+
+  **Expected Response:** 204 No Content. 404 if already deleted. 400 if `pgPipelineId` is not set (first run).
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Pipeline record removed from `portal_backend` DB |
+  | Pipeline engine | Pipeline already undeployed by the DATASET_DELETE saga |
+}

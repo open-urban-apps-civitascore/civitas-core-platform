@@ -59,6 +59,23 @@ services:
       timeout: 2s
       retries: 10
 
+  # Dedicated PostGIS sink for the NiFi pipeline adapter (mirrors the dev `civitas-geoserver-db`).
+  # The PostGIS saga handler provisions the typed sink table here; the deployed NiFi flow's
+  # PutDatabaseRecord writes rows into it. The postgis image auto-creates the PostGIS extension in
+  # the default database, so geometry columns work out of the box.
+  postgres-sink:
+    image: postgis/postgis:16-3.4-alpine
+    platform: linux/amd64
+    environment:
+      POSTGRES_DB: geosink
+      POSTGRES_USER: geosink
+      POSTGRES_PASSWORD: geosink
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d geosink -U geosink"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
   # ── Identity ───────────────────────────────────────────────
 
   keycloak:
@@ -285,7 +302,20 @@ services:
   # ── Data Pipelines ──────────────────────────────────────
 
   nifi:
-    image: apache/nifi:2.9.0
+    # Bake the PostgreSQL JDBC driver into the path the DBCP fragment loads it from
+    # (/opt/nifi/drivers/postgresql.jar) so PostGIS-sink pipelines can deploy. Dev bind-mounts
+    # ./drivers, but CI runs in Docker-in-Docker where host bind mounts don't work, so it is baked
+    # into the image instead.
+    build:
+      context: ../nifi
+      dockerfile_inline: |
+        FROM apache/nifi:2.9.0
+        USER root
+        RUN mkdir -p /opt/nifi/drivers \
+          && curl -fsSL -o /opt/nifi/drivers/postgresql.jar \
+               https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar \
+          && chown -R nifi:nifi /opt/nifi/drivers
+        USER nifi
     env_file:
      - ../nifi/.env.example
     environment:
@@ -407,12 +437,23 @@ services:
       # FROST SensorThings base URL the NiFi pipeline adapter posts observations to.
       NIFI_FROST_URL: http://civitas-frost:8080/FROST-Server/v1.1
       NIFI_TOPICS: de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
+      # PostGIS sink (mirrors dev): the NiFi adapter's platform DBCP (PutDatabaseRecord target) and
+      # the PostGIS saga handler's DDL connection both point at the dedicated geo sink DB.
+      NIFI_POSTGIS_URL: jdbc:postgresql://postgres-sink:5432/geosink
+      NIFI_POSTGIS_USER: geosink
+      NIFI_POSTGIS_PASSWORD: geosink
+      POSTGIS_JDBC_URL: jdbc:postgresql://postgres-sink:5432/geosink
+      POSTGIS_JDBC_USER: geosink
+      POSTGIS_JDBC_PASSWORD: geosink
       FLOWABLE_JDBC_URL: jdbc:postgresql://postgres-portal:5432/flowable
       FLOWABLE_JDBC_USERNAME: admin
       FLOWABLE_JDBC_PASSWORD: admin
     depends_on:
       # Flowable's JDBC URL targets postgres-portal — wait until it is healthy before boot.
       postgres-portal:
+        condition: service_healthy
+      # The PostGIS saga handler opens its DDL connection at init — wait for the sink DB.
+      postgres-sink:
         condition: service_healthy
       kafka:
         condition: service_healthy

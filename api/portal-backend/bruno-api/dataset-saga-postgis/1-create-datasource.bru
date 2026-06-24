@@ -1,0 +1,67 @@
+meta {
+  name: 1. Create DataSource (MQTT)
+  type: http
+  seq: 1
+  tags: [
+    requires-nifi
+  ]
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "PostGIS Saga Geo Source",
+    "description": "HiveMQ public MQTT broker — geo sensor demo data (lon/lat scalars)",
+    "connectorType": "MQTT",
+    "configuration": {
+      "urls": ["tcp://broker.hivemq.com:1883"],
+      "topics": ["+/civitas+/civitas/core/geo/sensor/+/position"],
+      "client_id": "civitas-saga-postgis-demo",
+      "qos": 1,
+      "connect_timeout": "5s",
+      "keepalive": "30s",
+      "tls": {
+        "enabled": false
+      }
+    },
+    "dataStructureVersionId": null,
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('pgDataSourceId', res.body.id);
+  }
+}
+
+tests {
+  test("DataSource created or already exists", function() {
+    const status = res.getStatus();
+    // 201=created, 409=already exists from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+}
+
+docs {
+  **PostGIS saga step 1** — Prerequisites: create supporting resources before triggering the saga.
+
+  Creates the passwordless MQTT datasource ("PostGIS Saga Geo Source") that the pipeline will consume. Mirrors the FROST `dataset-saga-workflow` source (public HiveMQ broker, TLS off). The geo demo messages carry scalar `lon`/`lat`/`stationid` fields that the pipeline's `geoPoint` mapping op assembles into a PostGIS geometry.
+
+  **Expected Response:** 201 Created, body contains `id`. 409 if the datasource already existed (idempotent).
+
+  **Post-condition:** Save `pgDataSourceId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource record created in `portal_backend` DB with status `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}

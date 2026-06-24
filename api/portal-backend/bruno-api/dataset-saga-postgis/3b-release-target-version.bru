@@ -1,0 +1,37 @@
+meta {
+  name: 3b. Release Target DataStructure Version
+  type: http
+  seq: 8
+  tags: [
+    requires-nifi
+  ]
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{pgTargetDataStructureId}}
+  versionId: {{pgTargetVersionId}}
+}
+
+tests {
+  test("Released or already released", function() {
+    const status = res.getStatus();
+    // 200=released, 400=not in DRAFT state (already released)
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **PostGIS saga step 3b** — Prerequisites: target structure (step 3), target version (step 3a).
+
+  Releases the target structure version so it can be referenced by the POSTGIS DataSink and the pipeline mapping.
+
+  **Expected Response:** 200 OK. 400 if not in DRAFT state (already released — idempotent).
+
+  **Post-condition:** Target version status transitions from `DRAFT` to `PUBLISHED`.
+}

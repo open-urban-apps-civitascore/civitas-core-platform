@@ -1,0 +1,36 @@
+meta {
+  name: 3c. Release Target DataStructure
+  type: http
+  seq: 9
+  tags: [
+    requires-nifi
+  ]
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{pgTargetDataStructureId}}
+}
+
+tests {
+  test("Released or already released", function() {
+    const status = res.getStatus();
+    // 200=released, 400=not in DRAFT state (already released)
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **PostGIS saga step 3c** — Prerequisites: target version released (step 3b).
+
+  Releases the target DataStructure itself so the POSTGIS DataSink and pipeline can use it.
+
+  **Expected Response:** 200 OK. 400 if not in DRAFT state (already released — idempotent).
+
+  **Post-condition:** Target DataStructure status transitions from `DRAFT` to `PUBLISHED`.
+}

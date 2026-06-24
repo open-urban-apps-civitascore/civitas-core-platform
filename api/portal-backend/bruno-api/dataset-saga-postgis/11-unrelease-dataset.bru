@@ -1,0 +1,47 @@
+meta {
+  name: 11. Unrelease DataSet (triggers delete saga)
+  type: http
+  seq: 18
+  tags: [
+    requires-nifi
+  ]
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/unrelease
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{pgDataSetId}}
+}
+
+tests {
+  test("Unreleased or already not released", function() {
+    const status = res.getStatus();
+    // 202=delete saga triggered, 400=not in AVAILABLE state
+    expect(status === 202 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **PostGIS saga step 11** — Trigger the DATASET_DELETE saga (cleanup phase).
+
+  Transitions the dataset from `AVAILABLE` back to `READY` and triggers the **DATASET_DELETE** saga asynchronously. The saga de-provisions infrastructure in reverse — undeploys the NiFi flow, drops/leaves the PostGIS sink table per adapter policy, removes APISIX routes + upstream, and removes the FROST project.
+
+  **Precondition:** `pgDataSetId` is set; dataset is in `AVAILABLE` state.
+
+  **Expected Response:** 202 Accepted (saga triggered). 400 if not in `AVAILABLE` state.
+
+  **Kafka Events**
+  - Produces: `de.civitascore.dataset.saga.trigger` (sagaType: `DATASET_DELETE`)
+  - Consumes: `de.civitascore.saga.result` (type: `SAGA_COMPLETED` or `SAGA_FAILED`)
+
+  **System Impact:**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | DataSet status → `READY`; `pendingSagaType` = `DELETE` until saga completes |
+  | Config Adapter (Orchestrator) | De-provisions NiFi → PostGIS → APISIX → FROST in reverse |
+}

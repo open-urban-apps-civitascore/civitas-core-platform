@@ -1,0 +1,36 @@
+meta {
+  name: 17. Cleanup - Delete Target DataStructure
+  type: http
+  seq: 25
+  tags: [
+    requires-nifi
+  ]
+}
+
+delete {
+  url: {{baseUrl}}/datastructures/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{pgTargetDataStructureId}}
+}
+
+tests {
+  test("Target DataStructure deleted or already gone", function() {
+    const status = res.getStatus();
+    // 204=deleted, 404=already gone, 400=wrong state (still released), 409=still referenced
+    expect(status === 204 || status === 404 || status === 400 || status === 409).to.be.true;
+  });
+}
+
+docs {
+  **PostGIS saga step 17** — Delete the target (geometry) DataStructure (cleanup).
+
+  Deletes the target structure created in step 3. Must run after the DataSink (step 13) and dataset (step 15) are gone, since the POSTGIS DataSink referenced this structure's version.
+
+  **Expected Response:** 204 No Content. 404 if already deleted. 400 if still released. 409 if still referenced.
+
+  **Post-condition:** Target DataStructure record removed from `portal_backend` DB.
+}

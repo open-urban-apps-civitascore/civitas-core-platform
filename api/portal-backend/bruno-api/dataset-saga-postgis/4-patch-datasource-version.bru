@@ -1,0 +1,48 @@
+meta {
+  name: 4. Patch DataSource with Source Version
+  type: http
+  seq: 10
+  tags: [
+    requires-nifi
+  ]
+}
+
+patch {
+  url: {{baseUrl}}/datasources/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{pgDataSourceId}}
+}
+
+body:json {
+  {
+    "dataStructureVersionId": "{{pgSourceVersionId}}"
+  }
+}
+
+tests {
+  test("DataSource patched or already configured", function() {
+    const status = res.getStatus();
+    // 200=patched, 400=invalid state
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **PostGIS saga step 4** — Prerequisites: DataSource created (step 1), source version released (step 2b).
+
+  Patches the datasource to set its `dataStructureVersionId` to the released source version. Required before the datasource can be released (step 4a).
+
+  **Expected Response:** 200 OK. 400 if the datasource is in an invalid state.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource `dataStructureVersionId` updated in `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}
