@@ -118,7 +118,8 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
       description: 'Entry point of the pipeline. Execution begins here.',
     }),
     isData: (data): data is ControlNodeData =>
-      'description' in data && !('entityType' in data) && !('cronExpression' in data) && !('mappingConfig' in data),
+      'nodeType' in data && (data as ControlNodeData).nodeType === PIPELINE_NODE_TYPES.Start,
+
     InspectorPanel: ControlPanel,
     panelReadonly: true,
   },
@@ -139,7 +140,8 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
       description: 'Exit point of the pipeline. Execution completes here.',
     }),
     isData: (data): data is ControlNodeData =>
-      'description' in data && !('entityType' in data) && !('cronExpression' in data) && !('mappingConfig' in data),
+      'nodeType' in data && (data as ControlNodeData).nodeType === PIPELINE_NODE_TYPES.End,
+
     InspectorPanel: ControlPanel,
     panelReadonly: true,
   },
