@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { STATUS_TYPES } from '@/types/common'
 import { DataSink, DATASINK_TYPES } from '@/types/datasinks'
 import { DATASTRUCTURE_VERSION_SOURCE, DatastructureVersion } from '@/types/datastructures'
-import { LayerFormData } from '@/types/namedApis'
+import { LayerFormData } from '@/types/layers'
 
 import { getNativeCRSFromDataSink, mapFormLayerToPayload } from './namedApis'
 

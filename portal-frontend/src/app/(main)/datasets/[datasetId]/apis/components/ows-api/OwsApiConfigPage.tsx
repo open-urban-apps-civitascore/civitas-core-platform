@@ -17,16 +17,16 @@ import { Form } from '@/components/ui/form'
 import { Dataset } from '@/types/datasets'
 import { DATASINK_TYPES } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
+import { LayerFormData } from '@/types/layers'
 import {
   API_TYPE_QUERY,
   DEFAULTS_BY_TYPE,
-  LayerFormData,
   NamedApi,
   OwsApiFormData,
   OwsApiFormSchema,
   StaApiFormData,
-  StyleFormData,
 } from '@/types/namedApis'
+import { StyleFormData } from '@/types/styles'
 import { getNativeCRSFromDataSink, mapApiLayerToFormData, mapApiStyleToFormData } from '@/utils/namedApis'
 
 import { useApiConfig } from '../../hooks/useApiConfig'
