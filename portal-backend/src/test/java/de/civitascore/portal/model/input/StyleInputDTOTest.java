@@ -48,6 +48,20 @@ class StyleInputDTOTest {
 
     Set<ConstraintViolation<StyleInputDTO>> violations = VALIDATOR.validate(dto);
 
+    // Whitespace-only trips both @NotBlank and @Pattern, so assert by property rather than count.
+    assertThat(violations).isNotEmpty();
+    assertThat(violations)
+        .allSatisfy(v -> assertThat(v.getPropertyPath().toString()).isEqualTo("name"));
+  }
+
+  @Test
+  @DisplayName("Name with invalid characters should fail validation")
+  void invalidCharactersInNameShouldFail() {
+    StyleInputDTO dto = valid();
+    dto.setName("Heat Map"); // space is not in [A-Za-z0-9_-]
+
+    Set<ConstraintViolation<StyleInputDTO>> violations = VALIDATOR.validate(dto);
+
     assertThat(violations).hasSize(1);
     assertThat(violations.iterator().next().getPropertyPath().toString()).isEqualTo("name");
   }
