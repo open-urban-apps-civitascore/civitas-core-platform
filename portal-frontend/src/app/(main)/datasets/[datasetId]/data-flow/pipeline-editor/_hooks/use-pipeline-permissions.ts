@@ -14,14 +14,11 @@ import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES, type PermissionName } from '@/types/currentUser'
 
 export interface PipelinePermissions {
-  canCreate: boolean
-  canUpdate: boolean
-  canDelete: boolean
-  canRelease: boolean
+  canDeletePipeline: boolean
   canReadDatasources: boolean
   canReadDatastructures: boolean
-  /** Editing a pipeline requires create, update, datasource-read and datastructure-read permissions together. */
-  canEdit: boolean
+  canCreatePipeline: boolean
+  canEditPipeline: boolean
 }
 
 export const usePipelinePermissions = (datasetId: string): PipelinePermissions => {
@@ -32,20 +29,17 @@ export const usePipelinePermissions = (datasetId: string): PipelinePermissions =
   const scoped = (permission: PermissionName) =>
     hasScopedPermission(permission, ASSIGNMENT_SCOPE_TYPES.DATASET, datasetId, datapoolId)
 
-  const canCreate = scoped(PERMISSION_NAMES.DATASET_CREATE)
-  const canUpdate = scoped(PERMISSION_NAMES.DATASET_UPDATE)
-  const canDelete = scoped(PERMISSION_NAMES.DATASET_DELETE)
-  const canRelease = scoped(PERMISSION_NAMES.DATASET_RELEASE)
+  const canCreateDataset = scoped(PERMISSION_NAMES.DATASET_CREATE)
+  const canUpdateDataset = scoped(PERMISSION_NAMES.DATASET_UPDATE)
+  const canDeletePipeline = scoped(PERMISSION_NAMES.DATASET_DELETE)
   const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
   const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
 
   return {
-    canCreate,
-    canUpdate,
-    canDelete,
-    canRelease,
+    canDeletePipeline,
     canReadDatasources,
     canReadDatastructures,
-    canEdit: canCreate && canUpdate && canReadDatasources && canReadDatastructures,
+    canCreatePipeline: canCreateDataset && canUpdateDataset && canReadDatasources && canReadDatastructures,
+    canEditPipeline: canUpdateDataset && canReadDatasources && canReadDatastructures,
   }
 }

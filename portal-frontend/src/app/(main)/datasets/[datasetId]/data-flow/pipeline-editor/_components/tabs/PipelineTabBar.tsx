@@ -103,6 +103,7 @@ interface PipelineTabBarProps {
   onCreateSession: () => void
   /** When false, tabs cannot be created or renamed (user lacks edit permission). */
   canEdit?: boolean
+  canCreate?: boolean
 }
 
 /**
@@ -116,6 +117,7 @@ export const PipelineTabBar: React.FC<PipelineTabBarProps> = ({
   onRenameSession,
   onCreateSession,
   canEdit = true,
+  canCreate = true,
 }) => {
   const t = useTranslations('pipelineEditor')
 
@@ -130,13 +132,13 @@ export const PipelineTabBar: React.FC<PipelineTabBarProps> = ({
             isActive={session.id === activeSessionId}
             onSelect={onSelectSession}
             onRename={onRenameSession}
-            canEdit={canEdit}
+            canEdit={canEdit || canCreate}
           />
         ))}
       </div>
 
       {/* New Tab Button */}
-      {canEdit && (
+      {canCreate && (
         <button
           onClick={onCreateSession}
           className="flex-shrink-0 border-r border-border p-2 transition-colors hover:bg-muted"

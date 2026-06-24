@@ -45,10 +45,10 @@ const getPipelineBadges = (dto: PipelineOutputDTO, datasourceConnectors: Map<str
 interface PipelineListProps {
   datasetId: string
   pipelines: PipelineBasicInfo[]
-  canEditPipeline: boolean
+  canCreatePipeline: boolean
 }
 
-export const PipelineList = ({ datasetId, pipelines, canEditPipeline }: PipelineListProps) => {
+export const PipelineList = ({ datasetId, pipelines, canCreatePipeline }: PipelineListProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.pipelines')
   const { hasPermission } = usePermissions()
   const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
@@ -75,7 +75,7 @@ export const PipelineList = ({ datasetId, pipelines, canEditPipeline }: Pipeline
     <div className="py-3 mb-6">
       <div className="flex items-center justify-between gap-4">
         <h4 className="font-semibold">{t('title')}</h4>
-        {canEditPipeline && (
+        {canCreatePipeline && (
           <Button asChild variant="outline">
             <GuardedLink href={`/datasets/${datasetId}/data-flow/pipeline-editor`}>{t('addButton')}</GuardedLink>
           </Button>

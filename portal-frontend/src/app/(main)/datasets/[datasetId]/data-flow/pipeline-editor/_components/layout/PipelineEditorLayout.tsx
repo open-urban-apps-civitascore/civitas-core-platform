@@ -66,7 +66,7 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
 
   const router = useRouter()
   const params = useParams<{ datasetId: string }>()
-  const { canEdit } = usePipelinePermissions(params.datasetId)
+  const { canEditPipeline: canEdit, canCreatePipeline: canCreate } = usePipelinePermissions(params.datasetId)
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
   const handleExit = useCallback(() => {
@@ -98,7 +98,7 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
       <Button onClick={handleExit} type="button" variant="secondary">
         {t('header.exit')}
       </Button>
-      <Button onClick={saveAllPipelines} disabled={!hasAnyDirtySession || isSavingAll || !canEdit}>
+      <Button onClick={saveAllPipelines} disabled={!hasAnyDirtySession || isSavingAll || (!canEdit && !canCreate)}>
         {isSavingAll ? (
           <>
             <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -131,11 +131,11 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
   )
 
   return (
-    <ReadOnlyProvider isReadOnly={!canEdit}>
+    <ReadOnlyProvider isReadOnly={!canEdit && !canCreate}>
       <PageHeader
         title={t('title')}
         subtitle={t('subtitle')}
-        customElement={canEdit ? customElement : undefined}
+        customElement={canEdit || canCreate ? customElement : undefined}
         className="!pb-2 !gap-2"
       />
       <div className="h-full w-full overflow-hidden rounded-xl border bg-background">
@@ -149,6 +149,7 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
               onRenameSession={handleRenameSession}
               onCreateSession={handleCreateSession}
               canEdit={canEdit}
+              canCreate={canCreate}
             />
           </div>
 

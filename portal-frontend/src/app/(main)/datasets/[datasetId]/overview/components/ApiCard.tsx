@@ -12,8 +12,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { ApiStandard, NamedApi, namedApiPathPrefix, NamedApiPayload } from '@/types/namedApis'
 import { cn } from '@/lib/utils'
+import { ApiStandard, NamedApi, namedApiPathPrefix, NamedApiPayload } from '@/types/namedApis'
 
 const STANDARD_ICONS: Record<ApiStandard, ComponentType<{ className?: string }>> = {
   STA: Timer,
@@ -141,18 +141,17 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpen
                   {t('actions.edit')}
                 </DropdownMenuItem>
               )}
-              {canView ||
-                (canEdit && (
-                  <DropdownMenuItem
-                    onClick={e => {
-                      e.stopPropagation()
-                      goToView()
-                    }}
-                    data-testid={`apiCardMenuView-${api.slug}`}
-                  >
-                    {t('actions.view')}
-                  </DropdownMenuItem>
-                ))}
+              {(canView || canEdit) && (
+                <DropdownMenuItem
+                  onClick={e => {
+                    e.stopPropagation()
+                    goToView()
+                  }}
+                  data-testid={`apiCardMenuView-${api.slug}`}
+                >
+                  {t('actions.view')}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onClick={e => {
                   e.stopPropagation()

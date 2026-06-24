@@ -43,7 +43,7 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
   const t = useTranslations('pipelineEditor')
   const { pipeline, runValidation, deletePipeline, isDirty, isDeleting } = useActivePipeline()
   const { datasetId } = useParams<{ datasetId: string }>()
-  const { canDelete } = usePipelinePermissions(datasetId)
+  const { canDeletePipeline: canDelete } = usePipelinePermissions(datasetId)
 
   const [shouldShowDeleteConfirm, setShouldShowDeleteConfirm] = useState(false)
 
