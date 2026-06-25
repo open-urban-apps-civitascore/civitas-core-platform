@@ -22,7 +22,10 @@ script:pre-request {
   // until 200, max ~50s (25 × 2s), to absorb propagation (DB commit + OPA fetch). While protected
   // the gateway answers 401; QuickJS axios throws on non-2xx, so catch and read the status.
   const axios = require('axios');
+  // Resolve the OWS slug once and pin it so the request URL ({{sagaOwsSlug}}) and this warm-up loop
+  // hit the SAME endpoint even if the variable was not set upstream.
   const slug = bru.getVar('sagaOwsSlug') || 'map';
+  bru.setVar('sagaOwsSlug', slug);
   const url = `${bru.getEnvVar('apisixApiUrl')}/v1/datasets/${bru.getVar('sagaDataSetId')}/${slug}`;
   for (let i = 0; i < 25; i++) {
     let status = 0;

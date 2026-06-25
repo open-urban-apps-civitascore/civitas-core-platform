@@ -260,7 +260,7 @@ Production defaults to actuator endpoints only. The `local` profile adds Swagger
 
 To add paths in a deployed environment, override with a comma-separated env var:
 
-```
+```bash
 SECURITY_PERMIT_PATHS_0=/actuator/health/**
 SECURITY_PERMIT_PATHS_1=/actuator/info
 SECURITY_PERMIT_PATHS_2=/api-docs/**

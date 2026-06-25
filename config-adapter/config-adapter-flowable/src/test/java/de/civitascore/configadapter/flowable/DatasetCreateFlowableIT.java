@@ -136,6 +136,7 @@ class DatasetCreateFlowableIT {
                 "apisix.api.host", "api.test.local",
                 "apisix.api.public.url", "http://api.test.local",
                 "apisix.plugin.config.id", "test-plugin-config",
+                "apisix.service.id", "svc-frost-server",
                 "apisix.frost.api.key", "test-frost-upstream-key")));
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();

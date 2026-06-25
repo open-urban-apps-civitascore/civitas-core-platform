@@ -247,7 +247,6 @@ Key aspects of the event structure:
 | Aspect | Detail |
 |--------|--------|
 | **`data.id`** | Dataset ID — becomes the APISIX route URI segment: `/api/dataspace/{id}/*` |
-| **`openDataAccess`** | Dataset open-data flag, persisted by the backend and read by OPA at request time (ABAC). It does **not** control the APISIX route — every route is always protected (OIDC + OPA). |
 | **`datasources[]`** | Connection definitions (PostgreSQL, MQTT, etc.) — passed to the Redpanda adapter for placeholder resolution |
 | **`datapipelines[]`** | Redpanda Connect pipeline definitions with per-pipeline `action` types, passed in batch to the Redpanda adapter |
 

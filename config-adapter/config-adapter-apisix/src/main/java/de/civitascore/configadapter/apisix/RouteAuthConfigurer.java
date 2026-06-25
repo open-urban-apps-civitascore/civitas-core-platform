@@ -118,13 +118,17 @@ final class RouteAuthConfigurer {
     boolean sta = readUpstreamKind(route) == RouteUpstreamKind.STA;
 
     // FROST upstream credential is tracked via a route label so a re-apply can clean a stale entry
-    // left behind by a different auth scheme or a renamed API key header. Only STA (STA → FROST)
-    // routes carry it; read the previously-set header BEFORE flipping the label.
-    String staleManagedHeader = sta ? RouteLabels.read(route, MANAGED_AUTH_HEADER_LABEL) : null;
+    // left behind by a different auth scheme, a renamed API key header, or a route that no longer
+    // carries it. Read the previously-set header BEFORE flipping the label — for BOTH kinds, so an
+    // OWS route is provably stripped of any FROST credential it should never forward.
+    String managedHeader = RouteLabels.read(route, MANAGED_AUTH_HEADER_LABEL);
 
     route.put("plugin_config_id", settings.pluginConfigId());
     if (sta) {
       RouteLabels.put(route, MANAGED_AUTH_HEADER_LABEL, settings.frostAuth().headerName());
+    } else {
+      // OWS (map-service) routes never carry the FROST upstream credential — drop any stale label.
+      RouteLabels.remove(route, MANAGED_AUTH_HEADER_LABEL);
     }
     // No methods filter: OPA decides per request (it allows only safe reads for anonymous open-data
     // callers), and a future authorized-write feature must not be blocked by a route-level gate.
@@ -141,7 +145,7 @@ final class RouteAuthConfigurer {
       return;
     }
     // STA routes inject the FROST upstream credential; OWS map-service routes carry none.
-    mergeProxyRewriteHeaders(proxyRewrite, staleManagedHeader, sta);
+    mergeProxyRewriteHeaders(proxyRewrite, managedHeader, sta);
   }
 
   /** A route's upstream kind, read from {@link #MANAGED_STANDARD_LABEL}; absent marker ⇒ STA. */
@@ -160,11 +164,13 @@ final class RouteAuthConfigurer {
    */
   @SuppressWarnings("unchecked")
   private void mergeProxyRewriteHeaders(
-      Map<String, Object> proxyRewrite, String staleManagedHeader, boolean sta) {
+      Map<String, Object> proxyRewrite, String managedHeader, boolean sta) {
     Map<String, Object> headers = mutableMap((Map<String, Object>) proxyRewrite.get("headers"));
 
     if (sta) {
-      mergeAuthSetEntries(headers, staleManagedHeader);
+      mergeAuthSetEntries(headers, managedHeader);
+    } else {
+      removeManagedAuthHeader(headers, managedHeader);
     }
     mergeStripList(headers);
 
@@ -189,6 +195,29 @@ final class RouteAuthConfigurer {
     }
     set.put(authHeaderName, settings.frostAuth().headerValue());
     headers.put("set", set);
+  }
+
+  /**
+   * {@code headers.set} for a non-STA (OWS) route — drop the adapter-managed FROST credential if a
+   * previous config left one behind (identified via the route label). OWS map-service routes must
+   * forward NO upstream credential; GeoServer serves the workspace OWS endpoint anonymously.
+   */
+  @SuppressWarnings("unchecked")
+  private void removeManagedAuthHeader(Map<String, Object> headers, String managedHeader) {
+    if (managedHeader == null) {
+      return;
+    }
+    Map<String, Object> set = (Map<String, Object>) headers.get("set");
+    if (set == null || !set.containsKey(managedHeader)) {
+      return;
+    }
+    Map<String, Object> mutable = mutableMap(set);
+    mutable.remove(managedHeader);
+    if (mutable.isEmpty()) {
+      headers.remove("set");
+    } else {
+      headers.put("set", mutable);
+    }
   }
 
   /** {@code headers.remove} — union with the adapter's strip list. Foreign entries stay. */

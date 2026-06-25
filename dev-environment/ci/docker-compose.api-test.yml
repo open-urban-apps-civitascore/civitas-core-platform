@@ -435,7 +435,6 @@ services:
   # an OWS named API; workspace provisioning is tied to GeoSinks, not named-API routing).
   geoserver-mock:
     image: mendhak/http-https-echo:34
-    container_name: civitas-geoserver-mock
     environment:
       HTTP_PORT: "8080"
     healthcheck:
