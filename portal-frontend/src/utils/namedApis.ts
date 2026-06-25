@@ -4,21 +4,16 @@ import { UMLClass } from '@/components/uml-modeler/types/uml'
 import { crsOptions } from '@/const/crs'
 import { DataSink } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
+import { BoundingBox, Layer, LayerApiPayload, LayerFormData } from '@/types/layers'
 import {
   ApiStandard,
-  BoundingBox,
   DEFAULTS_BY_TYPE,
-  Layer,
-  LayerApiPayload,
-  LayerFormData,
   NamedApi,
   NamedApiPayload,
   OwsApiFormData,
   StaApiFormData,
-  Style,
-  StyleApiPayload,
-  StyleFormData,
 } from '@/types/namedApis'
+import { Style, StyleFormData, StyleInput } from '@/types/styles'
 
 export const hasApiType = (apis: NamedApi[], apiType: ApiStandard): boolean =>
   apis.some(api => api.standard === apiType)
@@ -117,7 +112,7 @@ export const mapApiStyleToFormData = (styles: Style[]): StyleFormData[] =>
     sldContent: style.sldContent,
   }))
 
-export const mapFormStyleToPayload = (style: StyleFormData): StyleApiPayload => ({
+export const mapFormStyleToPayload = (style: StyleFormData): StyleInput => ({
   name: style.name.trim(),
   sldContent: style.sldContent,
 })

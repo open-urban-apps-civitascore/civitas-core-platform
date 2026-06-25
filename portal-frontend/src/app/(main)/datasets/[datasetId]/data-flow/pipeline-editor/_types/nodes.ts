@@ -1,5 +1,4 @@
-import { emptyMappingConfig, type MappingConfig } from '../_components/mapping-editor/_types'
-import type { PipelineNodeType } from './pipeline'
+import { type MappingConfig } from '../_components/mapping-editor/_types'
 import { PIPELINE_NODE_TYPES } from './pipeline'
 
 // ============================================================================
@@ -226,68 +225,4 @@ export const isCronNodeData = (data: PipelineNodeData): data is CronNodeData => 
  */
 export const isMappingNodeData = (data: PipelineNodeData): data is MappingNodeData => {
   return 'mappingConfig' in data
-}
-
-// ============================================================================
-// Node Data Factory Helpers
-// ============================================================================
-
-/**
- * Creates default node data based on node type.
- * Used when creating new nodes from the palette.
- *
- */
-export const createDefaultNodeData = (nodeType: PipelineNodeType): PipelineNodeData => {
-  switch (nodeType) {
-    case PIPELINE_NODE_TYPES.Start:
-      return {
-        nodeType: PIPELINE_NODE_TYPES.Start,
-        label: 'Start',
-        configured: true, // Always configured
-        description: 'Entry point of the pipeline. Execution begins here.',
-      }
-    case PIPELINE_NODE_TYPES.End:
-      return {
-        nodeType: PIPELINE_NODE_TYPES.End,
-        label: 'End',
-        configured: true, // Always configured
-        description: 'Exit point of the pipeline. Execution completes here.',
-      }
-    case PIPELINE_NODE_TYPES.DataSource:
-      return {
-        label: 'DataSource',
-        configured: false, // Needs entity selection
-        entityType: ENTITY_TYPES.Datasource,
-      }
-    case PIPELINE_NODE_TYPES.Frost:
-      return {
-        label: 'Frost Server',
-        configured: true, // Auto-configured with fixed server
-        entityType: ENTITY_TYPES.Frost,
-        serverName: 'Frost Server',
-        serverUrl: '',
-        version: '1.1',
-      }
-    case PIPELINE_NODE_TYPES.GeoPersistence:
-      return {
-        label: 'Geo Persistence',
-        configured: false, // Needs table name and data structure version
-        entityType: ENTITY_TYPES.Persistence,
-        tableName: '',
-      }
-    case PIPELINE_NODE_TYPES.Cron:
-      return {
-        label: 'CRON',
-        configured: false, // Needs cron expression
-        cronExpression: '',
-      }
-    case PIPELINE_NODE_TYPES.Mapping:
-      return {
-        label: 'Mapping',
-        configured: false, // Needs name + source + target
-        mappingConfig: emptyMappingConfig(),
-      }
-    default:
-      throw new Error(`Unknown node type: ${nodeType}`)
-  }
 }

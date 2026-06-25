@@ -160,51 +160,42 @@ apisix.topics=de.civitascore.api.backend.created,de.civitascore.api.backend.upda
 
 **Documentation:** For detailed documentation including event formats, error handling, and integration examples, see [APISIX Adapter Documentation](config-adapter-apisix/README.md).
 
-### 7. config-adapter-redpanda
-Production implementation of RedPanda Connect adapter for managing data pipelines.
+### 7. config-adapter-nifi
+Apache NiFi adapter: transforms the engine-neutral pipeline graph into a curated NiFi flow and deploys it via the NiFi REST API. Integrated as a saga step handler (not a standalone Kafka consumer).
 
 **Key Components:**
-- `RedpandaAdapter` - Manages RedPanda Connect data pipelines via Streams API
-- `RedpandaSagaHandler` - Saga orchestration for multi-pipeline dataset operations
+- `NifiSagaHandler` - `SagaCommandHandler` (`adapter() = "nifi"`); dispatches DEPLOY/UPDATE/DELETE/RESTORE per pipeline
+- `FlowDeploymentPlanner` / `NifiFlowBuilder` - programmatically compose a NiFi flow-snapshot from curated per-component fragments (the single place that knows NiFi specifics)
+- `NifiRestClient` - the verified deploy sequence over the NiFi REST API
 
-**Supported Operations:**
-- CREATE - Create new data pipelines (idempotent: HTTP 409 → success)
-- UPDATE - Update existing pipelines or create if absent (upsert)
-- DELETE - Delete pipelines (idempotent: HTTP 404 → success)
+**Supported Operations (saga):**
+- `DEPLOY_PIPELINES` / `UPDATE_PIPELINES` / `DELETE_PIPELINES` / `RESTORE_PIPELINES` (idempotent: redeploy = stop-and-delete + upload; delete 404 → success)
 
-**Subscribed Topics:**
-- `de.civitascore.data.pipeline.created`
-- `de.civitascore.data.pipeline.updated`
-- `de.civitascore.data.pipeline.deleted`
-
-**Saga Topics:**
-- `de.civitascore.dataset.redpanda.execute`
-- `de.civitascore.dataset.redpanda.compensate`
+**Security model:**
+- RecordPath-only mapping — never Jolt or scripting, so a constrained graph cannot smuggle arbitrary processors in
+- The uploaded snapshot carries no secrets; sensitive controller-service/processor properties are pushed post-upload via a separate REST call
+- Records that fail conversion/mapping are routed to a LogMessage error sink instead of being dropped silently
 
 **Configuration Properties:**
 ```properties
-# RedPanda Connect Streams API URL (default: http://localhost:4195)
-redpanda.url=http://localhost:4195
-
-# Topics to subscribe to
-redpanda.topics=de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
-
-# Master key for encrypted credentials (optional, only needed for ENC(...) values)
+# NiFi REST API base URL (default: https://localhost:8443)
+nifi.url=https://localhost:8443
+nifi.username=admin
+nifi.password=<single-user password>
+# Disable TLS verification for dev self-signed certs (set false in non-dev)
+nifi.tls.insecure=true
+# Platform sink endpoints the flow binds to
+nifi.frost.url=http://frost:8080/FROST-Server/v1.1
+nifi.postgis.url=jdbc:postgresql://db:5432/civitas
+nifi.postgis.user=nifi
+nifi.postgis.password=<db password>
+# Master key for encrypted datasource credentials (only needed for ENC(...) values)
 # CIVITAS_MASTER_KEY=<256-bit hex-encoded key>
 ```
 
-**Features:**
-- Full CRUD operations for RedPanda Connect data pipelines
-- Automatic JSON-to-YAML conversion for pipeline definitions
-- AES-256-GCM credential decryption for sensitive pipeline configuration
-- Idempotent operations with automatic conflict and not-found handling
-- Saga orchestration with forward execution and compensation (rollback)
-- Datasource injection and placeholder resolution for reusable pipeline templates
-- Comprehensive error handling with HTTP status-based categorization
+**Usage:** Replaces the former RedPanda Connect adapter as the pipeline engine; discovered via `ServiceLoader` and driven in-process by the Flowable saga engine.
 
-**Usage:** Production-ready adapter that integrates with RedPanda Connect for streaming data pipeline management.
-
-**Documentation:** For detailed documentation including event formats, credential encryption, error handling, and integration examples, see [RedPanda Adapter Documentation](config-adapter-redpanda/README.md).
+**Documentation:** See the module's package docs and the NiFi deploy sequence in `dev-environment/nifi/`.
 
 ### 8. config-adapter-geoserver
 Production implementation of GeoServer adapter for managing OGC geo service configuration.
@@ -324,7 +315,7 @@ The framework supports configuring multiple adapters to run independently. Each 
 
 **Multiple Adapters (comma-separated short names)**
 ```properties
-adapters=keycloak,apisix,redpanda,dummylog
+adapters=keycloak,apisix,dummylog
 eventhandler.name=kafka
 ```
 
@@ -1346,7 +1337,7 @@ This works because the module tests are independent and Testcontainers uses rand
 
 ### Building the Fat JAR
 
-Adapter plugins (APISIX, FROST, RedPanda, GeoServer, PostGIS, Examples) are only included in the fat JAR via the `dist` profile:
+Adapter plugins (APISIX, FROST, NiFi, GeoServer, PostGIS, Examples) are only included in the fat JAR via the `dist` profile:
 
 ```bash
 mvn package -Pdist

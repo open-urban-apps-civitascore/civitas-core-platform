@@ -44,7 +44,7 @@ class DatasetCreateBpmnTest {
 
   private SagaCommandHandler frostHandler;
   private SagaCommandHandler apisixHandler;
-  private SagaCommandHandler redpandaHandler;
+  private SagaCommandHandler pipelineHandler;
   private SagaCommandHandler geoserverHandler;
   private SagaCommandHandler postgisHandler;
 
@@ -52,7 +52,7 @@ class DatasetCreateBpmnTest {
   void setUp() {
     frostHandler = FlowableTestSupport.mockHandler("frost");
     apisixHandler = FlowableTestSupport.mockHandler("apisix");
-    redpandaHandler = FlowableTestSupport.mockHandler("redpanda");
+    pipelineHandler = FlowableTestSupport.mockHandler("nifi");
     geoserverHandler = FlowableTestSupport.mockHandler("geoserver");
     postgisHandler = FlowableTestSupport.mockHandler("postgis");
     stubGeoserverSuccess();
@@ -61,7 +61,7 @@ class DatasetCreateBpmnTest {
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
     registry.register(apisixHandler);
-    registry.register(redpandaHandler);
+    registry.register(pipelineHandler);
     registry.register(geoserverHandler);
     registry.register(postgisHandler);
 
@@ -87,21 +87,21 @@ class DatasetCreateBpmnTest {
   void shouldCompleteHappyPathWithPipelines() {
     stubFrostSuccess();
     stubApisixSuccess();
-    stubRedpandaSuccess();
+    stubPipelineSuccess();
 
     ProcessInstance instance = startProcess(true);
     executeAllJobs();
 
     assertProcessCompleted(instance.getId());
 
-    var inOrder = inOrder(frostHandler, apisixHandler, redpandaHandler);
+    var inOrder = inOrder(frostHandler, apisixHandler, pipelineHandler);
     inOrder.verify(frostHandler).handle(any());
     inOrder.verify(apisixHandler).handle(any());
-    inOrder.verify(redpandaHandler).handle(any());
+    inOrder.verify(pipelineHandler).handle(any());
   }
 
   @Test
-  void shouldSkipRedpandaWhenNoPipelines() {
+  void shouldSkipPipelineWhenNoPipelines() {
     stubFrostSuccess();
     stubApisixSuccess();
 
@@ -113,7 +113,7 @@ class DatasetCreateBpmnTest {
     var inOrder = inOrder(frostHandler, apisixHandler);
     inOrder.verify(frostHandler).handle(any());
     inOrder.verify(apisixHandler).handle(any());
-    verify(redpandaHandler, never()).handle(any());
+    verify(pipelineHandler, never()).handle(any());
   }
 
   @Test
@@ -137,10 +137,10 @@ class DatasetCreateBpmnTest {
   }
 
   @Test
-  void shouldCompensateInReverseOrderWhenRedpandaFails() {
+  void shouldCompensateInReverseOrderWhenPipelineFails() {
     stubFrostSuccess();
     stubApisixSuccess();
-    stubRedpandaFailure("Pipeline deployment failed");
+    stubPipelineFailure("Pipeline deployment failed");
     stubApisixCompensationSuccess();
     stubFrostCompensationSuccess();
 
@@ -197,10 +197,10 @@ class DatasetCreateBpmnTest {
   }
 
   @Test
-  void shouldPassBaseUrlFromFrostToRedpandaAsTargetUrl() {
+  void shouldPassFrostBaseUrlToPipelineStep() {
     stubFrostSuccess();
     stubApisixSuccess();
-    stubRedpandaSuccess();
+    stubPipelineSuccess();
 
     ProcessInstance instance = startProcess(true);
     executeAllJobs();
@@ -208,12 +208,14 @@ class DatasetCreateBpmnTest {
     assertProcessCompleted(instance.getId());
 
     ArgumentCaptor<SagaCommandMessage> captor = ArgumentCaptor.forClass(SagaCommandMessage.class);
-    verify(redpandaHandler).handle(captor.capture());
+    verify(pipelineHandler).handle(captor.capture());
 
+    // The NiFi pipeline adapter declares no field aliases, so the FROST baseUrl reaches the
+    // pipeline step under its original key (no baseUrl->targetUrl rename).
     assertEquals(
         "http://frost/v1.1/Projects(1)",
-        captor.getValue().payload().get("targetUrl"),
-        "FROST baseUrl should be mapped to targetUrl for Redpanda");
+        captor.getValue().payload().get("baseUrl"),
+        "FROST baseUrl should reach the pipeline step unrenamed");
   }
 
   @Test
@@ -272,10 +274,10 @@ class DatasetCreateBpmnTest {
   }
 
   @Test
-  void shouldCompensateGeoServerWhenRedpandaFailsWithGeoSink() {
+  void shouldCompensateGeoServerWhenPipelineFailsWithGeoSink() {
     stubFrostSuccess();
     stubApisixSuccess();
-    stubRedpandaFailure("Pipeline deployment failed");
+    stubPipelineFailure("Pipeline deployment failed");
     stubApisixCompensationSuccess();
     stubFrostCompensationSuccess();
 
@@ -400,8 +402,8 @@ class DatasetCreateBpmnTest {
                 Map.of("routeId", "r-1", "serviceId", "s-1")));
   }
 
-  private void stubRedpandaSuccess() {
-    when(redpandaHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+  private void stubPipelineSuccess() {
+    when(pipelineHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(
             SagaCommandResult.success(
                 "saga-test-123",
@@ -415,8 +417,8 @@ class DatasetCreateBpmnTest {
         .thenReturn(SagaCommandResult.failure("saga-test-123", "create-route", error));
   }
 
-  private void stubRedpandaFailure(String error) {
-    when(redpandaHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+  private void stubPipelineFailure(String error) {
+    when(pipelineHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.failure("saga-test-123", "deploy-pipelines", error));
   }
 

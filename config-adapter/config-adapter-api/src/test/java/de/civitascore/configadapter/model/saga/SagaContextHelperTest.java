@@ -86,7 +86,7 @@ class SagaContextHelperTest {
           saga(
               step("create-project", "frost", SagaStepStatus.SUCCESS),
               step("create-route", "apisix", SagaStepStatus.PENDING),
-              step("deploy-pipelines", "redpanda", SagaStepStatus.PENDING));
+              step("deploy-pipelines", "nifi", SagaStepStatus.PENDING));
 
       assertEquals(0, SagaContextHelper.findStepIndex(context, "create-project"));
       assertEquals(1, SagaContextHelper.findStepIndex(context, "create-route"));
@@ -113,7 +113,7 @@ class SagaContextHelperTest {
           saga(
               step("create-project", "frost", SagaStepStatus.SUCCESS),
               step("create-route", "apisix", SagaStepStatus.SUCCESS),
-              step("deploy-pipelines", "redpanda", SagaStepStatus.FAILED));
+              step("deploy-pipelines", "nifi", SagaStepStatus.FAILED));
 
       List<SagaStep> completed = SagaContextHelper.getCompletedSteps(context);
 
@@ -145,7 +145,7 @@ class SagaContextHelperTest {
           saga(
               step("create-project", "frost", SagaStepStatus.SUCCESS),
               step("create-route", "apisix", SagaStepStatus.PENDING),
-              step("deploy-pipelines", "redpanda", SagaStepStatus.PENDING));
+              step("deploy-pipelines", "nifi", SagaStepStatus.PENDING));
 
       List<SagaStep> pending = SagaContextHelper.getPendingSteps(context);
 
@@ -166,7 +166,7 @@ class SagaContextHelperTest {
           saga(
               step("create-project", "frost", SagaStepStatus.SUCCESS),
               step("create-route", "apisix", SagaStepStatus.SUCCESS),
-              step("deploy-pipelines", "redpanda", SagaStepStatus.FAILED));
+              step("deploy-pipelines", "nifi", SagaStepStatus.FAILED));
 
       List<SagaStep> reversed = SagaContextHelper.getCompletedStepsReversed(context);
 
@@ -233,7 +233,7 @@ class SagaContextHelperTest {
           saga(
               step("create-project", "frost", SagaStepStatus.SUCCESS),
               step("create-route", "apisix", SagaStepStatus.SUCCESS),
-              step("deploy-pipelines", "redpanda", SagaStepStatus.FAILED));
+              step("deploy-pipelines", "nifi", SagaStepStatus.FAILED));
 
       Optional<SagaStep> next = SagaContextHelper.getNextStepToCompensate(context);
 
@@ -273,7 +273,7 @@ class SagaContextHelperTest {
           saga(
               step("create-project", "frost", SagaStepStatus.SUCCESS),
               step("create-route", "apisix", SagaStepStatus.COMPENSATED),
-              step("deploy-pipelines", "redpanda", SagaStepStatus.FAILED));
+              step("deploy-pipelines", "nifi", SagaStepStatus.FAILED));
 
       Optional<SagaStep> next = SagaContextHelper.getNextStepToCompensate(context);
 
@@ -293,7 +293,7 @@ class SagaContextHelperTest {
           saga(
               step("create-project", "frost", SagaStepStatus.COMPENSATED),
               stepWithError("create-route", "apisix", SagaStepStatus.COMPENSATION_FAILED),
-              step("deploy-pipelines", "redpanda", SagaStepStatus.FAILED));
+              step("deploy-pipelines", "nifi", SagaStepStatus.FAILED));
 
       assertTrue(SagaContextHelper.isCompensationComplete(context));
     }

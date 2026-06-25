@@ -162,4 +162,51 @@ class AllowedScopesFilterTest {
     assertThat(allowedScopes.isWildcard()).isFalse();
     assertThat(allowedScopes.getScopeIds()).isEmpty();
   }
+
+  @Test
+  @DisplayName("Should set datapool IDs from X-Allowed-Pool-Ids header")
+  void shouldSetPoolIdsFromPoolHeader() throws Exception {
+    setupScopesProvider();
+    UUID p1 = UUID.randomUUID();
+    UUID p2 = UUID.randomUUID();
+    when(request.getHeader(AllowedScopesFilter.HEADER_NAME)).thenReturn(null);
+    when(request.getHeader(AllowedScopesFilter.HEADER_NAME_POOL)).thenReturn(p1 + "," + p2);
+
+    filter.doFilterInternal(request, response, filterChain);
+
+    assertThat(allowedScopes.isHeaderPresent()).isTrue();
+    assertThat(allowedScopes.getPoolIds()).containsExactlyInAnyOrder(p1, p2);
+    verify(filterChain).doFilter(request, response);
+  }
+
+  @Test
+  @DisplayName("Should mark header present for pool-only access (no scope header)")
+  void shouldHandlePoolOnlyAccess() throws Exception {
+    setupScopesProvider();
+    UUID p1 = UUID.randomUUID();
+    when(request.getHeader(AllowedScopesFilter.HEADER_NAME)).thenReturn(null);
+    when(request.getHeader(AllowedScopesFilter.HEADER_NAME_POOL)).thenReturn(p1.toString());
+
+    filter.doFilterInternal(request, response, filterChain);
+
+    assertThat(allowedScopes.isHeaderPresent()).isTrue();
+    assertThat(allowedScopes.isWildcard()).isFalse();
+    assertThat(allowedScopes.getScopeIds()).isEmpty();
+    assertThat(allowedScopes.getPoolIds()).containsExactly(p1);
+  }
+
+  @Test
+  @DisplayName("Should populate both scope and pool IDs when both headers present")
+  void shouldSetScopeAndPoolIds() throws Exception {
+    setupScopesProvider();
+    UUID s1 = UUID.randomUUID();
+    UUID p1 = UUID.randomUUID();
+    when(request.getHeader(AllowedScopesFilter.HEADER_NAME)).thenReturn(s1.toString());
+    when(request.getHeader(AllowedScopesFilter.HEADER_NAME_POOL)).thenReturn(p1.toString());
+
+    filter.doFilterInternal(request, response, filterChain);
+
+    assertThat(allowedScopes.getScopeIds()).containsExactly(s1);
+    assertThat(allowedScopes.getPoolIds()).containsExactly(p1);
+  }
 }

@@ -9,6 +9,7 @@ import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataSetAssembler;
 import de.civitascore.portal.repository.specification.DataSetSpec;
 import de.civitascore.portal.repository.specification.ScopeFilteringSpecification;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.service.DataSetService;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -100,6 +101,19 @@ public class DataSetController
   @Override
   protected DataSetService getService() {
     return dataSetService;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Widens dataset scope filtering with Epic 1 union inheritance: in addition to directly scoped
+   * dataset IDs, datasets belonging to a datapool the user has a DATAPOOL-scoped grant on are
+   * visible ({@code id IN (scopeIds) OR datapool_id IN (poolIds)}).
+   */
+  @Override
+  protected Specification<DataSet> scopeSpecification(AllowedScopes scopes) {
+    return ScopeFilteringSpecification.dataSetByScopeOrPool(
+        scopes.getScopeIds(), scopes.getPoolIds());
   }
 
   /** {@inheritDoc} */

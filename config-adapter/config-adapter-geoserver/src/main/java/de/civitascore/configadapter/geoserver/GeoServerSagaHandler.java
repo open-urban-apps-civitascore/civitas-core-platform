@@ -14,6 +14,7 @@ import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.crypto.CryptoKeyLoader;
+import de.civitascore.configadapter.model.dataset.SafeNames;
 import de.civitascore.configadapter.model.dataset.WorkspaceNames;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
@@ -73,7 +74,6 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   private static final String DEFAULT_POSTGIS_SCHEMA = "public";
 
   private static final Pattern WORKSPACE_NAME_PATTERN = Pattern.compile("[a-z0-9_]+");
-  private static final Pattern FEATURE_TYPE_NAME_PATTERN = Pattern.compile("[A-Za-z0-9_-]+");
 
   /**
    * Only datasinks of this type are provisioned as GeoServer feature types. Matches the {@code
@@ -856,7 +856,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
    * feature-type and table names are concatenated into GeoServer REST URIs.
    */
   private static void requireSafeName(String name, String field) {
-    if (name == null || !FEATURE_TYPE_NAME_PATTERN.matcher(name).matches()) {
+    if (name == null || !SafeNames.COMPILED_PATTERN.matcher(name).matches()) {
       throw new IllegalArgumentException(
           field + " contains invalid characters (allowed: A-Z, a-z, 0-9, _, -): " + name);
     }

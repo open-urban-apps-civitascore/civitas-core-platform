@@ -43,19 +43,19 @@ class ResultPublishingTest {
   private FlowableResultPublisher resultPublisher;
   private SagaCommandHandler frostHandler;
   private SagaCommandHandler apisixHandler;
-  private SagaCommandHandler redpandaHandler;
+  private SagaCommandHandler pipelineHandler;
 
   void setUp(boolean useBpmn) {
     frostHandler = FlowableTestSupport.mockHandler("frost");
     apisixHandler = FlowableTestSupport.mockHandler("apisix");
-    redpandaHandler = FlowableTestSupport.mockHandler("redpanda");
+    pipelineHandler = FlowableTestSupport.mockHandler("nifi");
     resultPublisher = mock(FlowableResultPublisher.class);
 
     processEngine =
         FlowableTestSupport.createTestEngine(
             Map.of(
                 "sagaHandlerRegistry",
-                FlowableTestSupport.registry(frostHandler, apisixHandler, redpandaHandler),
+                FlowableTestSupport.registry(frostHandler, apisixHandler, pipelineHandler),
                 "resultPublisher",
                 resultPublisher));
 
@@ -124,7 +124,7 @@ class ResultPublishingTest {
       setUp(useBpmn);
       stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1", "baseUrl", "http://f"));
       stubSuccess(apisixHandler, "create-route", Map.of("routeId", "r1"));
-      stubSuccess(redpandaHandler, "deploy-pipelines", Map.of("pipelineIds", List.of("pl1")));
+      stubSuccess(pipelineHandler, "deploy-pipelines", Map.of("pipelineIds", List.of("pl1")));
 
       Map<String, Object> vars = new HashMap<>();
       vars.put("sagaId", "saga-3step");
@@ -138,7 +138,7 @@ class ResultPublishingTest {
       Map<String, Object> results = captor.getValue();
       assertTrue(results.containsKey("projectId"), "FROST result key missing");
       assertTrue(results.containsKey("routeId"), "APISIX result key missing");
-      assertTrue(results.containsKey("pipelineIds"), "Redpanda result key missing");
+      assertTrue(results.containsKey("pipelineIds"), "Pipeline result key missing");
     }
 
     @ParameterizedTest(name = "{0}")

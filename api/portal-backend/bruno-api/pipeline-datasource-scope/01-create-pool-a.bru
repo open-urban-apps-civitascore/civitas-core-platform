@@ -1,0 +1,39 @@
+meta {
+  name: 01. Create DataPool A (dataset pool)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/datapools
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Scope Test Pool A {{scopeRunId}}",
+    "description": "DataPool the DataSet belongs to",
+    "contactPersonId": "{{userId}}",
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('scopePoolAId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("scopePoolAId is set", function() {
+    expect(bru.getVar('scopePoolAId')).to.be.a('string');
+  });
+}
+
+docs {
+  **Precondition:** `userId` set (step 00). **Post-condition:** saves `scopePoolAId`.
+}

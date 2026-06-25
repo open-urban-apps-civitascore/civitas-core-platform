@@ -61,7 +61,8 @@
       "nameExistsToast": "The name {name} is already in use. Please, choose another name.",
       "emailExists": "This email is already in use.",
       "emailExistsToast": "The email {email} is already in use. Please, choose another email address.",
-      "insufficientPermissions": "You do not have the necessary permissions to perform this action."
+      "insufficientPermissions": "You do not have the necessary permissions to perform this action.",
+      "invalidCharacters": "Only letters, numbers, hyphens and underscores are allowed."
     },
     "items": {
       "data": "data",
@@ -334,7 +335,6 @@
               "newStyle": "New Style {index}",
               "untitledStyle": "Untitled Style {index}",
               "name": "Name",
-
               "sldFile": "SLD file",
               "sldFilePlaceholder": "Select SLD...",
               "styleEditor": "Style editor",
@@ -1350,6 +1350,9 @@
               "label": "Pattern"
             }
           }
+        },
+        "geoPoint": {
+          "description": "longitude + latitude → Point"
         }
       }
     }

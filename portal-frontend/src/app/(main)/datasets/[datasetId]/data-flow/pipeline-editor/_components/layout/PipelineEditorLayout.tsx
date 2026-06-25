@@ -22,6 +22,7 @@ import { useTranslations } from 'next-intl'
 import { useCallback, useState } from 'react'
 
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
+import { EditorLayout } from '@/components/node-editor/EditorLayout'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -160,24 +161,14 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
               <span className="ml-2 text-sm text-muted-foreground">{t('toolbar.loading')}</span>
             </div>
           ) : (
-            <div className="flex flex-1 overflow-hidden">
-              {/* Left Panel - Palette */}
-              <PipelinePalette />
-
-              {/* Center Panel - Canvas + Toolbar */}
-              <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                {/* Toolbar */}
-                <PipelineToolbar />
-
-                {/* Canvas */}
-                <div className="relative flex-1 overflow-hidden">
-                  <PipelineCanvas />
-                </div>
-              </div>
-
-              {/* Right Panel - Inspector */}
-              <PipelineInspector />
-            </div>
+            <EditorLayout
+              className="flex-1"
+              palette={<PipelinePalette />}
+              inspector={<PipelineInspector />}
+              toolbar={<PipelineToolbar />}
+            >
+              <PipelineCanvas />
+            </EditorLayout>
           )}
         </div>
       </div>

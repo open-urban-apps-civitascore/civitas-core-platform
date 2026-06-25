@@ -1,16 +1,16 @@
 # Config Adapter Flowable Orchestrator
 
-Flowable-based saga orchestrator for multi-adapter provisioning workflows (Dataset lifecycle: FROST, APISIX, NiFi/Redpanda, GeoServer, PostGIS). Drop-in replacement for the custom `config-adapter-orchestrator`.
+Flowable-based saga orchestrator for multi-adapter provisioning workflows (Dataset lifecycle: FROST, APISIX, NiFi, GeoServer, PostGIS). Drop-in replacement for the custom `config-adapter-orchestrator`.
 
 ## How it works
 
-Flowable Engine runs **embedded** in the config-adapter JVM — no extra server or container needed. Saga workflows are defined as BPMN processes. Each saga step calls an existing `SagaCommandHandler` (FROST, APISIX, Redpanda, GeoServer, PostGIS) via a JavaDelegate bridge. State is persisted in PostgreSQL (Flowable's built-in tables with `ACT_` prefix).
+Flowable Engine runs **embedded** in the config-adapter JVM — no extra server or container needed. Saga workflows are defined as BPMN processes. Each saga step calls an existing `SagaCommandHandler` (FROST, APISIX, NiFi, GeoServer, PostGIS) via a JavaDelegate bridge. State is persisted in PostgreSQL (Flowable's built-in tables with `ACT_` prefix).
 
 ```text
 Kafka Trigger → FlowableTriggerConsumer → Flowable Engine (in-process)
                                              ├─ FROST handler (REST)
                                              ├─ APISIX handler (REST)
-                                             ├─ Redpanda handler (REST)
+                                             ├─ NiFi handler (REST)
                                              ├─ GeoServer handler (REST)
                                              └─ PostGIS handler (JDBC)
                                           → FlowableResultPublisher → Kafka Result
@@ -73,20 +73,20 @@ If the PostgreSQL volume already exists from before this split, recreate it: `do
 
 ## Saga Workflows
 
-### Dataset Create (FROST → APISIX → conditional PostGIS+GeoServer → conditional Redpanda)
+### Dataset Create (FROST → APISIX → conditional PostGIS+GeoServer → conditional NiFi)
 - Sequential execution
 - Conditional geo branch (`hasGeoSink`): `PROVISION_SINK` (PostGIS table/schema/read role) →
   `CREATE_WORKSPACE` → `CREATE_DATASTORE` → conditional `PROVISION_LAYERS` (`hasLayers`)
-- Conditional Redpanda step (`hasPipelines`)
+- Conditional NiFi step (`hasPipelines`)
 - On failure: reverse-order compensation (DELETE operations); the GeoServer part is undone by a
   single idempotent `DELETE_WORKSPACE` (recursive), the sink by `DEPROVISION_SINK`
   (compensate-geoserver → compensate-sink → compensate-apisix)
 
-### Dataset Update (FROST → APISIX → conditional GeoServer → conditional Redpanda)
+### Dataset Update (FROST → APISIX → conditional GeoServer → conditional NiFi)
 - Same structure as Create; the GeoServer branch is a single `UPDATE_WORKSPACE` step, compensated by
   `RESTORE_WORKSPACE`
 
-### Dataset Delete (Redpanda → APISIX → conditional GeoServer+PostGIS → FROST)
+### Dataset Delete (NiFi → APISIX → conditional GeoServer+PostGIS → FROST)
 - Reverse order, best-effort: continues on failure, no compensation
 - Conditional geo teardown (`hasGeoSink`): `DELETE_WORKSPACE` (recursive) after the APISIX route is
   removed, then `DEPROVISION_SINK` (drops the sink table and read role; the schema stays — it may
@@ -137,17 +137,16 @@ field) skips the teardown. Gating it this way (rather than always deleting) keep
 ### Adapter handlers: required vs optional
 
 The orchestrator only **requires** the handlers that every saga path uses unconditionally — `frost`
-and `apisix` — and fails fast at startup if either is missing. The **pipeline** adapter (`redpanda`,
-and `nifi` once it exists) is **conditional**: it runs only when a trigger carries pipelines
-(`hasPipelines == true`) and is resolved lazily per step. Therefore:
+and `apisix` — and fails fast at startup if either is missing. The **pipeline** adapter (`nifi`) is
+**conditional**: it runs only when a trigger carries pipelines (`hasPipelines == true`) and is
+resolved lazily per step. Therefore:
 
 - A deployment **without** the pipeline adapter still boots, and pipeline-free sagas complete normally.
 - A saga that *does* carry pipelines but finds no pipeline handler **fails gracefully** — the step
   raises a saga failure routed through the normal compensation/failure path, not an opaque crash.
 
-This keeps the engine runnable during the RedPanda → NiFi migration, while the pipeline adapter may
-be temporarily absent. Both the BPMN and coded variants share this behavior (enforced by the
-equivalence tests).
+This keeps the engine runnable in deployments where the pipeline adapter (`nifi`) is absent. Both the
+BPMN and coded variants share this behavior (enforced by the equivalence tests).
 
 The **geoserver** adapter is conditional in the same way: its steps run only when a trigger carries a
 `POSTGIS` data sink (`hasGeoSink`), so it is **not** in `REQUIRED_HANDLERS` and a deployment without

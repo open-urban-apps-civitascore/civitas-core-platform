@@ -152,7 +152,8 @@ public final class FlowableTestSupport {
   private static Map<String, String> fieldAliasesFor(String adapter) {
     return switch (adapter) {
       case "apisix" -> Map.of("baseUrl", "upstreamUrl");
-      case "redpanda" -> Map.of("baseUrl", "targetUrl");
+      // The NiFi pipeline adapter declares no field aliases (its sink target is platform-managed,
+      // not derived from the FROST baseUrl as the former pipeline adapter required).
       default -> Map.of();
     };
   }

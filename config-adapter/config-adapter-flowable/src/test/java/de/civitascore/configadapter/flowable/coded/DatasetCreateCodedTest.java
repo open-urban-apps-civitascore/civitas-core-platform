@@ -42,21 +42,21 @@ class DatasetCreateCodedTest {
 
   private SagaCommandHandler frostHandler;
   private SagaCommandHandler apisixHandler;
-  private SagaCommandHandler redpandaHandler;
+  private SagaCommandHandler pipelineHandler;
 
   @BeforeEach
   void setUp() {
     frostHandler = mock(SagaCommandHandler.class);
     apisixHandler = mock(SagaCommandHandler.class);
-    redpandaHandler = mock(SagaCommandHandler.class);
+    pipelineHandler = mock(SagaCommandHandler.class);
     when(frostHandler.adapter()).thenReturn("frost");
     when(apisixHandler.adapter()).thenReturn("apisix");
-    when(redpandaHandler.adapter()).thenReturn("redpanda");
+    when(pipelineHandler.adapter()).thenReturn("nifi");
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
     registry.register(apisixHandler);
-    registry.register(redpandaHandler);
+    registry.register(pipelineHandler);
 
     processEngine = FlowableTestSupport.createTestEngine(Map.of("sagaHandlerRegistry", registry));
     runtimeService = processEngine.getRuntimeService();
@@ -76,7 +76,7 @@ class DatasetCreateCodedTest {
     }
   }
 
-  // Happy path and skip-redpanda are covered by BpmnVsCodedEquivalenceTest.
+  // Happy path and skip-pipeline are covered by BpmnVsCodedEquivalenceTest.
   // Only coded-specific compensation tests remain here.
 
   @Test
@@ -101,10 +101,10 @@ class DatasetCreateCodedTest {
   }
 
   @Test
-  void shouldCompensateInReverseOrderWhenRedpandaFails() {
+  void shouldCompensateInReverseOrderWhenPipelineFails() {
     stubFrostSuccess();
     stubApisixSuccess();
-    stubRedpandaFailure("Pipeline deployment failed");
+    stubPipelineFailure("Pipeline deployment failed");
     when(apisixHandler.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "create-route"));
     when(frostHandler.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
@@ -174,8 +174,8 @@ class DatasetCreateCodedTest {
                 Map.of("routeId", "r-1", "serviceId", "s-1")));
   }
 
-  private void stubRedpandaSuccess() {
-    when(redpandaHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+  private void stubPipelineSuccess() {
+    when(pipelineHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(
             SagaCommandResult.success(
                 "saga-test-123",
@@ -189,8 +189,8 @@ class DatasetCreateCodedTest {
         .thenReturn(SagaCommandResult.failure("saga-test-123", "create-route", error));
   }
 
-  private void stubRedpandaFailure(String error) {
-    when(redpandaHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+  private void stubPipelineFailure(String error) {
+    when(pipelineHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.failure("saga-test-123", "deploy-pipelines", error));
   }
 }
