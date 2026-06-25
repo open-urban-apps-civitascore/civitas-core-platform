@@ -195,18 +195,24 @@ const buildClassSchema = (
     }
   }
 
-  // Associations / aggregation / composition originating from this element
+  // The composition/aggregation diamond (= the container) is drawn at the edge target, so the
+  // target embeds the source. Association has no diamond and keeps its drawn direction.
   for (const edge of diagram.edges) {
     const rel = edge.data.relationship
-    if (rel.source !== element.id) continue
     if (!['association', 'aggregation', 'composition'].includes(rel.type)) continue
 
-    const targetDefKey = classDefKeyById.get(rel.target)
-    if (!targetDefKey) continue
+    const isContainerAtTarget = rel.type === 'aggregation' || rel.type === 'composition'
+    if (isContainerAtTarget ? rel.target !== element.id : rel.source !== element.id) continue
 
-    const propName = rel.targetRole || sanitizeName(targetDefKey) || targetDefKey
-    const { lower, upper } = parseMultiplicity(rel.targetMultiplicity)
-    const ref: JsonSchemaObject = { $ref: `#/$defs/${targetDefKey}` }
+    const partId = isContainerAtTarget ? rel.source : rel.target
+    const partDefKey = classDefKeyById.get(partId)
+    if (!partDefKey) continue
+
+    const role = isContainerAtTarget ? rel.sourceRole : rel.targetRole
+    const multiplicity = isContainerAtTarget ? rel.sourceMultiplicity : rel.targetMultiplicity
+    const propName = role || sanitizeName(partDefKey) || partDefKey
+    const { lower, upper } = parseMultiplicity(multiplicity)
+    const ref: JsonSchemaObject = { $ref: `#/$defs/${partDefKey}` }
 
     if (isMany(upper)) {
       const arraySchema: JsonSchemaObject = { type: 'array', items: ref }
@@ -245,27 +251,22 @@ const buildClassSchema = (
 }
 
 /**
- * Selects the single root element of the diagram's class hierarchy.
- * A root candidate is a non-enumeration class that is not the target of any
- * composition, aggregation, inheritance, or realization edge. Among candidates
- * the class whose name matches the diagram name is preferred, otherwise the
- * first candidate is used. When no candidate exists (e.g. a fully circular
- * hierarchy or an enumeration-only diagram), the first element is used.
+ * Selects the single root element of the diagram's class hierarchy: a non-enumeration class not
+ * embedded by another. Among candidates the class whose name matches the diagram name is preferred,
+ * otherwise the first. Falls back to the first element when no candidate exists (e.g. a fully
+ * circular hierarchy or an enumeration-only diagram).
  */
 const selectRootElement = (diagram: UMLDiagram, elements: UMLElement[]): UMLElement | undefined => {
   if (elements.length === 0) return undefined
 
-  // An element is "contained" if it is the target of a composition, aggregation,
-  // inheritance, or realization edge.
+  // composition/aggregation embed the source (diamond/container sits at the target); inheritance/
+  // realization embed the target (parent).
   const containedIds = new Set<string>()
   for (const edge of diagram.edges) {
     const rel = edge.data.relationship
-    if (
-      rel.type === 'composition' ||
-      rel.type === 'aggregation' ||
-      rel.type === 'inheritance' ||
-      rel.type === 'realization'
-    ) {
+    if (rel.type === 'composition' || rel.type === 'aggregation') {
+      containedIds.add(rel.source)
+    } else if (rel.type === 'inheritance' || rel.type === 'realization') {
       containedIds.add(rel.target)
     }
   }
