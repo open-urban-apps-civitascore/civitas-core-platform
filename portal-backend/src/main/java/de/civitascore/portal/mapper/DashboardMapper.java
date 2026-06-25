@@ -18,7 +18,6 @@ public interface DashboardMapper
     extends DtoMapper<DashboardInputDTO, DashboardOutputDTO, Dashboard> {
 
   @Mapping(target = "dataSet", ignore = true)
-  @Mapping(target = "sources", ignore = true)
   @Mapping(target = "active", ignore = true)
   @Mapping(target = "externalDashboardId", ignore = true)
   @Override
@@ -34,7 +33,6 @@ public interface DashboardMapper
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "dataSet", ignore = true)
-  @Mapping(target = "sources", ignore = true)
   @Mapping(target = "active", ignore = true)
   @Mapping(target = "externalDashboardId", ignore = true)
   @Override

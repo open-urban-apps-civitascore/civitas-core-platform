@@ -6,12 +6,15 @@ import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
+import de.civitascore.portal.model.entity.DashboardSource;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
+import de.civitascore.portal.repository.DashboardRepository;
+import de.civitascore.portal.repository.DashboardSourceRepository;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.InvalidInputException;
@@ -41,11 +44,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputDTO> {
 
-  // Stable identifiers for drift events emitted by applyInfrastructureResult.
+  // Stable identifiers for drift events emitted by the saga-result handlers.
   private static final String DRIFT_ORPHAN_SLUGS = "orphan-slugs";
   private static final String DRIFT_UNPROVISIONED_SLUGS = "unprovisioned-slugs";
   private static final String DRIFT_REPLACED_ROUTEID = "replaced-routeid";
   private static final String DRIFT_UNEXPECTED_ROUTEIDS = "unexpected-routeids";
+  private static final String DRIFT_UNKNOWN_DASHBOARD = "unknown-dashboard";
+  private static final String DRIFT_MALFORMED_ID = "malformed-id";
 
   private final DataSetRepository dataSetRepository;
   private final DataSetMapper dataSetMapper;
@@ -55,17 +60,24 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   private final DataSetSagaPublisher sagaPublisher;
 
+  private final DashboardRepository dashboardRepository;
+  private final DashboardSourceRepository dashboardSourceRepository;
+
   public DataSetService(
       DataSetRepository dataSetRepository,
       DataSetMapper dataSetMapper,
       DataPoolRepository dataPoolRepository,
       AssignmentFactory assignmentFactory,
-      DataSetSagaPublisher sagaPublisher) {
+      DataSetSagaPublisher sagaPublisher,
+      DashboardRepository dashboardRepository,
+      DashboardSourceRepository dashboardSourceRepository) {
     this.dataSetRepository = dataSetRepository;
     this.dataSetMapper = dataSetMapper;
     this.dataPoolRepository = dataPoolRepository;
     this.assignmentFactory = assignmentFactory;
     this.sagaPublisher = sagaPublisher;
+    this.dashboardRepository = dashboardRepository;
+    this.dashboardSourceRepository = dashboardSourceRepository;
   }
 
   @Override
@@ -481,10 +493,13 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * fields set by earlier steps.
    *
    * <p><b>Drift policy:</b> divergence between the saga result and the entity (orphan slugs,
-   * unprovisioned slugs, replaced routeIds) is logged as drift events but does not fail the saga.
-   * Throwing here would not undo the upstream APISIX/FROST mutations and would cause Kafka
-   * redelivery to retry indefinitely without the orchestrator being able to compensate. Real
-   * compensation (fail-saga + cleanup) is not yet implemented.
+   * unprovisioned slugs, replaced routeIds, unknown/malformed dashboard ids) is logged as drift
+   * events but does not fail the saga. Throwing here would not undo the upstream APISIX/FROST
+   * mutations: the result is a non-retryable data condition (a retry replays the same payload and
+   * fails identically), so failing would only burn the bounded retries and dead-letter the message
+   * — see {@code KafkaEventConfig} (3 retries, then {@code <topic>.DLT}) — while leaving the
+   * dataset stuck with {@code pendingSagaType} set. Real compensation (fail-saga + cleanup) is not
+   * yet implemented.
    */
   private void applyInfrastructureResult(DataSet dataSet, SagaResultPayload result) {
     if (result.projectId() != null) {
@@ -561,6 +576,100 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
     if (result.pipelineIds() != null) {
       dataSet.setPipelineIds(result.pipelineIds());
+    }
+    applyDashboardResult(dataSet, result);
+  }
+
+  /**
+   * {@code dashboards} and {@code dashboardSources} arrive as two independent, dataset-scoped lists
+   * (dashboard-sync event contract), not nested. An unknown dashboard id is drift, not a failure,
+   * for the same reason as the routeId drift policy above.
+   */
+  private void applyDashboardResult(DataSet dataSet, SagaResultPayload result) {
+    if (result.dashboards() != null) {
+      for (SagaResultPayload.DashboardResult d : result.dashboards()) {
+        UUID dashboardId = tryParseUuid(dataSet, "dashboardId", d.dashboardId());
+        if (dashboardId == null) {
+          continue;
+        }
+        dashboardRepository
+            .findById(dashboardId)
+            .ifPresentOrElse(
+                dashboard -> dashboard.setExternalDashboardId(d.externalDashboardId()),
+                () ->
+                    log.error(
+                        "drift={} dataset={} dashboardId={} — saga returned a dashboard id absent"
+                            + " from the platform.",
+                        DRIFT_UNKNOWN_DASHBOARD,
+                        dataSet.getId(),
+                        Encode.forJava(d.dashboardId())));
+      }
+    }
+
+    if (result.dashboardSources() != null) {
+      reconcileDashboardSources(dataSet, result.dashboardSources());
+    }
+  }
+
+  /**
+   * The engine reports the complete current source set for the dataset, so a source missing from
+   * the report means removed. An empty report therefore clears every source — logged so the
+   * mass-delete is never silent.
+   */
+  private void reconcileDashboardSources(
+      DataSet dataSet, List<SagaResultPayload.DashboardSourceResult> sources) {
+    Set<String> reportedIds =
+        sources.stream()
+            .map(SagaResultPayload.DashboardSourceResult::externalSourceId)
+            .collect(Collectors.toSet());
+
+    List<DashboardSource> toDelete =
+        dashboardSourceRepository.findByMappedDatasetId(dataSet.getId()).stream()
+            .filter(existing -> !reportedIds.contains(existing.getExternalSourceId()))
+            .toList();
+    if (!toDelete.isEmpty() && reportedIds.isEmpty()) {
+      log.warn(
+          "dataset={} — engine reported no dashboard sources; clearing {} existing source(s).",
+          dataSet.getId(),
+          toDelete.size());
+    }
+    toDelete.forEach(dashboardSourceRepository::delete);
+
+    for (SagaResultPayload.DashboardSourceResult src : sources) {
+      // A bad id only skips its own upsert; the row stays in reportedIds, so it isn't deleted
+      // above.
+      UUID mappedDatasetId = tryParseUuid(dataSet, "mappedDatasetId", src.mappedDatasetId());
+      if (mappedDatasetId == null) {
+        continue;
+      }
+      DashboardSource entity =
+          dashboardSourceRepository
+              .findByExternalSourceId(src.externalSourceId())
+              .orElseGet(DashboardSource::new);
+      entity.setExternalSourceId(src.externalSourceId());
+      entity.setPhysicalSourceIdentifier(src.physicalSourceIdentifier());
+      entity.setMappedDatasetId(mappedDatasetId);
+      dashboardSourceRepository.save(entity);
+    }
+  }
+
+  /**
+   * Parses an engine-supplied id, treating a null or malformed value as drift (logged + skipped)
+   * rather than letting it abort the saga-result handler mid-transaction. Mirrors the listener's
+   * own {@code parseDatasetId} boundary so a bad secondary id can't roll back the primary
+   * write-back.
+   */
+  private UUID tryParseUuid(DataSet dataSet, String field, String value) {
+    try {
+      return UUID.fromString(value);
+    } catch (IllegalArgumentException | NullPointerException e) {
+      log.error(
+          "drift={} dataset={} field={} value={} — saga returned an unparseable id; skipping.",
+          DRIFT_MALFORMED_ID,
+          dataSet.getId(),
+          field,
+          Encode.forJava(String.valueOf(value)));
+      return null;
     }
   }
 }

@@ -11,16 +11,12 @@ import de.civitascore.portal.model.entity.DataSet;
 import jakarta.persistence.EntityManager;
 import jakarta.validation.ConstraintViolationException;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
-import org.hibernate.TransientPropertyValueException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.InvalidDataAccessApiUsageException;
-import org.springframework.transaction.annotation.Transactional;
 
 @DisplayName("Dashboard Binding Persistence Tests")
 class DashboardBindingPersistenceIntegrationTest extends BaseKeycloakIntegrationTest {
@@ -77,37 +73,6 @@ class DashboardBindingPersistenceIntegrationTest extends BaseKeycloakIntegration
     assertThatThrownBy(() -> dashboardRepository.saveAndFlush(dashboard))
         .isInstanceOf(ConstraintViolationException.class)
         .hasMessageContaining("dataSet");
-  }
-
-  @Test
-  @Transactional
-  @DisplayName("Binding a persisted dashboard source is stored and reloaded")
-  void bindingIsPersistedAndReloaded() {
-    DashboardSource source = dashboardSourceRepository.saveAndFlush(newSource());
-
-    Dashboard dashboard = newDashboard(newDataSet());
-    dashboard.setSources(Set.of(source));
-    UUID id = dashboardRepository.saveAndFlush(dashboard).getId();
-
-    entityManager.clear();
-
-    Dashboard loaded = dashboardRepository.findById(id).orElseThrow();
-    assertThat(loaded.getSources())
-        .extracting(DashboardSource::getId)
-        .containsExactly(source.getId());
-  }
-
-  @Test
-  @DisplayName("Cannot bind a non-existent (transient) dashboard source")
-  void cannotBindNonExistentSource() {
-    Dashboard dashboard = newDashboard(newDataSet());
-    dashboard.setSources(Set.of(newSource()));
-
-    // The binding has no cascade, so Hibernate rejects the transient source before flushing
-    // rather than letting the DB FK trip.
-    assertThatThrownBy(() -> dashboardRepository.saveAndFlush(dashboard))
-        .isInstanceOf(InvalidDataAccessApiUsageException.class)
-        .hasRootCauseInstanceOf(TransientPropertyValueException.class);
   }
 
   @Test
@@ -175,48 +140,6 @@ class DashboardBindingPersistenceIntegrationTest extends BaseKeycloakIntegration
   }
 
   @Test
-  @DisplayName("Deleting a dashboard removes its binding rows but keeps the bound source")
-  void deletingDashboardCascadesBindingsButKeepsSource() {
-    DashboardSource source = dashboardSourceRepository.saveAndFlush(newSource());
-    Dashboard dashboard = newDashboard(newDataSet());
-    dashboard.setSources(Set.of(source));
-    UUID dashboardId = dashboardRepository.saveAndFlush(dashboard).getId();
-
-    dashboardRepository.deleteById(dashboardId);
-    dashboardRepository.flush();
-    entityManager.clear();
-
-    assertThat(dashboardRepository.findById(dashboardId)).isEmpty();
-    assertThat(dashboardSourceRepository.findById(source.getId())).isPresent();
-  }
-
-  @Test
-  @DisplayName("Deleting a bound source cascades the binding row but keeps the dashboard")
-  void deletingSourceCascadesBindingButKeepsDashboard() {
-    DashboardSource source = dashboardSourceRepository.saveAndFlush(newSource());
-    Dashboard dashboard = newDashboard(newDataSet());
-    dashboard.setSources(Set.of(source));
-    UUID dashboardId = dashboardRepository.saveAndFlush(dashboard).getId();
-    UUID sourceId = source.getId();
-
-    dashboardSourceRepository.deleteById(sourceId);
-    dashboardSourceRepository.flush();
-    entityManager.clear();
-
-    assertThat(dashboardSourceRepository.findById(sourceId)).isEmpty();
-    assertThat(dashboardRepository.findById(dashboardId)).isPresent();
-    Number bindingCount =
-        (Number)
-            entityManager
-                .createNativeQuery(
-                    "SELECT count(*) FROM dashboard_dashboard_sources"
-                        + " WHERE dashboard_source_id = :id")
-                .setParameter("id", sourceId)
-                .getSingleResult();
-    assertThat(bindingCount.longValue()).isZero();
-  }
-
-  @Test
   @DisplayName("Dashboard lookups by external dashboard id resolve and existence checks work")
   void dashboardExternalIdLookups() {
     Dashboard dashboard = newDashboard(newDataSet());
@@ -265,29 +188,6 @@ class DashboardBindingPersistenceIntegrationTest extends BaseKeycloakIntegration
     entityManager.clear();
 
     assertThat(dashboardSourceRepository.findById(id)).isPresent();
-  }
-
-  @Test
-  @Transactional
-  @DisplayName("A source bound to two dashboards survives the deletion of one of them")
-  void sharedSourceSurvivesDeletionOfOneDashboard() {
-    DashboardSource source = dashboardSourceRepository.saveAndFlush(newSource());
-    Dashboard kept = newDashboard(newDataSet());
-    Dashboard removed = newDashboard(newDataSet());
-    kept.setSources(Set.of(source));
-    removed.setSources(Set.of(source));
-    UUID keptId = dashboardRepository.saveAndFlush(kept).getId();
-    UUID removedId = dashboardRepository.saveAndFlush(removed).getId();
-
-    dashboardRepository.deleteById(removedId);
-    dashboardRepository.flush();
-    entityManager.clear();
-
-    assertThat(dashboardRepository.findById(removedId)).isEmpty();
-    assertThat(dashboardSourceRepository.findById(source.getId())).isPresent();
-    assertThat(dashboardRepository.findById(keptId).orElseThrow().getSources())
-        .extracting(DashboardSource::getId)
-        .containsExactly(source.getId());
   }
 
   @Test

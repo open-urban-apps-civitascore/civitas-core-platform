@@ -1,6 +1,7 @@
 package de.civitascore.portal.messaging.saga;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import de.civitascore.configadapter.model.dataset.Dashboard;
 import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.model.dataset.NamedApi;
@@ -50,7 +51,8 @@ public sealed interface SagaTrigger
       List<DataSinkPayload> datasinks,
       List<LayerPayload> layers,
       List<DataPipeline> dataPipelines,
-      List<NamedApi> namedApis)
+      List<NamedApi> namedApis,
+      List<Dashboard> dashboards)
       implements SagaTrigger {
 
     public DatasetCreate {
@@ -70,7 +72,8 @@ public sealed interface SagaTrigger
         List<DataSinkPayload> datasinks,
         List<LayerPayload> layers,
         List<DataPipeline> dataPipelines,
-        List<NamedApi> namedApis) {
+        List<NamedApi> namedApis,
+        List<Dashboard> dashboards) {
       return new DatasetCreate(
           SagaType.DATASET_CREATE,
           datasetId,
@@ -81,7 +84,8 @@ public sealed interface SagaTrigger
           datasinks,
           layers,
           dataPipelines,
-          namedApis);
+          namedApis,
+          dashboards);
     }
   }
 
@@ -100,7 +104,8 @@ public sealed interface SagaTrigger
       List<DataSinkPayload> datasinks,
       List<LayerPayload> layers,
       List<DataPipeline> dataPipelines,
-      List<NamedApi> namedApis)
+      List<NamedApi> namedApis,
+      List<Dashboard> dashboards)
       implements SagaTrigger {
 
     public DatasetUpdate {
@@ -124,7 +129,8 @@ public sealed interface SagaTrigger
         List<DataSinkPayload> datasinks,
         List<LayerPayload> layers,
         List<DataPipeline> dataPipelines,
-        List<NamedApi> namedApis) {
+        List<NamedApi> namedApis,
+        List<Dashboard> dashboards) {
       return new DatasetUpdate(
           SagaType.DATASET_UPDATE,
           datasetId,
@@ -139,7 +145,8 @@ public sealed interface SagaTrigger
           datasinks,
           layers,
           dataPipelines,
-          namedApis);
+          namedApis,
+          dashboards);
     }
   }
 

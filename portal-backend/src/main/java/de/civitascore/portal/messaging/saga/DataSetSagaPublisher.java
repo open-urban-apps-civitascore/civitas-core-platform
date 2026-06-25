@@ -1,5 +1,6 @@
 package de.civitascore.portal.messaging.saga;
 
+import de.civitascore.configadapter.model.dataset.Dashboard;
 import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.model.dataset.NamedApi;
@@ -13,6 +14,7 @@ import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.saga.DataSinkPayload;
 import de.civitascore.portal.model.saga.LayerPayload;
+import de.civitascore.portal.repository.DashboardRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
@@ -47,6 +49,7 @@ public class DataSetSagaPublisher {
   private final ObjectMapper objectMapper;
   private final SagaProperties sagaProperties;
   private final DataSinkRepository dataSinkRepository;
+  private final DashboardRepository dashboardRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
 
   public DataSetSagaPublisher(
@@ -54,11 +57,13 @@ public class DataSetSagaPublisher {
       ObjectMapper objectMapper,
       SagaProperties sagaProperties,
       DataSinkRepository dataSinkRepository,
+      DashboardRepository dashboardRepository,
       DataStructureVersionRepository dataStructureVersionRepository) {
     this.eventKafkaTemplate = eventKafkaTemplate;
     this.objectMapper = objectMapper;
     this.sagaProperties = sagaProperties;
     this.dataSinkRepository = dataSinkRepository;
+    this.dashboardRepository = dashboardRepository;
     this.dataStructureVersionRepository = dataStructureVersionRepository;
   }
 
@@ -79,7 +84,8 @@ public class DataSetSagaPublisher {
             buildDatasinks(dataset),
             buildLayers(dataset),
             buildPipelines(dataset.getPipelines(), PipelineAction.ADD),
-            buildNamedApis(dataset));
+            buildNamedApis(dataset),
+            buildDashboards(dataset));
     sendTrigger(trigger);
   }
 
@@ -103,7 +109,8 @@ public class DataSetSagaPublisher {
             buildDatasinks(dataset),
             buildLayers(dataset),
             buildPipelineDiff(previousPipelines, dataset.getPipelines()),
-            buildNamedApis(dataset));
+            buildNamedApis(dataset),
+            buildDashboards(dataset));
     sendTrigger(trigger);
   }
 
@@ -268,6 +275,22 @@ public class DataSetSagaPublisher {
     }
     return dataset.getNamedApis().stream()
         .map(api -> new NamedApi(api.getSlug(), api.getStandard().name(), api.getVersion()))
+        .toList();
+  }
+
+  /**
+   * Dashboards ride along on the dataset CREATE/UPDATE saga rather than on their own event: a
+   * dashboard is only meaningful once the dataset is AVAILABLE (its Trino datasources exist), so
+   * its sync is bundled with the dataset provisioning.
+   */
+  private List<Dashboard> buildDashboards(DataSet dataset) {
+    var dashboards = dashboardRepository.findByDataSetId(dataset.getId());
+    if (dashboards.isEmpty()) {
+      // null, not empty: @JsonInclude(NON_NULL) then drops the field from the trigger entirely.
+      return null;
+    }
+    return dashboards.stream()
+        .map(d -> new Dashboard(d.getId().toString(), d.getName(), d.getExternalDashboardId()))
         .toList();
   }
 

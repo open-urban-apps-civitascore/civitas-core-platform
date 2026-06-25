@@ -32,16 +32,3 @@ CREATE TABLE dashboard_sources
 );
 
 CREATE INDEX idx_dashboard_sources_mapped_dataset_id ON dashboard_sources (mapped_dataset_id);
-
-CREATE TABLE dashboard_dashboard_sources
-(
-    dashboard_id        UUID NOT NULL,
-    dashboard_source_id UUID NOT NULL,
-    CONSTRAINT pk_dashboard_dashboard_sources PRIMARY KEY (dashboard_id, dashboard_source_id),
-    CONSTRAINT fk_dds_on_dashboard FOREIGN KEY (dashboard_id) REFERENCES dashboards (id) ON DELETE CASCADE,
-    CONSTRAINT fk_dds_on_dashboard_source FOREIGN KEY (dashboard_source_id) REFERENCES dashboard_sources (id) ON DELETE CASCADE
-);
-
--- The composite PRIMARY KEY already indexes the leading dashboard_id, so only the trailing
--- column needs its own index for reverse lookups.
-CREATE INDEX idx_dds_dashboard_source ON dashboard_dashboard_sources (dashboard_source_id);

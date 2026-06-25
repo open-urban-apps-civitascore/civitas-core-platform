@@ -2,7 +2,9 @@ package de.civitascore.portal.messaging.saga;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.configuration.SagaProperties;
@@ -16,6 +18,7 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.repository.DashboardRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
@@ -48,6 +51,7 @@ class DataSetSagaPublisherTest {
 
   @Mock private KafkaTemplate<String, String> kafkaTemplate;
   @Mock private DataSinkRepository dataSinkRepository;
+  @Mock private DashboardRepository dashboardRepository;
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
 
   private DataSetSagaPublisher publisher;
@@ -60,7 +64,10 @@ class DataSetSagaPublisherTest {
             new JsonMapper(),
             new SagaProperties("test.saga.trigger", 5),
             dataSinkRepository,
+            dashboardRepository,
             dataStructureVersionRepository);
+    // Dashboards default to none; tests that exercise dashboard payloads override this.
+    lenient().when(dashboardRepository.findByDataSetId(any())).thenReturn(List.of());
   }
 
   private DataSource dataSource(UUID id, ConnectorType type) {
@@ -782,6 +789,115 @@ class DataSetSagaPublisherTest {
       SagaResultPayload roundTripped = mapper.readValue(json, SagaResultPayload.class);
 
       assertThat(roundTripped.routeIds()).isNull();
+    }
+  }
+
+  @Nested
+  @DisplayName("dashboards serialization in saga triggers")
+  class DashboardsSerializationTests {
+
+    private DataSet emptyDataset() {
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setPipelines(Set.of());
+      return dataSet;
+    }
+
+    private ArgumentCaptor<String> stubKafkaSend() {
+      ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
+      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
+          .thenReturn(
+              CompletableFuture.completedFuture(
+                  new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
+      return jsonCaptor;
+    }
+
+    private de.civitascore.portal.model.entity.Dashboard dashboard(UUID id, String name) {
+      return dashboard(id, name, null);
+    }
+
+    private de.civitascore.portal.model.entity.Dashboard dashboard(
+        UUID id, String name, String externalDashboardId) {
+      var d = new de.civitascore.portal.model.entity.Dashboard();
+      d.setId(id);
+      d.setName(name);
+      d.setExternalDashboardId(externalDashboardId);
+      return d;
+    }
+
+    @Test
+    @DisplayName("new dashboard (no engine id) omits externalDashboardId — engine creates")
+    void createTriggerOmitsExternalIdForNewDashboard() throws Exception {
+      DataSet dataSet = emptyDataset();
+      UUID dashId = UUID.randomUUID();
+      when(dashboardRepository.findByDataSetId(dataSet.getId()))
+          .thenReturn(List.of(dashboard(dashId, "Traffic Overview"))); // no externalDashboardId
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var dashboards = payload.get("dashboards");
+      assertThat(dashboards).as("dashboards must be present in trigger payload").isNotNull();
+      assertThat(dashboards.size()).isEqualTo(1);
+      assertThat(dashboards.get(0).get("id").asString()).isEqualTo(dashId.toString());
+      assertThat(dashboards.get(0).get("name").asString()).isEqualTo("Traffic Overview");
+      // No engine id yet → field is dropped (NON_NULL) → engine treats it as a create.
+      assertThat(dashboards.get(0).has("externalDashboardId"))
+          .as("new dashboard must omit externalDashboardId so the engine creates it")
+          .isFalse();
+    }
+
+    @Test
+    @DisplayName("existing dashboard carries externalDashboardId — engine updates in place")
+    void triggerCarriesExternalIdForExistingDashboard() throws Exception {
+      DataSet dataSet = emptyDataset();
+      UUID dashId = UUID.randomUUID();
+      when(dashboardRepository.findByDataSetId(dataSet.getId()))
+          .thenReturn(List.of(dashboard(dashId, "Traffic Overview", "superset-42")));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var dashboard = payload.get("dashboards").get(0);
+      assertThat(dashboard.get("id").asString()).isEqualTo(dashId.toString());
+      // Engine id present → engine updates the existing dashboard in place, id stays stable.
+      assertThat(dashboard.get("externalDashboardId").asString()).isEqualTo("superset-42");
+    }
+
+    @Test
+    @DisplayName("UPDATE trigger carries dashboards too (post-release add)")
+    void updateTriggerCarriesDashboards() throws Exception {
+      DataSet dataSet = emptyDataset();
+      dataSet.setProjectId("proj-1");
+      dataSet.setServiceId("svc-1");
+      when(dashboardRepository.findByDataSetId(dataSet.getId()))
+          .thenReturn(List.of(dashboard(UUID.randomUUID(), "Weather Overview")));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishUpdateRequested(dataSet, Set.of());
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.get("dashboards")).isNotNull();
+      assertThat(payload.get("dashboards").size()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("no dashboards omits the field (NON_NULL contract)")
+    void noDashboardsOmitsField() throws Exception {
+      DataSet dataSet = emptyDataset();
+      when(dashboardRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of());
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.has("dashboards"))
+          .as("empty dashboards must be dropped, not sent as []")
+          .isFalse();
     }
   }
 }

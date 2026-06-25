@@ -18,6 +18,8 @@ import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.model.entity.Dashboard;
+import de.civitascore.portal.model.entity.DashboardSource;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
@@ -25,6 +27,8 @@ import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
+import de.civitascore.portal.repository.DashboardRepository;
+import de.civitascore.portal.repository.DashboardSourceRepository;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.InvalidInputException;
@@ -54,10 +58,18 @@ class DataSetServiceTest {
   @Mock private DataPoolRepository dataPoolRepository;
   @Mock private AssignmentFactory assignmentFactory;
   @Mock private DataSetSagaPublisher sagaPublisher;
+  @Mock private DashboardRepository dashboardRepository;
+  @Mock private DashboardSourceRepository dashboardSourceRepository;
 
   private DataSetService createService() {
     return new DataSetService(
-        dataSetRepository, dataSetMapper, dataPoolRepository, assignmentFactory, sagaPublisher);
+        dataSetRepository,
+        dataSetMapper,
+        dataPoolRepository,
+        assignmentFactory,
+        sagaPublisher,
+        dashboardRepository,
+        dashboardSourceRepository);
   }
 
   private DataSet readyDataSet(UUID id) {
@@ -464,6 +476,187 @@ class DataSetServiceTest {
       assertThat(persisted.getPublicUrl()).isEqualTo("https://public.example.com");
       assertThat(persisted.getPipelineIds()).containsExactly("pipe-1");
       assertThat(persisted.getPendingSagaType()).isNull();
+    }
+
+    @Test
+    @DisplayName("writes back the dashboard engine id and reconciles dashboard sources")
+    void appliesDashboardResult() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = new DataSet();
+      ds.setId(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      ds.setPipelines(new HashSet<>());
+      ds.setNamedApis(new HashSet<>());
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      UUID dashboardId = UUID.randomUUID();
+      Dashboard dashboard = new Dashboard();
+      dashboard.setId(dashboardId);
+      when(dashboardRepository.findById(dashboardId)).thenReturn(Optional.of(dashboard));
+
+      // The engine reports one source (src-keep). An existing row (src-stale) scoped to this
+      // dataset is absent from the report → must be deleted.
+      DashboardSource stale = new DashboardSource();
+      stale.setExternalSourceId("src-stale");
+      stale.setMappedDatasetId(id);
+      when(dashboardSourceRepository.findByMappedDatasetId(id)).thenReturn(List.of(stale));
+      when(dashboardSourceRepository.findByExternalSourceId("src-keep"))
+          .thenReturn(Optional.empty());
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              null,
+              null,
+              null,
+              List.of(new SagaResultPayload.DashboardResult(dashboardId.toString(), "engine-7")),
+              List.of(
+                  new SagaResultPayload.DashboardSourceResult(
+                      "src-keep", "trino.civitas.traffic", id.toString())),
+              null,
+              null,
+              null,
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      assertThat(dashboard.getExternalDashboardId()).isEqualTo("engine-7");
+      verify(dashboardSourceRepository).delete(stale);
+      ArgumentCaptor<DashboardSource> upserted = ArgumentCaptor.forClass(DashboardSource.class);
+      verify(dashboardSourceRepository).save(upserted.capture());
+      assertThat(upserted.getValue().getExternalSourceId()).isEqualTo("src-keep");
+      assertThat(upserted.getValue().getMappedDatasetId()).isEqualTo(id);
+      assertThat(upserted.getValue().getPhysicalSourceIdentifier())
+          .isEqualTo("trino.civitas.traffic");
+    }
+
+    @Test
+    @DisplayName("reconcile updates an existing dashboard source in place (no new row)")
+    void reconcileUpdatesExistingSource() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = new DataSet();
+      ds.setId(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      ds.setPipelines(new HashSet<>());
+      ds.setNamedApis(new HashSet<>());
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      // An existing row the engine re-reports with a changed physical identifier.
+      DashboardSource existing = new DashboardSource();
+      existing.setExternalSourceId("src-keep");
+      existing.setMappedDatasetId(id);
+      existing.setPhysicalSourceIdentifier("trino.civitas.old");
+      when(dashboardSourceRepository.findByMappedDatasetId(id)).thenReturn(List.of(existing));
+      when(dashboardSourceRepository.findByExternalSourceId("src-keep"))
+          .thenReturn(Optional.of(existing));
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              null,
+              null,
+              null,
+              null,
+              List.of(
+                  new SagaResultPayload.DashboardSourceResult(
+                      "src-keep", "trino.civitas.new", id.toString())),
+              null,
+              null,
+              null,
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      // Re-reported → not stale → not deleted; updated in place on the same instance.
+      verify(dashboardSourceRepository, never()).delete(any(DashboardSource.class));
+      ArgumentCaptor<DashboardSource> saved = ArgumentCaptor.forClass(DashboardSource.class);
+      verify(dashboardSourceRepository).save(saved.capture());
+      assertThat(saved.getValue()).isSameAs(existing);
+      assertThat(saved.getValue().getPhysicalSourceIdentifier()).isEqualTo("trino.civitas.new");
+    }
+
+    @Test
+    @DisplayName("reconcile skips a source with a malformed mappedDatasetId without aborting")
+    void reconcileSkipsMalformedSource() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = new DataSet();
+      ds.setId(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      ds.setPipelines(new HashSet<>());
+      ds.setNamedApis(new HashSet<>());
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dashboardSourceRepository.findByMappedDatasetId(id)).thenReturn(List.of());
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              null,
+              null,
+              null,
+              null,
+              List.of(
+                  new SagaResultPayload.DashboardSourceResult(
+                      "src-bad", "trino.civitas.x", "not-a-uuid")),
+              null,
+              null,
+              null,
+              null,
+              null,
+              null);
+
+      // The bad id is logged as drift and skipped; the handler must not throw and must clear
+      // pending.
+      createService().handleSagaCompleted(id, result);
+
+      verify(dashboardSourceRepository, never()).save(any());
+      assertThat(ds.getPendingSagaType()).isNull();
+    }
+
+    @Test
+    @DisplayName("an unknown dashboardId is logged as drift, not thrown")
+    void unknownDashboardIdIsDrift() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = new DataSet();
+      ds.setId(id);
+      ds.setDataSetStatus(DataSetStatus.AVAILABLE);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      ds.setPipelines(new HashSet<>());
+      ds.setNamedApis(new HashSet<>());
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      UUID unknownId = UUID.randomUUID();
+      when(dashboardRepository.findById(unknownId)).thenReturn(Optional.empty());
+
+      SagaResultPayload result =
+          new SagaResultPayload(
+              id.toString(),
+              null,
+              null,
+              null,
+              List.of(new SagaResultPayload.DashboardResult(unknownId.toString(), "engine-9")),
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null);
+
+      createService().handleSagaCompleted(id, result);
+
+      // No throw, saga clears its pending state regardless of the unknown dashboard.
+      assertThat(ds.getPendingSagaType()).isNull();
     }
 
     @Test
