@@ -72,7 +72,7 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
         isLoading={isLoading || isDatasetLoading}
         isError={isError || isDatasetError}
         onChange={handleEntityChange}
-        isDisabled={!canReadDatasources}
+        fallbackName={data.entityName}
       />
 
       {selectedEntity && (

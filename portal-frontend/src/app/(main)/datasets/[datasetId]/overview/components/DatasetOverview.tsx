@@ -49,6 +49,7 @@ import { pickDirtyValues } from '@/utils/form'
 import { mapDatasetToFormData } from '../../../utils/mappers'
 import { BaseInfoForm } from '../../components/BaseInfoForm'
 import { CompletionStep } from '../../components/CompletionStep'
+import { usePipelinePermissions } from '../../data-flow/pipeline-editor/_hooks/use-pipeline-permissions'
 import { ApiList } from './ApiList'
 import { PipelineList } from './PipelineList'
 
@@ -65,19 +66,31 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const tCommon = useTranslations('common')
 
   const { hasPermission, hasScopedPermission } = usePermissions()
+
+  const canRead = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_READ,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
+
   const canUpdate = hasScopedPermission(
     PERMISSION_NAMES.DATASET_UPDATE,
     ASSIGNMENT_SCOPE_TYPES.DATASET,
     dataset.id,
     dataset.datapool?.id,
   )
+
   const canRelease = hasScopedPermission(
     PERMISSION_NAMES.DATASET_RELEASE,
     ASSIGNMENT_SCOPE_TYPES.DATASET,
     dataset.id,
     dataset.datapool?.id,
   )
-  const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
+
+  const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
+
+  const { canCreatePipeline } = usePipelinePermissions(dataset.id, dataset.datapool?.id)
 
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
@@ -320,12 +333,13 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       buttons: [],
       content: (
         <>
-          <PipelineList datasetId={dataset.id} pipelines={pipelineList} canAdd={canUpdate && canReadDatasources} />
+          <PipelineList datasetId={dataset.id} pipelines={pipelineList} canCreatePipeline={canCreatePipeline} />
           <div className="border-t" />
           <ApiList
             datasetId={dataset.id}
             apis={namedApiList}
-            canEdit={canUpdate}
+            canEdit={canRead && canUpdate && canReadDatastructures}
+            canView={canRead && canReadDatastructures}
             isOpenDataAccess={dataset.openDataAccess}
           />
         </>

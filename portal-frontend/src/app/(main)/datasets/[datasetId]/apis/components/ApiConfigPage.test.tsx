@@ -45,6 +45,15 @@ vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }))
 
+vi.mock('@/hooks/use-permissions', () => ({
+  usePermissions: () => ({
+    hasPermission: () => true,
+    hasScopedPermission: () => true,
+    hasPermissionInScope: () => true,
+    hasAnyPermission: () => true,
+  }),
+}))
+
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))

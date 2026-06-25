@@ -24,6 +24,7 @@ import { CanvasScaffold } from '@/components/node-editor/canvas/CanvasScaffold'
 
 import { CANVAS_CONFIG } from '../../_constants/pipelineStyles'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
+import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 import type { PipelineNodeType } from '../../_types/pipeline'
 import { pipelineEdgeTypes } from '../edges/edgeTypes'
 import { pipelineNodeTypes } from '../nodes/nodeTypes'
@@ -48,6 +49,8 @@ interface PipelineCanvasProps {
 export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }) => {
   const t = useTranslations('pipelineEditor')
   const { pipeline, dispatch, addNode, addEdge, validateConnection, hideValidationPanel } = useActivePipeline()
+  const { isReadOnly } = useReadOnly()
+  const canEdit = !isReadOnly
 
   const nodeTypes = useMemo(() => pipelineNodeTypes, [])
   const edgeTypes = useMemo(() => pipelineEdgeTypes, [])
@@ -64,9 +67,10 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
 
   const onConnect = useCallback(
     (connection: Connection) => {
+      if (!canEdit) return
       if (validateConnection(connection)) addEdge(connection)
     },
-    [validateConnection, addEdge],
+    [canEdit, validateConnection, addEdge],
   )
 
   const onDropNode = useCallback(
@@ -104,6 +108,7 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
       onDropNode={onDropNode}
       onReactFlowSelectionChange={onReactFlowSelectionChange}
       isValidConnection={connection => validateConnection(connection as Connection)}
+      canEdit={canEdit}
       connectionMode={ConnectionMode.Loose}
       shouldSnapToGrid={CANVAS_CONFIG.snapToGrid}
       snapGrid={[CANVAS_CONFIG.gridSize, CANVAS_CONFIG.gridSize]}

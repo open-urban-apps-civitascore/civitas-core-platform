@@ -18,6 +18,7 @@ import { InspectorShell } from '@/components/node-editor/inspector/InspectorShel
 import { getNodeDefForData } from '../../_config/nodeRegistry'
 import { LAYOUT_DIMENSIONS } from '../../_constants/pipelineStyles'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
+import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 import type { PipelineNodeData } from '../../_types/nodes'
 import { InspectorHeader } from './components/InspectorHeader'
 import { ValidationPanel } from './validation'
@@ -37,14 +38,16 @@ interface PipelineInspectorProps {
 export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className = '' }) => {
   const t = useTranslations('pipelineEditor')
   const { selectedNode, selectedEdge, updateNode, shouldShowValidationPanel, validationResult } = useActivePipeline()
+  const { isReadOnly } = useReadOnly()
 
   const handleNodeUpdate = useCallback(
     (data: Partial<PipelineNodeData>) => {
+      if (isReadOnly) return
       if (selectedNode) {
         updateNode(selectedNode.id, data)
       }
     },
-    [selectedNode, updateNode],
+    [isReadOnly, selectedNode, updateNode],
   )
 
   // Render the appropriate panel by looking up the node's registry definition.
@@ -55,8 +58,18 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
     const def = getNodeDefForData(selectedNode.data)
     if (!def) return null
 
-    const { InspectorPanel } = def
-    return <InspectorPanel data={selectedNode.data} onUpdate={handleNodeUpdate} />
+    const { InspectorPanel, isPanelReadonly } = def
+    const panel = <InspectorPanel data={selectedNode.data} onUpdate={handleNodeUpdate} />
+
+    // Display-only panels stay fully legible. Editable panels are dimmed and made
+    // non-interactive in read-only mode; handleNodeUpdate additionally no-ops as a safeguard.
+    if (isPanelReadonly || !isReadOnly) return panel
+
+    return (
+      <div className="pointer-events-none opacity-60" aria-disabled>
+        {panel}
+      </div>
+    )
   }
 
   const shellWidthProps = {

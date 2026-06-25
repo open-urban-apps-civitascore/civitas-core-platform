@@ -50,6 +50,11 @@ export interface CanvasScaffoldProps {
   hasNativeDeleteKey?: boolean
   multiSelectionKeyCode?: string | string[] | null
   panActivationKeyCode?: string | string[] | null
+  /**
+   * When false, the canvas is read-only: nodes can't be moved, connected, deleted or
+   * dropped, and the interactive control is hidden. Defaults to true (fully editable).
+   */
+  canEdit?: boolean
   connectionMode?: ConnectionMode
   shouldSnapToGrid?: boolean
   snapGrid?: [number, number]
@@ -65,8 +70,10 @@ export interface CanvasScaffoldProps {
 
 const CanvasInner = (props: CanvasScaffoldProps) => {
   const { screenToFlowPosition, getNodes, getEdges, deleteElements } = useReactFlow()
+  const canEdit = props.canEdit ?? true
 
   const onDeleteSelected = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (!canEdit) return
     if (props.hasNativeDeleteKey) return
     if (e.key !== 'Delete' && e.key !== 'Backspace') return
     const selectedNodes = getNodes().filter(n => n.selected)
@@ -78,11 +85,12 @@ const CanvasInner = (props: CanvasScaffoldProps) => {
 
   const onDragOver = (e: DragEvent) => {
     e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
+    e.dataTransfer.dropEffect = canEdit ? 'move' : 'none'
   }
 
   const onDrop = (e: DragEvent) => {
     e.preventDefault()
+    if (!canEdit) return
     const type = e.dataTransfer.getData(PALETTE_DND_TYPE)
     if (!type) return
     const position = screenToFlowPosition({ x: e.clientX, y: e.clientY })
@@ -114,13 +122,16 @@ const CanvasInner = (props: CanvasScaffoldProps) => {
         isValidConnection={props.isValidConnection}
         onNodeClick={(_, node) => props.onSelectionChange?.(node.id)}
         onPaneClick={() => props.onSelectionChange?.(null)}
+        nodesDraggable={canEdit}
+        nodesConnectable={canEdit}
+        edgesReconnectable={canEdit}
         connectionMode={props.connectionMode}
         snapToGrid={props.shouldSnapToGrid}
         snapGrid={props.snapGrid}
         minZoom={props.minZoom}
         maxZoom={props.maxZoom}
         defaultViewport={props.defaultViewport}
-        deleteKeyCode={props.hasNativeDeleteKey ? (props.deleteKeyCode ?? ['Delete', 'Backspace']) : null}
+        deleteKeyCode={canEdit && props.hasNativeDeleteKey ? (props.deleteKeyCode ?? ['Delete', 'Backspace']) : null}
         multiSelectionKeyCode={props.multiSelectionKeyCode}
         panActivationKeyCode={props.panActivationKeyCode}
         fitView
@@ -128,7 +139,7 @@ const CanvasInner = (props: CanvasScaffoldProps) => {
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={props.backgroundGap} size={1} color="hsl(var(--border))" />
-        <Controls />
+        <Controls showInteractive={canEdit} />
         {props.children}
       </ReactFlow>
     </div>

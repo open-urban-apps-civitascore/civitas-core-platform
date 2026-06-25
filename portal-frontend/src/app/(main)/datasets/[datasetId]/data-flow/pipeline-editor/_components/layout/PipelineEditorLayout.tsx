@@ -29,6 +29,8 @@ import { cn } from '@/lib/utils'
 
 import { LAYOUT_DIMENSIONS } from '../../_constants/pipelineStyles'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
+import { usePipelinePermissions } from '../../_hooks/use-pipeline-permissions'
+import { ReadOnlyProvider } from '../../_hooks/use-pipeline-read-only'
 import { usePipelineSession } from '../../_hooks/use-pipeline-session'
 import type { UsePipelineSessionReturn } from '../../_types/session'
 import { PipelineCanvas } from '../canvas/PipelineCanvas'
@@ -65,6 +67,7 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
 
   const router = useRouter()
   const params = useParams<{ datasetId: string }>()
+  const { canEditPipeline: canEdit, canCreatePipeline: canCreate } = usePipelinePermissions(params.datasetId)
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
   const handleExit = useCallback(() => {
@@ -96,7 +99,7 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
       <Button onClick={handleExit} type="button" variant="secondary">
         {t('header.exit')}
       </Button>
-      <Button onClick={saveAllPipelines} disabled={!hasAnyDirtySession || isSavingAll}>
+      <Button onClick={saveAllPipelines} disabled={!hasAnyDirtySession || isSavingAll || (!canEdit && !canCreate)}>
         {isSavingAll ? (
           <>
             <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -129,8 +132,13 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
   )
 
   return (
-    <>
-      <PageHeader title={t('title')} subtitle={t('subtitle')} customElement={customElement} className="!pb-2 !gap-2" />
+    <ReadOnlyProvider isReadOnly={!canEdit && !canCreate}>
+      <PageHeader
+        title={t('title')}
+        subtitle={t('subtitle')}
+        customElement={canEdit || canCreate ? customElement : undefined}
+        className="!pb-2 !gap-2"
+      />
       <div className="h-full w-full overflow-hidden rounded-xl border bg-background">
         <div className={cn('flex h-full w-full flex-col', className)}>
           {/* Tab Bar */}
@@ -141,6 +149,8 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
               onSelectSession={handleSelectSession}
               onRenameSession={handleRenameSession}
               onCreateSession={handleCreateSession}
+              canEdit={canEdit}
+              canCreate={canCreate}
             />
           </div>
 
@@ -170,7 +180,7 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
         onConfirm={handleSaveAndExit}
         isLoading={isSavingAll}
       />
-    </>
+    </ReadOnlyProvider>
   )
 }
 
