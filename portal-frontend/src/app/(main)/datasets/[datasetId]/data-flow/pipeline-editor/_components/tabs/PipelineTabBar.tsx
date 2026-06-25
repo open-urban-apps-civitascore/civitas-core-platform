@@ -132,7 +132,7 @@ export const PipelineTabBar: React.FC<PipelineTabBarProps> = ({
             isActive={session.id === activeSessionId}
             onSelect={onSelectSession}
             onRename={onRenameSession}
-            canEdit={canEdit || canCreate}
+            canEdit={canEdit}
           />
         ))}
       </div>

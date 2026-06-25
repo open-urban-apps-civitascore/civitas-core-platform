@@ -43,7 +43,7 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
   const t = useTranslations('pipelineEditor')
   const { pipeline, runValidation, deletePipeline, isDirty, isDeleting } = useActivePipeline()
   const { datasetId } = useParams<{ datasetId: string }>()
-  const { canDeletePipeline: canDelete } = usePipelinePermissions(datasetId)
+  const { canDeletePipeline: canDelete, canEditPipeline: canEdit } = usePipelinePermissions(datasetId)
 
   const [shouldShowDeleteConfirm, setShouldShowDeleteConfirm] = useState(false)
 
@@ -106,10 +106,12 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
 
         {/* Right side - Validate */}
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleValidate} disabled={!pipeline}>
-            <CheckCircle2 className="mr-1 h-4 w-4" />
-            {t('toolbar.validate')}
-          </Button>
+          {canEdit && (
+            <Button variant="outline" size="sm" onClick={handleValidate} disabled={!pipeline}>
+              <CheckCircle2 className="mr-1 h-4 w-4" />
+              {t('toolbar.validate')}
+            </Button>
+          )}
         </div>
       </div>
 

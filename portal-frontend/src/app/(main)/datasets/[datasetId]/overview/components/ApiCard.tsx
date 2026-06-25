@@ -81,10 +81,7 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpen
     <>
       <div
         data-testid={`apiCard-${api.slug}`}
-        className={cn(
-          'flex flex-col bg-white border rounded-sm overflow-hidden group ',
-          canView || (canEdit && 'cursor-pointer'),
-        )}
+        className={cn('flex flex-col bg-white border rounded-sm overflow-hidden group ', canView && 'cursor-pointer')}
         onClick={canView ? goToView : undefined}
       >
         <div className="flex items-start gap-3 p-5">
@@ -106,7 +103,7 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpen
                 </Tooltip>
               )}
             </div>
-            <span className={cn('font-medium truncate ', canView || (canEdit && 'group-hover:underline'))}>
+            <span className={cn('font-medium truncate ', (canView || canEdit) && 'group-hover:underline')}>
               {api.name}
             </span>
             {api.description ? (
@@ -141,7 +138,7 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpen
                   {t('actions.edit')}
                 </DropdownMenuItem>
               )}
-              {(canView || canEdit) && (
+              {canView && (
                 <DropdownMenuItem
                   onClick={e => {
                     e.stopPropagation()

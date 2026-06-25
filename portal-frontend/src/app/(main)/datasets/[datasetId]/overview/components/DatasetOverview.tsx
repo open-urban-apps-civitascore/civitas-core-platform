@@ -90,7 +90,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
 
-  const { canCreatePipeline } = usePipelinePermissions(dataset.id)
+  const { canCreatePipeline } = usePipelinePermissions(dataset.id, dataset.datapool?.id)
 
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
@@ -338,7 +338,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
           <ApiList
             datasetId={dataset.id}
             apis={namedApiList}
-            canEdit={canUpdate && canReadDatastructures}
+            canEdit={canRead && canUpdate && canReadDatastructures}
             canView={canRead && canReadDatastructures}
             isOpenDataAccess={dataset.openDataAccess}
           />

@@ -64,13 +64,17 @@ export const ApiConfigWrapper = (props: ApiConfigWrapperProps) => {
   const tCommon = useTranslations('common')
   const t = useTranslations('datasets.overview.completion.apis.config')
 
-  const { hasScopedPermission } = usePermissions()
-  const canEdit = hasScopedPermission(
+  const { hasScopedPermission, hasPermission } = usePermissions()
+  const canUpdateDataset = hasScopedPermission(
     PERMISSION_NAMES.DATASET_UPDATE,
     ASSIGNMENT_SCOPE_TYPES.DATASET,
     dataset.id,
     dataset.datapool?.id,
   )
+
+  const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
+
+  const canEdit = canUpdateDataset && canReadDatastructures
 
   const buttonGroup = isReadOnly ? (
     <div className="flex items-center gap-2 px-[var(--layout-padding)]">
