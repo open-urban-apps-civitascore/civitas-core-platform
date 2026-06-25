@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useGetDatasinks } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { useGetPipelines } from '@/app/services/api/pipelines/clientRequests'
-import { PipelineBasicInfo } from '@/types/datasets'
 import { API_STANDARDS, NamedApi } from '@/types/namedApis'
 
 import { ApiList } from './ApiList'
@@ -38,12 +37,6 @@ const makeApi = (overrides: Partial<NamedApi> = {}): NamedApi => ({
   ...overrides,
 })
 
-const makePipeline = (overrides: Partial<PipelineBasicInfo> = {}): PipelineBasicInfo => ({
-  id: 'p-1',
-  name: 'Pipeline 1',
-  ...overrides,
-})
-
 const frostPipelineData = {
   data: [{ id: 'p-1', styles: { nodes: [{ type: 'frost', data: {} }] } }],
 }
@@ -51,7 +44,6 @@ const frostPipelineData = {
 const defaultProps = {
   datasetId: 'dataset-123',
   apis: [] as NamedApi[],
-  pipelines: [makePipeline()] as PipelineBasicInfo[],
   canEdit: true,
   isPublished: false,
   isOpenDataAccess: false,
@@ -61,7 +53,9 @@ const renderComponent = (props: Partial<typeof defaultProps> = {}) => render(<Ap
 
 describe('ApiList', () => {
   beforeEach(() => {
-    vi.mocked(useGetPipelines).mockReturnValue({ data: undefined } as ReturnType<typeof useGetPipelines>)
+    vi.mocked(useGetPipelines).mockReturnValue({
+      data: { data: [{ id: 'p-1' }] },
+    } as ReturnType<typeof useGetPipelines>)
   })
 
   describe('Empty state', () => {
@@ -92,7 +86,8 @@ describe('ApiList', () => {
 
   describe('Add API dropdown', () => {
     it('disables the button when there are no pipelines', () => {
-      renderComponent({ pipelines: [] })
+      vi.mocked(useGetPipelines).mockReturnValue({ data: undefined } as ReturnType<typeof useGetPipelines>)
+      renderComponent()
       expect(screen.getByText('addButton').closest('button')).toBeDisabled()
     })
 
