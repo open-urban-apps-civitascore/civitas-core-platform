@@ -123,7 +123,7 @@ Order: **FROST → APISIX → Redpanda (conditional)**
 
 ```
 Step 1: create-project    (frost)    → CREATE_PROJECT
-Step 2: create-route      (apisix)   → CREATE_ROUTE          ← receives openDataAccess flag
+Step 2: create-route      (apisix)   → CREATE_ROUTE          ← always provisions a protected route (OPA decides open-data per request)
 Step 3: deploy-pipelines  (redpanda) → DEPLOY_PIPELINES      ← SKIPPED if dataPipelines[] is empty
 ```
 
@@ -137,7 +137,7 @@ Order: **FROST → APISIX → Redpanda (conditional)** (same as create)
 
 ```
 Step 1: update-project    (frost)    → UPDATE_PROJECT
-Step 2: update-route      (apisix)   → UPDATE_ROUTE           ← receives openDataAccess flag
+Step 2: update-route      (apisix)   → UPDATE_ROUTE           ← always provisions a protected route (OPA decides open-data per request)
 Step 3: update-pipelines  (redpanda) → UPDATE_PIPELINES       ← SKIPPED if dataPipelines[] is empty
 ```
 
@@ -189,9 +189,10 @@ Resource IDs from the config adapters are stored in a **`properties[]` array** �
 |-------|----------|-------------|
 | `id` | yes | Dataset ID (becomes APISIX URL segment) |
 | `name` | yes | Dataset display name |
-| `openDataAccess` | yes | Auth control for APISIX route |
 | `datasources[]` | yes | Connection definitions for Redpanda placeholder resolution |
 | `datapipelines[]` | no | Pipeline definitions (if empty, Redpanda step is skipped) |
+
+> **Note:** `openDataAccess` is intentionally **not** part of the saga payload. The backend persists it on the dataset; OPA reads it from the AuthZ Repository at request time (ABAC) to allow anonymous payload reads. Routes are always provisioned protected, so the saga never needs the flag.
 
 **`dataset.update.requested`** — Full dataset definition **plus `properties[]` from create response**:
 
@@ -199,7 +200,6 @@ Resource IDs from the config adapters are stored in a **`properties[]` array** �
 |-------|----------|-------------|
 | `id` | yes | Dataset ID |
 | `name` | yes | Updated dataset name |
-| `openDataAccess` | yes | Updated auth control |
 | `datasources[]` | yes | Updated connection definitions |
 | `datapipelines[]` | no | Updated pipeline list (can mix `ADD`/`UPDATE`/`DELETE` actions) |
 | `properties[]` | yes | Resource IDs from config adapters (see below) |
@@ -229,12 +229,12 @@ Resource IDs from the config adapters are stored in a **`properties[]` array** �
 | Step | Adapter | Condition | Input (from orchestrator) | Output (result) | Compensation Data |
 |------|---------|-----------|--------------------------|-----------------|-------------------|
 | 1 | FROST | always | `datasetName`, `description` | `projectId`, `baseUrl` | `{projectId}` |
-| 2 | APISIX | always | `datasetId`, `namedApis[]` (slugs), `upstreamUrl` (= baseUrl from step 1), `openDataAccess` | `routeIds` (slug→routeId map), `serviceId` | `{routeIds, serviceId}` |
+| 2 | APISIX | always | `datasetId`, `namedApis[]` (slugs), `upstreamUrl` (= baseUrl from step 1) | `routeIds` (slug→routeId map), `serviceId` | `{routeIds, serviceId}` |
 | 3 | Redpanda | **only if `dataPipelines[]` is non-empty** | `dataPipelines[]` (full list), `datasources[]`, `targetUrl` (= baseUrl from step 1) | `pipelineIds[]` | `{pipelineIds[]}` |
 
 **FROST Adapter** — Creates an isolated FROST project per dataset, producing `projectId` and `baseUrl`. The `baseUrl` is the key output: it becomes the APISIX upstream URL and the Redpanda `${FROST_BASE}` placeholder value. → Details: [Section 12.1](#121-frost-adapter)
 
-**APISIX Adapter** — Creates one shared dataset upstream plus **one route per named API** (slug-keyed `routeIds`), each at `/v1/datasets/{datasetId}/{slug}`. Controls authentication per route via `openDataAccess`: sets or omits a reference to the centralized Plugin Config (OIDC + OPA). → Details: [Section 12.2](#122-apisix-adapter)
+**APISIX Adapter** — Creates one shared dataset upstream plus **one route per named API** (slug-keyed `routeIds`), each at `/v1/datasets/{datasetId}/{slug}`. Every route is **always protected**: it references the centralized Plugin Config (OIDC + OPA) and (for STA routes) carries the FROST upstream credential. Open-data access is no longer a route variant — it is decided by OPA per request from the dataset's `openDataAccess` flag (anonymous requests reach OPA via `unauth_action: pass`). → Details: [Section 12.2](#122-apisix-adapter)
 
 **Redpanda Adapter** — Deploys pipelines via the Redpanda Connect Streams API. Pipeline IDs are client-provided (`dataPipelines[].id`). The adapter resolves placeholders (`${DATASOURCE[n]}`, `${FROST_BASE}`) from `datasources[]` and the FROST base URL before deploying. On `dataset.update`, pipelines can carry mixed actions (`ADD`, `UPDATE`, `DELETE`). → Details: [Section 12.3](#123-redpanda-adapter)
 
@@ -247,7 +247,7 @@ Key aspects of the event structure:
 | Aspect | Detail |
 |--------|--------|
 | **`data.id`** | Dataset ID — becomes the APISIX route URI segment: `/api/dataspace/{id}/*` |
-| **`openDataAccess`** | Controls whether APISIX sets `plugin_config_id` (see [Issue #936](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/issues/936), details above) |
+| **`openDataAccess`** | Dataset open-data flag, persisted by the backend and read by OPA at request time (ABAC). It does **not** control the APISIX route — every route is always protected (OIDC + OPA). |
 | **`datasources[]`** | Connection definitions (PostgreSQL, MQTT, etc.) — passed to the Redpanda adapter for placeholder resolution |
 | **`datapipelines[]`** | Redpanda Connect pipeline definitions with per-pipeline `action` types, passed in batch to the Redpanda adapter |
 
@@ -256,12 +256,12 @@ Key aspects of the event structure:
 | Step | Adapter | Condition | Input (from orchestrator) | Output (result) | Compensation Data |
 |------|---------|-----------|--------------------------|-----------------|-------------------|
 | 1 | FROST | always | `projectId` (from `properties[]`), `datasetName`, `description` | `projectId`, `baseUrl` | `{previousName, previousDescription}` |
-| 2 | APISIX | always | `routeIds` (slug→routeId map, from `properties[]`), `serviceId`, `namedApis[]`, `openDataAccess` | `routeIds` | `{routeIds, serviceId, previousOpenDataAccess (per slug)}` |
+| 2 | APISIX | always | `routeIds` (slug→routeId map, from `properties[]`), `serviceId`, `namedApis[]` | `routeIds` | `{routeIds, serviceId}` |
 | 3 | Redpanda | **only if `dataPipelines[]` is non-empty** | `pipelineIds` (from `properties[]`), `dataPipelines[]` (full list), `datasources[]`, `targetUrl` | `pipelineIds[]` | `{previousPipelineIds[], previousConfig}` |
 
 Each adapter receives its **resource IDs via `properties[]`** (originally returned by `dataset.create.completed`) so it knows which resources to update. Adapters save their **previous state** before applying changes. Compensation restores that state.
 
-**Update scenario for `openDataAccess` change**: See [Section 12.2](#122-apisix-adapter) for how the APISIX adapter handles `openDataAccess` transitions (`false→true`: remove `plugin_config_id`, `true→false`: add it back).
+**Update scenario for `openDataAccess` change**: Toggling `openDataAccess` no longer triggers any gateway route change — the route is always protected, and OPA reads the (now-persisted) flag live from the AuthZ Repository on the next request. The UPDATE_ROUTE step re-applies the same protected shape idempotently; there is no `previousOpenDataAccess` compensation to capture. → See [Section 12.2](#122-apisix-adapter).
 
 ### Dataset Delete — What Each Adapter Needs
 
@@ -289,7 +289,6 @@ These events are sent by the Portal Backend to start a saga. The CloudEvents `ty
 {
   "id": "b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a",
   "name": "Neustadt Traffic Counts 2025",
-  "openDataAccess": true,
   "datasources": [
     {
       "id": "0a7b8c9d-1e2f-4a5b-9c0d-1e2f3a4b5c6d",
@@ -326,7 +325,6 @@ Contains the full updated dataset definition **plus `properties[]`** from the or
 {
   "id": "b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a",
   "name": "Neustadt Traffic Counts 2025 (Updated)",
-  "openDataAccess": false,
   "datasources": [ "..." ],
   "datapipelines": [
     {"id": "db-to-frost-01", "version": "2", "action": "UPDATE", "data": { "..." : "..." }},
@@ -400,8 +398,7 @@ The orchestrator extracts and transforms the trigger event into adapter-specific
 {
   "operation": "CREATE_ROUTE",
   "datasetId": "b7c8b5d4-...",
-  "upstreamUrl": "http://frost:8080/FROST-Server/v1.1/projects/proj-123",
-  "openDataAccess": true
+  "upstreamUrl": "http://frost:8080/FROST-Server/v1.1/projects/proj-123"
 }
 
 // UPDATE_ROUTE (from dataset.update)
@@ -410,8 +407,7 @@ The orchestrator extracts and transforms the trigger event into adapter-specific
   "routeId": "r-456",
   "serviceId": "svc-frost-server",
   "datasetId": "b7c8b5d4-...",
-  "upstreamUrl": "http://frost:8080/FROST-Server/v1.1/projects/proj-123",
-  "openDataAccess": false
+  "upstreamUrl": "http://frost:8080/FROST-Server/v1.1/projects/proj-123"
 }
 
 // DELETE_ROUTE (from dataset.delete)
@@ -536,11 +532,11 @@ Sent on the adapter's `compensate` topic when rolling back a failed saga.
   "serviceId": "svc-frost-server"
 }
 
-// Rollback update → restore previous auth config
+// Rollback update → re-apply the protected route config
 {
   "operation": "RESTORE_ROUTE",
-  "routeId": "r-456",
-  "previousOpenDataAccess": true
+  "routeIds": { "things": "r-456" },
+  "serviceId": "svc-frost-server"
 }
 ```
 
@@ -596,7 +592,6 @@ The backend **must persist** `properties[]` — the entries are required for fut
 {
   "sagaId": "saga-003",
   "datasetId": "b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a",
-  "openDataAccess": false,
   "properties": [
     {"pipelineIds": ["db-to-frost-01", "mqtt-to-frost-01"]}
   ]
@@ -646,7 +641,7 @@ sequenceDiagram
     participant APISIX
     participant RP as Redpanda Connect
 
-    PB->>O: dataset.create.requested<br/>{datasetName, openDataAccess: false,<br/>dataPipelines: [dbPipeline, mqttPipeline]}
+    PB->>O: dataset.create.requested<br/>{datasetName,<br/>dataPipelines: [dbPipeline, mqttPipeline]}
     Note over O: Create saga, state: EXECUTING<br/>dataPipelines non-empty → 3 steps<br/>Step 1/3: create-project
 
     O->>FROST: dataset.frost.execute<br/>{operation: CREATE_PROJECT,<br/>datasetName, description}
@@ -655,7 +650,7 @@ sequenceDiagram
 
     Note over O: Step 1 SUCCESS<br/>Persist state<br/>Step 2/3: create-route
 
-    O->>APISIX: dataset.apisix.execute<br/>{operation: CREATE_ROUTE,<br/>datasetId, upstreamUrl: baseUrl,<br/>openDataAccess: false}
+    O->>APISIX: dataset.apisix.execute<br/>{operation: CREATE_ROUTE,<br/>datasetId, upstreamUrl: baseUrl}
     APISIX->>APISIX: Create service + route<br/>with plugin_config_id (OIDC + OPA)
     APISIX->>O: dataset.apisix.completed<br/>{routeId: "r-456", serviceId: "svc-789"}
 
@@ -681,7 +676,7 @@ sequenceDiagram
     participant FROST
     participant APISIX
 
-    PB->>O: dataset.create.requested<br/>{datasetName, openDataAccess: true,<br/>dataPipelines: []}
+    PB->>O: dataset.create.requested<br/>{datasetName,<br/>dataPipelines: []}
     Note over O: Create saga, state: EXECUTING<br/>dataPipelines empty → 2 steps<br/>Step 1/2: create-project
 
     O->>FROST: dataset.frost.execute<br/>{operation: CREATE_PROJECT,<br/>datasetName, description}
@@ -689,8 +684,8 @@ sequenceDiagram
 
     Note over O: Step 1 SUCCESS<br/>Step 2/2: create-route
 
-    O->>APISIX: dataset.apisix.execute<br/>{operation: CREATE_ROUTE,<br/>datasetId, upstreamUrl: baseUrl,<br/>openDataAccess: true}
-    APISIX->>APISIX: Create service + route<br/>WITHOUT plugin_config_id<br/>(no OIDC, no OPA — public access)
+    O->>APISIX: dataset.apisix.execute<br/>{operation: CREATE_ROUTE,<br/>datasetId, upstreamUrl: baseUrl}
+    APISIX->>APISIX: Create service + route<br/>WITH plugin_config_id<br/>(OIDC + OPA — always protected;<br/>open data is an OPA per-request decision)
     APISIX->>O: dataset.apisix.completed<br/>{routeId: "r-456", serviceId: "svc-789"}
 
     Note over O: Step 2 SUCCESS<br/>No more steps (no pipelines)<br/>State: COMPLETED
@@ -698,11 +693,12 @@ sequenceDiagram
     O->>PB: dataset.create.completed<br/>{datasetId, projectId, routeId,<br/>pipelineIds: []}
 ```
 
-### 6.3 Success: OpenDataAccess Route
+### 6.3 Open Data Access (decided by OPA, not by the route)
 
-Shown inline in 5.2 above. When `openDataAccess: true`:
-- APISIX creates the route **without** `plugin_config_id` → no OIDC authentication, no OPA authorization
-- The route is publicly readable without login
+Open data is **not** a route variant. Regardless of `openDataAccess`, APISIX creates the route **with** `plugin_config_id` (OIDC + OPA) — routes are always protected. Anonymous read access for an open dataset is granted by **OPA at request time**:
+- OIDC runs with `unauth_action: pass`, so an anonymous request continues to OPA (instead of a 401 at the gateway).
+- OPA reads the dataset's `openDataAccess` flag from the AuthZ Repository and, for a flagged dataset, allows the anonymous **payload** read (ABAC). Writes and protected datasets are denied.
+- The FROST project itself stays **private**; APISIX reaches it with the upstream credential. There is no public FROST project anymore.
 
 ### 6.4 Failure at Step 1 (FROST) — No Compensation Needed
 
@@ -878,7 +874,7 @@ sequenceDiagram
 
 Update follows the **same step order** as create (FROST → APISIX → Redpanda). Each adapter receives the full current dataset definition and updates what is relevant to it. If nothing changed for an adapter, it returns SUCCESS immediately.
 
-The same conditional logic applies: the **Redpanda step is only executed if `dataPipelines[]` is non-empty**. The `openDataAccess` flag is forwarded to APISIX — if it changed from `false` to `true`, APISIX removes the `plugin_config_id` (disabling OIDC/OPA); if it changed from `true` to `false`, APISIX adds the `plugin_config_id` back.
+The same conditional logic applies: the **Redpanda step is only executed if `dataPipelines[]` is non-empty**. A change to `openDataAccess` does **not** reconfigure the route — UPDATE_ROUTE re-applies the same protected shape, and OPA simply reads the new flag value live on the next request.
 
 **Compensation for update = restore previous state.** Each adapter saves its state before modifying it. The saved state is returned in the step's `compensation` data.
 
@@ -892,7 +888,7 @@ sequenceDiagram
     participant APISIX
     participant RP as Redpanda Connect
 
-    PB->>O: dataset.update.requested<br/>{datasetId: "ds-001", datasetName,<br/>openDataAccess, dataPipelines[]}
+    PB->>O: dataset.update.requested<br/>{datasetId: "ds-001", datasetName,<br/>dataPipelines[]}
     Note over O: Create saga, state: EXECUTING<br/>Step 1/3: update-project
 
     O->>FROST: dataset.frost.execute<br/>{operation: UPDATE_PROJECT,<br/>datasetId: "ds-001", datasetName}
@@ -901,8 +897,8 @@ sequenceDiagram
 
     Note over O: Step 1 SUCCESS<br/>Step 2/3: update-route
 
-    O->>APISIX: dataset.apisix.execute<br/>{operation: UPDATE_ROUTE,<br/>datasetId: "ds-001",<br/>openDataAccess: true}
-    APISIX->>APISIX: Update route config<br/>(e.g. remove plugin_config_id<br/>when openDataAccess changed to true)
+    O->>APISIX: dataset.apisix.execute<br/>{operation: UPDATE_ROUTE,<br/>datasetId: "ds-001"}
+    APISIX->>APISIX: Re-apply protected route config<br/>(always plugin_config_id + STA credential;<br/>open-data is an OPA per-request decision)
     APISIX->>O: dataset.apisix.completed<br/>{routeId: "r-456"}
 
     Note over O: Step 2 SUCCESS<br/>Step 3/3: update-pipelines
@@ -983,7 +979,7 @@ sequenceDiagram
     Note over O: Step 1 SUCCESS
 
     O->>APISIX: dataset.apisix.execute {UPDATE_ROUTE}
-    APISIX->>O: dataset.apisix.completed<br/>{compensation: {previousOpenDataAccess: false}}
+    APISIX->>O: dataset.apisix.completed<br/>{compensation: {routeIds, serviceId}}
     Note over O: Step 2 SUCCESS
 
     O->>RP: dataset.redpanda.execute {UPDATE_PIPELINES}
@@ -992,8 +988,8 @@ sequenceDiagram
 
     Note over O: State: COMPENSATING<br/>Walk back: step 2 → step 1
 
-    O->>APISIX: dataset.apisix.compensate<br/>{operation: RESTORE_ROUTE,<br/>previousOpenDataAccess: false}
-    APISIX->>APISIX: Restore previous route config
+    O->>APISIX: dataset.apisix.compensate<br/>{operation: RESTORE_ROUTE,<br/>routeIds, serviceId}
+    APISIX->>APISIX: Re-apply the protected route config
     APISIX->>O: dataset.apisix.completed
     Note over O: Step 2 COMPENSATED
 
@@ -1583,43 +1579,43 @@ The APISIX adapter manages these resources per dataset:
 2. **Upstream**: One per dataset (the dataset's FROST project), shared by all of the dataset's routes.
 3. **Route**: Maps an external URL path to a service. **One route per named API** (per concept #1311/#1379), not one per dataset. Each `NamedApi` slug gets its own route at `/v1/datasets/{datasetId}/{slug}` with a deterministic id `NamedApiHelper.derive(datasetId, slug)`. The CREATE_ROUTE step fans out over the dataset's `namedApis` and returns a **slug-keyed `routeIds` map** (`{slug: routeId}`); UPDATE/DELETE/RESTORE iterate that map. The portal-backend persists each route id onto the matching `NamedApi` entity. (A dataset with no named APIs falls back to a single dataset-level route — a legacy/edge path the production saga does not hit.)
 
-Auth/AuthZ is **not** configured per route. Instead, a centralized **Plugin Config (id: `1`)** contains all auth plugins. The adapter controls authentication by referencing or omitting this Plugin Config:
+Auth/AuthZ is **not** configured per route. Instead, a centralized **Plugin Config (id: `1`)** contains all auth plugins, and **every** route references it — routes are always protected. Open data is no longer a route variant; it is an OPA per-request decision (see §6.3).
 
 ```
-Protected (openDataAccess: false):          Public (openDataAccess: true):
-┌────────────────────────────────┐          ┌─────────────────────────────────┐
-│ Route: /api/dataspace/ds-001/* │          │ Route: /api/dataspace/ds-001/*  │
-│   service_id: svc-frost-server │          │   service_id: svc-frost-server  │
-│   plugin_config_id: 1  ← auth  │          │   (no plugin_config_id) ← public|
-└────────────────────────────────┘          └─────────────────────────────────┘
-         │                                           │
-         ▼                                           ▼
-┌────────────────────────────┐              ┌────────────────────────────┐
-│ Plugin Config (id: 1)      │              │ (no auth pipeline)         │
-│   openid-connect (JWT)     │              └────────────────────────────┘
-│   opa (with_service: true) │
-│   request-id               │
-└────────────────────────────┘
+Every route (regardless of openDataAccess):
+┌────────────────────────────────┐
+│ Route: /v1/datasets/ds-001/*   │
+│   service_id: svc-frost-server │
+│   plugin_config_id: 1  ← auth  │
+└────────────────────────────────┘
+         │
+         ▼
+┌──────────────────────────────────────────────┐
+│ Plugin Config (id: 1)                          │
+│   serverless-pre-function (strip X-Userinfo)   │
+│   openid-connect (JWT, unauth_action: pass)    │
+│   opa (with_service: true)                     │
+│   request-id                                   │
+└──────────────────────────────────────────────┘
 ```
 
 **Plugin Config 1** contains (preconfigured, not managed by the adapter):
-- **`openid-connect`**: JWT validation against Keycloak
-- **`opa`**: Authorization via OPA with `with_service: true` — OPA uses the service name to look up permissions
+- **`serverless-pre-function`**: clears any client-supplied `X-Userinfo`/`X-Access-Token`/`X-Id-Token` in the rewrite phase **before** `openid-connect`, so a client cannot forge an identity now that anonymous requests reach OPA
+- **`openid-connect`**: JWT validation against Keycloak. Runs with `unauth_action: pass` — an anonymous request continues to OPA instead of being rejected at the gateway; a present bearer token is still validated and its claims forwarded as `X-Userinfo`
+- **`opa`**: Authorization via OPA with `with_service: true` — OPA uses the service name to dispatch the policy, and decides open-data access per request from the dataset's `openDataAccess` flag
 - **`request-id`**: Adds a trace ID to every request
 
 **Per-NamedApi route model (#1311/#1379):** the adapter provisions **one shared upstream per dataset** (keyed by `datasetId`, pointing at the dataset's FROST project) plus **one route per named API**. Each named API's route is bound to the path `/v1/datasets/{datasetId}/{slug}` with a deterministic id `NamedApiHelper.derive(datasetId, slug)` (a name-based UUID of `datasetId + "/" + slug`). The result is a **slug-keyed `routeIds` map** (`{slug: routeId}`) that the portal-backend persists onto each `NamedApi` entity. `apis` is a reserved slug so the discovery endpoint `/v1/datasets/{id}/apis` is never shadowed. (A command without `namedApis` falls back to a single dataset-level route at `/v1/datasets/{id}` — a legacy/edge path the production saga does not hit.)
 
 **Operations:**
 
-| Operation | What the adapter does | `openDataAccess` effect |
-|-----------|----------------------|------------------------|
-| `CREATE_ROUTE` | Create the shared dataset upstream + one route per `namedApis` slug at `/v1/datasets/{id}/{slug}` (id = `derive(id, slug)`); returns slug-keyed `routeIds` | `false`: set `plugin_config_id: 1` on each route; `true`: omit it |
-| `UPDATE_ROUTE` | Iterate the slug-keyed `routeIds`; GET → mutate → PUT each route | `false→true`: remove `plugin_config_id`; `true→false`: add `plugin_config_id: 1` (per route) |
+| Operation | What the adapter does | Auth |
+|-----------|----------------------|------|
+| `CREATE_ROUTE` | Create the shared dataset upstream + one route per `namedApis` slug at `/v1/datasets/{id}/{slug}` (id = `derive(id, slug)`); returns slug-keyed `routeIds` | always sets `plugin_config_id: 1` (+ STA upstream credential) |
+| `UPDATE_ROUTE` | Iterate the slug-keyed `routeIds`; GET → re-apply protected shape → PUT each route | always protected (idempotent); `openDataAccess` is not consulted |
 | `DELETE_ROUTE` | Delete each route in `routeIds`, then the shared upstream | n/a |
 
-**Route JSON examples** (named API `traffic` on dataset `ds-001`):
-
-Protected (`openDataAccess: false`):
+**Route JSON example** (named API `traffic` on dataset `ds-001`) — every route is protected:
 ```json
 {
     "uris": ["/v1/datasets/ds-001/traffic", "/v1/datasets/ds-001/traffic/*"],
@@ -1630,23 +1626,13 @@ Protected (`openDataAccess: false`):
 }
 ```
 
-Public (`openDataAccess: true`):
-```json
-{
-    "uris": ["/v1/datasets/ds-001/traffic", "/v1/datasets/ds-001/traffic/*"],
-    "hosts": ["api.localhost"],
-    "upstream_id": "ds-001",
-    "service_id": "frost-server"
-}
-```
-
-> Per-named-API saga routes bind to the dataset's backend via `upstream_id`. The `service_id` shown above is present **only when `apisix.service.id` is configured** — it references the APISIX *Service* whose name OPA reads (`input.service.name`) to select the `frost_server` policy (see the naming note above); omit it and the OPA `frost_server` dispatch does not engage. A protected route additionally references `plugin_config_id`; a public route omits both the plugin_config and the upstream-auth header. (`buildRouteBody` also sets `status: 1` and the `proxy-rewrite`/`regex_uri` rewrite, omitted here to keep the auth contrast clear.)
+> Per-named-API saga routes bind to the dataset's backend via `upstream_id`. The `service_id` shown above is present on **every** route — `apisix.service.id` is **required** (the adapter fails fast at startup without it). It references the APISIX *Service* whose name OPA reads (`input.service.name`) to select the `frost_server` policy (see the naming note above); without it OPA cannot resolve the backend and rejects every dataset route as `unknown_backend`. Every route also references `plugin_config_id` (OIDC + OPA); STA routes additionally carry the FROST upstream-auth header in their `proxy-rewrite` (OWS routes do not). There is no "public" route variant — open data is decided by OPA per request. (`buildRouteBody` also sets `status: 1` and the `proxy-rewrite`/`regex_uri` rewrite, omitted here for brevity.)
 
 **Path scheme**: each named API is reachable at `apisix.api.public.url` + `/v1/datasets/{datasetId}/{slug}` (pinned to the configured API virtual host `apisix.api.host`). Example: dataset `b7c8b5d4-…` with slug `traffic` → `/v1/datasets/b7c8b5d4-…/traffic`.
 
 **Service naming convention**: The adapter creates APISIX services with a name like `"frost-server"`. OPA identifies the backend via `input.service.name` and converts dashes to underscores for its data file lookup (`frost-server` → `frost_server`).
 
-**Future — WFS/WMS via GeoServer (not yet implemented):** each named API carries a `standard` (`STA`/`WFS`/`WMS`). Today every saga route binds to the dataset's FROST-project upstream, so only `STA` (SensorThings) is routable; `CREATE_ROUTE` therefore **fails fast** for a non-STA standard (`ApisixSagaHandler#isRoutableStandard`) rather than provisioning a FROST route behind a WFS/WMS public URL. WFS/WMS support plugs into that seam: select the upstream (a shared **GeoServer** upstream from `geoserver.url`) and the proxy-rewrite path **by `standard`**, plus add a `geoserver` APISIX Service + an OPA `geoserver` provider mapping (analogous to `frost_server`). The `standard` is already transported per slug in the saga payload and decoded into `RoutePayload.standardBySlug`.
+**Routable standards — STA and OWS:** each named API carries a `standard` (decoded per slug into `RoutePayload.standardBySlug` and resolved via `RouteUpstreamKind.fromStandard`). Two kinds are routable: `STA` (FROST SensorThings) binds to the per-dataset FROST-project upstream (with the FROST upstream credential), and `OWS` (GeoServer WFS/WMS) binds to the per-dataset map-server upstream from `geoserver.url` (no upstream credential — GeoServer serves the workspace OWS endpoint itself). `CREATE_ROUTE` **fails fast** for any other standard (`CUSTOM`/unknown), which is not routable. On the OPA side both kinds are handled identically: every dataset route carries the same `service_id`, so OPA dispatches to the path-based `frost_server` policy (`/v1/datasets/{id}/...`) regardless of standard — no separate `geoserver` OPA provider is needed. (Anonymous OWS open data is exercised **end-to-end** by Bruno step `9g4` against a `geoserver-mock` HTTP stub in the api-test stack: APISIX → OIDC (`unauth_action: pass`) → OPA (open-data grant) → OWS upstream → 200. The stub stands in for a real GeoServer — an OWS named API provisions only the route to `geoserver.url`, not a workspace.)
 
 **Implicit knowledge produced:**
 
@@ -1661,7 +1647,7 @@ Public (`openDataAccess: true`):
 | Saga Type | Compensation Action |
 |-----------|-------------------|
 | Create failed | `DELETE_ROUTE` (orchestrator) — plus the handler best-effort removes any routes + the upstream it already created in the failed step, so no partial state is orphaned |
-| Update failed | `RESTORE_ROUTE` — restores each slug route to the previous open/protected state captured per slug in `previousOpenDataAccess` |
+| Update failed | `RESTORE_ROUTE` — re-applies the protected route config to each slug route. Routes are always protected, so there is no per-slug open/protected state to capture or restore. |
 
 **Idempotency:** route ids/upstream id are deterministic, so PUTs are idempotent on retry. `DELETE_ROUTE`/`RESTORE_ROUTE` tolerate an already-absent route (404) so compensation re-runs are safe; a forward delete that finds none of its target routes logs a wholesale-miss warning (possible id mismatch).
 
@@ -1773,6 +1759,6 @@ A full example pipeline event is available in [`examples/dataset-event.json`](./
 - [ADR 030: Orchestrated Saga for Multi-Adapter Provisioning](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/issues/920)
 - [Saga Orchestrator Design Proposal](./SAGA.md) — Full implementation specification
 - [DFM Eventing: Dataset Create/Update/Delete](https://docs.core.civitasconnect.digital/review-feat-communication-flows/docs_v2/Architecture/Communication_Flows/Dataflow_Management/DFM_Eventing) — Current event flow (to be replaced)
-- [Issue #936: OpenData Attribute](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/issues/936) — `openDataAccess` flag affects APISIX route configuration
+- [Issue #936: OpenData Attribute](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/issues/936) — original `openDataAccess`→route-config design (**superseded**: open data is now an OPA per-request decision; routes are always protected)
 - [APISIX Config Adapter Handoff](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/blob/8b6d06385256318ac8ece741a4f52b7d73af6d4a/docs/claude/handoff/TEAM1-APISIX-CONFIG-ADAPTER.md) — APISIX Plugin Config / Service architecture
 - [Redpanda Connect Streams API](https://docs.redpanda.com/redpanda-connect/guides/streams_mode/streams_api/) — Pipeline management REST API

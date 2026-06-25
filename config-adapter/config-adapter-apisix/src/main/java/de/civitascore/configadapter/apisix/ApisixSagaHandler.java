@@ -127,8 +127,6 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     // is touched; the FROST upstream itself is only created when an STA named API actually uses it.
     RouteUpstreams.Target frostUpstream =
         RouteUpstreams.frost(requireString(command, "upstreamUrl"));
-    boolean openDataAccess =
-        Boolean.TRUE.equals(command.payload().getOrDefault("openDataAccess", false));
 
     RoutePayload routePayload = RoutePayload.decode(command);
     List<String> slugs = routePayload.slugs();
@@ -152,7 +150,7 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     // (CUSTOM/unknown) fails fast here, before any gateway state is created.
     Map<String, RouteUpstreamKind> kindBySlug = routePayload.routingKinds();
     Map<String, String> routeIds =
-        provisionRoutes(command, datasetId, openDataAccess, slugs, kindBySlug, frostUpstream);
+        provisionRoutes(command, datasetId, slugs, kindBySlug, frostUpstream);
 
     String publicUrl = settings.apiPublicUrl() + DATASETS_PATH_PREFIX + datasetId;
     Map<String, Object> resultData =
@@ -184,7 +182,6 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
   private Map<String, String> provisionRoutes(
       SagaCommandMessage command,
       String datasetId,
-      boolean openDataAccess,
       List<String> slugs,
       Map<String, RouteUpstreamKind> kindBySlug,
       RouteUpstreams.Target frostUpstream) {
@@ -215,11 +212,7 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
         adminClient.putRoute(
             routeId,
             authConfigurer.newRouteBody(
-                DATASETS_PATH_PREFIX + datasetId + "/" + slug,
-                upstreamId,
-                openDataAccess,
-                upstream.path(),
-                kind),
+                DATASETS_PATH_PREFIX + datasetId + "/" + slug, upstreamId, upstream.path(), kind),
             "CREATE route");
         routeIds.put(slug, routeId);
       }
@@ -238,8 +231,6 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleUpdateRoute(SagaCommandMessage command) {
-    boolean openDataAccess =
-        Boolean.TRUE.equals(command.payload().getOrDefault("openDataAccess", false));
     RoutePayload payload = RoutePayload.decode(command);
     Map<String, String> routeIds = payload.routeIds();
     boolean compensating = COMPENSATE_STEP.equals(command.type());
@@ -318,18 +309,11 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
               + ") — no auth change applied (possible routeId mismatch)");
     }
 
-    Map<String, Object> previousOpenBySlug =
-        applyAuthStateToRoutes(routeIds, loadedRoutes, openDataAccess);
+    applyAuthStateToRoutes(routeIds, loadedRoutes);
 
     Map<String, Object> resultData = Map.of(KEY_ROUTE_IDS, routeIds, KEY_SERVICE_ID, serviceId);
     Map<String, Object> compensationData =
-        Map.of(
-            KEY_ROUTE_IDS,
-            routeIds,
-            KEY_SERVICE_ID,
-            serviceId,
-            "previousOpenDataAccess",
-            previousOpenBySlug);
+        Map.of(KEY_ROUTE_IDS, routeIds, KEY_SERVICE_ID, serviceId);
 
     log.info(
         "APISIX routes updated: serviceId={}, slugs={}, saga={}",
@@ -342,28 +326,22 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Phase 2 of UPDATE_ROUTE — applies the requested auth state to every loaded route, capturing
-   * each route's previous open/protected state so RESTORE_ROUTE can roll each one back
-   * individually. A slug missing from {@code loadedRoutes} is reachable only on a compensation
-   * re-run (the route is already gone): the matching RESTORE for it is a no-op, so the requested
-   * state is recorded as the "previous" one.
+   * Phase 2 of UPDATE_ROUTE — re-applies the protected auth state to every loaded route. Routes are
+   * always protected (OPA decides open-data access per request), so there is no open/protected
+   * state to capture for compensation; RESTORE_ROUTE simply re-applies the same protected shape. A
+   * slug missing from {@code loadedRoutes} is reachable only on a compensation re-run (the route is
+   * already gone) and is skipped.
    */
-  private Map<String, Object> applyAuthStateToRoutes(
-      Map<String, String> routeIds,
-      Map<String, Map<String, Object>> loadedRoutes,
-      boolean openDataAccess) {
-    Map<String, Object> previousOpenBySlug = new LinkedHashMap<>();
+  private void applyAuthStateToRoutes(
+      Map<String, String> routeIds, Map<String, Map<String, Object>> loadedRoutes) {
     for (Map.Entry<String, String> entry : routeIds.entrySet()) {
       Map<String, Object> route = loadedRoutes.get(entry.getKey());
       if (route == null) {
-        previousOpenBySlug.put(entry.getKey(), openDataAccess);
         continue;
       }
-      previousOpenBySlug.put(entry.getKey(), !authConfigurer.routeIsPrivate(route));
-      authConfigurer.applyAuthState(route, openDataAccess);
+      authConfigurer.applyAuthState(route);
       adminClient.putRoute(entry.getValue(), route, "UPDATE route");
     }
-    return previousOpenBySlug;
   }
 
   /** Loads every target route via the Admin API; absent routes (404) are simply not in the map. */
@@ -462,21 +440,20 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
       return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
     }
 
-    // Per-named-API model: restore each slug route to the open/protected state captured by the
-    // corresponding UPDATE_ROUTE step. Idempotent compensation: if a route is already gone, there
-    // is nothing to restore — skip it rather than failing the rollback (the route may have been
-    // removed by a concurrent delete or a re-run of this compensation step).
+    // Per-named-API model: re-apply the protected auth state to each slug route. Routes are always
+    // protected (open-data access is an OPA per-request decision), so a rollback restores the same
+    // protected shape. Idempotent compensation: if a route is already gone, there is nothing to
+    // restore — skip it rather than failing the rollback (the route may have been removed by a
+    // concurrent delete or a re-run of this compensation step).
     payload.logRouteIdDivergence(serviceId, command.sagaId());
     for (Map.Entry<String, String> entry : routeIds.entrySet()) {
-      boolean previousOpenDataAccess =
-          Boolean.TRUE.equals(payload.previousOpenBySlug().getOrDefault(entry.getKey(), false));
       Optional<Map<String, Object>> route = adminClient.readRoute(entry.getValue());
       if (route.isEmpty()) {
         log.info(
             "RESTORE route — route {} already absent, skipping", Encode.forJava(entry.getValue()));
         continue;
       }
-      authConfigurer.applyAuthState(route.get(), previousOpenDataAccess);
+      authConfigurer.applyAuthState(route.get());
       adminClient.putRoute(entry.getValue(), route.get(), "RESTORE route");
     }
     log.info(

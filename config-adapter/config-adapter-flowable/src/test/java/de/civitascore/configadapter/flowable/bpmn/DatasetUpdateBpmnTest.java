@@ -220,7 +220,7 @@ class DatasetUpdateBpmnTest {
                 "saga-test-123",
                 "update-route",
                 Map.of("routeId", "r-1", "serviceId", "s-1"),
-                Map.of("routeId", "r-1", "previousOpenDataAccess", true)));
+                Map.of("routeId", "r-1", "serviceId", "s-1")));
   }
 
   private void stubPipelineSuccess() {

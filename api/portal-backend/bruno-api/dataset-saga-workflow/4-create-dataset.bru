@@ -19,7 +19,8 @@ body:json {
     "description": "Dataset for end-to-end saga workflow test",
     "openDataAccess": false,
     "namedApis": [
-      { "name": "Things", "slug": "things", "standard": "STA", "version": "1.1" }
+      { "name": "Things", "slug": "things", "standard": "STA", "version": "1.1" },
+      { "name": "Map", "slug": "map", "standard": "OWS" }
     ]
   }
 }
@@ -30,10 +31,13 @@ script:post-response {
   }
   // Per-NamedApi route model (#1368): remember the API slug so the route guards (9b/9g) can
   // target the per-slug route /v1/datasets/{id}/{slug} instead of the old flat datasetId scheme.
-  const slug =
-    (res.body && res.body.namedApis && res.body.namedApis[0] && res.body.namedApis[0].slug) ||
-    'things';
-  bru.setVar('sagaSlug', slug);
+  const apis = (res.body && res.body.namedApis) || [];
+  const sta = apis.find(a => a.standard === 'STA') || apis[0];
+  bru.setVar('sagaSlug', (sta && sta.slug) || 'things');
+  // OWS named-API slug for the anonymous OWS open-data e2e (9g4): proves open data is universal
+  // across routable backends, not FROST-only.
+  const ows = apis.find(a => a.standard === 'OWS');
+  bru.setVar('sagaOwsSlug', (ows && ows.slug) || 'map');
 }
 
 tests {

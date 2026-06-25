@@ -11,8 +11,9 @@
 #   4. OPA evaluates permission against user_context
 #   5. OPA returns {allow: true/false, reason: "..."}
 #
-# NOTE: Public endpoints are handled at APISIX level (routes without auth plugins).
-# OPA only sees requests that require authorization.
+# NOTE: dataset routes are always protected (no "routes without auth plugins" anymore). Anonymous
+# requests reach OPA via openid-connect unauth_action=pass, and open data is decided here by rule 0
+# (open_data.rego), not bypassed at the gateway.
 #
 # Decision flow:
 #   1. Null-permission endpoint? → allow if authenticated (e.g., /users/me)
@@ -23,6 +24,7 @@ package civitas.authz
 
 import rego.v1
 
+import data.civitas.authz.open_data
 import data.civitas.authz.permission_eval
 import data.civitas.authz.resource_mapping
 import data.civitas.authz.user_context_fetcher
@@ -41,6 +43,11 @@ decision := result if {
 # Allow if user has required permission (includes null-permission endpoints)
 allow if {
 	permission_eval.has_permission
+}
+
+# Allow anonymous/unauthorized reads of an open-data dataset (ABAC, see open_data.rego)
+allow if {
+	open_data.is_open_data_grant
 }
 
 # =============================================================================
@@ -62,32 +69,57 @@ allow if {
 #     rules 1,2,4,5,6 require is_known_endpoint which is false when backend is unknown)
 #   - Rule 8: not is_known_endpoint (rules 1-6 require is_known_endpoint or
 #     is_null_permission_endpoint, which implies is_known_endpoint)
+#   - Rule 0 (open_data) requires `not permission_eval.has_permission`, so it is
+#     exclusive with rules 4,5 (which require has_permission) for free. It can
+#     co-fire with rules 1,2 (null-permission — possible for an open-data endpoint,
+#     notably in allow-all/dev mode where permissions are nulled), 3
+#     (missing_user_context) and 6 (permission_denied) — all paths an anonymous read
+#     of an open dataset could otherwise hit — so each of rules 1,2,3,6 carries an
+#     explicit `not open_data.is_open_data_grant` guard, letting the open-data allow
+#     win. Rule 7/8 (unknown backend/endpoint) cannot co-fire: rule 0 requires a
+#     matched DATASET resource endpoint, which implies a known backend + endpoint.
 #
 # If adding new rules or providers, verify mutual exclusivity is preserved.
 # Consider refactoring to an `else` chain if the conditions become harder to
 # reason about — that would give true priority ordering enforced by OPA.
 
+# 0. Open data (ABAC): anonymous/unauthorized GET of a dataset flagged
+# openDataAccess=true on an open-data-eligible endpoint. No scope header — these
+# are single-resource reads, and an anonymous caller has no scopes to filter by.
+evaluate_request := {"allow": true, "reason": "open_data"} if {
+	open_data.is_open_data_grant
+}
+
 # 1. Null-permission endpoints (auth required, no specific permission)
-# No scope header needed - these endpoints don't have permission-based filtering
+# No scope header needed - these endpoints don't have permission-based filtering.
+# Guarded against the open-data grant: an open-data-eligible endpoint can also be a
+# null-permission endpoint (notably in allow-all/dev mode where all permissions are
+# nulled). An anonymous reader of an open dataset must be allowed by rule 0, not fall
+# through to the authenticated/anonymous null-permission branches below.
 evaluate_request := {"allow": true, "reason": "authenticated_endpoint"} if {
 	permission_eval.is_null_permission_endpoint
 	permission_eval.is_authenticated
+	not open_data.is_open_data_grant
 }
 
 # 2. Null-permission endpoint but not authenticated;
 # Separate case for more specific error message
-evaluate_request := {"allow": false, "reason": "authentication_required"} if {
+evaluate_request := {"allow": false, "reason": "authentication_required", "status_code": deny_status} if {
 	permission_eval.is_null_permission_endpoint
 	not permission_eval.is_authenticated
+	not open_data.is_open_data_grant
 }
 
 # 3. Missing user context (AuthZ Repository unavailable or fetch failed) - fail secure
-# Must be checked BEFORE permission evaluation to avoid conflicts
-evaluate_request := {"allow": false, "reason": "missing_user_context"} if {
+# Must be checked BEFORE permission evaluation to avoid conflicts.
+# Guarded against the open-data grant: an anonymous read of an open dataset has no
+# user context but must be allowed by rule 0, not denied here.
+evaluate_request := {"allow": false, "reason": "missing_user_context", "status_code": deny_status} if {
 	resource_mapping.backend != "unknown"
 	permission_eval.is_known_endpoint
 	not permission_eval.is_null_permission_endpoint
 	not has_user_context
+	not open_data.is_open_data_grant
 }
 
 # 4. Scoped access granted (TENANT or specific scopes)
@@ -126,23 +158,43 @@ evaluate_request := result if {
 }
 
 # 6. Permission denied (user lacks required permission)
-# Is a separate case for more specific error message
-evaluate_request := {"allow": false, "reason": "permission_denied", "required_permissions": permission_eval.required_permissions} if {
+# Is a separate case for more specific error message.
+# Guarded against the open-data grant: an unauthorized read of an open dataset
+# must be allowed by rule 0, not denied here.
+evaluate_request := {"allow": false, "reason": "permission_denied", "required_permissions": permission_eval.required_permissions, "status_code": deny_status} if {
 	permission_eval.is_known_endpoint
 	not permission_eval.is_null_permission_endpoint
 	has_user_context
 	not permission_eval.has_permission
+	not open_data.is_open_data_grant
 }
 
 # 7. Unknown backend (no APISIX service metadata or unknown service name)
-evaluate_request := {"allow": false, "reason": "unknown_backend"} if {
+evaluate_request := {"allow": false, "reason": "unknown_backend", "status_code": deny_status} if {
 	resource_mapping.backend == "unknown"
 }
 
 # 8. Unknown endpoint (path not in backend's mappings) - fail secure
-evaluate_request := {"allow": false, "reason": "unknown_endpoint"} if {
+evaluate_request := {"allow": false, "reason": "unknown_endpoint", "status_code": deny_status} if {
 	resource_mapping.backend != "unknown"
 	not permission_eval.is_known_endpoint
+}
+
+# =============================================================================
+# DENY STATUS CODE (consumed by the APISIX opa plugin)
+# =============================================================================
+# Map a deny to the right HTTP status so the gateway answers correctly once
+# anonymous requests reach OPA (APISIX openid-connect runs with unauth_action=pass):
+#   - 401 when the caller presented NO credentials (no X-Userinfo header) — they
+#     are unauthenticated, so "authenticate first".
+#   - 403 when the caller IS authenticated (header present) but lacks access, or
+#     when the AuthZ Repository is unavailable for an authenticated caller.
+# Without this the plugin would answer every deny with 403, breaking the
+# established "anonymous → 401" contract on protected data routes.
+default deny_status := 403
+
+deny_status := 401 if {
+	not user_context_fetcher.has_raw_userinfo_header
 }
 
 # =============================================================================

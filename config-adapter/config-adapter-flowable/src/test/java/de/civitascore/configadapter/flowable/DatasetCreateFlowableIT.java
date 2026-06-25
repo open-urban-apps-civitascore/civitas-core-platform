@@ -173,7 +173,6 @@ class DatasetCreateFlowableIT {
     variables.put("datasetId", datasetId);
     variables.put("datasetName", "Flowable E2E Test Dataset");
     variables.put("description", "Integration test via Flowable");
-    variables.put("openDataAccess", true);
     variables.put("hasPipelines", false);
     variables.put("datasources", List.of());
     variables.put("dataPipelines", List.of());
@@ -263,7 +262,6 @@ class DatasetCreateFlowableIT {
     variables.put("datasetId", datasetId);
     variables.put("datasetName", "Flowable Fail Test");
     variables.put("description", "Should compensate");
-    variables.put("openDataAccess", true);
     variables.put("hasPipelines", false);
     variables.put("datasources", List.of());
     variables.put("dataPipelines", List.of());

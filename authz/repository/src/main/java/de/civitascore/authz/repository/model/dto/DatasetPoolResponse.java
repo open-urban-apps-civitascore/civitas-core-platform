@@ -7,12 +7,20 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * DTO representing the datapool a dataset belongs to.
+ * DTO describing the authorization-relevant attributes of a single dataset.
  *
- * <p>Returned by the {@code /api/v1/dataset-pool/{datasetId}} endpoint and consumed by OPA to apply
- * Epic 1 union inheritance (a DATAPOOL-scoped grant applies to every dataset in that pool).
+ * <p>Returned by the {@code /api/v1/dataset-pool/{datasetId}} endpoint and consumed by OPA. It
+ * answers two questions in one round-trip:
  *
- * <p>{@link #poolId} is {@code null} when the dataset is not assigned to any pool.
+ * <ul>
+ *   <li>{@link #poolId} — the datapool the dataset belongs to (Epic 1 union inheritance: a
+ *       DATAPOOL-scoped grant applies to every dataset in that pool). {@code null} when the dataset
+ *       is not assigned to any pool.
+ *   <li>{@link #openDataAccess} — whether the dataset is flagged for open data access, i.e. anyone
+ *       (including anonymous callers) may read its <b>payload</b> (ABAC, see OPA open_data policy).
+ *       Open data is payload-only; metadata/discovery stay authenticated. Never {@code null} —
+ *       defaults to {@code false} (secure default).
+ * </ul>
  */
 @Data
 @Builder
@@ -20,4 +28,5 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class DatasetPoolResponse {
   private UUID poolId;
+  private boolean openDataAccess;
 }

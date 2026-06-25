@@ -14,9 +14,10 @@ get {
 }
 
 script:pre-request {
-  // The UPDATE saga from 9f reconciles the APISIX route to open asynchronously. Poll the
-  // data-plane WITHOUT a token until it returns 200 (auth plugin removed, FROST public),
-  // max ~50s (25 attempts × 2s). While still protected the gateway answers 401.
+  // 9f persisted openDataAccess=true. The route always carries OIDC + OPA (no bypass); OPA now
+  // reads the dataset's open-data flag and allows the anonymous read (ABAC). Poll the data-plane
+  // WITHOUT a token until it returns 200, max ~50s (25 attempts × 2s) to absorb any propagation
+  // (DB commit + OPA fetch). While the dataset is still protected the gateway answers 401.
   // Bruno's QuickJS axios does not honour a validateStatus function, so it throws on non-2xx;
   // catch the 401 (still-protected) state instead of letting it abort the loop.
   const axios = require('axios');
@@ -45,9 +46,9 @@ tests {
 docs {
   **Saga step 9g of 18** — Verify the open data-access workflow end-to-end (issue #1368, journeys J1/J3).
 
-  After 9f flipped `openDataAccess` to true, the dataset's per-named-API APISIX route must drop its OpenID-Connect auth plugin and the FROST project must be public — so an **unauthenticated** GET to `api.<host>/v1/datasets/{id}/{slug}` returns 200. This is the counterpart to the protected path (9c → 401): together they cover both `openDataAccess` workflows (false **and** true).
+  After 9f flipped `openDataAccess` to true, an **unauthenticated** GET to `api.<host>/v1/datasets/{id}/{slug}` returns 200 — decided by **OPA** (ABAC on the dataset's open-data flag), not by a gateway bypass. The route keeps OIDC + OPA; OIDC passes the anonymous request through (`unauth_action: pass`) and OPA grants the open-data read. This is the counterpart to the protected path (9c → 401): together they cover both `openDataAccess` workflows (false **and** true).
 
-  **Precondition:** 9f accepted; pre-request polled the data-plane until 200 (UPDATE saga reconciled the route to open).
+  **Precondition:** 9f accepted; pre-request polled the data-plane until 200 (open-data flag visible to OPA).
 
   **Expected Response:** 200 OK, JSON body — no bearer token sent.
 }

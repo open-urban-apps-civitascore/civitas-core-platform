@@ -46,18 +46,52 @@ services:
 # =============================================================================
 # PLUGIN CONFIGS - Reusable plugin bundles
 # =============================================================================
-# Attach plugin_config_id to protected routes. Public routes omit it.
+# Every dataset route attaches plugin_config_id — routes are always protected (OIDC + OPA).
+# Open data is an OPA per-request decision, not a route variant; there are no "public" routes.
 
 plugin_configs:
   - id: 1
     desc: "Standard auth + authz (openid-connect + OPA)"
     plugins:
-      # 1. JWT validation - validates token and sets X-Userinfo header
+      # 0. Strip client-supplied identity headers BEFORE openid-connect runs. With
+      # unauth_action: "pass", anonymous requests now reach OPA, and OPA's trust model keys
+      # off X-Userinfo. Without this, a client could forge X-Userinfo (an arbitrary `sub`) and
+      # impersonate a user. serverless-pre-function (priority 10000) runs in the rewrite phase
+      # BEFORE openid-connect (priority 2599), so the forged headers are cleared first; openid-
+      # connect then re-sets the real X-Userinfo for a validly authenticated request.
+      serverless-pre-function:
+        phase: rewrite
+        functions:
+          - "return function(conf, ctx) ngx.req.clear_header('X-Userinfo'); ngx.req.clear_header('X-Access-Token'); ngx.req.clear_header('X-Id-Token') end"
+
+      # 1. JWT validation - validates a present token and sets X-Userinfo header.
+      # unauth_action: "pass" lets ANONYMOUS requests continue to OPA instead of being
+      # rejected with 401 here. OPA is the sole authorization gate: it denies protected
+      # resources for anonymous callers (401/403) and allows reads of open-data datasets
+      # (ABAC). A present bearer token is still validated via JWKS and its claims forwarded.
+      #
+      # NOTE: unauth_action: "pass" requires bearer_only: false (APISIX rejects
+      # bearer_only: true + pass — it keeps blocking anonymous). bearer_only: false in turn
+      # makes APISIX require a session.secret (schema), and the bearer token must be read
+      # from the Authorization header (access_token_in_authorization_header). The session.secret
+      # is NOT inert under bearer_only: false — it is a real authentication credential; see the
+      # SECURITY note on the `secret` field below.
       openid-connect:
         client_id: "apisix-validator"
         client_secret: "unused-for-jwks-validation"
         discovery: "http://civitas-keycloak:8080/realms/civitas-core/.well-known/openid-configuration"
-        bearer_only: true
+        bearer_only: false
+        unauth_action: "pass"
+        access_token_in_authorization_header: true
+        session:
+          # ⚠️ SECURITY: With bearer_only=false, openid-connect processes session cookies, so this is
+          # a REAL authentication credential — anyone who knows it can mint trusted session state.
+          # Therefore NO secret is committed: it is read from the OIDC_SESSION_SECRET environment
+          # variable, with NO default. If the variable is unset, APISIX fails to start (it cannot
+          # resolve ${{...}}) — secure-by-default, so this standalone config can never run with a
+          # known/placeholder key. Inject a strong, non-shared value (CI seeds a per-run random one
+          # via seed-routes.sh; production injects from a secret in civitas-core-deployment).
+          secret: ${{OIDC_SESSION_SECRET}}
         use_jwks: true
         # DEV-ONLY: ssl_verify disabled for local HTTP Keycloak.
         # PRODUCTION MUST use ssl_verify: true — see the "Gateway Trust Model"

@@ -65,10 +65,12 @@ public class DataSetSagaPublisher {
   }
 
   /**
-   * Publishes a {@code DATASET_CREATE} saga trigger. See {@link SagaTrigger} for the contract. The
-   * dataset's {@code openDataAccess} flag is propagated downstream: FROST sets it as the project's
-   * {@code public} flag (anonymous read access) and APISIX attaches the auth plugin only for
-   * protected datasets.
+   * Publishes a {@code DATASET_CREATE} saga trigger. See {@link SagaTrigger} for the contract.
+   *
+   * <p>{@code openDataAccess} is intentionally NOT part of the saga payload: routes are always
+   * provisioned protected and the FROST project is always private. Open data access is decided by
+   * OPA at request time from the persisted {@code openDataAccess} flag (read via the AuthZ
+   * Repository), not by saga-time route/FROST configuration.
    */
   public void publishCreateRequested(DataSet dataset) {
     verifyLayerStyleReferences(dataset);
@@ -77,7 +79,6 @@ public class DataSetSagaPublisher {
             dataset.getId().toString(),
             dataset.getName(),
             dataset.getDescription(),
-            dataset.getOpenDataAccess(),
             buildDatasources(dataset),
             buildDatasinks(dataset),
             buildLayers(dataset),
@@ -89,8 +90,8 @@ public class DataSetSagaPublisher {
 
   /**
    * Publishes a {@code DATASET_UPDATE} saga trigger with a pipeline diff against {@code
-   * previousPipelines}. Toggling {@code openDataAccess} re-applies the FROST {@code public} flag
-   * and the APISIX auth-plugin attachment.
+   * previousPipelines}. Toggling {@code openDataAccess} does not trigger any route/FROST change —
+   * it only changes what OPA reads per request (see {@link #publishCreateRequested}).
    */
   public void publishUpdateRequested(DataSet dataset, Set<Pipeline> previousPipelines) {
     verifyLayerStyleReferences(dataset);
@@ -99,7 +100,6 @@ public class DataSetSagaPublisher {
             dataset.getId().toString(),
             dataset.getName(),
             dataset.getDescription(),
-            dataset.getOpenDataAccess(),
             dataset.getProjectId(),
             buildRouteIds(dataset),
             dataset.getServiceId(),

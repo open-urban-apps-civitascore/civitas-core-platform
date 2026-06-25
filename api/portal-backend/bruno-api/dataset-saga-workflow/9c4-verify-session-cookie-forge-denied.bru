@@ -1,0 +1,42 @@
+meta {
+  name: 9c4. Verify a forged session cookie does not authenticate (→ 401)
+  type: http
+  seq: 25
+  tags: [
+    requires-nifi
+  ]
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}/{{sagaSlug}}
+  body: none
+  auth: none
+}
+
+headers {
+  Cookie: session=Zm9yZ2VkLXNlc3Npb24tc3RhdGUtbm90LXNpZ25lZA
+}
+
+tests {
+  test("A forged/garbage session cookie does not grant access (401)", function() {
+    // With bearer_only=false the openid-connect plugin processes session cookies, so the session
+    // secret is a real credential. The secret is never a known committed constant (seed-routes.sh
+    // generates a per-run random one; prod injects), so an attacker cannot mint a VALID session.
+    // A forged/garbage cookie must fail to decrypt → treated as anonymous → OPA denies → 401.
+    expect(res.getStatus()).to.equal(401);
+  });
+}
+
+docs {
+  **Saga step 9c4** — Session-cookie forgery guard.
+
+  Because `unauth_action: pass` requires `bearer_only: false`, APISIX's openid-connect plugin still
+  processes session cookies — the `session.secret` is a real authentication credential, not an inert
+  schema value. The secret must never be a known committed constant (seed-routes.sh uses a per-run
+  random value; production injects a strong one). This test sends a **forged session cookie** on an
+  unauthenticated request to a protected dataset and asserts the gateway denies it (**401**): a
+  garbage cookie fails to decrypt and the caller is treated as anonymous. It guards against a
+  regression that re-introduces a known/weak session secret or otherwise trusts client session state.
+
+  **Precondition:** runs while the dataset is protected (before 9f).
+}

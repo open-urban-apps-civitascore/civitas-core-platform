@@ -388,6 +388,10 @@ services:
       APISIX_API_PUBLIC_URL: http://api.localhost:9080
       APISIX_PLUGIN_CONFIG_ID: "1"
       APISIX_SERVICE_ID: svc-frost-server
+      # Upstream for OWS (GeoServer) named-API routes. Points at a lightweight HTTP echo stub so an
+      # anonymous OWS payload request can be proven to traverse APISIX → OIDC → OPA → OWS upstream
+      # end-to-end (no real GeoServer needed; the OWS named API does not provision a workspace).
+      APISIX_GEOSERVER_URL: http://geoserver-mock:8080/geoserver
       # Headers the saga's route-level proxy-rewrite must strip in lieu of plugin_config 1
       # (Route-over-PluginConfig precedence overrides plugin_config's proxy-rewrite).
       APISIX_PROXY_REWRITE_HEADERS_REMOVE: X-Allowed-Scope-Ids,X-Allowed-Pool-Ids
@@ -424,6 +428,22 @@ services:
       timeout: 10s
       retries: 10
       start_period: 60s
+
+  # ── OWS upstream stub: stands in for GeoServer so an OWS named-API route has a reachable upstream.
+  # Echoes any request with 200, which is all the anonymous-OWS open-data e2e (9g4) needs to prove the
+  # request traverses APISIX → OIDC → OPA → OWS upstream. Not a real GeoServer (none is provisioned by
+  # an OWS named API; workspace provisioning is tied to GeoSinks, not named-API routing).
+  geoserver-mock:
+    image: mendhak/http-https-echo:34
+    container_name: civitas-geoserver-mock
+    environment:
+      HTTP_PORT: "8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8080/', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
   # ── APISIX Route Seeding (one-shot, run via: docker compose run --rm apisix-seed)
   apisix-seed:

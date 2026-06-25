@@ -61,6 +61,44 @@ class TrustedHeaderGatewayContractTest {
         .containsAll(TRUSTED_HEADERS);
   }
 
+  @Test
+  @DisplayName("the OIDC session secret is injected, never a committed literal (secure-by-default)")
+  void devGatewaySessionSecretIsNeverCommitted() throws IOException {
+    String yaml = Files.readString(apisixConfig());
+    List<String> secrets = sessionSecretValues(yaml);
+
+    assertThat(secrets)
+        .as("apisix.yaml must declare an openid-connect session.secret (bearer_only=false)")
+        .isNotEmpty();
+    // With bearer_only=false the openid-connect plugin processes session cookies, so session.secret
+    // is a real authentication credential. A committed literal (even a "REPLACE-ME" placeholder) is
+    // runnable and readable from git, so it MUST be injected via the environment. Resolving an
+    // unset
+    // ${{...}} makes APISIX fail to start — secure-by-default.
+    assertThat(secrets)
+        .as(
+            "every openid-connect session.secret must be injected via ${{OIDC_SESSION_SECRET}}, never"
+                + " a committed literal — a hard-coded/placeholder key is an authentication"
+                + " credential anyone can read from git (re-introduces the known-key bypass)")
+        .allMatch(v -> v.equals("${{OIDC_SESSION_SECRET}}"));
+  }
+
+  /**
+   * Values of every {@code secret:} key (the openid-connect session secret), trimmed and unquoted.
+   */
+  private static List<String> sessionSecretValues(String yaml) {
+    List<String> values = new ArrayList<>();
+    Matcher m = Pattern.compile("(?m)^\\s*secret:\\s*(.+?)\\s*$").matcher(yaml);
+    while (m.find()) {
+      String raw = m.group(1).strip();
+      if (raw.length() >= 2 && raw.startsWith("\"") && raw.endsWith("\"")) {
+        raw = raw.substring(1, raw.length() - 1);
+      }
+      values.add(raw);
+    }
+    return values;
+  }
+
   /** Collects the YAML sequence items immediately following the first {@code key:} line. */
   private static List<String> listItemsUnder(String yaml, String key) {
     List<String> items = new ArrayList<>();

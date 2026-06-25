@@ -273,8 +273,8 @@ class FrostSagaHandlerTest {
     }
 
     @Test
-    @DisplayName("sets public=true on body when openDataAccess is true")
-    void shouldSetPublicTrueWhenOpenDataAccess() {
+    @DisplayName("always creates the project private even when openDataAccess is true")
+    void shouldAlwaysCreateProjectPrivate() {
       try (FrostSagaHandler handler = createHandler()) {
         Response mockResponse = mock(Response.class);
         when(mockResponse.getStatus()).thenReturn(201);
@@ -284,6 +284,8 @@ class FrostSagaHandlerTest {
         ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
         when(mockBuilder.post(captor.capture())).thenReturn(mockResponse);
 
+        // openDataAccess=true must NOT make the FROST project public: open data is an OPA
+        // (ABAC) decision at request time, never FROST project visibility.
         SagaCommandMessage command =
             createCommand(
                 "EXECUTE_STEP",
@@ -294,12 +296,12 @@ class FrostSagaHandlerTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
-        assertEquals(true, body.get("public"));
+        assertEquals(false, body.get("public"));
       }
     }
 
     @Test
-    @DisplayName("defaults public to false when openDataAccess missing or false")
+    @DisplayName("creates the project private when openDataAccess missing or false")
     void shouldDefaultPublicToFalse() {
       try (FrostSagaHandler handler = createHandler()) {
         Response mockResponse = mock(Response.class);
@@ -422,14 +424,14 @@ class FrostSagaHandlerTest {
     }
 
     @Test
-    @DisplayName("sets public on body and captures previousPublic in compensationData")
-    void shouldSetPublicAndCapturePreviousPublic() {
+    @DisplayName("forces the project private on update and captures no previousPublic")
+    void shouldForcePrivateAndNotCapturePreviousPublic() {
       try (FrostSagaHandler handler = createHandler()) {
         Response getResponse = mock(Response.class);
         when(getResponse.getStatus()).thenReturn(200);
         when(getResponse.readEntity(Map.class))
             .thenReturn(
-                Map.of("name", "Old Name", "description", "Old Description", "public", false));
+                Map.of("name", "Old Name", "description", "Old Description", "public", true));
         when(mockBuilder.get()).thenReturn(getResponse);
 
         Response patchResponse = mock(Response.class);
@@ -438,6 +440,7 @@ class FrostSagaHandlerTest {
         ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
         when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(patchResponse);
 
+        // Even a previously-public project (and openDataAccess=true) is forced private on update.
         SagaCommandMessage command =
             createCommand(
                 "EXECUTE_STEP",
@@ -456,9 +459,9 @@ class FrostSagaHandlerTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
-        assertEquals(true, body.get("public"));
+        assertEquals(false, body.get("public"));
         assertEquals("STEP_COMPLETED", result.type());
-        assertEquals(false, result.compensationData().get("previousPublic"));
+        assertNull(result.compensationData().get("previousPublic"));
       }
     }
   }
@@ -672,8 +675,8 @@ class FrostSagaHandlerTest {
     }
 
     @Test
-    @DisplayName("restores previousPublic in body when present in payload")
-    void shouldRestorePreviousPublicWhenPresent() {
+    @DisplayName("forces the project private on restore, ignoring any previousPublic in payload")
+    void shouldForcePrivateOnRestoreIgnoringPreviousPublic() {
       try (FrostSagaHandler handler = createHandler()) {
         Response mockResponse = mock(Response.class);
         when(mockResponse.getStatus()).thenReturn(200);
@@ -681,6 +684,7 @@ class FrostSagaHandlerTest {
         ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
         when(mockBuilder.method(eq("PATCH"), captor.capture())).thenReturn(mockResponse);
 
+        // A stale previousPublic=true from an old saga must NOT resurrect a public project.
         SagaCommandMessage command =
             createCommand(
                 "COMPENSATE_STEP",
@@ -695,13 +699,13 @@ class FrostSagaHandlerTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
-        assertEquals(true, body.get("public"));
+        assertEquals(false, body.get("public"));
       }
     }
 
     @Test
-    @DisplayName("omits public from body when previousPublic missing (back-compat)")
-    void shouldOmitPublicWhenPreviousPublicMissing() {
+    @DisplayName("forces the project private on restore when no previousPublic is present")
+    void shouldForcePrivateOnRestoreWhenPreviousPublicMissing() {
       try (FrostSagaHandler handler = createHandler()) {
         Response mockResponse = mock(Response.class);
         when(mockResponse.getStatus()).thenReturn(200);
@@ -722,7 +726,7 @@ class FrostSagaHandlerTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
-        assertNull(body.get("public"));
+        assertEquals(false, body.get("public"));
       }
     }
   }
