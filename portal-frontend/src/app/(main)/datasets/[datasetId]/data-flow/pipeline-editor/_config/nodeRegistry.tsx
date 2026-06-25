@@ -99,7 +99,7 @@ export interface PipelineNodeDef<D extends PipelineNodeData = PipelineNodeData> 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- panels are typed per-node; the union is widened here
   InspectorPanel: ComponentType<NodeInspectorPanelProps<any>>
   /** Whether the inspector panel needs the `onUpdate` callback (read-only panels don't). */
-  panelReadonly?: boolean
+  isPanelReadonly?: boolean
 }
 
 // ============================================================================
@@ -127,7 +127,7 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
       'nodeType' in data && (data as ControlNodeData).nodeType === PIPELINE_NODE_TYPES.Start,
 
     InspectorPanel: ControlPanel,
-    panelReadonly: true,
+    isPanelReadonly: true,
   },
 
   // ---- Control: End ----
@@ -149,7 +149,7 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
       'nodeType' in data && (data as ControlNodeData).nodeType === PIPELINE_NODE_TYPES.End,
 
     InspectorPanel: ControlPanel,
-    panelReadonly: true,
+    isPanelReadonly: true,
   },
 
   // ---- Source: DataSource ----
@@ -210,7 +210,7 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
     isData: (data): data is FrostNodeData =>
       'entityType' in data && (data as FrostNodeData).entityType === ENTITY_TYPES.Frost,
     InspectorPanel: FrostPanel,
-    panelReadonly: true,
+    isPanelReadonly: true,
   },
 
   // ---- Storage: GeoPersistence ----

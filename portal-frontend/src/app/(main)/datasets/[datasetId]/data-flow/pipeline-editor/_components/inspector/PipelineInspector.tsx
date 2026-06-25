@@ -58,12 +58,12 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
     const def = getNodeDefForData(selectedNode.data)
     if (!def) return null
 
-    const { InspectorPanel, panelReadonly } = def
+    const { InspectorPanel, isPanelReadonly } = def
     const panel = <InspectorPanel data={selectedNode.data} onUpdate={handleNodeUpdate} />
 
     // Display-only panels stay fully legible. Editable panels are dimmed and made
     // non-interactive in read-only mode; handleNodeUpdate additionally no-ops as a safeguard.
-    if (panelReadonly || !isReadOnly) return panel
+    if (isPanelReadonly || !isReadOnly) return panel
 
     return (
       <div className="pointer-events-none opacity-60" aria-disabled>
