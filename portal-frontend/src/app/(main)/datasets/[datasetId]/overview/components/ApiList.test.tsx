@@ -26,6 +26,9 @@ vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
   useGetDatasinks: vi.fn().mockReturnValue({
     data: { data: [{ id: 'sink-1', dataSinkType: 'POSTGIS' }] },
   }),
+}))
+
+vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
   useGetPipelines: vi.fn(),
 }))
 
