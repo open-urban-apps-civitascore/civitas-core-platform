@@ -1,0 +1,54 @@
+meta {
+  name: Attach DataSinks to Pipeline
+  type: http
+  seq: 7
+}
+
+patch {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{pipelineId}}
+}
+
+body:json {
+  {
+    "dataSinkIds": ["{{postgisDataSinkId}}"]
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('pipelineId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Pipeline references the DataSink", function() {
+    expect(res.body.dataSinkIds).to.be.an('array');
+    expect(res.body.dataSinkIds).to.include(bru.getVar('postgisDataSinkId'));
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId`, `pipelineId`, and `postgisDataSinkId` are set. Run after `pipelines/create-pipeline.bru` and `datasinks/create-postgis-datasink.bru`.
+
+  **Expected Response:** 200 OK, body reflects the updated `dataSinkIds`. Other Pipeline fields remain unchanged.
+
+  **Note:** This is an additive request — `pipelines/create-pipeline.bru`, `update-pipeline.bru`, and `patch-pipeline.bru` do not include `dataSinkIds` in their bodies, so they continue to work even when no DataSink has been created. Run this request only after you have a DataSink to attach.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Pipeline-to-DataSink association recorded; the DataSink's `pipeline` reference is set by `PipelineService` |
+  | Config Adapter | — (the association affects the saga trigger only when the parent DataSet is released) |
+  | External System | — |
+}

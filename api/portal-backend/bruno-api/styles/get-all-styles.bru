@@ -1,0 +1,37 @@
+meta {
+  name: Get All Styles
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/datasets/:dataSetId/styles
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+  ~sort: createdAt,DESC
+  ~name: default
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns paginated list", function() {
+    expect(res.body.content).to.be.an('array');
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` is set.
+
+  **Expected Response:** 200 OK, paginated list of Styles belonging to the data set.
+}

@@ -1,0 +1,57 @@
+meta {
+  name: Create FROST DataSink
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+body:json {
+  {
+    "dataSinkType": "FROST",
+    "configuration": {}
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataSinkId', res.body.id);
+    bru.setVar('frostDataSinkId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Has id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+  test("Has FROST type", function() {
+    expect(res.body.dataSinkType).to.equal('FROST');
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` is set.
+
+  **Expected Response:** 201 Created, body contains `id`. FROST sinks carry no configuration of their own — provisioning happens via the FROST adapter on dataset release.
+
+  **Post-condition:** Save `dataSinkId` and `frostDataSinkId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSink record created in `portal_backend` DB, linked to the DataSet |
+  | Config Adapter | — (FROST project is provisioned when the parent DataSet is released) |
+  | External System | — |
+}

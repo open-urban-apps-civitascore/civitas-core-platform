@@ -1,0 +1,55 @@
+meta {
+  name: Update DataSink
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{dataSinkId}}
+}
+
+body:json {
+  {
+    "dataSinkType": "POSTGIS",
+    "configuration": {
+      "tableName": "sensor_observations_v2",
+      "dataStructureVersionId": "{{dataStructureVersionId}}"
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataSinkId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Configuration reflects update", function() {
+    expect(res.body.configuration.tableName).to.equal('sensor_observations_v2');
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId`, `dataSinkId`, and `dataStructureVersionId` are set.
+
+  **Expected Response:** 200 OK, body reflects updated configuration.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSink record updated in `portal_backend` DB |
+  | Config Adapter | — (GeoServer datastore reflects the new table only after the DataSet is re-released) |
+  | External System | — |
+}

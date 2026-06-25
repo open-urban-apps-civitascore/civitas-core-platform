@@ -1,0 +1,34 @@
+meta {
+  name: Get DataSink by ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{dataSinkId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Has correct id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+  test("Has dataSinkType", function() {
+    expect(res.body.dataSinkType).to.be.a('string');
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` and `dataSinkId` are set.
+
+  **Expected Response:** 200 OK, body contains the DataSink with matching `id`, including the `inUse` flag and (for POSTGIS) the inline DataStructureVersion summary.
+}

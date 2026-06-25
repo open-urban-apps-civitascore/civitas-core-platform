@@ -1,0 +1,38 @@
+meta {
+  name: Delete DataSink
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{dataSinkId}}
+}
+
+tests {
+  test("Status code is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` and `dataSinkId` are set. The DataSink must not be in use by a Layer (delete dependent Layers first).
+
+  **Expected Response:** 204 No Content.
+
+  **Verification:** Issue `get-datasink-by-id` for the same `dataSinkId` and confirm 404.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSink record removed |
+  | Config Adapter | — |
+  | External System | — |
+}

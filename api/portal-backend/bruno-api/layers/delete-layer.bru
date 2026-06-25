@@ -1,0 +1,38 @@
+meta {
+  name: Delete Layer
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:dataSetId/layers/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{layerId}}
+}
+
+tests {
+  test("Status code is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` and `layerId` are set.
+
+  **Expected Response:** 204 No Content.
+
+  **Verification:** Issue `get-layer-by-id` for the same `layerId` and confirm 404.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Layer record removed; references to Styles are released (Styles themselves are not deleted) |
+  | Config Adapter | — |
+  | External System | — |
+}
