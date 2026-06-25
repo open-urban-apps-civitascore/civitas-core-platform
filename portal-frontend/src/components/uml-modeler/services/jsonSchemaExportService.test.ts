@@ -340,20 +340,22 @@ describe('exportToJsonSchema', () => {
           },
         },
       ],
+      // Diamond at the target (TrafficSensor = container), so the part's role/multiplicity sit on
+      // the source end.
       edges: [
         {
           id: 'edge-1',
           type: 'composition',
-          source: 'node-1',
-          target: 'node-2',
+          source: 'node-2',
+          target: 'node-1',
           data: {
             relationship: {
               id: 'rel-1',
               type: 'composition',
-              source: 'elem-1',
-              target: 'elem-2',
-              targetRole: 'readings',
-              targetMultiplicity: '*',
+              source: 'elem-2',
+              target: 'elem-1',
+              sourceRole: 'readings',
+              sourceMultiplicity: '*',
             },
             label: '',
             isSelected: false,
@@ -369,5 +371,87 @@ describe('exportToJsonSchema', () => {
 
     const defs = schema.$defs as Record<string, Record<string, unknown>>
     expect(defs.Reading).toBeDefined()
+  })
+
+  /** Second class node (Reading) reused by the aggregation/association cases below. */
+  const readingNode = {
+    id: 'node-2',
+    type: 'class' as const,
+    position: { x: 200, y: 0 },
+    data: {
+      element: {
+        id: 'elem-2',
+        name: 'Reading',
+        type: 'class' as const,
+        attributes: [{ id: 'a1', name: 'value', type: 'Double', visibility: 'public' as const }],
+        operations: [],
+      },
+      label: 'Reading',
+    },
+  }
+
+  it('embeds the source part into the target container for aggregation', () => {
+    const diagram = baseDiagram({
+      nodes: [...baseDiagram().nodes, readingNode],
+      edges: [
+        {
+          id: 'edge-1',
+          type: 'aggregation',
+          source: 'node-2',
+          target: 'node-1',
+          data: {
+            relationship: {
+              id: 'rel-1',
+              type: 'aggregation',
+              source: 'elem-2',
+              target: 'elem-1',
+              sourceRole: 'readings',
+            },
+            label: '',
+            isSelected: false,
+            isDirty: false,
+          },
+        },
+      ],
+    })
+
+    const schema = exportToJsonSchema(diagram)
+    const properties = schema.properties as Record<string, Record<string, unknown>>
+    expect(properties.readings).toEqual({ $ref: '#/$defs/Reading' })
+    expect((schema.$defs as Record<string, Record<string, unknown>>).Reading).toMatchObject({ title: 'Reading' })
+    expect(schema.title).toBe('TrafficSensor')
+  })
+
+  it('keeps the drawn direction for association (source references target)', () => {
+    const diagram = baseDiagram({
+      nodes: [...baseDiagram().nodes, readingNode],
+      edges: [
+        {
+          id: 'edge-1',
+          type: 'association',
+          source: 'node-1',
+          target: 'node-2',
+          data: {
+            relationship: {
+              id: 'rel-1',
+              type: 'association',
+              source: 'elem-1',
+              target: 'elem-2',
+              targetRole: 'reading',
+            },
+            label: '',
+            isSelected: false,
+            isDirty: false,
+          },
+        },
+      ],
+    })
+
+    const schema = exportToJsonSchema(diagram)
+    const properties = schema.properties as Record<string, Record<string, unknown>>
+    // Direction not flipped: source stays root and references the target.
+    expect(properties.reading).toEqual({ $ref: '#/$defs/Reading' })
+    expect((schema.$defs as Record<string, Record<string, unknown>>).Reading).toMatchObject({ title: 'Reading' })
+    expect(schema.title).toBe('TrafficSensor')
   })
 })
