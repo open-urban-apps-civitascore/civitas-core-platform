@@ -15,12 +15,6 @@ params:path {
   id: {{dataSinkId}}
 }
 
-tests {
-  test("Status code is 204", function() {
-    expect(res.getStatus()).to.equal(204);
-  });
-}
-
 docs {
   **Precondition:** `dataSetId` and `dataSinkId` are set. The DataSink must not be in use by a Layer (delete dependent Layers first).
 

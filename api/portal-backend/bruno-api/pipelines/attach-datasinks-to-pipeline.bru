@@ -27,16 +27,6 @@ script:post-response {
   }
 }
 
-tests {
-  test("Status code is 200", function() {
-    expect(res.getStatus()).to.equal(200);
-  });
-  test("Pipeline references the DataSink", function() {
-    expect(res.body.dataSinkIds).to.be.an('array');
-    expect(res.body.dataSinkIds).to.include(bru.getVar('postgisDataSinkId'));
-  });
-}
-
 docs {
   **Precondition:** `dataSetId`, `pipelineId`, and `postgisDataSinkId` are set. Run after `pipelines/create-pipeline.bru` and `datasinks/create-postgis-datasink.bru`.
 

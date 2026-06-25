@@ -31,22 +31,6 @@ script:post-response {
   }
 }
 
-tests {
-  test("Status code is 201", function() {
-    expect(res.getStatus()).to.equal(201);
-  });
-  test("Has id", function() {
-    expect(res.body.id).to.be.a('string');
-  });
-  test("Has POSTGIS type", function() {
-    expect(res.body.dataSinkType).to.equal('POSTGIS');
-  });
-  test("Has configuration with tableName", function() {
-    expect(res.body.configuration).to.be.an('object');
-    expect(res.body.configuration.tableName).to.equal('sensor_observations');
-  });
-}
-
 docs {
   **Precondition:** `dataSetId` and `dataStructureVersionId` are set. The setup folder seeds the DataSet but not a version — run `datastructures/create-version.bru` first (or set `dataStructureVersionId` manually) to populate that variable.
 

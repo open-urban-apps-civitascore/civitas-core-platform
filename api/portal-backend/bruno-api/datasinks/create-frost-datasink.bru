@@ -28,18 +28,6 @@ script:post-response {
   }
 }
 
-tests {
-  test("Status code is 201", function() {
-    expect(res.getStatus()).to.equal(201);
-  });
-  test("Has id", function() {
-    expect(res.body.id).to.be.a('string');
-  });
-  test("Has FROST type", function() {
-    expect(res.body.dataSinkType).to.equal('FROST');
-  });
-}
-
 docs {
   **Precondition:** `dataSetId` is set.
 

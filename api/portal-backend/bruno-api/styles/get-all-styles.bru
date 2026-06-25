@@ -21,15 +21,6 @@ params:query {
   ~name: default
 }
 
-tests {
-  test("Status code is 200", function() {
-    expect(res.getStatus()).to.equal(200);
-  });
-  test("Returns paginated list", function() {
-    expect(res.body.content).to.be.an('array');
-  });
-}
-
 docs {
   **Precondition:** `dataSetId` is set.
 

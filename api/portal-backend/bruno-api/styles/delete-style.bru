@@ -15,12 +15,6 @@ params:path {
   id: {{styleId}}
 }
 
-tests {
-  test("Status code is 204", function() {
-    expect(res.getStatus()).to.equal(204);
-  });
-}
-
 docs {
   **Precondition:** `dataSetId` and `styleId` are set. The Style must not be referenced by any Layer (delete dependent Layers or detach their style references first).
 

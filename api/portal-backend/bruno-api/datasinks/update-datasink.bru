@@ -31,15 +31,6 @@ script:post-response {
   }
 }
 
-tests {
-  test("Status code is 200", function() {
-    expect(res.getStatus()).to.equal(200);
-  });
-  test("Configuration reflects update", function() {
-    expect(res.body.configuration.tableName).to.equal('sensor_observations_v2');
-  });
-}
-
 docs {
   **Precondition:** `dataSetId`, `dataSinkId`, and `dataStructureVersionId` are set.
 

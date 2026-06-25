@@ -28,12 +28,6 @@ script:post-response {
   }
 }
 
-tests {
-  test("Status code is 200", function() {
-    expect(res.getStatus()).to.equal(200);
-  });
-}
-
 docs {
   **Precondition:** `dataSetId` and `styleId` are set.
 

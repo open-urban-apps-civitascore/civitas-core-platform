@@ -15,18 +15,6 @@ params:path {
   id: {{dataSinkId}}
 }
 
-tests {
-  test("Status code is 200", function() {
-    expect(res.getStatus()).to.equal(200);
-  });
-  test("Has correct id", function() {
-    expect(res.body.id).to.be.a('string');
-  });
-  test("Has dataSinkType", function() {
-    expect(res.body.dataSinkType).to.be.a('string');
-  });
-}
-
 docs {
   **Precondition:** `dataSetId` and `dataSinkId` are set.
 

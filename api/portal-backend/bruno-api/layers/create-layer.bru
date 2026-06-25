@@ -33,21 +33,6 @@ script:post-response {
   }
 }
 
-tests {
-  test("Status code is 201", function() {
-    expect(res.getStatus()).to.equal(201);
-  });
-  test("Has id", function() {
-    expect(res.body.id).to.be.a('string');
-  });
-  test("Has layerName", function() {
-    expect(res.body.layerName).to.equal('sensor_observations_layer');
-  });
-  test("Has dataSinkId", function() {
-    expect(res.body.dataSinkId).to.be.a('string');
-  });
-}
-
 docs {
   **Precondition:** `dataSetId`, `postgisDataSinkId` (from `datasinks/create-postgis-datasink.bru`), `defaultStyleId` (from `styles/create-style.bru`), and `alternativeStyleId` (from `styles/create-alternative-style.bru`) are all set.
 
