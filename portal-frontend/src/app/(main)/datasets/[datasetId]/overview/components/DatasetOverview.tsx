@@ -51,6 +51,7 @@ import { BaseInfoForm } from '../../components/BaseInfoForm'
 import { CompletionStep } from '../../components/CompletionStep'
 import { ApiList } from './ApiList'
 import { PipelineList } from './PipelineList'
+import { VisualizationList } from './VisualizationList'
 
 interface DatasetOverviewProps {
   dataset: Dataset
@@ -326,9 +327,24 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
             datasetId={dataset.id}
             apis={namedApiList}
             canEdit={canUpdate}
+            isPublished={dataset.dataSetStatus === DATASET_STATUS_TYPES.AVAILABLE}
             isOpenDataAccess={dataset.openDataAccess}
           />
         </>
+      ),
+    },
+    {
+      title: t('overview.completion.visualizations.title'),
+      showSeparator: true,
+      isCompleted: (dataset.visualizations ?? []).length > 0,
+      buttons: [],
+      content: (
+        <VisualizationList
+          datasetId={dataset.id}
+          visualizations={dataset.visualizations ?? []}
+          canEdit={canUpdate}
+          isOpenDataAccess={dataset.openDataAccess}
+        />
       ),
     },
     {
