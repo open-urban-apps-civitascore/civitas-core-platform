@@ -2,20 +2,22 @@ package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DashboardMapper;
+import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
+import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.Dashboard;
-import de.civitascore.portal.model.entity.DashboardSource;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DashboardInputDTO;
 import de.civitascore.portal.repository.DashboardRepository;
 import de.civitascore.portal.repository.DataSetRepository;
-import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +32,7 @@ class DashboardServiceTest {
   @Mock private DashboardRepository dashboardRepository;
   @Mock private DashboardMapper dashboardMapper;
   @Mock private DataSetRepository dataSetRepository;
+  @Mock private DataSetSagaPublisher sagaPublisher;
   @InjectMocks private DashboardService service;
 
   private UUID dataSetId;
@@ -140,27 +143,90 @@ class DashboardServiceTest {
   }
 
   @Test
-  void preSaveRejectsSourceWithForeignMappedDataSet() {
+  void postSaveFiresUpdateSagaWhenDataSetIsAvailable() {
+    dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+    dataSet.setProjectId("apisix-project-1"); // has engine infrastructure
     Dashboard dashboard = new Dashboard();
     dashboard.setDataSet(dataSet);
-    DashboardSource foreign = new DashboardSource();
-    foreign.setMappedDatasetId(
-        UUID.randomUUID()); // anchored to a different dataSet than the dashboard
-    dashboard.setSources(Set.of(foreign));
 
-    assertThatThrownBy(() -> service.preSave(dashboard)).isInstanceOf(InvalidInputException.class);
+    service.postSave(dashboard, new DashboardInputDTO());
+
+    assertThat(dataSet.getPendingSagaType()).isEqualTo(PendingSagaType.UPDATE);
+    verify(dataSetRepository).save(dataSet);
+    verify(sagaPublisher).publishUpdateRequested(dataSet, dataSet.getPipelines());
   }
 
   @Test
-  void preSaveAcceptsSourceMatchingDataSet() {
+  void postSaveSkipsSagaForDraftDataSet() {
+    dataSet.setDataSetStatus(DataSetStatus.DRAFT);
     Dashboard dashboard = new Dashboard();
     dashboard.setDataSet(dataSet);
-    DashboardSource matching = new DashboardSource();
-    matching.setMappedDatasetId(dataSetId);
-    dashboard.setSources(Set.of(matching));
 
-    Dashboard result = service.preSave(dashboard);
-    assertThat(result).isSameAs(dashboard);
+    service.postSave(dashboard, new DashboardInputDTO());
+
+    assertThat(dataSet.getPendingSagaType()).isNull();
+    verify(sagaPublisher, never()).publishUpdateRequested(dataSet, dataSet.getPipelines());
+  }
+
+  @Test
+  void postSaveSkipsSagaWhenAvailableButProjectIdNull() {
+    dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+    // projectId left null: released but no engine infrastructure yet — nothing to sync.
+    Dashboard dashboard = new Dashboard();
+    dashboard.setDataSet(dataSet);
+
+    service.postSave(dashboard, new DashboardInputDTO());
+
+    assertThat(dataSet.getPendingSagaType()).isNull();
+    verify(sagaPublisher, never()).publishUpdateRequested(dataSet, dataSet.getPipelines());
+  }
+
+  @Test
+  void postSaveRejectsChangeWhileSagaInFlight() {
+    dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+    dataSet.setProjectId("apisix-project-1");
+    dataSet.setPendingSagaType(PendingSagaType.CREATE); // a saga is already running
+    Dashboard dashboard = new Dashboard();
+    dashboard.setDataSet(dataSet);
+
+    assertThatThrownBy(() -> service.postSave(dashboard, new DashboardInputDTO()))
+        .isInstanceOf(ResourceInUseException.class);
+    verify(sagaPublisher, never()).publishUpdateRequested(dataSet, dataSet.getPipelines());
+  }
+
+  @Test
+  void deleteFiresUpdateSagaWhenDataSetIsAvailable() {
+    dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+    dataSet.setProjectId("apisix-project-1");
+    UUID dashboardId = UUID.randomUUID();
+    Dashboard dashboard = new Dashboard();
+    dashboard.setId(dashboardId);
+    dashboard.setDataSet(dataSet);
+    when(dashboardRepository.existsById(dashboardId)).thenReturn(true);
+    when(dashboardRepository.findById(dashboardId)).thenReturn(Optional.of(dashboard));
+
+    service.deleteById(dashboardId);
+
+    verify(dashboardRepository).deleteById(dashboardId);
+    verify(sagaPublisher).publishUpdateRequested(dataSet, dataSet.getPipelines());
+  }
+
+  @Test
+  void deleteRejectedWhileSagaInFlight() {
+    dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+    dataSet.setProjectId("apisix-project-1");
+    dataSet.setPendingSagaType(PendingSagaType.UPDATE); // a saga is already running
+    UUID dashboardId = UUID.randomUUID();
+    Dashboard dashboard = new Dashboard();
+    dashboard.setId(dashboardId);
+    dashboard.setDataSet(dataSet);
+    when(dashboardRepository.existsById(dashboardId)).thenReturn(true);
+    when(dashboardRepository.findById(dashboardId)).thenReturn(Optional.of(dashboard));
+
+    // The guard runs in preProcessDelete, so a refused delete must leave the row intact.
+    assertThatThrownBy(() -> service.deleteById(dashboardId))
+        .isInstanceOf(ResourceInUseException.class);
+    verify(dashboardRepository, never()).deleteById(dashboardId);
   }
 
   @Test

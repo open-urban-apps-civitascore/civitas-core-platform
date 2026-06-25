@@ -2,13 +2,16 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.DashboardMapper;
 import de.civitascore.portal.mapper.DtoMapper;
+import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
+import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.Dashboard;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DashboardInputDTO;
 import de.civitascore.portal.repository.BaseRepository;
 import de.civitascore.portal.repository.DashboardRepository;
 import de.civitascore.portal.repository.DataSetRepository;
-import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,6 +27,7 @@ public class DashboardService extends BaseService<Dashboard, DashboardInputDTO> 
   private final DashboardRepository dashboardRepository;
   private final DashboardMapper dashboardMapper;
   private final DataSetRepository dataSetRepository;
+  private final DataSetSagaPublisher sagaPublisher;
 
   @Override
   protected BaseRepository<Dashboard, UUID> getRepository() {
@@ -82,24 +86,61 @@ public class DashboardService extends BaseService<Dashboard, DashboardInputDTO> 
   }
 
   /**
-   * Defense-in-depth for the engine-sync write path: this CRUD API never populates {@code sources}
-   * (the input DTO has no such field), but if a future caller does, every bound source must stay
-   * anchored to this dashboard's dataset — otherwise the source would authorise access through a
-   * dataset the dashboard isn't bound to.
+   * Dashboards are freely editable on an AVAILABLE dataset (unlike named APIs), but every change
+   * has to reach the engine: create/update fire a {@code DATASET_UPDATE} saga so the new dashboard
+   * set rides along to the config-adapter (see the dashboard-sync event contract). Reject changes
+   * while a saga is already in-flight, so callers don't have to orchestrate request ordering.
    */
   @Override
-  protected Dashboard preSave(Dashboard entity) {
-    UUID dataSetId = entity.getDataSet() != null ? entity.getDataSet().getId() : null;
-    entity.getSources().stream()
-        .filter(source -> dataSetId == null || !dataSetId.equals(source.getMappedDatasetId()))
-        .findFirst()
-        .ifPresent(
-            source -> {
-              throw new InvalidInputException(
-                  getEntityName(),
-                  "sources",
-                  "every bound source's mappedDatasetId must equal the dashboard's dataSetId");
-            });
-    return super.preSave(entity);
+  protected Dashboard postSave(Dashboard entity, DashboardInputDTO input) {
+    triggerSyncIfReleased(entity.getDataSet());
+    return super.postSave(entity, input);
+  }
+
+  @Override
+  protected Dashboard preProcessDelete(UUID id) {
+    Dashboard entity = super.preProcessDelete(id);
+    // Reject before the row is gone, so a refused delete leaves the dashboard set intact.
+    if (entity != null) {
+      guardNoSagaInFlight(entity.getDataSet());
+    }
+    return entity;
+  }
+
+  @Override
+  protected void postDelete(Dashboard entity) {
+    if (entity != null) {
+      triggerSyncIfReleased(entity.getDataSet());
+    }
+    super.postDelete(entity);
+  }
+
+  /**
+   * Only a live dataset (AVAILABLE with engine infrastructure) needs syncing: DRAFT/READY datasets
+   * have no engine state yet, and their dashboards ride along on the release saga instead.
+   *
+   * @throws ResourceInUseException if a saga is already in-flight for the dataset
+   */
+  private void triggerSyncIfReleased(DataSet dataSet) {
+    if (dataSet == null
+        || dataSet.getDataSetStatus() != DataSetStatus.AVAILABLE
+        || dataSet.getProjectId() == null) {
+      return;
+    }
+    guardNoSagaInFlight(dataSet);
+    dataSet.setPendingSagaType(PendingSagaType.UPDATE);
+    dataSetRepository.save(dataSet);
+    sagaPublisher.publishUpdateRequested(dataSet, dataSet.getPipelines());
+  }
+
+  private void guardNoSagaInFlight(DataSet dataSet) {
+    if (dataSet != null
+        && dataSet.getDataSetStatus() == DataSetStatus.AVAILABLE
+        && dataSet.getPendingSagaType() != null) {
+      throw new ResourceInUseException(
+          "DataSet",
+          dataSet.getId(),
+          "Cannot change dashboards while a saga is in-flight: " + dataSet.getPendingSagaType());
+    }
   }
 }
