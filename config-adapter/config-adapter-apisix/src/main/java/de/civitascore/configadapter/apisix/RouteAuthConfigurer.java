@@ -57,6 +57,9 @@ final class RouteAuthConfigurer {
    */
   static final String MANAGED_STANDARD_LABEL = "civitas-named-api-standard";
 
+  /** {@code proxy-rewrite.headers} sub-map of request headers to set on the upstream. */
+  private static final String HEADERS_SET_KEY = "set";
+
   private final ApisixHandlerSettings settings;
 
   RouteAuthConfigurer(ApisixHandlerSettings settings) {
@@ -188,13 +191,13 @@ final class RouteAuthConfigurer {
    */
   @SuppressWarnings("unchecked")
   private void mergeAuthSetEntries(Map<String, Object> headers, String staleManagedHeader) {
-    Map<String, Object> set = mutableMap((Map<String, Object>) headers.get("set"));
+    Map<String, Object> set = mutableMap((Map<String, Object>) headers.get(HEADERS_SET_KEY));
     String authHeaderName = settings.frostAuth().headerName();
     if (staleManagedHeader != null && !staleManagedHeader.equals(authHeaderName)) {
       set.remove(staleManagedHeader);
     }
     set.put(authHeaderName, settings.frostAuth().headerValue());
-    headers.put("set", set);
+    headers.put(HEADERS_SET_KEY, set);
   }
 
   /**
@@ -207,16 +210,16 @@ final class RouteAuthConfigurer {
     if (managedHeader == null) {
       return;
     }
-    Map<String, Object> set = (Map<String, Object>) headers.get("set");
+    Map<String, Object> set = (Map<String, Object>) headers.get(HEADERS_SET_KEY);
     if (set == null || !set.containsKey(managedHeader)) {
       return;
     }
     Map<String, Object> mutable = mutableMap(set);
     mutable.remove(managedHeader);
     if (mutable.isEmpty()) {
-      headers.remove("set");
+      headers.remove(HEADERS_SET_KEY);
     } else {
-      headers.put("set", mutable);
+      headers.put(HEADERS_SET_KEY, mutable);
     }
   }
 
