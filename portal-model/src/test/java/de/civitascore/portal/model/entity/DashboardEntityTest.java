@@ -15,23 +15,19 @@ class DashboardEntityTest {
   class FieldAssignment {
 
     @Test
-    @DisplayName("Holds the dashboard-specific fields, the dataset reference, and bound sources")
+    @DisplayName("Holds the dashboard-specific fields and the dataset reference")
     void shouldHoldAllFields() {
       DataSet dataSet = new DataSet();
       dataSet.setId(UUID.randomUUID());
-      DashboardSource source = new DashboardSource();
-      source.setId(UUID.randomUUID());
 
       Dashboard dashboard = new Dashboard();
       dashboard.setExternalDashboardId("dash-42");
       dashboard.setActive(false);
       dashboard.setDataSet(dataSet);
-      dashboard.getSources().add(source);
 
       assertThat(dashboard.getExternalDashboardId()).isEqualTo("dash-42");
       assertThat(dashboard.isActive()).isFalse();
       assertThat(dashboard.getDataSet()).isSameAs(dataSet);
-      assertThat(dashboard.getSources()).containsExactly(source);
     }
   }
 
@@ -43,12 +39,6 @@ class DashboardEntityTest {
     @DisplayName("active should default to true")
     void activeDefaultsToTrue() {
       assertThat(new Dashboard().isActive()).isTrue();
-    }
-
-    @Test
-    @DisplayName("sources should default to an empty set")
-    void sourcesDefaultsToEmptySet() {
-      assertThat(new Dashboard().getSources()).isNotNull().isEmpty();
     }
 
     @Test
