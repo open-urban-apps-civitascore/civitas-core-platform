@@ -18,15 +18,8 @@ vi.mock('next-intl', () => ({
 }))
 
 vi.mock('@/components/modals/warning-modal/WarningModal', () => ({
-  WarningModal: ({
-    open,
-    onDiscard,
-    onConfirm,
-  }: {
-    open: boolean
-    onDiscard: () => void
-    onConfirm: () => void
-  }) =>
+  // eslint-disable-next-line react/boolean-prop-naming
+  WarningModal: ({ open, onDiscard, onConfirm }: { open: boolean; onDiscard: () => void; onConfirm: () => void }) =>
     open ? (
       <div data-testid="warningModal">
         <button data-testid="discardButton" onClick={onDiscard} />

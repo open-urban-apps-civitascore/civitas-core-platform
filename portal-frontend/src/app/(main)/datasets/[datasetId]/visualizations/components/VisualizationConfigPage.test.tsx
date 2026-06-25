@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Dataset } from '@/types/datasets'
-import { VisualizationFormData, VISUALIZATION_TYPE_QUERY } from '@/types/visualizations'
+import { VISUALIZATION_TYPE_QUERY, VisualizationFormData } from '@/types/visualizations'
 
 import { VisualizationConfigPage } from './VisualizationConfigPage'
 
