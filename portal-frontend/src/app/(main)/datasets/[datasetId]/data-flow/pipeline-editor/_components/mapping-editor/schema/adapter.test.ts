@@ -10,12 +10,12 @@ const classNode = (id: string, name: string, attributes: { name: string; type?: 
   data: { element: { id, name, type: 'class', attributes: attributes.map(a => ({ type: 'String', ...a })) } },
 })
 
-/** Structural edge. Composition/aggregation carry the part's role on the source end; association on the target end. */
+/** Structural edge. Composition/aggregation carry the part's role/multiplicity on the source end; association on the target end. */
 const edge = (
   type: 'composition' | 'aggregation' | 'association',
   source: string,
   target: string,
-  roles: { sourceRole?: string; targetRole?: string } = {},
+  roles: { sourceRole?: string; targetRole?: string; sourceMultiplicity?: string; targetMultiplicity?: string } = {},
 ) => ({
   source,
   target,
@@ -71,6 +71,26 @@ describe('umlDiagramToSchemaTree', () => {
     const nested = tree.fields.find(f => f.name === 'customer')
     expect(nested?.type).toBe('object')
     expect(nested?.children?.map(c => c.name)).toEqual(['email'])
+  })
+
+  it('reads the part multiplicity from the source end for composition (* -> array)', () => {
+    const diagram = {
+      nodes: [classNode('thing-id', 'Thing', [{ name: 'id' }]), classNode('r-id', 'Reading', [{ name: 'value' }])],
+      edges: [edge('composition', 'r-id', 'thing-id', { sourceRole: 'readings', sourceMultiplicity: '*' })],
+    } as unknown as UMLDiagram
+
+    const nested = umlDiagramToSchemaTree(diagram, 'thing').fields.find(f => f.name === 'readings')
+    expect(nested?.type).toBe('array')
+  })
+
+  it('reads the multiplicity from the target end for association (* -> array)', () => {
+    const diagram = {
+      nodes: [classNode('order-id', 'Order', [{ name: 'orderNo' }]), classNode('item-id', 'Item', [{ name: 'sku' }])],
+      edges: [edge('association', 'order-id', 'item-id', { targetRole: 'items', targetMultiplicity: '*' })],
+    } as unknown as UMLDiagram
+
+    const nested = umlDiagramToSchemaTree(diagram, 'order').fields.find(f => f.name === 'items')
+    expect(nested?.type).toBe('array')
   })
 
   it('never roots on an embedded part even when fallbackName matches it', () => {

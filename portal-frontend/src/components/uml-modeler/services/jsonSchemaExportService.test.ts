@@ -418,6 +418,7 @@ describe('exportToJsonSchema', () => {
     const schema = exportToJsonSchema(diagram)
     const properties = schema.properties as Record<string, Record<string, unknown>>
     expect(properties.readings).toEqual({ $ref: '#/$defs/Reading' })
+    expect((schema.$defs as Record<string, Record<string, unknown>>).Reading).toMatchObject({ title: 'Reading' })
     expect(schema.title).toBe('TrafficSensor')
   })
 
@@ -450,6 +451,7 @@ describe('exportToJsonSchema', () => {
     const properties = schema.properties as Record<string, Record<string, unknown>>
     // Direction not flipped: source stays root and references the target.
     expect(properties.reading).toEqual({ $ref: '#/$defs/Reading' })
+    expect((schema.$defs as Record<string, Record<string, unknown>>).Reading).toMatchObject({ title: 'Reading' })
     expect(schema.title).toBe('TrafficSensor')
   })
 })
