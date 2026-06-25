@@ -9,7 +9,6 @@ import { useGetPipelines } from '@/app/services/api/pipelines/clientRequests'
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { PipelineBasicInfo } from '@/types/datasets'
 import { DATASINK_TYPES } from '@/types/datasinks'
 import { API_STANDARDS, NamedApi } from '@/types/namedApis'
 import { hasApiType } from '@/utils/namedApis'
@@ -19,13 +18,12 @@ import { ApiCard } from './ApiCard'
 interface ApiListProps {
   datasetId: string
   apis: NamedApi[]
-  pipelines: PipelineBasicInfo[]
   canEdit: boolean
   isPublished: boolean
   isOpenDataAccess: boolean
 }
 
-export const ApiList = ({ datasetId, apis, pipelines, canEdit, isPublished, isOpenDataAccess }: ApiListProps) => {
+export const ApiList = ({ datasetId, apis, canEdit, isPublished, isOpenDataAccess }: ApiListProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.apis')
   const hasOws = hasApiType(apis, API_STANDARDS.OWS)
 
@@ -39,7 +37,7 @@ export const ApiList = ({ datasetId, apis, pipelines, canEdit, isPublished, isOp
 
   const { data: pipelinesData } = useGetPipelines(datasetId)
 
-  const hasPipeline = pipelines.length > 0
+  const hasPipeline = (pipelinesData?.data?.length ?? 0) > 0
   const hasFrostPipeline =
     pipelinesData?.data?.some(p => p.styles?.nodes?.some(n => n.type === PIPELINE_NODE_TYPES.Frost)) ?? false
 

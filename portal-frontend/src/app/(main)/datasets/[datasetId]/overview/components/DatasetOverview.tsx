@@ -326,7 +326,6 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
           <ApiList
             datasetId={dataset.id}
             apis={namedApiList}
-            pipelines={pipelineList}
             canEdit={canUpdate}
             isPublished={dataset.dataSetStatus === DATASET_STATUS_TYPES.AVAILABLE}
             isOpenDataAccess={dataset.openDataAccess}
@@ -337,7 +336,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     {
       title: t('overview.completion.visualizations.title'),
       showSeparator: true,
-      isCompleted: false,
+      isCompleted: (dataset.visualizations ?? []).length > 0,
       buttons: [],
       content: (
         <VisualizationList

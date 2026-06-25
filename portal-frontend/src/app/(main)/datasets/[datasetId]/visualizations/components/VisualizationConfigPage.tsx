@@ -13,7 +13,7 @@ import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
-import { Button } from '@/components/ui/button'
+import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { Form } from '@/components/ui/form'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { Dataset } from '@/types/datasets'
@@ -103,19 +103,14 @@ export const VisualizationConfigPage = ({ dataset, visualizationType, testId }: 
   useRegisterUnsavedChanges(hasUnsavedChanges, handleSave)
 
   const buttonGroup = (
-    <div className="flex items-center gap-2 px-[var(--layout-padding)]">
-      <Button data-testid="cancelButton" type="button" variant="secondary" onClick={handleExit}>
-        {tCommon('actions.cancel')}
-      </Button>
-      <Button
-        data-testid="confirmButton"
-        type="submit"
-        form="visualization-config-form"
-        disabled={!hasUnsavedChanges || !isFormValid}
-      >
-        {tCommon('actions.submit')}
-      </Button>
-    </div>
+    <ActionButtons
+      confirmButtonType="submit"
+      formId="visualization-config-form"
+      onCancelClick={handleExit}
+      isConfirmButtonDisabled={!hasUnsavedChanges || !isFormValid}
+      hasCard={false}
+      wrapperClassname="px-[var(--layout-padding)]"
+    />
   )
 
   return (
