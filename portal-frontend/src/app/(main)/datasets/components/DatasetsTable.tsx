@@ -72,7 +72,7 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
       },
     }),
     columnHelper.accessor('datapool', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.datapool')} />,
+      header: t('tableHeaders.datapool'),
       cell: info =>
         info.getValue()?.id ? (
           hasScopedPermission(PERMISSION_NAMES.DATAPOOL_READ, ASSIGNMENT_SCOPE_TYPES.DATAPOOL, info.getValue()!.id) ? (
