@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality } from '../constants/umlTypes'
 import type { UMLDiagram } from '../types/diagram'
 import { exportToJsonSchema, sanitizeName } from './jsonSchemaExportService'
 
@@ -86,6 +87,67 @@ describe('exportToJsonSchema', () => {
     const properties = schema.properties as Record<string, Record<string, unknown>>
 
     expect(properties.tags).toEqual({ type: 'array', items: { type: 'string' } })
+  })
+
+  // Every cardinality offered by the property dropdown (issue #1707) and its
+  // expected JSON Schema mapping. The Record is keyed off PropertyCardinality so a
+  // new dropdown value without a mapping expectation fails to type-check here.
+  const cardinalityExpectations: Record<
+    PropertyCardinality,
+    { expectedProp: Record<string, unknown>; required: boolean }
+  > = {
+    '0..1': { expectedProp: { type: 'string' }, required: false },
+    '1': { expectedProp: { type: 'string' }, required: true },
+    '0..*': { expectedProp: { type: 'array', items: { type: 'string' } }, required: false },
+    '1..*': { expectedProp: { type: 'array', items: { type: 'string' }, minItems: 1 }, required: true },
+  }
+  const cardinalityCases = PROPERTY_CARDINALITY_VALUES.map(multiplicity => ({
+    multiplicity,
+    ...cardinalityExpectations[multiplicity],
+  }))
+
+  it.each(cardinalityCases)(
+    'maps cardinality "$multiplicity" to the expected property and required flag',
+    ({ multiplicity, expectedProp, required }) => {
+      const diagram = baseDiagram({
+        nodes: [
+          {
+            id: 'node-1',
+            type: 'class',
+            position: { x: 0, y: 0 },
+            data: {
+              element: {
+                id: 'elem-1',
+                name: 'TrafficSensor',
+                type: 'class',
+                attributes: [{ id: 'a1', name: 'tags', type: 'String', visibility: 'public', multiplicity }],
+                operations: [],
+              },
+              label: 'TrafficSensor',
+            },
+          },
+        ],
+      })
+
+      const schema = exportToJsonSchema(diagram)
+      const properties = schema.properties as Record<string, Record<string, unknown>>
+
+      expect(properties.tags).toEqual(expectedProp)
+      if (required) {
+        expect(schema.required ?? []).toContain('tags')
+      } else {
+        expect(schema.required ?? []).not.toContain('tags')
+      }
+    },
+  )
+
+  it('treats an unset multiplicity as a single required scalar (backwards compatible)', () => {
+    const schema = exportToJsonSchema(baseDiagram())
+    const properties = schema.properties as Record<string, Record<string, unknown>>
+
+    // stationId has no multiplicity set -> plain scalar, and required.
+    expect(properties.stationId).toEqual({ type: 'string' })
+    expect(schema.required).toContain('stationId')
   })
 
   it('adds id attributes to required', () => {

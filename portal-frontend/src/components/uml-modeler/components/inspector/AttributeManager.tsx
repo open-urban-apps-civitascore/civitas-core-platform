@@ -8,7 +8,13 @@ import { GroupedOption, GroupedSelect } from '@/components/select/grouped-select
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 
-import { UML_GEOMETRY_TYPES, UML_PRIMITIVE_TYPES } from '../../constants/umlTypes'
+import {
+  cardinalityForDisplay,
+  cardinalityForStorage,
+  PROPERTY_CARDINALITY_VALUES,
+  UML_GEOMETRY_TYPES,
+  UML_PRIMITIVE_TYPES,
+} from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
 import {
@@ -77,6 +83,19 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
     { value: 'protected', label: '#' },
     { value: 'package', label: '~' },
   ]
+  // Options for the cardinality dropdown of a single attribute. Imported or
+  // edge-authored models may carry a multiplicity outside the dropdown's four
+  // values (e.g. `*` or a range like `1..5`); we surface that value as an extra
+  // option so it stays visible and isn't silently discarded on the next edit.
+  const getMultiplicityOptions = (multiplicity?: string): SelectOption<string>[] => {
+    const displayed = cardinalityForDisplay(multiplicity)
+    const options: SelectOption<string>[] = PROPERTY_CARDINALITY_VALUES.map(value => ({ value, label: value }))
+    if (!options.some(option => option.value === displayed)) {
+      options.push({ value: displayed, label: displayed })
+    }
+    return options
+  }
+
   const primitiveTypeOptions = Object.keys(UML_PRIMITIVE_TYPES) as UMLPrimitiveType[]
   const geometryTypeOptions = Object.keys(UML_GEOMETRY_TYPES) as UMLGeometryType[]
 
@@ -196,6 +215,19 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
                 value={typeof attribute.type === 'string' ? attribute.type : attribute.type.name}
                 size="sm"
                 triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Cardinality / multiplicity */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Cardinality</label>
+              <BasicSelect
+                options={getMultiplicityOptions(attribute.multiplicity)}
+                onValueChange={e => updateAttribute(attribute.id, { multiplicity: cardinalityForStorage(e) })}
+                value={cardinalityForDisplay(attribute.multiplicity)}
+                triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                size="sm"
+                disabled={isReadOnly}
               />
             </div>
 
