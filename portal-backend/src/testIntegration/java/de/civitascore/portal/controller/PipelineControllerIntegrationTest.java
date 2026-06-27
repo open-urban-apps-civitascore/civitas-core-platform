@@ -1247,10 +1247,18 @@ class PipelineControllerIntegrationTest
       ResponseEntity<PipelineOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      Pipeline saved = pipelineRepository.findById(response.getBody().getId()).orElseThrow();
+      UUID pipelineId = response.getBody().getId();
+      Pipeline saved = pipelineRepository.findById(pipelineId).orElseThrow();
       assertThat(saved.getDataSources())
           .extracting(DataSource::getId)
           .containsExactly(specificDs.getId());
+
+      // The API response must expose the linked datasource via dataSourceIds (work item #1760).
+      assertThat(response.getBody().getDataSourceIds()).containsExactly(specificDs.getId());
+
+      ResponseEntity<PipelineOutputDTO> getResponse = performGetById(pipelineId);
+      assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(getResponse.getBody().getDataSourceIds()).containsExactly(specificDs.getId());
     }
 
     @Test
