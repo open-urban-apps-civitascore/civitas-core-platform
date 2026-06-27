@@ -1,0 +1,45 @@
+meta {
+  name: Patch DataSink
+  type: http
+  seq: 6
+}
+
+patch {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{dataSinkId}}
+}
+
+body:json {
+  {
+    "configuration": {
+      "tableName": "sensor_observations_patched",
+      "dataStructureVersionId": "{{dataStructureVersionId}}"
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataSinkId', res.body.id);
+  }
+}
+
+docs {
+  **Precondition:** `dataSetId`, `dataSinkId`, and `dataStructureVersionId` are set.
+
+  **Expected Response:** 200 OK, body reflects the patched fields; other fields unchanged.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSink `configuration` updated; other fields unchanged |
+  | Config Adapter | — |
+  | External System | — |
+}

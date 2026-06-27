@@ -1,0 +1,50 @@
+meta {
+  name: Create Layer
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/layers
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+body:json {
+  {
+    "dataSinkId": "{{postgisDataSinkId}}",
+    "layerName": "sensor_observations_layer",
+    "title": "Sensor Observations",
+    "description": "Hourly sensor readings, location-based",
+    "crs": "EPSG:25832",
+    "bboxAutoCalculate": true,
+    "defaultStyleId": "{{defaultStyleId}}",
+    "alternativeStyleIds": ["{{alternativeStyleId}}"]
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('layerId', res.body.id);
+  }
+}
+
+docs {
+  **Precondition:** `dataSetId`, `postgisDataSinkId` (from `datasinks/create-postgis-datasink.bru`), `defaultStyleId` (from `styles/create-style.bru`), and `alternativeStyleId` (from `styles/create-alternative-style.bru`) are all set.
+
+  **Expected Response:** 201 Created, body contains `id` and the layer's resolved fields. `geometryType` and `nativeCRS` remain null until the dataset is released and the saga provisions the layer in GeoServer.
+
+  **Post-condition:** Save `layerId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Layer record created in `portal_backend` DB, linked to the DataSet, DataSink, and referenced Styles |
+  | Config Adapter | — (GeoServer feature type and style bindings are provisioned when the parent DataSet is released) |
+  | External System | — |
+}

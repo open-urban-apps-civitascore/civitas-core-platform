@@ -1,0 +1,32 @@
+meta {
+  name: Delete Style
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:dataSetId/styles/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{styleId}}
+}
+
+docs {
+  **Precondition:** `dataSetId` and `styleId` are set. The Style must not be referenced by any Layer (delete dependent Layers or detach their style references first).
+
+  **Expected Response:** 204 No Content.
+
+  **Verification:** Issue `get-style-by-id` for the same `styleId` and confirm 404.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Style record removed |
+  | Config Adapter | — |
+  | External System | — |
+}
