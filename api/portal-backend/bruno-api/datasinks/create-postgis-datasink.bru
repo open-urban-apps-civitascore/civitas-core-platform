@@ -1,0 +1,48 @@
+meta {
+  name: Create POSTGIS DataSink
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+body:json {
+  {
+    "dataSinkType": "POSTGIS",
+    "configuration": {
+      "tableName": "sensor_observations",
+      "dataStructureVersionId": "{{dataStructureVersionId}}"
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataSinkId', res.body.id);
+    bru.setVar('postgisDataSinkId', res.body.id);
+  }
+}
+
+docs {
+  **Precondition:** `dataSetId` and `dataStructureVersionId` are set. The setup folder seeds the DataSet but not a version — run `datastructures/create-version.bru` first (or set `dataStructureVersionId` manually) to populate that variable.
+
+  **Expected Response:** 201 Created, body contains `id` and the resolved configuration (with an inline DataStructureVersion summary).
+
+  **Post-condition:** Save `dataSinkId` and `postgisDataSinkId` from `body.id`. `postgisDataSinkId` is the sticky reference used by `layers/create-layer.bru` and `pipelines/attach-datasinks-to-pipeline.bru`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSink record created in `portal_backend` DB, linked to the DataSet |
+  | Config Adapter | — (the GeoServer workspace/datastore is provisioned when the parent DataSet is released) |
+  | External System | — |
+}

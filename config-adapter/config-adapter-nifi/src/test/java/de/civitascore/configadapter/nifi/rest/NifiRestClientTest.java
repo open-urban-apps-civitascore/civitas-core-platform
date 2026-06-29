@@ -11,7 +11,10 @@ package de.civitascore.configadapter.nifi.rest;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.containing;
+import static com.github.tomakehurst.wiremock.client.WireMock.delete;
+import static com.github.tomakehurst.wiremock.client.WireMock.deleteRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.put;
@@ -491,6 +494,57 @@ class NifiRestClientTest {
 
     // no matching group -> no-op, no exception
     client.deleteFlowByName("pipeline-absent");
+  }
+
+  @Test
+  void deleteWaitsForProcessGroupToStopBeforeDeleting() throws Exception {
+    stubAuth();
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/root-1"))
+            .willReturn(
+                json(
+                    "{ \"processGroupFlow\": { \"flow\": { \"processGroups\": [ { \"id\": \"pg-1\","
+                        + " \"component\": { \"name\": \"pipeline-x\" }, \"revision\": { \"version\":"
+                        + " 2 } } ] } } }")));
+    server.stubFor(put(urlEqualTo("/nifi-api/flow/process-groups/pg-1")).willReturn(json("{}")));
+
+    // Stopping is asynchronous: the first status poll still reports a running processor with an
+    // active thread, the second reports the group fully stopped. The delete must not fire until
+    // then, else NiFi answers 409 ("Processor is running").
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/pg-1"))
+            .inScenario("stopping")
+            .whenScenarioStateIs("Started")
+            .willReturn(
+                json(
+                    "{ \"runningCount\": 1, \"status\": { \"aggregateSnapshot\": {"
+                        + " \"activeThreadCount\": 1 } } }"))
+            .willSetStateTo("stopped"));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/pg-1"))
+            .inScenario("stopping")
+            .whenScenarioStateIs("stopped")
+            .willReturn(
+                json(
+                    "{ \"runningCount\": 0, \"status\": { \"aggregateSnapshot\": {"
+                        + " \"activeThreadCount\": 0 } } }")));
+
+    server.stubFor(
+        put(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json("{}")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json("{ \"controllerServices\": [] }")));
+    server.stubFor(delete(urlPathEqualTo("/nifi-api/process-groups/pg-1")).willReturn(json("{}")));
+
+    client.deleteFlowByName("pipeline-x");
+
+    // Polled until stopped (two status reads) before the single delete was issued.
+    server.verify(2, getRequestedFor(urlPathEqualTo("/nifi-api/process-groups/pg-1")));
+    server.verify(1, deleteRequestedFor(urlPathEqualTo("/nifi-api/process-groups/pg-1")));
   }
 
   private static com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder json(

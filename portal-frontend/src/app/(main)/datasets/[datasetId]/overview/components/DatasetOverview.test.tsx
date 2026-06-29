@@ -23,6 +23,7 @@ vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   useReleaseDataset: () => ({ mutateAsync: mockReleaseDataset, isPending: false }),
   useUnreleaseDataset: () => ({ mutateAsync: mockUnreleaseDataset, isPending: false }),
   useUpdateReleasedDatasetMeta: () => ({ mutateAsync: mockUpdateReleasedDatasetMeta, isPending: false }),
+  useGetDataset: () => ({ data: undefined }),
 }))
 
 vi.mock('@/app/services/api/users/clientRequests', () => ({

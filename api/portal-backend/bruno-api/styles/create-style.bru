@@ -1,0 +1,47 @@
+meta {
+  name: Create Style
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/styles
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+body:json {
+  {
+    "name": "default_point_style",
+    "sldContent": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><StyledLayerDescriptor xmlns=\"http://www.opengis.net/sld\" xmlns:ogc=\"http://www.opengis.net/ogc\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" version=\"1.0.0\"><NamedLayer><Name>default_point_style</Name><UserStyle><FeatureTypeStyle><Rule><PointSymbolizer><Graphic><Mark><WellKnownName>circle</WellKnownName><Fill><CssParameter name=\"fill\">#1e5ba8</CssParameter></Fill></Mark><Size>8</Size></Graphic></PointSymbolizer></Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('styleId', res.body.id);
+    bru.setVar('defaultStyleId', res.body.id);
+  }
+}
+
+docs {
+  **Precondition:** `dataSetId` is set.
+
+  **Expected Response:** 201 Created, body contains `id`, `name`, and the persisted `sldContent`.
+
+  **Post-condition:** Save `styleId` and `defaultStyleId` from `body.id`. `defaultStyleId` is the sticky reference used as `defaultStyleId` in `layers/create-layer.bru`.
+
+  **Validation:** `name` must match the SafeNames pattern `[A-Za-z0-9_-]+` and be unique within the parent DataSet. The backend only enforces `@NotBlank` on `sldContent` — the test payload uses a minimal SLD 1.0.0 shell sufficient for backend CRUD round-trips. Replace with a full SLD body if exercising the GeoServer upload step.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Style record created in `portal_backend` DB, linked to the DataSet |
+  | Config Adapter | — (style is uploaded to GeoServer when the parent DataSet is released) |
+  | External System | — |
+}

@@ -9,9 +9,9 @@
 import { useCallback, useMemo } from 'react'
 
 import { useGetDatasources } from '@/app/services/api/datasources/clientRequests'
-import { DATASOURCE_FILTER_PARAMS } from '@/const/searchParams'
+import { DATASOURCE_FILTER_PARAMS, QUERY_PARAMS } from '@/const/searchParams'
 import type { Datasource } from '@/types/datasources'
-import { DATASOURCE_STATUS_TYPES } from '@/types/datasources'
+import { DATAPOOL_SCOPE_TYPES, DATASOURCE_STATUS_TYPES } from '@/types/datasources'
 
 // ============================================================================
 // Types
@@ -39,6 +39,8 @@ export interface UseEntityResult<T extends SelectableEntity> {
   getEntityById: (id: string) => T | undefined
 }
 
+const DATASOURCE_PAGE_SIZE = 2000
+
 // ============================================================================
 // DataSource Hook (Real API)
 // ============================================================================
@@ -57,9 +59,13 @@ export const useDataSourceEntities = (opts?: {
 
   const params = useMemo(() => {
     const p = new URLSearchParams()
-    p.set('dataSourceStatus', DATASOURCE_STATUS_TYPES.AVAILABLE)
-    p.set('size', '2000')
-    if (datapoolId) p.set(DATASOURCE_FILTER_PARAMS.datapoolId, datapoolId)
+    p.set(DATASOURCE_FILTER_PARAMS.dataSourceStatus, DATASOURCE_STATUS_TYPES.AVAILABLE)
+    p.set(QUERY_PARAMS.pageSize, String(DATASOURCE_PAGE_SIZE))
+    if (datapoolId) {
+      p.set(DATASOURCE_FILTER_PARAMS.datapoolId, datapoolId)
+    } else if (datapoolId === null) {
+      p.set(DATASOURCE_FILTER_PARAMS.datapoolScopeType, DATAPOOL_SCOPE_TYPES.ALL)
+    }
     return p
   }, [datapoolId])
 

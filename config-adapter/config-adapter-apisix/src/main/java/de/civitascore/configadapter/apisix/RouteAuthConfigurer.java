@@ -85,6 +85,13 @@ final class RouteAuthConfigurer {
     body.put("uris", new String[] {routePath, routePath + "/*"});
     body.put("hosts", new String[] {settings.apiHost()});
     body.put("upstream_id", upstreamId);
+    // EVERY dataset route — STA and OWS alike — carries this single shared service_id. OPA reads
+    // input.service.name from it (with_service=true) to pick the backend policy, so OWS/GeoServer
+    // routes are deliberately authorized under the `frost_server` backend policy too (the one
+    // carrying `_open_data: true`); 9g4 proves anonymous OWS open data works through it. This is an
+    // intentional coupling: if backends are ever split by service name, OWS open data must get its
+    // own service/policy (or a backend-neutral name like `dataset-payload`) instead of relying on
+    // `frost_server` == FROST-only.
     if (settings.serviceId() != null) {
       body.put("service_id", settings.serviceId());
     }

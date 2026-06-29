@@ -124,6 +124,30 @@ export const MULTIPLICITY_VALUES = [
   '*', // Many (shorthand for 0..*)
 ]
 
+// Cardinalities offered by the per-property dropdown (issue #1707). These drive
+// the JSON Schema mapping: `..1` values stay scalar, `..*` values become arrays;
+// a lower bound of 1 marks the property as `required`. Deliberately omits the
+// `*` shorthand that MULTIPLICITY_VALUES carries for relationship edges, since
+// it would be redundant with `0..*` here.
+export const PROPERTY_CARDINALITY_VALUES = ['0..1', '1', '0..*', '1..*'] as const
+
+export type PropertyCardinality = (typeof PROPERTY_CARDINALITY_VALUES)[number]
+
+/**
+ * Maps a stored `multiplicity` value to the cardinality the dropdown should
+ * display. An unset multiplicity is treated as `1` (exactly one) everywhere
+ * downstream (see {@link parseMultiplicity}), so it surfaces as `1`.
+ */
+export const cardinalityForDisplay = (multiplicity?: string): string => multiplicity || '1'
+
+/**
+ * Maps a dropdown selection back to the value to persist on the attribute.
+ * Selecting `1` clears the field (writes `undefined`) because unset already
+ * means exactly-one downstream; persisting a literal `"1"` would needlessly
+ * mutate models that previously had no multiplicity set.
+ */
+export const cardinalityForStorage = (value: string): string | undefined => (value === '1' ? undefined : value)
+
 // UML Stereotypes
 export const UML_STEREOTYPES = {
   class: ['<<entity>>', '<<boundary>>', '<<control>>', '<<utility>>', '<<service>>'],

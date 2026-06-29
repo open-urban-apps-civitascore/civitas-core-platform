@@ -7,6 +7,7 @@
  * selectors. Opens the fullscreen Schema-as-MegaNode editor when all are set.
  */
 
+import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -16,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+import { usePipelinePermissions } from '../../../_hooks/use-pipeline-permissions'
 import type { MappingNodeData } from '../../../_types/nodes'
 import type { MappingConfig } from '../../mapping-editor/_types'
 import { MappingEditorModal } from '../../mapping-editor/MappingEditorModal'
@@ -42,6 +44,9 @@ interface DatastructureFieldProps {
 
 /** Datastructure-version picker reusing DataModelImportModal, resolving the schema name. */
 const DatastructureField = ({ label, placeholder, selectedKey, name, onSelect }: DatastructureFieldProps) => {
+  const { datasetId } = useParams<{ datasetId: string }>()
+  const { canReadDatastructures } = usePipelinePermissions(datasetId)
+
   const [isOpen, setIsOpen] = useState(false)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
   const parsed = useMemo(() => (pendingKey ? parseCompositeKey(pendingKey) : null), [pendingKey])
@@ -71,13 +76,15 @@ const DatastructureField = ({ label, placeholder, selectedKey, name, onSelect }:
       <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setIsOpen(true)}>
         <span className="truncate">{name || placeholder}</span>
       </Button>
-      <DataModelImportModal
-        open={isOpen}
-        onOpenChange={setIsOpen}
-        selectedVersion={selectedKey}
-        datasourceTitle={name || label}
-        onSelectVersion={handleSelect}
-      />
+      {canReadDatastructures && (
+        <DataModelImportModal
+          open={isOpen}
+          onOpenChange={setIsOpen}
+          selectedVersion={selectedKey}
+          datasourceTitle={name || label}
+          onSelectVersion={handleSelect}
+        />
+      )}
     </div>
   )
 }

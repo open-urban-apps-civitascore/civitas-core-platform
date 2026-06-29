@@ -2,9 +2,6 @@ meta {
   name: 11. Unrelease DataSet (triggers delete saga)
   type: http
   seq: 33
-  tags: [
-    requires-nifi
-  ]
 }
 
 post {
@@ -19,9 +16,10 @@ params:path {
 
 script:pre-request {
   // The preceding toggle UPDATE sagas (9f/9h) must fully settle (pendingSagaType null) before we can
-  // unrelease, else the backend returns 409. With two named APIs (STA + OWS) those sagas provision/
-  // re-apply two routes, so settling takes a bit longer — poll until settled (deterministic, not a
-  // fixed sleep). Mirrors 9h's pre-request poll.
+  // unrelease, else the backend returns 409 (a saga is already in flight); 9i/9j/10 are read-only and
+  // don't wait. With two named APIs (STA + OWS) those sagas provision/re-apply two routes, so settling
+  // takes a bit longer — poll until settled (deterministic, not a fixed sleep). Same pattern (and
+  // QuickJS token boilerplate) as 9f/9h.
   const axios = require('axios');
   const base = bru.getEnvVar('baseUrl');
   const kc = bru.getEnvVar('keycloakUrl');

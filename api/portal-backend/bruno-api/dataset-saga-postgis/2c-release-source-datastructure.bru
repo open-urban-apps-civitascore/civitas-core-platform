@@ -1,0 +1,33 @@
+meta {
+  name: 2c. Release Source DataStructure
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{pgSourceDataStructureId}}
+}
+
+tests {
+  test("Released", function() {
+    const status = res.getStatus();
+    // 200=released
+    expect(status).to.equal(200);
+  });
+}
+
+docs {
+  **PostGIS saga step 2c** — Prerequisites: source version released (step 2b).
+
+  Releases the source DataStructure itself so it can be used by the datasource.
+
+  **Expected Response:** 200 OK. 400 if not in DRAFT state (already released — idempotent).
+
+  **Post-condition:** Source DataStructure status transitions from `DRAFT` to `PUBLISHED`.
+}

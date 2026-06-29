@@ -1,0 +1,41 @@
+meta {
+  name: 12. Unstage DataSet
+  type: http
+  seq: 20
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/unstage
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{pgDataSetId}}
+}
+
+tests {
+  test("Unstaged", function() {
+    const status = res.getStatus();
+    // 200=unstaged (READY → DRAFT); 11a already cleared the saga, so a non-200 is a real failure.
+    expect(status).to.equal(200);
+  });
+}
+
+docs {
+  **PostGIS saga step 12** — Unstage the dataset before deleting it.
+
+  Transitions the dataset from `READY` back to `DRAFT`. Must be called after the DATASET_DELETE saga (step 11/11a) has completed.
+
+  **Precondition:** `pgDataSetId` is set; dataset is in `READY` state (DELETE saga complete).
+
+  **Expected Response:** 200 OK (status `DRAFT`). 400 if a saga is still pending or already `DRAFT`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSet status → `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality } from '../constants/umlTypes'
 import type { UMLDiagram } from '../types/diagram'
 import { exportToJsonSchema, sanitizeName } from './jsonSchemaExportService'
 
@@ -86,6 +87,67 @@ describe('exportToJsonSchema', () => {
     const properties = schema.properties as Record<string, Record<string, unknown>>
 
     expect(properties.tags).toEqual({ type: 'array', items: { type: 'string' } })
+  })
+
+  // Every cardinality offered by the property dropdown (issue #1707) and its
+  // expected JSON Schema mapping. The Record is keyed off PropertyCardinality so a
+  // new dropdown value without a mapping expectation fails to type-check here.
+  const cardinalityExpectations: Record<
+    PropertyCardinality,
+    { expectedProp: Record<string, unknown>; required: boolean }
+  > = {
+    '0..1': { expectedProp: { type: 'string' }, required: false },
+    '1': { expectedProp: { type: 'string' }, required: true },
+    '0..*': { expectedProp: { type: 'array', items: { type: 'string' } }, required: false },
+    '1..*': { expectedProp: { type: 'array', items: { type: 'string' }, minItems: 1 }, required: true },
+  }
+  const cardinalityCases = PROPERTY_CARDINALITY_VALUES.map(multiplicity => ({
+    multiplicity,
+    ...cardinalityExpectations[multiplicity],
+  }))
+
+  it.each(cardinalityCases)(
+    'maps cardinality "$multiplicity" to the expected property and required flag',
+    ({ multiplicity, expectedProp, required }) => {
+      const diagram = baseDiagram({
+        nodes: [
+          {
+            id: 'node-1',
+            type: 'class',
+            position: { x: 0, y: 0 },
+            data: {
+              element: {
+                id: 'elem-1',
+                name: 'TrafficSensor',
+                type: 'class',
+                attributes: [{ id: 'a1', name: 'tags', type: 'String', visibility: 'public', multiplicity }],
+                operations: [],
+              },
+              label: 'TrafficSensor',
+            },
+          },
+        ],
+      })
+
+      const schema = exportToJsonSchema(diagram)
+      const properties = schema.properties as Record<string, Record<string, unknown>>
+
+      expect(properties.tags).toEqual(expectedProp)
+      if (required) {
+        expect(schema.required ?? []).toContain('tags')
+      } else {
+        expect(schema.required ?? []).not.toContain('tags')
+      }
+    },
+  )
+
+  it('treats an unset multiplicity as a single required scalar (backwards compatible)', () => {
+    const schema = exportToJsonSchema(baseDiagram())
+    const properties = schema.properties as Record<string, Record<string, unknown>>
+
+    // stationId has no multiplicity set -> plain scalar, and required.
+    expect(properties.stationId).toEqual({ type: 'string' })
+    expect(schema.required).toContain('stationId')
   })
 
   it('adds id attributes to required', () => {
@@ -340,20 +402,22 @@ describe('exportToJsonSchema', () => {
           },
         },
       ],
+      // Diamond at the target (TrafficSensor = container), so the part's role/multiplicity sit on
+      // the source end.
       edges: [
         {
           id: 'edge-1',
           type: 'composition',
-          source: 'node-1',
-          target: 'node-2',
+          source: 'node-2',
+          target: 'node-1',
           data: {
             relationship: {
               id: 'rel-1',
               type: 'composition',
-              source: 'elem-1',
-              target: 'elem-2',
-              targetRole: 'readings',
-              targetMultiplicity: '*',
+              source: 'elem-2',
+              target: 'elem-1',
+              sourceRole: 'readings',
+              sourceMultiplicity: '*',
             },
             label: '',
             isSelected: false,
@@ -369,5 +433,87 @@ describe('exportToJsonSchema', () => {
 
     const defs = schema.$defs as Record<string, Record<string, unknown>>
     expect(defs.Reading).toBeDefined()
+  })
+
+  /** Second class node (Reading) reused by the aggregation/association cases below. */
+  const readingNode = {
+    id: 'node-2',
+    type: 'class' as const,
+    position: { x: 200, y: 0 },
+    data: {
+      element: {
+        id: 'elem-2',
+        name: 'Reading',
+        type: 'class' as const,
+        attributes: [{ id: 'a1', name: 'value', type: 'Double', visibility: 'public' as const }],
+        operations: [],
+      },
+      label: 'Reading',
+    },
+  }
+
+  it('embeds the source part into the target container for aggregation', () => {
+    const diagram = baseDiagram({
+      nodes: [...baseDiagram().nodes, readingNode],
+      edges: [
+        {
+          id: 'edge-1',
+          type: 'aggregation',
+          source: 'node-2',
+          target: 'node-1',
+          data: {
+            relationship: {
+              id: 'rel-1',
+              type: 'aggregation',
+              source: 'elem-2',
+              target: 'elem-1',
+              sourceRole: 'readings',
+            },
+            label: '',
+            isSelected: false,
+            isDirty: false,
+          },
+        },
+      ],
+    })
+
+    const schema = exportToJsonSchema(diagram)
+    const properties = schema.properties as Record<string, Record<string, unknown>>
+    expect(properties.readings).toEqual({ $ref: '#/$defs/Reading' })
+    expect((schema.$defs as Record<string, Record<string, unknown>>).Reading).toMatchObject({ title: 'Reading' })
+    expect(schema.title).toBe('TrafficSensor')
+  })
+
+  it('keeps the drawn direction for association (source references target)', () => {
+    const diagram = baseDiagram({
+      nodes: [...baseDiagram().nodes, readingNode],
+      edges: [
+        {
+          id: 'edge-1',
+          type: 'association',
+          source: 'node-1',
+          target: 'node-2',
+          data: {
+            relationship: {
+              id: 'rel-1',
+              type: 'association',
+              source: 'elem-1',
+              target: 'elem-2',
+              targetRole: 'reading',
+            },
+            label: '',
+            isSelected: false,
+            isDirty: false,
+          },
+        },
+      ],
+    })
+
+    const schema = exportToJsonSchema(diagram)
+    const properties = schema.properties as Record<string, Record<string, unknown>>
+    // Direction not flipped: source stays root and references the target.
+    expect(properties.reading).toEqual({ $ref: '#/$defs/Reading' })
+    expect((schema.$defs as Record<string, Record<string, unknown>>).Reading).toMatchObject({ title: 'Reading' })
+    expect(schema.title).toBe('TrafficSensor')
   })
 })

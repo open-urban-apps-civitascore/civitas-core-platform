@@ -17,10 +17,11 @@ interface ApiListProps {
   datasetId: string
   apis: NamedApi[]
   canEdit: boolean
+  canView: boolean
   isOpenDataAccess: boolean
 }
 
-export const ApiList = ({ datasetId, apis, canEdit, isOpenDataAccess }: ApiListProps) => {
+export const ApiList = ({ datasetId, apis, canEdit, canView, isOpenDataAccess }: ApiListProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.apis')
   const hasOws = hasApiType(apis, API_STANDARDS.OWS)
 
@@ -36,35 +37,38 @@ export const ApiList = ({ datasetId, apis, canEdit, isOpenDataAccess }: ApiListP
     <div className="py-3">
       <div className="flex items-center justify-between gap-4">
         <h4 className="font-semibold">{t('title')}</h4>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline">
-              {t('addButton')}
-              <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <GuardedLink href={`/datasets/${datasetId}/apis?type=sensorthings`} className="flex items-center gap-3">
-                <span>{t('sensorThings')}</span>
-                <span className="text-xs text-muted-foreground">{t('sensorThingsSubtitle')}</span>
-              </GuardedLink>
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={!canCreateOwsApi} asChild={!hasOws}>
-              {canCreateOwsApi ? (
-                <GuardedLink href={`/datasets/${datasetId}/apis?type=ows`} className="flex items-center gap-3">
-                  <span>{t('ows')}</span>
-                  <span className="text-xs text-muted-foreground">{t('owsSubtitle')}</span>
+
+        {canEdit && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                {t('addButton')}
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <GuardedLink href={`/datasets/${datasetId}/apis?type=sensorthings`} className="flex items-center gap-3">
+                  <span>{t('sensorThings')}</span>
+                  <span className="text-xs text-muted-foreground">{t('sensorThingsSubtitle')}</span>
                 </GuardedLink>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <span className="text-muted-foreground">{t('ows')}</span>
-                  <span className="text-xs text-muted-foreground">{t('owsSubtitle')}</span>
-                </div>
-              )}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={!canCreateOwsApi} asChild={!hasOws}>
+                {canCreateOwsApi ? (
+                  <GuardedLink href={`/datasets/${datasetId}/apis?type=ows`} className="flex items-center gap-3">
+                    <span>{t('ows')}</span>
+                    <span className="text-xs text-muted-foreground">{t('owsSubtitle')}</span>
+                  </GuardedLink>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <span className="text-muted-foreground">{t('ows')}</span>
+                    <span className="text-xs text-muted-foreground">{t('owsSubtitle')}</span>
+                  </div>
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {apis.length > 0 ? (
@@ -76,6 +80,7 @@ export const ApiList = ({ datasetId, apis, canEdit, isOpenDataAccess }: ApiListP
               datasetId={datasetId}
               existingApis={apis}
               canEdit={canEdit}
+              canView={canView}
               isOpenDataAccess={isOpenDataAccess}
             />
           ))}

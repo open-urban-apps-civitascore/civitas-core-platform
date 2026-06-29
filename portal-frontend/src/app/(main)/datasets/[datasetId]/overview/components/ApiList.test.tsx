@@ -37,6 +37,7 @@ const defaultProps = {
   datasetId: 'dataset-123',
   apis: [] as NamedApi[],
   canEdit: true,
+  canView: true,
   isOpenDataAccess: false,
 }
 

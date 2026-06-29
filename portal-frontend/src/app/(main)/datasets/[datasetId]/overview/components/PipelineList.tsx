@@ -13,6 +13,8 @@ import { useGetPipelines } from '@/app/services/api/pipelines/clientRequests'
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { usePermissions } from '@/hooks/use-permissions'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { PipelineBasicInfo } from '@/types/datasets'
 import { DATASINK_TYPES } from '@/types/datasinks'
 
@@ -43,13 +45,15 @@ const getPipelineBadges = (dto: PipelineOutputDTO, datasourceConnectors: Map<str
 interface PipelineListProps {
   datasetId: string
   pipelines: PipelineBasicInfo[]
-  canAdd: boolean
+  canCreatePipeline: boolean
 }
 
-export const PipelineList = ({ datasetId, pipelines, canAdd }: PipelineListProps) => {
+export const PipelineList = ({ datasetId, pipelines, canCreatePipeline }: PipelineListProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.pipelines')
+  const { hasPermission } = usePermissions()
+  const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
   const { data: pipelinesData } = useGetPipelines(datasetId)
-  const { data: datasourcesData } = useGetDatasources()
+  const { data: datasourcesData } = useGetDatasources({ isEnabled: canReadDatasources })
 
   const datasourceConnectors = useMemo(() => {
     const map = new Map<string, string>()
@@ -71,7 +75,7 @@ export const PipelineList = ({ datasetId, pipelines, canAdd }: PipelineListProps
     <div className="py-3 mb-6">
       <div className="flex items-center justify-between gap-4">
         <h4 className="font-semibold">{t('title')}</h4>
-        {canAdd && (
+        {canCreatePipeline && (
           <Button asChild variant="outline">
             <GuardedLink href={`/datasets/${datasetId}/data-flow/pipeline-editor`}>{t('addButton')}</GuardedLink>
           </Button>

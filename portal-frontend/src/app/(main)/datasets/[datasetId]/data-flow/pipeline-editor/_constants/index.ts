@@ -7,26 +7,7 @@
  */
 
 // Node categories
-export {
-  getNodeCategory,
-  getNodeTypesForCategory,
-  NODE_CATEGORIES,
-  NODE_CATEGORY_LABELS,
-  NODE_CATEGORY_ORDER,
-  NODE_TYPE_CATEGORY_MAP,
-  type NodeCategory,
-} from './nodeCategories'
-
-// Palette items
-export {
-  getAllPaletteItems,
-  getPaletteCategory,
-  getPaletteItem,
-  PALETTE_NODE_DEFINITIONS,
-  type PaletteCategory,
-  type PaletteItem,
-  PIPELINE_PALETTE_CATEGORIES,
-} from './paletteItems'
+export { NODE_CATEGORIES, NODE_CATEGORY_ORDER, type NodeCategory } from './nodeCategories'
 
 // Visual styles
 export {

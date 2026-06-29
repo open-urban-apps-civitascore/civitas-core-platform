@@ -22,6 +22,7 @@ import de.civitascore.configadapter.nifi.mapping.ValueNode.ConcatNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConstNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConvertNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.CopyNode;
+import de.civitascore.configadapter.nifi.mapping.ValueNode.GeoPointNode;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -145,6 +146,79 @@ class MappingConfigParserTest {
     assertEquals(ConversionOp.TO_STRING, conv.op());
     CopyNode inner = assertInstanceOf(CopyNode.class, conv.input());
     assertEquals("$.n", inner.sourcePath());
+  }
+
+  @Test
+  void geoPointParsesNamedLonLatOperands() throws Exception {
+    MappingConfig mc =
+        parse(
+            """
+        { "fields": { "$.geo": { "op": "geoPoint", "lon": "$.lon",
+            "lat": { "op": "toFloat", "input": "$.lat" } } } }
+        """);
+
+    GeoPointNode geo = assertInstanceOf(GeoPointNode.class, mc.fields().get("$.geo"));
+    CopyNode lon = assertInstanceOf(CopyNode.class, geo.lon());
+    assertEquals("$.lon", lon.sourcePath());
+    ConvertNode lat = assertInstanceOf(ConvertNode.class, geo.lat());
+    assertEquals(ConversionOp.TO_FLOAT, lat.op());
+  }
+
+  @Test
+  void geoPointMissingLatIsRejected() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                parse(
+                    """
+            { "fields": { "$.geo": { "op": "geoPoint", "lon": "$.lon" } } }
+            """));
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+  }
+
+  @Test
+  void blankShorthandSourcePathIsRejected() {
+    // A blank path would resolve to the record root '/' and silently copy the whole record — for a
+    // coordinate that yields garbage WKT, so it must fail at parse time.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                parse(
+                    """
+            { "fields": { "$.geo": { "op": "geoPoint", "lon": "", "lat": "$.lat" } } }
+            """));
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+  }
+
+  @Test
+  void blankExplicitCopySourcePathIsRejected() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                parse(
+                    """
+            { "fields": { "$.x": { "op": "copy", "sourcePath": "   " } } }
+            """));
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+  }
+
+  @Test
+  void nestedGeoPointOperandIsRejected() {
+    // A geoPoint coordinate must be a scalar; a geometry nested as an operand would render to
+    // malformed WKT, so it is rejected at parse time.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                parse(
+                    """
+            { "fields": { "$.geo": { "op": "geoPoint",
+                "lon": { "op": "geoPoint", "lon": "$.a", "lat": "$.b" }, "lat": "$.lat" } } }
+            """));
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
   }
 
   @Test

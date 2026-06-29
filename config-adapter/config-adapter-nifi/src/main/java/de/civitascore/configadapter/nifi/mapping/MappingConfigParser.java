@@ -16,6 +16,7 @@ import de.civitascore.configadapter.nifi.mapping.ValueNode.ConcatNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConstNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConvertNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.CopyNode;
+import de.civitascore.configadapter.nifi.mapping.ValueNode.GeoPointNode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -61,7 +62,7 @@ public class MappingConfigParser {
 
   private ValueNode parseValue(JsonNode node) throws FatalAdapterException {
     if (node.isTextual()) {
-      return new CopyNode(node.asText());
+      return copyOf(node.asText());
     }
     if (!node.isObject()) {
       throw reject(
@@ -78,8 +79,22 @@ public class MappingConfigParser {
       case "copy" -> parseCopy(node);
       case "const" -> parseConst(node);
       case "concat" -> parseConcat(node);
+      case "geoPoint" -> parseGeoPoint(node);
       default -> parseConversionOrReject(op, node);
     };
+  }
+
+  private ValueNode parseGeoPoint(JsonNode node) throws FatalAdapterException {
+    JsonNode lon = node.get("lon");
+    JsonNode lat = node.get("lat");
+    if (lon == null || lat == null) {
+      throw reject("geoPoint requires a 'lon' and a 'lat'");
+    }
+    // Each operand is itself a value — a source path or a nested scalar op (e.g. toFloat); a nested
+    // geometry is rejected as a non-scalar.
+    ValueNode lonNode = requireScalarOperand(parseValue(lon), "geoPoint 'lon'");
+    ValueNode latNode = requireScalarOperand(parseValue(lat), "geoPoint 'lat'");
+    return new GeoPointNode(lonNode, latNode);
   }
 
   private ValueNode parseCopy(JsonNode node) throws FatalAdapterException {
@@ -87,7 +102,7 @@ public class MappingConfigParser {
     if (sourcePath == null || !sourcePath.isTextual()) {
       throw reject("copy requires a textual 'sourcePath'");
     }
-    return new CopyNode(sourcePath.asText());
+    return copyOf(sourcePath.asText());
   }
 
   private ValueNode parseConst(JsonNode node) throws FatalAdapterException {
@@ -104,7 +119,7 @@ public class MappingConfigParser {
     }
     List<ValueNode> parsed = new ArrayList<>();
     for (JsonNode input : inputs) {
-      parsed.add(parseValue(input));
+      parsed.add(requireScalarOperand(parseValue(input), "concat input"));
     }
     return new ConcatNode(optionalText(node, "separator"), List.copyOf(parsed));
   }
@@ -128,7 +143,33 @@ public class MappingConfigParser {
     if (!requiresPattern && pattern != null) {
       throw reject(op + " does not take a 'pattern'");
     }
-    return new ConvertNode(conversion.get(), parseValue(input), pattern);
+    return new ConvertNode(
+        conversion.get(), requireScalarOperand(parseValue(input), op + " input"), pattern);
+  }
+
+  /**
+   * Wraps a source path into a {@link CopyNode}, rejecting a blank one: a blank path resolves to
+   * the record root {@code /} (copying the whole record), which only fails far downstream — so it
+   * is caught at parse time instead.
+   */
+  private CopyNode copyOf(String sourcePath) throws FatalAdapterException {
+    if (sourcePath.isBlank()) {
+      throw reject("a source path must be non-blank");
+    }
+    return new CopyNode(sourcePath);
+  }
+
+  /**
+   * Rejects a {@code geoPoint} operand where only a scalar is meaningful (a coordinate, a {@code
+   * concat} input, or a conversion input): a nested geometry renders to malformed WKT, so it is
+   * caught at parse time rather than late in PostGIS.
+   */
+  private ValueNode requireScalarOperand(ValueNode node, String where)
+      throws FatalAdapterException {
+    if (node instanceof GeoPointNode) {
+      throw reject(where + " must be a scalar value, not a geoPoint geometry");
+    }
+    return node;
   }
 
   private static Object jsonToValue(JsonNode node) {

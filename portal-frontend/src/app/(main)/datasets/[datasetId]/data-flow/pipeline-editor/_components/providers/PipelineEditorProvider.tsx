@@ -29,6 +29,7 @@ import {
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { isDatapoolScopeViolationError } from '@/utils/errors'
 
+import { getNodeDef } from '../../_config/nodeRegistry'
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
 import {
   buildDataSinkPayloads,
@@ -55,7 +56,7 @@ import {
   type ValidationResultWithNodeStatus,
 } from '../../_services/validationService'
 import type { ActivePipelineContextValue, PipelineStats } from '../../_types/context'
-import { createDefaultNodeData, type PipelineNodeData } from '../../_types/nodes'
+import type { PipelineNodeData } from '../../_types/nodes'
 import type { NodeCreationContext, Pipeline, PipelineEdge, PipelineNode, PipelineNodeType } from '../../_types/pipeline'
 import type { UsePipelineSessionReturn } from '../../_types/session'
 
@@ -199,7 +200,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   // ===== Node Operations =====
   const addNode = useCallback(
     (context: NodeCreationContext) => {
-      const nodeData = createDefaultNodeData(context.nodeType)
+      const def = getNodeDef(context.nodeType)
+      if (!def) return
+      const nodeData = def.createDefaultData()
       const newNode: PipelineNode = {
         id: crypto.randomUUID(),
         type: context.nodeType as PipelineNodeType,
