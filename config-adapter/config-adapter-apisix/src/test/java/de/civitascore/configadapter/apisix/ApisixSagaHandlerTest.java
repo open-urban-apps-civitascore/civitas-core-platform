@@ -103,6 +103,7 @@ class ApisixSagaHandlerTest {
           "apisix.api.host",
           "apisix.api.public.url",
           "apisix.plugin.config.id",
+          "apisix.service.id",
           "apisix.frost.basic.auth.username",
           "apisix.frost.basic.auth.password"
         })
@@ -122,6 +123,9 @@ class ApisixSagaHandlerTest {
         }
         if (!"apisix.plugin.config.id".equals(missingProperty)) {
           when(config.getProperty("apisix.plugin.config.id")).thenReturn("auth-plugin-default");
+        }
+        if (!"apisix.service.id".equals(missingProperty)) {
+          when(config.getProperty("apisix.service.id")).thenReturn("svc-frost-server");
         }
         if (!"apisix.frost.basic.auth.username".equals(missingProperty)) {
           when(config.getProperty("apisix.frost.basic.auth.username")).thenReturn("frost-user");
@@ -145,6 +149,7 @@ class ApisixSagaHandlerTest {
         when(config.getProperty("apisix.api.host")).thenReturn("api.example.test");
         when(config.getProperty("apisix.api.public.url")).thenReturn("https://api.example.test");
         when(config.getProperty("apisix.plugin.config.id")).thenReturn("auth-plugin-default");
+        when(config.getProperty("apisix.service.id")).thenReturn("svc-frost-server");
         when(config.getProperty("apisix.frost.api.key")).thenReturn("test-api-key");
         when(config.getProperty("apisix.frost.api.key.header", "X-API-Key"))
             .thenReturn("X-API-Key");
@@ -166,6 +171,7 @@ class ApisixSagaHandlerTest {
         when(config.getProperty("apisix.api.host")).thenReturn("api.example.test");
         when(config.getProperty("apisix.api.public.url")).thenReturn("https://api.example.test");
         when(config.getProperty("apisix.plugin.config.id")).thenReturn("auth-plugin-default");
+        when(config.getProperty("apisix.service.id")).thenReturn("svc-frost-server");
         when(config.getProperty("apisix.frost.api.key")).thenReturn("frost-key");
         // Header name explicitly blank — would otherwise produce headers.set[""]: "<key>".
         when(config.getProperty("apisix.frost.api.key.header", "X-API-Key")).thenReturn("");
@@ -185,6 +191,7 @@ class ApisixSagaHandlerTest {
         when(config.getProperty("apisix.api.host")).thenReturn("api.example.test");
         when(config.getProperty("apisix.api.public.url")).thenReturn("https://api.example.test");
         when(config.getProperty("apisix.plugin.config.id")).thenReturn("auth-plugin-default");
+        when(config.getProperty("apisix.service.id")).thenReturn("svc-frost-server");
         when(config.getProperty("apisix.frost.api.key.header", "X-API-Key"))
             .thenReturn("X-API-Key");
 
@@ -257,6 +264,32 @@ class ApisixSagaHandlerTest {
     }
 
     @Test
+    @DisplayName(
+        "always protects the route (plugin_config_id, no methods gate) even when openDataAccess=true")
+    void shouldAlwaysProtectRouteEvenWhenOpenDataAccessTrue() {
+      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(201);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+
+        // openDataAccess=true must NOT bypass auth anymore: open-data access is decided by OPA per
+        // request (ABAC), so the route is provisioned protected exactly like any other — it keeps
+        // plugin_config_id (OIDC + OPA) and carries no read-only methods gate.
+        SagaCommandResult result =
+            handler.handle(createRouteCommand(Map.of("openDataAccess", true)));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
+            ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder, times(2)).put(entityCaptor.capture()); // upstream + route
+        Map<String, Object> routeBody = entityCaptor.getAllValues().get(1).getEntity();
+        assertEquals("auth-plugin-1", routeBody.get("plugin_config_id"));
+        assertNull(routeBody.get("methods"), "no read-only method gate — OPA gates per request");
+      }
+    }
+
+    @Test
     @DisplayName("includes service_id in route body when configured")
     void shouldIncludeServiceIdInRouteBody() {
       try (ApisixSagaHandler handler = createHandler()) {
@@ -272,25 +305,6 @@ class ApisixSagaHandlerTest {
         verify(mockBuilder, times(2)).put(entityCaptor.capture());
         Map<String, Object> routeBody = entityCaptor.getAllValues().get(1).getEntity();
         assertEquals("svc-frost-server", routeBody.get("service_id"));
-      }
-    }
-
-    @Test
-    @DisplayName("omits service_id from route body when not configured")
-    void shouldOmitServiceIdWhenNotConfigured() {
-      try (ApisixSagaHandler handler = createHandlerWithConfig("auth-plugin-default", null)) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(201);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
-
-        handler.handle(createRouteCommand(Map.of("openDataAccess", true)));
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
-            ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder, times(2)).put(entityCaptor.capture());
-        Map<String, Object> routeBody = entityCaptor.getAllValues().get(1).getEntity();
-        assertFalse(routeBody.containsKey("service_id"));
       }
     }
 
@@ -639,31 +653,6 @@ class ApisixSagaHandlerTest {
 
     @Test
     @DisplayName(
-        "open-data OWS route has read-only methods, no plugin_config_id, and no credential")
-    void shouldRouteOwsOpenData() {
-      try (ApisixSagaHandler handler = createHandler()) {
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(201);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(ok);
-
-        handler.handle(
-            createPerApiCommand(true, List.of(Map.of("slug", "map", "standard", "OWS"))));
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
-            ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder, times(2)).put(entityCaptor.capture());
-        Map<String, Object> routeBody = entityCaptor.getAllValues().get(1).getEntity();
-
-        assertFalse(routeBody.containsKey("plugin_config_id"), "open data → no auth gate plugin");
-        assertEquals(List.of("GET", "HEAD", "OPTIONS"), routeBody.get("methods"));
-        assertEquals("ds-001-ows", routeBody.get("upstream_id"));
-        assertNull(authSetHeadersOf(routeBody), "open OWS route must not inject a credential");
-      }
-    }
-
-    @Test
-    @DisplayName(
         "a dataset with both STA and OWS named APIs provisions a FROST and a map-server upstream")
     void shouldProvisionBothUpstreamsForMixedStandards() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
@@ -776,16 +765,13 @@ class ApisixSagaHandlerTest {
         Map<String, String> routeIds = (Map<String, String>) result.resultData().get("routeIds");
         assertEquals(Map.of("traffic", "rid-traffic", "weather", "rid-weather"), routeIds);
 
-        // Compensation must capture each slug's previous open/protected state as a slug-keyed map
-        // (the exact contract per-slug RESTORE_ROUTE consumes). Both routes were private
-        // (plugin_config_id present) so each slug's previous openDataAccess is false.
-        @SuppressWarnings("unchecked")
-        Map<String, Object> previousOpen =
-            (Map<String, Object>) result.compensationData().get("previousOpenDataAccess");
-        assertEquals(Map.of("traffic", false, "weather", false), previousOpen);
+        // Routes are always protected (no open/protected toggle), so compensation carries only the
+        // routeIds + serviceId RESTORE_ROUTE needs to re-apply the protected state — no
+        // previousOpenDataAccess capture anymore.
         assertEquals(
             Map.of("traffic", "rid-traffic", "weather", "rid-weather"),
             result.compensationData().get("routeIds"));
+        assertNull(result.compensationData().get("previousOpenDataAccess"));
       }
     }
 
@@ -890,12 +876,8 @@ class ApisixSagaHandlerTest {
         assertEquals("STEP_COMPLETED", result.type());
         verify(mockBuilder, times(2)).get();
         verify(mockBuilder, times(1)).put(any(Entity.class));
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> previousOpen =
-            (Map<String, Object>) result.compensationData().get("previousOpenDataAccess");
-        assertEquals(true, previousOpen.get("traffic")); // absent → requested state as no-op
-        assertEquals(false, previousOpen.get("weather")); // present private route
+        // Routes are always protected — no previousOpenDataAccess capture.
+        assertNull(result.compensationData().get("previousOpenDataAccess"));
       }
     }
 
@@ -1161,53 +1143,6 @@ class ApisixSagaHandlerTest {
     }
 
     @Test
-    @DisplayName("restores each slug route to its captured previous open/protected state")
-    void shouldRestoreEachSlugToCapturedState() {
-      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response getResp = privateRouteGet();
-        when(mockBuilder.get()).thenReturn(getResp);
-        Response putResp = mock(Response.class);
-        when(putResp.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(putResp);
-
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("routeIds", Map.of("traffic", "rid-traffic", "weather", "rid-weather"));
-        payload.put("serviceId", "ds-001");
-        // traffic was previously public (→ drop plugin_config_id), weather private (→ keep it).
-        payload.put("previousOpenDataAccess", Map.of("traffic", true, "weather", false));
-
-        SagaCommandResult result =
-            handler.handle(
-                new SagaCommandMessage(
-                    "COMPENSATE_STEP",
-                    "m",
-                    "saga-001",
-                    "restore-route",
-                    "apisix",
-                    "RESTORE_ROUTE",
-                    payload));
-
-        assertEquals("COMPENSATION_COMPLETED", result.type());
-        verify(mockBuilder, times(2)).get();
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Entity<Map<String, Object>>> captor = ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder, times(2)).put(captor.capture());
-        List<Map<String, Object>> bodies =
-            captor.getAllValues().stream().map(Entity::getEntity).toList();
-        // Order-agnostic (map iteration): exactly one route restored public, one private.
-        long publicBodies = bodies.stream().filter(b -> !b.containsKey("plugin_config_id")).count();
-        long privateBodies = bodies.stream().filter(b -> b.containsKey("plugin_config_id")).count();
-        assertEquals(1, publicBodies);
-        assertEquals(1, privateBodies);
-
-        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-        verify(mockTarget, atLeastOnce()).path(pathCaptor.capture());
-        assertTrue(pathCaptor.getAllValues().contains("/apisix/admin/routes/rid-traffic"));
-        assertTrue(pathCaptor.getAllValues().contains("/apisix/admin/routes/rid-weather"));
-      }
-    }
-
-    @Test
     @DisplayName("skips a slug route that is already gone (404) and restores the rest")
     void shouldSkipGoneSlugAndRestoreOthers() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
@@ -1224,7 +1159,6 @@ class ApisixSagaHandlerTest {
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("traffic", "rid-traffic", "weather", "rid-weather"));
         payload.put("serviceId", "ds-001");
-        payload.put("previousOpenDataAccess", Map.of("traffic", false, "weather", false));
 
         SagaCommandResult result =
             handler.handle(
@@ -1245,8 +1179,8 @@ class ApisixSagaHandlerTest {
     }
 
     @Test
-    @DisplayName("restores a slug absent from previousOpenDataAccess as protected (default false)")
-    void shouldRestoreSlugMissingFromPreviousMapAsProtected() {
+    @DisplayName("restores a slug route as protected (routes are always protected)")
+    void shouldRestoreSlugAsProtected() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
         Response getResp = privateRouteGet();
         when(mockBuilder.get()).thenReturn(getResp);
@@ -1257,8 +1191,6 @@ class ApisixSagaHandlerTest {
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("traffic", "rid-traffic"));
         payload.put("serviceId", "ds-001");
-        // Empty map: the slug is missing → getOrDefault(false) → restored protected, not crashing.
-        payload.put("previousOpenDataAccess", Map.of());
 
         SagaCommandResult result =
             handler.handle(
@@ -1277,86 +1209,6 @@ class ApisixSagaHandlerTest {
         verify(mockBuilder).put(captor.capture());
         // Default false → protected → plugin_config_id retained.
         assertTrue(captor.getValue().getEntity().containsKey("plugin_config_id"));
-      }
-    }
-
-    @Test
-    @DisplayName("coerces string previousOpenDataAccess values (\"true\"/\"false\") to booleans")
-    void shouldCoerceStringPreviousOpenValues() {
-      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response getResp = privateRouteGet();
-        when(mockBuilder.get()).thenReturn(getResp);
-        Response putResp = mock(Response.class);
-        when(putResp.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(putResp);
-
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("routeIds", Map.of("traffic", "rid-traffic", "weather", "rid-weather"));
-        payload.put("serviceId", "ds-001");
-        // Values arrive as JSON strings (e.g. after a serialize/deserialize round-trip), not
-        // booleans.
-        payload.put("previousOpenDataAccess", Map.of("traffic", "true", "weather", "false"));
-
-        SagaCommandResult result =
-            handler.handle(
-                new SagaCommandMessage(
-                    "COMPENSATE_STEP",
-                    "m",
-                    "saga-001",
-                    "restore-route",
-                    "apisix",
-                    "RESTORE_ROUTE",
-                    payload));
-
-        assertEquals("COMPENSATION_COMPLETED", result.type());
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Entity<Map<String, Object>>> captor = ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder, times(2)).put(captor.capture());
-        List<Map<String, Object>> bodies =
-            captor.getAllValues().stream().map(Entity::getEntity).toList();
-        // "true" → public (plugin_config_id dropped); "false" → protected (retained).
-        long publicBodies = bodies.stream().filter(b -> !b.containsKey("plugin_config_id")).count();
-        long privateBodies = bodies.stream().filter(b -> b.containsKey("plugin_config_id")).count();
-        assertEquals(1, publicBodies);
-        assertEquals(1, privateBodies);
-      }
-    }
-
-    @Test
-    @DisplayName("drops a null-keyed previousOpenDataAccess entry and still restores valid slugs")
-    void shouldDropNullKeyedPreviousOpenEntry() {
-      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response getResp = privateRouteGet();
-        when(mockBuilder.get()).thenReturn(getResp);
-        Response putResp = mock(Response.class);
-        when(putResp.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(putResp);
-
-        Map<String, Object> previous = new HashMap<>();
-        previous.put("traffic", true);
-        previous.put(null, true); // null key → dropped (logged), must not abort the restore
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("routeIds", Map.of("traffic", "rid-traffic"));
-        payload.put("serviceId", "ds-001");
-        payload.put("previousOpenDataAccess", previous);
-
-        SagaCommandResult result =
-            handler.handle(
-                new SagaCommandMessage(
-                    "COMPENSATE_STEP",
-                    "m",
-                    "saga-001",
-                    "restore-route",
-                    "apisix",
-                    "RESTORE_ROUTE",
-                    payload));
-
-        assertEquals("COMPENSATION_COMPLETED", result.type());
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Entity<Map<String, Object>>> captor = ArgumentCaptor.forClass(Entity.class);
-        verify(mockBuilder).put(captor.capture());
-        // The valid "traffic"=true entry still applies → restored public.
-        assertFalse(captor.getValue().getEntity().containsKey("plugin_config_id"));
       }
     }
 
@@ -1397,9 +1249,9 @@ class ApisixSagaHandlerTest {
         Map<String, Object> payload = new HashMap<>();
         payload.put("routeIds", Map.of("map", "rid-map"));
         payload.put("serviceId", "ds-001");
-        // Restore to the previous protected state: compensation must re-apply the gate without ever
-        // injecting a FROST credential onto a GeoServer route.
-        payload.put("previousOpenDataAccess", Map.of("map", false));
+        // Compensation must re-apply the gateway gate without ever injecting a FROST credential
+        // onto a
+        // GeoServer route.
 
         SagaCommandResult result =
             handler.handle(
@@ -1467,20 +1319,6 @@ class ApisixSagaHandlerTest {
     }
 
     @Test
-    @DisplayName("open-data routes restrict methods to GET/HEAD/OPTIONS (no OPA on the route)")
-    void shouldRestrictMethodsOnOpenDataRoute() {
-      try (ApisixSagaHandler handler = createHandler()) {
-        stubPutCreated();
-
-        handler.handle(createRouteCommand(true));
-
-        // Without plugin_config_id (no OIDC/OPA), the method gate is the only thing keeping
-        // anonymous writes away from FROST — "open" means anonymous READ (finding 1).
-        assertEquals(OPEN_DATA_METHODS, captureRouteBody(2).get("methods"));
-      }
-    }
-
-    @Test
     @DisplayName("protected routes carry no methods filter (OPA gates per request)")
     void shouldNotRestrictMethodsOnProtectedRoute() {
       try (ApisixSagaHandler handler = createHandler()) {
@@ -1489,41 +1327,6 @@ class ApisixSagaHandlerTest {
         handler.handle(createRouteCommand(false));
 
         assertFalse(captureRouteBody(2).containsKey("methods"));
-      }
-    }
-
-    @Test
-    @DisplayName("UPDATE toggle protected→open adds the method gate to the existing route")
-    void shouldAddMethodGateWhenTogglingToOpen() {
-      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Response getResp = mock(Response.class);
-        when(getResp.getStatus()).thenReturn(200);
-        when(getResp.readEntity(Map.class))
-            .thenAnswer(
-                inv -> {
-                  Map<String, Object> value = new HashMap<>();
-                  value.put("uri", "/v1/datasets/ds-001/data");
-                  value.put("plugin_config_id", "auth-plugin-1");
-                  Map<String, Object> envelope = new HashMap<>();
-                  envelope.put("value", value);
-                  return envelope;
-                });
-        when(mockBuilder.get()).thenReturn(getResp);
-        stubPutCreated();
-
-        handler.handle(
-            createCommand(
-                "EXECUTE_STEP",
-                "UPDATE_ROUTE",
-                Map.of(
-                    "routeIds",
-                    Map.of("data", "rid-data"),
-                    "serviceId",
-                    "ds-001",
-                    "openDataAccess",
-                    true)));
-
-        assertEquals(OPEN_DATA_METHODS, captureRouteBody(1).get("methods"));
       }
     }
 
@@ -1802,28 +1605,6 @@ class ApisixSagaHandlerTest {
     }
 
     @Test
-    @DisplayName(
-        "does not inject Basic Auth header when openDataAccess=true (but keeps the default strip)")
-    void shouldNotInjectAuthHeaderForPublicProject() {
-      try (ApisixSagaHandler handler = createHandler()) {
-        stubPutCreated();
-
-        handler.handle(createRouteCommand(true));
-
-        Map<String, Object> proxyRewrite = captureProxyRewrite();
-        @SuppressWarnings("unchecked")
-        Map<String, Object> headers = (Map<String, Object>) proxyRewrite.get("headers");
-        assertNotNull(
-            headers,
-            "even without configured headers.remove, the hard-coded trust-header strip applies"
-                + " (MR !547 finding 3 — secure-by-default)");
-        assertFalse(
-            headers.containsKey("set"), "public routes must NOT carry FROST upstream credentials");
-        assertEquals(List.of("X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids"), headers.get("remove"));
-      }
-    }
-
-    @Test
     @DisplayName("merges configured proxy-rewrite headers.remove into route-level plugin")
     void shouldMergeProxyRewriteHeadersRemoveIntoRoute() {
       try (ApisixSagaHandler handler =
@@ -1841,31 +1622,6 @@ class ApisixSagaHandlerTest {
             remove instanceof String[] arr ? Arrays.asList(arr) : remove,
             "route-level proxy-rewrite must strip the configured headers (Finding P1 — plugin"
                 + " config's proxy-rewrite is overridden by route precedence)");
-      }
-    }
-
-    @Test
-    @DisplayName("strips configured headers for PUBLIC routes too (no FROST auth header set)")
-    void shouldStripHeadersForPublicRoutesEvenWithoutAuth() {
-      try (ApisixSagaHandler handler = createHandlerWithHeadersRemove("X-Allowed-Scope-Ids")) {
-        stubPutCreated();
-
-        handler.handle(createRouteCommand(true));
-
-        Map<String, Object> proxyRewrite = captureProxyRewrite();
-        @SuppressWarnings("unchecked")
-        Map<String, Object> headers = (Map<String, Object>) proxyRewrite.get("headers");
-        assertNotNull(
-            headers,
-            "public routes must still strip client-supplied internal headers (Finding —"
-                + " strip is a general saga-route protection, not auth-specific)");
-        Object remove = headers.get("remove");
-        assertEquals(
-            List.of("X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids"),
-            remove instanceof String[] arr ? Arrays.asList(arr) : remove);
-        assertFalse(
-            headers.containsKey("set"),
-            "public routes must NOT carry headers.set (no FROST upstream auth)");
       }
     }
 
@@ -1947,91 +1703,6 @@ class ApisixSagaHandlerTest {
     }
 
     @Test
-    @DisplayName("switching private→public removes plugin_config_id and Authorization header")
-    void shouldSwitchFromPrivateToPublic() {
-      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        stubGetReturning(existingRoute(true));
-        stubPutOk();
-
-        SagaCommandResult result =
-            handler.handle(
-                createCommand(
-                    "EXECUTE_STEP",
-                    "UPDATE_ROUTE",
-                    Map.of(
-                        "routeIds",
-                        Map.of("data", "ds-001"),
-                        "serviceId",
-                        "ds-001",
-                        "openDataAccess",
-                        true)));
-
-        assertEquals("STEP_COMPLETED", result.type());
-        assertEquals(
-            false,
-            ((Map<?, ?>) result.compensationData().get("previousOpenDataAccess")).get("data"));
-
-        Map<String, Object> body = capturePutBody();
-        assertFalse(body.containsKey("plugin_config_id"));
-        @SuppressWarnings("unchecked")
-        Map<String, Object> plugins = (Map<String, Object>) body.get("plugins");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> proxyRewrite = (Map<String, Object>) plugins.get("proxy-rewrite");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> headers = (Map<String, Object>) proxyRewrite.get("headers");
-        assertFalse(
-            headers.containsKey("set"), "the FROST credential must be removed on the public flip");
-        assertEquals(
-            List.of("X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids"),
-            headers.get("remove"),
-            "the hard-coded trust-header strip stays in place on public routes");
-      }
-    }
-
-    @Test
-    @DisplayName("switching public→private sets plugin_config_id and Authorization header")
-    void shouldSwitchFromPublicToPrivate() {
-      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        stubGetReturning(existingRoute(false));
-        stubPutOk();
-
-        SagaCommandResult result =
-            handler.handle(
-                createCommand(
-                    "EXECUTE_STEP",
-                    "UPDATE_ROUTE",
-                    Map.of(
-                        "routeIds",
-                        Map.of("data", "ds-001"),
-                        "serviceId",
-                        "ds-001",
-                        "openDataAccess",
-                        false)));
-
-        assertEquals("STEP_COMPLETED", result.type());
-        assertEquals(
-            true,
-            ((Map<?, ?>) result.compensationData().get("previousOpenDataAccess")).get("data"));
-
-        Map<String, Object> body = capturePutBody();
-        assertEquals("auth-plugin-1", body.get("plugin_config_id"));
-        @SuppressWarnings("unchecked")
-        Map<String, Object> plugins = (Map<String, Object>) body.get("plugins");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> proxyRewrite = (Map<String, Object>) plugins.get("proxy-rewrite");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> headers = (Map<String, Object>) proxyRewrite.get("headers");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> set = (Map<String, Object>) headers.get("set");
-        String expected =
-            "Basic "
-                + Base64.getEncoder()
-                    .encodeToString("frost-user:frost-pass".getBytes(StandardCharsets.UTF_8));
-        assertEquals(expected, set.get("Authorization"));
-      }
-    }
-
-    @Test
     @DisplayName("strips read-only fields (create_time, update_time) from the PUT body")
     void shouldStripReadOnlyFields() {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
@@ -2053,305 +1724,6 @@ class ApisixSagaHandlerTest {
         Map<String, Object> body = capturePutBody();
         assertFalse(body.containsKey("create_time"));
         assertFalse(body.containsKey("update_time"));
-      }
-    }
-
-    @Test
-    @DisplayName("detects legacy private route (plugin_config_id without headers) as private")
-    void shouldDetectLegacyPrivateRouteAsPreviouslyPrivate() {
-      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        // Legacy route: pre-PR layout — plugin_config_id is set but no upstream headers yet.
-        Map<String, Object> legacy = existingRoute(false);
-        legacy.put("plugin_config_id", "auth-plugin-1");
-        stubGetReturning(legacy);
-        stubPutOk();
-
-        SagaCommandResult result =
-            handler.handle(
-                createCommand(
-                    "EXECUTE_STEP",
-                    "UPDATE_ROUTE",
-                    Map.of(
-                        "routeIds",
-                        Map.of("data", "ds-001"),
-                        "serviceId",
-                        "ds-001",
-                        "openDataAccess",
-                        true)));
-
-        assertEquals(
-            false,
-            ((Map<?, ?>) result.compensationData().get("previousOpenDataAccess")).get("data"),
-            "legacy private route (plugin_config_id only) must be detected as previously private");
-      }
-    }
-
-    @Test
-    @DisplayName("does not misclassify public route with foreign headers.set entries as private")
-    void shouldNotMisclassifyPublicRouteWithForeignHeadersSetAsPrivate() {
-      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        // Public route (no plugin_config_id, no adapter label) but with an operator-added
-        // headers.set entry. The old heuristic flagged any headers.set as private and produced
-        // wrong compensation data on the next flip.
-        Map<String, Object> publicRoute = existingRoute(false);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> plugins = (Map<String, Object>) publicRoute.get("plugins");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> proxyRewrite = (Map<String, Object>) plugins.get("proxy-rewrite");
-        Map<String, Object> foreignSet = new HashMap<>();
-        foreignSet.put("X-Trace-Id", "trace-123");
-        Map<String, Object> foreignHeaders = new HashMap<>();
-        foreignHeaders.put("set", foreignSet);
-        proxyRewrite.put("headers", foreignHeaders);
-        stubGetReturning(publicRoute);
-        stubPutOk();
-
-        SagaCommandResult result =
-            handler.handle(
-                createCommand(
-                    "EXECUTE_STEP",
-                    "UPDATE_ROUTE",
-                    Map.of(
-                        "routeIds",
-                        Map.of("data", "ds-001"),
-                        "serviceId",
-                        "ds-001",
-                        "openDataAccess",
-                        true)));
-
-        assertEquals(
-            true,
-            ((Map<?, ?>) result.compensationData().get("previousOpenDataAccess")).get("data"),
-            "public route must stay classified as public regardless of foreign headers.set"
-                + " entries (Finding P2 — only plugin_config_id is authoritative)");
-      }
-    }
-
-    @Test
-    @DisplayName("cleans custom API-key header on public flip when adapter is currently using it")
-    void shouldCleanCurrentlyConfiguredCustomHeaderOnPublicFlip() {
-      // Migration-positive: pre-label route used the custom header X-Frost-Key, and the adapter
-      // is STILL configured with that custom header. The standard
-      // `set.remove(frostUpstreamAuthHeaderName)` covers this case end-to-end. Operators with
-      // historical custom headers who want a clean migration: trigger an UPDATE while still on
-      // the historical configuration (then optionally rotate to a different header afterwards).
-      // See LEGACY_ADAPTER_AUTH_HEADERS javadoc for the documented limitation.
-      try (ApisixSagaHandler handler =
-          createHandlerWithApiKeyAuth("frost-key-val", "X-Frost-Key")) {
-        Map<String, Object> legacy = existingRoute(false);
-        legacy.put("plugin_config_id", "auth-plugin-1");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> plugins = (Map<String, Object>) legacy.get("plugins");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> proxyRewrite = (Map<String, Object>) plugins.get("proxy-rewrite");
-        Map<String, Object> set = new HashMap<>();
-        set.put("X-Frost-Key", "stale-key-value");
-        set.put("X-Trace-Id", "trace-123");
-        Map<String, Object> headers = new HashMap<>();
-        headers.put("set", set);
-        proxyRewrite.put("headers", headers);
-        // No label — represents pre-label adapter version.
-        stubGetReturning(legacy);
-        stubPutOk();
-
-        handler.handle(
-            createCommand(
-                "EXECUTE_STEP",
-                "UPDATE_ROUTE",
-                Map.of(
-                    "routeIds",
-                    Map.of("data", "ds-001"),
-                    "serviceId",
-                    "ds-001",
-                    "openDataAccess",
-                    true)));
-
-        Map<String, Object> body = capturePutBody();
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultPlugins = (Map<String, Object>) body.get("plugins");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultPr = (Map<String, Object>) resultPlugins.get("proxy-rewrite");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultHeaders = (Map<String, Object>) resultPr.get("headers");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultSet = (Map<String, Object>) resultHeaders.get("set");
-        assertFalse(
-            resultSet.containsKey("X-Frost-Key"),
-            "currently-configured custom API-key header must be cleaned on public flip"
-                + " — got headers.set: "
-                + resultSet);
-        assertEquals("trace-123", resultSet.get("X-Trace-Id"), "foreign entries survive");
-      }
-    }
-
-    @Test
-    @DisplayName("strips legacy Authorization on already-public/inconsistent route")
-    void shouldStripLegacyAuthHeaderEvenOnAlreadyPublicRoute() {
-      // Defense in depth: route has no plugin_config_id (so already "public" by our authoritative
-      // signal) but still carries a stale Authorization in headers.set — left over from a buggy
-      // earlier write or external mutation. An UPDATE to public must scrub it regardless.
-      try (ApisixSagaHandler handler = createHandlerWithApiKeyAuth("apikey", "X-API-Key")) {
-        Map<String, Object> route = existingRoute(false);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> plugins = (Map<String, Object>) route.get("plugins");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> proxyRewrite = (Map<String, Object>) plugins.get("proxy-rewrite");
-        Map<String, Object> set = new HashMap<>();
-        set.put("Authorization", "Basic stale-creds");
-        set.put("X-Trace-Id", "trace-123");
-        Map<String, Object> headers = new HashMap<>();
-        headers.put("set", set);
-        proxyRewrite.put("headers", headers);
-        stubGetReturning(route);
-        stubPutOk();
-
-        handler.handle(
-            createCommand(
-                "EXECUTE_STEP",
-                "UPDATE_ROUTE",
-                Map.of(
-                    "routeIds",
-                    Map.of("data", "ds-001"),
-                    "serviceId",
-                    "ds-001",
-                    "openDataAccess",
-                    true)));
-
-        Map<String, Object> body = capturePutBody();
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultPlugins = (Map<String, Object>) body.get("plugins");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultPr = (Map<String, Object>) resultPlugins.get("proxy-rewrite");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultHeaders = (Map<String, Object>) resultPr.get("headers");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultSet = (Map<String, Object>) resultHeaders.get("set");
-        assertFalse(
-            resultSet.containsKey("Authorization"),
-            "public routes must never carry FROST credentials, even from inconsistent prior state");
-        assertEquals(
-            "trace-123",
-            resultSet.get("X-Trace-Id"),
-            "non-auth foreign entries are still preserved");
-      }
-    }
-
-    @Test
-    @DisplayName("removes unlabeled legacy Authorization header on public flip (migration)")
-    void shouldRemoveUnlabeledLegacyAuthHeaderOnGoingPublic() {
-      // Migration scenario: route was provisioned by a pre-label version of this adapter, so it
-      // carries plugin_config_id + headers.set.Authorization but no civitas-frost-upstream-auth-
-      // header label. Adapter is now configured with API key scheme. Without a fallback list of
-      // well-known adapter-managed header names, the stale Authorization would survive the flip.
-      try (ApisixSagaHandler handler = createHandlerWithApiKeyAuth("apikey-value", "X-API-Key")) {
-        Map<String, Object> legacy = existingRoute(false);
-        legacy.put("plugin_config_id", "auth-plugin-1");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> plugins = (Map<String, Object>) legacy.get("plugins");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> proxyRewrite = (Map<String, Object>) plugins.get("proxy-rewrite");
-        Map<String, Object> set = new HashMap<>();
-        set.put("Authorization", "Basic stale-creds");
-        set.put("X-Trace-Id", "trace-123");
-        Map<String, Object> headers = new HashMap<>();
-        headers.put("set", set);
-        proxyRewrite.put("headers", headers);
-        // No labels block at all — represents pre-label adapter version.
-        stubGetReturning(legacy);
-        stubPutOk();
-
-        handler.handle(
-            createCommand(
-                "EXECUTE_STEP",
-                "UPDATE_ROUTE",
-                Map.of(
-                    "routeIds",
-                    Map.of("data", "ds-001"),
-                    "serviceId",
-                    "ds-001",
-                    "openDataAccess",
-                    true)));
-
-        Map<String, Object> body = capturePutBody();
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultPlugins = (Map<String, Object>) body.get("plugins");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultPr = (Map<String, Object>) resultPlugins.get("proxy-rewrite");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultHeaders = (Map<String, Object>) resultPr.get("headers");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultSet = (Map<String, Object>) resultHeaders.get("set");
-        assertFalse(
-            resultSet.containsKey("Authorization"),
-            "legacy unlabeled Authorization must be wiped on public flip — got headers.set: "
-                + resultSet);
-        assertEquals(
-            "trace-123",
-            resultSet.get("X-Trace-Id"),
-            "foreign entries must still survive the migration cleanup");
-      }
-    }
-
-    @Test
-    @DisplayName("removes stale adapter-managed auth header from previous scheme on public flip")
-    void shouldRemoveStaleAuthHeaderFromPreviousSchemeOnGoingPublic() {
-      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        // Route was provisioned with API-Key scheme earlier (label says "X-Old-Key"), the
-        // operator then reconfigured the adapter to Basic Auth ("Authorization"). On public
-        // flip the stale X-Old-Key entry would have remained without label-driven cleanup.
-        Map<String, Object> existing = existingRoute(true);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> plugins = (Map<String, Object>) existing.get("plugins");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> proxyRewrite = (Map<String, Object>) plugins.get("proxy-rewrite");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> set = (Map<String, Object>) proxyRewrite.get("headers");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> innerSet = (Map<String, Object>) set.get("set");
-        innerSet.clear();
-        innerSet.put("X-Old-Key", "stale-key-value");
-        innerSet.put("X-Trace-Id", "trace-123");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> labels = (Map<String, Object>) existing.get("labels");
-        labels.put("civitas-frost-upstream-auth-header", "X-Old-Key");
-        stubGetReturning(existing);
-        stubPutOk();
-
-        handler.handle(
-            createCommand(
-                "EXECUTE_STEP",
-                "UPDATE_ROUTE",
-                Map.of(
-                    "routeIds",
-                    Map.of("data", "ds-001"),
-                    "serviceId",
-                    "ds-001",
-                    "openDataAccess",
-                    true)));
-
-        Map<String, Object> body = capturePutBody();
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultPlugins = (Map<String, Object>) body.get("plugins");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultPr = (Map<String, Object>) resultPlugins.get("proxy-rewrite");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultHeaders = (Map<String, Object>) resultPr.get("headers");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultSet = (Map<String, Object>) resultHeaders.get("set");
-        assertFalse(
-            resultSet.containsKey("X-Old-Key"),
-            "stale adapter-managed header (label-tracked) must be removed on public flip"
-                + " — got headers.set: "
-                + resultSet);
-        assertEquals("trace-123", resultSet.get("X-Trace-Id"), "foreign entries stay");
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultLabels = (Map<String, Object>) body.get("labels");
-        if (resultLabels != null) {
-          assertFalse(
-              resultLabels.containsKey("civitas-frost-upstream-auth-header"),
-              "label tracking the adapter-managed header must be cleared on public flip");
-        }
       }
     }
 
@@ -2410,38 +1782,6 @@ class ApisixSagaHandlerTest {
             "Authorization",
             resultLabels.get("civitas-frost-upstream-auth-header"),
             "label must follow the currently configured header name");
-      }
-    }
-
-    @Test
-    @DisplayName("detects private route with numeric plugin_config_id as private")
-    void shouldDetectNumericPluginConfigIdAsPrivate() {
-      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        // APISIX returns plugin_config_id as Integer when it was originally PUT with a numeric
-        // literal (allowed by RouteConfigValue). The detection must not be String-only.
-        Map<String, Object> legacy = existingRoute(false);
-        legacy.put("plugin_config_id", 1);
-        stubGetReturning(legacy);
-        stubPutOk();
-
-        SagaCommandResult result =
-            handler.handle(
-                createCommand(
-                    "EXECUTE_STEP",
-                    "UPDATE_ROUTE",
-                    Map.of(
-                        "routeIds",
-                        Map.of("data", "ds-001"),
-                        "serviceId",
-                        "ds-001",
-                        "openDataAccess",
-                        true)));
-
-        assertEquals(
-            false,
-            ((Map<?, ?>) result.compensationData().get("previousOpenDataAccess")).get("data"),
-            "numeric plugin_config_id must also count as private (Finding P2 — Integer values"
-                + " allowed per RouteConfigValue.java)");
       }
     }
 
@@ -2509,54 +1849,6 @@ class ApisixSagaHandlerTest {
         assertTrue(
             removeList.contains("X-User-Strip"),
             "user-defined headers.remove entries must survive the merge");
-      }
-    }
-
-    @Test
-    @DisplayName("removes only the adapter-managed Authorization header when going public")
-    void shouldOnlyRemoveAdapterManagedHeaderOnGoingPublic() {
-      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        Map<String, Object> existing = existingRoute(true);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> plugins = (Map<String, Object>) existing.get("plugins");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> proxyRewrite = (Map<String, Object>) plugins.get("proxy-rewrite");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> headers = (Map<String, Object>) proxyRewrite.get("headers");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> set = (Map<String, Object>) headers.get("set");
-        set.put("X-Trace-Id", "trace-123");
-        stubGetReturning(existing);
-        stubPutOk();
-
-        handler.handle(
-            createCommand(
-                "EXECUTE_STEP",
-                "UPDATE_ROUTE",
-                Map.of(
-                    "routeIds",
-                    Map.of("data", "ds-001"),
-                    "serviceId",
-                    "ds-001",
-                    "openDataAccess",
-                    true)));
-
-        Map<String, Object> body = capturePutBody();
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultPlugins = (Map<String, Object>) body.get("plugins");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultPr = (Map<String, Object>) resultPlugins.get("proxy-rewrite");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultHeaders = (Map<String, Object>) resultPr.get("headers");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resultSet = (Map<String, Object>) resultHeaders.get("set");
-        assertEquals(
-            "trace-123",
-            resultSet.get("X-Trace-Id"),
-            "foreign headers.set entries are kept even when stripping the adapter header");
-        assertFalse(
-            resultSet.containsKey("Authorization"),
-            "adapter-managed Authorization header must be removed when going public");
       }
     }
 
@@ -2717,39 +2009,13 @@ class ApisixSagaHandlerTest {
                 createCommand(
                     "COMPENSATE_STEP",
                     "RESTORE_ROUTE",
-                    Map.of(
-                        "routeIds", Map.of("data", "ds-001"),
-                        "serviceId", "ds-001",
-                        "previousOpenDataAccess", Map.of("data", false))));
+                    Map.of("routeIds", Map.of("data", "ds-001"), "serviceId", "ds-001")));
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
         assertEquals("saga-001", result.sagaId());
 
         Map<String, Object> body = capturePutBody();
         assertEquals("auth-plugin-1", body.get("plugin_config_id"));
-      }
-    }
-
-    @Test
-    @DisplayName("returns COMPENSATION_COMPLETED and restores previous public state")
-    void shouldRestorePreviousPublicState() {
-      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
-        stubGetReturning(existingRoute(true));
-        stubPutOk();
-
-        SagaCommandResult result =
-            handler.handle(
-                createCommand(
-                    "COMPENSATE_STEP",
-                    "RESTORE_ROUTE",
-                    Map.of(
-                        "routeIds", Map.of("data", "ds-001"),
-                        "serviceId", "ds-001",
-                        "previousOpenDataAccess", Map.of("data", true))));
-
-        assertEquals("COMPENSATION_COMPLETED", result.type());
-        Map<String, Object> body = capturePutBody();
-        assertFalse(body.containsKey("plugin_config_id"));
       }
     }
 
@@ -2768,10 +2034,7 @@ class ApisixSagaHandlerTest {
                 createCommand(
                     "COMPENSATE_STEP",
                     "RESTORE_ROUTE",
-                    Map.of(
-                        "routeIds", Map.of("data", "ds-001"),
-                        "serviceId", "ds-001",
-                        "previousOpenDataAccess", Map.of("data", true))));
+                    Map.of("routeIds", Map.of("data", "ds-001"), "serviceId", "ds-001")));
 
         assertEquals("COMPENSATION_FAILED", result.type());
         assertNotNull(result.error());
@@ -2789,10 +2052,7 @@ class ApisixSagaHandlerTest {
                 createCommand(
                     "COMPENSATE_STEP",
                     "RESTORE_ROUTE",
-                    Map.of(
-                        "routeIds", Map.of("data", "ds-001"),
-                        "serviceId", "ds-001",
-                        "previousOpenDataAccess", Map.of("data", false))));
+                    Map.of("routeIds", Map.of("data", "ds-001"), "serviceId", "ds-001")));
 
         assertEquals("COMPENSATION_FAILED", result.type());
         assertNotNull(result.error());
@@ -2813,10 +2073,7 @@ class ApisixSagaHandlerTest {
                 createCommand(
                     "COMPENSATE_STEP",
                     "RESTORE_ROUTE",
-                    Map.of(
-                        "routeIds", Map.of("data", "ds-001"),
-                        "serviceId", "ds-001",
-                        "previousOpenDataAccess", Map.of("data", false))));
+                    Map.of("routeIds", Map.of("data", "ds-001"), "serviceId", "ds-001")));
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
         verify(mockBuilder, never()).put(any(Entity.class));

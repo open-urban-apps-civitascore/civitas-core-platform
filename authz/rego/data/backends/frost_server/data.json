@@ -7,9 +7,11 @@
   "api_host": "api.localhost",
 
   "_permission_comment": "Reading SensorThings content through this protected data-plane route requires DATASET_PAYLOAD_READ (payload access), NOT the broader metadata-level DATASET_READ. A user with only DATASET_READ (e.g. DATASET_ARCHITECT) must NOT be able to read FROST content. The /apis discovery endpoint is portal_backend, not this backend.",
+  "_open_data_comment": "`_open_data: true` marks an endpoint as anonymously readable when the dataset is flagged openDataAccess=true (see policy/open_data.rego). It covers ALL FROST sub-resources because they all map to this single /v1/datasets/{id} pattern. Reads only; writes are never open.",
   "endpoints": {
     "/v1/datasets/{id}": {
-      "GET": "DATASET_PAYLOAD_READ"
+      "GET": "DATASET_PAYLOAD_READ",
+      "_open_data": true
     }
   }
 }

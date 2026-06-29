@@ -14,32 +14,31 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
- * Builds saga route bodies and applies the open/protected auth state to them. This is the single
- * place encoding what "open data" vs "protected" means on the gateway:
+ * Builds saga route bodies and applies the gateway auth state to them. Every published-data route
+ * is <b>always protected</b>: it carries the {@code plugin_config_id} (OIDC + OPA) and, for {@link
+ * RouteUpstreamKind#STA} routes, the FROST upstream credential in {@code proxy-rewrite.headers.set}
+ * (tracked via the {@link #MANAGED_AUTH_HEADER_LABEL} route label). No {@code methods} restriction
+ * is applied — the per-request OPA decision is the gate.
  *
- * <ul>
- *   <li><b>Protected</b> — {@code plugin_config_id} (OIDC/OPA), the FROST upstream credential in
- *       {@code proxy-rewrite.headers.set} (tracked via the {@link #MANAGED_AUTH_HEADER_LABEL} route
- *       label), no {@code methods} restriction (the gateway-side OPA decision gates per request).
- *   <li><b>Open data</b> — no {@code plugin_config_id} and no upstream credential, but {@code
- *       methods} restricted to read-only verbs ({@link #OPEN_DATA_METHODS}): "open" means anonymous
- *       <i>read</i>. Without OIDC/OPA on the route, this method gate is the only thing keeping
- *       anonymous writes (POST/PATCH/DELETE) away from FROST (MR !547 review finding 1).
- *   <li><b>Always</b> — internal trust headers are stripped via {@code
- *       proxy-rewrite.headers.remove} (see {@link ApisixHandlerSettings#ALWAYS_STRIPPED_HEADERS}).
- * </ul>
+ * <p>"Open data" is no longer a route-level concept. Anonymous read access to an open dataset is
+ * decided by OPA at request time (ABAC on the dataset's {@code openDataAccess} flag): the request
+ * still traverses the OIDC/OPA route, and OPA returns allow. The former bypass — stripping the auth
+ * plugin and making the FROST project public — has been removed so authorization is never decided
+ * around OPA.
  *
  * <p>The FROST upstream credential applies only to {@link RouteUpstreamKind#STA} routes. {@link
  * RouteUpstreamKind#OWS} routes carry <b>no</b> upstream credential — GeoServer serves the
- * workspace OWS endpoint anonymously, so the protected/open gate above is the whole story for them.
- * A route's kind is recorded at CREATE via {@link #MANAGED_STANDARD_LABEL} so UPDATE/RESTORE (which
- * read the route back from APISIX without the standard in their payload) toggle it correctly.
+ * workspace OWS endpoint anonymously. A route's kind is recorded at CREATE via {@link
+ * #MANAGED_STANDARD_LABEL} so UPDATE/RESTORE (which read the route back from APISIX without the
+ * standard in their payload) re-apply the credential correctly.
+ *
+ * <p>Internal trust headers are always stripped via {@code proxy-rewrite.headers.remove} (see
+ * {@link ApisixHandlerSettings#ALWAYS_STRIPPED_HEADERS}).
  *
  * <p>CREATE builds a fresh skeleton and runs it through the same {@link #applyAuthState} as
- * UPDATE/RESTORE, so the open/protected semantics cannot drift between the create and toggle paths.
+ * UPDATE/RESTORE, so the protected shape cannot drift between the create and re-apply paths.
  */
 final class RouteAuthConfigurer {
 
@@ -58,31 +57,8 @@ final class RouteAuthConfigurer {
    */
   static final String MANAGED_STANDARD_LABEL = "civitas-named-api-standard";
 
-  /**
-   * HTTP methods allowed on open-data routes: anonymous read plus the verbs browsers need for it
-   * (HEAD probes, CORS preflight OPTIONS — FROST answers CORS itself). Everything else (writes) has
-   * no route and is rejected by APISIX with 404.
-   */
-  static final List<String> OPEN_DATA_METHODS = List.of("GET", "HEAD", "OPTIONS");
-
-  /**
-   * Well-known header names the adapter has historically set in {@code headers.set} before the
-   * label tracking was introduced. Used as a migration-safety fallback to clean up stale FROST
-   * credentials on public flips for routes that pre-date the {@link #MANAGED_AUTH_HEADER_LABEL}
-   * mechanism.
-   *
-   * <p><b>Migration scope:</b> covers Basic Auth ({@code Authorization}) and the default API key
-   * header ({@code X-API-Key}). Routes provisioned under a custom {@code
-   * apisix.frost.api.key.header} (e.g. {@code X-Frost-Key}) before label tracking shipped are NOT
-   * automatically cleaned via this fallback — the adapter cannot enumerate historical custom values
-   * it never recorded. For those, the adapter still cleans the currently-configured header name on
-   * every flip; operators with a different historical name must either (a) trigger an UPDATE while
-   * the adapter is still configured with the historical name, or (b) clean up manually via the
-   * APISIX admin API. New routes (post-label) carry the {@link #MANAGED_AUTH_HEADER_LABEL} and are
-   * unaffected.
-   */
-  private static final Set<String> LEGACY_ADAPTER_AUTH_HEADERS =
-      Set.of("Authorization", FrostUpstreamAuth.DEFAULT_API_KEY_HEADER);
+  /** {@code proxy-rewrite.headers} sub-map of request headers to set on the upstream. */
+  private static final String HEADERS_SET_KEY = "set";
 
   private final ApisixHandlerSettings settings;
 
@@ -92,7 +68,7 @@ final class RouteAuthConfigurer {
 
   /**
    * Builds the full route body for CREATE_ROUTE: URIs, host pinning, upstream binding,
-   * proxy-rewrite path mapping — then applies the open/protected auth state through the same path
+   * proxy-rewrite path mapping — then applies the protected auth state through the same path
    * UPDATE/RESTORE use. {@code routePath} is the per-named-API {@code /v1/datasets/{id}/{slug}};
    * {@code upstreamId} keys the dataset upstream selected by {@code kind} (the FROST-project
    * upstream for {@link RouteUpstreamKind#STA}, the map-server upstream for {@link
@@ -101,11 +77,7 @@ final class RouteAuthConfigurer {
    * /geoserver/{workspace}/ows} for map services).
    */
   Map<String, Object> newRouteBody(
-      String routePath,
-      String upstreamId,
-      boolean isOpenData,
-      String upstreamPath,
-      RouteUpstreamKind kind) {
+      String routePath, String upstreamId, String upstreamPath, RouteUpstreamKind kind) {
     Map<String, Object> body = new HashMap<>();
 
     // Published-data routes are pinned to the configured API virtual host (apisix.api.host)
@@ -113,6 +85,13 @@ final class RouteAuthConfigurer {
     body.put("uris", new String[] {routePath, routePath + "/*"});
     body.put("hosts", new String[] {settings.apiHost()});
     body.put("upstream_id", upstreamId);
+    // EVERY dataset route — STA and OWS alike — carries this single shared service_id. OPA reads
+    // input.service.name from it (with_service=true) to pick the backend policy, so OWS/GeoServer
+    // routes are deliberately authorized under the `frost_server` backend policy too (the one
+    // carrying `_open_data: true`); 9g4 proves anonymous OWS open data works through it. This is an
+    // intentional coupling: if backends are ever split by service name, OWS open data must get its
+    // own service/policy (or a backend-neutral name like `dataset-payload`) instead of relying on
+    // `frost_server` == FROST-only.
     if (settings.serviceId() != null) {
       body.put("service_id", settings.serviceId());
     }
@@ -134,41 +113,36 @@ final class RouteAuthConfigurer {
       RouteLabels.put(body, MANAGED_STANDARD_LABEL, RouteUpstreamKind.OWS.name());
     }
 
-    applyAuthState(body, isOpenData);
+    applyAuthState(body);
     return body;
   }
 
   /**
-   * Sets or removes {@code plugin_config_id}, the {@code methods} read-only gate, and the upstream
-   * auth header in {@code proxy-rewrite} according to {@code isOpenData}. Mutates the given route
-   * map in place. Used by CREATE (on a fresh skeleton), UPDATE (toggle) and RESTORE (rollback), so
-   * every path produces the same auth shape.
+   * Applies the protected auth state to a route: sets {@code plugin_config_id} (OIDC + OPA),
+   * injects the FROST upstream credential for STA routes, and removes any {@code methods} gate.
+   * Mutates the given route map in place. Used by CREATE (on a fresh skeleton), UPDATE and RESTORE
+   * (re-apply), so every path produces the same protected shape — there is no longer an "open"
+   * variant.
    */
-  void applyAuthState(Map<String, Object> route, boolean isOpenData) {
+  void applyAuthState(Map<String, Object> route) {
     boolean sta = readUpstreamKind(route) == RouteUpstreamKind.STA;
 
-    // FROST upstream credential is tracked via a route label so a later toggle can clean a stale
-    // entry left behind by a different auth scheme or a renamed API key header. Only STA
-    // (STA → FROST) routes carry it; read the previously-set header BEFORE flipping the label.
-    String staleManagedHeader = sta ? RouteLabels.read(route, MANAGED_AUTH_HEADER_LABEL) : null;
+    // FROST upstream credential is tracked via a route label so a re-apply can clean a stale entry
+    // left behind by a different auth scheme, a renamed API key header, or a route that no longer
+    // carries it. Read the previously-set header BEFORE flipping the label — for BOTH kinds, so an
+    // OWS route is provably stripped of any FROST credential it should never forward.
+    String managedHeader = RouteLabels.read(route, MANAGED_AUTH_HEADER_LABEL);
 
-    if (isOpenData) {
-      route.remove("plugin_config_id");
-      if (sta) {
-        RouteLabels.remove(route, MANAGED_AUTH_HEADER_LABEL);
-      }
-      // Open data = anonymous READ. With no OIDC/OPA on the route, restricting the matchable
-      // methods is the gateway's only write protection for the upstream.
-      route.put("methods", OPEN_DATA_METHODS);
+    route.put("plugin_config_id", settings.pluginConfigId());
+    if (sta) {
+      RouteLabels.put(route, MANAGED_AUTH_HEADER_LABEL, settings.frostAuth().headerName());
     } else {
-      route.put("plugin_config_id", settings.pluginConfigId());
-      if (sta) {
-        RouteLabels.put(route, MANAGED_AUTH_HEADER_LABEL, settings.frostAuth().headerName());
-      }
-      // Protected routes carry no methods filter: OPA decides per request, and a future
-      // authorized-write feature must not be blocked by a stale route-level gate.
-      route.remove("methods");
+      // OWS (map-service) routes never carry the FROST upstream credential — drop any stale label.
+      RouteLabels.remove(route, MANAGED_AUTH_HEADER_LABEL);
     }
+    // No methods filter: OPA decides per request (it allows only safe reads for anonymous open-data
+    // callers), and a future authorized-write feature must not be blocked by a route-level gate.
+    route.remove("methods");
 
     @SuppressWarnings("unchecked")
     Map<String, Object> plugins = (Map<String, Object>) route.get("plugins");
@@ -181,25 +155,13 @@ final class RouteAuthConfigurer {
       return;
     }
     // STA routes inject the FROST upstream credential; OWS map-service routes carry none.
-    mergeProxyRewriteHeaders(proxyRewrite, isOpenData, staleManagedHeader, sta);
+    mergeProxyRewriteHeaders(proxyRewrite, managedHeader, sta);
   }
 
   /** A route's upstream kind, read from {@link #MANAGED_STANDARD_LABEL}; absent marker ⇒ STA. */
   private static RouteUpstreamKind readUpstreamKind(Map<String, Object> route) {
     String standard = RouteLabels.read(route, MANAGED_STANDARD_LABEL);
     return RouteUpstreamKind.fromStandard(standard).orElse(RouteUpstreamKind.STA);
-  }
-
-  /**
-   * Detects whether a route is currently configured as private. The single authoritative signal is
-   * {@code plugin_config_id} — the gateway-side OIDC/OPA gate. Foreign {@code headers.set} entries
-   * (operator-added trace headers, etc.) do not mark a route as private; relying on them would
-   * misclassify public routes that an operator decorated independently.
-   */
-  boolean routeIsPrivate(Map<String, Object> route) {
-    Object existingPluginConfigId = route.get("plugin_config_id");
-    return existingPluginConfigId != null
-        && !(existingPluginConfigId instanceof String s && s.isBlank());
   }
 
   /**
@@ -212,14 +174,13 @@ final class RouteAuthConfigurer {
    */
   @SuppressWarnings("unchecked")
   private void mergeProxyRewriteHeaders(
-      Map<String, Object> proxyRewrite,
-      boolean isOpenData,
-      String staleManagedHeader,
-      boolean sta) {
+      Map<String, Object> proxyRewrite, String managedHeader, boolean sta) {
     Map<String, Object> headers = mutableMap((Map<String, Object>) proxyRewrite.get("headers"));
 
     if (sta) {
-      mergeAuthSetEntries(headers, isOpenData, staleManagedHeader);
+      mergeAuthSetEntries(headers, managedHeader);
+    } else {
+      removeManagedAuthHeader(headers, managedHeader);
     }
     mergeStripList(headers);
 
@@ -231,34 +192,41 @@ final class RouteAuthConfigurer {
   }
 
   /**
-   * {@code headers.set} — touch only adapter-managed FROST upstream auth entries. A stale entry
-   * from a previous config (different scheme or renamed API key header) is identified via the route
-   * label written when we last set it; remove it before applying the current value.
+   * {@code headers.set} — set the adapter-managed FROST upstream credential. A stale entry from a
+   * previous config (different scheme or renamed API key header) is identified via the route label
+   * written when we last set it; remove it before applying the current value.
    */
   @SuppressWarnings("unchecked")
-  private void mergeAuthSetEntries(
-      Map<String, Object> headers, boolean isOpenData, String staleManagedHeader) {
-    Map<String, Object> set = mutableMap((Map<String, Object>) headers.get("set"));
+  private void mergeAuthSetEntries(Map<String, Object> headers, String staleManagedHeader) {
+    Map<String, Object> set = mutableMap((Map<String, Object>) headers.get(HEADERS_SET_KEY));
     String authHeaderName = settings.frostAuth().headerName();
     if (staleManagedHeader != null && !staleManagedHeader.equals(authHeaderName)) {
       set.remove(staleManagedHeader);
     }
-    if (isOpenData) {
-      set.remove(authHeaderName);
-      // Public routes must never carry FROST credentials. Wipe well-known adapter-managed
-      // header names unconditionally — this covers pre-label legacy routes, inconsistent state
-      // left behind by external mutation, and the rare case of a config-time scheme change.
-      // Non-auth foreign entries (e.g. user-added X-Trace-Id) are preserved.
-      for (String legacy : LEGACY_ADAPTER_AUTH_HEADERS) {
-        set.remove(legacy);
-      }
-    } else {
-      set.put(authHeaderName, settings.frostAuth().headerValue());
+    set.put(authHeaderName, settings.frostAuth().headerValue());
+    headers.put(HEADERS_SET_KEY, set);
+  }
+
+  /**
+   * {@code headers.set} for a non-STA (OWS) route — drop the adapter-managed FROST credential if a
+   * previous config left one behind (identified via the route label). OWS map-service routes must
+   * forward NO upstream credential; GeoServer serves the workspace OWS endpoint anonymously.
+   */
+  @SuppressWarnings("unchecked")
+  private void removeManagedAuthHeader(Map<String, Object> headers, String managedHeader) {
+    if (managedHeader == null) {
+      return;
     }
-    if (set.isEmpty()) {
-      headers.remove("set");
+    Map<String, Object> set = (Map<String, Object>) headers.get(HEADERS_SET_KEY);
+    if (set == null || !set.containsKey(managedHeader)) {
+      return;
+    }
+    Map<String, Object> mutable = mutableMap(set);
+    mutable.remove(managedHeader);
+    if (mutable.isEmpty()) {
+      headers.remove(HEADERS_SET_KEY);
     } else {
-      headers.put("set", set);
+      headers.put(HEADERS_SET_KEY, mutable);
     }
   }
 

@@ -91,7 +91,6 @@ class ResultPublishDelegateResultKeysTest {
     vars.put("datasetId", "ds-1");
     vars.put("datasetName", "Test");
     vars.put("description", "A test dataset");
-    vars.put("openDataAccess", true);
     vars.put("hasPipelines", false);
     vars.put("datasources", java.util.List.of());
     vars.put("dataPipelines", java.util.List.of());

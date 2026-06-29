@@ -105,14 +105,17 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     String datasetName = requireString(command, "datasetName");
     String datasetId = requireString(command, "datasetId");
     String description = (String) command.payload().getOrDefault(KEY_DESCRIPTION, "");
-    boolean openDataAccess =
-        Boolean.TRUE.equals(command.payload().getOrDefault("openDataAccess", false));
 
     String projectName = frostProjectName(datasetName, datasetId);
     Map<String, Object> body = new HashMap<>();
     body.put(KEY_NAME, projectName);
     body.put(KEY_DESCRIPTION, description);
-    body.put(KEY_PUBLIC, openDataAccess);
+    // The FROST project is ALWAYS created private. Open data access is an authorization
+    // decision made by OPA at request time (ABAC on the dataset's openDataAccess flag), not by
+    // FROST project visibility — anonymous open-data reads flow through the gateway → OPA, never
+    // around it via a publicly readable FROST project. (Replaces the former
+    // public=openDataAccess bypass.)
+    body.put(KEY_PUBLIC, false);
 
     try (Response response =
         authStrategy
@@ -217,13 +220,10 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     String datasetName = requireString(command, "datasetName");
     String datasetId = requireString(command, "datasetId");
     String description = (String) command.payload().getOrDefault(KEY_DESCRIPTION, "");
-    boolean openDataAccess =
-        Boolean.TRUE.equals(command.payload().getOrDefault("openDataAccess", false));
 
     // Read current state before updating (needed for compensation)
     String previousName;
     String previousDescription;
-    boolean previousPublic;
     try (Response getResponse =
         authStrategy
             .apply(
@@ -237,14 +237,19 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       Map<String, Object> currentProject = getResponse.readEntity(Map.class);
       previousName = (String) currentProject.getOrDefault(KEY_NAME, "");
       previousDescription = (String) currentProject.getOrDefault(KEY_DESCRIPTION, "");
-      previousPublic = Boolean.TRUE.equals(currentProject.getOrDefault(KEY_PUBLIC, false));
     }
 
+    // Always force the project private (see handleCreateProject). New projects are never created
+    // public, so a public project can only be legacy/pre-migration data; re-provisioning flips it
+    // back to private, closing the old OPA-bypass path.
     Map<String, Object> body =
         Map.of(
-            KEY_NAME, frostProjectName(datasetName, datasetId),
-            KEY_DESCRIPTION, description,
-            KEY_PUBLIC, openDataAccess);
+            KEY_NAME,
+            frostProjectName(datasetName, datasetId),
+            KEY_DESCRIPTION,
+            description,
+            KEY_PUBLIC,
+            false);
 
     try (Response response =
         authStrategy
@@ -261,13 +266,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       Map<String, Object> resultData = Map.of(KEY_PROJECT_ID, projectId, "baseUrl", baseUrl);
       Map<String, Object> compensationData =
           new HashMap<>(
-              Map.of(
-                  KEY_PROJECT_ID,
-                  projectId,
-                  "previousDescription",
-                  previousDescription,
-                  "previousPublic",
-                  previousPublic));
+              Map.of(KEY_PROJECT_ID, projectId, "previousDescription", previousDescription));
       if (previousName.isBlank()) {
         // FROST returned no usable name (unexpected). Capturing "" would make a later
         // RESTORE_PROJECT blank the project name and break the unique-name duplicate-recovery
@@ -338,7 +337,8 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     Map<String, Object> body = new HashMap<>();
     // Only restore the name when the UPDATE saga captured a usable one. PATCHing "" would blank
     // the project identity and break the unique-name duplicate-recovery lookup; leaving the field
-    // unset preserves the current value via PATCH semantics (same guard as previousPublic below).
+    // unset preserves the current value via PATCH semantics. (The public flag is not restored —
+    // it is unconditionally forced false below, since FROST projects are never public.)
     if (previousName instanceof String name && !name.isBlank()) {
       body.put(KEY_NAME, name);
     } else {
@@ -349,22 +349,9 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
           Encode.forJava(command.sagaId()));
     }
     body.put(KEY_DESCRIPTION, previousDescription);
-    // Only restore previousPublic when the UPDATE saga captured it (older sagas may
-    // predate this field — leaving it unset preserves the current value via PATCH semantics).
-    Object previousPublic = command.payload().get("previousPublic");
-    if (previousPublic != null) {
-      body.put(KEY_PUBLIC, Boolean.TRUE.equals(previousPublic));
-    } else {
-      // Privacy-relevant edge: without a captured previousPublic (e.g. an in-flight saga across a
-      // deploy) the FROST project's public flag is left as-is rather than reverted. Surface it so
-      // an
-      // operator can verify the access state after such a rollback.
-      log.info(
-          "RESTORE_PROJECT: previousPublic not captured — leaving the FROST public flag unchanged"
-              + " for projectId={}, saga={}",
-          Encode.forJava(projectId),
-          Encode.forJava(command.sagaId()));
-    }
+    // Force private on restore as well: FROST projects are never public in the OPA-decides model,
+    // so a compensation must not resurrect a public flag. (No previousPublic is captured anymore.)
+    body.put(KEY_PUBLIC, false);
 
     try (Response response =
         authStrategy

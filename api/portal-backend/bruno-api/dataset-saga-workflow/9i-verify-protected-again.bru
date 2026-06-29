@@ -11,8 +11,9 @@ get {
 }
 
 script:pre-request {
-  // The UPDATE saga from 9h re-attaches the auth plugin asynchronously. Poll the data-plane
-  // WITHOUT a token until it returns 401 again (route re-protected), max ~50s (25 attempts × 2s).
+  // After 9h flipped the flag to false, OPA stops granting anonymous access once its attribute
+  // cache re-reads the flag. Poll the data-plane WITHOUT a token until it returns 401 again
+  // (anonymous re-denied), max ~50s (25 attempts × 2s).
   // Bruno's QuickJS axios does not honour a validateStatus function, so it throws on non-2xx;
   // catch the 401 (re-protected) state — that is exactly the status we are polling for.
   const axios = require('axios');
@@ -36,9 +37,9 @@ tests {
 docs {
   **Saga step 9i of 18** — Confirm the toggle is fully reversible (issue #1368, journey J3).
 
-  After 9h flipped `openDataAccess` back to false, an unauthenticated GET must again be rejected with 401 — proving the UPDATE saga re-attached the OpenID-Connect auth plugin. Together, 9c/9g/9i pin the complete state machine: protected → open → protected.
+  After 9h flipped `openDataAccess` back to false, an unauthenticated GET must again be rejected with 401 — proving OPA stopped granting anonymous access once it re-read the flag (the route was protected the whole time). Together, 9c/9g/9i pin the complete state machine: protected → open → protected.
 
-  **Precondition:** 9h accepted; pre-request polled the data-plane until 401 (UPDATE saga re-protected the route).
+  **Precondition:** 9h accepted; pre-request polled the data-plane until 401 (OPA re-read the flag and re-denied anonymous access).
 
   **Expected Response:** 401 Unauthorized (no bearer token).
 }

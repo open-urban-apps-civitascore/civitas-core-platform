@@ -27,11 +27,13 @@ public class DatasetPoolService {
   private final DataSetRepository dataSetRepository;
 
   /**
-   * Returns the datapool membership of a dataset.
+   * Returns the authorization attributes of a dataset: its datapool membership (Epic 1 union
+   * inheritance) and its open-data flag (ABAC). Both are resolved from the single {@code DataSet}
+   * row, so the lookup stays one query.
    *
    * @param datasetId the dataset id
-   * @return present with the pool id (possibly {@code null} when the dataset has no pool) if the
-   *     dataset exists; empty if the dataset does not exist
+   * @return present with the pool id (possibly {@code null} when the dataset has no pool) and the
+   *     open-data flag if the dataset exists; empty if the dataset does not exist
    */
   @Transactional(readOnly = true)
   public Optional<DatasetPoolResponse> getDatasetPool(UUID datasetId) {
@@ -40,7 +42,9 @@ public class DatasetPoolService {
         .map(
             dataSet -> {
               DataPool pool = dataSet.getDataPool();
-              return new DatasetPoolResponse(pool != null ? pool.getId() : null);
+              return new DatasetPoolResponse(
+                  pool != null ? pool.getId() : null,
+                  Boolean.TRUE.equals(dataSet.getOpenDataAccess()));
             });
   }
 }

@@ -10,6 +10,7 @@
    - [Kafka](#13-kafka)
    - [Data-Plane Base URL](#15-data-plane-base-url)
    - [Gateway Trust Model (APISIX / OPA)](#16-gateway-trust-model-apisix--opa)
+   - [Open Data Access (anonymous pass-through)](#17-open-data-access-anonymous-pass-through)
 2. [Optional / Tuning](#2-optional--tuning)
    - [Server](#21-server)
    - [Event Publishing & Config-Adapter](#22-event-publishing--config-adapter)
@@ -117,6 +118,64 @@ place; the dev-environment equivalents are in `dev-environment/apisix/apisix_con
 
 ---
 
+### 1.7 Open Data Access (anonymous pass-through)
+
+"Open data" datasets (`Dataset.openDataAccess = true`) allow **anonymous** read access to their
+**payload** (e.g. STA/FROST, OWS/GeoServer). This is decided **centrally by OPA at request time** —
+there is no per-route bypass and the FROST project is never made public. For OPA to make that
+decision, anonymous requests must *reach* OPA instead of being rejected at the gateway, which changes
+the prod APISIX `openid-connect` configuration.
+
+> **No portal-backend change is required for this feature.** The backend has no role here:
+> `openDataAccess` is persisted on the dataset and read by **OPA** from the AuthZ Repository. There is
+> **no new env var** on this service. The work below lives entirely in the **`civitas-core-deployment`**
+> repo (prod APISIX config, owned by Team 3); the dev equivalents are in
+> `dev-environment/apisix/apisix_conf/apisix.yaml` and `dev-environment/apisix/seed-routes.sh`.
+
+The shared dataset-route plugin config (OIDC + OPA) MUST be set up as follows:
+
+1. **Let anonymous requests pass to OPA.** The `openid-connect` plugin MUST run with:
+
+   | Setting | Value | Why |
+   |---|---|---|
+   | `unauth_action` | `"pass"` | An unauthenticated request continues to OPA instead of a 401 at the gateway. OPA then grants or denies per the dataset's `openDataAccess` flag. |
+   | `bearer_only` | `false` | Required by APISIX once `unauth_action: pass` is used. A present bearer token is still validated and its claims still forwarded as `X-Userinfo`. |
+   | `access_token_in_authorization_header` | `true` | Keeps bearer-token auth working for authenticated callers under `bearer_only: false`. |
+
+2. **`session.secret` is now a real credential — inject a strong one.** With `bearer_only: false`,
+   `openid-connect` processes session cookies, so `session.secret` is an **authentication secret**, not
+   an inert schema value: anyone who knows it can mint session state the gateway trusts. It MUST be a
+   strong, **injected** value (e.g. from a Kubernetes Secret) and MUST NOT be a known, shared, or
+   committed constant. (The dev seeding script generates a fresh **random** secret per run for exactly
+   this reason; never copy a dev value into prod.)
+
+3. **Strip client-supplied identity headers at the gateway.** Because anonymous requests now reach
+   OPA, and OPA derives identity from `X-Userinfo`, a `serverless-pre-function` MUST run in the
+   **rewrite phase, before `openid-connect`**, and clear any client-supplied `X-Userinfo`,
+   `X-Access-Token`, and `X-Id-Token`. Without it a client can forge an identity (authorization
+   bypass). The `serverless-pre-function` plugin MUST also be present in the APISIX `plugins`
+   allowlist. This is the identity-header analogue of the `X-Allowed-Scope-Ids`/`X-Allowed-Pool-Ids`
+   strip in [§1.6](#16-gateway-trust-model-apisix--opa) point 2, and the same saga-route caveat applies
+   (a route-level `proxy-rewrite` overrides the shared one), so the strip must hold on the
+   saga-created `/v1/datasets/{id}/{slug}` routes as well — keep it on the shared plugin config that
+   every route references.
+
+> **Deploy points 1–3 together.** Enabling `unauth_action: pass` (point 1) without the identity-header
+> strip (point 3) opens an identity-spoofing window the moment anonymous requests can reach OPA. Roll
+> them out as one coordinated change.
+
+> **Scope:** open data is **payload-only**. Management/discovery endpoints
+> (`GET /v1/datasets/{id}`, `GET /v1/datasets/{id}/apis`) stay authenticated at both OPA and this
+> backend — do not add them to any anonymous allowlist.
+
+The dev side of this contract is guarded by the Bruno API tests `9c2`/`9c3`/`9c4` (forged
+`X-Userinfo` and forged session cookie → 401), `9g`/`9g2`/`9g3` (anonymous STA payload → 200, anonymous
+write/discovery → 401), and `9g4` (anonymous OWS/GeoServer payload → 200, proving open data is
+universal across routable backends); there is **no in-repo guard for the prod APISIX config** — keep
+it in sync by hand.
+
+---
+
 ## 2. Optional / Tuning
 
 ### 2.1 Server
@@ -201,7 +260,7 @@ Production defaults to actuator endpoints only. The `local` profile adds Swagger
 
 To add paths in a deployed environment, override with a comma-separated env var:
 
-```
+```bash
 SECURITY_PERMIT_PATHS_0=/actuator/health/**
 SECURITY_PERMIT_PATHS_1=/actuator/info
 SECURITY_PERMIT_PATHS_2=/api-docs/**

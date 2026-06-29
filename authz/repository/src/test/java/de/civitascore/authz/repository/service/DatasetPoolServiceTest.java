@@ -68,5 +68,43 @@ class DatasetPoolServiceTest {
       assertThat(result).isPresent();
       assertThat(result.get().getPoolId()).isNull();
     }
+
+    @Test
+    @DisplayName("returns openDataAccess=true when the dataset is flagged for open data")
+    void datasetFlaggedOpen_returnsOpenDataAccessTrue() {
+      DataSet dataSet = new DataSet();
+      dataSet.setOpenDataAccess(true);
+      when(dataSetRepository.findById(DATASET_ID)).thenReturn(Optional.of(dataSet));
+
+      Optional<DatasetPoolResponse> result = datasetPoolService.getDatasetPool(DATASET_ID);
+
+      assertThat(result).isPresent();
+      assertThat(result.get().isOpenDataAccess()).isTrue();
+    }
+
+    @Test
+    @DisplayName("returns openDataAccess=false when the dataset is not flagged open")
+    void datasetNotFlaggedOpen_returnsOpenDataAccessFalse() {
+      DataSet dataSet = new DataSet();
+      dataSet.setOpenDataAccess(false);
+      when(dataSetRepository.findById(DATASET_ID)).thenReturn(Optional.of(dataSet));
+
+      Optional<DatasetPoolResponse> result = datasetPoolService.getDatasetPool(DATASET_ID);
+
+      assertThat(result).isPresent();
+      assertThat(result.get().isOpenDataAccess()).isFalse();
+    }
+
+    @Test
+    @DisplayName("defaults openDataAccess to false when the flag is unset (secure default)")
+    void datasetUnsetFlag_defaultsToFalse() {
+      DataSet dataSet = new DataSet();
+      when(dataSetRepository.findById(DATASET_ID)).thenReturn(Optional.of(dataSet));
+
+      Optional<DatasetPoolResponse> result = datasetPoolService.getDatasetPool(DATASET_ID);
+
+      assertThat(result).isPresent();
+      assertThat(result.get().isOpenDataAccess()).isFalse();
+    }
   }
 }

@@ -14,7 +14,8 @@
 #   - Tests mock http.send() using OPA's `with http.send as mock_fn` syntax
 #
 # main.rego uses these rules to produce final allow/deny decisions with reasons.
-# Public endpoints are handled at APISIX level (never reach OPA).
+# Open data is NOT an APISIX-level bypass anymore: routes are always protected and anonymous
+# requests reach OPA (openid-connect unauth_action=pass), where open_data.rego decides them.
 
 # [R-021] Why no roles in this code?
 # The AuthZ Repository's /user-context/{externalId} endpoint returns PRE-FLATTENED

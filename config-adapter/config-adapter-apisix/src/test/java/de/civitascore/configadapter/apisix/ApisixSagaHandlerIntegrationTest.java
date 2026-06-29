@@ -45,6 +45,7 @@ class ApisixSagaHandlerIntegrationTest extends AbstractApisixIntegrationTest {
   private static final String FROST_USER = "frost-user";
   private static final String FROST_PASS = "frost-pass";
   private static final String PLUGIN_CONFIG_ID = "auth-plugin-default";
+  private static final String SERVICE_ID = "svc-frost-it";
   // Per-named-API model: the saga provisions one route per slug. These tests use a single named API
   // ("data"); the route id is the deterministic NamedApiHelper.derive(datasetId, slug).
   private static final String SLUG = "data";
@@ -61,12 +62,23 @@ class ApisixSagaHandlerIntegrationTest extends AbstractApisixIntegrationTest {
     // gateway-side stand-in before each test. Real deployments wire this to OIDC/OPA plugins.
     createPluginConfigDirectly(PLUGIN_CONFIG_ID, Map.of());
 
+    // apisix.service.id is required: every saga route references it and OPA resolves the backend
+    // from it via with_service=true. Seed the referenced Service so APISIX accepts the routes.
+    createServiceDirectly(
+        SERVICE_ID,
+        Map.of(
+            "name",
+            "frost-server",
+            "upstream",
+            Map.of("type", "roundrobin", "nodes", Map.of("127.0.0.1:80", 1))));
+
     Map<String, Object> props = new HashMap<>();
     props.put("apisix.admin.url", adminApiUrl);
     props.put("apisix.admin.key", ADMIN_API_KEY);
     props.put("apisix.api.host", API_HOST);
     props.put("apisix.api.public.url", API_PUBLIC_URL);
     props.put("apisix.plugin.config.id", PLUGIN_CONFIG_ID);
+    props.put("apisix.service.id", SERVICE_ID);
     props.put("apisix.proxy.rewrite.headers.remove", "X-Allowed-Scope-Ids");
     props.put("apisix.frost.basic.auth.username", FROST_USER);
     props.put("apisix.frost.basic.auth.password", FROST_PASS);
@@ -147,38 +159,21 @@ class ApisixSagaHandlerIntegrationTest extends AbstractApisixIntegrationTest {
   }
 
   @Test
-  void createRouteShouldOmitAuthHeaderButKeepStripListForPublicProject() throws Exception {
-    String datasetId = "it-" + UUID.randomUUID();
-
-    sagaHandler.handle(createRouteCommand(datasetId, true));
-
-    JsonNode proxyRewrite =
-        getRouteFromApisix(routeId(datasetId)).get("value").get("plugins").get("proxy-rewrite");
-    JsonNode headers = proxyRewrite.get("headers");
-    assertNotNull(
-        headers,
-        "public routes still need the configured security strip list (X-Allowed-Scope-Ids)"
-            + " — strip is a general saga-route protection, not auth-specific");
-    assertNull(
-        headers.get("set"), "public-data routes must not carry upstream auth in headers.set");
-    assertEquals("X-Allowed-Scope-Ids", headers.get("remove").get(0).asText());
-  }
-
-  @Test
-  void updateRouteShouldAddAuthHeaderAndPluginConfigWhenSwitchingToPrivate() throws Exception {
+  void updateRouteKeepsRouteProtectedAndCapturesNoPreviousOpen() throws Exception {
     String datasetId = "it-" + UUID.randomUUID();
     sagaHandler.handle(createRouteCommand(datasetId, true));
 
+    // openDataAccess is ignored — the route is always protected. UPDATE re-applies the protected
+    // state and captures no previousOpenDataAccess (there is no open/protected toggle anymore).
     SagaCommandResult result = sagaHandler.handle(updateRouteCommand(datasetId, false));
     assertEquals("STEP_COMPLETED", result.type());
-    assertEquals(
-        true, ((Map<?, ?>) result.compensationData().get("previousOpenDataAccess")).get(SLUG));
+    assertNull(result.compensationData().get("previousOpenDataAccess"));
 
     JsonNode value = getRouteFromApisix(routeId(datasetId)).get("value");
     assertEquals(
         PLUGIN_CONFIG_ID,
         value.get("plugin_config_id").asText(),
-        "private route must carry gateway-side plugin_config_id");
+        "protected route must carry gateway-side plugin_config_id");
 
     JsonNode proxyRewrite = value.get("plugins").get("proxy-rewrite");
     String expected =
@@ -192,29 +187,6 @@ class ApisixSagaHandlerIntegrationTest extends AbstractApisixIntegrationTest {
         "^/v1/datasets/" + datasetId + "/" + SLUG + "(/.*)?$",
         regex,
         "UPDATE must preserve the existing regex_uri (Finding 1 — PATCH would have wiped it)");
-  }
-
-  @Test
-  void updateRouteShouldRemoveAuthHeaderAndPluginConfigWhenSwitchingToPublic() throws Exception {
-    String datasetId = "it-" + UUID.randomUUID();
-    sagaHandler.handle(createRouteCommand(datasetId, false));
-
-    SagaCommandResult result = sagaHandler.handle(updateRouteCommand(datasetId, true));
-    assertEquals("STEP_COMPLETED", result.type());
-    assertEquals(
-        false, ((Map<?, ?>) result.compensationData().get("previousOpenDataAccess")).get(SLUG));
-
-    JsonNode value = getRouteFromApisix(routeId(datasetId)).get("value");
-    assertNull(
-        value.get("plugin_config_id"),
-        "public-data routes must drop plugin_config_id (Finding 2 — PATCH would have kept it)");
-    JsonNode headers = value.get("plugins").get("proxy-rewrite").get("headers");
-    assertNull(
-        headers.get("set"), "public-data routes must drop the upstream Authorization header");
-    assertEquals(
-        "X-Allowed-Scope-Ids",
-        headers.get("remove").get(0).asText(),
-        "public-data routes must KEEP the security strip list after the flip");
   }
 
   private SagaCommandMessage updateRouteCommand(String datasetId, boolean openDataAccess) {

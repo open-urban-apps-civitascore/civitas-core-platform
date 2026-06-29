@@ -72,9 +72,9 @@ tests {
 docs {
   **Saga step 9h of 18** — Flip the dataset back to protected (issue #1368, journey J3).
 
-  Mirrors 9f in reverse: `openDataAccess: false` triggers a DATASET_UPDATE saga that re-attaches the APISIX auth plugin + FROST upstream credentials and clears the FROST `public` flag. This exercises the `previousPublic` capture on the second update and confirms the toggle is reversible.
+  Mirrors 9f in reverse: `openDataAccess: false` persists the flag back to protected. The route is always protected anyway, so nothing is re-attached and there is no FROST `public` flag to clear; OPA simply re-reads the now-`false` flag and stops granting anonymous access (after its attribute-cache TTL). Confirms the toggle is reversible — now a pure OPA-read change, not a route/FROST reconfiguration.
 
   **Precondition:** the open-flip saga (9f) has settled (polled in pre-request).
 
-  **Expected Response:** 200 OK, body `openDataAccess: false`. The route is re-protected (verified in 9i).
+  **Expected Response:** 200 OK, body `openDataAccess: false`. The route was protected all along; OPA stops granting anonymous access once it re-reads the flag (verified in 9i).
 }

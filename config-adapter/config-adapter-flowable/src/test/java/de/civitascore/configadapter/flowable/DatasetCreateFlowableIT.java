@@ -136,6 +136,7 @@ class DatasetCreateFlowableIT {
                 "apisix.api.host", "api.test.local",
                 "apisix.api.public.url", "http://api.test.local",
                 "apisix.plugin.config.id", "test-plugin-config",
+                "apisix.service.id", "svc-frost-server",
                 "apisix.frost.api.key", "test-frost-upstream-key")));
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
@@ -173,7 +174,6 @@ class DatasetCreateFlowableIT {
     variables.put("datasetId", datasetId);
     variables.put("datasetName", "Flowable E2E Test Dataset");
     variables.put("description", "Integration test via Flowable");
-    variables.put("openDataAccess", true);
     variables.put("hasPipelines", false);
     variables.put("datasources", List.of());
     variables.put("dataPipelines", List.of());
@@ -263,7 +263,6 @@ class DatasetCreateFlowableIT {
     variables.put("datasetId", datasetId);
     variables.put("datasetName", "Flowable Fail Test");
     variables.put("description", "Should compensate");
-    variables.put("openDataAccess", true);
     variables.put("hasPipelines", false);
     variables.put("datasources", List.of());
     variables.put("dataPipelines", List.of());

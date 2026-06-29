@@ -74,9 +74,9 @@ tests {
 docs {
   **Saga step 9f of 18** — Flip a released dataset to open data access (issue #1368, journey J3).
 
-  `PUT /datasets/{id}/released/meta` with `openDataAccess: true` updates the released dataset and triggers a **DATASET_UPDATE** saga that re-applies the FROST project `public` flag and **removes** the APISIX auth plugin from the dataset's route. `assignments` and `namedApis` are omitted so the null reconciler leaves them untouched (keeps step 10 green; named APIs are immutable while released anyway).
+  `PUT /datasets/{id}/released/meta` with `openDataAccess: true` updates the released dataset and **persists** the flag. The route is **not** reconfigured: the DATASET_UPDATE saga re-applies the same protected route and the FROST project stays private. Anonymous read access is granted by **OPA**, which re-reads the now-`true` flag from the AuthZ Repository on the next request (after its short attribute-cache TTL) — there is no FROST `public` flag and no auth-plugin removal anymore. `assignments` and `namedApis` are omitted so the null reconciler leaves them untouched (keeps step 10 green; named APIs are immutable while released anyway).
 
   **Precondition:** CREATE saga (step 8) has settled (`pendingSagaType == null`, polled in pre-request); dataset is AVAILABLE.
 
-  **Expected Response:** 200 OK, body `openDataAccess: true`. The UPDATE saga then reconciles the route to open (verified in 9g).
+  **Expected Response:** 200 OK, body `openDataAccess: true`. The route stays protected; OPA then grants anonymous payload reads once it re-reads the flag (verified in 9g).
 }

@@ -11,7 +11,9 @@ get {
 }
 
 tests {
-  test("Unauthenticated request rejected by openid-connect", function() {
+  test("Unauthenticated request to a protected dataset is denied (401)", function() {
+    // openid-connect passes the anonymous request through (unauth_action: pass); OPA denies it
+    // because the dataset is not open-data (missing_user_context → 401 via deny_status).
     expect(res.getStatus()).to.equal(401);
   });
 }

@@ -160,14 +160,15 @@ apisix.topics=de.civitascore.api.backend.created,de.civitascore.api.backend.upda
 apisix.api.host=api.localhost
 apisix.api.public.url=http://api.localhost:9080
 
-# Gateway-side auth plugin_config_id — required. Private dataset routes (openDataAccess=false)
-# attach this plugin_config so APISIX enforces OIDC/OPA in front of the upstream. The referenced
-# plugin_config must be provisioned in APISIX before any private dataset is created. The dev/CI
-# stack provisions it as plugin_config id `1` (see dev-environment apisix seeding).
+# Gateway-side auth plugin_config_id — required. EVERY dataset route attaches this plugin_config so
+# APISIX enforces OIDC/OPA in front of the upstream — routes are always protected, and open-data
+# access is an OPA per-request decision (not a route variant). The referenced plugin_config must be
+# provisioned in APISIX before any dataset is created. The dev/CI stack provisions it as
+# plugin_config id `1` (see dev-environment apisix seeding).
 apisix.plugin.config.id=1
 
 # Headers the saga route's proxy-rewrite must strip — optional but typically required in
-# production. Applied to EVERY saga route (public and private alike), because APISIX merges
+# production. Applied to EVERY saga route (all routes are protected), because APISIX merges
 # plugins by Route-over-PluginConfig precedence: the saga always defines its own proxy-rewrite,
 # so any proxy-rewrite.headers.remove in the shared plugin_config is silently overridden.
 # Mirror the strip list from plugin_config here so e.g. client-supplied X-Allowed-Scope-Ids
