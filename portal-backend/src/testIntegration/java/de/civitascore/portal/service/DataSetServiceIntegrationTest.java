@@ -270,6 +270,26 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(second).hasSize(1);
       assertThat(second.get(0).getId()).isEqualTo(assignmentId);
     }
+
+    @Test
+    @DisplayName(
+        "Embedded DATA assignment inherits the parent entity's scope, never stays unscoped")
+    void embeddedDataAssignmentInheritsDatasetScope() throws Exception {
+      DataSet dataSet = portalData.dataSet();
+      Group group = portalData.group();
+      Role dataRole = portalData.role(b -> b.roleType(RoleType.DATA));
+
+      patchAssignments(dataSet.getId(), group.getId(), dataRole.getId());
+
+      assertThat(assignmentRepository.findAllByGroupId(group.getId()))
+          .singleElement()
+          .satisfies(
+              a -> {
+                assertThat(a.getRole().getId()).isEqualTo(dataRole.getId());
+                assertThat(a.getScopeType()).isEqualTo(ScopeType.DATASET);
+                assertThat(a.getDataset().getId()).isEqualTo(dataSet.getId());
+              });
+    }
   }
 
   @Nested
