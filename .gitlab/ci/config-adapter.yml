@@ -350,7 +350,10 @@ deploy-config-adapter:
   stage: deploy
   needs:
     - job: setup-version-config-adapter
+    - job: setup-version
+      artifacts: true
     - job: container-scan-config-adapter
+
   services:
     - docker:27-dind
   variables:
