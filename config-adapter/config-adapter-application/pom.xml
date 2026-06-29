@@ -46,7 +46,7 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Saga command handlers (apisix, frost, redpanda) are bundled at runtime via the
+        <!-- Saga command handlers (apisix, frost, nifi) are bundled at runtime via the
              dist profile below. They are also needed on the TEST classpath so the bootstrap
              tests can ServiceLoader-discover the handlers the Flowable orchestrator requires. -->
         <dependency>
@@ -63,7 +63,7 @@
         </dependency>
         <dependency>
             <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-redpanda</artifactId>
+            <artifactId>config-adapter-nifi</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
@@ -243,13 +243,19 @@
                 </dependency>
                 <dependency>
                     <groupId>de.civitas-core</groupId>
-                    <artifactId>config-adapter-redpanda</artifactId>
+                    <artifactId>config-adapter-nifi</artifactId>
                     <version>${project.version}</version>
                     <scope>runtime</scope>
                 </dependency>
                 <dependency>
                     <groupId>de.civitas-core</groupId>
                     <artifactId>config-adapter-geoserver</artifactId>
+                    <version>${project.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>de.civitas-core</groupId>
+                    <artifactId>config-adapter-postgis</artifactId>
                     <version>${project.version}</version>
                     <scope>runtime</scope>
                 </dependency>

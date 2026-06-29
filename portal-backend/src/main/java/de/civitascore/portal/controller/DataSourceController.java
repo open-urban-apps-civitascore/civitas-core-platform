@@ -85,7 +85,25 @@ public class DataSourceController
         schema =
             @Schema(
                 type = "string",
-                allowableValues = {"MQTT", "SQL"}))
+                allowableValues = {"MQTT", "SQL"})),
+    @Parameter(
+        name = "datapoolId",
+        description =
+            "Filter by DataPool scope. Returns DataSources with scope type ALL, or SPECIFIC DataSources that include this DataPool.",
+        in = ParameterIn.QUERY,
+        schema =
+            @Schema(
+                type = "string",
+                format = "uuid",
+                example = "550e8400-e29b-41d4-a716-446655440000")),
+    @Parameter(
+        name = "datapoolScopeType",
+        description = "Filter by DataPool scope type (exact match).",
+        in = ParameterIn.QUERY,
+        schema =
+            @Schema(
+                type = "string",
+                allowableValues = {"ALL", "NONE", "SPECIFIC"}))
   })
   /**
    * Retrieves a paginated list of data sources with optional filtering by name, description,

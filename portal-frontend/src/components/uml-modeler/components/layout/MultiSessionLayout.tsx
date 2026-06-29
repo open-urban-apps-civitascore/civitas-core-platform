@@ -19,8 +19,7 @@ interface MultiSessionLayoutProps {
   className?: string
   externalSessionManager?: UseMultiSessionReturn
   isMultiSessionMode: boolean
-  canExportXmi: boolean
-  canImportXmi: boolean
+  canExportModel: boolean
   placeHolder?: JSX.Element
   onImportFromDatastructure?: () => void
 }
@@ -30,8 +29,7 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
     className,
     externalSessionManager,
     isMultiSessionMode,
-    canExportXmi,
-    canImportXmi,
+    canExportModel,
     placeHolder,
     onImportFromDatastructure,
   } = props
@@ -85,7 +83,7 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
 
   const activeSession = sessionManager.getActiveSession()
 
-  const shouldShowToolBar = !isControlledExternally || canImportXmi || canExportXmi || onImportFromDatastructure
+  const shouldShowToolBar = !isControlledExternally || canExportModel || !!onImportFromDatastructure
 
   return (
     <ActiveDiagramProviderComponent sessionManager={sessionManager}>
@@ -112,8 +110,7 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
               <Toolbar
                 onSave={isControlledExternally ? undefined : handleSave}
                 hasUnsavedChanges={activeSession?.isDirty || false}
-                canExportXmi={canExportXmi}
-                canImportXmi={canImportXmi}
+                canExportModel={canExportModel}
                 onImportFromDatastructure={onImportFromDatastructure}
               />
             )}

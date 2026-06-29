@@ -188,7 +188,8 @@ class RoleInitializerTest {
     List<String> permissionNames =
         dataConsumer.getPermissions().stream().map(Permission::getName).toList();
 
-    assertThat(permissionNames).containsExactlyInAnyOrder("DATASET_READ", "DATASET_PAYLOAD_READ");
+    assertThat(permissionNames)
+        .containsExactlyInAnyOrder("DATASET_READ", "DATASET_PAYLOAD_READ", "DATAPOOL_READ");
   }
 
   @Test
@@ -237,7 +238,8 @@ class RoleInitializerTest {
             "DATASOURCE_READ",
             "DATASOURCE_RELEASE",
             "DATASTRUCTURE_READ",
-            "DATASTRUCTURE_RELEASE");
+            "DATASTRUCTURE_RELEASE",
+            "DATAPOOL_READ");
   }
 
   @Test
@@ -297,7 +299,8 @@ class RoleInitializerTest {
     verify(roleRepository).saveAll(List.of(existingRole));
     Set<String> permissionNames =
         existingRole.getPermissions().stream().map(Permission::getName).collect(Collectors.toSet());
-    assertThat(permissionNames).containsExactlyInAnyOrder("DATASET_READ", "DATASET_PAYLOAD_READ");
+    assertThat(permissionNames)
+        .containsExactlyInAnyOrder("DATASET_READ", "DATASET_PAYLOAD_READ", "DATAPOOL_READ");
   }
 
   @Test

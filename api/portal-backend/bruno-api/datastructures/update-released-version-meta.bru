@@ -20,9 +20,14 @@ body:json {
     "dataStructureVersionSource": "OWN",
     "version": "1.0.1",
     "description": "Updated version description",
-    "modelAtlasUri": "http://civitas.org/model/StudentDatabaseModel1/1.0.1",
     "modelName": "UpdatedModelName",
-    "model": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<uml:Model xmi:version=\"20131001\" xmlns:xmi=\"http://www.omg.org/spec/XMI/20131001\" xmlns:uml=\"http://www.eclipse.org/uml2/5.0.0/UML\" xmi:id=\"_model\" name=\"UpdatedModel\" URI=\"http://civitas.org/model/StudentDatabaseModel1/1.0.1\">\n</uml:Model>",
+    "model": {
+      "$id": "http://civitas.org/model/StudentDatabaseModel1/1.0.1",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "UpdatedModel",
+      "type": "object",
+      "properties": {}
+    },
     "styles": {}
   }
 }
@@ -46,5 +51,5 @@ docs {
   |---|---|
   | Backend | Released version metadata updated |
   | Config Adapter | -- |
-  | Model Atlas / Apicurio Registry | Version metadata updated in registry |
+  | External System | -- |
 }

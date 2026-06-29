@@ -65,11 +65,6 @@ springdoc:
       # Dev-only secret for local Swagger UI OAuth — never use in deployed environments
       client-secret: dev-only-portal-frontend-secret
 
-model-atlas:
-  baseUrl: "http://localhost:8086"
-  scope: civitas
-  stage: draft
-
 # Seed data for local development — activated by the "init" Spring profile.
 # On startup, these groups and users are created in the DB (if they don't exist yet)
 # and synced to Keycloak via config-adapter (if no externalId is set).
@@ -106,5 +101,6 @@ init:
       title: OTHER
       groups:
         - 'Local Tenant Admins'
+        - 'Local Data Architects'
         - 'Local Data Owners'
         - 'Local Data Gatekeepers'

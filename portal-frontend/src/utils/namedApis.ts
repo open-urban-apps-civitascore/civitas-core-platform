@@ -2,23 +2,18 @@ import proj4 from 'proj4'
 
 import { UMLClass } from '@/components/uml-modeler/types/uml'
 import { crsOptions } from '@/const/crs'
-import { Datasink } from '@/types/datasinks'
+import { DataSink } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
+import { BoundingBox, Layer, LayerApiPayload, LayerFormData } from '@/types/layers'
 import {
   ApiStandard,
-  BoundingBox,
   DEFAULTS_BY_TYPE,
-  Layer,
-  LayerApiPayload,
-  LayerFormData,
   NamedApi,
   NamedApiPayload,
   OwsApiFormData,
   StaApiFormData,
-  Style,
-  StyleApiPayload,
-  StyleFormData,
 } from '@/types/namedApis'
+import { Style, StyleFormData, StyleInput } from '@/types/styles'
 
 export const hasApiType = (apis: NamedApi[], apiType: ApiStandard): boolean =>
   apis.some(api => api.standard === apiType)
@@ -100,13 +95,13 @@ export const buildOwsPayload = (data: OwsApiFormData): NamedApiPayload => ({
   description: data.baseInfo.description || undefined,
 })
 
-export const getNativeCRSFromDatasink = (
-  datasinkId: string,
-  postgisDatasinks: Datasink[],
+export const getNativeCRSFromDataSink = (
+  dataSinkId: string,
+  postgisDataSinks: DataSink[],
   postgisDatastructures: DatastructureVersion[],
 ): string => {
-  const datasink = postgisDatasinks.find(d => d.id === datasinkId)
-  const datastructure = postgisDatastructures.find(d => d.id === datasink?.configuration.dataStructureVersion.id)
+  const dataSink = postgisDataSinks.find(d => d.id === dataSinkId)
+  const datastructure = postgisDatastructures.find(d => d.id === dataSink?.configuration.dataStructureVersion.id)
   const umlClass = datastructure?.styles?.nodes?.[0]?.data?.element as UMLClass | undefined
   return umlClass?.attributes?.find(a => a.meta?.gisInfo?.crs)?.meta?.gisInfo?.crs ?? ''
 }
@@ -117,7 +112,7 @@ export const mapApiStyleToFormData = (styles: Style[]): StyleFormData[] =>
     sldContent: style.sldContent,
   }))
 
-export const mapFormStyleToPayload = (style: StyleFormData): StyleApiPayload => ({
+export const mapFormStyleToPayload = (style: StyleFormData): StyleInput => ({
   name: style.name.trim(),
   sldContent: style.sldContent,
 })

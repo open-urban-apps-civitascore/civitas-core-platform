@@ -27,8 +27,7 @@ public interface SagaCommandHandler extends AutoCloseable {
 
   /**
    * Returns the adapter name this handler is responsible for (e.g. {@code "frost"}, {@code
-   * "apisix"}, {@code "redpanda"}). Must match the {@code adapter} field in {@link
-   * SagaCommandMessage}.
+   * "apisix"}, {@code "nifi"}). Must match the {@code adapter} field in {@link SagaCommandMessage}.
    */
   String adapter();
 

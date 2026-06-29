@@ -1,0 +1,28 @@
+meta {
+  name: Get All Layers
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/datasets/:dataSetId/layers
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+  ~sort: createdAt,DESC
+  ~layerName: sensor
+}
+
+docs {
+  **Precondition:** `dataSetId` is set.
+
+  **Expected Response:** 200 OK, paginated list of Layers belonging to the data set.
+}

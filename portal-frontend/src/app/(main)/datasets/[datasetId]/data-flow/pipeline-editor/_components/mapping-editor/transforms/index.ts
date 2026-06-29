@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Binary, Calendar, CalendarClock, Combine, Hash, Type } from 'lucide-react'
+import { Binary, Calendar, CalendarClock, Combine, Hash, MapPin, Type } from 'lucide-react'
 
 import type { ConfigField, PortDef, TransformDef } from '@/components/node-editor/types'
 import { buildRegistry } from '@/components/node-editor/types'
@@ -17,6 +17,7 @@ export interface MappingTransformDef extends TransformDef {
 }
 
 const scalar = (id: string, label: string, dataType?: string): PortDef => ({ id, label, type: 'scalar', dataType })
+const geometry = (id: string, label: string, dataType?: string): PortDef => ({ id, label, type: 'geometry', dataType })
 
 /** stringConcat is variadic; ports are grown on demand and persisted on the node. */
 export const concatInputPorts = (count: number): PortDef[] =>
@@ -76,13 +77,14 @@ export const LITERAL_DEFAULT_TYPE = 'String'
 /**
  * Given a UML type name, returns the output PortDef for a literal node.
  * Reuses adapter.ts's GEOMETRY set and PRIMITIVE map — single source of truth.
- * Geometries are scalar-like first-class types: their `dataType` is the concrete
- * geometry name (e.g. 'Point') so Point vs Polygon is matched exactly like int↔int;
+ * Geometries are first-class typed ports: their `dataType` is the concrete
+ * geometry name (e.g. 'Point') so Point vs Polygon is matched by exact type;
  * other primitives → scalar port with the matching subtype.
  */
 export const literalOutputPort = (umlType: string): PortDef => {
-  const dataType = (GEOMETRY as Set<string>).has(umlType) ? umlType : (PRIMITIVE[umlType] ?? 'str')
-  return { id: 'out', label: 'value', type: 'scalar', dataType }
+  const isGeom = (GEOMETRY as Set<string>).has(umlType)
+  const dataType = isGeom ? umlType : (PRIMITIVE[umlType] ?? 'str')
+  return { id: 'out', label: 'value', type: isGeom ? 'geometry' : 'scalar', dataType }
 }
 
 const literal: MappingTransformDef = {
@@ -142,6 +144,25 @@ const concat: MappingTransformDef = {
   opConfig: op => (op.op === 'concat' ? { separator: op.separator ?? '' } : {}),
 }
 
+const geoPoint: MappingTransformDef = {
+  type: 'geoPoint',
+  category: 'categories.conversionFunctions',
+  label: 'geoPoint',
+  description: 'transforms.geoPoint.description',
+  icon: MapPin,
+  inputs: [scalar('lon', 'longitude', 'float'), scalar('lat', 'latitude', 'float')],
+  outputs: [geometry('out', 'Point', 'Point')],
+  config: [],
+  op: 'geoPoint',
+  toValueNode: inputs => ({
+    op: 'geoPoint' as const,
+    lon: inputs[0] ?? '',
+    lat: inputs[1] ?? '',
+  }),
+  opInputs: op => (op.op === 'geoPoint' ? [op.lon, op.lat] : []),
+  opConfig: () => ({}),
+}
+
 /**
  * Conversion nodes
  */
@@ -163,4 +184,4 @@ const conversions: MappingTransformDef[] = [
   ]),
 ]
 
-export const mappingRegistry = buildRegistry<MappingTransformDef>([literal, concat, ...conversions])
+export const mappingRegistry = buildRegistry<MappingTransformDef>([literal, concat, geoPoint, ...conversions])

@@ -134,7 +134,7 @@ export const MappingEditorModal = ({
       const field = sourceFields.get(handleId)
       if (!field) return null
       // `sub` is the concrete field type (incl. geometry names like 'Point') so the
-      // scalar subtype check matches Point↔Point and blocks Point↔Polygon.
+      // exact subtype check matches Point↔Point and blocks Point↔Polygon.
       return { type: field.portType, sub: field.type }
     }
     if (nodeId === TARGET_NODE_ID) {
@@ -154,17 +154,16 @@ export const MappingEditorModal = ({
 
   /**
    * Two ports are compatible when:
-   *  - both have the same portType category (scalar / array / object)
-   *  - AND for scalars: the subtype matches exactly (int↔int, str↔str, Point↔Point, …)
-   *    — type conversions must go through an explicit conversion node, and geometries
-   *    (first-class scalar-like types) only connect to the same geometry kind, so
-   *    Point↔Polygon is blocked automatically.
+   *  - both have the same portType category (scalar / geometry / array / object)
+   *  - AND for scalar/geometry ports: the subtype matches exactly (int↔int, str↔str, Point↔Point, …)
+   *    — type conversions must go through an explicit conversion node.
    */
   const portsCompatible = useCallback(
     (from: { type: PortType; sub?: string } | null, to: { type: PortType; sub?: string } | null): boolean => {
       if (!from || !to) return false
       if (from.type !== to.type) return false
-      if (from.type === 'scalar' && from.sub && to.sub && from.sub !== to.sub) return false
+      if ((from.type === 'scalar' || from.type === 'geometry') && from.sub && to.sub && from.sub !== to.sub)
+        return false
       return true
     },
     [],

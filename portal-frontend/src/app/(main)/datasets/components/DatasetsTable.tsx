@@ -3,11 +3,12 @@ import { CheckIcon, CircleDashed, UserCheck } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
+import { ContactCell } from '@/components/table/contact-cell/ContactCell'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { usePermissions } from '@/hooks/use-permissions'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { DatasetTableData } from '@/types/datasets'
 import { TableProps } from '@/types/table'
@@ -70,30 +71,29 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
         },
       },
     }),
+    columnHelper.accessor('datapool', {
+      header: t('tableHeaders.datapool'),
+      cell: info =>
+        info.getValue()?.id ? (
+          hasScopedPermission(PERMISSION_NAMES.DATAPOOL_READ, ASSIGNMENT_SCOPE_TYPES.DATAPOOL, info.getValue()!.id) ? (
+            <LinkCell href={`datapools/${info.getValue()?.id}`}>{info.getValue()?.name || ''}</LinkCell>
+          ) : (
+            <span>{t('anonymousDatapool')}</span>
+          )
+        ) : (
+          '-'
+        ),
+      meta: {
+        truncate: true,
+        style: {
+          width: '25%',
+        },
+      },
+    }),
     columnHelper.accessor('createdBy', {
       header: t('tableHeaders.createdBy'),
       cell: info => {
-        const user = info.getValue()
-        const userNameParts = user?.name.split(' ') || []
-        const firstName = userNameParts[0] || ''
-        const lastName = userNameParts[userNameParts.length - 1] || ''
-
-        return (
-          <LinkCell href={`users/${info.getValue()?.id}`}>
-            <div className="flex items-center gap-2">
-              {firstName && lastName ? (
-                <Avatar className="size-8 rounded-lg">
-                  <AvatarImage src="" alt={user?.name || ''} />
-                  <AvatarFallback className="rounded-lg">
-                    {`${firstName.charAt(0)}${lastName.charAt(0)}` || ''}
-                  </AvatarFallback>
-                </Avatar>
-              ) : null}
-
-              {info.getValue()?.name}
-            </div>
-          </LinkCell>
-        )
+        return <ContactCell user={info.getValue()} />
       },
       meta: {
         style: {
@@ -136,7 +136,13 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
             id: 'actions',
             header: t('tableHeaders.action'),
             cell: (info: { row: { id: string | null; original: DatasetTableData } }) =>
-              info.row.id && hasScopedPermission(PERMISSION_NAMES.DATASET_DELETE, 'DATASET', info.row.id) ? (
+              info.row.id &&
+              hasScopedPermission(
+                PERMISSION_NAMES.DATASET_DELETE,
+                ASSIGNMENT_SCOPE_TYPES.DATASET,
+                info.row.id,
+                info.row.original.datapool?.id,
+              ) ? (
                 <TableDropdownMenu
                   menuItems={[{ label: tCommon('actions.delete'), onClick: () => onDeleteClick(info.row.id) }]}
                 />

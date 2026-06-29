@@ -1,7 +1,9 @@
 package de.civitascore.portal.model.output.assembler;
 
+import de.civitascore.portal.mapper.DataPoolMapper;
 import de.civitascore.portal.mapper.PermissionMapper;
 import de.civitascore.portal.mapper.RoleMapper;
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
@@ -24,7 +26,7 @@ public class RoleAssembler implements BaseAssembler<Role, RoleOutputDTO, UUID> {
 
   private final RoleMapper roleMapper;
   private final PermissionMapper permissionMapper;
-
+  private final DataPoolMapper dataPoolMapper;
   private final AssignmentService assignmentService;
 
   /** {@inheritDoc} Maps role fields including permission summaries. */
@@ -38,6 +40,10 @@ public class RoleAssembler implements BaseAssembler<Role, RoleOutputDTO, UUID> {
               .map(permissionMapper::toSummary)
               .collect(Collectors.toList()));
     }
+
+    output.setDatapools(
+        dataPoolMapper.toDataPoolSummaries(
+            assignmentService.findAllByRoleIdAndScopeType(entity.getId(), ScopeType.DATAPOOL)));
 
     return output;
   }

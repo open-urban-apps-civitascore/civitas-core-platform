@@ -151,19 +151,18 @@ class FlowableTriggerConsumerHasPipelinesTest {
     assertEquals(Boolean.FALSE, captor.getValue().get("hasPipelines"));
   }
 
-  @ParameterizedTest(name = "hasGeoSink={1} when dataSinks={0}")
+  @ParameterizedTest(name = "hasGeoSink={1} when datasinks={0}")
   @MethodSource("geoSinkCases")
-  void deriveHasGeoSink(Object dataSinks, boolean expected) throws Exception {
-    TriggerTestSupport.processTrigger(consumer, triggerWith("dataSinks", dataSinks));
+  void deriveHasGeoSink(Object datasinks, boolean expected) throws Exception {
+    TriggerTestSupport.processTrigger(consumer, triggerWith("datasinks", datasinks));
 
     assertEquals(expected, capturedVariables().get("hasGeoSink"));
   }
 
   static Stream<Arguments> geoSinkCases() {
     return Stream.of(
-        Arguments.of(
-            List.of(Map.of("dataSinkType", "FROST"), Map.of("dataSinkType", "POSTGIS")), true),
-        Arguments.of(List.of(Map.of("dataSinkType", "FROST")), false),
+        Arguments.of(List.of(Map.of("type", "FROST"), Map.of("type", "POSTGIS")), true),
+        Arguments.of(List.of(Map.of("type", "FROST")), false),
         Arguments.of(List.of(), false),
         Arguments.of(null, false));
   }

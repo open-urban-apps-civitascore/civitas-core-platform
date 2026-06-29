@@ -12,6 +12,16 @@ interface DataSourceStatusSpec extends Specification<DataSource> {}
 @Spec(path = "connectorType", params = "connectorType", spec = Equal.class)
 interface DataSourceConnectorTypeSpec extends Specification<DataSource> {}
 
+@Spec(path = "id", params = "datapoolId", spec = DataSourceScopedDatapoolSpec.class)
+interface DataSourceScopedDatapoolFilter extends Specification<DataSource> {}
+
+@Spec(path = "datapoolScopeType", params = "datapoolScopeType", spec = Equal.class)
+interface DataSourceDatapoolScopeTypeSpec extends Specification<DataSource> {}
+
 /** JPA Specification for filtering {@link DataSource} entities via query parameters. */
 public interface DataSourceSpec
-    extends NamedEntitySpec<DataSource>, DataSourceStatusSpec, DataSourceConnectorTypeSpec {}
+    extends NamedEntitySpec<DataSource>,
+        DataSourceStatusSpec,
+        DataSourceConnectorTypeSpec,
+        DataSourceScopedDatapoolFilter,
+        DataSourceDatapoolScopeTypeSpec {}

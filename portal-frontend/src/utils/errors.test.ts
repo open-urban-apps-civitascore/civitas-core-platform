@@ -1,7 +1,7 @@
 import { AxiosError, AxiosHeaders, InternalAxiosRequestConfig } from 'axios'
 import { describe, expect, it } from 'vitest'
 
-import { isNameConflictError, isPermissionsError } from './errors'
+import { isDatapoolScopeViolationError, isNameConflictError, isPermissionsError } from './errors'
 
 const getError = (status: number, detail?: string) => {
   return new AxiosError(
@@ -76,5 +76,21 @@ describe('isPermissionsError', () => {
   it('returns false for non-403 status codes', () => {
     const error = getError(401, 'Unauthorized')
     expect(isPermissionsError(error)).toBe(false)
+  })
+})
+
+describe('isDatapoolScopeViolationError', () => {
+  it('returns true for a 422 error', () => {
+    const error = getError(422, 'DataSource "My DS" is not permitted for this datapool')
+    expect(isDatapoolScopeViolationError(error)).toBe(true)
+  })
+
+  it('returns false for non-422 status codes', () => {
+    const error = getError(400, 'Bad request')
+    expect(isDatapoolScopeViolationError(error)).toBe(false)
+  })
+
+  it('returns false for non-axios errors', () => {
+    expect(isDatapoolScopeViolationError(new Error('plain error'))).toBe(false)
   })
 })

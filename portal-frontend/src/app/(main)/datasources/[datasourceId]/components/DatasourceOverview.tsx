@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { useGetDatapools } from '@/app/services/api/datapools/clientRequests'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -17,14 +18,24 @@ import { Form } from '@/components/ui/form'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
-import { Datasource, DATASOURCE_STATUS_TYPES, DatasourceStatusType, DatasourceTab } from '@/types/datasources'
+import { Datapool } from '@/types/datapools'
+import {
+  DATAPOOL_SCOPE_TYPES,
+  Datasource,
+  DATASOURCE_STATUS_TYPES,
+  DatasourceStatusType,
+  DatasourceTab,
+} from '@/types/datasources'
 import { getSelectedDatastructureVersion } from '@/utils/datasources'
 
 import { useDatasourceForm } from '../hooks/useDatasourceForm'
 import { AccessManagementTab } from './access-management/AccessManagementTab'
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { ConnectorTab } from './connector-tab/ConnectorTab'
+import { AddDatapoolModal } from './datapools-tab/AddDatapoolModal'
+import { DatapoolsTab } from './datapools-tab/DatapoolsTab'
 import { DatastructureTab } from './datastructure-tab/DatastructureTab'
 
 interface DatasourceOverviewProps {
@@ -36,6 +47,7 @@ const allTabs: Tab<DatasourceTab>[] = [
   { value: 'basicInfo', label: 'datasources.tabs.basicInfo' },
   { value: 'connector', label: 'datasources.tabs.connector' },
   { value: 'dataStructure', label: 'datasources.tabs.dataStructure' },
+  { value: 'datapools', label: 'datasources.tabs.datapools' },
   { value: 'accessManagement', label: 'datasources.tabs.accessManagement' },
 ]
 
@@ -44,13 +56,46 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
   const { hasPermission, hasScopedPermission } = usePermissions()
-  const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASOURCE_UPDATE, 'DATASOURCE', datasource.id)
-  const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASOURCE_RELEASE, 'DATASOURCE', datasource.id)
+  const canUpdate = hasScopedPermission(
+    PERMISSION_NAMES.DATASOURCE_UPDATE,
+    ASSIGNMENT_SCOPE_TYPES.DATASOURCE,
+    datasource.id,
+  )
+  const canRelease = hasScopedPermission(
+    PERMISSION_NAMES.DATASOURCE_RELEASE,
+    ASSIGNMENT_SCOPE_TYPES.DATASOURCE,
+    datasource.id,
+  )
   const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const [assignedGroups, setAssignedGroups] = useState<GroupRoleAssignmentTable[]>(initialAssignments)
+
+  const scopedDatapoolIds =
+    datasource.datapoolScope?.type === DATAPOOL_SCOPE_TYPES.SPECIFIC ? datasource.datapoolScope.datapoolIds : []
+
+  const scopedDatapoolIdsKey = scopedDatapoolIds.join(',')
+
+  const datapoolIdsParam = useMemo(() => {
+    if (!scopedDatapoolIdsKey) return undefined
+    const params = new URLSearchParams()
+    params.set('id', scopedDatapoolIdsKey)
+    return params
+  }, [scopedDatapoolIdsKey])
+
+  const { data: initialDatapoolsResponse, isLoading: isLoadingDatapools } = useGetDatapools({
+    params: datapoolIdsParam,
+    isEnabled: scopedDatapoolIds.length > 0,
+  })
+
+  const initialDatapools = useMemo<Datapool[]>(
+    () => (scopedDatapoolIds.length > 0 ? (initialDatapoolsResponse?.data ?? []) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [initialDatapoolsResponse, scopedDatapoolIdsKey],
+  )
+  const [assignedDatapools, setAssignedDatapools] = useState<Datapool[]>([])
+  const [isAddDatapoolModalOpen, setIsAddDatapoolModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit')
 
   // Derive initial IDs from the datasource's linked version summary
@@ -63,6 +108,10 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   useEffect(() => {
     setIsReadOnly(searchParams.get('mode') !== 'edit')
   }, [searchParams])
+
+  useEffect(() => {
+    setAssignedDatapools(initialDatapools)
+  }, [initialDatapools])
 
   const updateMode = useCallback(
     (isEditing: boolean) => {
@@ -81,6 +130,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const {
     areAssignmentsDirty,
+    areDatapoolsDirty,
     form: datasourceForm,
     dataSourceStatus,
     selectedConnectorType,
@@ -91,15 +141,16 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     submitDatasource,
     resetToInitialState: resetDatasourceToInitialState,
     isLoading: isLoadingDatasource,
-  } = useDatasourceForm(datasource, assignedGroups, initialAssignments)
+  } = useDatasourceForm(datasource, assignedGroups, initialAssignments, assignedDatapools, initialDatapools)
 
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
-  const hasUnsavedChanges = datasourceForm.formState.isDirty || areAssignmentsDirty || hasStatusChanged
+  const hasUnsavedChanges =
+    datasourceForm.formState.isDirty || areAssignmentsDirty || areDatapoolsDirty || hasStatusChanged
 
   const tabs = useMemo(
-    () => (canReadDatastructures ? allTabs : allTabs.filter(tab => tab.value !== 'dataStructure')),
+    () => allTabs.filter(tab => tab.value !== 'dataStructure' || canReadDatastructures),
     [canReadDatastructures],
   )
 
@@ -107,6 +158,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     resetDatasourceToInitialState()
     datasourceForm.reset()
     setAssignedGroups(initialAssignments)
+    setAssignedDatapools(initialDatapools)
     setSelectedDatastructureId(initialDatastructureId)
     setSelectedDatastructureVersionId(initialVersionId)
   }
@@ -187,6 +239,17 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             isDatasourceInUse={datasource.inUse}
           />
         )
+      case 'datapools':
+        return (
+          <DatapoolsTab
+            form={datasourceForm}
+            isReadOnly={isReadOnly}
+            assignedDatapools={assignedDatapools}
+            isLoadingDatapools={isLoadingDatapools}
+            onDeleteDatapool={id => setAssignedDatapools(prev => prev.filter(dp => dp.id !== id))}
+            onOpenAddModal={() => setIsAddDatapoolModalOpen(true)}
+          />
+        )
       case 'accessManagement':
         return (
           <AccessManagementTab
@@ -209,7 +272,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
           selectedTab: selectedTab,
           onTabChange: setSelectedTab,
           completedTabs,
-          tabsWithNoCompletionStatus: ['accessManagement'], // Access Management tab has no required fields, so it should not show completion status
+          tabsWithNoCompletionStatus: ['accessManagement', 'datapools'], // Access Management and Datapools tabs have no required fields, so they should not show completion status
           hasCompletionStatus: true,
         }}
         customElement={
@@ -243,7 +306,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             onSubmit={e => e.preventDefault()}
             className={cn(selectedTab === 'dataStructure' && 'h-full')}
           >
-            {isLoadingDatasource ? <LoadingSpinner className="h-[300px]" /> : renderTabContent()}
+            {isLoadingDatasource ? <LoadingSpinner className="h-75" /> : renderTabContent()}
           </form>
         </Form>
       </PageBackground>
@@ -254,6 +317,13 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
         onOpenChange={setIsExitModalOpen}
         onDiscard={handleDiscardAndExit}
         onConfirm={handleSaveAndExit}
+      />
+
+      <AddDatapoolModal
+        open={isAddDatapoolModalOpen}
+        onOpenChange={setIsAddDatapoolModalOpen}
+        assignedDatapoolIds={assignedDatapools.map(dp => dp.id)}
+        onAddDatapools={newDatapools => setAssignedDatapools(prev => [...prev, ...newDatapools])}
       />
     </PageContainer>
   )

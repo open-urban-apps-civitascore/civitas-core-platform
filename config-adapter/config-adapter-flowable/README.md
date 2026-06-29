@@ -1,16 +1,18 @@
 # Config Adapter Flowable Orchestrator
 
-Flowable-based saga orchestrator for multi-adapter provisioning workflows (Dataset lifecycle: FROST, APISIX, NiFi/Redpanda). Drop-in replacement for the custom `config-adapter-orchestrator`.
+Flowable-based saga orchestrator for multi-adapter provisioning workflows (Dataset lifecycle: FROST, APISIX, NiFi, GeoServer, PostGIS). Drop-in replacement for the custom `config-adapter-orchestrator`.
 
 ## How it works
 
-Flowable Engine runs **embedded** in the config-adapter JVM — no extra server or container needed. Saga workflows are defined as BPMN processes. Each saga step calls an existing `SagaCommandHandler` (FROST, APISIX, Redpanda) via a JavaDelegate bridge. State is persisted in PostgreSQL (Flowable's built-in tables with `ACT_` prefix).
+Flowable Engine runs **embedded** in the config-adapter JVM — no extra server or container needed. Saga workflows are defined as BPMN processes. Each saga step calls an existing `SagaCommandHandler` (FROST, APISIX, NiFi, GeoServer, PostGIS) via a JavaDelegate bridge. State is persisted in PostgreSQL (Flowable's built-in tables with `ACT_` prefix).
 
 ```text
 Kafka Trigger → FlowableTriggerConsumer → Flowable Engine (in-process)
                                              ├─ FROST handler (REST)
                                              ├─ APISIX handler (REST)
-                                             └─ Redpanda handler (REST)
+                                             ├─ NiFi handler (REST)
+                                             ├─ GeoServer handler (REST)
+                                             └─ PostGIS handler (JDBC)
                                           → FlowableResultPublisher → Kafka Result
 ```
 
@@ -71,22 +73,24 @@ If the PostgreSQL volume already exists from before this split, recreate it: `do
 
 ## Saga Workflows
 
-### Dataset Create (FROST → APISIX → conditional GeoServer → conditional Redpanda)
+### Dataset Create (FROST → APISIX → conditional PostGIS+GeoServer → conditional NiFi)
 - Sequential execution
-- Conditional GeoServer branch (`hasGeoSink`): `CREATE_WORKSPACE` → `CREATE_DATASTORE` →
-  conditional `PROVISION_LAYERS` (`hasLayers`)
-- Conditional Redpanda step (`hasPipelines`)
-- On failure: reverse-order compensation (DELETE operations); the GeoServer branch is undone by a
-  single idempotent `DELETE_WORKSPACE` (recursive)
+- Conditional geo branch (`hasGeoSink`): `PROVISION_SINK` (PostGIS table/schema/read role) →
+  `CREATE_WORKSPACE` → `CREATE_DATASTORE` → conditional `PROVISION_LAYERS` (`hasLayers`)
+- Conditional NiFi step (`hasPipelines`)
+- On failure: reverse-order compensation (DELETE operations); the GeoServer part is undone by a
+  single idempotent `DELETE_WORKSPACE` (recursive), the sink by `DEPROVISION_SINK`
+  (compensate-geoserver → compensate-sink → compensate-apisix)
 
-### Dataset Update (FROST → APISIX → conditional GeoServer → conditional Redpanda)
+### Dataset Update (FROST → APISIX → conditional GeoServer → conditional NiFi)
 - Same structure as Create; the GeoServer branch is a single `UPDATE_WORKSPACE` step, compensated by
   `RESTORE_WORKSPACE`
 
-### Dataset Delete (Redpanda → APISIX → conditional GeoServer → FROST)
+### Dataset Delete (NiFi → APISIX → conditional GeoServer+PostGIS → FROST)
 - Reverse order, best-effort: continues on failure, no compensation
-- Conditional GeoServer teardown (`hasGeoSink`): `DELETE_WORKSPACE` (recursive), after the APISIX
-  route is removed
+- Conditional geo teardown (`hasGeoSink`): `DELETE_WORKSPACE` (recursive) after the APISIX route is
+  removed, then `DEPROVISION_SINK` (drops the sink table and read role; the schema stays — it may
+  be shared)
 
 ### GeoServer branch — conditional and currently dormant
 
@@ -95,16 +99,16 @@ the trigger payload by `FlowableTriggerConsumer` (never trusted from the payload
 
 | Flag | Derived when |
 |------|--------------|
-| `hasGeoSink` | `dataSinks` contains a sink with `dataSinkType == "POSTGIS"` |
+| `hasGeoSink` | `datasinks` contains a sink with `type == "POSTGIS"` |
 | `hasLayers` | `layers` is a non-empty list |
 
-Expected trigger payload shape the GeoServer handler consumes (to be emitted by the backend in a
-follow-up — see below):
+Trigger payload shape the GeoServer/PostGIS handlers consume (emitted by the backend's
+`DataSetSagaPublisher` for create, update, and delete triggers):
 
 ```jsonc
 {
-  "dataSinks": [
-    { "id": "...", "dataSinkType": "POSTGIS",
+  "datasinks": [
+    { "id": "...", "type": "POSTGIS",
       "configuration": { "tableName": "...", "dataStructureVersionId": "..." } }
   ],
   "layers": [
@@ -113,19 +117,18 @@ follow-up — see below):
 }
 ```
 
-**Dormant today:** the backend's saga trigger (`SagaTrigger` / `DataSetSagaPublisher` in
-`portal-backend`) does **not yet emit** `dataSinks` or `layers`, so `hasGeoSink`/`hasLayers` always
-derive to `false` and the GeoServer branch is skipped — the existing FROST → APISIX → Redpanda flow
-is unchanged. Activating GeoServer end-to-end requires a separate backend change to serialize the
-`POSTGIS` `DataSink` and `Layer` entities into the trigger.
+**Activation status:** the backend's saga trigger (`SagaTrigger` / `DataSetSagaPublisher` in
+`portal-backend`) emits `datasinks` on **create, update, and delete** triggers, so `hasGeoSink`
+derives from real payloads and the geo branch (PostGIS sink + GeoServer workspace) runs end-to-end.
+Only `layers` is **not yet emitted** — `hasLayers` always derives to `false` and `PROVISION_LAYERS`
+is skipped until a backend change serializes the `Layer` entities into the trigger.
 
-**This applies to DELETE too.** The GeoServer teardown (`DELETE_WORKSPACE`) is gated on the same
-derived `hasGeoSink`, so the **`DATASET_DELETE` trigger must also carry the `POSTGIS` `dataSinks`**
-for the workspace to be removed — symmetric with create/update. A delete trigger without `dataSinks`
-skips the teardown (so the workspace would not be removed). Gating it this way (rather than always
-deleting) keeps deployments **without** a GeoServer adapter from failing every delete and avoids a
-spurious `DELETE …?recurse=true` on non-geo datasets. The end-to-end derivation for delete is
-covered by `DatasetDeleteTriggerTest` (realistic trigger through `FlowableTriggerConsumer`).
+**Delete gating.** The teardown (`DELETE_WORKSPACE` + `DEPROVISION_SINK`) is gated on the same
+derived `hasGeoSink`; a delete trigger without `datasinks` (e.g. from a backend predating the
+field) skips the teardown. Gating it this way (rather than always deleting) keeps deployments
+**without** a GeoServer adapter from failing every delete and avoids a spurious
+`DELETE …?recurse=true` on non-geo datasets. The end-to-end derivation for delete is covered by
+`DatasetDeleteTriggerTest` (realistic trigger through `FlowableTriggerConsumer`).
 
 > Vocabulary note: the GeoServer concept doc uses a `GEO_PERSISTENCE` sink type, but the
 > config-adapter targets the `portal-model` vocabulary (`DataSinkType.POSTGIS` + a separate `Layer`
@@ -134,17 +137,16 @@ covered by `DatasetDeleteTriggerTest` (realistic trigger through `FlowableTrigge
 ### Adapter handlers: required vs optional
 
 The orchestrator only **requires** the handlers that every saga path uses unconditionally — `frost`
-and `apisix` — and fails fast at startup if either is missing. The **pipeline** adapter (`redpanda`,
-and `nifi` once it exists) is **conditional**: it runs only when a trigger carries pipelines
-(`hasPipelines == true`) and is resolved lazily per step. Therefore:
+and `apisix` — and fails fast at startup if either is missing. The **pipeline** adapter (`nifi`) is
+**conditional**: it runs only when a trigger carries pipelines (`hasPipelines == true`) and is
+resolved lazily per step. Therefore:
 
 - A deployment **without** the pipeline adapter still boots, and pipeline-free sagas complete normally.
 - A saga that *does* carry pipelines but finds no pipeline handler **fails gracefully** — the step
   raises a saga failure routed through the normal compensation/failure path, not an opaque crash.
 
-This keeps the engine runnable during the RedPanda → NiFi migration, while the pipeline adapter may
-be temporarily absent. Both the BPMN and coded variants share this behavior (enforced by the
-equivalence tests).
+This keeps the engine runnable in deployments where the pipeline adapter (`nifi`) is absent. Both the
+BPMN and coded variants share this behavior (enforced by the equivalence tests).
 
 The **geoserver** adapter is conditional in the same way: its steps run only when a trigger carries a
 `POSTGIS` data sink (`hasGeoSink`), so it is **not** in `REQUIRED_HANDLERS` and a deployment without

@@ -21,8 +21,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /**
- * Represents a specific version of a {@link DataStructure}, including its schema definition,
- * status, and optional Model Atlas reference.
+ * Represents a specific version of a {@link DataStructure}, including its JSON Schema definition
+ * and status.
  *
  * @see DataStructureVersionStatus
  * @see DataStructureVersionSource
@@ -49,14 +49,12 @@ public class DataStructureVersion extends BaseEntity {
   @Column(name = "version", nullable = false)
   private String version;
 
-  @Column(name = "model_atlas_uri")
-  private String modelAtlasUri;
-
   @Column(name = "model_name")
   private String modelName;
 
-  @Column(name = "external_id")
-  private String externalId;
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "model", columnDefinition = "jsonb")
+  private Map<String, Object> model;
 
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "styles", columnDefinition = "jsonb")

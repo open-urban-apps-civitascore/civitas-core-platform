@@ -10,7 +10,7 @@ import {
 } from '@tanstack/react-table'
 import { Trash, UserPlus, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { DataTable } from '@/components/table/DataTable'
@@ -32,6 +32,9 @@ interface AccessManagementTableProps {
   onDeleteRole?: (groupId: string, roleId: string) => void
   isLoading?: boolean
   isReadOnly?: boolean
+  tableTitle?: string
+  tableSubtitle?: string
+  tableAction?: React.ReactNode
 }
 
 const AssignedRoleButton = ({
@@ -72,6 +75,9 @@ export const AccessManagementTable = ({
   onDeleteRole,
   isLoading,
   isReadOnly = true,
+  tableTitle,
+  tableSubtitle,
+  tableAction,
 }: AccessManagementTableProps) => {
   const t = useTranslations('accessManagement')
 
@@ -198,6 +204,9 @@ export const AccessManagementTable = ({
       pageSize={pagination.pageSize}
       pageIndex={pagination.pageIndex}
       isPaginationHidden={assignments.length <= 10}
+      tableTitle={tableTitle}
+      tableSubtitle={tableSubtitle}
+      tableAction={tableAction}
     />
   )
 }

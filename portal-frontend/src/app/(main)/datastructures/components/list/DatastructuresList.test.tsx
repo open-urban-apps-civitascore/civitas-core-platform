@@ -47,7 +47,11 @@ const defaultProps = {
   rowCount: 0,
 }
 
-const mockCurrentUser = (permissions: PermissionName[]) => {
+const mockCurrentUser = (
+  permissions: PermissionName[],
+  scopeType: 'TENANT' | 'DATASTRUCTURE' = 'TENANT',
+  scopeId: string | null = null,
+) => {
   vi.mocked(useGetCurrentUser).mockReturnValue({
     data: {
       username: 'test',
@@ -55,7 +59,7 @@ const mockCurrentUser = (permissions: PermissionName[]) => {
       title: 'MR' as const,
       firstName: 'Test',
       lastName: 'User',
-      assignments: [{ scopeType: 'TENANT', scopeId: null, permissions }],
+      assignments: [{ scopeType, scopeId, permissions }],
     },
   } as unknown as ReturnType<typeof useGetCurrentUser>)
 }
@@ -75,6 +79,12 @@ describe('DatastructuresList permission gating', () => {
 
   it('hides create button when user lacks DATASTRUCTURE_CREATE permission', () => {
     mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_READ])
+    renderComponent()
+    expect(screen.queryByTestId('addDatastructureButton')).not.toBeInTheDocument()
+  })
+
+  it('hides create button when user has DATASTRUCTURE_CREATE only via resource-scoped assignment', () => {
+    mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_CREATE], 'DATASTRUCTURE', 'ds1')
     renderComponent()
     expect(screen.queryByTestId('addDatastructureButton')).not.toBeInTheDocument()
   })

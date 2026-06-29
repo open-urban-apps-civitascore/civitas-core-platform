@@ -181,7 +181,8 @@ integration-test-backend:
       junit: portal-backend/target/failsafe-reports/TEST-*.xml
 
 # Saga E2E integration tests — cross-module tests validating the full dataset saga workflow
-# (portal-backend + config-adapter orchestrator in-process, with real FROST, Kafka, Redpanda Connect).
+# (portal-backend + Flowable saga engine in-process, with real FROST, Kafka, Redpanda Connect —
+#  pipeline-engine migration to NiFi still pending, see WI 1622).
 # Auto-runs on main/develop, manual trigger on MRs (heavy: ~2 min, 6+ containers).
 saga-e2e-test-backend:
   image: maven:3.9-eclipse-temurin-25
@@ -320,12 +321,13 @@ api-test-backend:
     # Run Bruno API tests from a container on the same Compose network
     - docker run -d --name bruno-runner --network api-test-net node:22-alpine sleep infinity
     - docker cp api/portal-backend/bruno-api/. bruno-runner:/tests/
-    # Skip saga steps tagged requires-nifi while the pipeline adapter is unavailable.
+    # The NiFi + GeoServer adapters are wired into the CI stack, so the dataset-saga Bruno
+    # lifecycles run as the end-to-end acceptance gate.
     - |
       docker exec bruno-runner sh -c '
         npm install -g @usebruno/cli 2>/dev/null
         cd /tests
-        npx @usebruno/cli run --env ci --exclude-tags=requires-nifi > /tests/bruno-output.txt 2>&1
+        npx @usebruno/cli run --env ci > /tests/bruno-output.txt 2>&1
         RESULT=$?
         cat /tests/bruno-output.txt
         exit $RESULT

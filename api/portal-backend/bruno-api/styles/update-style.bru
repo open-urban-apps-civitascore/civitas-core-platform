@@ -1,0 +1,45 @@
+meta {
+  name: Update Style
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/datasets/:dataSetId/styles/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{styleId}}
+}
+
+body:json {
+  {
+    "name": "default_point_style",
+    "sldContent": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><StyledLayerDescriptor xmlns=\"http://www.opengis.net/sld\" xmlns:ogc=\"http://www.opengis.net/ogc\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" version=\"1.0.0\"><NamedLayer><Name>default_point_style</Name><UserStyle><FeatureTypeStyle><Rule><PointSymbolizer><Graphic><Mark><WellKnownName>circle</WellKnownName><Fill><CssParameter name=\"fill\">#00aa55</CssParameter></Fill></Mark><Size>10</Size></Graphic></PointSymbolizer></Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('styleId', res.body.id);
+  }
+}
+
+docs {
+  **Precondition:** `dataSetId` and `styleId` are set.
+
+  **Expected Response:** 200 OK, body reflects updated `sldContent`.
+
+  **Note:** PATCH is not supported on Styles — the controller returns 405. Use this PUT for any modification.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Style record updated in `portal_backend` DB |
+  | Config Adapter | — (GeoServer style is re-uploaded when the parent DataSet is re-released) |
+  | External System | — |
+}

@@ -54,6 +54,12 @@
       <artifactId>spring-security-core</artifactId>
     </dependency>
 
+    <!-- Jackson annotations only — needed by @JsonInclude on the shared saga payload records. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+    </dependency>
+
     <!-- Lombok -->
     <dependency>
       <groupId>org.projectlombok</groupId>

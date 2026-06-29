@@ -30,8 +30,9 @@
 		<module>config-adapter-examples</module>
 		<module>config-adapter-frost</module>
 		<module>config-adapter-geoserver</module>
-		<module>config-adapter-redpanda</module>
+		<module>config-adapter-nifi</module>
 		<module>config-adapter-flowable</module>
+		<module>config-adapter-postgis</module>
 	</modules>
 
 	<properties>
@@ -139,6 +140,11 @@
 				<artifactId>jersey-media-json-jackson</artifactId>
 				<version>${jersey.version}</version>
 			</dependency>
+			<dependency>
+				<groupId>org.glassfish.jersey.media</groupId>
+				<artifactId>jersey-media-multipart</artifactId>
+				<version>${jersey.version}</version>
+			</dependency>
 
 			<!-- Apache Commons -->
 			<dependency>
@@ -211,6 +217,7 @@
 				<artifactId>HikariCP</artifactId>
 				<version>${hikaricp.version}</version>
 			</dependency>
+			<!-- JDBC / Connection Pool -->
 			<dependency>
 				<groupId>org.postgresql</groupId>
 				<artifactId>postgresql</artifactId>
@@ -250,6 +257,12 @@
 			<dependency>
 				<groupId>org.testcontainers</groupId>
 				<artifactId>testcontainers-kafka</artifactId>
+				<version>${testcontainers.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.testcontainers</groupId>
+				<artifactId>testcontainers-postgresql</artifactId>
 				<version>${testcontainers.version}</version>
 				<scope>test</scope>
 			</dependency>

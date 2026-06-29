@@ -6,12 +6,15 @@ import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
+import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -25,6 +28,8 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.encoder.Encode;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,20 +52,46 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   private final DataSetRepository dataSetRepository;
   private final DataSetMapper dataSetMapper;
+  private final DataPoolRepository dataPoolRepository;
 
   private final AssignmentFactory assignmentFactory;
 
   private final DataSetSagaPublisher sagaPublisher;
 
+  private final ObjectProvider<AllowedScopes> allowedScopesProvider;
+
   public DataSetService(
       DataSetRepository dataSetRepository,
       DataSetMapper dataSetMapper,
+      DataPoolRepository dataPoolRepository,
       AssignmentFactory assignmentFactory,
-      DataSetSagaPublisher sagaPublisher) {
+      DataSetSagaPublisher sagaPublisher,
+      ObjectProvider<AllowedScopes> allowedScopesProvider) {
     this.dataSetRepository = dataSetRepository;
     this.dataSetMapper = dataSetMapper;
+    this.dataPoolRepository = dataPoolRepository;
     this.assignmentFactory = assignmentFactory;
     this.sagaPublisher = sagaPublisher;
+    this.allowedScopesProvider = allowedScopesProvider;
+  }
+
+  /**
+   * Authorizes placing a dataset into the given target datapool (F4). OPA grants the dataset write
+   * but cannot authorize the TARGET pool — it never sees the request body — so the backend enforces
+   * it here using the per-request {@link AllowedScopes}: a TENANT (wildcard) caller may use any
+   * pool, otherwise the target pool must be among the caller's authorized pools
+   * (X-Allowed-Pool-Ids).
+   *
+   * @param datapoolId the target datapool the dataset is being placed into (non-null)
+   * @throws AccessDeniedException if the caller is not authorized for the target pool
+   */
+  private void authorizeTargetPool(UUID datapoolId) {
+    AllowedScopes scopes = allowedScopesProvider.getObject();
+    if (scopes.isWildcard() || scopes.getPoolIds().contains(datapoolId)) {
+      return;
+    }
+    throw new AccessDeniedException(
+        "Not authorized to place a dataset into datapool " + datapoolId);
   }
 
   @Override
@@ -117,6 +148,25 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    */
   @Override
   protected DataSet postConvertToEntity(DataSet entity, DataSetInputDTO input) {
+    UUID currentPoolId = entity.getDataPool() != null ? entity.getDataPool().getId() : null;
+    if (input.getDatapoolId() != null) {
+      DataPool dataPool =
+          dataPoolRepository
+              .findById(input.getDatapoolId())
+              .orElseThrow(() -> new ResourceNotFoundException("DataPool", input.getDatapoolId()));
+      // Authorize only when the dataset is actually being placed into a DIFFERENT pool. A PATCH
+      // re-sends the dataset's existing datapoolId (BaseController#patchInput merges the current
+      // state), so an update that leaves the pool unchanged must NOT require pool authorization —
+      // otherwise a caller holding a direct dataset grant (scope id) but no pool scope could no
+      // longer edit a dataset that happens to sit in a pool.
+      if (!input.getDatapoolId().equals(currentPoolId)) {
+        authorizeTargetPool(input.getDatapoolId());
+      }
+      entity.setDataPool(dataPool);
+    } else {
+      entity.setDataPool(null);
+    }
+
     List<NamedApiInputDTO> incoming = input.getNamedApis();
     if (incoming != null) {
       // Validate slug uniqueness up front (before touching the entity): two NamedApi rows with the

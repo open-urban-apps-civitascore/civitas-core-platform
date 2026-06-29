@@ -3,6 +3,8 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.mapper.PipelineMapper;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
+import de.civitascore.portal.model.embedded.DatapoolScopeType;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
@@ -12,14 +14,17 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -133,6 +138,7 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
             "Pipeline", "dataSourceIds", "One or more DataSource IDs not found");
       }
       dataSources.forEach(this::validateDataSourceLinkable);
+      validateDataSourcesInScope(dataSources, entity.getDataSet());
       entity.setDataSources(new HashSet<>(dataSources));
     } else {
       entity.setDataSources(null);
@@ -209,6 +215,42 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
             });
 
     return saved;
+  }
+
+  private void validateDataSourcesInScope(List<DataSource> dataSources, DataSet dataSet) {
+    List<DataSource> offendingDataSources =
+        new ArrayList<>(
+            dataSources.stream()
+                .filter(ds -> ds.getDatapoolScopeType() == DatapoolScopeType.NONE)
+                .toList());
+
+    DataPool dataPool = dataSet.getDataPool();
+    if (dataPool != null) {
+      offendingDataSources.addAll(
+          dataSources.stream().filter(ds -> !isPermittedForDataPool(ds, dataPool)).toList());
+    } else {
+      // A pool-less dataset belongs to no datapool, so a SPECIFIC-scoped datasource (confined to
+      // its
+      // scopedDataPools) must NOT be usable here — otherwise its pool-confined data could be routed
+      // into a pool-less (and possibly openDataAccess=public) dataset, defeating the restriction.
+      offendingDataSources.addAll(
+          dataSources.stream()
+              .filter(ds -> ds.getDatapoolScopeType() == DatapoolScopeType.SPECIFIC)
+              .toList());
+    }
+
+    if (!offendingDataSources.isEmpty()) {
+      throw new DataSourceScopeViolationException(
+          offendingDataSources.stream().map(DataSource::getId).collect(Collectors.toList()));
+    }
+  }
+
+  private boolean isPermittedForDataPool(DataSource dataSource, DataPool dataPool) {
+    if (dataSource.getDatapoolScopeType() != DatapoolScopeType.SPECIFIC) {
+      return true;
+    }
+    return dataSource.getScopedDataPools().stream()
+        .anyMatch(scopedPool -> scopedPool.getId().equals(dataPool.getId()));
   }
 
   private void validateDataSourceLinkable(DataSource dataSource) {

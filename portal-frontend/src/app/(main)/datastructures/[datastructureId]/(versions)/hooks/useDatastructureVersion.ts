@@ -43,7 +43,6 @@ export const defaultDatastructureVersionFormData: DatastructureVersionFormData =
   description: '',
   dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
   dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
-  modelAtlasUri: null,
   modelName: null,
   nodes: [],
   edges: [],
@@ -113,17 +112,12 @@ export const useDatastructureVersion = ({
   }, [edges, form, shouldMarkModelFieldsDirty])
 
   /**
-   * Set form values nodes and modelAtlasUri depending on the nodes amount in the diagram
-   * If there are no nodes, the diagram is considered not existing, and modelAtlasUri gets set to null
+   * Set form value nodes depending on the nodes amount in the diagram.
+   * When there are no nodes, the diagram is considered not existing.
    */
   useEffect(() => {
     form.setValue('nodes', nodes || [], { shouldDirty: shouldMarkModelFieldsDirty })
-    const hasDiagram = nodes && nodes.length > 0
-    const modelAtlasUriValue = hasDiagram ? modelUri : null
-    form.setValue('modelAtlasUri', modelAtlasUriValue, {
-      shouldDirty: shouldMarkModelFieldsDirty,
-    })
-  }, [nodes, form, modelUri, shouldMarkModelFieldsDirty])
+  }, [nodes, form, shouldMarkModelFieldsDirty])
 
   /**
    * after closing the diagram, a new session gets created. This session is clean.
@@ -132,7 +126,6 @@ export const useDatastructureVersion = ({
    */
   useEffect(() => {
     if (!activeSession?.isDirty && activeSessionId !== initialSession?.id) {
-      form.setValue('modelAtlasUri', null, { shouldDirty: true })
       form.setValue('modelName', null, { shouldDirty: true })
       form.setValue('nodes', [], { shouldDirty: true })
       form.setValue('edges', [], { shouldDirty: true })

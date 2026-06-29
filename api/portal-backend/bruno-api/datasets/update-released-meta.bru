@@ -10,6 +10,10 @@ put {
   auth: inherit
 }
 
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
 params:path {
   id: {{dataSetId}}
 }
@@ -19,6 +23,7 @@ body:json {
     "name": "Updated Dataset Name",
     "description": "Updated description for released dataset",
     "openDataAccess": false,
+    "datapoolId": "{{dataPoolId}}",
     "assignments": []
   }
 }
@@ -32,7 +37,7 @@ tests {
 }
 
 docs {
-  **Precondition:** `dataSetId` is set and in released state.
+  **Precondition:** `dataSetId` is set and in released state. `dataPoolId` is set if a pool assignment should be preserved.
 
   **Expected Response:** 200 OK, released metadata is updated.
 

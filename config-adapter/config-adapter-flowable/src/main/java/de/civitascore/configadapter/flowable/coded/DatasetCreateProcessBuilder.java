@@ -15,7 +15,7 @@ import org.flowable.bpmn.model.BpmnModel;
  * Builds the Dataset Create saga process programmatically using Flowable's BpmnModel API. Produces
  * equivalent behavior to {@code processes/dataset-create.bpmn} (Approach A).
  *
- * <p>The full topology (FROST → APISIX → conditional Redpanda + reverse-order compensation chain)
+ * <p>The full topology (FROST → APISIX → conditional Pipeline + reverse-order compensation chain)
  * lives in {@link DatasetProvisioningSagaTemplate}; this class only supplies the CREATE-specific
  * operation codes.
  */

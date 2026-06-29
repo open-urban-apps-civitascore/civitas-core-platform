@@ -38,4 +38,7 @@ public class DataSourceOutputDTO extends BaseOutputDTO {
       description = "Whether this data source is currently referenced by a pipeline",
       accessMode = Schema.AccessMode.READ_ONLY)
   private boolean inUse;
+
+  @Schema(description = "Datapool scope configuration")
+  private DatapoolScopeOutputDTO datapoolScope;
 }

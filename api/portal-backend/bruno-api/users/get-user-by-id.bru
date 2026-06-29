@@ -14,6 +14,10 @@ params:path {
   id: {{userId}}
 }
 
+vars:pre-request {
+  userId: 3103b600-bcd3-41d5-9d37-bf221e9af81f
+}
+
 tests {
   test("Status code is 200", function() {
     expect(res.getStatus()).to.equal(200);
@@ -25,7 +29,7 @@ tests {
 
 docs {
   **Precondition:** `userId` is set (from TC-USER-04).
-
+  
   **Expected Response**
   - Status: `200 OK`
   - Body contains the user with matching `id`

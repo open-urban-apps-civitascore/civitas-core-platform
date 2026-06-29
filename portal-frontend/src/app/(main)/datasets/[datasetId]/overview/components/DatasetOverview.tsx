@@ -1,7 +1,6 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
@@ -31,6 +30,8 @@ import { useError } from '@/hooks/use-error'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
+import { SelectOption } from '@/types/common'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
   CompletionStepData,
@@ -43,12 +44,12 @@ import {
   DatasetUpdateApiData,
   DatasetUpdateApiSchema,
 } from '@/types/datasets'
-import { isNameConflictError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 import { mapDatasetToFormData } from '../../../utils/mappers'
 import { BaseInfoForm } from '../../components/BaseInfoForm'
 import { CompletionStep } from '../../components/CompletionStep'
+import { usePipelinePermissions } from '../../data-flow/pipeline-editor/_hooks/use-pipeline-permissions'
 import { ApiList } from './ApiList'
 import { PipelineList } from './PipelineList'
 
@@ -57,16 +58,39 @@ interface DatasetOverviewProps {
   groupCount: number
   roleCount: number
   testId?: string
+  datapoolOptions: SelectOption[]
 }
 export const DatasetOverview = (props: DatasetOverviewProps) => {
-  const { dataset, groupCount, roleCount, testId } = props
+  const { dataset, groupCount, roleCount, testId, datapoolOptions } = props
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
 
   const { hasPermission, hasScopedPermission } = usePermissions()
-  const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASET_UPDATE, 'DATASET', dataset.id)
-  const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASET_RELEASE, 'DATASET', dataset.id)
-  const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
+
+  const canRead = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_READ,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
+
+  const canUpdate = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_UPDATE,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
+
+  const canRelease = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_RELEASE,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
+
+  const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
+
+  const { canCreatePipeline } = usePipelinePermissions(dataset.id, dataset.datapool?.id)
 
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
@@ -76,7 +100,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const namedApiList = namedApis ?? []
 
   const router = useRouter()
-  const { handleFormValidationError, handleNameError } = useError()
+  const { handleFormValidationError } = useError()
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
   const [dataSetStatus, setDataSetStatus] = useState<DatasetStatusTypes>(
     dataset.dataSetStatus ?? DATASET_STATUS_TYPES.DRAFT,
@@ -107,7 +131,8 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   // Reset form and local status when dataset prop changes (e.g. after router.refresh())
   useEffect(() => {
-    form.reset(mapDatasetToFormData(dataset))
+    const formData = mapDatasetToFormData(dataset)
+    form.reset(formData)
     setDataSetStatus(dataset.dataSetStatus ?? DATASET_STATUS_TYPES.DRAFT)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset])
@@ -224,12 +249,8 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       router.refresh()
       setIsReadOnly(true)
       return true
-    } catch (error) {
-      if (isNameConflictError(error as AxiosError)) {
-        handleNameError(form, form.getValues('name'))
-      } else {
-        toast.error(t('messages.transitionError'))
-      }
+    } catch {
+      toast.error(t('messages.transitionError'))
       return false
     }
   }
@@ -312,12 +333,13 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       buttons: [],
       content: (
         <>
-          <PipelineList datasetId={dataset.id} pipelines={pipelineList} canAdd={canUpdate && canReadDatasources} />
+          <PipelineList datasetId={dataset.id} pipelines={pipelineList} canCreatePipeline={canCreatePipeline} />
           <div className="border-t" />
           <ApiList
             datasetId={dataset.id}
             apis={namedApiList}
-            canEdit={canUpdate}
+            canEdit={canRead && canUpdate && canReadDatastructures}
+            canView={canRead && canReadDatastructures}
             isOpenDataAccess={dataset.openDataAccess}
           />
         </>
@@ -409,7 +431,12 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
             className="h-full"
           >
             <ContentCard className={cn('h-auto')} footerElement={<FooterElement />}>
-              <BaseInfoForm form={form} isReadOnly={isReadOnly} isLoading={isLoading} />
+              <BaseInfoForm
+                form={form}
+                isReadOnly={isReadOnly}
+                isLoading={isLoading}
+                datapoolOptions={datapoolOptions}
+              />
             </ContentCard>
 
             <div className="mt-6">

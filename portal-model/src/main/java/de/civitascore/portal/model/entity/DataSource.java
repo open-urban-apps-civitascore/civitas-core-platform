@@ -2,6 +2,7 @@ package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
+import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.entity.base.BaseDataEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -11,6 +12,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
@@ -65,6 +68,19 @@ public class DataSource extends BaseDataEntity {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "data_structure_version_id")
   private DataStructureVersion dataStructureVersion;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "datapool_scope_type", nullable = false)
+  @Builder.Default
+  private DatapoolScopeType datapoolScopeType = DatapoolScopeType.ALL;
+
+  @ManyToMany(fetch = FetchType.LAZY)
+  @JoinTable(
+      name = "data_source_datapools",
+      joinColumns = @JoinColumn(name = "data_source_id"),
+      inverseJoinColumns = @JoinColumn(name = "datapool_id"))
+  @Builder.Default
+  private Set<DataPool> scopedDataPools = new HashSet<>();
 
   @OneToMany(
       mappedBy = "dataSource",

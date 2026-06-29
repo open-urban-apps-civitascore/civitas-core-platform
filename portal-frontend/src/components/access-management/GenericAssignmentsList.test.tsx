@@ -397,6 +397,43 @@ describe('GenericAssignmentsList', () => {
 
       expect(screen.getByText('Keine Gruppen und Rollen vorhanden')).toBeInTheDocument()
     })
+
+    it('renders tableTitle and tableSubtitle above the table when assignments exist', () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...controlledProps} tableTitle="Table Title" tableSubtitle="Table Subtitle" />
+        </NextIntlClientProvider>,
+      )
+
+      expect(screen.getByText('Table Title')).toBeInTheDocument()
+      expect(screen.getByText('Table Subtitle')).toBeInTheDocument()
+    })
+
+    it('does not render tableTitle and tableSubtitle when no assignments exist', () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList
+            {...controlledProps}
+            assignedGroups={[]}
+            tableTitle="Table Title"
+            tableSubtitle="Table Subtitle"
+          />
+        </NextIntlClientProvider>,
+      )
+
+      expect(screen.queryByText('Table Title')).not.toBeInTheDocument()
+      expect(screen.queryByText('Table Subtitle')).not.toBeInTheDocument()
+    })
+
+    it('does not render tableTitle and tableSubtitle when not provided', () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...controlledProps} />
+        </NextIntlClientProvider>,
+      )
+
+      expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+    })
   })
 
   describe('permission gating', () => {

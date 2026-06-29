@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -18,13 +19,16 @@ import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
+import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -42,6 +46,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DataSetService Tests")
@@ -49,11 +55,35 @@ class DataSetServiceTest {
 
   @Mock private DataSetRepository dataSetRepository;
   @Mock private DataSetMapper dataSetMapper;
+  @Mock private DataPoolRepository dataPoolRepository;
   @Mock private AssignmentFactory assignmentFactory;
   @Mock private DataSetSagaPublisher sagaPublisher;
+  @Mock private ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   private DataSetService createService() {
-    return new DataSetService(dataSetRepository, dataSetMapper, assignmentFactory, sagaPublisher);
+    // Default to TENANT wildcard so the F4 target-pool check passes for existing pool-setting
+    // tests;
+    // F4-specific tests override allowedScopesProvider.getObject() after calling createService().
+    lenient().when(allowedScopesProvider.getObject()).thenReturn(wildcardScopes());
+    return new DataSetService(
+        dataSetRepository,
+        dataSetMapper,
+        dataPoolRepository,
+        assignmentFactory,
+        sagaPublisher,
+        allowedScopesProvider);
+  }
+
+  private static AllowedScopes wildcardScopes() {
+    AllowedScopes scopes = new AllowedScopes();
+    scopes.setWildcard();
+    return scopes;
+  }
+
+  private static AllowedScopes poolScopes(UUID... poolIds) {
+    AllowedScopes scopes = new AllowedScopes();
+    scopes.setPoolIds(Set.of(poolIds));
+    return scopes;
   }
 
   private DataSet readyDataSet(UUID id) {
@@ -312,12 +342,17 @@ class DataSetServiceTest {
     @DisplayName("allows update when no saga is pending")
     void allowsUpdateWhenNoSagaPending() {
       UUID id = UUID.randomUUID();
+      UUID poolId = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
+      DataPool pool = new DataPool();
+      pool.setId(poolId);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataPoolRepository.findById(poolId)).thenReturn(Optional.of(pool));
 
       DataSetInputDTO input = new DataSetInputDTO();
       input.setName("updated name");
+      input.setDatapoolId(poolId);
 
       DataSet result = createService().updateReleasedMeta(id, input);
       assertThat(result).isNotNull();
@@ -758,6 +793,106 @@ class DataSetServiceTest {
       verify(dataSetRepository).save(saved.capture());
       assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.READY);
       assertThat(saved.getValue().getPendingSagaType()).isNull();
+    }
+  }
+
+  @Nested
+  @DisplayName("datapool resolution")
+  class DataPoolResolutionTests {
+
+    @Test
+    @DisplayName("create throws ResourceNotFoundException when datapoolId points to unknown pool")
+    void createRejectsUnknownDatapoolId() {
+      UUID poolId = UUID.randomUUID();
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("ds");
+      input.setDatapoolId(poolId);
+
+      DataSet entity = draftDataSet(UUID.randomUUID());
+      when(dataSetMapper.toEntity(any())).thenReturn(entity);
+      when(dataPoolRepository.findById(poolId)).thenReturn(Optional.empty());
+
+      assertThatThrownBy(() -> createService().create(input))
+          .isInstanceOf(ResourceNotFoundException.class);
+      verify(dataSetRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create resolves datapoolId and assigns the DataPool to the entity")
+    void createAssignsResolvedDataPool() {
+      UUID poolId = UUID.randomUUID();
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("ds");
+      input.setDatapoolId(poolId);
+
+      DataSet entity = draftDataSet(UUID.randomUUID());
+      DataPool pool = new DataPool();
+      pool.setId(poolId);
+
+      when(dataSetMapper.toEntity(any())).thenReturn(entity);
+      when(dataPoolRepository.findById(poolId)).thenReturn(Optional.of(pool));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSet saved = createService().create(input);
+      assertThat(saved.getDataPool()).isSameAs(pool);
+    }
+
+    @Test
+    @DisplayName("create rejects a target datapool the caller is not authorized for (F4)")
+    void createRejectsUnauthorizedTargetPool() {
+      UUID poolId = UUID.randomUUID();
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("ds");
+      input.setDatapoolId(poolId);
+
+      DataSet entity = draftDataSet(UUID.randomUUID());
+      DataPool pool = new DataPool();
+      pool.setId(poolId);
+
+      DataSetService service = createService();
+      when(dataSetMapper.toEntity(any())).thenReturn(entity);
+      when(dataPoolRepository.findById(poolId)).thenReturn(Optional.of(pool));
+      // Caller is authorized only for a DIFFERENT pool → the target pool is off-limits.
+      when(allowedScopesProvider.getObject()).thenReturn(poolScopes(UUID.randomUUID()));
+
+      assertThatThrownBy(() -> service.create(input)).isInstanceOf(AccessDeniedException.class);
+      verify(dataSetRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName(
+        "create with null datapoolId creates dataset without pool (datapoolId is optional)")
+    void createWithNullDatapoolIdLeavesDataPoolNull() {
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("ds");
+
+      DataSet entity = draftDataSet(UUID.randomUUID());
+      when(dataSetMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSet saved = createService().create(input);
+      assertThat(saved.getDataPool()).isNull();
+      verify(dataPoolRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("update with null datapoolId unassigns the DataPool from the entity")
+    void updateWithNullDatapoolIdUnassignsDataPool() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = draftDataSet(id);
+      DataPool existingPool = new DataPool();
+      existingPool.setId(UUID.randomUUID());
+      ds.setDataPool(existingPool);
+
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("updated name");
+
+      DataSet result = createService().update(id, input);
+      assertThat(result.getDataPool()).isNull();
+      verify(dataPoolRepository, never()).findById(any());
     }
   }
 }

@@ -102,12 +102,16 @@ evaluate_request := result if {
 		"allow": true,
 		"reason": "permission_granted",
 		"required_permissions": permission_eval.required_permissions,
-		"headers": {"X-Allowed-Scope-Ids": allowed_scope_ids_header},
+		"headers": object.union(
+			{"X-Allowed-Scope-Ids": allowed_scope_ids_header},
+			pool_ids_header,
+		),
 	}
 }
 
-# 5. Unscoped access granted (assignments with scopeType=null)
-# Unscoped assignments have no scope to filter on, so no header is needed.
+# 5. Permission granted but with no expressible scope (no wildcard / specific / pool)
+# — no scope header is emitted. Tenant-wide & unscoped grants do NOT take this path;
+# they emit "X-Allowed-Scope-Ids: *" via rule 4 (the backend 403s on a missing header).
 evaluate_request := result if {
 	permission_eval.is_known_endpoint
 	not permission_eval.is_null_permission_endpoint
@@ -160,30 +164,48 @@ evaluate_request := {"allow": false, "reason": "unknown_endpoint"} if {
 # Specific scope IDs are included only if ALL required permissions are available
 # for that specific scope ID.
 
-# Check if user has TENANT scope for ALL required permissions (AND semantics)
-# TENANT scope acts as wildcard for collection endpoint filtering.
-# Also cascades to resource endpoints via scope inheritance (Q-005 resolved).
-has_tenant_scope if {
+# WILDCARD scope: the user holds tenant-wide access for ALL required permissions,
+# via an explicit TENANT scope OR an unscoped (scopeType=null) assignment. Both grant
+# tenant-wide access (see permission_eval scope classification), so OPA emits
+# "X-Allowed-Scope-Ids: *" and the backend skips filtering. This DOMINATES any narrower
+# DATASET/DATAPOOL grant the user also happens to hold.
+#
+# Emitted as an EXPLICIT "*", never an omitted header: the backend rejects a DataEntity
+# request that arrives WITHOUT X-Allowed-Scope-Ids with 403, so a tenant-wide reader
+# (e.g. unscoped DATASET_READ + an incidental pool grant) needs the wildcard, not an
+# absent header. Also cascades to resource endpoints via scope inheritance (Q-005).
+has_wildcard_scope if {
 	count(permission_eval.required_permissions) > 0
 	every perm in permission_eval.required_permissions {
-		has_tenant_scoped_permission(perm)
+		has_wildcard_scoped_permission(perm)
 	}
 }
 
-# Helper: check if a single permission exists with TENANT scope
-has_tenant_scoped_permission(perm) if {
+# Helper: a single permission granted tenant-wide via an explicit TENANT scope ...
+has_wildcard_scoped_permission(perm) if {
 	some group in user_context_fetcher.user_context.groups
 	some assignment in group.assignments
 	perm in assignment.permissions
 	permission_eval.is_tenant_scoped(assignment)
 }
 
-# User has permission but no scoped assignments — no scope header needed.
-# If has_permission is true (required by rule 5) and there's no tenant scope
-# and no specific scope IDs, the permission must come from an unscoped assignment.
+# ... or via an unscoped (scopeType=null) assignment, which is likewise tenant-wide.
+has_wildcard_scoped_permission(perm) if {
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	perm in assignment.permissions
+	permission_eval.is_unscoped(assignment)
+}
+
+# User has permission but NO expressible scope: not wildcard, no specific scope IDs,
+# and no pool grant. Only then is no scope header emitted. This stays deliberately
+# narrow — tenant-wide/unscoped access takes the has_wildcard_scope ("*") path above,
+# so the headerless branch is never hit for a legitimate tenant-wide reader (which the
+# backend would otherwise 403 on a missing X-Allowed-Scope-Ids).
 is_unscoped_only if {
-	not has_tenant_scope
+	not has_wildcard_scope
 	count(specific_scope_ids) == 0
+	count(allowed_pool_ids) == 0
 }
 
 # Collect specific scope IDs where user has ALL required permissions (AND semantics)
@@ -212,18 +234,41 @@ scope_has_permission(perm, target_scope_id) if {
 	assignment.scopeId == target_scope_id
 }
 
+# DATAPOOL scope IDs the user may use for the dataset COLLECTION (Epic 1 union).
+# Single source of truth: permission_eval.qualifying_datapool_ids (a pool must
+# carry ALL required permissions), so the X-Allowed-Pool-Ids header and the
+# allow-decision can never diverge. The backend ORs these into its list filter
+# (datapool_id IN (...)), so OPA passes only the small set of granted pool ids —
+# never an enumerated list of dataset ids.
+allowed_pool_ids := permission_eval.qualifying_datapool_ids
+
 # Generate the header value based on user's scopes
 default allowed_scope_ids_header := ""
 
-# TENANT scope = wildcard (header used for collection filtering by backend)
+# Wildcard (TENANT or unscoped tenant-wide) = "*"; backend skips filtering.
 allowed_scope_ids_header := "*" if {
-	has_tenant_scope
+	has_wildcard_scope
 }
 
 # Specific scopes = comma-separated sorted IDs
 allowed_scope_ids_header := concat(",", sort(specific_scope_ids)) if {
-	not has_tenant_scope
+	not has_wildcard_scope
 	count(specific_scope_ids) > 0
+}
+
+# X-Allowed-Pool-Ids header (Epic 1 union, collection filtering).
+# Present only when the user has dataset-relevant DATAPOOL grants; the backend
+# ORs it into the collection filter as `datapool_id IN (<ids>)`. Built as a
+# separate object so the header is OMITTED ENTIRELY when there are no pool grants.
+# This omission is security-relevant: emitting an empty "X-Allowed-Pool-Ids: ""
+# instead would cause AllowedScopesFilter to mark the request scoped, flipping a
+# pool-less user from unscoped to scoped-with-no-pools. Keep the omit semantics.
+pool_ids_header := {"X-Allowed-Pool-Ids": concat(",", sort(allowed_pool_ids))} if {
+	count(allowed_pool_ids) > 0
+}
+
+pool_ids_header := {} if {
+	count(allowed_pool_ids) == 0
 }
 
 # =============================================================================

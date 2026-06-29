@@ -48,7 +48,11 @@ const defaultProps = {
   rowCount: 0,
 }
 
-const mockCurrentUser = (permissions: PermissionName[]) => {
+const mockCurrentUser = (
+  permissions: PermissionName[],
+  scopeType: 'TENANT' | 'DATASET' | 'DATAPOOL' = 'TENANT',
+  scopeId: string | null = null,
+) => {
   vi.mocked(useGetCurrentUser).mockReturnValue({
     data: {
       username: 'test',
@@ -56,7 +60,7 @@ const mockCurrentUser = (permissions: PermissionName[]) => {
       title: 'MR' as const,
       firstName: 'Test',
       lastName: 'User',
-      assignments: [{ scopeType: 'TENANT', scopeId: null, permissions }],
+      assignments: [{ scopeType, scopeId, permissions }],
     },
   } as unknown as ReturnType<typeof useGetCurrentUser>)
 }
@@ -68,7 +72,7 @@ describe('DatasetsList permission gating', () => {
     vi.clearAllMocks()
   })
 
-  it('shows create button when user has DATASET_CREATE permission', () => {
+  it('shows create button when user has DATASET_CREATE via TENANT-scoped assignment', () => {
     mockCurrentUser([PERMISSION_NAMES.DATASET_CREATE])
     renderComponent()
     expect(screen.getByTestId('addDatasetButton')).toBeInTheDocument()
@@ -76,6 +80,12 @@ describe('DatasetsList permission gating', () => {
 
   it('hides create button when user lacks DATASET_CREATE permission', () => {
     mockCurrentUser([PERMISSION_NAMES.DATASET_READ])
+    renderComponent()
+    expect(screen.queryByTestId('addDatasetButton')).not.toBeInTheDocument()
+  })
+
+  it('hides create button when user has DATASET_CREATE only via DATASET-scoped assignment', () => {
+    mockCurrentUser([PERMISSION_NAMES.DATASET_CREATE], 'DATASET', 'ds1')
     renderComponent()
     expect(screen.queryByTestId('addDatasetButton')).not.toBeInTheDocument()
   })

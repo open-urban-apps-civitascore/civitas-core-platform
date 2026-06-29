@@ -10,6 +10,10 @@ put {
   auth: inherit
 }
 
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
 params:path {
   id: {{dataSetId}}
 }
@@ -19,6 +23,7 @@ body:json {
     "name": "Sensor Readings Dataset",
     "description": "Updated dataset description",
     "openDataAccess": false,
+    "datapoolId": "{{dataPoolId}}",
     "assignments": [],
     "namedApis": [
       { "name": "Traffic Sensor Readings", "slug": "traffic", "standard": "STA", "version": "1.1", "description": "Live traffic counter readings from city sensors." },
@@ -42,7 +47,7 @@ tests {
 }
 
 docs {
-  **Precondition:** `dataSetId` is set.
+  **Precondition:** `dataSetId` and `dataPoolId` are set.
 
   **Expected Response:** 200 OK, body reflects updated values.
 

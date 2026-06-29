@@ -851,7 +851,7 @@ export APISIX_PLUGIN_CONFIG_ID=1
 export APISIX_SERVICE_ID=svc-frost-server
 # Headers the saga's route-level proxy-rewrite must strip in lieu of plugin_config 1
 # (Route-over-PluginConfig precedence overrides plugin_config's proxy-rewrite).
-export APISIX_PROXY_REWRITE_HEADERS_REMOVE=X-Allowed-Scope-Ids
+export APISIX_PROXY_REWRITE_HEADERS_REMOVE=X-Allowed-Scope-Ids,X-Allowed-Pool-Ids
 # FROST upstream auth APISIX injects into proxy-rewrite for private dataset routes.
 export APISIX_FROST_API_KEY=dev-frost-api-key
 export APISIX_FROST_API_KEY_HEADER=X-API-Key
@@ -871,6 +871,10 @@ export GEOSERVER_POSTGIS_PORT=5434
 export GEOSERVER_POSTGIS_DB=geoserver
 export GEOSERVER_POSTGIS_USER=geoserver
 export GEOSERVER_POSTGIS_PASSWORD=geoserver
+# PostGIS adapter DDL connection — must point at the same database the GeoServer datastore reads
+export POSTGIS_JDBC_URL=jdbc:postgresql://localhost:5434/geoserver
+export POSTGIS_JDBC_USER=geoserver
+export POSTGIS_JDBC_PASSWORD=geoserver
 
 java -jar "$CONFIG_ADAPTER_JAR"
 exec bash
@@ -939,7 +943,7 @@ if [ "$config_adapter_option" = "3" ]; then
     echo "  APISIX_API_PUBLIC_URL=http://api.localhost:9080"
     echo "  APISIX_PLUGIN_CONFIG_ID=1"
     echo "  APISIX_SERVICE_ID=svc-frost-server"
-    echo "  APISIX_PROXY_REWRITE_HEADERS_REMOVE=X-Allowed-Scope-Ids"
+    echo "  APISIX_PROXY_REWRITE_HEADERS_REMOVE=X-Allowed-Scope-Ids,X-Allowed-Pool-Ids"
     echo "  APISIX_FROST_API_KEY=dev-frost-api-key"
     echo "  APISIX_FROST_API_KEY_HEADER=X-API-Key"
     echo "  FROST_URL=http://localhost:8085/FROST-Server/v1.1"
@@ -954,6 +958,9 @@ if [ "$config_adapter_option" = "3" ]; then
     echo "  GEOSERVER_POSTGIS_DB=geoserver"
     echo "  GEOSERVER_POSTGIS_USER=geoserver"
     echo "  GEOSERVER_POSTGIS_PASSWORD=geoserver"
+    echo "  POSTGIS_JDBC_URL=jdbc:postgresql://localhost:5434/geoserver"
+    echo "  POSTGIS_JDBC_USER=geoserver"
+    echo "  POSTGIS_JDBC_PASSWORD=geoserver"
     echo
 fi
 

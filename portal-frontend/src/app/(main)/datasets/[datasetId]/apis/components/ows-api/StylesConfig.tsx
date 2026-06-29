@@ -17,7 +17,8 @@ import { Button } from '@/components/ui/button'
 import { FormItem, FormLabel } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { OwsApiFormData, StyleFormData } from '@/types/namedApis'
+import { OwsApiFormData } from '@/types/namedApis'
+import { StyleFormData } from '@/types/styles'
 import { getEmptyLabelIndex, isNewItem } from '@/utils/common'
 
 interface StylesConfigProps {
@@ -121,7 +122,7 @@ export const StylesConfig = (props: StylesConfigProps) => {
       ) : (
         <ContentCard>
           <DetailsFieldContainer className="pt-0 pb-3">
-            <SubHeader title={t('title')} titleClassName="text-2xl leading-none font-bold" />
+            <SubHeader title={t('title')} subtitle={t('subtitle')} titleClassName="mb-1" />
           </DetailsFieldContainer>
           <div className="flex gap-6">
             <SidebarList

@@ -72,6 +72,11 @@ public enum PermissionName implements GrantedAuthority {
   DATASOURCE_DELETE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASOURCE_RELEASE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
 
+  DATAPOOL_CREATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
+  DATAPOOL_READ(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
+  DATAPOOL_UPDATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
+  DATAPOOL_DELETE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
+
   DATASTRUCTURE_CREATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASTRUCTURE_READ(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASTRUCTURE_UPDATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),

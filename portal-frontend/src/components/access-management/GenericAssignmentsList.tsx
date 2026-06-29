@@ -30,7 +30,7 @@ import { AddRoleModal } from './AddRoleModal'
 /**
  * Uncontrolled mode: component manages its own state.
  * Used for standalone pages (e.g. datasets).
- * Renders with title, subtitle and save/cancel action buttons.
+ * Renders with page-level title, subtitle and save/cancel action buttons.
  */
 type UncontrolledProps = {
   entityId: string
@@ -48,7 +48,7 @@ type UncontrolledProps = {
 /**
  * Controlled mode: parent manages the assignments state.
  * Used for embedded contexts (e.g. datasources tab).
- * No title, subtitle or action buttons – the parent handles saving.
+ * No action buttons – the parent handles saving.
  */
 type ControlledProps = {
   assignedGroups: GroupRoleAssignmentTable[]
@@ -67,10 +67,21 @@ type GenericAssignmentsListProps = {
   firstBoxText?: string
   secondBoxText?: string
   hasSecondBox?: boolean
+  tableTitle?: string
+  tableSubtitle?: string
+  noDataSubtitle?: string
 } & (UncontrolledProps | ControlledProps)
 
 export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
-  const { testId = 'accessManagement', hasSecondBox = false, firstBoxText, secondBoxText } = props
+  const {
+    testId = 'accessManagement',
+    hasSecondBox = false,
+    firstBoxText,
+    secondBoxText,
+    tableTitle,
+    tableSubtitle,
+    noDataSubtitle,
+  } = props
 
   const isControlled = props.assignedGroups !== undefined
   const { hasPermission } = usePermissions()
@@ -221,46 +232,64 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
     if (!isControlled && isSuccess) props.onExit?.()
   }
 
-  // Shared content
+  const shouldShowAddButton = !isReadOnly && canAddGroups
+
+  const addButton = shouldShowAddButton ? (
+    <Button onClick={handleAddAssignmentClick}>
+      <Plus className="h-4 w-4 mr-2" />
+      {t('addAssignment')}
+    </Button>
+  ) : null
+
+  const renderNoData = () => (
+    <>
+      {addButton && <div className="flex justify-end mb-4">{addButton}</div>}
+      <NoDataCard
+        icon={<List size={24} />}
+        title={t('noDataPage.title')}
+        subTitle={noDataSubtitle ?? t('noDataPage.description')}
+        isDisabled={isReadOnly}
+      />
+    </>
+  )
+
+  const renderTable = () => (
+    <AccessManagementTable
+      assignments={assignedGroups}
+      onDeleteClick={id => handleDeleteGroup(id as string)}
+      onAddRoleClick={canAddRoles ? handleAddRoleClick : undefined}
+      onDeleteRole={handleDeleteRole}
+      isReadOnly={isReadOnly}
+      isLoading={isLoading}
+      tableTitle={tableTitle}
+      tableSubtitle={tableSubtitle}
+      tableAction={addButton}
+    />
+  )
+
+  const renderInfoBoxes = () => (
+    <div className="mt-6 space-y-4">
+      <ContentCard className="flex flex-row items-start justify-start gap-3 py-3 px-4">
+        <InfoIcon className="h-5 w-5 text-foreground shrink-0 mt-0.5" />
+        <p className="text-sm text-foreground">{firstBoxText ?? t('infoBoxes.firstBox')}</p>
+      </ContentCard>
+      {!isReadOnly && hasSecondBox && (
+        <ContentCard className="flex flex-row items-start justify-start gap-3 py-3 px-4">
+          <TriangleAlert className="h-5 w-5 text-foreground shrink-0 mt-0.5" />
+          <p className="text-sm text-foreground">{secondBoxText ?? t('infoBoxes.secondBox')}</p>
+        </ContentCard>
+      )}
+    </div>
+  )
+
   const mainContent = (
     <div className="min-h-0">
-      {!isReadOnly && canAddGroups && (
-        <div className="flex justify-end mb-4">
-          <Button onClick={handleAddAssignmentClick}>
-            <Plus className="h-4 w-4 mr-2" />
-            {t('addAssignment')}
-          </Button>
-        </div>
-      )}
       {assignedGroups.length === 0 ? (
-        <NoDataCard
-          icon={<List size={24} />}
-          title={t('noDataPage.title')}
-          subTitle={t('noDataPage.description')}
-          isDisabled={isReadOnly}
-        />
+        renderNoData()
       ) : (
         <>
-          <AccessManagementTable
-            assignments={assignedGroups}
-            onDeleteClick={id => handleDeleteGroup(id as string)}
-            onAddRoleClick={canAddRoles ? handleAddRoleClick : undefined}
-            onDeleteRole={handleDeleteRole}
-            isReadOnly={isReadOnly}
-            isLoading={isLoading}
-          />
-          <div className="mt-6 space-y-4">
-            <ContentCard className="flex flex-row items-start justify-start gap-3 py-3 px-4">
-              <InfoIcon className="h-5 w-5 text-foreground shrink-0 mt-0.5" />
-              <p className="text-sm text-foreground">{firstBoxText ?? t('infoBoxes.firstBox')}</p>
-            </ContentCard>
-            {!isReadOnly && hasSecondBox && (
-              <ContentCard className="flex flex-row items-start justify-start gap-3 py-3 px-4">
-                <TriangleAlert className="h-5 w-5 text-foreground shrink-0 mt-0.5" />
-                <p className="text-sm text-foreground">{secondBoxText ?? t('infoBoxes.secondBox')}</p>
-              </ContentCard>
-            )}
-          </div>
+          {renderTable()}
+          {renderInfoBoxes()}
         </>
       )}
     </div>
@@ -290,7 +319,7 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
     </>
   )
 
-  // Controlled mode: no title, no subtitle, no action buttons
+  // Controlled mode: optional title/subtitle, no action buttons
   if (isControlled) {
     return (
       <div data-testid={testId}>

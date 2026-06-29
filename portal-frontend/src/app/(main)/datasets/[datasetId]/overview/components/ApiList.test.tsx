@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import { useGetDatasinks } from '@/app/services/api/datasets/datasinks/clientRequests'
+import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { API_STANDARDS, NamedApi } from '@/types/namedApis'
 
 import { ApiList } from './ApiList'
@@ -20,7 +20,7 @@ vi.mock('next-intl', () => ({
 }))
 
 vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
-  useGetDatasinks: vi.fn().mockReturnValue({
+  useGetDataSinks: vi.fn().mockReturnValue({
     data: { data: [{ id: 'sink-1', dataSinkType: 'POSTGIS' }] },
   }),
 }))
@@ -37,6 +37,7 @@ const defaultProps = {
   datasetId: 'dataset-123',
   apis: [] as NamedApi[],
   canEdit: true,
+  canView: true,
   isOpenDataAccess: false,
 }
 
@@ -99,8 +100,8 @@ describe('ApiList', () => {
       expect(screen.getByText('ows').closest('a')).toBeNull()
     })
 
-    it('WFS/WMS item is disabled when there are no PostGIS datasinks', async () => {
-      vi.mocked(useGetDatasinks).mockReturnValueOnce({ data: { data: [] } } as never)
+    it('WFS/WMS item is disabled when there are no PostGIS data sinks', async () => {
+      vi.mocked(useGetDataSinks).mockReturnValueOnce({ data: { data: [] } } as never)
       renderComponent()
       await userEvent.click(screen.getByText('addButton'))
       const item = screen.getByText('ows').closest('[role="menuitem"]')

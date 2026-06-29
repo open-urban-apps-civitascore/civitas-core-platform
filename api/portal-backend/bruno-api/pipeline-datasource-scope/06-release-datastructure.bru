@@ -1,0 +1,27 @@
+meta {
+  name: 06. Release DataStructure
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{scopeDataStructureId}}
+}
+
+tests {
+  test("Released or already released", function() {
+    const status = res.getStatus();
+    // 200=released, 400=already released
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  Makes the DataStructure usable; required before the DataSource can be patched + released.
+}

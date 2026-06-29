@@ -1,0 +1,39 @@
+meta {
+  name: Setup - Find Existing DataPool
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/datapools?q=Default DataPool
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const match = res.body.content.find(d => d.name === 'Default DataPool');
+    if (match) {
+      bru.setVar('dataPoolId', match.id);
+      bru.setVar('setupDataPoolId', match.id);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Purpose:** Checks whether a DataPool named "Default DataPool" from a previous run already exists. If found, saves the ID. No DataPool is required — `dataPoolId` will be set by the datapools/create-datapool step if not found here.
+
+  **Expected Response:** 200 OK, body is a paginated list (may be empty).
+
+  **Post-condition:** If a match is found, saves `dataPoolId` and `setupDataPoolId` from `body.content[].id`.
+}

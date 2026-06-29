@@ -33,10 +33,8 @@ const isGeometry = (type: string): type is GeometryType => (GEOMETRY as Set<stri
 
 const STRUCTURAL = new Set<UMLRelationship['type']>(['association', 'aggregation', 'composition'])
 
-// Geometries are scalar-like: a Point port matches another Point port the same way
-// int matches int, so they render as scalar handles rather than object handles.
 const portTypeFor = (type: FieldType): PortType =>
-  type === 'array' ? 'array' : type === 'object' ? 'object' : 'scalar'
+  type === 'array' ? 'array' : type === 'object' ? 'object' : isGeometry(type) ? 'geometry' : 'scalar'
 
 const isMany = (multiplicity?: string): boolean => !!multiplicity && multiplicity.includes('*')
 
@@ -77,11 +75,20 @@ const indexDiagram = (diagram: UMLDiagram): DiagramIndex => {
     const sourceEl = byKey.get(rel?.source ?? edge.source)
     const targetEl = byKey.get(rel?.target ?? edge.target)
     if (!sourceEl || !targetEl) continue
-    const name = rel?.targetRole || rel?.name || lowerFirst(targetEl.name)
-    const list = outgoing.get(sourceEl.id) ?? []
-    list.push({ target: targetEl, name, many: isMany(rel?.targetMultiplicity) })
-    outgoing.set(sourceEl.id, list)
-    incoming.add(targetEl.id)
+
+    // The composition/aggregation diamond (= the container) is drawn at the edge target, so the
+    // target contains the source. Association has no diamond and keeps its drawn direction.
+    const isContainerAtTarget = rel?.type === 'composition' || rel?.type === 'aggregation'
+    const container = isContainerAtTarget ? targetEl : sourceEl
+    const part = isContainerAtTarget ? sourceEl : targetEl
+    const role = isContainerAtTarget ? rel?.sourceRole : rel?.targetRole
+    const multiplicity = isContainerAtTarget ? rel?.sourceMultiplicity : rel?.targetMultiplicity
+
+    const name = role || rel?.name || lowerFirst(part.name)
+    const list = outgoing.get(container.id) ?? []
+    list.push({ target: part, name, many: isMany(multiplicity) })
+    outgoing.set(container.id, list)
+    incoming.add(part.id)
   }
 
   return { byKey, byName, outgoing, incoming }
@@ -134,9 +141,9 @@ const buildFields = (el: UMLElement, base: string, index: DiagramIndex, visited:
 const pickRoot = (diagram: UMLDiagram, index: DiagramIndex, fallbackName: string): UMLElement | null => {
   const elements = (diagram.nodes ?? []).map(n => n.data?.element).filter((e): e is UMLElement => !!e)
   if (elements.length === 0) return null
-  const byNameMatch = elements.find(e => e.name.toLowerCase() === fallbackName.toLowerCase())
-  if (byNameMatch) return byNameMatch
-  return elements.find(e => !index.incoming.has(e.id)) ?? elements[0]
+  const roots = elements.filter(e => !index.incoming.has(e.id))
+  const pool = roots.length > 0 ? roots : elements
+  return pool.find(e => e.name.toLowerCase() === fallbackName.toLowerCase()) ?? pool[0]
 }
 
 /** Converts a datastructure version's `styles` (UML diagram) into the editor's field tree. */

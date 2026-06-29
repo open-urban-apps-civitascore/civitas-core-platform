@@ -1,6 +1,6 @@
 import type { Edge, Node, Viewport } from '@xyflow/react'
 
-import { PipelineDatasink } from '@/types/datasinks'
+import { DataSinkPayload } from '@/types/datasinks'
 
 import type { PipelineNodeData } from './nodes'
 
@@ -116,8 +116,9 @@ export interface PipelinePayload {
   /** JSON-stringified PipelineStylesPayload — backend stores as opaque string */
   styles: PipelineStylesPayload
   dataSourceIds: string[] // IDs extracted from DataSource nodes
-  dataSinks: PipelineDatasink[] // datasinks config
-  model: object // Pipeline graph serialized in RedPandaConnect syntax
+  dataSinkIds: string[] // IDs of data sinks
+  /** Engine-neutral pipeline graph forwarded to the config-adapter as-is (React-Flow nodes/edges + mappingConfig). */
+  model: PipelineStylesPayload
 }
 
 // ============================================================================
@@ -137,7 +138,7 @@ export interface PipelineOutputDTO {
   styles: PipelineStylesPayload
   dataSources: number[]
   apis: string[]
-  dataSinks: PipelineDatasink[]
+  dataSinks: DataSinkPayload[]
   model: object
 }
 

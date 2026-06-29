@@ -101,13 +101,14 @@ final class ApisixAdminClient {
 
   /**
    * Best-effort rollback of a partially-completed CREATE_ROUTE: deletes the given routes plus the
-   * shared dataset upstream. Each delete is idempotent (404-tolerant) and any secondary failure is
-   * logged and swallowed so the caller's original failure is the one propagated.
+   * dataset upstream(s) created by the step (the FROST upstream and/or the map-server upstream).
+   * Each delete is idempotent (404-tolerant) and any secondary failure is logged and swallowed so
+   * the caller's original failure is the one propagated.
    */
   // The generic catches are deliberate: cleanup is best-effort and must swallow ANY runtime
   // failure so the caller's original provisioning failure stays the propagated one.
   @SuppressWarnings("PMD.AvoidCatchingGenericException")
-  void bestEffortCleanup(String upstreamId, Iterable<String> routeIds, String sagaId) {
+  void bestEffortCleanup(Iterable<String> upstreamIds, Iterable<String> routeIds, String sagaId) {
     for (String routeId : routeIds) {
       try {
         deleteRoute(routeId, "CLEANUP partial route");
@@ -120,15 +121,17 @@ final class ApisixAdminClient {
             Encode.forJava(ex.getMessage()));
       }
     }
-    try {
-      deleteUpstream(upstreamId, "CLEANUP partial upstream");
-    } catch (RuntimeException ex) {
-      LOG.warn(
-          "CLEANUP: could not delete partial upstream {} (saga={}) — may be orphaned on the"
-              + " gateway: {}",
-          Encode.forJava(upstreamId),
-          Encode.forJava(sagaId),
-          Encode.forJava(ex.getMessage()));
+    for (String upstreamId : upstreamIds) {
+      try {
+        deleteUpstream(upstreamId, "CLEANUP partial upstream");
+      } catch (RuntimeException ex) {
+        LOG.warn(
+            "CLEANUP: could not delete partial upstream {} (saga={}) — may be orphaned on the"
+                + " gateway: {}",
+            Encode.forJava(upstreamId),
+            Encode.forJava(sagaId),
+            Encode.forJava(ex.getMessage()));
+      }
     }
   }
 

@@ -16,15 +16,30 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { toast } from 'sonner'
 
 import {
+  useCreateDataSink,
+  useDeleteDataSink,
+  useUpdateDataSink,
+} from '@/app/services/api/datasets/datasinks/clientRequests'
+import {
   useCreatePipeline,
   useDeletePipeline,
   useGetPipelines,
   useUpdatePipeline,
 } from '@/app/services/api/pipelines/clientRequests'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
+import { isDatapoolScopeViolationError } from '@/utils/errors'
 
+import { getNodeDef } from '../../_config/nodeRegistry'
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
-import { buildPipelinePayload, syncDatasinkIds } from '../../_services/payloadBuilderService'
+import {
+  buildDataSinkPayloads,
+  buildPipelinePayload,
+  createDataSinkSnapshot,
+  type DataSinkSnapshot,
+  getRemovedDataSinkIds,
+  hasDataSinkChanged,
+  updateNodeEntityId,
+} from '../../_services/payloadBuilderService'
 import {
   createEmptyPipeline,
   getPipelineStats,
@@ -41,7 +56,7 @@ import {
   type ValidationResultWithNodeStatus,
 } from '../../_services/validationService'
 import type { ActivePipelineContextValue, PipelineStats } from '../../_types/context'
-import { createDefaultNodeData, type PipelineNodeData } from '../../_types/nodes'
+import type { PipelineNodeData } from '../../_types/nodes'
 import type { NodeCreationContext, Pipeline, PipelineEdge, PipelineNode, PipelineNodeType } from '../../_types/pipeline'
 import type { UsePipelineSessionReturn } from '../../_types/session'
 
@@ -85,6 +100,12 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const createPipelineMutation = useCreatePipeline(datasetId)
   const updatePipelineMutation = useUpdatePipeline(datasetId)
   const deletePipelineMutation = useDeletePipeline(datasetId)
+  const createDataSinkMutation = useCreateDataSink()
+  const deleteDataSinkMutation = useDeleteDataSink()
+  const updateDataSinkMutation = useUpdateDataSink()
+
+  // ===== Data sink snapshot for change detection =====
+  const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
 
   // ===== Load pipelines from backend on mount =====
   useEffect(() => {
@@ -108,6 +129,11 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
     // Load all sessions into the session manager
     sessionManager.loadSessions(sessions, activeSessionId)
+
+    // Create initial data sink snapshots for change detection
+    for (const session of sessions) {
+      dataSinkSnapshotsRef.current[session.id] = createDataSinkSnapshot(session.pipeline)
+    }
   }, [pipelinesQuery.data, sessionManager, requestedPipelineId])
 
   // ===== Validation State =====
@@ -121,7 +147,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   // Pipeline can be saved when: isDirty && validation passed (no errors) && validation has been run
   const canSave = useMemo(() => {
     const isDirty = activeSession?.isDirty || false
-    const hasErrors = validationResult?.errors?.length ?? 0 > 0
+    const hasErrors = (validationResult?.errors?.length ?? 0) > 0
     return isDirty && !isValidationRequired && !hasErrors
   }, [activeSession?.isDirty, validationResult?.errors?.length, isValidationRequired])
 
@@ -174,7 +200,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   // ===== Node Operations =====
   const addNode = useCallback(
     (context: NodeCreationContext) => {
-      const nodeData = createDefaultNodeData(context.nodeType)
+      const def = getNodeDef(context.nodeType)
+      if (!def) return
+      const nodeData = def.createDefaultData()
       const newNode: PipelineNode = {
         id: crypto.randomUUID(),
         type: context.nodeType as PipelineNodeType,
@@ -394,44 +422,63 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
     setIsSavingAll(true)
     const saveFailedNames: string[] = []
+    const scopeViolationNames: string[] = []
     try {
       // Serialize saves to avoid concurrent mutation state issues
       for (const session of dirtySessions) {
         try {
-          const payload = buildPipelinePayload(session.pipeline)
-          const pipelineId = session.pipeline.id
+          let currentPipeline = session.pipeline
+          const snapshot = dataSinkSnapshotsRef.current[session.id] ?? {}
 
-          let savedPipeline: Pipeline
-          if (pipelineId) {
-            const response = await updatePipelineMutation.mutateAsync({ pipelineId, data: payload })
-            savedPipeline = session.pipeline
-            const { pipeline: synced, hasChanges } = syncDatasinkIds(savedPipeline, response.data.dataSinks ?? [])
-            if (hasChanges) {
-              await updatePipelineMutation.mutateAsync({ pipelineId, data: buildPipelinePayload(synced) })
-              savedPipeline = synced
-            }
-          } else {
-            const response = await createPipelineMutation.mutateAsync(payload)
-            savedPipeline = { ...session.pipeline, id: response.data.id }
-            const { pipeline: synced, hasChanges } = syncDatasinkIds(savedPipeline, response.data.dataSinks ?? [])
-            if (hasChanges) {
-              await updatePipelineMutation.mutateAsync({
-                pipelineId: response.data.id,
-                data: buildPipelinePayload(synced),
-              })
-              savedPipeline = synced
+          // Step 1: Delete data sinks for removed persistence nodes
+          const removedDataSinkIds = getRemovedDataSinkIds(currentPipeline, snapshot)
+          for (const dataSinkId of removedDataSinkIds) {
+            await deleteDataSinkMutation.mutateAsync({ datasetId, dataSinkId: dataSinkId })
+          }
+
+          // Step 2: Save data sinks (create new / update changed)
+          const dataSinkPayloads = buildDataSinkPayloads(currentPipeline)
+          for (const { nodeId, entityId, payload } of dataSinkPayloads) {
+            if (!entityId) {
+              const response = await createDataSinkMutation.mutateAsync({ datasetId, data: payload })
+              currentPipeline = updateNodeEntityId(currentPipeline, nodeId, response.data.id)
+            } else if (hasDataSinkChanged(nodeId, payload, snapshot)) {
+              await updateDataSinkMutation.mutateAsync({ datasetId, dataSinkId: entityId, data: payload })
             }
           }
-          sessionManager.updateSessionPipeline(session.id, { ...savedPipeline, isDirty: false })
+
+          // Step 3: Save pipeline (with updated entityIds from step 1)
+          const pipelinePayload = buildPipelinePayload(currentPipeline)
+          const pipelineId = currentPipeline.id
+
+          if (pipelineId) {
+            await updatePipelineMutation.mutateAsync({ pipelineId, data: pipelinePayload })
+          } else {
+            const response = await createPipelineMutation.mutateAsync(pipelinePayload)
+            currentPipeline = { ...currentPipeline, id: response.data.id }
+          }
+
+          // Step 4: Update session state and snapshot
+          sessionManager.updateSessionPipeline(session.id, { ...currentPipeline, isDirty: false })
           sessionManager.markSessionClean(session.id)
-          toast.success(t('header.saveSucces'))
-        } catch {
-          saveFailedNames.push(session.name)
+          dataSinkSnapshotsRef.current[session.id] = createDataSinkSnapshot(currentPipeline)
+          toast.success(t('header.saveSuccess', { name: currentPipeline.name }))
+        } catch (error) {
+          if (isDatapoolScopeViolationError(error)) {
+            scopeViolationNames.push(session.name)
+          } else {
+            saveFailedNames.push(session.name)
+          }
         }
       }
 
+      if (scopeViolationNames.length > 0) {
+        toast.error(t('header.datasourceScopeViolation', { name: scopeViolationNames.join(', ') }))
+      }
       if (saveFailedNames.length > 0) {
         toast.error(t('header.saveFailed', { names: saveFailedNames.join(', ') }))
+      }
+      if (scopeViolationNames.length > 0 || saveFailedNames.length > 0) {
         return false
       }
 
@@ -439,7 +486,17 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     } finally {
       setIsSavingAll(false)
     }
-  }, [isSavingAll, sessionManager, createPipelineMutation, updatePipelineMutation, t])
+  }, [
+    isSavingAll,
+    sessionManager,
+    createPipelineMutation,
+    updatePipelineMutation,
+    createDataSinkMutation,
+    deleteDataSinkMutation,
+    updateDataSinkMutation,
+    datasetId,
+    t,
+  ])
 
   useRegisterUnsavedChanges(hasAnyDirtySession, saveAllPipelines)
 

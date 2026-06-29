@@ -54,7 +54,7 @@ public enum AdapterOperation {
   FROST_ENTITY_UPDATE("FROST entity update"),
   FROST_ENTITY_DELETE("FROST entity deletion"),
 
-  // RedPanda Connect operations
+  // Pipeline operations
   PIPELINE_CREATE("pipeline creation"),
   PIPELINE_UPDATE("pipeline update"),
   PIPELINE_DELETE("pipeline deletion"),
@@ -63,6 +63,16 @@ public enum AdapterOperation {
   GEOSERVER_RESOURCE_CREATE("GeoServer resource creation"),
   GEOSERVER_RESOURCE_UPDATE("GeoServer resource update"),
   GEOSERVER_RESOURCE_DELETE("GeoServer resource deletion"),
+
+  // PostGIS / SQL operations
+  SQL_TABLE_CREATE("table creation"),
+  SQL_TABLE_DELETE("table deletion"),
+  SQL_SCHEMA_CREATE("schema creation"),
+  SQL_SCHEMA_UPDATE("schema update"),
+  SQL_SCHEMA_DELETE("schema deletion"),
+  SQL_ROLE_CREATE("database role creation"),
+  SQL_ROLE_UPDATE("database role update"),
+  SQL_ROLE_DELETE("database role deletion"),
 
   // DummyLog operations
   EVENT_PROCESSING("event processing");

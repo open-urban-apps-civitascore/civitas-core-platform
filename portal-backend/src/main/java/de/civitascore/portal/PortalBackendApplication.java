@@ -2,7 +2,6 @@ package de.civitascore.portal;
 
 import de.civitascore.portal.configuration.EventProperties;
 import de.civitascore.portal.configuration.KeycloakProperties;
-import de.civitascore.portal.configuration.ModelAtlasProperties;
 import de.civitascore.portal.configuration.SagaProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -14,8 +13,7 @@ import org.springframework.boot.persistence.autoconfigure.EntityScan;
 @EnableConfigurationProperties({
   KeycloakProperties.class,
   EventProperties.class,
-  SagaProperties.class,
-  ModelAtlasProperties.class
+  SagaProperties.class
 })
 public class PortalBackendApplication {
 

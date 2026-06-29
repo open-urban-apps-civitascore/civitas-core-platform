@@ -11,7 +11,7 @@ Start it before running any test cases:
 ~/git/civitas-core-platform/dev-environment/start-portal-dev.sh
 ```
 
-The script starts all required infrastructure (Keycloak, PostgreSQL, Kafka, APISIX, OPA, FROST, Model Atlas)
+The script starts all required infrastructure (Keycloak, PostgreSQL, Kafka, APISIX, OPA, FROST)
 and optionally builds and starts the portal backend and frontend.
 Refer to the script's `--help` output for available options (e.g. `--authz`, `--backend`, `--frontend`).
 
@@ -50,7 +50,7 @@ The columns are:
 The three systems covered are:
 - **Backend** — portal-backend service, persists to PostgreSQL (`portal_backend` DB)
 - **Config Adapter** — listens to Kafka events and forwards changes to external systems
-- **External System** — the specific downstream system (Keycloak, APISIX, FROST Server, Model Atlas), or `—` if not applicable
+- **External System** — the specific downstream system (Keycloak, APISIX, FROST Server), or `—` if not applicable
 
 ---
 
