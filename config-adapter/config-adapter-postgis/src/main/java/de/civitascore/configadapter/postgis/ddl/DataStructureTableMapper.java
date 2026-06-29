@@ -168,17 +168,12 @@ public final class DataStructureTableMapper {
       Set<String> visitedRefs,
       LinkedHashMap<String, Object> properties,
       LinkedHashSet<String> required) {
-    // 1. allOf branches first, so inherited (parent) columns precede the node's own.
     if (node.get("allOf") instanceof List<?> branches) {
       for (Object branch : branches) {
         collectInto(mapValue(branch), definitions, visitedRefs, properties, required);
       }
     }
 
-    // 2. A node-level local $ref names a parent definition. GeoJSON refs are geometry, not parents,
-    // and a property-level $ref never reaches here (it is a value inside `properties`). An
-    // unresolvable parent ref would silently drop inherited columns and create a partial table, so
-    // it is rejected rather than ignored.
     String ref = stringValue(node.get("$ref"));
     if (ref != null && geometryType(ref) == null) {
       String key = localDefName(ref);
@@ -198,8 +193,6 @@ public final class DataStructureTableMapper {
       }
     }
 
-    // 3. The node's own properties/required. putAll lets the most specific (last-processed)
-    // definition win the type while keeping each column's first-seen position.
     properties.putAll(mapValue(node.get("properties")));
     if (node.get("required") instanceof List<?> list) {
       list.forEach(value -> required.add(String.valueOf(value)));

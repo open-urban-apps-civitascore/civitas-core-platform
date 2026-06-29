@@ -313,8 +313,6 @@ class DataStructureTableMapperTest {
 
   @Test
   void resolvesAllOfInheritanceMergingParentAndSubclassColumns() {
-    // The editor emits a subclass root as allOf:[{$ref parent}, {own properties}]; the parent lives
-    // in $defs. Both parents' and the subclass's columns must be derived, parent first.
     Map<String, Object> schema =
         json(
             """
@@ -373,7 +371,6 @@ class DataStructureTableMapperTest {
 
   @Test
   void resolvesMultiLevelInheritance() {
-    // A -> B -> C: a $ref target may itself carry allOf, so resolution recurses.
     Map<String, Object> schema =
         json(
             """
@@ -416,7 +413,6 @@ class DataStructureTableMapperTest {
 
   @Test
   void resolvesInheritedGeometryColumn() {
-    // A geometry property inherited from a parent is still recognised as a geometry column.
     Map<String, Object> schema =
         json(
             """
@@ -443,8 +439,6 @@ class DataStructureTableMapperTest {
 
   @Test
   void subclassPropertyOverridesInheritedColumnType() {
-    // On a name collision the most specific (subclass) branch wins the type; the column keeps the
-    // inherited first-seen position.
     Map<String, Object> schema =
         json(
             """
@@ -465,8 +459,6 @@ class DataStructureTableMapperTest {
 
   @Test
   void usesDefinitionsForRefResolution() {
-    // The legacy `definitions` keyword and `#/definitions/<Name>` refs resolve the same way as
-    // `$defs`.
     Map<String, Object> schema =
         json(
             """
@@ -487,8 +479,6 @@ class DataStructureTableMapperTest {
 
   @Test
   void breaksCyclicInheritanceWithoutInfiniteLoop() {
-    // Defensive: a (malformed) inheritance cycle must terminate rather than recurse forever. The
-    // cycle guard skips the re-entrant ref, so B's columns resolve before A's own.
     Map<String, Object> schema =
         json(
             """
@@ -508,8 +498,6 @@ class DataStructureTableMapperTest {
 
   @Test
   void resolvesAllOfNestedInsideSelectedDefinition() {
-    // The root carries no properties/allOf, so the single named definition is selected and then
-    // merged — its own allOf parent must still be resolved.
     Map<String, Object> schema =
         json(
             """
@@ -529,8 +517,6 @@ class DataStructureTableMapperTest {
 
   @Test
   void siblingParentCollisionLetsTheSecondRefWinTheType() {
-    // Two parents declare the same property; the later allOf branch wins the type while the column
-    // keeps its first-seen position.
     Map<String, Object> schema =
         json(
             """
@@ -549,8 +535,6 @@ class DataStructureTableMapperTest {
 
   @Test
   void unresolvableParentRefIsRejected() {
-    // A parent $ref naming a missing definition would silently drop inherited columns, so it is
-    // rejected even when an inline branch could otherwise contribute columns.
     Map<String, Object> schema =
         json(
             """
@@ -570,8 +554,6 @@ class DataStructureTableMapperTest {
 
   @Test
   void nonLocalParentRefIsRejected() {
-    // A parent $ref that is neither GeoJSON nor a local definition reference cannot be resolved and
-    // is rejected rather than silently ignored.
     Map<String, Object> schema =
         json(
             """
