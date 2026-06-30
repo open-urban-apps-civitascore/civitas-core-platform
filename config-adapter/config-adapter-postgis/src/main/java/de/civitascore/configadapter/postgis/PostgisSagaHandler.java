@@ -424,6 +424,24 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       table.setColumns(columns);
       table.setGeometryColumns(geometryColumns);
       table.setPrimaryKey(primaryKey);
+      // The primary key must reference actual table columns; otherwise the emitted PRIMARY KEY(...)
+      // would name a missing column and provisioning fails with broken DDL. This can happen when
+      // columns are configured explicitly but the x-core-primaryKey marker points at an omitted
+      // one.
+      if (primaryKey != null && !primaryKey.isEmpty()) {
+        Set<String> columnNames = new HashSet<>();
+        columns.forEach(column -> columnNames.add(column.name()));
+        geometryColumns.forEach(geometry -> columnNames.add(geometry.name()));
+        List<String> missingKeyColumns =
+            primaryKey.stream().filter(key -> !columnNames.contains(key)).toList();
+        if (!missingKeyColumns.isEmpty()) {
+          throw new IllegalArgumentException(
+              "POSTGIS data sink '"
+                  + tableName
+                  + "' primary key references column(s) not present in the table: "
+                  + missingKeyColumns);
+        }
+      }
       table.setIndexes(convertList(config.get("indexes"), IndexConfig.class));
       if (requireColumns && table.getColumns().isEmpty() && table.getGeometryColumns().isEmpty()) {
         throw new IllegalArgumentException(

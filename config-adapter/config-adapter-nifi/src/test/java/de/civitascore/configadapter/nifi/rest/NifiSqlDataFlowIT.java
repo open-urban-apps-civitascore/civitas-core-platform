@@ -283,18 +283,20 @@ class NifiSqlDataFlowIT {
       String pipelineId, Map<String, Object> graph, Datasource source, SinkSpec sink)
       throws Exception {
     byte[] key = CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
-    FlowDeploymentPlanner planner =
-        new FlowDeploymentPlanner(
-            new GraphParser(),
-            new MappingConfigParser(),
-            new RecordPathCompiler(),
-            new NifiFlowBuilder(),
-            new CredentialResolver(key),
-            new PlatformSinkConfig("jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
-            null);
-    DeploymentPlan plan =
-        planner.plan(new PipelineDeploymentRequest(pipelineId, graph, source, sink));
-    client.deployFlow(plan);
+    try (CredentialResolver resolver = new CredentialResolver(key)) {
+      FlowDeploymentPlanner planner =
+          new FlowDeploymentPlanner(
+              new GraphParser(),
+              new MappingConfigParser(),
+              new RecordPathCompiler(),
+              new NifiFlowBuilder(),
+              resolver,
+              new PlatformSinkConfig("jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
+              null);
+      DeploymentPlan plan =
+          planner.plan(new PipelineDeploymentRequest(pipelineId, graph, source, sink));
+      client.deployFlow(plan);
+    }
   }
 
   private Datasource sqlSource(String table) throws Exception {

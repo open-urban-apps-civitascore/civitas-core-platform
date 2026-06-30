@@ -60,7 +60,7 @@ const makeDefaultQueryParams = () => ({
 })
 
 const mockPermissions = {
-  hasPermission: (perm: string) => perm === 'ASSIGNMENT_CREATE',
+  hasPermission: (perm: string) => perm === 'ASSIGNMENT_CREATE' || perm === 'ASSIGNMENT_DELETE',
   hasAnyPermission: () => false,
   hasScopedPermission: () => false,
 }
@@ -168,7 +168,7 @@ describe('Add group and Delete group button Visibility', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(usePermissions).mockReturnValue({
-      hasPermission: (perm: string) => perm === 'ASSIGNMENT_CREATE',
+      hasPermission: (perm: string) => perm === 'ASSIGNMENT_CREATE' || perm === 'ASSIGNMENT_DELETE',
       hasAnyPermission: () => false,
       hasScopedPermission: () => false,
     })
@@ -252,6 +252,54 @@ describe('GroupAssignmentTab permission gating', () => {
     })
     render(<GroupAssignmentTab {...defaultProps} isReadOnly={false} />)
     expect(screen.getByText('addGroup')).toBeInTheDocument()
+  })
+
+  it('hides delete button in edit mode when user lacks ASSIGNMENT_DELETE', () => {
+    vi.mocked(usePermissions).mockReturnValue({
+      hasPermission: (perm: string) => perm === 'ASSIGNMENT_CREATE',
+      hasAnyPermission: () => false,
+      hasScopedPermission: () => false,
+    })
+    vi.mocked(useGetGroups).mockReturnValue({
+      data: { data: mockGroups, totalElements: 2 },
+      isFetching: false,
+    } as unknown as ReturnType<typeof useGetGroups>)
+    vi.mocked(useQueryParams).mockReturnValue(makeDefaultQueryParams() as unknown as ReturnType<typeof useQueryParams>)
+    render(
+      <GroupAssignmentTab
+        {...defaultProps}
+        isReadOnly={false}
+        selectedGroupIds={['group-1']}
+        initialAssignments={mockSystemRoleAssignments}
+        isSystemRole={true}
+        onGroupAssignmentUpdate={onGroupAssignmentUpdate}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument()
+  })
+
+  it('shows delete button in edit mode when user has ASSIGNMENT_DELETE', () => {
+    vi.mocked(usePermissions).mockReturnValue({
+      hasPermission: (perm: string) => perm === 'ASSIGNMENT_CREATE' || perm === 'ASSIGNMENT_DELETE',
+      hasAnyPermission: () => false,
+      hasScopedPermission: () => false,
+    })
+    vi.mocked(useGetGroups).mockReturnValue({
+      data: { data: mockGroups, totalElements: 2 },
+      isFetching: false,
+    } as unknown as ReturnType<typeof useGetGroups>)
+    vi.mocked(useQueryParams).mockReturnValue(makeDefaultQueryParams() as unknown as ReturnType<typeof useQueryParams>)
+    render(
+      <GroupAssignmentTab
+        {...defaultProps}
+        isReadOnly={false}
+        selectedGroupIds={['group-1']}
+        initialAssignments={mockSystemRoleAssignments}
+        isSystemRole={true}
+        onGroupAssignmentUpdate={onGroupAssignmentUpdate}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Open menu' })).toBeInTheDocument()
   })
 })
 

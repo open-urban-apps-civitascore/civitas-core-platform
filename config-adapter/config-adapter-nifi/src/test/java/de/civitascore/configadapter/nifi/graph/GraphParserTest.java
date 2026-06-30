@@ -119,18 +119,38 @@ class GraphParserTest {
             map(
                 """
                 { "nodes": [
+                    { "id": "n-start", "type": "start", "data": {} },
                     { "id": "n-cron", "type": "cron", "data": { "cronExpression": "0 0 6 * * ?" } },
                     { "id": "n-src", "type": "dataSource", "data": {} },
                     { "id": "n-map", "type": "mapping",
                       "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } },
                     { "id": "n-frost", "type": "frost", "data": {} } ],
                   "edges": [
-                    { "id": "e1", "source": "n-src", "target": "n-map" },
-                    { "id": "e2", "source": "n-map", "target": "n-frost" } ] }
+                    { "id": "e0", "source": "n-start", "target": "n-cron" },
+                    { "id": "e1", "source": "n-cron", "target": "n-src" },
+                    { "id": "e2", "source": "n-src", "target": "n-map" },
+                    { "id": "e3", "source": "n-map", "target": "n-frost" } ] }
                 """));
 
-    assertEquals(4, graph.nodes().size());
+    assertEquals(5, graph.nodes().size());
     assertEquals(Optional.of("0 0 6 * * ?"), graph.triggerCron());
+  }
+
+  @Test
+  void detachedCronNodeIsRejected() throws Exception {
+    // a cron node with no edges is not part of the flow; it must not silently schedule the source
+    PipelineGraph graph =
+        parser.parse(
+            map(
+                """
+                { "nodes": [
+                    { "id": "n-cron", "type": "cron", "data": { "cronExpression": "0 0 6 * * ?" } },
+                    { "id": "n-src", "type": "dataSource", "data": {} },
+                    { "id": "n-frost", "type": "frost", "data": {} } ],
+                  "edges": [ { "id": "e1", "source": "n-src", "target": "n-frost" } ] }
+                """));
+
+    assertThrows(IllegalStateException.class, graph::triggerCron);
   }
 
   @Test

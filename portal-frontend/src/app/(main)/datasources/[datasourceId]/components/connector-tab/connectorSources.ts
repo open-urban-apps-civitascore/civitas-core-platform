@@ -24,6 +24,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
     {
       key: 'password',
       type: 'input',
+      inputType: 'password',
       label: { label: 'Password', labelHint: null },
       placeholder: '',
       defaultValue: '',
@@ -92,6 +93,9 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       required: true,
     },
     {
+      // Intentionally a plain (unmasked) input: the DSN is a readable connection
+      // string, not a secret. Credentials belong in the dedicated `user`/`password`
+      // fields below, not embedded in the DSN — so it is not declared inputType: 'password'.
       key: 'dsn',
       type: 'input',
       label: { label: 'DSN', labelHint: null },
@@ -110,6 +114,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
     {
       key: 'password',
       type: 'input',
+      inputType: 'password',
       label: { label: 'Password', labelHint: null },
       placeholder: '',
       defaultValue: '',

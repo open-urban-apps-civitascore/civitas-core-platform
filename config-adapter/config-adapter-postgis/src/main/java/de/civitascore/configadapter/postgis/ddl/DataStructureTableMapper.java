@@ -36,6 +36,12 @@ import java.util.regex.Pattern;
  *
  * <p>Names in {@code excludedNames} (explicitly configured geometry columns) are skipped so they
  * are not duplicated as derived columns.
+ *
+ * <p>A subclass's own properties live outside the root (under {@code allOf}), so columns are
+ * gathered by resolving {@code allOf} branches and their local {@code $ref} parents, not just the
+ * root {@code properties}. Inherited columns come first, and on a name collision the subclass wins
+ * the column type while the column keeps its first-seen position. A property-level {@code $ref}
+ * stays {@code JSONB}; only node-level parents are followed.
  */
 public final class DataStructureTableMapper {
 
@@ -57,19 +63,16 @@ public final class DataStructureTableMapper {
    * @throws IllegalArgumentException if the schema contains no usable definition with properties
    */
   public static TableColumns deriveColumns(Map<String, Object> schema, Set<String> excludedNames) {
-    // Select the main definition through the shared DataStructureSchema so the columns and the PK
-    // are derived from the SAME definition — they cannot diverge by construction.
-    Map<String, Object> definition = DataStructureSchema.mainDefinition(schema);
-    Map<String, Object> properties = mapValue(definition.get("properties"));
+    // Resolve the table definition through the shared DataStructureSchema (allOf-aware) so the
+    // columns and the primary key are derived from the SAME merged definition — no divergence.
+    DataStructureSchema.ResolvedDefinition resolved = DataStructureSchema.resolveDefinition(schema);
+    Map<String, Object> properties = resolved.properties();
     if (properties.isEmpty()) {
       throw new IllegalArgumentException(
           "dataStructure JSON Schema has no usable definition with properties; cannot derive sink"
               + " table columns");
     }
-    List<String> required =
-        definition.get("required") instanceof List<?> list
-            ? list.stream().map(String::valueOf).toList()
-            : List.of();
+    List<String> required = List.copyOf(resolved.required());
 
     List<ColumnConfig> columns = new ArrayList<>();
     List<GeometryColumnConfig> geometryColumns = new ArrayList<>();

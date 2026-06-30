@@ -152,7 +152,16 @@ public record PipelineGraph(List<GraphNode> nodes, List<GraphEdge> edges) {
     if (crons.isEmpty()) {
       return Optional.empty();
     }
-    Object expression = crons.get(0).data().get(KEY_CRON_EXPRESSION);
+    GraphNode cron = crons.get(0);
+    // A cron node only schedules the source when it is actually wired into the flow. A detached
+    // (unwired) cron must not silently schedule the source — or make an MQTT plan fail with "cron
+    // not supported" — so reject it, mirroring the mapping connectivity check.
+    if (!isWired(cron.id())) {
+      throw new IllegalStateException(
+          "the cron node is not wired into the flow (it needs both an incoming and an outgoing"
+              + " edge)");
+    }
+    Object expression = cron.data().get(KEY_CRON_EXPRESSION);
     if (!(expression instanceof String text) || text.isBlank()) {
       throw new IllegalStateException("cron node has no cronExpression");
     }

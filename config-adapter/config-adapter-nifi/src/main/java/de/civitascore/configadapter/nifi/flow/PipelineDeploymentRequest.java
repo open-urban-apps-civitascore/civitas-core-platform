@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.nifi.flow;
 
 import de.civitascore.configadapter.model.dataset.Datasource;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -60,13 +61,33 @@ public record PipelineDeploymentRequest(
       if (type == SinkType.POSTGIS && (tableName == null || tableName.isBlank())) {
         throw new IllegalArgumentException("POSTGIS sink requires a non-blank tableName");
       }
-      primaryKeyColumns = primaryKeyColumns == null ? List.of() : List.copyOf(primaryKeyColumns);
+      // These names are joined verbatim into NiFi's "Update Keys", so normalize them here: trim,
+      // reject blank entries (a broken UPSERT config otherwise), and de-duplicate while preserving
+      // order.
+      primaryKeyColumns = sanitizeKeyColumns(primaryKeyColumns);
       // Primary-key columns only drive the PostGIS PutDatabaseRecord UPSERT; a non-POSTGIS sink
       // carrying them is a meaningless state, so reject it rather than let it pass unused.
       if (type != SinkType.POSTGIS && !primaryKeyColumns.isEmpty()) {
         throw new IllegalArgumentException(
             "primaryKeyColumns are only valid for a POSTGIS sink, not " + type);
       }
+    }
+
+    private static List<String> sanitizeKeyColumns(List<String> keys) {
+      if (keys == null) {
+        return List.of();
+      }
+      List<String> sanitized = new ArrayList<>();
+      for (String key : keys) {
+        if (key == null || key.isBlank()) {
+          throw new IllegalArgumentException("primaryKeyColumns must not contain blank entries");
+        }
+        String trimmed = key.trim();
+        if (!sanitized.contains(trimmed)) {
+          sanitized.add(trimmed);
+        }
+      }
+      return List.copyOf(sanitized);
     }
 
     /** A sink without an explicit primary key (INSERT semantics). */

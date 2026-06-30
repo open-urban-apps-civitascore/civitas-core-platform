@@ -424,12 +424,15 @@ const validateMappingCoversRequiredTargetFields: ValidationRule = {
       }
       if (required.length === 0) return
 
-      const assigned = new Set(
-        Object.entries(node.data.mappingConfig?.fields ?? {})
-          .filter(([, value]) => isNonEmptyMappingValue(value))
-          .map(([key]) => key),
-      )
-      const missing = required.filter(path => !assigned.has(path))
+      const assigned = Object.entries(node.data.mappingConfig?.fields ?? {})
+        .filter(([, value]) => isNonEmptyMappingValue(value))
+        .map(([key]) => key)
+      // A required leaf is covered if it is mapped directly OR an ancestor path is mapped — mapping a
+      // whole object/array subtree (parent path) covers its leaf required fields. The `.`/`[` suffix
+      // anchors the match to a path-segment boundary so `$.loc` does not "cover" `$.location.lat`.
+      const isCovered = (leaf: string) =>
+        assigned.some(path => leaf === path || leaf.startsWith(`${path}.`) || leaf.startsWith(`${path}[`))
+      const missing = required.filter(path => !isCovered(path))
       if (missing.length === 0) return
 
       errors.push({

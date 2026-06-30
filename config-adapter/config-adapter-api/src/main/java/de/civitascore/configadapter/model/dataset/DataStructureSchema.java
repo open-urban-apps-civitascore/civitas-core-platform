@@ -10,37 +10,78 @@
 package de.civitascore.configadapter.model.dataset;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Engine-neutral reads over a DataStructure JSON Schema (the model the portal stores on a
  * data-structure version and ships at {@code datasinks[].dataStructure}).
  *
- * <p>This is the single source of truth for deriving the conceptual primary key from the {@code
- * x-core-primaryKey} marker, so the PostGIS adapter (which sets the table {@code PRIMARY KEY}) and
- * the NiFi adapter (which sets PutDatabaseRecord {@code Update Keys} for UPSERT) can never disagree
- * on what the key columns are.
+ * <p>This is the single source of truth for resolving a data structure's table definition — the
+ * merged {@code properties}/{@code required} of the main type, following {@code allOf}/{@code $ref}
+ * inheritance — and for deriving the conceptual primary key from the {@code x-core-primaryKey}
+ * marker. Both the PostGIS adapter (table columns + {@code PRIMARY KEY}) and the NiFi adapter
+ * (PutDatabaseRecord {@code Update Keys}) resolve through {@link #resolveDefinition(Map)}, so the
+ * columns and the primary key are always derived from the same definition and cannot diverge.
  */
 public final class DataStructureSchema {
 
   /** JSON Schema extension keyword carrying the conceptual primary key (UML {@code {id}}). */
   public static final String PRIMARY_KEY_MARKER = "x-core-primaryKey";
 
+  /** Local definition reference prefixes ({@code #/$defs/Name} / {@code #/definitions/Name}). */
+  private static final String[] LOCAL_DEF_PREFIXES = {"#/$defs/", "#/definitions/"};
+
   private DataStructureSchema() {}
 
+  /** The merged {@code properties} (column name → spec) and unioned {@code required} of a table. */
+  public record ResolvedDefinition(Map<String, Object> properties, Set<String> required) {}
+
   /**
-   * The property names marked {@code x-core-primaryKey} in the schema's main definition, in
-   * declaration order; empty if the schema is null, has no usable definition, or marks none.
+   * Resolves the table definition into merged properties/required, following {@code allOf}
+   * inheritance. The root is the entry point when it carries {@code properties} or {@code allOf};
+   * otherwise the single (or title-matching) named definition is selected and then merged (so a
+   * named definition with its own {@code allOf} is resolved too).
+   *
+   * @throws IllegalArgumentException if no usable definition can be selected unambiguously, or a
+   *     parent {@code $ref} is not a resolvable local definition
+   */
+  public static ResolvedDefinition resolveDefinition(Map<String, Object> schema) {
+    Map<String, Object> definitions = definitions(schema);
+
+    if (!propertiesOf(schema).isEmpty() || schema.get("allOf") instanceof List<?>) {
+      ResolvedDefinition merged = mergeDefinition(schema, definitions);
+      if (!merged.properties().isEmpty()) {
+        return merged;
+      }
+    }
+
+    Map<String, Object> selected = selectDefinitionNode(schema, definitions);
+    return mergeDefinition(selected, definitions);
+  }
+
+  /**
+   * The property names marked {@code x-core-primaryKey} in the resolved definition, in declaration
+   * order; empty if the schema is null, marks none, or cannot be resolved (the column derivation
+   * surfaces an unresolvable schema as an error — the primary key is best-effort here).
    */
   @SuppressWarnings("unchecked")
   public static List<String> primaryKeyColumns(Map<String, Object> schema) {
     if (schema == null) {
       return List.of();
     }
+    Map<String, Object> properties;
+    try {
+      properties = resolveDefinition(schema).properties();
+    } catch (IllegalArgumentException unresolvable) {
+      return List.of();
+    }
     List<String> keys = new ArrayList<>();
-    for (Map.Entry<String, Object> entry : mainProperties(schema).entrySet()) {
+    for (Map.Entry<String, Object> entry : properties.entrySet()) {
       if (entry.getValue() instanceof Map<?, ?> spec
           && Boolean.TRUE.equals(((Map<String, Object>) spec).get(PRIMARY_KEY_MARKER))) {
         keys.add(entry.getKey());
@@ -49,76 +90,133 @@ public final class DataStructureSchema {
     return List.copyOf(keys);
   }
 
-  /** The {@code properties} of the {@link #mainDefinition(Map)}, or empty. */
-  public static Map<String, Object> mainProperties(Map<String, Object> schema) {
-    return propertiesOf(mainDefinition(schema));
+  /**
+   * Selects the single (or title-matching) named definition. Unlike the root entry in {@link
+   * #resolveDefinition}, this never inspects root {@code properties}; it only chooses among {@code
+   * $defs}/{@code definitions}.
+   */
+  private static Map<String, Object> selectDefinitionNode(
+      Map<String, Object> schema, Map<String, Object> definitions) {
+    if (definitions.size() == 1) {
+      return mapValue(definitions.values().iterator().next());
+    }
+    String title = stringValue(schema.get("title"));
+    if (title != null && definitions.get(title) instanceof Map) {
+      return mapValue(definitions.get(title));
+    }
+    Map<String, Object> single = singlePropertyDefinition(definitions);
+    if (single != null) {
+      return single;
+    }
+    throw new IllegalArgumentException(
+        definitions.isEmpty()
+            ? "dataStructure JSON Schema has empty definitions; cannot derive sink table columns"
+            : "dataStructure JSON Schema has "
+                + definitions.size()
+                + " definitions and none matches the title '"
+                + title
+                + "'; the sink table mapping requires exactly one");
   }
 
   /**
-   * The single source of truth for selecting a DataStructure's main definition: the root object if
-   * it has {@code properties}, else the title-matching definition, else the unique definition that
-   * carries {@code properties}; an empty map when none can be resolved unambiguously. Both the
-   * PostGIS column derivation and the PK derivation select through this method, so they cannot pick
-   * different definitions.
+   * Recursively merges a definition node's {@code allOf} branches, local {@code $ref} parents, and
+   * own {@code properties}/{@code required} into a single resolved definition.
    */
-  public static Map<String, Object> mainDefinition(Map<String, Object> schema) {
-    if (schema == null) {
-      return Map.of();
-    }
-    if (!propertiesOf(schema).isEmpty()) {
-      return schema;
-    }
-    Map<String, Object> defs = definitions(schema);
-    if (defs.get(asString(schema.get("title"))) instanceof Map<?, ?> titled
-        && !propertiesOf(titled).isEmpty()) {
-      return castMap(titled);
-    }
-    return singleDefinition(defs);
+  private static ResolvedDefinition mergeDefinition(
+      Map<String, Object> node, Map<String, Object> definitions) {
+    LinkedHashMap<String, Object> properties = new LinkedHashMap<>();
+    LinkedHashSet<String> required = new LinkedHashSet<>();
+    collectInto(node, definitions, new HashSet<>(), properties, required);
+    return new ResolvedDefinition(properties, required);
   }
 
-  /** The {@code properties} map of a schema/definition object, or empty if absent. */
-  @SuppressWarnings("unchecked")
-  private static Map<String, Object> propertiesOf(Object definition) {
-    if (definition instanceof Map<?, ?> map && map.get("properties") instanceof Map<?, ?> props) {
-      return (Map<String, Object>) props;
+  private static void collectInto(
+      Map<String, Object> node,
+      Map<String, Object> definitions,
+      Set<String> visitedRefs,
+      LinkedHashMap<String, Object> properties,
+      LinkedHashSet<String> required) {
+    if (node.get("allOf") instanceof List<?> branches) {
+      for (Object branch : branches) {
+        collectInto(mapValue(branch), definitions, visitedRefs, properties, required);
+      }
     }
-    return Map.of();
+
+    String ref = stringValue(node.get("$ref"));
+    if (ref != null) {
+      String key = localDefName(ref);
+      if (key == null) {
+        throw new IllegalArgumentException(
+            "dataStructure JSON Schema parent $ref '"
+                + ref
+                + "' is not a local definition reference");
+      }
+      if (visitedRefs.add(key)) {
+        Map<String, Object> target = mapValue(definitions.get(key));
+        if (target.isEmpty()) {
+          throw new IllegalArgumentException(
+              "dataStructure JSON Schema parent $ref '" + ref + "' resolves to no definition");
+        }
+        collectInto(target, definitions, visitedRefs, properties, required);
+      }
+    }
+
+    properties.putAll(propertiesOf(node));
+    if (node.get("required") instanceof List<?> list) {
+      list.forEach(value -> required.add(String.valueOf(value)));
+    }
+  }
+
+  /**
+   * Local definition key from {@code #/$defs/<Name>} or {@code #/definitions/<Name>}, else null.
+   */
+  private static String localDefName(String ref) {
+    for (String prefix : LOCAL_DEF_PREFIXES) {
+      if (ref.startsWith(prefix)) {
+        return ref.substring(prefix.length());
+      }
+    }
+    return null;
   }
 
   /**
    * Named type definitions, merging draft 2020-12 {@code $defs} over the older {@code definitions}.
    */
-  @SuppressWarnings("unchecked")
   private static Map<String, Object> definitions(Map<String, Object> schema) {
-    Map<String, Object> defs = new LinkedHashMap<>();
-    if (schema.get("definitions") instanceof Map<?, ?> d) {
-      defs.putAll((Map<String, Object>) d);
-    }
-    if (schema.get("$defs") instanceof Map<?, ?> d) {
-      defs.putAll((Map<String, Object>) d);
-    }
-    return defs;
+    Map<String, Object> merged = new LinkedHashMap<>(mapValue(schema.get("definitions")));
+    merged.putAll(mapValue(schema.get("$defs")));
+    return merged;
   }
 
-  /** The only definition that carries {@code properties} if exactly one does, else empty. */
-  private static Map<String, Object> singleDefinition(Map<String, Object> defs) {
-    Map<String, Object> single = Map.of();
-    int withProps = 0;
-    for (Object value : defs.values()) {
-      if (value instanceof Map<?, ?> def && !propertiesOf(def).isEmpty()) {
-        single = castMap(def);
-        withProps++;
+  /**
+   * The only definition that carries properties, if exactly one does. Referenced type definitions
+   * (e.g. an inlined geometry class) have none and do not count as table candidates.
+   */
+  private static Map<String, Object> singlePropertyDefinition(Map<String, Object> definitions) {
+    Map<String, Object> match = null;
+    for (Object value : definitions.values()) {
+      Map<String, Object> definition = mapValue(value);
+      if (!propertiesOf(definition).isEmpty()) {
+        if (match != null) {
+          return null;
+        }
+        match = definition;
       }
     }
-    return withProps == 1 ? single : Map.of();
+    return match;
+  }
+
+  /** The {@code properties} map of a schema/definition object, or empty if absent. */
+  private static Map<String, Object> propertiesOf(Object definition) {
+    return definition instanceof Map<?, ?> map ? mapValue(map.get("properties")) : Map.of();
   }
 
   @SuppressWarnings("unchecked")
-  private static Map<String, Object> castMap(Map<?, ?> map) {
-    return (Map<String, Object>) map;
+  private static Map<String, Object> mapValue(Object value) {
+    return value instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
   }
 
-  private static String asString(Object value) {
+  private static String stringValue(Object value) {
     return value instanceof String s ? s : null;
   }
 }

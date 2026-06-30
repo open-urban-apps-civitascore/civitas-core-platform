@@ -445,6 +445,36 @@ class PostgisSagaHandlerTest {
     }
 
     @Test
+    void primaryKeyReferencingMissingColumnIsRejected() {
+      // explicit columns omit the x-core-primaryKey field → a PRIMARY KEY referencing a missing
+      // column would be emitted; reject with a clear error instead of broken DDL
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of(
+                          "tableName",
+                          "obs",
+                          "columns",
+                          List.of(Map.of("name", "temperature", "type", "TEXT"))),
+                      "dataStructure",
+                      Map.of(
+                          "properties",
+                          Map.of(
+                              "station_id", Map.of("type", "string", "x-core-primaryKey", true),
+                              "temperature", Map.of("type", "string"))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_FAILED", result.type());
+      assertTrue(result.error().contains("not present in the table"));
+    }
+
+    @Test
     void provisionSinkWithoutPostgisSinkFails() {
       Map<String, Object> trigger =
           Map.of("datasinks", List.of(Map.of("type", "KAFKA", "configuration", Map.of())));

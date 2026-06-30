@@ -40,7 +40,6 @@ export const BoundingBoxConfig = (props: BoundingBoxConfigProps) => {
               label={field}
               name={`layers.${layerFieldIndex}.nativeBoundingBox.${field}` as FieldPath<OwsApiFormData>}
               placeholder=""
-              type="number"
               required
               disabled={isDisabled}
               shouldShowErrors={false}

@@ -157,6 +157,19 @@ class NifiSagaHandlerTest {
   }
 
   @Test
+  void nonStringExplicitPrimaryKeyEntryIsRejected() throws Exception {
+    // a numeric/blank configuration.primaryKey entry must fail as INVALID_PAYLOAD, not be
+    // String.valueOf'd into a bogus UPSERT key
+    SagaCommandResult result =
+        handler.handle(
+            deployWithSink(
+                "{ \"tableName\": \"obs\", \"primaryKey\": [42] }",
+                "{ \"properties\": { \"id\": { \"type\": \"string\" } } }"));
+    assertEquals("STEP_FAILED", result.type());
+    verify(restClient, times(0)).deployFlow(any());
+  }
+
+  @Test
   void explicitPrimaryKeyOverridesDataStructureMarker() throws Exception {
     String snapshot =
         capturedSnapshot(

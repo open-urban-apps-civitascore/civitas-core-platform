@@ -19,6 +19,7 @@ import de.civitascore.configadapter.model.postgis.ColumnConfig;
 import de.civitascore.configadapter.model.postgis.ColumnType;
 import de.civitascore.configadapter.model.postgis.GeometryType;
 import de.civitascore.configadapter.postgis.ddl.DataStructureTableMapper.TableColumns;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -335,7 +336,7 @@ class DataStructureTableMapperTest {
         assertThrows(
             IllegalArgumentException.class,
             () -> DataStructureTableMapper.deriveColumns(schema, Set.of()));
-    assertTrue(error.getMessage().contains("no usable definition"));
+    assertTrue(error.getMessage().contains("empty definitions"));
   }
 
   @Test
@@ -348,5 +349,264 @@ class DataStructureTableMapperTest {
             IllegalArgumentException.class,
             () -> DataStructureTableMapper.deriveColumns(schema, Set.of()));
     assertTrue(error.getMessage().contains("no usable definition"));
+  }
+
+  @Test
+  void resolvesAllOfInheritanceMergingParentAndSubclassColumns() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "title": "Dog",
+              "allOf": [
+                { "$ref": "#/$defs/Animal" },
+                { "type": "object",
+                  "properties": {
+                    "breed":   { "type": "string" },
+                    "goodBoy": { "type": "boolean" } } } ],
+              "$defs": {
+                "Animal": {
+                  "type": "object",
+                  "properties": {
+                    "id":   { "type": "string", "format": "uuid" },
+                    "name": { "type": "string" } } } } }
+            """);
+
+    TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
+
+    assertEquals(
+        List.of("id", "name", "breed", "goodBoy"),
+        derived.columns().stream().map(ColumnConfig::name).toList());
+    Map<String, ColumnConfig> named = byName(derived);
+    assertEquals(ColumnType.UUID, named.get("id").type());
+    assertEquals(ColumnType.TEXT, named.get("name").type());
+    assertEquals(ColumnType.TEXT, named.get("breed").type());
+    assertEquals(ColumnType.BOOLEAN, named.get("goodBoy").type());
+  }
+
+  @Test
+  void mergesRequiredAcrossAllOfBranches() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "title": "Dog",
+              "allOf": [
+                { "$ref": "#/$defs/Animal" },
+                { "type": "object",
+                  "properties": { "breed": { "type": "string" }, "goodBoy": { "type": "boolean" } },
+                  "required": ["breed"] } ],
+              "$defs": {
+                "Animal": {
+                  "properties": { "id": { "type": "string" }, "name": { "type": "string" } },
+                  "required": ["id"] } } }
+            """);
+
+    Map<String, ColumnConfig> named =
+        byName(DataStructureTableMapper.deriveColumns(schema, Set.of()));
+
+    assertEquals(false, named.get("id").nullable());
+    assertEquals(false, named.get("breed").nullable());
+    assertTrue(named.get("name").isNullable());
+    assertTrue(named.get("goodBoy").isNullable());
+  }
+
+  @Test
+  void resolvesMultiLevelInheritance() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "title": "C",
+              "allOf": [ { "$ref": "#/$defs/B" }, { "properties": { "c": { "type": "string" } } } ],
+              "$defs": {
+                "A": { "properties": { "a": { "type": "string" } } },
+                "B": { "allOf": [ { "$ref": "#/$defs/A" } ],
+                       "properties": { "b": { "type": "string" } } } } }
+            """);
+
+    assertEquals(
+        List.of("a", "b", "c"),
+        DataStructureTableMapper.deriveColumns(schema, Set.of()).columns().stream()
+            .map(ColumnConfig::name)
+            .toList());
+  }
+
+  @Test
+  void resolvesMultipleInheritanceFromSeveralRefs() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "title": "Leaf",
+              "allOf": [
+                { "$ref": "#/$defs/Animal" },
+                { "$ref": "#/$defs/Trackable" },
+                { "properties": { "breed": { "type": "string" } } } ],
+              "$defs": {
+                "Animal":    { "properties": { "id": { "type": "string" }, "name": { "type": "string" } } },
+                "Trackable": { "properties": { "tag": { "type": "string" } } } } }
+            """);
+
+    assertEquals(
+        List.of("id", "name", "tag", "breed"),
+        DataStructureTableMapper.deriveColumns(schema, Set.of()).columns().stream()
+            .map(ColumnConfig::name)
+            .toList());
+  }
+
+  @Test
+  void resolvesInheritedGeometryColumn() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "title": "Station",
+              "allOf": [
+                { "$ref": "#/$defs/Spatial" },
+                { "properties": { "station_id": { "type": "string" } } } ],
+              "$defs": {
+                "Spatial": {
+                  "properties": {
+                    "location": { "$ref": "https://geojson.org/schema/Point.json", "crs": "EPSG:25832" } } } } }
+            """);
+
+    TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
+
+    assertEquals(1, derived.columns().size());
+    assertEquals("station_id", derived.columns().get(0).name());
+    assertEquals(1, derived.geometryColumns().size());
+    var geometry = derived.geometryColumns().get(0);
+    assertEquals("location", geometry.name());
+    assertEquals(GeometryType.POINT, geometry.geometryType());
+    assertEquals(25832, geometry.srid());
+  }
+
+  @Test
+  void subclassPropertyOverridesInheritedColumnType() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "title": "Sub",
+              "allOf": [
+                { "$ref": "#/$defs/Parent" },
+                { "properties": { "value": { "type": "number" }, "extra": { "type": "string" } } } ],
+              "$defs": {
+                "Parent": { "properties": { "value": { "type": "string" } } } } }
+            """);
+
+    TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
+
+    assertEquals(
+        List.of("value", "extra"), derived.columns().stream().map(ColumnConfig::name).toList());
+    assertEquals(ColumnType.DOUBLE_PRECISION, byName(derived).get("value").type());
+  }
+
+  @Test
+  void usesDefinitionsForRefResolution() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "title": "Dog",
+              "allOf": [
+                { "$ref": "#/definitions/Animal" },
+                { "properties": { "breed": { "type": "string" } } } ],
+              "definitions": {
+                "Animal": { "properties": { "id": { "type": "string" } } } } }
+            """);
+
+    assertEquals(
+        List.of("id", "breed"),
+        DataStructureTableMapper.deriveColumns(schema, Set.of()).columns().stream()
+            .map(ColumnConfig::name)
+            .toList());
+  }
+
+  @Test
+  void breaksCyclicInheritanceWithoutInfiniteLoop() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "title": "A",
+              "allOf": [ { "$ref": "#/$defs/A" } ],
+              "$defs": {
+                "A": { "allOf": [ { "$ref": "#/$defs/B" } ], "properties": { "a": { "type": "string" } } },
+                "B": { "allOf": [ { "$ref": "#/$defs/A" } ], "properties": { "b": { "type": "string" } } } } }
+            """);
+
+    assertEquals(
+        List.of("b", "a"),
+        DataStructureTableMapper.deriveColumns(schema, Set.of()).columns().stream()
+            .map(ColumnConfig::name)
+            .toList());
+  }
+
+  @Test
+  void resolvesAllOfNestedInsideSelectedDefinition() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "title": "Sub",
+              "$defs": {
+                "Sub":  { "allOf": [ { "$ref": "#/$defs/Base" } ],
+                          "properties": { "own": { "type": "string" } } },
+                "Base": { "properties": { "inherited": { "type": "string" } } } } }
+            """);
+
+    assertEquals(
+        List.of("inherited", "own"),
+        DataStructureTableMapper.deriveColumns(schema, Set.of()).columns().stream()
+            .map(ColumnConfig::name)
+            .toList());
+  }
+
+  @Test
+  void siblingParentCollisionLetsTheSecondRefWinTheType() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "title": "Leaf",
+              "allOf": [ { "$ref": "#/$defs/First" }, { "$ref": "#/$defs/Second" } ],
+              "$defs": {
+                "First":  { "properties": { "id": { "type": "string" } } },
+                "Second": { "properties": { "id": { "type": "integer" } } } } }
+            """);
+
+    TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
+
+    assertEquals(List.of("id"), derived.columns().stream().map(ColumnConfig::name).toList());
+    assertEquals(ColumnType.BIGINT, byName(derived).get("id").type());
+  }
+
+  @Test
+  void unresolvableParentRefIsRejected() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "title": "Partial",
+              "allOf": [
+                { "$ref": "#/$defs/Missing" },
+                { "properties": { "own": { "type": "string" } } } ],
+              "$defs": { "Other": { "properties": { "x": { "type": "string" } } } } }
+            """);
+
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> DataStructureTableMapper.deriveColumns(schema, Set.of()));
+    assertTrue(error.getMessage().contains("resolves to no definition"));
+  }
+
+  @Test
+  void nonLocalParentRefIsRejected() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "title": "Sub",
+              "allOf": [
+                { "$ref": "common.json#/$defs/Base" },
+                { "properties": { "own": { "type": "string" } } } ] }
+            """);
+
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> DataStructureTableMapper.deriveColumns(schema, Set.of()));
+    assertTrue(error.getMessage().contains("not a local definition reference"));
   }
 }

@@ -342,11 +342,23 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
    * adapter exactly.
    */
   @SuppressWarnings("unchecked")
-  private static List<String> resolvePrimaryKey(Map<String, Object> sink) {
+  private static List<String> resolvePrimaryKey(Map<String, Object> sink)
+      throws FatalAdapterException {
     if (sink.get("configuration") instanceof Map<?, ?> config
         && ((Map<String, Object>) config).get("primaryKey") instanceof List<?> explicit
         && !explicit.isEmpty()) {
-      return explicit.stream().map(String::valueOf).toList();
+      List<String> keys = new ArrayList<>();
+      for (Object entry : explicit) {
+        // Reject malformed entries rather than String.valueOf-ing them: a number/blank would become
+        // a bogus UPSERT key instead of failing fast.
+        if (!(entry instanceof String key) || key.isBlank()) {
+          throw new FatalAdapterException(
+              AdapterErrorCode.INVALID_PAYLOAD,
+              "configuration.primaryKey must contain only non-blank strings");
+        }
+        keys.add(key);
+      }
+      return keys;
     }
     return sink.get("dataStructure") instanceof Map<?, ?> ds
         ? DataStructureSchema.primaryKeyColumns((Map<String, Object>) ds)

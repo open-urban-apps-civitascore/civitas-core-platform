@@ -106,7 +106,7 @@ tests {
 docs {
   **SQL saga step 7** — Prerequisites: DataSource AVAILABLE (step 4a), DataSet created (step 5), POSTGIS DataSink created (step 6).
 
-  Creates the pipeline attached to the dataset, modelled as a CORE intermediate-representation graph. It consumes from the MQTT datasource (`sqlDataSourceId`) and declares the POSTGIS sink (`sqlDataSinkId`) in `dataSinkIds`.
+  Creates the pipeline attached to the dataset, modelled as a CORE intermediate-representation graph. It consumes from the SQL datasource (`sqlDataSourceId`) and declares the POSTGIS sink (`sqlDataSinkId`) in `dataSinkIds`.
 
   The mapping node carries an inline `mappingConfig` whose `fields` use the **geoPoint** op:
   `"$.geo": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" }`.

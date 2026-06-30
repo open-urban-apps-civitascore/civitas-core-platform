@@ -36,7 +36,6 @@ public class JdbcSqlSourceProbe implements SqlSourceProbe {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR, e, "PostgreSQL JDBC driver not on the classpath");
     }
-    DriverManager.setLoginTimeout(LOGIN_TIMEOUT_SECONDS);
     Properties props = new Properties();
     if (user != null && !user.isBlank()) {
       props.setProperty("user", user);
@@ -44,6 +43,10 @@ public class JdbcSqlSourceProbe implements SqlSourceProbe {
     if (password != null && !password.isBlank()) {
       props.setProperty("password", password);
     }
+    // setLoginTimeout mutates JVM-global state; save and restore it so the probe does not shorten
+    // unrelated JDBC calls later in the same process.
+    int previousLoginTimeout = DriverManager.getLoginTimeout();
+    DriverManager.setLoginTimeout(LOGIN_TIMEOUT_SECONDS);
     try (Connection ignored = DriverManager.getConnection(jdbcUrl, props)) {
       // a successful open+close proves reachability and that the credentials are accepted
     } catch (SQLException e) {
@@ -51,6 +54,8 @@ public class JdbcSqlSourceProbe implements SqlSourceProbe {
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           e,
           "SQL source is not reachable with the configured connection: " + e.getMessage());
+    } finally {
+      DriverManager.setLoginTimeout(previousLoginTimeout);
     }
   }
 }

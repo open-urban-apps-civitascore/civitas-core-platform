@@ -98,6 +98,23 @@ describe('validateMappingCoversRequiredTargetFields', () => {
     expect(errors[0].messageParams?.fields).toBe('$.name, $.id')
   })
 
+  it('treats a required leaf as covered when an ancestor (object/array) path is mapped', () => {
+    // mapping the whole $.location subtree covers its required leaves
+    const result = validatePipeline(
+      pipelineWith([mappingNode({ '$.location': '$.geo' }, ['$.location.lat', '$.location.lon'])]),
+    )
+    expect(result.errors.some(error => error.messageKey === REQUIRED_FIELDS_KEY)).toBe(false)
+  })
+
+  it('still flags a required leaf when neither it nor an ancestor is mapped', () => {
+    const result = validatePipeline(
+      pipelineWith([mappingNode({ '$.location': '$.geo' }, ['$.location.lat', '$.other'])]),
+    )
+    const errors = result.errors.filter(error => error.messageKey === REQUIRED_FIELDS_KEY)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].messageParams?.fields).toBe('$.other')
+  })
+
   it('does not require optional target fields (known-empty snapshot is valid)', () => {
     const result = validatePipeline(pipelineWith([mappingNode({}, [])]))
     expect(result.errors.some(error => error.messageKey === REQUIRED_FIELDS_KEY)).toBe(false)
