@@ -1,5 +1,26 @@
 import type { FieldNode, SchemaTree } from '../_types'
 
+/**
+ * The paths of the required leaf fields. Recurses only into required objects/arrays, so an optional
+ * container does not force its children to be mapped. Used to snapshot the target's required fields
+ * on the mapping node for synchronous pipeline validation.
+ */
+export const requiredFieldPaths = (tree: SchemaTree): string[] => {
+  const paths: string[] = []
+  const walk = (fields: FieldNode[]) => {
+    for (const field of fields) {
+      if (!field.required) continue
+      if (field.children && field.children.length > 0) {
+        walk(field.children)
+      } else {
+        paths.push(field.path)
+      }
+    }
+  }
+  walk(tree.fields)
+  return paths
+}
+
 /** Flattens a field tree into a path → field lookup. */
 export const flattenTree = (tree: SchemaTree): Map<string, FieldNode> => {
   const map = new Map<string, FieldNode>()

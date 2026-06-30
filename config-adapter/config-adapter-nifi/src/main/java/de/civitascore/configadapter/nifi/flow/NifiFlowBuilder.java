@@ -42,9 +42,23 @@ public class NifiFlowBuilder {
   private static final String CS_TOKEN_PREFIX = "${CS:";
   private static final String STRATEGY_PROPERTY = "Replacement Value Strategy";
 
+  /**
+   * Sink-property key carrying the FROST SensorThings base URL into the find-or-create sub-flow
+   * (set by {@code FlowDeploymentPlanner.bindFrost}; consumed here, not bound as a processor
+   * property).
+   */
+  public static final String FROST_BASE_URL = "Frost Base URL";
+
+  /** InvokeHTTP failure-side relationships routed to the error sink (find-or-create stages). */
+  private static final List<String> HTTP_FAILURE_RELATIONSHIPS =
+      List.of("Failure", "Retry", "No Retry");
+
   private static final String READER = "JsonTreeReader";
   private static final String WRITER = "JsonRecordSetWriter";
   private static final String DBCP = "PostGISConnectionPool";
+
+  /** Friendly name of the source-side DB connection pool (SQL pull sources). */
+  private static final String SOURCE_DBCP = "SourceConnectionPool";
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -61,6 +75,8 @@ public class NifiFlowBuilder {
    *     node)
    * @param controllerServiceProperties non-sensitive controller-service properties, keyed by
    *     friendly name
+   * @param sourceCron the cron (Quartz) schedule for the source processor, or {@code null} to keep
+   *     the source fragment's built-in schedule
    */
   public record FlowBuildSpec(
       String processGroupName,
@@ -69,7 +85,8 @@ public class NifiFlowBuilder {
       SinkType sinkType,
       Map<String, String> sinkProperties,
       List<UpdateRecordProperty> mappingProperties,
-      Map<String, Map<String, String>> controllerServiceProperties) {
+      Map<String, Map<String, String>> controllerServiceProperties,
+      String sourceCron) {
     public FlowBuildSpec {
       Objects.requireNonNull(processGroupName, "processGroupName");
       Objects.requireNonNull(sourceType, "sourceType");
@@ -81,6 +98,7 @@ public class NifiFlowBuilder {
       controllerServiceProperties =
           Map.copyOf(
               Objects.requireNonNull(controllerServiceProperties, "controllerServiceProperties"));
+      // sourceCron is intentionally nullable — most flows keep the fragment's built-in schedule.
     }
   }
 
@@ -126,47 +144,63 @@ public class NifiFlowBuilder {
 
     // Controller services first — processors reference them by id.
     Map<String, String> csIdByName = new LinkedHashMap<>();
-    addControllerService(controllerServices, "json_tree_reader", pgId, READER, csIdByName, spec);
-    addControllerService(
-        controllerServices, "json_record_set_writer", pgId, WRITER, csIdByName, spec);
-    if (spec.sinkType() == SinkType.POSTGIS) {
-      addControllerService(
-          controllerServices, "dbcp_connection_pool", pgId, DBCP, csIdByName, spec);
-    }
+    addControllerServices(controllerServices, pgId, csIdByName, spec);
 
-    // Processor chain: source -> convert -> [mapping...] -> sink. A mapping may need more than one
+    // Processor chain: source -> [convert] -> [mapping...] -> sink. A mapping may need more than
+    // one
     // UpdateRecord because a single processor allows only one Replacement Value Strategy, so const
-    // (literal-value) fields and record-path fields land on separate processors.
+    // (literal-value) fields and record-path fields land on separate processors. The convert step
+    // exists only to turn a raw (non-record) source payload into records — the MQTT source emits
+    // raw
+    // bytes on 'Message'; the SQL source (QueryDatabaseTableRecord) already emits records on
+    // 'success', so it is wired straight into the mapping/sink with no convert.
+    boolean sqlSource = spec.sourceType() == SourceType.SQL;
+    boolean frostSink = spec.sinkType() == SinkType.FROST;
+    // The FROST find-or-create works on the SensorThings envelope ($.things/$.observations) that an
+    // MQTT STA source delivers. A SQL source emits plain table records, which SplitJson would never
+    // match — the flow would silently produce nothing. Reject the combination rather than deploy
+    // it.
+    if (frostSink && sqlSource) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "FROST sink requires an MQTT SensorThings source; a SQL source does not emit the STA"
+              + " envelope");
+    }
     Processor source =
-        loadProcessor(sourceFragment(spec.sourceType()), pgId, csIdByName, "Message");
-    Processor convert = loadProcessor("convert_record", pgId, csIdByName, "success");
-    List<Processor> mappingProcessors = buildMappingProcessors(spec, pgId, csIdByName);
-    Processor sink = loadProcessor(sinkFragment(spec.sinkType()), pgId, csIdByName, null);
+        loadProcessor(
+            sourceFragment(spec.sourceType()), pgId, csIdByName, sqlSource ? "success" : "Message");
+    applySchedule(source, spec.sourceCron());
+    // ConvertRecord turns raw MQTT bytes into records; a SQL source already emits records, and the
+    // FROST find-or-create works on the raw JSON envelope (SplitJson/EvaluateJsonPath) — so both
+    // skip the convert step.
+    Processor convert =
+        (sqlSource || frostSink)
+            ? null
+            : loadProcessor("convert_record", pgId, csIdByName, "success");
+    // FROST find-or-create works on the raw JSON envelope; a record-based UpdateRecord mapping
+    // cannot run in that path (it would re-wrap the envelope). The source delivers the final STA
+    // shape, so a mapping node is not applied for a FROST sink.
+    List<Processor> mappingProcessors =
+        frostSink ? List.of() : buildMappingProcessors(spec, pgId, csIdByName);
 
-    List<Processor> chain = new ArrayList<>();
-    chain.add(source);
-    chain.add(convert);
-    chain.addAll(mappingProcessors);
-    chain.add(sink);
-
-    bindProperties(chain, spec);
-
-    for (int i = 0; i < chain.size(); i++) {
-      processors.add(chain.get(i).node());
+    // Common prefix: source -> [convert] -> [mapping...]. The sink stage differs: PostGIS/MQTT is a
+    // single terminal processor (linear), FROST is a multi-stage find-or-create sub-flow.
+    List<Processor> prefix = new ArrayList<>();
+    prefix.add(source);
+    if (convert != null) {
+      prefix.add(convert);
+    }
+    prefix.addAll(mappingProcessors);
+    bindProperties(prefix, spec);
+    for (int i = 0; i < prefix.size(); i++) {
+      processors.add(prefix.get(i).node());
       if (i > 0) {
-        connections.add(connection(pgId, chain.get(i - 1), chain.get(i)));
+        connections.add(connection(pgId, prefix.get(i - 1), prefix.get(i)));
       }
     }
-
-    wireErrorSink(
-        pgId,
-        csIdByName,
-        processors,
-        connections,
-        convert,
-        mappingProcessors,
-        sink,
-        spec.sinkType());
+    Processor tail = prefix.get(prefix.size() - 1);
+    wireSinkStage(
+        spec, pgId, csIdByName, processors, connections, tail, convert, mappingProcessors);
 
     ObjectNode root = mapper.createObjectNode();
     root.set("flowContents", flow);
@@ -179,6 +213,27 @@ public class NifiFlowBuilder {
   }
 
   // ─── Fragment loading ───────────────────────────────────────────────────────
+
+  /**
+   * Adds the controller services the flow needs: the JSON reader/writer always, a source-side DB
+   * pool for a SQL pull source, and the sink DB pool for a PostGIS sink.
+   */
+  private void addControllerServices(
+      ArrayNode controllerServices, String pgId, Map<String, String> csIdByName, FlowBuildSpec spec)
+      throws FatalAdapterException {
+    addControllerService(controllerServices, "json_tree_reader", pgId, READER, csIdByName, spec);
+    addControllerService(
+        controllerServices, "json_record_set_writer", pgId, WRITER, csIdByName, spec);
+    if (spec.sourceType() == SourceType.SQL) {
+      // SQL pull source reads records over its own DB connection pool.
+      addControllerService(
+          controllerServices, "dbcp_connection_pool", pgId, SOURCE_DBCP, csIdByName, spec);
+    }
+    if (spec.sinkType() == SinkType.POSTGIS) {
+      addControllerService(
+          controllerServices, "dbcp_connection_pool", pgId, DBCP, csIdByName, spec);
+    }
+  }
 
   private void addControllerService(
       ArrayNode target,
@@ -291,7 +346,7 @@ public class NifiFlowBuilder {
     for (Processor processor : chain) {
       String type = processor.node().path("type").asText();
       ObjectNode props = (ObjectNode) processor.node().get("properties");
-      if (type.endsWith("ConsumeMQTT")) {
+      if (type.endsWith("ConsumeMQTT") || type.endsWith("QueryDatabaseTableRecord")) {
         spec.sourceProperties().forEach(props::put);
       } else if (type.endsWith("PutDatabaseRecord") || type.endsWith("InvokeHTTP")) {
         spec.sinkProperties().forEach(props::put);
@@ -330,8 +385,13 @@ public class NifiFlowBuilder {
    * sink. The graph shape is intentionally stable: swapping LogMessage for a durable/recoverable
    * dead-letter sink is a later, isolated change.
    *
-   * <p>The source (ConsumeMQTT) is not wired here: it runs without a record reader, so it emits
-   * only {@code Message} and has no parse-failure relationship to route.
+   * <p>The source is not wired here: ConsumeMQTT emits only {@code Message} and
+   * QueryDatabaseTableRecord only {@code success} — neither has a parse-failure relationship to
+   * route. {@code convert} is {@code null} for a SQL source (which emits records directly, so no
+   * ConvertRecord step exists); its failure edge is then simply absent. Consequently a SQL-source
+   * <em>runtime</em> failure (DB unreachable after deploy, query error) surfaces as a NiFi
+   * processor bulletin, not as an error-sink record; deploy-time config errors are caught earlier
+   * by the {@code JdbcSqlSourceProbe} and the bind-time guards in {@code FlowDeploymentPlanner}.
    */
   private void wireErrorSink(
       String pgId,
@@ -345,7 +405,9 @@ public class NifiFlowBuilder {
       throws FatalAdapterException {
     Processor errorSink = loadProcessor("log_message", pgId, csIdByName, null);
     processors.add(errorSink.node());
-    connections.add(connection(pgId, convert, errorSink, "failure"));
+    if (convert != null) {
+      connections.add(connection(pgId, convert, errorSink, "failure"));
+    }
     for (Processor mapping : mappingProcessors) {
       connections.add(connection(pgId, mapping, errorSink, "failure"));
     }
@@ -378,6 +440,286 @@ public class NifiFlowBuilder {
         }
       }
     }
+  }
+
+  /**
+   * Wires the sink stage onto the prefix tail: a FROST find-or-create sub-flow, or a single linear
+   * terminal sink (PostGIS). Both route their write failures to a shared LogMessage error sink.
+   */
+  private void wireSinkStage(
+      FlowBuildSpec spec,
+      String pgId,
+      Map<String, String> csIdByName,
+      ArrayNode processors,
+      ArrayNode connections,
+      Processor tail,
+      Processor convert,
+      List<Processor> mappingProcessors)
+      throws FatalAdapterException {
+    if (spec.sinkType() == SinkType.FROST) {
+      Processor errorSink = loadProcessor("log_message", pgId, csIdByName, null);
+      processors.add(errorSink.node());
+      if (convert != null) {
+        connections.add(connection(pgId, convert, errorSink, "failure"));
+      }
+      for (Processor mapping : mappingProcessors) {
+        connections.add(connection(pgId, mapping, errorSink, "failure"));
+      }
+      buildFrostFindOrCreate(spec, pgId, csIdByName, processors, connections, tail, errorSink);
+    } else {
+      Processor sink = loadProcessor(sinkFragment(spec.sinkType()), pgId, csIdByName, null);
+      bindProperties(List.of(sink), spec);
+      processors.add(sink.node());
+      connections.add(connection(pgId, tail, sink));
+      wireErrorSink(
+          pgId,
+          csIdByName,
+          processors,
+          connections,
+          convert,
+          mappingProcessors,
+          sink,
+          spec.sinkType());
+    }
+  }
+
+  // ─── FROST find-or-create ─────────────────────────────────────────────────────
+
+  /**
+   * Builds the FROST find-or-create sub-flow, replacing a single {@code POST /Observations}. The
+   * STA envelope is processed in two independent legs cloned from the source:
+   *
+   * <ul>
+   *   <li><b>Things</b> ({@code $.things}): look up by {@code properties/reference}; POST only when
+   *       absent, so a re-delivered message never duplicates a Thing.
+   *   <li><b>Observations</b> ({@code $.observations}): look up the Datastream by {@code
+   *       properties/reference} + {@code name}; if found, merge its {@code @iot.id} into the
+   *       observation and POST {@code /Observations}; if not found, route to the error sink (the
+   *       Datastream must exist — like the prior engine, the pipeline does not create it).
+   * </ul>
+   *
+   * <p>Each leg captures the body into an attribute before the lookup GET (which overwrites the
+   * content) and restores it before the write. <b>Every</b> failure relationship — split/extract
+   * {@code failure}, the restore/inject {@code failure}, and the GET/POST {@code Failure/Retry/No
+   * Retry} — routes to the shared error (log) sink, so a malformed envelope, unparseable lookup
+   * response, or failed write is logged, never silently dropped.
+   */
+  private void buildFrostFindOrCreate(
+      FlowBuildSpec spec,
+      String pgId,
+      Map<String, String> csIdByName,
+      ArrayNode processors,
+      ArrayNode connections,
+      Processor upstream,
+      Processor errorSink)
+      throws FatalAdapterException {
+    String base = spec.sinkProperties().getOrDefault(FROST_BASE_URL, "");
+    buildThingLeg(base, pgId, csIdByName, processors, connections, upstream, errorSink);
+    buildObservationLeg(base, pgId, csIdByName, processors, connections, upstream, errorSink);
+  }
+
+  /** Things leg: find by reference, POST only when absent (idempotent create). */
+  private void buildThingLeg(
+      String base,
+      String pgId,
+      Map<String, String> csIdByName,
+      ArrayNode processors,
+      ArrayNode connections,
+      Processor upstream,
+      Processor errorSink)
+      throws FatalAdapterException {
+    Processor route =
+        buildLookup(
+            pgId,
+            csIdByName,
+            processors,
+            connections,
+            upstream,
+            errorSink,
+            new FrostLeg(
+                "thing",
+                "$.things",
+                Map.of("frost.ref", "$.properties.reference"),
+                base
+                    + "/Things?$filter=properties/reference%20eq%20"
+                    + "'${frost.ref:replaceAll(\"'\",\"''\"):urlEncode()}'",
+                "new",
+                "${frost.id:isEmpty()}"));
+
+    Processor restore = loadProcessor("replace_text", pgId, csIdByName, "success", "thingRestore");
+    setProp(restore, "Replacement Value", "${frost.body}");
+    Processor post = loadProcessor("invoke_http", pgId, csIdByName, null, "thingPost");
+    setProp(post, "HTTP Method", "POST");
+    setProp(post, "HTTP URL", base + "/Things");
+    setProp(post, "Request Content-Type", "application/json");
+
+    processors.add(restore.node());
+    processors.add(post.node());
+    connections.add(connection(pgId, route, restore));
+    connections.add(connection(pgId, restore, post));
+    routeFailure(pgId, connections, restore, errorSink);
+    routeHttpFailures(pgId, connections, post, errorSink);
+  }
+
+  /** Observations leg: find the Datastream, merge its id into the observation, POST (else log). */
+  private void buildObservationLeg(
+      String base,
+      String pgId,
+      Map<String, String> csIdByName,
+      ArrayNode processors,
+      ArrayNode connections,
+      Processor upstream,
+      Processor errorSink)
+      throws FatalAdapterException {
+    Processor route =
+        buildLookup(
+            pgId,
+            csIdByName,
+            processors,
+            connections,
+            upstream,
+            errorSink,
+            new FrostLeg(
+                "obs",
+                "$.observations",
+                Map.of("frost.ref", "$.parameters.reference", "frost.name", "$.parameters.name"),
+                base
+                    + "/Datastreams?$filter=properties/reference%20eq%20"
+                    + "'${frost.ref:replaceAll(\"'\",\"''\"):urlEncode()}'"
+                    + "%20and%20name%20eq%20'${frost.name:replaceAll(\"'\",\"''\"):urlEncode()}'",
+                "found",
+                "${frost.id:isEmpty():not()}"));
+    // A missing Datastream must not be dropped silently.
+    removeAutoTerminated(route.node(), "unmatched");
+    connections.add(connection(pgId, route, errorSink, "unmatched"));
+
+    Processor restore = loadProcessor("replace_text", pgId, csIdByName, "success", "obsRestore");
+    setProp(restore, "Replacement Value", "${frost.body}");
+    // Merge the resolved Datastream id as the first key of the observation object (no Jolt/script):
+    // a regex replace of the leading brace injects "Datastream":{"@iot.id":<id>},. This assumes the
+    // observation is a non-empty JSON object (a STA Observation always carries at least `result`,
+    // so
+    // it is never `{}`); the appended comma would otherwise produce a trailing comma. The
+    // Datastream
+    // @iot.id is numeric in FROST's default config, so it is injected unquoted.
+    Processor inject = loadProcessor("replace_text", pgId, csIdByName, "success", "obsInject");
+    setProp(inject, "Replacement Strategy", "Regex Replace");
+    setProp(inject, "Search Value", "^\\{");
+    setProp(inject, "Replacement Value", "{\"Datastream\":{\"@iot.id\":${frost.id}},");
+    Processor post = loadProcessor("invoke_http", pgId, csIdByName, null, "obsPost");
+    setProp(post, "HTTP Method", "POST");
+    setProp(post, "HTTP URL", base + "/Observations");
+    setProp(post, "Request Content-Type", "application/json");
+
+    processors.add(restore.node());
+    processors.add(inject.node());
+    processors.add(post.node());
+    connections.add(connection(pgId, route, restore));
+    connections.add(connection(pgId, restore, inject));
+    connections.add(connection(pgId, inject, post));
+    routeFailure(pgId, connections, restore, errorSink);
+    routeFailure(pgId, connections, inject, errorSink);
+    routeHttpFailures(pgId, connections, post, errorSink);
+  }
+
+  /** The per-leg parameters of a find-or-create lookup chain. */
+  private record FrostLeg(
+      String disc,
+      String splitPath,
+      Map<String, String> refProps,
+      String getUrl,
+      String routeRelationship,
+      String routeCondition) {}
+
+  /**
+   * Builds the shared lookup chain: split the array, capture the body (json) + reference
+   * attribute(s), GET by {@code $filter}, extract the {@code @iot.id}, and route by the given
+   * condition. Every intermediate {@code failure} (split/extract) and the GET's {@code
+   * Failure/Retry/No Retry} are routed to the error sink so nothing is dropped silently. Returns
+   * the route processor so the caller attaches its leg-specific tail.
+   */
+  private Processor buildLookup(
+      String pgId,
+      Map<String, String> csIdByName,
+      ArrayNode processors,
+      ArrayNode connections,
+      Processor upstream,
+      Processor errorSink,
+      FrostLeg leg)
+      throws FatalAdapterException {
+    String disc = leg.disc();
+    String splitPath = leg.splitPath();
+    Map<String, String> refProps = leg.refProps();
+    String getUrl = leg.getUrl();
+    String routeRelationship = leg.routeRelationship();
+    String routeCondition = leg.routeCondition();
+    Processor split = loadProcessor("split_json", pgId, csIdByName, "split", disc + "Split");
+    setProp(split, "JsonPath Expression", splitPath);
+
+    Processor extractBody =
+        loadProcessor("evaluate_json_path", pgId, csIdByName, "matched", disc + "Body");
+    setProp(extractBody, "Return Type", "json");
+    setProp(extractBody, "frost.body", "$");
+
+    Processor extractRef =
+        loadProcessor("evaluate_json_path", pgId, csIdByName, "matched", disc + "Ref");
+    for (Map.Entry<String, String> ref : refProps.entrySet()) {
+      setProp(extractRef, ref.getKey(), ref.getValue());
+    }
+
+    Processor get = loadProcessor("invoke_http", pgId, csIdByName, "Response", disc + "Get");
+    setProp(get, "HTTP Method", "GET");
+    setProp(get, "HTTP URL", getUrl);
+
+    Processor extractId =
+        loadProcessor("evaluate_json_path", pgId, csIdByName, "matched", disc + "Id");
+    setProp(extractId, "frost.id", "$.value[0]['@iot.id']");
+
+    Processor route =
+        loadProcessor("route_on_attribute", pgId, csIdByName, routeRelationship, disc + "Route");
+    setProp(route, routeRelationship, routeCondition);
+
+    for (Processor p : List.of(split, extractBody, extractRef, get, extractId, route)) {
+      processors.add(p.node());
+    }
+    connections.add(connection(pgId, upstream, split));
+    connections.add(connection(pgId, split, extractBody));
+    connections.add(connection(pgId, extractBody, extractRef));
+    connections.add(connection(pgId, extractRef, get));
+    removeAutoTerminated(get.node(), "Response");
+    connections.add(connection(pgId, get, extractId));
+    connections.add(connection(pgId, extractId, route));
+    for (String relationship : HTTP_FAILURE_RELATIONSHIPS) {
+      removeAutoTerminated(get.node(), relationship);
+      connections.add(connection(pgId, get, errorSink, relationship));
+    }
+    // A malformed envelope (split) or an unparseable lookup response (extract) must be logged, not
+    // dropped — route every intermediate 'failure' to the error sink.
+    for (Processor stage : List.of(split, extractBody, extractRef, extractId)) {
+      routeFailure(pgId, connections, stage, errorSink);
+    }
+    return route;
+  }
+
+  private void routeHttpFailures(
+      String pgId, ArrayNode connections, Processor http, Processor errorSink) {
+    for (String relationship : HTTP_FAILURE_RELATIONSHIPS) {
+      removeAutoTerminated(http.node(), relationship);
+      connections.add(connection(pgId, http, errorSink, relationship));
+    }
+  }
+
+  /**
+   * Routes a processor's single {@code failure} relationship to the error sink (no silent drop).
+   */
+  private void routeFailure(
+      String pgId, ArrayNode connections, Processor processor, Processor errorSink) {
+    removeAutoTerminated(processor.node(), "failure");
+    connections.add(connection(pgId, processor, errorSink, "failure"));
+  }
+
+  private static void setProp(Processor processor, String key, String value) {
+    ((ObjectNode) processor.node().get("properties")).put(key, value);
   }
 
   // ─── Connections ────────────────────────────────────────────────────────────
@@ -419,13 +761,25 @@ public class NifiFlowBuilder {
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
 
-  private static String sourceFragment(SourceType sourceType) throws FatalAdapterException {
+  private static String sourceFragment(SourceType sourceType) {
     return switch (sourceType) {
       case MQTT -> "consume_mqtt";
-      case SQL ->
-          throw new FatalAdapterException(
-              AdapterErrorCode.NIFI_TEMPLATE_ERROR, "SQL source not yet supported");
+      case SQL -> "query_database_table_record";
     };
+  }
+
+  /**
+   * Switches the entry processor to cron-driven scheduling. A {@code null} cron leaves the source
+   * fragment's built-in schedule (timer-driven for MQTT, the fragment default for SQL). Only the
+   * source's schedule drives the flow — downstream processors stay timer-driven and run when
+   * FlowFiles arrive in their queues.
+   */
+  private static void applySchedule(Processor source, String cron) {
+    if (cron == null) {
+      return;
+    }
+    source.node().put("schedulingStrategy", "CRON_DRIVEN");
+    source.node().put("schedulingPeriod", cron);
   }
 
   private static String sinkFragment(SinkType sinkType) {

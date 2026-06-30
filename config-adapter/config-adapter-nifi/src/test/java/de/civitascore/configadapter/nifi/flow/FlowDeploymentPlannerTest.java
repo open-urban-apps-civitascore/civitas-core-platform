@@ -100,6 +100,22 @@ class FlowDeploymentPlannerTest {
         """);
   }
 
+  /**
+   * A graph with no mapping node (source feeds the sink directly) — e.g. a FROST find-or-create.
+   */
+  private Map<String, Object> graphWithoutMapping() throws Exception {
+    return map(
+        """
+        {
+          "nodes": [
+            { "id": "n-start", "type": "start", "data": {} },
+            { "id": "n-end", "type": "end", "data": {} }
+          ],
+          "edges": [ { "id": "e1", "source": "n-start", "target": "n-end" } ]
+        }
+        """);
+  }
+
   private Datasource mqttSource(String encryptedPassword) {
     Datasource source = new Datasource();
     source.setId("a1");
@@ -116,6 +132,495 @@ class FlowDeploymentPlannerTest {
 
   private SinkSpec postgisSink() {
     return new SinkSpec(SinkType.POSTGIS, "sensor_observations");
+  }
+
+  /** A PostGIS sink with a primary key — required for a cron-scheduled (re-reading) SQL source. */
+  private SinkSpec postgisSinkWithPk() {
+    return new SinkSpec(SinkType.POSTGIS, "sensor_observations", List.of("id"));
+  }
+
+  /** The first processor of the given type in a flow snapshot. */
+  private com.fasterxml.jackson.databind.JsonNode processorOfType(
+      String snapshot, String typeSuffix) throws Exception {
+    for (com.fasterxml.jackson.databind.JsonNode p :
+        mapper.readTree(snapshot).get("flowContents").get("processors")) {
+      if (p.path("type").asText().endsWith(typeSuffix)) {
+        return p;
+      }
+    }
+    throw new AssertionError("no processor of type " + typeSuffix);
+  }
+
+  private Datasource sqlSource(String encryptedPassword) {
+    Datasource source = new Datasource();
+    source.setId("s1");
+    source.setType("SQL");
+    // the portal SQL connector shape (see datasources/contract)
+    source.handleUnknownProperty("driver", "postgres");
+    source.handleUnknownProperty("dsn", "postgres://reader@srcdb:5432/in");
+    source.handleUnknownProperty("user", "reader");
+    source.handleUnknownProperty("table", "events");
+    source.handleUnknownProperty("columns", List.of("*"));
+    source.handleUnknownProperty("password", encryptedPassword);
+    return source;
+  }
+
+  /** A SQL datasource with explicit connector fields (any may be null to omit it). */
+  private Datasource sqlSourceWith(String driver, String table, Object columns, String where) {
+    Datasource source = new Datasource();
+    source.setId("s2");
+    source.setType("SQL");
+    source.handleUnknownProperty("dsn", "postgres://reader@srcdb:5432/in");
+    source.handleUnknownProperty("user", "reader");
+    if (driver != null) {
+      source.handleUnknownProperty("driver", driver);
+    }
+    if (table != null) {
+      source.handleUnknownProperty("table", table);
+    }
+    if (columns != null) {
+      source.handleUnknownProperty("columns", columns);
+    }
+    if (where != null) {
+      source.handleUnknownProperty("where", where);
+    }
+    return source;
+  }
+
+  /** A basic, valid SQL datasource (postgres) for negative/WHERE tests. */
+  private Datasource sqlSourceBasic() {
+    Datasource source = new Datasource();
+    source.setId("s3");
+    source.setType("SQL");
+    source.handleUnknownProperty("driver", "postgres");
+    source.handleUnknownProperty("dsn", "postgres://reader@srcdb:5432/in");
+    source.handleUnknownProperty("user", "reader");
+    source.handleUnknownProperty("table", "events");
+    source.handleUnknownProperty("columns", List.of("*"));
+    return source;
+  }
+
+  @Test
+  void unsupportedRedpandaQueryFieldsAreRejected() throws Exception {
+    // #5: prefix/suffix/init_statement are Redpanda Connect concepts the NiFi mapping cannot honor
+    // —
+    // fail loud rather than silently drop them
+    for (String field : List.of("prefix", "suffix", "init_statement")) {
+      Datasource source = sqlSourceBasic();
+      source.handleUnknownProperty(field, "SELECT 1");
+      try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+        FatalAdapterException ex =
+            assertThrows(
+                FatalAdapterException.class,
+                () ->
+                    planner(resolver)
+                        .plan(
+                            new PipelineDeploymentRequest(
+                                "p-sql-" + field, graphWithMapping(), source, postgisSinkWithPk())),
+                "must reject unsupported field: " + field);
+        assertEquals(
+            de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+            ex.getErrorCode());
+      }
+    }
+  }
+
+  @Test
+  void whereWithCursorPlaceholderIsRejected() throws Exception {
+    // #5: the Redpanda cursor idiom (":last_id") is not bound by NiFi and would be invalid SQL
+    Datasource source = sqlSourceBasic();
+    source.handleUnknownProperty("where", "id > :last_id");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-sql-cursor", graphWithMapping(), source, postgisSinkWithPk())));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          ex.getErrorCode());
+    }
+  }
+
+  @Test
+  void whereWithPositionalPlaceholderIsRejected() throws Exception {
+    // #5: a JDBC '?' positional placeholder is not bound by NiFi either — must be rejected too
+    Datasource source = sqlSourceBasic();
+    source.handleUnknownProperty("where", "col = ?");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-sql-q", graphWithMapping(), source, postgisSinkWithPk())));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          ex.getErrorCode());
+    }
+  }
+
+  @Test
+  void whereWithPostgresCastIsAllowed() throws Exception {
+    // a PostgreSQL '::' type cast is valid literal SQL, not a ':name' placeholder — must NOT be
+    // rejected
+    Datasource source = sqlSourceBasic();
+    source.handleUnknownProperty("where", "created_at::date >= '2024-01-01'");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      DeploymentPlan plan =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-sql-cast", graphWithMapping(), source, postgisSinkWithPk()));
+      assertTrue(
+          plan.snapshotJson().contains("created_at::date >= '2024-01-01'"),
+          "cast WHERE is bound, not rejected");
+    }
+  }
+
+  @Test
+  void primaryKeyOnSinkWritesUpsertKeyedOnIt() throws Exception {
+    // x-core-primaryKey on the target → PutDatabaseRecord UPSERT keyed on it, so a re-reading cron
+    // source updates instead of duplicating rows. NiFi needs the key columns explicitly (Update
+    // Keys); it does not derive them from the table's PRIMARY KEY.
+    Datasource source = sqlSourceBasic();
+    SinkSpec sink = new SinkSpec(SinkType.POSTGIS, "sensor_observations", List.of("id"));
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      DeploymentPlan plan =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest("p-sql-upsert", graphWithMapping(), source, sink));
+      String snapshot = plan.snapshotJson();
+      assertTrue(snapshot.contains("\"Statement Type\":\"UPSERT\""), "UPSERT statement type");
+      assertTrue(snapshot.contains("\"Update Keys\":\"id\""), "Update Keys = primary key");
+      assertTrue(
+          snapshot.contains("\"Database Type\":\"PostgreSQL\""),
+          "PostgreSQL adapter required for UPSERT (ON CONFLICT)");
+    }
+  }
+
+  @Test
+  void compositePrimaryKeyWritesAllKeyColumnsToUpdateKeys() throws Exception {
+    // a multi-column PK must join ALL key columns into Update Keys, not just the first — otherwise
+    // the UPSERT ON CONFLICT target would not match the composite PRIMARY KEY
+    Datasource source = sqlSourceBasic();
+    SinkSpec sink = new SinkSpec(SinkType.POSTGIS, "sensor_observations", List.of("tenant", "id"));
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(new PipelineDeploymentRequest("p-sql-ckpk", graphWithMapping(), source, sink))
+              .snapshotJson();
+      assertTrue(snapshot.contains("\"Update Keys\":\"tenant,id\""), "all key columns joined");
+    }
+  }
+
+  @Test
+  void withoutPrimaryKeyTheSinkStaysInsert() throws Exception {
+    // no marker → keep the fragment's INSERT default (no UPSERT/Update Keys forced on). Uses an
+    // MQTT
+    // source: a push source delivers new data per message, so a PK is not required (unlike a
+    // re-reading SQL source, which the planner rejects without one).
+    Datasource source = mqttSource(null);
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      DeploymentPlan plan =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-mqtt-insert", graphWithMapping(), source, postgisSink()));
+      assertFalse(
+          plan.snapshotJson().contains("\"Statement Type\":\"UPSERT\""), "no UPSERT without a PK");
+    }
+  }
+
+  @Test
+  void whereWithTimeLiteralIsAllowed() throws Exception {
+    // a ':' inside a quoted time literal must not be mistaken for a placeholder
+    Datasource source = sqlSourceBasic();
+    source.handleUnknownProperty("where", "ts >= '2024-01-01 12:00:00'");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      DeploymentPlan plan =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-sql-time", graphWithMapping(), source, postgisSinkWithPk()));
+      assertTrue(
+          plan.snapshotJson().contains("ts >= '2024-01-01 12:00:00'"),
+          "time-literal WHERE is bound, not rejected");
+    }
+  }
+
+  @Test
+  void sslModeInDsnIsPreservedInJdbcUrl() throws Exception {
+    // #4: TLS to the source DB is configured via the dsn's sslmode (PgJDBC honors it in the URL);
+    // the dsn→jdbc conversion must preserve query parameters
+    Datasource source = sqlSourceBasic();
+    source.handleUnknownProperty("dsn", "postgres://srcdb:5432/in?sslmode=require");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      DeploymentPlan plan =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-sql-ssl", graphWithMapping(), source, postgisSinkWithPk()));
+      assertTrue(
+          plan.snapshotJson().contains("jdbc:postgresql://srcdb:5432/in?sslmode=require"),
+          "sslmode preserved in the JDBC URL");
+    }
+  }
+
+  @Test
+  void fileBasedClientCertTlsIsRejected() throws Exception {
+    // #4: cert-file TLS (sslcert/sslkey/sslrootcert) needs files we cannot provision into NiFi —
+    // reject rather than deploy a connection that silently fails
+    Datasource source = sqlSourceBasic();
+    source.handleUnknownProperty(
+        "dsn", "postgres://srcdb:5432/in?sslmode=verify-full&sslcert=/x.pem");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-sql-mtls", graphWithMapping(), source, postgisSinkWithPk())));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          ex.getErrorCode());
+    }
+  }
+
+  @Test
+  void sqlSourceConnectionProbeFailureFailsLoud() throws Exception {
+    // #3: an unreachable / mis-credentialed source must fail the plan loudly, not deploy a flow
+    // that silently produces no data
+    FlowDeploymentPlanner.SqlSourceProbe failing =
+        (url, user, pw) -> {
+          throw new FatalAdapterException(
+              de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+              "unreachable: " + url);
+        };
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FlowDeploymentPlanner probing =
+          new FlowDeploymentPlanner(
+              new GraphParser(),
+              new MappingConfigParser(),
+              new RecordPathCompiler(),
+              new NifiFlowBuilder(),
+              resolver,
+              new FlowDeploymentPlanner.PlatformSinkConfig(
+                  "jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
+              "http://frost:8080/FROST-Server/v1.1",
+              failing);
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  probing.plan(
+                      new PipelineDeploymentRequest(
+                          "p-probe", graphWithMapping(), sqlSource(null), postgisSinkWithPk())));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          ex.getErrorCode());
+    }
+  }
+
+  @Test
+  void sqlColumnsAndWhereClauseAreBound() throws Exception {
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      DeploymentPlan plan =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-sql-cols",
+                      graphWithMapping(),
+                      sqlSourceWith("postgres", "events", List.of("id", "name"), "id > 10"),
+                      postgisSinkWithPk()));
+      String snapshot = plan.snapshotJson();
+      // a specific column list is bound (not "*"), and the WHERE clause flows onto the query
+      assertTrue(snapshot.contains("\"Columns to Return\":\"id,name\""), "columns bound");
+      assertTrue(snapshot.contains("\"Additional WHERE Clause\":\"id > 10\""), "where bound");
+    }
+  }
+
+  @Test
+  void allColumnsWildcardLeavesColumnsToReturnUnset() throws Exception {
+    // columns ["*"] (or empty) means all columns — QueryDatabaseTableRecord's default; the adapter
+    // must NOT bind a literal "Columns to Return":"*" which NiFi would treat as a column named '*'.
+    // The fragment ships the property as null, so the bound value must stay null/empty.
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-sql-allcols",
+                      graphWithMapping(),
+                      sqlSourceWith("postgres", "events", List.of("*"), null),
+                      postgisSinkWithPk()))
+              .snapshotJson();
+      var cols =
+          processorOfType(snapshot, "QueryDatabaseTableRecord")
+              .path("properties")
+              .path("Columns to Return");
+      assertTrue(
+          cols.isMissingNode() || cols.isNull() || cols.asText("").isEmpty(),
+          "no specific columns bound for '*'");
+    }
+  }
+
+  @Test
+  void positionalBindPlaceholderInWhereIsRejected() throws Exception {
+    // Postgres positional ($1) and numeric (:1) bind params can't be honored either (NiFi appends
+    // the clause verbatim)
+    for (String where : List.of("id = $1", "active AND rank > :1")) {
+      try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+        FatalAdapterException ex =
+            assertThrows(
+                FatalAdapterException.class,
+                () ->
+                    planner(resolver)
+                        .plan(
+                            new PipelineDeploymentRequest(
+                                "p-sql-posph",
+                                graphWithMapping(),
+                                sqlSourceWith("postgres", "events", List.of("*"), where),
+                                postgisSinkWithPk())));
+        assertEquals(
+            de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+            ex.getErrorCode());
+      }
+    }
+  }
+
+  @Test
+  void frostSinkWithMappingIsRejected() throws Exception {
+    // a FROST sink consumes the raw SensorThings envelope; a configured record mapping would be
+    // silently ignored by the builder — reject rather than deploy a no-op transformation
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-frost-map",
+                              graphWithMapping(),
+                              mqttSource(null),
+                              new SinkSpec(SinkType.FROST, null))));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          ex.getErrorCode());
+    }
+  }
+
+  @Test
+  void unsupportedSqlDriverIsRejected() throws Exception {
+    // only PostgreSQL is wired (the bundled NiFi JDBC driver); any other driver fails the plan
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-sql-drv",
+                              graphWithMapping(),
+                              sqlSourceWith("mysql", "events", List.of("*"), null),
+                              postgisSinkWithPk())));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          ex.getErrorCode());
+    }
+  }
+
+  @Test
+  void sqlSourceWithBlankDsnIsRejected() throws Exception {
+    // without a DSN the pool URL is unset and the flow would silently fall back to the fragment's
+    // demo database — fail loud instead
+    Datasource source = sqlSourceBasic();
+    source.handleUnknownProperty("dsn", "   ");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-sql-nodsn", graphWithMapping(), source, postgisSinkWithPk())));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          ex.getErrorCode());
+    }
+  }
+
+  @Test
+  void sqlSourcePlaintextPasswordIsRejected() throws Exception {
+    // a non-ENC(...) password must be rejected: a plaintext secret must never enter the snapshot,
+    // and a probe-only bind would pass while the deployed pool fails to authenticate
+    Datasource source = sqlSource("plaintext-secret");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-sql-plainpw", graphWithMapping(), source, postgisSinkWithPk())));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          ex.getErrorCode());
+    }
+  }
+
+  @Test
+  void sqlSourceWithoutTableIsRejected() throws Exception {
+    // QueryDatabaseTableRecord cannot run without a table — reject rather than deploy a broken flow
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-sql-notable",
+                              graphWithMapping(),
+                              sqlSourceWith("postgres", null, List.of("*"), null),
+                              postgisSinkWithPk())));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          ex.getErrorCode());
+    }
+  }
+
+  /** A start → cron → mapping → end graph (cron wired into the functional component). */
+  private Map<String, Object> graphWithCron(String cronExpression) throws Exception {
+    return map(
+        """
+        {
+          "nodes": [
+            { "id": "n-start", "type": "start", "data": {} },
+            { "id": "n-cron", "type": "cron", "data": { "cronExpression": "%s" } },
+            { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
+                "fields": { "$.a": "$.b" } } } },
+            { "id": "n-end", "type": "end", "data": {} }
+          ],
+          "edges": [
+            { "id": "e1", "source": "n-start", "target": "n-cron" },
+            { "id": "e2", "source": "n-cron", "target": "n-map" },
+            { "id": "e3", "source": "n-map", "target": "n-end" }
+          ]
+        }
+        """
+            .formatted(cronExpression));
   }
 
   @Test
@@ -196,8 +701,7 @@ class FlowDeploymentPlannerTest {
       DeploymentPlan plan =
           planner(resolver)
               .plan(
-                  new PipelineDeploymentRequest(
-                      "p-typed", graph, mqttSource(null), new SinkSpec(SinkType.FROST, null)));
+                  new PipelineDeploymentRequest("p-typed", graph, mqttSource(null), postgisSink()));
       // the conversion is rendered as a transparent record-path copy, no schema involved
       assertTrue(plan.snapshotJson().contains("/n"));
     }
@@ -224,7 +728,7 @@ class FlowDeploymentPlannerTest {
                 noFrostPlanner.plan(
                     new PipelineDeploymentRequest(
                         "p-nofrost",
-                        graphWithMapping(),
+                        graphWithoutMapping(),
                         mqttSource(null),
                         new SinkSpec(SinkType.FROST, null))));
     assertEquals(
@@ -257,8 +761,7 @@ class FlowDeploymentPlannerTest {
       DeploymentPlan plan =
           planner(resolver)
               .plan(
-                  new PipelineDeploymentRequest(
-                      "p-mixed", graph, mqttSource(null), new SinkSpec(SinkType.FROST, null)));
+                  new PipelineDeploymentRequest("p-mixed", graph, mqttSource(null), postgisSink()));
       String snapshot = plan.snapshotJson();
       // both fields are bound: the copy as a record-path, the const as a literal-value — across the
       // two strategy-grouped UpdateRecord processors
@@ -290,28 +793,97 @@ class FlowDeploymentPlannerTest {
       DeploymentPlan plan =
           planner(resolver)
               .plan(
-                  new PipelineDeploymentRequest(
-                      "p-real", graph, mqttSource(null), new SinkSpec(SinkType.FROST, null)));
+                  new PipelineDeploymentRequest("p-real", graph, mqttSource(null), postgisSink()));
       assertTrue(plan.snapshotJson().contains("/a")); // the mapping was still found and compiled
     }
   }
 
   @Test
-  void cronTriggerIsRejected() throws Exception {
-    // a cron-scheduled pipeline must not deploy as an unscheduled (timer-driven) flow
-    Map<String, Object> graph =
-        map(
-            """
-            { "nodes": [
-                { "id": "n-cron", "type": "cron", "data": { "cronExpression": "0 0 * * *" } },
-                { "id": "n-src", "type": "dataSource", "data": {} },
-                { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": { "$.a": "$.b" } } } },
-                { "id": "n-frost", "type": "frost", "data": {} } ],
-              "edges": [
-                { "id": "e1", "source": "n-src", "target": "n-map" },
-                { "id": "e2", "source": "n-map", "target": "n-frost" } ] }
-            """);
+  void cronSchedulesSqlSourceAndKeepsSecretOut() throws Exception {
+    // a cron node drives the SQL source's NiFi schedule; the SQL config binds onto the query
+    // processor; the DB password is pushed separately, never in the snapshot
+    byte[] key = stretchedKey();
+    String enc =
+        "ENC("
+            + CredentialEncryptor.encrypt(
+                SECRET, key, CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT)
+            + ")";
+    try (CredentialResolver resolver = new CredentialResolver(key)) {
+      DeploymentPlan plan =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-sql-cron",
+                      graphWithCron("0 0 6 * * ?"),
+                      sqlSource(enc),
+                      postgisSinkWithPk()));
+
+      String snapshot = plan.snapshotJson();
+      assertTrue(snapshot.contains("\"Table Name\":\"events\""), "table bound onto the query");
+      // pin the schedule to the SQL source processor (not just "appears somewhere in the snapshot")
+      var sourceProc = processorOfType(snapshot, "QueryDatabaseTableRecord");
+      assertEquals(
+          "CRON_DRIVEN",
+          sourceProc.path("schedulingStrategy").asText(),
+          "source is cron-scheduled");
+      assertEquals(
+          "0 0 6 * * ?",
+          sourceProc.path("schedulingPeriod").asText(),
+          "cron expression bound to the source processor schedule");
+      // jdbc URL derived from the dsn (userinfo stripped)
+      assertTrue(snapshot.contains("jdbc:postgresql://srcdb:5432/in"), "dsn → jdbc url");
+
+      // SECURITY INVARIANT: the plaintext secret never appears in the snapshot, but is pushed
+      assertFalse(snapshot.contains(SECRET));
+      assertEquals(
+          SECRET, plan.sensitivePropsByComponent().get("SourceConnectionPool").get("Password"));
+    }
+  }
+
+  @Test
+  void sevenFieldQuartzCronWithYearIsAccepted() throws Exception {
+    // Quartz allows an optional 7th field (year); a valid 7-field expression must be accepted
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-cron7",
+                      graphWithCron("0 0 6 * * ? 2026"),
+                      sqlSource(null),
+                      postgisSinkWithPk()))
+              .snapshotJson();
+      var sourceProc = processorOfType(snapshot, "QueryDatabaseTableRecord");
+      assertEquals("0 0 6 * * ? 2026", sourceProc.path("schedulingPeriod").asText());
+    }
+  }
+
+  @Test
+  void sqlSourceToPostgisWithoutPrimaryKeyIsRejected() throws Exception {
+    // any SQL source re-reads the whole table on a recurring schedule (even with no explicit cron,
+    // via the fragment's 5-min default); without a target PK the PostGIS write would
+    // INSERT-duplicate
+    // every run — fail the plan. Both the no-cron and the cron graph must be rejected.
+    for (Map<String, Object> graph : List.of(graphWithMapping(), graphWithCron("0 0 6 * * ?"))) {
+      try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+        FatalAdapterException ex =
+            assertThrows(
+                FatalAdapterException.class,
+                () ->
+                    planner(resolver)
+                        .plan(
+                            new PipelineDeploymentRequest(
+                                "p-sql-nopk", graph, sqlSource(null), postgisSink())));
+        assertEquals(
+            de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+            ex.getErrorCode());
+      }
+    }
+  }
+
+  @Test
+  void invalidCronExpressionIsRejected() throws Exception {
+    // a 5-field (non-NiFi/Quartz) expression must fail the plan, not reach the remote NiFi
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       FatalAdapterException ex =
           assertThrows(
@@ -320,10 +892,32 @@ class FlowDeploymentPlannerTest {
                   planner(resolver)
                       .plan(
                           new PipelineDeploymentRequest(
-                              "p-cron",
-                              graph,
+                              "p-bad-cron",
+                              graphWithCron("0 0 * * *"),
+                              sqlSource(null),
+                              postgisSink())));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          ex.getErrorCode());
+    }
+  }
+
+  @Test
+  void cronOnMqttSourceIsRejected() throws Exception {
+    // ConsumeMQTT is push-based — a cron schedule there is rejected rather than misleadingly
+    // applied
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-mqtt-cron",
+                              graphWithCron("0 0 6 * * ?"),
                               mqttSource(null),
-                              new SinkSpec(SinkType.FROST, null))));
+                              postgisSink())));
       assertEquals(
           de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           ex.getErrorCode());
@@ -504,28 +1098,9 @@ class FlowDeploymentPlannerTest {
     }
   }
 
-  @Test
-  void geoPointMappingOnFrostSinkIsRejected() throws Exception {
-    // geometryEncoding(FROST)=GEOJSON, and geoPoint cannot be rendered as a GeoJSON object via
-    // RecordPath, so compile() — and therefore plan() — must reject before deploying. The standard
-    // planner has a FROST URL, proving the rejection is the encoding, not a missing URL.
-    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
-      FatalAdapterException ex =
-          assertThrows(
-              FatalAdapterException.class,
-              () ->
-                  planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p-frost-geo",
-                              graphWithGeoPoint(),
-                              mqttSource(null),
-                              new SinkSpec(SinkType.FROST, null))));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_MAPPING_ERROR,
-          ex.getErrorCode());
-    }
-  }
+  // Note: a FROST sink with a geoPoint (or any) mapping is now rejected wholesale by
+  // frostSinkWithMappingIsRejected — a FROST sink consumes the raw STA envelope and has no mapping
+  // stage — so the former geoPoint-specific FROST rejection test is subsumed by it.
 
   @Test
   void withStringtypeUnspecifiedCoversAllBranches() {

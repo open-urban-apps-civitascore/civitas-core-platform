@@ -1,0 +1,45 @@
+meta {
+  name: 4. Patch DataSource with Source Version
+  type: http
+  seq: 10
+}
+
+patch {
+  url: {{baseUrl}}/datasources/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{sqlDataSourceId}}
+}
+
+body:json {
+  {
+    "dataStructureVersionId": "{{sqlSourceVersionId}}"
+  }
+}
+
+tests {
+  test("DataSource patched", function() {
+    const status = res.getStatus();
+    // 200=patched
+    expect(status).to.equal(200);
+  });
+}
+
+docs {
+  **SQL saga step 4** — Prerequisites: DataSource created (step 1), source version released (step 2b).
+
+  Patches the datasource to set its `dataStructureVersionId` to the released source version. Required before the datasource can be released (step 4a).
+
+  **Expected Response:** 200 OK. 400 if the datasource is in an invalid state.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource `dataStructureVersionId` updated in `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

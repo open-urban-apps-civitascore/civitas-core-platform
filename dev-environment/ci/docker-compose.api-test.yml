@@ -527,6 +527,9 @@ services:
       NIFI_USERNAME: admin
       NIFI_PASSWORD: nifi-dev-password-1234567890
       NIFI_TLS_INSECURE: "true"
+      # Master key for decrypting datasource credentials (e.g. a SQL source DB password). Must match
+      # the portal-backend key (application-local.yaml, loaded via SPRING_PROFILES_ACTIVE=local).
+      CIVITAS_MASTER_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
       # FROST SensorThings base URL the NiFi pipeline adapter posts observations to.
       NIFI_FROST_URL: http://civitas-frost:8080/FROST-Server/v1.1
       NIFI_TOPICS: de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted

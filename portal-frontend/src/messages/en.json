@@ -1175,7 +1175,7 @@
     },
     "cronPanel": {
       "cronExpression": "CRON Expression",
-      "invalidCron": "Invalid cron expression. Must be 6-field Quartz syntax (seconds minutes hours day-of-month month day-of-week).",
+      "invalidCron": "Invalid cron expression. Must be 6- or 7-field Quartz syntax (seconds minutes hours day-of-month month day-of-week [year]).",
       "cronHint": "A CRON expression defines when the pipeline should run automatically.",
       "learnCron": "Learn about CRON expressions",
       "currentExpression": "Current Expression"
@@ -1242,10 +1242,13 @@
         "startNodeRequired": "Pipeline must have at least one Start node",
         "endNodeRequired": "Pipeline must have at least one End node",
         "nodeNotConfigured": "{label} is not configured",
-        "invalidCronExpression": "{label} has an invalid cron expression. Must be a 6-field Quartz syntax.",
+        "invalidCronExpression": "{label} has an invalid cron expression. Must be 6- or 7-field Quartz syntax.",
         "orphanNode": "{label} is not connected to any other node",
         "minimumFunctionalNodes": "Pipeline must have at least one functional node between Start and End",
-        "duplicateTableName": "Two Geo Persistence tables must not have the same name"
+        "duplicateTableName": "Two Geo Persistence tables must not have the same name",
+        "cronMqttIncompatible": "A CRON trigger cannot be used with an MQTT data source. Use a SQL (pull) source instead.",
+        "mappingRequiredFieldsMissing": "{label} does not map all required target fields: {fields}",
+        "mappingNotSaved": "{label} has no saved field mapping — open the mapping editor and save it"
       }
     },
     "toolbar": {

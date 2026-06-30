@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.postgis.ddl;
 
+import de.civitascore.configadapter.model.dataset.DataStructureSchema;
 import de.civitascore.configadapter.model.postgis.ColumnConfig;
 import de.civitascore.configadapter.model.postgis.ColumnType;
 import de.civitascore.configadapter.model.postgis.GeometryColumnConfig;
@@ -56,11 +57,14 @@ public final class DataStructureTableMapper {
    * @throws IllegalArgumentException if the schema contains no usable definition with properties
    */
   public static TableColumns deriveColumns(Map<String, Object> schema, Set<String> excludedNames) {
-    Map<String, Object> definition = selectDefinition(schema);
+    // Select the main definition through the shared DataStructureSchema so the columns and the PK
+    // are derived from the SAME definition — they cannot diverge by construction.
+    Map<String, Object> definition = DataStructureSchema.mainDefinition(schema);
     Map<String, Object> properties = mapValue(definition.get("properties"));
     if (properties.isEmpty()) {
       throw new IllegalArgumentException(
-          "dataStructure JSON Schema has no properties; cannot derive sink table columns");
+          "dataStructure JSON Schema has no usable definition with properties; cannot derive sink"
+              + " table columns");
     }
     List<String> required =
         definition.get("required") instanceof List<?> list
@@ -75,7 +79,12 @@ public final class DataStructureTableMapper {
         continue;
       }
       Map<String, Object> spec = mapValue(property.getValue());
-      Boolean nullable = required.contains(name) ? false : null;
+      // A primary-key column must be NOT NULL even if the schema's `required` list omits it; the
+      // x-core-primaryKey marker therefore also forces non-nullability here. The PK column LIST
+      // itself is derived centrally by DataStructureSchema (used by both the PostGIS and NiFi
+      // adapters) so the table PRIMARY KEY and the UPSERT keys cannot diverge.
+      boolean isPrimaryKey = Boolean.TRUE.equals(spec.get(DataStructureSchema.PRIMARY_KEY_MARKER));
+      Boolean nullable = (required.contains(name) || isPrimaryKey) ? false : null;
 
       GeometryType geometryType = geometryType(stringValue(spec.get("$ref")));
       if (geometryType != null) {
@@ -89,60 +98,6 @@ public final class DataStructureTableMapper {
       columns.add(new ColumnConfig(name, type, null, null, null, nullable));
     }
     return new TableColumns(columns, geometryColumns);
-  }
-
-  /** Root {@code properties} if present, else the single (or title-matching) definition. */
-  private static Map<String, Object> selectDefinition(Map<String, Object> schema) {
-    if (!mapValue(schema.get("properties")).isEmpty()) {
-      return schema;
-    }
-    Map<String, Object> definitions = definitions(schema);
-    if (definitions.size() == 1) {
-      return mapValue(definitions.values().iterator().next());
-    }
-    String title = stringValue(schema.get("title"));
-    if (title != null && definitions.get(title) instanceof Map) {
-      return mapValue(definitions.get(title));
-    }
-    Map<String, Object> single = singlePropertyDefinition(definitions);
-    if (single != null) {
-      return single;
-    }
-    throw new IllegalArgumentException(
-        definitions.isEmpty()
-            ? "dataStructure JSON Schema has empty definitions; cannot derive sink table columns"
-            : "dataStructure JSON Schema has "
-                + definitions.size()
-                + " definitions and none matches the title '"
-                + stringValue(schema.get("title"))
-                + "'; the sink table mapping requires exactly one");
-  }
-
-  /**
-   * Named type definitions, merging draft 2020-12 {@code $defs} with the older {@code definitions}.
-   */
-  private static Map<String, Object> definitions(Map<String, Object> schema) {
-    Map<String, Object> merged = new LinkedHashMap<>(mapValue(schema.get("definitions")));
-    merged.putAll(mapValue(schema.get("$defs")));
-    return merged;
-  }
-
-  /**
-   * The only definition that carries properties, if exactly one does. Referenced type definitions
-   * (e.g. an inlined geometry class) have none and do not count as table candidates.
-   */
-  private static Map<String, Object> singlePropertyDefinition(Map<String, Object> definitions) {
-    Map<String, Object> match = null;
-    for (Object value : definitions.values()) {
-      Map<String, Object> definition = mapValue(value);
-      if (!mapValue(definition.get("properties")).isEmpty()) {
-        if (match != null) {
-          return null;
-        }
-        match = definition;
-      }
-    }
-    return match;
   }
 
   /**

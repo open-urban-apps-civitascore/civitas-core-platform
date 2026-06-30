@@ -152,6 +152,14 @@ const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, stri
     schema.default = attr.defaultValue
   }
 
+  // Conceptual identity marker (engine-neutral): the UML "{id}" attribute is the entity's primary
+  // key. Adapters interpret it technically (PostGIS PRIMARY KEY + UPSERT, FROST reference key, …);
+  // the editor stays unaware of any concrete implementation. JSON Schema has no native PK keyword,
+  // so the platform extension keyword 'x-core-primaryKey' carries it.
+  if (attr.isId) {
+    schema['x-core-primaryKey'] = true
+  }
+
   return schema
 }
 

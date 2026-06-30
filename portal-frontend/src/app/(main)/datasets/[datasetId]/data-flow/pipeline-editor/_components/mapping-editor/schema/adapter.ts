@@ -38,6 +38,18 @@ const portTypeFor = (type: FieldType): PortType =>
 
 const isMany = (multiplicity?: string): boolean => !!multiplicity && multiplicity.includes('*')
 
+/**
+ * Whether a multiplicity makes the field required (lower bound >= 1). Mirrors the JSON-Schema export:
+ * an unset multiplicity is a single required value; {@code 0..1}/{@code 0..*}/{@code *} are optional.
+ */
+const requiredMultiplicity = (multiplicity?: string): boolean => {
+  if (!multiplicity) return true
+  const trimmed = multiplicity.trim()
+  if (trimmed === '*') return false
+  const lower = trimmed.includes('..') ? trimmed.split('..')[0].trim() : trimmed
+  return lower !== '0' && lower !== '*'
+}
+
 const hasAttributes = (el: UMLElement): el is UMLClass => el.type === 'class' || el.type === 'abstractClass'
 
 const lowerFirst = (value: string): string => value.charAt(0).toLowerCase() + value.slice(1)
@@ -106,6 +118,7 @@ const buildFields = (el: UMLElement, base: string, index: DiagramIndex, visited:
     for (const attr of el.attributes) {
       const path = `${base}.${attr.name}`
       const ref = resolveRef(attr.type, index)
+      const required = !!attr.isId || requiredMultiplicity(attr.multiplicity)
       if (ref && hasAttributes(ref) && !visited.has(ref.id)) {
         const type: FieldType = isMany(attr.multiplicity) ? 'array' : 'object'
         fields.push({
@@ -113,11 +126,12 @@ const buildFields = (el: UMLElement, base: string, index: DiagramIndex, visited:
           name: attr.name,
           type,
           portType: portTypeFor(type),
+          required,
           children: buildFields(ref, path + (type === 'array' ? '[]' : ''), index, new Set([...visited, el.id])),
         })
       } else {
         const type = scalarType(attr.type)
-        fields.push({ path, name: attr.name, type, portType: portTypeFor(type) })
+        fields.push({ path, name: attr.name, type, portType: portTypeFor(type), required })
       }
     }
   }
@@ -131,6 +145,9 @@ const buildFields = (el: UMLElement, base: string, index: DiagramIndex, visited:
       name: rel.name,
       type,
       portType: portTypeFor(type),
+      // Relationship lower bound is not threaded here; treat nested relations as optional so they
+      // don't force a mapping (scalar attribute requiredness is what matters in practice).
+      required: false,
       children: buildFields(rel.target, path + (type === 'array' ? '[]' : ''), index, new Set([...visited, el.id])),
     })
   }

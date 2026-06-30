@@ -47,6 +47,17 @@ public class FlowDeploymentPlanner {
   private static final Pattern SECONDS =
       Pattern.compile("(\\d+)\\s*(?:s|sec|secs|second|seconds)?", Pattern.CASE_INSENSITIVE);
 
+  /**
+   * A {@code :name} bind placeholder that is NOT part of a PostgreSQL {@code ::} cast — the
+   * lookbehind excludes the second colon of {@code ::}, and the trailing letter excludes the first.
+   */
+  private static final Pattern NAMED_PLACEHOLDER = Pattern.compile("(?<!:):[A-Za-z_]");
+
+  /**
+   * A PostgreSQL positional {@code $1} or numeric {@code :1} bind placeholder (not a {@code ::}).
+   */
+  private static final Pattern POSITIONAL_PLACEHOLDER = Pattern.compile("\\$\\d|(?<!:):\\d");
+
   private final ObjectMapper mapper = new ObjectMapper();
   private final GraphParser graphParser;
   private final MappingConfigParser mappingConfigParser;
@@ -55,12 +66,27 @@ public class FlowDeploymentPlanner {
   private final CredentialResolver credentialResolver;
   private final PlatformSinkConfig platformSink;
   private final String frostBaseUrl;
+  private final SqlSourceProbe sqlSourceProbe;
 
   /** Platform-managed sink connection (not a tenant credential). */
   public record PlatformSinkConfig(String postgisUrl, String postgisUser, String postgisPassword) {}
 
   /**
-   * Creates a planner.
+   * Validates that a SQL source is actually reachable before deploy, so a misconfigured source
+   * (wrong host/credentials) fails the saga loudly instead of deploying a flow that silently
+   * produces no data. The default {@link #NO_OP} skips the check (used in unit tests with no real
+   * DB); production wires a real JDBC probe.
+   */
+  @FunctionalInterface
+  public interface SqlSourceProbe {
+    /** A probe that performs no check. */
+    SqlSourceProbe NO_OP = (jdbcUrl, user, password) -> {};
+
+    void probe(String jdbcUrl, String user, String password) throws FatalAdapterException;
+  }
+
+  /**
+   * Creates a planner with no SQL source connectivity probe (the {@link SqlSourceProbe#NO_OP}).
    *
    * @param graphParser the graph parser
    * @param mappingConfigParser the mapping parser
@@ -78,6 +104,38 @@ public class FlowDeploymentPlanner {
       CredentialResolver credentialResolver,
       PlatformSinkConfig platformSink,
       String frostBaseUrl) {
+    this(
+        graphParser,
+        mappingConfigParser,
+        recordPathCompiler,
+        flowBuilder,
+        credentialResolver,
+        platformSink,
+        frostBaseUrl,
+        SqlSourceProbe.NO_OP);
+  }
+
+  /**
+   * Creates a planner.
+   *
+   * @param graphParser the graph parser
+   * @param mappingConfigParser the mapping parser
+   * @param recordPathCompiler the RecordPath compiler
+   * @param flowBuilder the NiFi flow builder
+   * @param credentialResolver the credential resolver
+   * @param platformSink the platform sink connection (may be null)
+   * @param frostBaseUrl the FROST SensorThings base URL for FROST sinks (may be null)
+   * @param sqlSourceProbe the SQL source connectivity probe
+   */
+  public FlowDeploymentPlanner(
+      GraphParser graphParser,
+      MappingConfigParser mappingConfigParser,
+      RecordPathCompiler recordPathCompiler,
+      NifiFlowBuilder flowBuilder,
+      CredentialResolver credentialResolver,
+      PlatformSinkConfig platformSink,
+      String frostBaseUrl,
+      SqlSourceProbe sqlSourceProbe) {
     this.graphParser = graphParser;
     this.mappingConfigParser = mappingConfigParser;
     this.recordPathCompiler = recordPathCompiler;
@@ -85,6 +143,7 @@ public class FlowDeploymentPlanner {
     this.credentialResolver = credentialResolver;
     this.platformSink = platformSink;
     this.frostBaseUrl = frostBaseUrl;
+    this.sqlSourceProbe = sqlSourceProbe;
   }
 
   /**
@@ -97,7 +156,18 @@ public class FlowDeploymentPlanner {
   public DeploymentPlan plan(PipelineDeploymentRequest request) throws FatalAdapterException {
     PipelineGraph graph = graphParser.parse(request.graphData());
     Optional<MappingConfig> mapping = parseMapping(graph);
+    Optional<String> sourceCron = parseTriggerCron(graph);
     SinkSpec sink = request.sink();
+    // A FROST sink runs the find-or-create on the raw SensorThings envelope and has no
+    // record-mapping
+    // stage — a configured mapping would be silently ignored. Reject the combination rather than
+    // deploy a flow whose transformation never runs.
+    if (sink.type() == SinkType.FROST && mapping.isPresent()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "a FROST sink does not support a record mapping; the SensorThings envelope from the source"
+              + " is consumed as-is");
+    }
     // compile() throws a checked FatalAdapterException (an op may be unrenderable for the sink),
     // which a lambda in Optional.map() cannot propagate — hence the explicit isPresent() branch.
     List<UpdateRecordProperty> mappingProperties =
@@ -112,12 +182,36 @@ public class FlowDeploymentPlanner {
     SourceType sourceType =
         SourceType.fromRaw(source.getType()).orElseThrow(() -> template(source.getType()));
 
+    // Cron schedules the source processor. ConsumeMQTT is push-based (it self-triggers on broker
+    // messages), so a cron there would only throttle the drain, not the data — reject rather than
+    // deploy a misleading schedule. Cron belongs on a pull source (SQL).
+    if (sourceCron.isPresent() && sourceType == SourceType.MQTT) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "cron scheduling is not supported for push-based MQTT sources");
+    }
+
+    // A SQL source ALWAYS re-reads the whole table on a recurring schedule — an explicit cron, or
+    // the QueryDatabaseTableRecord fragment's built-in default (every 5 min) when no cron node is
+    // present — and it tracks no max-value column. So without a sink primary key the PostGIS write
+    // stays INSERT and every run duplicates all rows. Require a key for ANY SQL→PostGIS pipeline
+    // (from x-core-primaryKey on the target, or an explicit configuration.primaryKey); this also
+    // surfaces the case where a marker exists but the schema is too ambiguous to resolve one.
+    if (sourceType == SourceType.SQL
+        && sink.type() == SinkType.POSTGIS
+        && sink.primaryKeyColumns().isEmpty()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "a SQL source writing to PostGIS requires a primary key on the target (x-core-primaryKey)"
+              + " so re-read rows are de-duplicated; none was resolved");
+    }
+
     Map<String, String> sourceProperties = new LinkedHashMap<>();
     Map<String, String> sinkProperties = new LinkedHashMap<>();
     Map<String, Map<String, String>> controllerServiceProperties = new LinkedHashMap<>();
     Map<String, Map<String, String>> sensitive = new LinkedHashMap<>();
 
-    bindSource(sourceType, source, sourceProperties, sensitive);
+    bindSource(sourceType, source, sourceProperties, controllerServiceProperties, sensitive);
     bindSink(sink, sinkProperties, controllerServiceProperties, sensitive);
 
     String processGroupName = "pipeline-" + request.pipelineId();
@@ -130,7 +224,8 @@ public class FlowDeploymentPlanner {
                 sink.type(),
                 sinkProperties,
                 mappingProperties,
-                controllerServiceProperties));
+                controllerServiceProperties,
+                sourceCron.orElse(null)));
 
     return new DeploymentPlan(processGroupName, snapshot, Map.copyOf(sensitive));
   }
@@ -157,17 +252,218 @@ public class FlowDeploymentPlanner {
     return Optional.of(mappingConfigParser.parse(mapper.valueToTree(rawConfig)));
   }
 
+  private Optional<String> parseTriggerCron(PipelineGraph graph) throws FatalAdapterException {
+    Optional<String> cron;
+    try {
+      cron = graph.triggerCron();
+    } catch (IllegalStateException e) {
+      // an unbuildable schedule (multiple cron nodes, blank expression)
+      throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, e, e.getMessage());
+    }
+    if (cron.isPresent() && !isValidNifiCron(cron.get())) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR, "invalid NiFi cron expression: " + cron.get());
+    }
+    return cron;
+  }
+
+  /**
+   * Whether {@code expression} is a NiFi (Quartz) cron — 6 or 7 whitespace-separated fields ({@code
+   * sec min hour day-of-month month day-of-week [year]}). NiFi itself validates the field syntax on
+   * deploy; this only guards the field count so an obviously malformed value fails the plan early
+   * rather than the remote NiFi REST call. Mirrors the 6-or-7-field check in the editor's {@code
+   * validationService.isValidQuartzCron}. Package-private for unit testing.
+   */
+  static boolean isValidNifiCron(String expression) {
+    if (expression == null || expression.isBlank()) {
+      return false;
+    }
+    int fields = expression.trim().split("\\s+").length;
+    return fields == 6 || fields == 7;
+  }
+
   private void bindSource(
       SourceType sourceType,
       Datasource source,
       Map<String, String> sourceProperties,
+      Map<String, Map<String, String>> controllerServiceProperties,
       Map<String, Map<String, String>> sensitive)
       throws FatalAdapterException {
     Map<String, Object> original = source.getAdditionalProperties();
     Map<String, Object> decrypted = credentialResolver.decrypt(original);
-    if (sourceType == SourceType.MQTT) {
-      bindMqttSource(decrypted, original, sourceProperties, sensitive);
+    switch (sourceType) {
+      case MQTT -> bindMqttSource(decrypted, original, sourceProperties, sensitive);
+      case SQL ->
+          bindSqlSource(
+              decrypted, original, sourceProperties, controllerServiceProperties, sensitive);
     }
+  }
+
+  /**
+   * Binds a SQL datasource to QueryDatabaseTableRecord + a source-side DBCP connection pool, using
+   * the portal's connector field names ({@code table}/{@code columns}/{@code where} for the query,
+   * {@code dsn}/{@code user}/{@code password}/{@code driver} for the connection). Table is required
+   * — QueryDatabaseTableRecord cannot run without one. Only the PostgreSQL driver is supported so
+   * far (the bundled NiFi JDBC driver), so any other {@code driver} is rejected rather than
+   * mis-built.
+   */
+  private void bindSqlSource(
+      Map<String, Object> decrypted,
+      Map<String, Object> original,
+      Map<String, String> sourceProperties,
+      Map<String, Map<String, String>> controllerServiceProperties,
+      Map<String, Map<String, String>> sensitive)
+      throws FatalAdapterException {
+    rejectUnsupportedSqlFields(decrypted);
+
+    String table = trimmedString(decrypted.get("table"));
+    if (table.isEmpty()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR, "SQL source requires a non-empty 'table'");
+    }
+    sourceProperties.put("Table Name", table);
+    // empty / "*" means all columns — QueryDatabaseTableRecord's default; only set a specific list
+    List<String> columns = trimmedNonBlank(decrypted.get("columns"));
+    if (!columns.isEmpty() && !columns.equals(List.of("*"))) {
+      sourceProperties.put("Columns to Return", String.join(",", columns));
+    }
+    putIfPresent(sourceProperties, "Additional WHERE Clause", decrypted.get("where"));
+
+    // NOTE: a cron-recurring SQL source re-reads the whole table each run. Duplicate prevention is
+    // handled sink-side (PutDatabaseRecord UPSERT keyed on the target's x-core-primaryKey), not in
+    // the source.
+
+    // Only PostgreSQL is wired (the bundled /opt/nifi/drivers/postgresql.jar). Reject others.
+    String driver = trimmedString(decrypted.get("driver"));
+    if (!driver.isEmpty()
+        && !"postgres".equalsIgnoreCase(driver)
+        && !"postgresql".equalsIgnoreCase(driver)) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR, "SQL source driver not supported: " + driver);
+    }
+
+    // A blank DSN must be rejected: without it the DBCP pool URL is left unset and the flow falls
+    // back to the fragment's hardcoded demo database, silently producing wrong/no data.
+    String dsn = trimmedString(decrypted.get("dsn"));
+    if (dsn.isEmpty()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR, "SQL source requires a non-empty 'dsn'");
+    }
+    String jdbcUrl = postgresDsnToJdbcUrl(dsn);
+    Map<String, String> pool = new LinkedHashMap<>();
+    putIfPresent(pool, "Database Connection URL", jdbcUrl);
+    putIfPresent(pool, "Database User", decrypted.get("user"));
+    pool.put("Database Driver Class Name", "org.postgresql.Driver");
+    pool.put("Database Driver Locations", "/opt/nifi/drivers/postgresql.jar");
+    // The Redpanda conn_max_* fields (idle/lifetime/open) are intentionally NOT mapped: the
+    // connection pool is platform-managed (NiFi DBCPConnectionPool defaults), not tenant-tunable.
+    controllerServiceProperties.put("SourceConnectionPool", pool);
+
+    // A password, if present, must be encrypted: a plaintext secret must never be written into the
+    // (logged, non-secret) flow snapshot, and binding it only to the probe but not to the deployed
+    // pool would make the probe pass while the running flow fails to authenticate.
+    Object password = original.get("password");
+    if (password != null && !String.valueOf(password).isBlank() && !isEncrypted(password)) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "SQL source password must be encrypted (plaintext secrets are not accepted)");
+    }
+    if (isEncrypted(password)) {
+      sensitive
+          .computeIfAbsent("SourceConnectionPool", k -> new LinkedHashMap<>())
+          .put("Password", String.valueOf(decrypted.get("password")));
+    }
+
+    // Fail loud if the source DB is not reachable, rather than deploying a flow that silently
+    // produces no data.
+    sqlSourceProbe.probe(jdbcUrl, trimmedString(decrypted.get("user")), passwordOf(decrypted));
+  }
+
+  private static String passwordOf(Map<String, Object> decrypted) {
+    Object password = decrypted.get("password");
+    return password == null ? null : String.valueOf(password);
+  }
+
+  /**
+   * Fails loud on SQL connector fields the NiFi mapping cannot honor — rather than silently
+   * dropping them. {@code prefix}/{@code suffix}/{@code init_statement} are Redpanda Connect (the
+   * former engine) query concepts with no QueryDatabaseTableRecord equivalent; a {@code where}
+   * carrying a bind placeholder ({@code :name} or {@code ?}) would reach NiFi as unbound, invalid
+   * SQL; and cert-file TLS ({@code sslcert}/{@code sslkey}/{@code sslrootcert}) needs files this
+   * adapter cannot provision into NiFi ({@code sslmode} alone is fine — PgJDBC honors it in the
+   * URL).
+   */
+  private static void rejectUnsupportedSqlFields(Map<String, Object> config)
+      throws FatalAdapterException {
+    for (String field : List.of("prefix", "suffix", "init_statement")) {
+      if (!trimmedString(config.get(field)).isEmpty()) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+            "SQL source field not supported by the pipeline engine: " + field);
+      }
+    }
+    if (containsBindPlaceholder(trimmedString(config.get("where")))) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "SQL 'where' must be literal SQL without bind placeholders (':name' or '?')");
+    }
+    String dsn = trimmedString(config.get("dsn")).toLowerCase(Locale.ROOT);
+    if (dsn.contains("sslcert=") || dsn.contains("sslkey=") || dsn.contains("sslrootcert=")) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "SQL source cert-file TLS (sslcert/sslkey/sslrootcert) is not supported; use sslmode"
+              + " without client certificates");
+    }
+  }
+
+  /** A value as a trimmed string, or {@code ""} for null. */
+  private static String trimmedString(Object value) {
+    return value == null ? "" : String.valueOf(value).trim();
+  }
+
+  /**
+   * Whether a WHERE clause contains a bind placeholder NiFi cannot honor — a named {@code :name}, a
+   * positional {@code ?}, or a PostgreSQL positional {@code $1}/numeric {@code :1}. NiFi appends
+   * the clause verbatim with no parameter binding, so any of these would be invalid. String
+   * literals are stripped first so a {@code ?}/{@code :} inside quotes is ignored (e.g. {@code
+   * 'why?'}, {@code '12:00:00'}), and PostgreSQL {@code ::} casts (e.g. {@code created_at::date})
+   * are not mistaken for a {@code :name} placeholder.
+   *
+   * <p>Known conservative limitation: the bare {@code ?} check also rejects jsonb key-exists
+   * operators ({@code ?}, {@code ?|}, {@code ?&amp;}) in a literal WHERE. A jsonb-operator filter
+   * is therefore not supported here; this is a deliberate false-positive favouring safety.
+   */
+  private static boolean containsBindPlaceholder(String where) {
+    if (where.isEmpty()) {
+      return false;
+    }
+    String sansLiterals = where.replaceAll("'(?:[^']|'')*'", "");
+    return sansLiterals.indexOf('?') >= 0
+        || NAMED_PLACEHOLDER.matcher(sansLiterals).find()
+        || POSITIONAL_PLACEHOLDER.matcher(sansLiterals).find();
+  }
+
+  /**
+   * Converts a portal SQL {@code dsn} ({@code postgres://[user[:pw]@]host:port/db[?params]}) to the
+   * JDBC URL the DBCP pool expects ({@code jdbc:postgresql://host:port/db[?params]}). User/password
+   * carried in the DSN userinfo are dropped here — they are bound separately as Database User /
+   * sensitive Password. Returns {@code null} for a null/blank DSN (the pool URL is then left
+   * unset).
+   */
+  static String postgresDsnToJdbcUrl(Object dsn) {
+    if (dsn == null) {
+      return null;
+    }
+    String text = String.valueOf(dsn).trim();
+    if (text.isEmpty()) {
+      return null;
+    }
+    String withoutScheme = text.replaceFirst("(?i)^(postgres|postgresql)://", "");
+    int at = withoutScheme.indexOf('@');
+    if (at >= 0) {
+      withoutScheme = withoutScheme.substring(at + 1);
+    }
+    return "jdbc:postgresql://" + withoutScheme;
   }
 
   /**
@@ -278,6 +574,17 @@ public class FlowDeploymentPlanner {
         // SinkSpec guarantees a non-blank tableName for POSTGIS (the invalid state is rejected at
         // construction), so PutDatabaseRecord always has a target here.
         sinkProperties.put("Table Name", sink.tableName());
+        // With a primary key (the data structure's x-core-primaryKey marker), write UPSERT keyed on
+        // it so a cron-recurring source that re-reads rows updates instead of duplicating them.
+        // NiFi
+        // does not derive the conflict key from the table PK — it must be given via Update Keys.
+        if (!sink.primaryKeyColumns().isEmpty()) {
+          sinkProperties.put("Statement Type", "UPSERT");
+          sinkProperties.put("Update Keys", String.join(",", sink.primaryKeyColumns()));
+          // UPSERT needs the PostgreSQL DatabaseAdapter to emit ON CONFLICT; the default "Generic"
+          // adapter throws "UPSERT not supported" and routes every record to failure.
+          sinkProperties.put("Database Type", "PostgreSQL");
+        }
         bindPlatformDbcp(controllerServiceProperties, sensitive);
       }
       case FROST -> bindFrost(sinkProperties);
@@ -291,9 +598,9 @@ public class FlowDeploymentPlanner {
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           "FROST sink requires the FROST base URL (nifi.frost.url) to be configured");
     }
-    sinkProperties.put("HTTP Method", "POST");
-    sinkProperties.put("HTTP URL", frostBaseUrl + "/Observations");
-    sinkProperties.put("Request Content-Type", "application/json");
+    // The base URL feeds the find-or-create sub-flow (NifiFlowBuilder), which derives the per-stage
+    // URLs (/Things, /Datastreams, /Observations) — not a single POST endpoint.
+    sinkProperties.put(NifiFlowBuilder.FROST_BASE_URL, frostBaseUrl);
   }
 
   private void bindPlatformDbcp(

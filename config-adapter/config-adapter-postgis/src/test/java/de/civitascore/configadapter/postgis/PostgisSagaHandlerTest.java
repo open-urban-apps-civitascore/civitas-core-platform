@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.postgis;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -365,6 +366,82 @@ class PostgisSagaHandlerTest {
               .orElseThrow();
       assertTrue(createTable.contains("\"station_id\" TEXT NOT NULL"));
       assertTrue(createTable.contains("\"temperature\" TEXT NOT NULL"));
+    }
+
+    @Test
+    void provisionSinkDerivesPrimaryKeyFromMarkerEvenWithExplicitColumns() throws Exception {
+      // H1: the PK is derived from x-core-primaryKey even when columns are explicitly configured,
+      // so
+      // the table PRIMARY KEY matches the NiFi UPSERT Update Keys (no ON CONFLICT against a
+      // constraint-less table). (Composite-key ORDER is covered by DataStructureSchemaTest.)
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of(
+                          "tableName",
+                          "sensor_observations",
+                          "columns",
+                          List.of(
+                              Map.of("name", "station_id", "type", "TEXT"),
+                              Map.of("name", "temperature", "type", "TEXT"))),
+                      "dataStructure",
+                      Map.of(
+                          "properties",
+                          Map.of(
+                              "station_id", Map.of("type", "string", "x-core-primaryKey", true),
+                              "temperature", Map.of("type", "string"))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      String createTable =
+          sql.getAllValues().stream()
+              .filter(s -> s.startsWith("CREATE TABLE"))
+              .findFirst()
+              .orElseThrow();
+      assertTrue(createTable.contains("PRIMARY KEY (\"station_id\")"), createTable);
+    }
+
+    @Test
+    void explicitConfigPrimaryKeyOverridesMarker() throws Exception {
+      // an explicit configuration.primaryKey wins over the x-core-primaryKey marker (same
+      // precedence
+      // as the NiFi adapter) — the table PRIMARY KEY is the explicit column, not the marked one
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of("tableName", "obs", "primaryKey", List.of("v")),
+                      "dataStructure",
+                      Map.of(
+                          "properties",
+                          Map.of(
+                              "id", Map.of("type", "string", "x-core-primaryKey", true),
+                              "v", Map.of("type", "string"))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      String createTable =
+          sql.getAllValues().stream()
+              .filter(s -> s.startsWith("CREATE TABLE"))
+              .findFirst()
+              .orElseThrow();
+      assertTrue(createTable.contains("PRIMARY KEY (\"v\")"), createTable);
+      assertFalse(createTable.contains("PRIMARY KEY (\"id\")"), createTable);
     }
 
     @Test

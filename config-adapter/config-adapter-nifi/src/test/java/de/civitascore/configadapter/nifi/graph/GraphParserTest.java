@@ -111,15 +111,15 @@ class GraphParserTest {
   }
 
   @Test
-  void cronTriggerNodeIsRejected() throws Exception {
-    // a cron node carries a schedule the adapter cannot honor yet — reject rather than deploy a
-    // pipeline that silently ignores the cron expression
+  void cronTriggerNodeIsParsedAndExposesItsSchedule() throws Exception {
+    // the parser tolerates a cron node like any other; its cronExpression is exposed via
+    // triggerCron() to drive the source schedule (no longer rejected)
     PipelineGraph graph =
         parser.parse(
             map(
                 """
                 { "nodes": [
-                    { "id": "n-cron", "type": "cron", "data": { "cronExpression": "0 0 * * *" } },
+                    { "id": "n-cron", "type": "cron", "data": { "cronExpression": "0 0 6 * * ?" } },
                     { "id": "n-src", "type": "dataSource", "data": {} },
                     { "id": "n-map", "type": "mapping",
                       "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } },
@@ -129,7 +129,52 @@ class GraphParserTest {
                     { "id": "e2", "source": "n-map", "target": "n-frost" } ] }
                 """));
 
-    assertThrows(IllegalStateException.class, graph::transformNode);
+    assertEquals(4, graph.nodes().size());
+    assertEquals(Optional.of("0 0 6 * * ?"), graph.triggerCron());
+  }
+
+  @Test
+  void triggerCronIsEmptyWithoutACronNode() throws Exception {
+    PipelineGraph graph =
+        parser.parse(
+            map(
+                """
+                { "nodes": [
+                    { "id": "n-map", "type": "mapping",
+                      "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } } ],
+                  "edges": [] }
+                """));
+
+    assertEquals(Optional.empty(), graph.triggerCron());
+  }
+
+  @Test
+  void multipleCronNodesAreRejected() throws Exception {
+    PipelineGraph graph =
+        parser.parse(
+            map(
+                """
+                { "nodes": [
+                    { "id": "c1", "type": "cron", "data": { "cronExpression": "0 0 6 * * ?" } },
+                    { "id": "c2", "type": "cron", "data": { "cronExpression": "0 0 7 * * ?" } } ],
+                  "edges": [] }
+                """));
+
+    assertThrows(IllegalStateException.class, graph::triggerCron);
+  }
+
+  @Test
+  void cronNodeWithBlankExpressionIsRejected() throws Exception {
+    PipelineGraph graph =
+        parser.parse(
+            map(
+                """
+                { "nodes": [
+                    { "id": "c1", "type": "cron", "data": { "cronExpression": "  " } } ],
+                  "edges": [] }
+                """));
+
+    assertThrows(IllegalStateException.class, graph::triggerCron);
   }
 
   @Test

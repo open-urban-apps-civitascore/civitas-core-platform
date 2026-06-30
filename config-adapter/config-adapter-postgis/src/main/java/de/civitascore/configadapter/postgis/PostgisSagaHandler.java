@@ -15,6 +15,7 @@ import de.civitascore.configadapter.adapter.SagaCommandHandler;
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
+import de.civitascore.configadapter.model.dataset.DataStructureSchema;
 import de.civitascore.configadapter.model.postgis.ColumnConfig;
 import de.civitascore.configadapter.model.postgis.DbRoleConfig;
 import de.civitascore.configadapter.model.postgis.GeometryColumnConfig;
@@ -391,15 +392,14 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       List<GeometryColumnConfig> geometryColumns =
           convertList(config.get("geometryColumns"), GeometryColumnConfig.class);
       List<ColumnConfig> columns = convertList(config.get("columns"), ColumnConfig.class);
-      if (requireColumns
-          && columns.isEmpty()
-          && sink.get("dataStructure") instanceof Map<?, ?> model) {
+      @SuppressWarnings("unchecked")
+      Map<String, Object> dataStructure =
+          sink.get("dataStructure") instanceof Map<?, ?> model ? (Map<String, Object>) model : null;
+      if (requireColumns && columns.isEmpty() && dataStructure != null) {
         Set<String> geometryNames = new HashSet<>();
         for (GeometryColumnConfig geometry : geometryColumns) {
           geometryNames.add(geometry.name());
         }
-        @SuppressWarnings("unchecked")
-        Map<String, Object> dataStructure = (Map<String, Object>) model;
         DataStructureTableMapper.TableColumns derived =
             DataStructureTableMapper.deriveColumns(dataStructure, geometryNames);
         columns = derived.columns();
@@ -408,13 +408,22 @@ public class PostgisSagaHandler implements SagaCommandHandler {
           geometryColumns.addAll(derived.geometryColumns());
         }
       }
+      // Explicit configuration wins; otherwise derive the primary key from the schema's
+      // x-core-primaryKey marker — via the SHARED DataStructureSchema so the table PRIMARY KEY is
+      // identical to the NiFi UPSERT Update Keys. Derived regardless of whether columns were
+      // explicit, so an explicit-columns sink still gets its PK (else UPSERT would conflict on a
+      // table with no matching constraint).
+      List<String> primaryKey = stringList(config.get("primaryKey"));
+      if ((primaryKey == null || primaryKey.isEmpty()) && dataStructure != null) {
+        primaryKey = DataStructureSchema.primaryKeyColumns(dataStructure);
+      }
 
       TableConfig table = new TableConfig();
       table.setSchema(schemaName);
       table.setName(tableName);
       table.setColumns(columns);
       table.setGeometryColumns(geometryColumns);
-      table.setPrimaryKey(stringList(config.get("primaryKey")));
+      table.setPrimaryKey(primaryKey);
       table.setIndexes(convertList(config.get("indexes"), IndexConfig.class));
       if (requireColumns && table.getColumns().isEmpty() && table.getGeometryColumns().isEmpty()) {
         throw new IllegalArgumentException(

@@ -28,6 +28,8 @@ export interface FieldNode {
   name: string
   type: FieldType
   portType: PortType
+  /** Whether the field is required (UML {id} or multiplicity lower bound >= 1); absent = optional. */
+  required?: boolean
   children?: FieldNode[]
 }
 

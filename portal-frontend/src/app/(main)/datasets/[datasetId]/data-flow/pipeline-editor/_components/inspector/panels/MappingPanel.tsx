@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label'
 
 import { usePipelinePermissions } from '../../../_hooks/use-pipeline-permissions'
 import type { MappingNodeData } from '../../../_types/nodes'
-import type { MappingConfig } from '../../mapping-editor/_types'
+import { emptyMappingConfig, type MappingConfig } from '../../mapping-editor/_types'
 import { MappingEditorModal } from '../../mapping-editor/MappingEditorModal'
 
 const parseCompositeKey = (key: string): { datastructureId: string; versionId: string } | null => {
@@ -104,9 +104,18 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
     data.targetDatastructureId && data.targetVersionId ? `${data.targetDatastructureId}/${data.targetVersionId}` : null
   const canOpen = Boolean(data.label.trim() && sourceKey && targetKey)
 
-  const handleName = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const label = e.target.value
-    onUpdate({ label, configured: Boolean(label.trim() && sourceKey && targetKey) })
+  // The node is "configured" (deployable) ONLY after the field mapping has been saved (handleSave).
+  // The name and the source/target selection alone never mark it configured — otherwise a node with
+  // source+target but no actual mapping would pass validation and deploy an empty transformation.
+  const handleName = (e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ label: e.target.value })
+
+  // Changing the source or target invalidates any previously-saved mapping (it was built against the
+  // old schema), so reset the saved mapping + its required-field snapshot and un-configure the node;
+  // the user must re-open the editor and save again.
+  const invalidateMapping = {
+    mappingConfig: emptyMappingConfig(),
+    targetRequiredFields: undefined,
+    configured: false,
   }
 
   const handleSource = (sel: SchemaSelection) =>
@@ -114,7 +123,7 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
       sourceDatastructureId: sel.datastructureId,
       sourceVersionId: sel.versionId,
       sourceName: sel.name,
-      configured: Boolean(data.label.trim() && targetKey),
+      ...invalidateMapping,
     })
 
   const handleTarget = (sel: SchemaSelection) =>
@@ -122,10 +131,11 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
       targetDatastructureId: sel.datastructureId,
       targetVersionId: sel.versionId,
       targetName: sel.name,
-      configured: Boolean(data.label.trim() && sourceKey),
+      ...invalidateMapping,
     })
 
-  const handleSave = (config: MappingConfig) => onUpdate({ mappingConfig: config, configured: true })
+  const handleSave = (config: MappingConfig, targetRequiredFields: string[]) =>
+    onUpdate({ mappingConfig: config, targetRequiredFields, configured: true })
 
   return (
     <div className="space-y-4 p-4">

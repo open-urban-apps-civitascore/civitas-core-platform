@@ -1,0 +1,61 @@
+{
+  "name": "SplitEntities",
+  "comments": "Splits a JSON array (e.g. $.things or $.observations of the STA envelope) into one FlowFile per element so each entity can be resolved (find-or-create) individually.",
+  "position": {
+    "x": 0.0,
+    "y": 200.0
+  },
+  "type": "org.apache.nifi.processors.standard.SplitJson",
+  "bundle": {
+    "group": "org.apache.nifi",
+    "artifact": "nifi-standard-nar",
+    "version": "2.9.0"
+  },
+  "properties": {
+    "JsonPath Expression": "$.things",
+    "Null Value Representation": "empty string",
+    "Max String Length": "20 MB"
+  },
+  "propertyDescriptors": {
+    "JsonPath Expression": {
+      "name": "JsonPath Expression",
+      "displayName": "JsonPath Expression",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Null Value Representation": {
+      "name": "Null Value Representation",
+      "displayName": "Null Value Representation",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Max String Length": {
+      "name": "Max String Length",
+      "displayName": "Max String Length",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    }
+  },
+  "style": {},
+  "schedulingPeriod": "0 sec",
+  "schedulingStrategy": "TIMER_DRIVEN",
+  "executionNode": "ALL",
+  "penaltyDuration": "30 sec",
+  "yieldDuration": "1 sec",
+  "bulletinLevel": "WARN",
+  "runDurationMillis": 0,
+  "concurrentlySchedulableTaskCount": 1,
+  "autoTerminatedRelationships": [
+    "original",
+    "failure"
+  ],
+  "scheduledState": "ENABLED",
+  "retryCount": 10,
+  "retriedRelationships": [],
+  "backoffMechanism": "PENALIZE_FLOWFILE",
+  "maxBackoffPeriod": "10 mins",
+  "componentType": "PROCESSOR"
+}

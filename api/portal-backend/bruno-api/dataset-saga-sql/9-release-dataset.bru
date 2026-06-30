@@ -1,0 +1,48 @@
+meta {
+  name: 9. Release DataSet (triggers PostGIS saga)
+  type: http
+  seq: 16
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sqlDataSetId}}
+}
+
+tests {
+  test("Released", function() {
+    const status = res.getStatus();
+    // 202=saga triggered
+    expect(status).to.equal(202);
+  });
+}
+
+docs {
+  **SQL saga step 9** — Trigger the DATASET_CREATE saga (PostGIS path).
+
+  Transitions the dataset from `READY` to `AVAILABLE` and triggers the **DATASET_CREATE** saga asynchronously. Because this dataset has a POSTGIS DataSink, the saga trigger carries a sink payload (type `POSTGIS`, the `configuration` map, and the resolved target JSON Schema). The orchestrator therefore additionally provisions the PostGIS table (deriving `saga_sql_observations` columns from the schema, with `geo` as `GEOMETRY(POINT,4326)`) and deploys the NiFi flow whose mapping emits WKT into that column.
+
+  On failure, compensation runs in reverse and the dataset reverts to `READY`.
+
+  **Precondition:** `sqlDataSetId` is set; dataset is in `READY` state.
+
+  **Expected Response:** 202 Accepted (saga triggered). 400 if not in `READY` state.
+
+  **Kafka Events**
+  - Produces: `de.civitascore.dataset.saga.trigger` (sagaType: `DATASET_CREATE`, with a POSTGIS DataSink payload)
+  - Consumes: `de.civitascore.saga.result` (type: `SAGA_COMPLETED` or `SAGA_FAILED`)
+
+  **System Impact:**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | DataSet status → `AVAILABLE`; `pendingSagaType` = `CREATE` until saga completes |
+  | Config Adapter (Orchestrator) | Provisions FROST project, APISIX route, PostGIS sink table, NiFi flow |
+  | PostGIS | Table `saga_sql_observations` created from the target schema |
+  | Pipeline engine (NiFi) | geoPoint pipeline deployed against the PostGIS sink |
+}

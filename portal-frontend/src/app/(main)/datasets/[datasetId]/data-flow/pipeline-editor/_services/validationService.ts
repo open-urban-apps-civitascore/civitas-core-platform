@@ -6,7 +6,12 @@
  *
  */
 
-import { isCronNodeData, isGeoPersistenceNodeData } from '../_types/nodes'
+import {
+  isCronNodeData,
+  isDataSourceNodeData,
+  isGeoPersistenceNodeData,
+  isMappingNodeData,
+} from '../_types/nodes'
 import { type Pipeline, PIPELINE_NODE_TYPES } from '../_types/pipeline'
 
 // ============================================================================
@@ -14,8 +19,12 @@ import { type Pipeline, PIPELINE_NODE_TYPES } from '../_types/pipeline'
 // ============================================================================
 
 /**
- * Validates a 6-field Quartz cron expression.
- * Fields: seconds minutes hours day-of-month month day-of-week
+ * Validates a Quartz cron expression with 6 or 7 fields.
+ * Fields: seconds minutes hours day-of-month month day-of-week [year]
+ *
+ * The 7th field (year) is optional, matching the adapter's backend check
+ * (FlowDeploymentPlanner.isValidNifiCron also accepts 6 or 7 fields), so a valid 7-field expression
+ * is accepted in both places.
  *
  * Supports: wildcards (*), ranges (-), steps (/), lists (,), and ? for day-of-month/day-of-week.
  */
@@ -24,9 +33,9 @@ export const isValidQuartzCron = (expression: string): boolean => {
   if (!trimmed) return false
 
   const fields = trimmed.split(/\s+/)
-  if (fields.length !== 6) return false
+  if (fields.length !== 6 && fields.length !== 7) return false
 
-  const [seconds, minutes, hours, dayOfMonth, month, dayOfWeek] = fields
+  const [seconds, minutes, hours, dayOfMonth, month, dayOfWeek, year] = fields
 
   // Seconds: 0-59, supports *, */N, ranges, steps, lists
   const secondsPattern = /^(\*(\/\d+)?|(\d|[0-5]\d)([-/]\d+)?)([,](\*(\/\d+)?|(\d|[0-5]\d)([-/]\d+)?))*$/
@@ -43,6 +52,8 @@ export const isValidQuartzCron = (expression: string): boolean => {
   // Day of week: 1-7 or SUN-SAT or ? or L
   const dayOfWeekPattern =
     /^(\*(\/\d+)?|\?|L|([1-7]|SUN|MON|TUE|WED|THU|FRI|SAT)([-/]([1-7]|SUN|MON|TUE|WED|THU|FRI|SAT))?[L#]?(\d)?)([,](\*(\/\d+)?|([1-7]|SUN|MON|TUE|WED|THU|FRI|SAT)([-/]([1-7]|SUN|MON|TUE|WED|THU|FRI|SAT))?[L#]?(\d)?))*$/i
+  // Year (optional): a 4-digit year, *, ranges, steps, lists
+  const yearPattern = /^(\*(\/\d+)?|\d{4}([-/]\d+)?)([,](\*(\/\d+)?|\d{4}([-/]\d+)?))*$/
 
   return (
     secondsPattern.test(seconds) &&
@@ -50,7 +61,8 @@ export const isValidQuartzCron = (expression: string): boolean => {
     hoursPattern.test(hours) &&
     dayOfMonthPattern.test(dayOfMonth) &&
     monthPattern.test(month) &&
-    dayOfWeekPattern.test(dayOfWeek)
+    dayOfWeekPattern.test(dayOfWeek) &&
+    (year === undefined || yearPattern.test(year))
   )
 }
 
@@ -216,12 +228,12 @@ const validateNodeConfiguration: ValidationRule = {
 }
 
 /**
- * Rule: CRON nodes must have a valid 6-field Quartz cron expression.
+ * Rule: CRON nodes must have a valid 6- or 7-field Quartz cron expression.
  */
 const validateCronExpression: ValidationRule = {
   id: 'cron-expression-valid',
   name: 'Valid Cron Expression',
-  description: 'CRON nodes must have a valid 6-field Quartz cron expression',
+  description: 'CRON nodes must have a valid 6- or 7-field Quartz cron expression',
   validate: (pipeline: Pipeline) => {
     const errors: PipelineValidationError[] = []
 
@@ -342,6 +354,103 @@ const validateUniqueGeoPersistenceTableNames: ValidationRule = {
   },
 }
 
+/**
+ * Rule: a CRON trigger schedules the source processor. An MQTT source is push-based (it self-
+ * triggers on broker messages), so a cron there cannot drive the data — the pipeline engine rejects
+ * this combination at deploy. Surface it here so the user sees it on "Validate" instead of as a
+ * failed deployment. Cron belongs with a pull source (SQL).
+ */
+const validateCronRequiresNonMqttSource: ValidationRule = {
+  id: 'cron-requires-non-mqtt-source',
+  name: 'CRON Requires Non-MQTT Source',
+  description: 'A CRON trigger cannot be combined with an MQTT (push) data source',
+  validate: (pipeline: Pipeline) => {
+    const hasCron = pipeline.nodes.some(node => node.type === PIPELINE_NODE_TYPES.Cron)
+    if (!hasCron) return { errors: [], warnings: [] }
+
+    const hasMqttSource = pipeline.nodes.some(
+      node =>
+        node.type === PIPELINE_NODE_TYPES.DataSource &&
+        isDataSourceNodeData(node.data) &&
+        node.data.entityMetadata?.connector === 'MQTT',
+    )
+    if (!hasMqttSource) return { errors: [], warnings: [] }
+
+    return {
+      errors: [
+        {
+          id: crypto.randomUUID(),
+          type: 'structure',
+          messageKey: 'validation.messages.cronMqttIncompatible',
+          severity: 'error',
+        },
+      ],
+      warnings: [],
+    }
+  },
+}
+
+/** A mapping value counts as assigned only if it is a non-blank string or a (non-null) op node. */
+const isNonEmptyMappingValue = (value: unknown): boolean =>
+  typeof value === 'string' ? value.trim() !== '' : value != null
+
+/**
+ * Rule: a mapping must assign every REQUIRED target field with a non-empty value. The required
+ * paths are snapshotted on the node at mapping-save time ({@code targetRequiredFields}, written only
+ * by the editor's save). A {@code configured} mapping node WITHOUT that snapshot was therefore never
+ * actually saved (the editor was never opened/saved, or a source/target change invalidated it) — or
+ * is a legacy node — so it is blocked with an error, not silently accepted. (A node that is not yet
+ * {@code configured} is left to {@code validateNodeConfiguration}; this rule does not double-report
+ * it.) Optional target fields may stay unmapped.
+ */
+const validateMappingCoversRequiredTargetFields: ValidationRule = {
+  id: 'mapping-required-target-fields',
+  name: 'Mapping Covers Required Target Fields',
+  description: 'A mapping must assign every required target field',
+  validate: (pipeline: Pipeline) => {
+    const errors: PipelineValidationError[] = []
+
+    pipeline.nodes.forEach(node => {
+      if (!isMappingNodeData(node.data)) return
+      // a not-yet-configured node is reported by validateNodeConfiguration; avoid a double error
+      if (!node.data.configured) return
+      const required = node.data.targetRequiredFields
+
+      if (required === undefined) {
+        errors.push({
+          id: crypto.randomUUID(),
+          type: 'node',
+          elementId: node.id,
+          messageKey: 'validation.messages.mappingNotSaved',
+          messageParams: { label: node.data.label || node.type },
+          severity: 'error',
+        })
+        return
+      }
+      if (required.length === 0) return
+
+      const assigned = new Set(
+        Object.entries(node.data.mappingConfig?.fields ?? {})
+          .filter(([, value]) => isNonEmptyMappingValue(value))
+          .map(([key]) => key),
+      )
+      const missing = required.filter(path => !assigned.has(path))
+      if (missing.length === 0) return
+
+      errors.push({
+        id: crypto.randomUUID(),
+        type: 'node',
+        elementId: node.id,
+        messageKey: 'validation.messages.mappingRequiredFieldsMissing',
+        messageParams: { label: node.data.label || node.type, fields: missing.join(', ') },
+        severity: 'error',
+      })
+    })
+
+    return { errors, warnings: [] }
+  },
+}
+
 // ============================================================================
 // All Validation Rules
 // ============================================================================
@@ -358,6 +467,8 @@ export const VALIDATION_RULES: ValidationRule[] = [
   validateCronExpression,
   validateOrphanNodes,
   validateUniqueGeoPersistenceTableNames,
+  validateCronRequiresNonMqttSource,
+  validateMappingCoversRequiredTargetFields,
 ]
 
 // ============================================================================

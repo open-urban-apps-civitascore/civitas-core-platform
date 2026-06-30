@@ -1162,7 +1162,7 @@
     },
     "cronPanel": {
       "cronExpression": "CRON-Ausdruck",
-      "invalidCron": "Ungültiger CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein (Sekunden Minuten Stunden Tag-des-Monats Monat Wochentag).",
+      "invalidCron": "Ungültiger CRON-Ausdruck. Muss 6- oder 7-Feld Quartz-Syntax sein (Sekunden Minuten Stunden Tag-des-Monats Monat Wochentag [Jahr]).",
       "cronHint": "Ein CRON-Ausdruck legt fest, wann die Pipeline automatisch ausgeführt werden soll.",
       "learnCron": "Über CRON-Ausdrücke erfahren",
       "currentExpression": "Aktueller Ausdruck"
@@ -1229,10 +1229,13 @@
         "startNodeRequired": "Pipeline muss mindestens einen Start-Knoten haben",
         "endNodeRequired": "Pipeline muss mindestens einen End-Knoten haben",
         "nodeNotConfigured": "{label} ist nicht konfiguriert",
-        "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein.",
+        "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6- oder 7-Feld Quartz-Syntax sein.",
         "orphanNode": "{label} ist mit keinem anderen Knoten verbunden",
         "minimumFunctionalNodes": "Pipeline muss mindestens einen funktionalen Knoten zwischen Start und Ende haben",
-        "duplicateTableName": "Zwei Geo-Persistenz-Speicher dürfen nicht den gleichen Namen haben"
+        "duplicateTableName": "Zwei Geo-Persistenz-Speicher dürfen nicht den gleichen Namen haben",
+        "cronMqttIncompatible": "Ein CRON-Trigger kann nicht mit einer MQTT-Datenquelle verwendet werden. Bitte eine SQL-Quelle (Pull) verwenden.",
+        "mappingRequiredFieldsMissing": "{label} weist nicht alle Pflicht-Zielfelder zu: {fields}",
+        "mappingNotSaved": "{label} hat kein gespeichertes Feld-Mapping — bitte den Mapping-Editor öffnen und speichern"
       }
     },
     "toolbar": {

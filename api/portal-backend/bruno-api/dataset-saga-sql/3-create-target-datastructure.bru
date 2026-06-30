@@ -1,0 +1,60 @@
+meta {
+  name: 3. Create Target DataStructure (geometry)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/datastructures
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "SQL Saga Target Structure",
+    "description": "Target schema with a GeoJSON Point geometry field (PostGIS sink table schema)",
+    "createdFromDataSource": false,
+    "dataStructureVersionIds": [],
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sqlTargetDataStructureId', res.body.id);
+  }
+}
+
+tests {
+  test("Target DataStructure created", function() {
+    const status = res.getStatus();
+    // 201=created. This collection assumes a clean DB per run (CI uses an ephemeral stack); a 409
+    // would mean a previous run leaked — fail loudly rather than carry a stale id downstream.
+    expect(status).to.equal(201);
+  });
+
+  test("Has id", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.id).to.be.a('string');
+    }
+  });
+}
+
+docs {
+  **SQL saga step 3** — Prerequisites: source structure released (step 2c).
+
+  Creates the target DataStructure ("SQL Saga Target Structure"). Its version (step 3a) holds a JSON Schema with a `geo` property that `$ref`s the GeoJSON Point schema. The PostGIS adapter turns that ref into a `GEOMETRY(POINT,4326)` column when the saga provisions the sink table. The POSTGIS DataSink (step 6) references this version.
+
+  **Expected Response:** 201 Created, body contains `id`. 409 if it already exists (idempotent).
+
+  **Post-condition:** Save `sqlTargetDataStructureId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataStructure record created in `portal_backend` DB with status `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}

@@ -140,19 +140,10 @@ const SqlBaseSchema = z.object({
   table: z.string().trim(),
   columns: z.string().trim(),
   where: z.string().trim(),
-  prefix: z.string().trim(),
-  suffix: z.string().trim(),
-  init_statement: z.string().trim(),
-  conn_max_idle_time: z.string().trim(),
-  conn_max_life_time: z.string().trim(),
-  conn_max_idle: z.preprocess(
-    v => (v === '' || v === undefined ? undefined : Number(v)),
-    z.number().int().nonnegative(),
-  ),
-  conn_max_open: z.preprocess(
-    v => (v === '' || v === undefined ? undefined : Number(v)),
-    z.number().int().nonnegative(),
-  ),
+  // prefix/suffix/init_statement/conn_max_* are Redpanda-Connect fields the NiFi engine does not
+  // honor (issue #1779): the form no longer offers them and the adapter rejects them, so they are
+  // not part of the form schema. They remain in SqlApiResponseSchema so loading a legacy datasource
+  // that still carries them does not fail (unknown keys are stripped on save).
   user: z.string().trim(),
   password: z.string().trim(),
 })
@@ -160,14 +151,6 @@ const SqlBaseSchema = z.object({
 export const SqlLooseSchema = SqlBaseSchema.partial().extend({
   dsn: URISchema.optional(),
   columns: z.preprocess(parseStringArray, z.array(z.string()).optional()),
-  conn_max_idle: z.preprocess(
-    v => (v === '' || v === undefined ? undefined : Number(v)),
-    z.number().int().nonnegative().optional(),
-  ),
-  conn_max_open: z.preprocess(
-    v => (v === '' || v === undefined ? undefined : Number(v)),
-    z.number().int().nonnegative().optional(),
-  ),
 })
 
 export const SqlStrictSchema = SqlBaseSchema.partial()
@@ -181,14 +164,6 @@ export const SqlStrictSchema = SqlBaseSchema.partial()
     dsn: z.string().min(1, 'common.errors.required').pipe(URISchema),
     table: z.string().trim().min(1, 'common.errors.descriptionRequired'),
     columns: z.preprocess(parseStringArray, z.array(z.string()).min(1, 'required')),
-    conn_max_idle: z.preprocess(
-      v => (v === '' || v === undefined ? undefined : Number(v)),
-      z.number().int().nonnegative().optional(),
-    ),
-    conn_max_open: z.preprocess(
-      v => (v === '' || v === undefined ? undefined : Number(v)),
-      z.number().int().nonnegative().optional(),
-    ),
   })
 
 export const SqlApiToFormSchema = SqlApiResponseSchema.transform(({ columns, ...rest }) => ({
