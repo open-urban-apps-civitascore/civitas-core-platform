@@ -133,6 +133,10 @@ const typeToSchema = (type: UMLType, classDefKeyById: Map<string, string>, crs?:
  * multiplicity (arrays) and default values.
  * For geometry attributes, the CRS string from `attr.meta.gisInfo.crs` is
  * forwarded to `typeToSchema` and emitted as a sibling `crs` property.
+ * A primary-key attribute (`attr.isId`) is marked with the custom
+ * `x-core-primaryKey: true` annotation so the flag survives in the schema
+ * (consumers such as the PostGIS config-adapter derive the table's PRIMARY KEY
+ * from it; plain JSON Schema validators ignore it).
  */
 const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, string>): JsonSchemaObject => {
   const crs = attr.meta?.gisInfo?.crs
@@ -150,6 +154,10 @@ const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, stri
 
   if (attr.defaultValue !== undefined && attr.defaultValue !== '') {
     schema.default = attr.defaultValue
+  }
+
+  if (attr.isId) {
+    schema['x-core-primaryKey'] = true
   }
 
   return schema

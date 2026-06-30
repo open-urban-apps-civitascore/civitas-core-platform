@@ -78,7 +78,8 @@ describe('exportToJsonSchema', () => {
     const schema = exportToJsonSchema(baseDiagram())
     const properties = schema.properties as Record<string, Record<string, unknown>>
 
-    expect(properties.stationId).toEqual({ type: 'string' })
+    // stationId is the primary key (isId), so it carries the x-core-primaryKey annotation.
+    expect(properties.stationId).toEqual({ type: 'string', 'x-core-primaryKey': true })
     expect(properties.temperature).toEqual({ type: 'number' })
   })
 
@@ -146,13 +147,22 @@ describe('exportToJsonSchema', () => {
     const properties = schema.properties as Record<string, Record<string, unknown>>
 
     // stationId has no multiplicity set -> plain scalar, and required.
-    expect(properties.stationId).toEqual({ type: 'string' })
+    expect(properties.stationId).toEqual({ type: 'string', 'x-core-primaryKey': true })
     expect(schema.required).toContain('stationId')
   })
 
   it('adds id attributes to required', () => {
     const schema = exportToJsonSchema(baseDiagram())
     expect(schema.required).toEqual(['stationId'])
+  })
+
+  it('marks id attributes with x-core-primaryKey on the property', () => {
+    const schema = exportToJsonSchema(baseDiagram())
+    const properties = schema.properties as Record<string, Record<string, unknown>>
+
+    // stationId (isId) carries the flag; a non-id attribute does not.
+    expect(properties.stationId['x-core-primaryKey']).toBe(true)
+    expect(properties.temperature).not.toHaveProperty('x-core-primaryKey')
   })
 
   it('carries documentation into description', () => {
