@@ -208,17 +208,15 @@ class NifiDeploymentIT {
     source.handleUnknownProperty("urls", List.of("tcp://localhost:1883"));
     source.handleUnknownProperty("topics", List.of("sensors/+/temp"));
 
+    // FROST consumes the raw SensorThings envelope from the source (find-or-create); no mapping
+    // node — the planner rejects a FROST sink with a mapping (see frostSinkWithMappingIsRejected).
     Map<String, Object> graph =
         map(
             """
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
-                { "id": "m", "type": "mapping",
-                  "data": { "mappingConfig": { "fields": { "$.id": "$.id" } } } },
                 { "id": "e", "type": "end", "data": {} } ],
-              "edges": [
-                { "id": "e1", "source": "s", "target": "m" },
-                { "id": "e2", "source": "m", "target": "e" } ] }
+              "edges": [ { "id": "e1", "source": "s", "target": "e" } ] }
             """);
 
     FlowDeploymentPlanner planner =

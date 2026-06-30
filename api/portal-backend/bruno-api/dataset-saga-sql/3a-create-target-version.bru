@@ -26,7 +26,7 @@ body:json {
       "title": "GeoSensorTarget",
       "type": "object",
       "properties": {
-        "stationid": { "type": "string" },
+        "stationid": { "type": "string", "x-core-primaryKey": true },
         "geo": { "$ref": "https://geojson.org/schema/Point.json" }
       },
       "required": ["stationid"]
