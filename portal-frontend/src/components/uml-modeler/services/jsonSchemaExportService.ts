@@ -133,10 +133,11 @@ const typeToSchema = (type: UMLType, classDefKeyById: Map<string, string>, crs?:
  * multiplicity (arrays) and default values.
  * For geometry attributes, the CRS string from `attr.meta.gisInfo.crs` is
  * forwarded to `typeToSchema` and emitted as a sibling `crs` property.
- * A primary-key attribute (`attr.isId`) is marked with the custom
- * `x-core-primaryKey: true` annotation so the flag survives in the schema
- * (consumers such as the PostGIS config-adapter derive the table's PRIMARY KEY
- * from it; plain JSON Schema validators ignore it).
+ * A single-valued primary-key attribute (`attr.isId`) is marked with the
+ * custom `x-core-primaryKey: true` annotation so the flag survives in the
+ * schema (consumers such as the PostGIS config-adapter derive the table's
+ * PRIMARY KEY from it; plain JSON Schema validators ignore it). An array-valued
+ * attribute cannot back a primary key, so the marker is not emitted for it.
  */
 const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, string>): JsonSchemaObject => {
   const crs = attr.meta?.gisInfo?.crs
@@ -144,7 +145,8 @@ const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, stri
   const { lower, upper } = parseMultiplicity(attr.multiplicity)
 
   let schema: JsonSchemaObject
-  if (isMany(upper)) {
+  const isMultivalued = isMany(upper)
+  if (isMultivalued) {
     schema = { type: 'array', items: baseSchema }
     if (lower >= 1) schema.minItems = lower
     if (upper !== Infinity) schema.maxItems = upper
@@ -156,7 +158,7 @@ const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, stri
     schema.default = attr.defaultValue
   }
 
-  if (attr.isId) {
+  if (attr.isId && !isMultivalued) {
     schema['x-core-primaryKey'] = true
   }
 

@@ -165,6 +165,37 @@ describe('exportToJsonSchema', () => {
     expect(properties.temperature).not.toHaveProperty('x-core-primaryKey')
   })
 
+  it('does not emit x-core-primaryKey for an array-valued id attribute', () => {
+    const diagram = baseDiagram({
+      nodes: [
+        {
+          id: 'node-1',
+          type: 'class',
+          position: { x: 0, y: 0 },
+          data: {
+            element: {
+              id: 'elem-1',
+              name: 'TrafficSensor',
+              type: 'class',
+              attributes: [
+                { id: 'a1', name: 'ids', type: 'String', visibility: 'public', isId: true, multiplicity: '*' },
+              ],
+              operations: [],
+            },
+            label: 'TrafficSensor',
+          },
+        },
+      ],
+    })
+
+    const schema = exportToJsonSchema(diagram)
+    const properties = schema.properties as Record<string, Record<string, unknown>>
+
+    // An array attribute cannot back a primary key: it stays a plain array with no marker.
+    expect(properties.ids).toEqual({ type: 'array', items: { type: 'string' } })
+    expect(properties.ids).not.toHaveProperty('x-core-primaryKey')
+  })
+
   it('carries documentation into description', () => {
     const schema = exportToJsonSchema(baseDiagram())
     expect(schema.description).toBe('A traffic sensor reading')
