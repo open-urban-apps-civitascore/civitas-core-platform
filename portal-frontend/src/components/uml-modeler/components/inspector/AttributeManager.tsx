@@ -303,7 +303,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
               </label>
             </div>
             {isPrimaryKeyMultiplicityInvalid(attribute) && (
-              <p className="text-xs text-red-600">{t('primaryKey.arrayInvalid')}</p>
+              <p className="text-xs text-destructive">{t('primaryKey.arrayInvalid')}</p>
             )}
           </div>
         ))}
