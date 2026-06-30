@@ -6,12 +6,7 @@
  *
  */
 
-import {
-  isCronNodeData,
-  isDataSourceNodeData,
-  isGeoPersistenceNodeData,
-  isMappingNodeData,
-} from '../_types/nodes'
+import { isCronNodeData, isDataSourceNodeData, isGeoPersistenceNodeData, isMappingNodeData } from '../_types/nodes'
 import { type Pipeline, PIPELINE_NODE_TYPES } from '../_types/pipeline'
 
 // ============================================================================

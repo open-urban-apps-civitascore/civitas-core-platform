@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Pipeline, PipelineNode } from '../_types/pipeline'
-
 import { createEmptyPipeline } from './pipelineService'
 import { isValidQuartzCron, validatePipeline } from './validationService'
 
@@ -80,9 +79,7 @@ describe('isValidQuartzCron', () => {
 
 describe('validateMappingCoversRequiredTargetFields', () => {
   it('flags a mapping that does not assign every required target field, naming the missing ones', () => {
-    const result = validatePipeline(
-      pipelineWith([mappingNode({ '$.name': 'x' }, ['$.name', '$.id'])]),
-    )
+    const result = validatePipeline(pipelineWith([mappingNode({ '$.name': 'x' }, ['$.name', '$.id'])]))
     const errors = result.errors.filter(error => error.messageKey === REQUIRED_FIELDS_KEY)
     expect(errors).toHaveLength(1)
     expect(errors[0].elementId).toBe('map-1')
@@ -90,16 +87,12 @@ describe('validateMappingCoversRequiredTargetFields', () => {
   })
 
   it('accepts a mapping that assigns all required target fields', () => {
-    const result = validatePipeline(
-      pipelineWith([mappingNode({ '$.name': 'x', '$.id': 'y' }, ['$.name', '$.id'])]),
-    )
+    const result = validatePipeline(pipelineWith([mappingNode({ '$.name': 'x', '$.id': 'y' }, ['$.name', '$.id'])]))
     expect(result.errors.some(error => error.messageKey === REQUIRED_FIELDS_KEY)).toBe(false)
   })
 
   it('treats an empty or null mapping value as unmapped', () => {
-    const result = validatePipeline(
-      pipelineWith([mappingNode({ '$.name': '  ', '$.id': null }, ['$.name', '$.id'])]),
-    )
+    const result = validatePipeline(pipelineWith([mappingNode({ '$.name': '  ', '$.id': null }, ['$.name', '$.id'])]))
     const errors = result.errors.filter(error => error.messageKey === REQUIRED_FIELDS_KEY)
     expect(errors).toHaveLength(1)
     expect(errors[0].messageParams?.fields).toBe('$.name, $.id')

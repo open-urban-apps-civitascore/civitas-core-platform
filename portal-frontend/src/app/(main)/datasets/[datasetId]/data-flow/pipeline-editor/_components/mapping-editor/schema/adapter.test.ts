@@ -52,12 +52,7 @@ describe('umlDiagramToSchemaTree — required derivation', () => {
   })
 
   it('requiredFieldPaths returns only the required field paths', () => {
-    expect(requiredFieldPaths(umlDiagramToSchemaTree(diagram, 'thing'))).toEqual([
-      '$.id',
-      '$.name',
-      '$.tags',
-      '$.note',
-    ])
+    expect(requiredFieldPaths(umlDiagramToSchemaTree(diagram, 'thing'))).toEqual(['$.id', '$.name', '$.tags', '$.note'])
   })
 })
 
