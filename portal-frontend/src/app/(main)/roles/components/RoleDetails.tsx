@@ -17,20 +17,13 @@ import { useCreateRole, useDeleteRole, useGetRole, useUpdateRole } from '@/app/s
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
+import { InfoModal } from '@/components/modals/info-modal/InfoModal'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { useError } from '@/hooks/use-error'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
@@ -98,7 +91,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const [pendingPermissionIds, setPendingPermissionIds] = useState<string[]>([])
   const tBaseInfo = useTranslations('roles.baseInfoTab')
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
-  const [isDeleteErrorOpen, setIsDeleteErrorOpen] = useState(false)
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false)
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
 
   const deleteRole = useDeleteRole()
@@ -213,6 +206,14 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const isAnyDirty = form.formState.isDirty || arePermissionsDirty || areAssignmentsDirty
 
+  const handleDeleteClick = () => {
+    if ((assignmentsData?.data?.length ?? 0) > 0) {
+      setIsInfoModalOpen(true)
+    } else {
+      setIsDeleteConfirmOpen(true)
+    }
+  }
+
   const handleDeleteRole = () => {
     setIsDeleteConfirmOpen(false)
     deleteRole.mutate(roleId || '', {
@@ -222,7 +223,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
       },
       onError: error => {
         if (isPermissionsError(error as AxiosError)) handlePermissionsError()
-        else setIsDeleteErrorOpen(true)
+        else toast.error(tRoles('errors.deleteError'))
       },
     })
   }
@@ -419,7 +420,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
                 form={form}
                 isDefaultRole={isDefaultRole}
                 isReadOnly={isReadOnly || isDefaultRole}
-                deleteRole={roleId && canDelete ? () => setIsDeleteConfirmOpen(true) : undefined}
+                deleteRole={roleId && canDelete ? handleDeleteClick : undefined}
                 getRoleError={getRoleError}
               />
             )}
@@ -458,19 +459,12 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         isLoading={deleteRole.isPending}
       />
 
-      <Dialog open={isDeleteErrorOpen} onOpenChange={setIsDeleteErrorOpen}>
-        <DialogContent className="sm:max-w-md" showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>{tBaseInfo('deleteErrorModal.title')}</DialogTitle>
-            <DialogDescription>{tBaseInfo('deleteErrorModal.description')}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex sm:justify-end">
-            <Button type="button" onClick={() => setIsDeleteErrorOpen(false)}>
-              {tBaseInfo('deleteErrorModal.close')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <InfoModal
+        open={isInfoModalOpen}
+        title={tBaseInfo('infoModal.title')}
+        description={tBaseInfo('infoModal.description')}
+        onClose={() => setIsInfoModalOpen(false)}
+      />
 
       <ExitWarningModal
         open={isExitModalOpen}

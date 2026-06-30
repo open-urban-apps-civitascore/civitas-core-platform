@@ -809,10 +809,9 @@
         "description": "This action cannot be undone.",
         "confirm": "Delete"
       },
-      "deleteErrorModal": {
+      "infoModal": {
         "title": "Role cannot be deleted",
-        "description": "All assignments to groups and scopes must be removed first.",
-        "close": "Close"
+        "description": "All assignments to groups and scopes must be removed first."
       }
     },
     "permissionsTab": {
@@ -887,7 +886,8 @@
     },
     "errors": {
       "createError": "An error occurred while creating the role",
-      "updateError": "An error occurred while updating the role"
+      "updateError": "An error occurred while updating the role",
+      "deleteError": "An error occurred while deleting the role"
     },
     "success": {
       "assignmentSuccess": "The assignments have been successfully updated"
