@@ -371,4 +371,76 @@ class DataStructureTableMapperTest {
 
     assertEquals(List.of("station_id"), derived.primaryKey());
   }
+
+  @Test
+  void ignoresPrimaryKeyMarkerWithFalseOrNonBooleanValue() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "properties": {
+                "a": { "type": "string", "x-core-primaryKey": false },
+                "b": { "type": "string", "x-core-primaryKey": "true" },
+                "c": { "type": "string", "x-core-primaryKey": 1 } } }
+            """);
+
+    TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
+
+    assertTrue(derived.primaryKey().isEmpty());
+  }
+
+  @Test
+  void ignoresPrimaryKeyMarkerOnGeometryColumn() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "properties": {
+                "location":   { "$ref": "https://geojson.org/schema/Point.json",
+                                "x-core-primaryKey": true },
+                "station_id": { "type": "string", "x-core-primaryKey": true } } }
+            """);
+
+    TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
+
+    // The geometry property is dropped from the PK (it cannot back a B-tree key) but still
+    // becomes a geometry column; only the scalar marker survives.
+    assertEquals(List.of("station_id"), derived.primaryKey());
+    assertEquals(1, derived.geometryColumns().size());
+    assertEquals("location", derived.geometryColumns().get(0).name());
+  }
+
+  @Test
+  void ignoresPrimaryKeyMarkerOnJsonbColumn() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "properties": {
+                "payload":    { "type": "object", "x-core-primaryKey": true },
+                "tags":       { "type": "array", "x-core-primaryKey": true },
+                "station_id": { "type": "string", "x-core-primaryKey": true } } }
+            """);
+
+    TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
+
+    assertEquals(List.of("station_id"), derived.primaryKey());
+  }
+
+  @Test
+  void derivesPrimaryKeyFromMarkerInsideDefinition() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "$id": "urn:core:datastructure:1",
+              "title": "Observation",
+              "$defs": {
+                "Observation": {
+                  "type": "object",
+                  "properties": {
+                    "station_id": { "type": "string", "x-core-primaryKey": true },
+                    "temperature": { "type": "number" } } } } }
+            """);
+
+    TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
+
+    assertEquals(List.of("station_id"), derived.primaryKey());
+  }
 }

@@ -21,6 +21,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.owasp.encoder.Encode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Derives the table columns for a PostGIS sink from the JSON Schema the portal-backend stores on
@@ -33,13 +36,17 @@ import java.util.regex.Pattern;
  * EPSG:25832}), defaulting to 4326 (the GeoServer handler's CRS default). Any other {@code $ref} is
  * a nested object and maps to {@code JSONB}.
  *
- * <p>A property carrying {@code x-core-primaryKey: true} (the UML editor's primary-key marker,
- * issue #1784) contributes its name to the table's primary key, in schema property order.
+ * <p>A non-excluded property carrying {@code x-core-primaryKey: true} (the UML editor's primary-key
+ * marker, issue #1784) contributes its name to the table's primary key, in schema property order. A
+ * marked property that maps to a non-scalar column (geometry, {@code JSONB} object/array) cannot
+ * back a B-tree primary key, so it is logged and skipped rather than producing invalid DDL.
  *
  * <p>Names in {@code excludedNames} (explicitly configured geometry columns) are skipped so they
- * are not duplicated as derived columns.
+ * are not duplicated as derived columns (and are therefore not part of the derived primary key).
  */
 public final class DataStructureTableMapper {
+
+  private static final Logger logger = LoggerFactory.getLogger(DataStructureTableMapper.class);
 
   private static final int DEFAULT_SRID = 4326;
 
@@ -60,7 +67,8 @@ public final class DataStructureTableMapper {
 
   /**
    * Derived non-spatial and geometry columns for one sink table, plus the primary-key column names
-   * collected from {@code x-core-primaryKey} property markers (in schema property order).
+   * collected from {@code x-core-primaryKey} property markers on non-excluded, scalar-column
+   * properties (in schema property order).
    */
   public record TableColumns(
       List<ColumnConfig> columns,
@@ -92,13 +100,16 @@ public final class DataStructureTableMapper {
       }
       Map<String, Object> spec = mapValue(property.getValue());
       Boolean nullable = required.contains(name) ? false : null;
-
-      if (Boolean.TRUE.equals(spec.get(PRIMARY_KEY_MARKER))) {
-        primaryKey.add(name);
-      }
+      boolean markedPrimaryKey = Boolean.TRUE.equals(spec.get(PRIMARY_KEY_MARKER));
 
       GeometryType geometryType = geometryType(stringValue(spec.get("$ref")));
       if (geometryType != null) {
+        if (markedPrimaryKey) {
+          logger.warn(
+              "Ignoring x-core-primaryKey on property '{}': a geometry column cannot back a"
+                  + " B-tree primary key",
+              Encode.forJava(name));
+        }
         Integer srid = sridFromCrs(spec.get("crs"));
         geometryColumns.add(
             new GeometryColumnConfig(
@@ -106,6 +117,17 @@ public final class DataStructureTableMapper {
         continue;
       }
       ColumnType type = columnType(spec);
+      if (markedPrimaryKey) {
+        if (type == ColumnType.JSONB) {
+          logger.warn(
+              "Ignoring x-core-primaryKey on property '{}': a {} column cannot back a B-tree"
+                  + " primary key",
+              Encode.forJava(name),
+              type);
+        } else {
+          primaryKey.add(name);
+        }
+      }
       columns.add(new ColumnConfig(name, type, null, null, null, nullable));
     }
     return new TableColumns(columns, geometryColumns, primaryKey);

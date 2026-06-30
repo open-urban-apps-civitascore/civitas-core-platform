@@ -67,7 +67,7 @@ import org.slf4j.LoggerFactory;
  *     "tableName": "sensor_readings",    // required; the table GeoServer reads
  *     "columns": [ {name,type,...} ],    // optional explicit override (see below)
  *     "geometryColumns": [ {name,geometryType,srid,...} ],
- *     "primaryKey": ["id"],              // optional override; otherwise derived from the schema
+ *     "primaryKey": ["id"],              // optional override (non-empty); else derived from schema
  *     "indexes": [ {...} ],
  *     "readRole": { "name":"ds_42_geo", "canLogin":true,
  *                   "password":"ENC(...)", "privileges":["USAGE"] } },  // optional GeoServer role
@@ -404,9 +404,10 @@ public class PostgisSagaHandler implements SagaCommandHandler {
         DataStructureTableMapper.TableColumns derived =
             DataStructureTableMapper.deriveColumns(dataStructure, geometryNames);
         derivedPrimaryKey = derived.primaryKey();
-        // Columns are derived from the schema only when not configured explicitly; the
-        // primary key is taken from the schema's x-core-primaryKey markers regardless, and
-        // overridden below by an explicit configuration.primaryKey when present.
+        // Columns are derived from the schema only when not configured explicitly; the primary key
+        // is taken from the schema's x-core-primaryKey markers regardless of whether columns were
+        // configured explicitly (filtered to the actual columns and overridden by an explicit
+        // configuration.primaryKey below).
         if (columns.isEmpty()) {
           columns = derived.columns();
           if (!derived.geometryColumns().isEmpty()) {
@@ -416,9 +417,29 @@ public class PostgisSagaHandler implements SagaCommandHandler {
         }
       }
 
+      // An explicit configuration.primaryKey (a non-empty list) is an operator decision and wins
+      // verbatim; otherwise fall back to the schema-derived key. The derived key is filtered to the
+      // columns actually created on this table, because explicit configuration.columns may diverge
+      // from the dataStructure properties that carried the markers (a derived PK referencing a
+      // missing column would make CREATE TABLE fail).
       List<String> primaryKey = stringList(config.get("primaryKey"));
       if (primaryKey == null || primaryKey.isEmpty()) {
-        primaryKey = derivedPrimaryKey;
+        Set<String> columnNames = new HashSet<>();
+        for (ColumnConfig column : columns) {
+          columnNames.add(column.name());
+        }
+        primaryKey = new ArrayList<>();
+        for (String pkColumn : derivedPrimaryKey) {
+          if (columnNames.contains(pkColumn)) {
+            primaryKey.add(pkColumn);
+          } else {
+            logger.warn(
+                "Ignoring schema-derived primary-key column '{}' for table '{}': no such column on"
+                    + " the table",
+                Encode.forJava(pkColumn),
+                Encode.forJava(tableName));
+          }
+        }
       }
 
       TableConfig table = new TableConfig();

@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.postgis;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -428,6 +429,45 @@ class PostgisSagaHandlerTest {
               .findFirst()
               .orElseThrow();
       assertTrue(createTable.contains("PRIMARY KEY (\"temperature\")"));
+    }
+
+    @Test
+    void derivedPrimaryKeyAbsentFromExplicitColumnsIsDropped() throws Exception {
+      // Explicit configuration.columns are used as-is; the schema still marks a property that is
+      // not among those columns. The derived PK must be filtered out so CREATE TABLE stays valid.
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of(
+                          "tableName",
+                          "sensor_observations",
+                          "columns",
+                          List.of(Map.of("name", "temperature", "type", "TEXT"))),
+                      "dataStructure",
+                      Map.of(
+                          "properties",
+                          Map.of(
+                              "station_id", Map.of("type", "string", "x-core-primaryKey", true),
+                              "temperature", Map.of("type", "string"))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      String createTable =
+          sql.getAllValues().stream()
+              .filter(s -> s.startsWith("CREATE TABLE"))
+              .findFirst()
+              .orElseThrow();
+      assertTrue(createTable.contains("\"temperature\" TEXT"));
+      assertFalse(
+          createTable.contains("PRIMARY KEY"), "expected no primary key clause: " + createTable);
     }
 
     @Test
