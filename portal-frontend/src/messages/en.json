@@ -1374,6 +1374,10 @@
     "export": {
       "success": "Diagram exported successfully",
       "error": "Failed to export diagram. Please try again."
+    },
+    "primaryKey": {
+      "arrayInvalid": "An array-valued attribute cannot be a primary key.",
+      "arrayInvalidToast": "Array-valued attributes cannot be a primary key: {attributes}. Please fix the cardinality or remove the primary-key flag."
     }
   },
   "datapools": {

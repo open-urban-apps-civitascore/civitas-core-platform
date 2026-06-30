@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality } from '../constants/umlTypes'
 import type { UMLDiagram } from '../types/diagram'
-import { exportToJsonSchema, sanitizeName } from './jsonSchemaExportService'
+import {
+  exportToJsonSchema,
+  findInvalidPrimaryKeyAttributeNames,
+  isPrimaryKeyMultiplicityInvalid,
+  sanitizeName,
+} from './jsonSchemaExportService'
 
 const baseDiagram = (overrides?: Partial<UMLDiagram>): UMLDiagram => ({
   id: 'diagram-1',
@@ -556,5 +561,86 @@ describe('exportToJsonSchema', () => {
     expect(properties.reading).toEqual({ $ref: '#/$defs/Reading' })
     expect((schema.$defs as Record<string, Record<string, unknown>>).Reading).toMatchObject({ title: 'Reading' })
     expect(schema.title).toBe('TrafficSensor')
+  })
+})
+
+describe('primary-key multiplicity validation', () => {
+  it('flags an id attribute with a many multiplicity as invalid', () => {
+    expect(
+      isPrimaryKeyMultiplicityInvalid({
+        id: 'a',
+        name: 'ids',
+        type: 'String',
+        visibility: 'public',
+        isId: true,
+        multiplicity: '*',
+      }),
+    ).toBe(true)
+    expect(
+      isPrimaryKeyMultiplicityInvalid({
+        id: 'a',
+        name: 'ids',
+        type: 'String',
+        visibility: 'public',
+        isId: true,
+        multiplicity: '1..*',
+      }),
+    ).toBe(true)
+  })
+
+  it('does not flag a single-valued id attribute or a non-id array attribute', () => {
+    expect(
+      isPrimaryKeyMultiplicityInvalid({ id: 'a', name: 'id', type: 'String', visibility: 'public', isId: true }),
+    ).toBe(false)
+    expect(
+      isPrimaryKeyMultiplicityInvalid({
+        id: 'a',
+        name: 'id',
+        type: 'String',
+        visibility: 'public',
+        isId: true,
+        multiplicity: '0..1',
+      }),
+    ).toBe(false)
+    expect(
+      isPrimaryKeyMultiplicityInvalid({
+        id: 'a',
+        name: 'tags',
+        type: 'String',
+        visibility: 'public',
+        multiplicity: '*',
+      }),
+    ).toBe(false)
+  })
+
+  it('collects names of all invalid primary-key attributes across the diagram', () => {
+    const diagram = baseDiagram({
+      nodes: [
+        {
+          id: 'node-1',
+          type: 'class',
+          position: { x: 0, y: 0 },
+          data: {
+            element: {
+              id: 'elem-1',
+              name: 'TrafficSensor',
+              type: 'class',
+              attributes: [
+                { id: 'a1', name: 'stationId', type: 'String', visibility: 'public', isId: true },
+                { id: 'a2', name: 'tagIds', type: 'String', visibility: 'public', isId: true, multiplicity: '1..*' },
+              ],
+              operations: [],
+            },
+            label: 'TrafficSensor',
+          },
+        },
+      ],
+    })
+
+    expect(findInvalidPrimaryKeyAttributeNames(diagram)).toEqual(['tagIds'])
+  })
+
+  it('returns an empty array for a valid diagram', () => {
+    expect(findInvalidPrimaryKeyAttributeNames(baseDiagram())).toEqual([])
   })
 })

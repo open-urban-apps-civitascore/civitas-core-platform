@@ -1,6 +1,7 @@
 'use client'
 
 import { Plus, Trash2 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useCallback } from 'react'
 
 import { BasicSelect } from '@/components/select/basicSelect/BasicSelect'
@@ -17,6 +18,7 @@ import {
 } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
+import { isPrimaryKeyMultiplicityInvalid } from '../../services/jsonSchemaExportService'
 import {
   type UMLAttribute,
   type UMLElement,
@@ -33,6 +35,7 @@ interface AttributeManagerProps {
 export const AttributeManager: React.FC<AttributeManagerProps> = props => {
   const { nodeId, element } = props
   const { isReadOnly } = useReadOnly()
+  const t = useTranslations('umlModeler')
 
   const { updateNode } = useActiveDiagram()
 
@@ -289,16 +292,19 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
             <div className="flex items-center">
               <input
                 type="checkbox"
-                id={`static-${attribute.id}`}
+                id={`primary-key-${attribute.id}`}
                 checked={attribute.isId}
                 onChange={e => updateAttribute(attribute.id, { isId: e.target.checked })}
                 className="mr-2"
                 disabled={isReadOnly}
               />
-              <label htmlFor={`static-${attribute.id}`} className="text-xs text-gray-600">
+              <label htmlFor={`primary-key-${attribute.id}`} className="text-xs text-gray-600">
                 {`Primary Key {id}`}
               </label>
             </div>
+            {isPrimaryKeyMultiplicityInvalid(attribute) && (
+              <p className="text-xs text-red-600">{t('primaryKey.arrayInvalid')}</p>
+            )}
           </div>
         ))}
 

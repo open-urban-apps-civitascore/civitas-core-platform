@@ -10,7 +10,7 @@ import { BasicDropdownMenu } from '@/components/dropdown-menu/BasicDropdownMenu'
 import { Button } from '@/components/ui/button'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
-import { downloadJsonSchema } from '../../services/jsonSchemaExportService'
+import { downloadJsonSchema, findInvalidPrimaryKeyAttributeNames } from '../../services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '../../services/modelUploadService'
 
 interface ToolbarProps {
@@ -36,6 +36,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const handleSave = useCallback(() => {
     if (isSaving) return
 
+    const invalidPrimaryKeys = findInvalidPrimaryKeyAttributeNames(diagram)
+    if (invalidPrimaryKeys.length > 0) {
+      toast.error(t('primaryKey.arrayInvalidToast', { attributes: invalidPrimaryKeys.join(', ') }))
+      return
+    }
+
     const payload = {
       ...buildUMLModelPayload(diagram),
       name: sessionName || diagram.name,
@@ -53,6 +59,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   }, [diagram, isSaving, onSave, createModel, sessionName, t])
 
   const handleExport = useCallback(() => {
+    const invalidPrimaryKeys = findInvalidPrimaryKeyAttributeNames(diagram)
+    if (invalidPrimaryKeys.length > 0) {
+      toast.error(t('primaryKey.arrayInvalidToast', { attributes: invalidPrimaryKeys.join(', ') }))
+      return
+    }
+
     try {
       downloadJsonSchema(diagram)
       toast.success(t('export.success'))

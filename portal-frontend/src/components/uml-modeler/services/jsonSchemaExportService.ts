@@ -174,6 +174,33 @@ const isAttributeRequired = (attr: UMLAttribute): boolean => {
   return lower >= 1
 }
 
+/**
+ * An array-valued attribute cannot be a primary key: it maps to a JSONB column
+ * downstream, which cannot back a primary key. A primary-key attribute with a
+ * many multiplicity (`*`, `n..*`) is therefore invalid and must be surfaced to
+ * the user instead of being silently dropped on export.
+ */
+export const isPrimaryKeyMultiplicityInvalid = (attr: UMLAttribute): boolean =>
+  !!attr.isId && isMany(parseMultiplicity(attr.multiplicity).upper)
+
+/**
+ * Names of attributes across the diagram that are marked as primary key but
+ * have a many multiplicity, i.e. an invalid primary-key/array combination.
+ * Empty when the diagram is valid. Used to block save/export and to flag the
+ * offending attributes in the inspector.
+ */
+export const findInvalidPrimaryKeyAttributeNames = (diagram: UMLDiagram): string[] => {
+  const invalid: string[] = []
+  for (const node of diagram.nodes) {
+    const element = node.data.element
+    if (!('attributes' in element) || !Array.isArray((element as UMLClass).attributes)) continue
+    for (const attr of (element as UMLClass).attributes) {
+      if (isPrimaryKeyMultiplicityInvalid(attr)) invalid.push(attr.name)
+    }
+  }
+  return invalid
+}
+
 const hasAttributes = (element: UMLElement): element is UMLClass =>
   'attributes' in element && Array.isArray((element as UMLClass).attributes)
 

@@ -14,6 +14,10 @@ vi.mock('../../hooks/use-read-only', () => ({
   useReadOnly: () => ({ isReadOnly: false }),
 }))
 
+vi.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => key,
+}))
+
 const NODE_ID = 'node-1'
 
 const elementWith = (attribute: Partial<UMLAttribute>): UMLClass => ({
@@ -72,5 +76,20 @@ describe('AttributeManager cardinality dropdown', () => {
     openCardinality()
     expect(screen.getByRole('option', { name: '*' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: '1..*' })).toBeInTheDocument()
+  })
+})
+
+describe('AttributeManager primary-key validation', () => {
+  beforeEach(() => updateNode.mockClear())
+
+  it('shows an error message for an array-valued primary-key attribute', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWith({ isId: true, multiplicity: '1..*' })} />)
+    // The mocked useTranslations returns the key verbatim.
+    expect(screen.getByText('primaryKey.arrayInvalid')).toBeInTheDocument()
+  })
+
+  it('shows no error for a single-valued primary-key attribute', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWith({ isId: true })} />)
+    expect(screen.queryByText('primaryKey.arrayInvalid')).not.toBeInTheDocument()
   })
 })
