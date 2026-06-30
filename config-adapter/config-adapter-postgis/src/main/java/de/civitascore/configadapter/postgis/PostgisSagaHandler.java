@@ -418,27 +418,33 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       }
 
       // An explicit configuration.primaryKey (a non-empty list) is an operator decision and wins
-      // verbatim; otherwise fall back to the schema-derived key. The derived key is filtered to the
-      // columns actually created on this table, because explicit configuration.columns may diverge
-      // from the dataStructure properties that carried the markers (a derived PK referencing a
-      // missing column would make CREATE TABLE fail).
+      // verbatim; otherwise fall back to the schema-derived key. The derived key is only used when
+      // every one of its columns was actually created on this table: explicit configuration.columns
+      // may diverge from the dataStructure properties that carried the markers, and emitting a
+      // partial composite key (e.g. dropping one component) would silently change the table's
+      // uniqueness semantics. If any component is missing the whole derived key is discarded.
       List<String> primaryKey = stringList(config.get("primaryKey"));
       if (primaryKey == null || primaryKey.isEmpty()) {
         Set<String> columnNames = new HashSet<>();
         for (ColumnConfig column : columns) {
           columnNames.add(column.name());
         }
-        primaryKey = new ArrayList<>();
+        List<String> missing = new ArrayList<>();
         for (String pkColumn : derivedPrimaryKey) {
-          if (columnNames.contains(pkColumn)) {
-            primaryKey.add(pkColumn);
-          } else {
-            logger.warn(
-                "Ignoring schema-derived primary-key column '{}' for table '{}': no such column on"
-                    + " the table",
-                Encode.forJava(pkColumn),
-                Encode.forJava(tableName));
+          if (!columnNames.contains(pkColumn)) {
+            missing.add(pkColumn);
           }
+        }
+        if (missing.isEmpty()) {
+          primaryKey = new ArrayList<>(derivedPrimaryKey);
+        } else {
+          primaryKey = List.of();
+          logger.warn(
+              "Discarding schema-derived primary key {} for table '{}': column(s) {} are not on the"
+                  + " table",
+              Encode.forJava(derivedPrimaryKey.toString()),
+              Encode.forJava(tableName),
+              Encode.forJava(missing.toString()));
         }
       }
 
