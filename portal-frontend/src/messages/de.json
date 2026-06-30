@@ -1361,10 +1361,6 @@
     "export": {
       "success": "Diagramm erfolgreich exportiert",
       "error": "Diagramm konnte nicht exportiert werden. Bitte versuchen Sie es erneut."
-    },
-    "primaryKey": {
-      "arrayInvalid": "Ein mehrwertiges Attribut kann kein Primary Key sein.",
-      "arrayInvalidToast": "Mehrwertige Attribute können kein Primary Key sein: {attributes}. Bitte korrigieren Sie die Kardinalität oder entfernen Sie die Primary-Key-Markierung."
     }
   },
   "datapools": {

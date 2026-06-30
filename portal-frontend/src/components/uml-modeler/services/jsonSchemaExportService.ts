@@ -171,21 +171,9 @@ const isAttributeRequired = (attr: UMLAttribute): boolean => {
   return lower >= 1
 }
 
-/** A many multiplicity maps to a JSONB array column, which cannot back a primary key. */
-export const isPrimaryKeyMultiplicityInvalid = (attr: UMLAttribute): boolean =>
-  !!attr.isId && isMany(parseMultiplicity(attr.multiplicity).upper)
-
-export const findInvalidPrimaryKeyAttributeNames = (diagram: UMLDiagram): string[] => {
-  const invalid: string[] = []
-  for (const node of diagram.nodes) {
-    const element = node.data.element
-    if (!('attributes' in element) || !Array.isArray((element as UMLClass).attributes)) continue
-    for (const attr of (element as UMLClass).attributes) {
-      if (isPrimaryKeyMultiplicityInvalid(attr)) invalid.push(attr.name)
-    }
-  }
-  return invalid
-}
+/** A many multiplicity (`*`, `n..*`, bounded upper > 1) maps to an array, which cannot be a key. */
+export const isMultivaluedMultiplicity = (multiplicity?: string): boolean =>
+  isMany(parseMultiplicity(multiplicity).upper)
 
 const hasAttributes = (element: UMLElement): element is UMLClass =>
   'attributes' in element && Array.isArray((element as UMLClass).attributes)

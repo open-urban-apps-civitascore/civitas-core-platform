@@ -10,7 +10,7 @@ import { BasicDropdownMenu } from '@/components/dropdown-menu/BasicDropdownMenu'
 import { Button } from '@/components/ui/button'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
-import { downloadJsonSchema, findInvalidPrimaryKeyAttributeNames } from '../../services/jsonSchemaExportService'
+import { downloadJsonSchema } from '../../services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '../../services/modelUploadService'
 
 interface ToolbarProps {
@@ -33,16 +33,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const isSaving = createModel.isPending
   const t = useTranslations('umlModeler')
 
-  const hasBlockingInvalidPrimaryKeys = useCallback(() => {
-    const invalidPrimaryKeys = findInvalidPrimaryKeyAttributeNames(diagram)
-    if (invalidPrimaryKeys.length === 0) return false
-    toast.error(t('primaryKey.arrayInvalidToast', { attributes: invalidPrimaryKeys.join(', ') }))
-    return true
-  }, [diagram, t])
-
   const handleSave = useCallback(() => {
     if (isSaving) return
-    if (hasBlockingInvalidPrimaryKeys()) return
 
     const payload = {
       ...buildUMLModelPayload(diagram),
@@ -58,18 +50,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         toast.error(t('save.error'))
       },
     })
-  }, [diagram, isSaving, onSave, createModel, sessionName, t, hasBlockingInvalidPrimaryKeys])
+  }, [diagram, isSaving, onSave, createModel, sessionName, t])
 
   const handleExport = useCallback(() => {
-    if (hasBlockingInvalidPrimaryKeys()) return
-
     try {
       downloadJsonSchema(diagram)
       toast.success(t('export.success'))
     } catch {
       toast.error(t('export.error'))
     }
-  }, [diagram, t, hasBlockingInvalidPrimaryKeys])
+  }, [diagram, t])
 
   return (
     <div className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">

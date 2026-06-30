@@ -79,17 +79,27 @@ describe('AttributeManager cardinality dropdown', () => {
   })
 })
 
-describe('AttributeManager primary-key validation', () => {
+describe('AttributeManager primary key', () => {
   beforeEach(() => updateNode.mockClear())
 
-  it('shows an error message for an array-valued primary-key attribute', () => {
-    render(<AttributeManager nodeId={NODE_ID} element={elementWith({ isId: true, multiplicity: '1..*' })} />)
-    // The mocked useTranslations returns the key verbatim.
-    expect(screen.getByText('primaryKey.arrayInvalid')).toBeInTheDocument()
+  it('shows the Primary Key checkbox for a single-valued attribute', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWith({ multiplicity: '0..1' })} />)
+    expect(screen.getByText('Primary Key')).toBeInTheDocument()
   })
 
-  it('shows no error for a single-valued primary-key attribute', () => {
+  it('hides the Primary Key checkbox for a multivalued attribute', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWith({ multiplicity: '1..*' })} />)
+    expect(screen.queryByText('Primary Key')).not.toBeInTheDocument()
+  })
+
+  it('clears isId when an attribute becomes multivalued', () => {
     render(<AttributeManager nodeId={NODE_ID} element={elementWith({ isId: true })} />)
-    expect(screen.queryByText('primaryKey.arrayInvalid')).not.toBeInTheDocument()
+    const combobox = within(cardinalityField()).getByRole('combobox')
+    fireEvent.click(combobox)
+    fireEvent.click(screen.getByRole('option', { name: '0..*' }))
+
+    expect(updateNode).toHaveBeenCalledWith(NODE_ID, {
+      attributes: [expect.objectContaining({ id: 'a1', multiplicity: '0..*', isId: false })],
+    })
   })
 })

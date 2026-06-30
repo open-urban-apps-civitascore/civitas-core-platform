@@ -1,7 +1,6 @@
 'use client'
 
 import { Plus, Trash2 } from 'lucide-react'
-import { useTranslations } from 'next-intl'
 import { useCallback } from 'react'
 
 import { BasicSelect } from '@/components/select/basicSelect/BasicSelect'
@@ -18,7 +17,7 @@ import {
 } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
-import { isPrimaryKeyMultiplicityInvalid } from '../../services/jsonSchemaExportService'
+import { isMultivaluedMultiplicity } from '../../services/jsonSchemaExportService'
 import {
   type UMLAttribute,
   type UMLElement,
@@ -35,7 +34,6 @@ interface AttributeManagerProps {
 export const AttributeManager: React.FC<AttributeManagerProps> = props => {
   const { nodeId, element } = props
   const { isReadOnly } = useReadOnly()
-  const t = useTranslations('umlModeler')
 
   const { updateNode } = useActiveDiagram()
 
@@ -226,7 +224,13 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
               <label className="block text-xs font-medium text-gray-600 mb-1">Cardinality</label>
               <BasicSelect
                 options={getMultiplicityOptions(attribute.multiplicity)}
-                onValueChange={e => updateAttribute(attribute.id, { multiplicity: cardinalityForStorage(e) })}
+                onValueChange={e => {
+                  const multiplicity = cardinalityForStorage(e)
+                  updateAttribute(attribute.id, {
+                    multiplicity,
+                    ...(isMultivaluedMultiplicity(multiplicity) ? { isId: false } : {}),
+                  })
+                }}
                 value={cardinalityForDisplay(attribute.multiplicity)}
                 triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                 size="sm"
@@ -288,22 +292,21 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
               </label>
             </div>
 
-            {/* Primary key checkbox */}
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id={`primary-key-${attribute.id}`}
-                checked={attribute.isId || false}
-                onChange={e => updateAttribute(attribute.id, { isId: e.target.checked })}
-                className="mr-2"
-                disabled={isReadOnly}
-              />
-              <label htmlFor={`primary-key-${attribute.id}`} className="text-xs text-gray-600">
-                Primary Key {'{id}'}
-              </label>
-            </div>
-            {isPrimaryKeyMultiplicityInvalid(attribute) && (
-              <p className="text-xs text-destructive">{t('primaryKey.arrayInvalid')}</p>
+            {/* Primary key checkbox — hidden for multivalued attributes, which cannot be a key */}
+            {!isMultivaluedMultiplicity(attribute.multiplicity) && (
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id={`primary-key-${attribute.id}`}
+                  checked={attribute.isId || false}
+                  onChange={e => updateAttribute(attribute.id, { isId: e.target.checked })}
+                  className="mr-2"
+                  disabled={isReadOnly}
+                />
+                <label htmlFor={`primary-key-${attribute.id}`} className="text-xs text-gray-600">
+                  Primary Key
+                </label>
+              </div>
             )}
           </div>
         ))}
