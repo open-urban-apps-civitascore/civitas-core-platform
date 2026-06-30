@@ -536,6 +536,32 @@ class PostgisSagaHandlerTest {
               .anyMatch(s -> s.startsWith("DROP TABLE \"ds_42\".\"sensor_readings\"")));
     }
 
+    @Test
+    void deprovisionSinkWithPrimaryKeyMarkerSchemaSucceeds() throws Exception {
+      // regression: the delete trigger carries the dataStructure (with an x-core-primaryKey marker)
+      // but no explicit columns. Deprovision must NOT derive/validate the PK (the table is being
+      // dropped, not built) — otherwise "PK not in columns" would wrongly fail the delete saga.
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of("schema", "ds_42", "tableName", "sensor_readings"),
+                      "dataStructure",
+                      Map.of(
+                          "properties",
+                          Map.of(
+                              "stationid", Map.of("type", "string", "x-core-primaryKey", true),
+                              "temperature", Map.of("type", "string"))))));
+
+      SagaCommandResult result = handler.handle(compensate("DEPROVISION_SINK", trigger));
+
+      assertEquals("COMPENSATION_COMPLETED", result.type());
+    }
+
     private Map<String, Object> postgisSinkTrigger() {
       return Map.of(
           "datasetId",

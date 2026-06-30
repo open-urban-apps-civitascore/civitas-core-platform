@@ -408,14 +408,34 @@ public class PostgisSagaHandler implements SagaCommandHandler {
           geometryColumns.addAll(derived.geometryColumns());
         }
       }
-      // Explicit configuration wins; otherwise derive the primary key from the schema's
-      // x-core-primaryKey marker — via the SHARED DataStructureSchema so the table PRIMARY KEY is
-      // identical to the NiFi UPSERT Update Keys. Derived regardless of whether columns were
-      // explicit, so an explicit-columns sink still gets its PK (else UPSERT would conflict on a
-      // table with no matching constraint).
+      // The primary key only matters when the table is created (PROVISION). For DEPROVISION
+      // (requireColumns=false) columns are intentionally not derived, so deriving/validating a PK
+      // there would wrongly fail — the table is being dropped, not built.
       List<String> primaryKey = stringList(config.get("primaryKey"));
-      if ((primaryKey == null || primaryKey.isEmpty()) && dataStructure != null) {
-        primaryKey = DataStructureSchema.primaryKeyColumns(dataStructure);
+      if (requireColumns) {
+        // Explicit configuration wins; otherwise derive the primary key from the schema's
+        // x-core-primaryKey marker — via the SHARED DataStructureSchema so the table PRIMARY KEY is
+        // identical to the NiFi UPSERT Update Keys.
+        if ((primaryKey == null || primaryKey.isEmpty()) && dataStructure != null) {
+          primaryKey = DataStructureSchema.primaryKeyColumns(dataStructure);
+        }
+        // The primary key must reference actual table columns; otherwise the emitted PRIMARY
+        // KEY(...) would name a missing column and provisioning fails with broken DDL. This can
+        // happen when columns are configured explicitly but the marker points at an omitted one.
+        if (primaryKey != null && !primaryKey.isEmpty()) {
+          Set<String> columnNames = new HashSet<>();
+          columns.forEach(column -> columnNames.add(column.name()));
+          geometryColumns.forEach(geometry -> columnNames.add(geometry.name()));
+          List<String> missingKeyColumns =
+              primaryKey.stream().filter(key -> !columnNames.contains(key)).toList();
+          if (!missingKeyColumns.isEmpty()) {
+            throw new IllegalArgumentException(
+                "POSTGIS data sink '"
+                    + tableName
+                    + "' primary key references column(s) not present in the table: "
+                    + missingKeyColumns);
+          }
+        }
       }
 
       TableConfig table = new TableConfig();
@@ -424,24 +444,6 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       table.setColumns(columns);
       table.setGeometryColumns(geometryColumns);
       table.setPrimaryKey(primaryKey);
-      // The primary key must reference actual table columns; otherwise the emitted PRIMARY KEY(...)
-      // would name a missing column and provisioning fails with broken DDL. This can happen when
-      // columns are configured explicitly but the x-core-primaryKey marker points at an omitted
-      // one.
-      if (primaryKey != null && !primaryKey.isEmpty()) {
-        Set<String> columnNames = new HashSet<>();
-        columns.forEach(column -> columnNames.add(column.name()));
-        geometryColumns.forEach(geometry -> columnNames.add(geometry.name()));
-        List<String> missingKeyColumns =
-            primaryKey.stream().filter(key -> !columnNames.contains(key)).toList();
-        if (!missingKeyColumns.isEmpty()) {
-          throw new IllegalArgumentException(
-              "POSTGIS data sink '"
-                  + tableName
-                  + "' primary key references column(s) not present in the table: "
-                  + missingKeyColumns);
-        }
-      }
       table.setIndexes(convertList(config.get("indexes"), IndexConfig.class));
       if (requireColumns && table.getColumns().isEmpty() && table.getGeometryColumns().isEmpty()) {
         throw new IllegalArgumentException(
