@@ -97,14 +97,40 @@ describe('AttributeManager primary key', () => {
     expect(screen.queryByText(/Primary Key/)).not.toBeInTheDocument()
   })
 
-  it('clears isId when an attribute becomes non-key-eligible', () => {
+  it('reflects isId in the checkbox checked state', () => {
+    const { rerender } = render(<AttributeManager nodeId={NODE_ID} element={elementWith({ isId: true })} />)
+    expect(screen.getByRole('checkbox', { name: /Primary Key/ })).toBeChecked()
+
+    rerender(<AttributeManager nodeId={NODE_ID} element={elementWith({ isId: undefined })} />)
+    expect(screen.getByRole('checkbox', { name: /Primary Key/ })).not.toBeChecked()
+  })
+
+  it('sets isId when the checkbox is checked', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWith({ isId: false })} />)
+    fireEvent.click(screen.getByRole('checkbox', { name: /Primary Key/ }))
+
+    expect(updateNode).toHaveBeenCalledWith(NODE_ID, {
+      attributes: [expect.objectContaining({ id: 'a1', isId: true })],
+    })
+  })
+
+  it('clears isId when the checkbox is unchecked', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWith({ isId: true })} />)
+    fireEvent.click(screen.getByRole('checkbox', { name: /Primary Key/ }))
+
+    expect(updateNode).toHaveBeenCalledWith(NODE_ID, {
+      attributes: [expect.objectContaining({ id: 'a1', isId: false })],
+    })
+  })
+
+  it.each(['0..1', '1..*'])('clears isId when the cardinality changes to %s', cardinality => {
     render(<AttributeManager nodeId={NODE_ID} element={elementWith({ isId: true })} />)
     const combobox = within(cardinalityField()).getByRole('combobox')
     fireEvent.click(combobox)
-    fireEvent.click(screen.getByRole('option', { name: '0..1' }))
+    fireEvent.click(screen.getByRole('option', { name: cardinality }))
 
     expect(updateNode).toHaveBeenCalledWith(NODE_ID, {
-      attributes: [expect.objectContaining({ id: 'a1', multiplicity: '0..1', isId: false })],
+      attributes: [expect.objectContaining({ id: 'a1', multiplicity: cardinality, isId: false })],
     })
   })
 })

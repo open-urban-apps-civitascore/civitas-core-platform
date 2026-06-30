@@ -78,7 +78,6 @@ describe('exportToJsonSchema', () => {
     const schema = exportToJsonSchema(baseDiagram())
     const properties = schema.properties as Record<string, Record<string, unknown>>
 
-    // stationId is the primary key (isId), so it carries the x-core-primaryKey annotation.
     expect(properties.stationId).toEqual({ type: 'string', 'x-core-primaryKey': true })
     expect(properties.temperature).toEqual({ type: 'number' })
   })
@@ -160,7 +159,6 @@ describe('exportToJsonSchema', () => {
     const schema = exportToJsonSchema(baseDiagram())
     const properties = schema.properties as Record<string, Record<string, unknown>>
 
-    // stationId (isId) carries the flag; a non-id attribute does not.
     expect(properties.stationId['x-core-primaryKey']).toBe(true)
     expect(properties.temperature).not.toHaveProperty('x-core-primaryKey')
   })
@@ -191,9 +189,42 @@ describe('exportToJsonSchema', () => {
     const schema = exportToJsonSchema(diagram)
     const properties = schema.properties as Record<string, Record<string, unknown>>
 
-    // An array attribute cannot back a primary key: it stays a plain array with no marker.
     expect(properties.ids).toEqual({ type: 'array', items: { type: 'string' } })
     expect(properties.ids).not.toHaveProperty('x-core-primaryKey')
+  })
+
+  it('marks every member of a composite primary key', () => {
+    const diagram = baseDiagram({
+      nodes: [
+        {
+          id: 'node-1',
+          type: 'class',
+          position: { x: 0, y: 0 },
+          data: {
+            element: {
+              id: 'elem-1',
+              name: 'TrafficSensor',
+              type: 'class',
+              attributes: [
+                { id: 'a1', name: 'tenantId', type: 'String', visibility: 'public', isId: true },
+                { id: 'a2', name: 'stationId', type: 'String', visibility: 'public', isId: true },
+                { id: 'a3', name: 'temperature', type: 'Double', visibility: 'public', multiplicity: '0..1' },
+              ],
+              operations: [],
+            },
+            label: 'TrafficSensor',
+          },
+        },
+      ],
+    })
+
+    const schema = exportToJsonSchema(diagram)
+    const properties = schema.properties as Record<string, Record<string, unknown>>
+
+    expect(properties.tenantId['x-core-primaryKey']).toBe(true)
+    expect(properties.stationId['x-core-primaryKey']).toBe(true)
+    expect(properties.temperature).not.toHaveProperty('x-core-primaryKey')
+    expect(schema.required).toEqual(['tenantId', 'stationId'])
   })
 
   it('carries documentation into description', () => {
