@@ -33,6 +33,9 @@ import java.util.regex.Pattern;
  * EPSG:25832}), defaulting to 4326 (the GeoServer handler's CRS default). Any other {@code $ref} is
  * a nested object and maps to {@code JSONB}.
  *
+ * <p>A property carrying {@code x-core-primaryKey: true} (the UML editor's primary-key marker,
+ * issue #1784) contributes its name to the table's primary key, in schema property order.
+ *
  * <p>Names in {@code excludedNames} (explicitly configured geometry columns) are skipped so they
  * are not duplicated as derived columns.
  */
@@ -46,11 +49,23 @@ public final class DataStructureTableMapper {
   /** Extracts the numeric SRID from a CRS identifier such as {@code EPSG:25832}. */
   private static final Pattern EPSG_CODE = Pattern.compile("(?i)EPSG:+\\s*(\\d+)");
 
+  /**
+   * Custom annotation the UML editor sets on a property to mark it as the table's primary key
+   * (issue #1784). JSON Schema has no standard primary-key keyword, so the editor emits this flag
+   * and the sink mapping derives the {@code PRIMARY KEY} from it.
+   */
+  private static final String PRIMARY_KEY_MARKER = "x-core-primaryKey";
+
   private DataStructureTableMapper() {}
 
-  /** Derived non-spatial and geometry columns for one sink table. */
+  /**
+   * Derived non-spatial and geometry columns for one sink table, plus the primary-key column names
+   * collected from {@code x-core-primaryKey} property markers (in schema property order).
+   */
   public record TableColumns(
-      List<ColumnConfig> columns, List<GeometryColumnConfig> geometryColumns) {}
+      List<ColumnConfig> columns,
+      List<GeometryColumnConfig> geometryColumns,
+      List<String> primaryKey) {}
 
   /**
    * @throws IllegalArgumentException if the schema contains no usable definition with properties
@@ -69,6 +84,7 @@ public final class DataStructureTableMapper {
 
     List<ColumnConfig> columns = new ArrayList<>();
     List<GeometryColumnConfig> geometryColumns = new ArrayList<>();
+    List<String> primaryKey = new ArrayList<>();
     for (Map.Entry<String, Object> property : properties.entrySet()) {
       String name = property.getKey();
       if (excludedNames.contains(name)) {
@@ -76,6 +92,10 @@ public final class DataStructureTableMapper {
       }
       Map<String, Object> spec = mapValue(property.getValue());
       Boolean nullable = required.contains(name) ? false : null;
+
+      if (Boolean.TRUE.equals(spec.get(PRIMARY_KEY_MARKER))) {
+        primaryKey.add(name);
+      }
 
       GeometryType geometryType = geometryType(stringValue(spec.get("$ref")));
       if (geometryType != null) {
@@ -88,7 +108,7 @@ public final class DataStructureTableMapper {
       ColumnType type = columnType(spec);
       columns.add(new ColumnConfig(name, type, null, null, null, nullable));
     }
-    return new TableColumns(columns, geometryColumns);
+    return new TableColumns(columns, geometryColumns, primaryKey);
   }
 
   /** Root {@code properties} if present, else the single (or title-matching) definition. */

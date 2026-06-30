@@ -67,7 +67,7 @@ import org.slf4j.LoggerFactory;
  *     "tableName": "sensor_readings",    // required; the table GeoServer reads
  *     "columns": [ {name,type,...} ],    // optional explicit override (see below)
  *     "geometryColumns": [ {name,geometryType,srid,...} ],
- *     "primaryKey": ["id"],
+ *     "primaryKey": ["id"],              // optional override; otherwise derived from the schema
  *     "indexes": [ {...} ],
  *     "readRole": { "name":"ds_42_geo", "canLogin":true,
  *                   "password":"ENC(...)", "privileges":["USAGE"] } },  // optional GeoServer role
@@ -76,7 +76,9 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Columns come from explicit {@code configuration.columns} when present, otherwise derived from
  * {@code dataStructure} via {@link DataStructureTableMapper}; at least one column or geometry
- * column must result for provisioning (deprovisioning needs only the identifiers).
+ * column must result for provisioning (deprovisioning needs only the identifiers). The primary key
+ * comes from explicit {@code configuration.primaryKey} when present, otherwise from the {@code
+ * x-core-primaryKey} markers in {@code dataStructure} (issue #1784).
  *
  * <p>{@code PROVISION_SINK} creates schema (if given), table, and read role + grants for each sink
  * in one transaction; {@code DEPROVISION_SINK} drops the table and role (schemas are left, as they
@@ -391,9 +393,8 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       List<GeometryColumnConfig> geometryColumns =
           convertList(config.get("geometryColumns"), GeometryColumnConfig.class);
       List<ColumnConfig> columns = convertList(config.get("columns"), ColumnConfig.class);
-      if (requireColumns
-          && columns.isEmpty()
-          && sink.get("dataStructure") instanceof Map<?, ?> model) {
+      List<String> derivedPrimaryKey = List.of();
+      if (requireColumns && sink.get("dataStructure") instanceof Map<?, ?> model) {
         Set<String> geometryNames = new HashSet<>();
         for (GeometryColumnConfig geometry : geometryColumns) {
           geometryNames.add(geometry.name());
@@ -402,11 +403,22 @@ public class PostgisSagaHandler implements SagaCommandHandler {
         Map<String, Object> dataStructure = (Map<String, Object>) model;
         DataStructureTableMapper.TableColumns derived =
             DataStructureTableMapper.deriveColumns(dataStructure, geometryNames);
-        columns = derived.columns();
-        if (!derived.geometryColumns().isEmpty()) {
-          geometryColumns = new ArrayList<>(geometryColumns);
-          geometryColumns.addAll(derived.geometryColumns());
+        derivedPrimaryKey = derived.primaryKey();
+        // Columns are derived from the schema only when not configured explicitly; the
+        // primary key is taken from the schema's x-core-primaryKey markers regardless, and
+        // overridden below by an explicit configuration.primaryKey when present.
+        if (columns.isEmpty()) {
+          columns = derived.columns();
+          if (!derived.geometryColumns().isEmpty()) {
+            geometryColumns = new ArrayList<>(geometryColumns);
+            geometryColumns.addAll(derived.geometryColumns());
+          }
         }
+      }
+
+      List<String> primaryKey = stringList(config.get("primaryKey"));
+      if (primaryKey == null || primaryKey.isEmpty()) {
+        primaryKey = derivedPrimaryKey;
       }
 
       TableConfig table = new TableConfig();
@@ -414,7 +426,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       table.setName(tableName);
       table.setColumns(columns);
       table.setGeometryColumns(geometryColumns);
-      table.setPrimaryKey(stringList(config.get("primaryKey")));
+      table.setPrimaryKey(primaryKey);
       table.setIndexes(convertList(config.get("indexes"), IndexConfig.class));
       if (requireColumns && table.getColumns().isEmpty() && table.getGeometryColumns().isEmpty()) {
         throw new IllegalArgumentException(

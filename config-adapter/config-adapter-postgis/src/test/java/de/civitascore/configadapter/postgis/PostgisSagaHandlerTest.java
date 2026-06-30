@@ -368,6 +368,69 @@ class PostgisSagaHandlerTest {
     }
 
     @Test
+    void provisionSinkDerivesPrimaryKeyFromXCorePrimaryKeyMarker() throws Exception {
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of("tableName", "sensor_observations"),
+                      "dataStructure",
+                      Map.of(
+                          "properties",
+                          Map.of(
+                              "station_id", Map.of("type", "string", "x-core-primaryKey", true),
+                              "temperature", Map.of("type", "string"))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      String createTable =
+          sql.getAllValues().stream()
+              .filter(s -> s.startsWith("CREATE TABLE"))
+              .findFirst()
+              .orElseThrow();
+      assertTrue(createTable.contains("PRIMARY KEY (\"station_id\")"));
+    }
+
+    @Test
+    void explicitConfigurationPrimaryKeyOverridesSchemaMarker() throws Exception {
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of(
+                          "tableName", "sensor_observations", "primaryKey", List.of("temperature")),
+                      "dataStructure",
+                      Map.of(
+                          "properties",
+                          Map.of(
+                              "station_id", Map.of("type", "string", "x-core-primaryKey", true),
+                              "temperature", Map.of("type", "string"))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      String createTable =
+          sql.getAllValues().stream()
+              .filter(s -> s.startsWith("CREATE TABLE"))
+              .findFirst()
+              .orElseThrow();
+      assertTrue(createTable.contains("PRIMARY KEY (\"temperature\")"));
+    }
+
+    @Test
     void provisionSinkWithoutPostgisSinkFails() {
       Map<String, Object> trigger =
           Map.of("datasinks", List.of(Map.of("type", "KAFKA", "configuration", Map.of())));

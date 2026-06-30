@@ -19,6 +19,7 @@ import de.civitascore.configadapter.model.postgis.ColumnConfig;
 import de.civitascore.configadapter.model.postgis.ColumnType;
 import de.civitascore.configadapter.model.postgis.GeometryType;
 import de.civitascore.configadapter.postgis.ddl.DataStructureTableMapper.TableColumns;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -308,5 +309,66 @@ class DataStructureTableMapperTest {
             IllegalArgumentException.class,
             () -> DataStructureTableMapper.deriveColumns(schema, Set.of()));
     assertTrue(error.getMessage().contains("no properties"));
+  }
+
+  @Test
+  void derivesPrimaryKeyFromXCorePrimaryKeyMarker() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "properties": {
+                "station_id": { "type": "string", "x-core-primaryKey": true },
+                "temperature": { "type": "number" } } }
+            """);
+
+    TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
+
+    assertEquals(List.of("station_id"), derived.primaryKey());
+  }
+
+  @Test
+  void derivesCompositePrimaryKeyInPropertyOrder() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "properties": {
+                "tenant_id": { "type": "string", "x-core-primaryKey": true },
+                "value":     { "type": "number" },
+                "station_id": { "type": "string", "x-core-primaryKey": true } } }
+            """);
+
+    TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
+
+    assertEquals(List.of("tenant_id", "station_id"), derived.primaryKey());
+  }
+
+  @Test
+  void emptyPrimaryKeyWhenNoMarkerPresent() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "properties": {
+                "station_id": { "type": "string" },
+                "temperature": { "type": "number" } } }
+            """);
+
+    TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of());
+
+    assertTrue(derived.primaryKey().isEmpty());
+  }
+
+  @Test
+  void excludedPropertyIsNotPartOfPrimaryKey() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "properties": {
+                "location":   { "type": "string", "x-core-primaryKey": true },
+                "station_id": { "type": "string", "x-core-primaryKey": true } } }
+            """);
+
+    TableColumns derived = DataStructureTableMapper.deriveColumns(schema, Set.of("location"));
+
+    assertEquals(List.of("station_id"), derived.primaryKey());
   }
 }
