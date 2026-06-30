@@ -727,9 +727,9 @@ class GeoServerAdapterTest {
   @Nested
   class RequireSafePath {
 
-    // Inputs are already slash-normalized (requireSafePath runs after the leading/trailing-slash
-    // trim), so any "/" here is an internal separator. Each covers a distinct traversal/injection
-    // class that must be rejected as INVALID_PAYLOAD.
+    // requireSafePath must enforce its contract on its own, independent of the caller's
+    // slash-normalization: every "/"-delimited segment (including leading/trailing empties) must be
+    // a safe single path segment, otherwise the input is rejected as INVALID_PAYLOAD.
     @ParameterizedTest
     @ValueSource(
         strings = {
@@ -740,6 +740,8 @@ class GeoServerAdapterTest {
           "workspaces/./styles", // single-dot in the middle
           "../workspaces/myws", // leading parent traversal
           "workspaces//styles", // empty segment from double slash
+          "workspaces/", // trailing empty segment (split must keep it)
+          "/workspaces", // leading empty segment
           "workspaces/%2e%2e/admin", // url-encoded dot-dot
           "workspaces/%2f..%2fadmin", // url-encoded slash
           "workspaces/..\\..\\admin", // backslash traversal

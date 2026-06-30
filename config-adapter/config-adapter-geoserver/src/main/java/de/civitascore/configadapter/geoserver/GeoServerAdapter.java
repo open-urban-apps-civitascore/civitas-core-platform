@@ -402,7 +402,10 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
    * and backslashes.
    */
   static void requireSafePath(String targetResource) throws FatalAdapterException {
-    for (String segment : targetResource.split("/")) {
+    // split with limit -1 so trailing empty segments (e.g. "workspaces/") are kept and rejected;
+    // the default limit would silently drop them, making the guard depend on the caller having
+    // already trimmed trailing slashes.
+    for (String segment : targetResource.split("/", -1)) {
       if (!SafeNames.COMPILED_PATTERN.matcher(segment).matches()) {
         throw new FatalAdapterException(
             AdapterErrorCode.INVALID_PAYLOAD,
