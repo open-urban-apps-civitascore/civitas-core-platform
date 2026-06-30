@@ -82,9 +82,14 @@ describe('AttributeManager cardinality dropdown', () => {
 describe('AttributeManager primary key', () => {
   beforeEach(() => updateNode.mockClear())
 
-  it('shows the Primary Key checkbox for a single-valued attribute', () => {
-    render(<AttributeManager nodeId={NODE_ID} element={elementWith({ multiplicity: '0..1' })} />)
+  it('shows the Primary Key checkbox for an exactly-one attribute', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWith({ multiplicity: '1' })} />)
     expect(screen.getByText(/Primary Key/)).toBeInTheDocument()
+  })
+
+  it('hides the Primary Key checkbox for an optional (0..1) attribute', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWith({ multiplicity: '0..1' })} />)
+    expect(screen.queryByText(/Primary Key/)).not.toBeInTheDocument()
   })
 
   it('hides the Primary Key checkbox for a multivalued attribute', () => {
@@ -92,14 +97,14 @@ describe('AttributeManager primary key', () => {
     expect(screen.queryByText(/Primary Key/)).not.toBeInTheDocument()
   })
 
-  it('clears isId when an attribute becomes multivalued', () => {
+  it('clears isId when an attribute becomes non-key-eligible', () => {
     render(<AttributeManager nodeId={NODE_ID} element={elementWith({ isId: true })} />)
     const combobox = within(cardinalityField()).getByRole('combobox')
     fireEvent.click(combobox)
-    fireEvent.click(screen.getByRole('option', { name: '0..*' }))
+    fireEvent.click(screen.getByRole('option', { name: '0..1' }))
 
     expect(updateNode).toHaveBeenCalledWith(NODE_ID, {
-      attributes: [expect.objectContaining({ id: 'a1', multiplicity: '0..*', isId: false })],
+      attributes: [expect.objectContaining({ id: 'a1', multiplicity: '0..1', isId: false })],
     })
   })
 })

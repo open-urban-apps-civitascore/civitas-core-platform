@@ -171,9 +171,14 @@ const isAttributeRequired = (attr: UMLAttribute): boolean => {
   return lower >= 1
 }
 
-/** A many multiplicity (`*`, `n..*`, bounded upper > 1) maps to an array, which cannot be a key. */
-export const isMultivaluedMultiplicity = (multiplicity?: string): boolean =>
-  isMany(parseMultiplicity(multiplicity).upper)
+/**
+ * A primary key must be exactly one mandatory value: a many multiplicity is an array, and an
+ * optional one (`0..1`) is nullable — neither can be (part of) a primary key.
+ */
+export const canMultiplicityBePrimaryKey = (multiplicity?: string): boolean => {
+  const { lower, upper } = parseMultiplicity(multiplicity)
+  return lower >= 1 && upper === 1
+}
 
 const hasAttributes = (element: UMLElement): element is UMLClass =>
   'attributes' in element && Array.isArray((element as UMLClass).attributes)

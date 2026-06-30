@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality } from '../constants/umlTypes'
 import type { UMLDiagram } from '../types/diagram'
-import { exportToJsonSchema, isMultivaluedMultiplicity, sanitizeName } from './jsonSchemaExportService'
+import { canMultiplicityBePrimaryKey, exportToJsonSchema, sanitizeName } from './jsonSchemaExportService'
 
 const baseDiagram = (overrides?: Partial<UMLDiagram>): UMLDiagram => ({
   id: 'diagram-1',
@@ -559,17 +559,20 @@ describe('exportToJsonSchema', () => {
   })
 })
 
-describe('isMultivaluedMultiplicity', () => {
-  it('is true for unbounded and bounded many multiplicities', () => {
-    expect(isMultivaluedMultiplicity('*')).toBe(true)
-    expect(isMultivaluedMultiplicity('1..*')).toBe(true)
-    expect(isMultivaluedMultiplicity('2')).toBe(true)
-    expect(isMultivaluedMultiplicity('1..5')).toBe(true)
+describe('canMultiplicityBePrimaryKey', () => {
+  it('is true only for exactly-one (1 or unset)', () => {
+    expect(canMultiplicityBePrimaryKey('1')).toBe(true)
+    expect(canMultiplicityBePrimaryKey(undefined)).toBe(true)
   })
 
-  it('is false for single-valued or unset multiplicities', () => {
-    expect(isMultivaluedMultiplicity(undefined)).toBe(false)
-    expect(isMultivaluedMultiplicity('1')).toBe(false)
-    expect(isMultivaluedMultiplicity('0..1')).toBe(false)
+  it('is false for optional (0..1) — a primary key cannot be nullable', () => {
+    expect(canMultiplicityBePrimaryKey('0..1')).toBe(false)
+  })
+
+  it('is false for many multiplicities (unbounded and bounded)', () => {
+    expect(canMultiplicityBePrimaryKey('*')).toBe(false)
+    expect(canMultiplicityBePrimaryKey('1..*')).toBe(false)
+    expect(canMultiplicityBePrimaryKey('2')).toBe(false)
+    expect(canMultiplicityBePrimaryKey('1..5')).toBe(false)
   })
 })

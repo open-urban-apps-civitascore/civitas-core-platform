@@ -17,7 +17,7 @@ import {
 } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
-import { isMultivaluedMultiplicity } from '../../services/jsonSchemaExportService'
+import { canMultiplicityBePrimaryKey } from '../../services/jsonSchemaExportService'
 import {
   type UMLAttribute,
   type UMLElement,
@@ -228,7 +228,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
                   const multiplicity = cardinalityForStorage(e)
                   updateAttribute(attribute.id, {
                     multiplicity,
-                    ...(isMultivaluedMultiplicity(multiplicity) ? { isId: false } : {}),
+                    ...(canMultiplicityBePrimaryKey(multiplicity) ? {} : { isId: false }),
                   })
                 }}
                 value={cardinalityForDisplay(attribute.multiplicity)}
@@ -292,8 +292,8 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
               </label>
             </div>
 
-            {/* Primary key checkbox — hidden for multivalued attributes, which cannot be a key */}
-            {!isMultivaluedMultiplicity(attribute.multiplicity) && (
+            {/* Primary key checkbox — only a single mandatory value (cardinality 1) can be a key */}
+            {canMultiplicityBePrimaryKey(attribute.multiplicity) && (
               <div className="flex items-center">
                 <input
                   type="checkbox"
