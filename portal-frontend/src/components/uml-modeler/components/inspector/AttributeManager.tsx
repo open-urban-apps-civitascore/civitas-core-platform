@@ -292,7 +292,6 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
               </label>
             </div>
 
-            {/* Primary key checkbox — only a single mandatory value (cardinality 1) can be a key */}
             {canMultiplicityBePrimaryKey(attribute.multiplicity) && (
               <div className="flex items-center">
                 <input
