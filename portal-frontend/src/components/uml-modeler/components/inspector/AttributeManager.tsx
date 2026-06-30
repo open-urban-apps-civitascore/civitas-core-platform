@@ -293,13 +293,13 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
               <input
                 type="checkbox"
                 id={`primary-key-${attribute.id}`}
-                checked={attribute.isId}
+                checked={attribute.isId || false}
                 onChange={e => updateAttribute(attribute.id, { isId: e.target.checked })}
                 className="mr-2"
                 disabled={isReadOnly}
               />
               <label htmlFor={`primary-key-${attribute.id}`} className="text-xs text-gray-600">
-                {`Primary Key {id}`}
+                Primary Key {'{id}'}
               </label>
             </div>
             {isPrimaryKeyMultiplicityInvalid(attribute) && (
