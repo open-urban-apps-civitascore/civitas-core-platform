@@ -78,7 +78,7 @@ import org.slf4j.LoggerFactory;
  * {@code dataStructure} via {@link DataStructureTableMapper}; at least one column or geometry
  * column must result for provisioning (deprovisioning needs only the identifiers). The primary key
  * comes from explicit {@code configuration.primaryKey} when present, otherwise from the {@code
- * x-core-primaryKey} markers in {@code dataStructure} (issue #1784).
+ * x-core-primaryKey} markers in {@code dataStructure}.
  *
  * <p>{@code PROVISION_SINK} creates schema (if given), table, and read role + grants for each sink
  * in one transaction; {@code DEPROVISION_SINK} drops the table and role (schemas are left, as they
@@ -404,10 +404,6 @@ public class PostgisSagaHandler implements SagaCommandHandler {
         DataStructureTableMapper.TableColumns derived =
             DataStructureTableMapper.deriveColumns(dataStructure, geometryNames);
         derivedPrimaryKey = derived.primaryKey();
-        // Columns are derived from the schema only when not configured explicitly; the primary key
-        // is taken from the schema's x-core-primaryKey markers regardless of whether columns were
-        // configured explicitly (filtered to the actual columns and overridden by an explicit
-        // configuration.primaryKey below).
         if (columns.isEmpty()) {
           columns = derived.columns();
           if (!derived.geometryColumns().isEmpty()) {
@@ -417,12 +413,8 @@ public class PostgisSagaHandler implements SagaCommandHandler {
         }
       }
 
-      // An explicit configuration.primaryKey (a non-empty list) is an operator decision and wins
-      // verbatim; otherwise fall back to the schema-derived key. The derived key is only used when
-      // every one of its columns was actually created on this table: explicit configuration.columns
-      // may diverge from the dataStructure properties that carried the markers, and emitting a
-      // partial composite key (e.g. dropping one component) would silently change the table's
-      // uniqueness semantics. If any component is missing the whole derived key is discarded.
+      // A partial composite key would silently change the table's uniqueness semantics, so the
+      // derived key is used only when every one of its columns exists on the table.
       List<String> primaryKey = stringList(config.get("primaryKey"));
       if (primaryKey == null || primaryKey.isEmpty()) {
         Set<String> columnNames = new HashSet<>();

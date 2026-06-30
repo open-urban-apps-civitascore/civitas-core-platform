@@ -36,13 +36,12 @@ import org.slf4j.LoggerFactory;
  * EPSG:25832}), defaulting to 4326 (the GeoServer handler's CRS default). Any other {@code $ref} is
  * a nested object and maps to {@code JSONB}.
  *
- * <p>A non-excluded property carrying {@code x-core-primaryKey: true} (the UML editor's primary-key
- * marker, issue #1784) contributes its name to the table's primary key, in schema property order. A
- * marked property that maps to a non-scalar column (geometry, {@code JSONB} object/array) cannot
- * back a B-tree primary key, so it is logged and skipped rather than producing invalid DDL.
+ * <p>A non-excluded property carrying {@code x-core-primaryKey: true} contributes its name to the
+ * table's primary key, in schema property order. A non-scalar column (geometry, {@code JSONB}
+ * object/array) cannot back a B-tree primary key, so such a marker is skipped.
  *
  * <p>Names in {@code excludedNames} (explicitly configured geometry columns) are skipped so they
- * are not duplicated as derived columns (and are therefore not part of the derived primary key).
+ * are not duplicated as derived columns.
  */
 public final class DataStructureTableMapper {
 
@@ -56,20 +55,11 @@ public final class DataStructureTableMapper {
   /** Extracts the numeric SRID from a CRS identifier such as {@code EPSG:25832}. */
   private static final Pattern EPSG_CODE = Pattern.compile("(?i)EPSG:+\\s*(\\d+)");
 
-  /**
-   * Custom annotation the UML editor sets on a property to mark it as the table's primary key
-   * (issue #1784). JSON Schema has no standard primary-key keyword, so the editor emits this flag
-   * and the sink mapping derives the {@code PRIMARY KEY} from it.
-   */
+  /** JSON Schema has no standard primary-key keyword; this custom marker flags the PK property. */
   private static final String PRIMARY_KEY_MARKER = "x-core-primaryKey";
 
   private DataStructureTableMapper() {}
 
-  /**
-   * Derived non-spatial and geometry columns for one sink table, plus the primary-key column names
-   * collected from {@code x-core-primaryKey} property markers on non-excluded, scalar-column
-   * properties (in schema property order).
-   */
   public record TableColumns(
       List<ColumnConfig> columns,
       List<GeometryColumnConfig> geometryColumns,
