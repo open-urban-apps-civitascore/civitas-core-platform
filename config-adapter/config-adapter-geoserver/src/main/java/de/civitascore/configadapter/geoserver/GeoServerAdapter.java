@@ -19,6 +19,7 @@ import de.civitascore.configadapter.model.AdapterOperation;
 import de.civitascore.configadapter.model.ConfigEvent;
 import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.Operation;
+import de.civitascore.configadapter.model.dataset.SafeNames;
 import de.civitascore.configadapter.model.geoserver.DataStoreConfig;
 import de.civitascore.configadapter.model.geoserver.GeoServerConfigValue;
 import jakarta.ws.rs.ProcessingException;
@@ -189,6 +190,11 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
 
     // Normalize leading/trailing slashes once so REST path building and parsing are consistent.
     targetResource = targetResource.replaceAll("^/+|/+$", "");
+
+    // Reject path-traversal and other unsafe segments before the value is concatenated into the
+    // GeoServer REST URI (the JAX-RS client resolves ".." segments, so this would otherwise allow
+    // escaping /rest/). Same single-segment guarantee that GeoServerSagaHandler enforces.
+    requireSafePath(targetResource);
 
     ResourceType resourceType = detectResourceType(targetResource);
     if (resourceType == ResourceType.UNKNOWN) {
@@ -386,6 +392,25 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
       }
     }
     return null;
+  }
+
+  /**
+   * Rejects a {@code targetResource} whose path segments are not safe as single REST URL segments,
+   * since the value is concatenated into the GeoServer REST URI. Each {@code /}-delimited segment
+   * must match {@link SafeNames#COMPILED_PATTERN} ({@code A-Z}, {@code a-z}, {@code 0-9}, {@code
+   * _}, {@code -}), which rejects {@code ..}/{@code .} traversal, empty segments, percent-encoding
+   * and backslashes.
+   */
+  static void requireSafePath(String targetResource) throws FatalAdapterException {
+    for (String segment : targetResource.split("/")) {
+      if (!SafeNames.COMPILED_PATTERN.matcher(segment).matches()) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.INVALID_PAYLOAD,
+            "targetResource contains an unsafe path segment (allowed per segment: A-Z, a-z, 0-9, _,"
+                + " -): "
+                + targetResource);
+      }
+    }
   }
 
   static ResourceType detectResourceType(String targetResource) {
