@@ -33,14 +33,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const isSaving = createModel.isPending
   const t = useTranslations('umlModeler')
 
+  const hasBlockingInvalidPrimaryKeys = useCallback(() => {
+    const invalidPrimaryKeys = findInvalidPrimaryKeyAttributeNames(diagram)
+    if (invalidPrimaryKeys.length === 0) return false
+    toast.error(t('primaryKey.arrayInvalidToast', { attributes: invalidPrimaryKeys.join(', ') }))
+    return true
+  }, [diagram, t])
+
   const handleSave = useCallback(() => {
     if (isSaving) return
-
-    const invalidPrimaryKeys = findInvalidPrimaryKeyAttributeNames(diagram)
-    if (invalidPrimaryKeys.length > 0) {
-      toast.error(t('primaryKey.arrayInvalidToast', { attributes: invalidPrimaryKeys.join(', ') }))
-      return
-    }
+    if (hasBlockingInvalidPrimaryKeys()) return
 
     const payload = {
       ...buildUMLModelPayload(diagram),
@@ -56,14 +58,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         toast.error(t('save.error'))
       },
     })
-  }, [diagram, isSaving, onSave, createModel, sessionName, t])
+  }, [diagram, isSaving, onSave, createModel, sessionName, t, hasBlockingInvalidPrimaryKeys])
 
   const handleExport = useCallback(() => {
-    const invalidPrimaryKeys = findInvalidPrimaryKeyAttributeNames(diagram)
-    if (invalidPrimaryKeys.length > 0) {
-      toast.error(t('primaryKey.arrayInvalidToast', { attributes: invalidPrimaryKeys.join(', ') }))
-      return
-    }
+    if (hasBlockingInvalidPrimaryKeys()) return
 
     try {
       downloadJsonSchema(diagram)
@@ -71,7 +69,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     } catch {
       toast.error(t('export.error'))
     }
-  }, [diagram, t])
+  }, [diagram, t, hasBlockingInvalidPrimaryKeys])
 
   return (
     <div className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">

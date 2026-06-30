@@ -586,6 +586,27 @@ describe('primary-key multiplicity validation', () => {
         multiplicity: '1..*',
       }),
     ).toBe(true)
+    // Bounded-many multiplicities (upper bound > 1) are arrays too.
+    expect(
+      isPrimaryKeyMultiplicityInvalid({
+        id: 'a',
+        name: 'ids',
+        type: 'String',
+        visibility: 'public',
+        isId: true,
+        multiplicity: '2',
+      }),
+    ).toBe(true)
+    expect(
+      isPrimaryKeyMultiplicityInvalid({
+        id: 'a',
+        name: 'ids',
+        type: 'String',
+        visibility: 'public',
+        isId: true,
+        multiplicity: '1..5',
+      }),
+    ).toBe(true)
   })
 
   it('does not flag a single-valued id attribute or a non-id array attribute', () => {
