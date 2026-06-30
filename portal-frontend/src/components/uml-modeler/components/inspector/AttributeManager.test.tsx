@@ -84,12 +84,12 @@ describe('AttributeManager primary key', () => {
 
   it('shows the Primary Key checkbox for a single-valued attribute', () => {
     render(<AttributeManager nodeId={NODE_ID} element={elementWith({ multiplicity: '0..1' })} />)
-    expect(screen.getByText('Primary Key')).toBeInTheDocument()
+    expect(screen.getByText(/Primary Key/)).toBeInTheDocument()
   })
 
   it('hides the Primary Key checkbox for a multivalued attribute', () => {
     render(<AttributeManager nodeId={NODE_ID} element={elementWith({ multiplicity: '1..*' })} />)
-    expect(screen.queryByText('Primary Key')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Primary Key/)).not.toBeInTheDocument()
   })
 
   it('clears isId when an attribute becomes multivalued', () => {

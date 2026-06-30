@@ -304,7 +304,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
                   disabled={isReadOnly}
                 />
                 <label htmlFor={`primary-key-${attribute.id}`} className="text-xs text-gray-600">
-                  Primary Key
+                  Primary Key {'{id}'}
                 </label>
               </div>
             )}
