@@ -133,11 +133,8 @@ const typeToSchema = (type: UMLType, classDefKeyById: Map<string, string>, crs?:
  * multiplicity (arrays) and default values.
  * For geometry attributes, the CRS string from `attr.meta.gisInfo.crs` is
  * forwarded to `typeToSchema` and emitted as a sibling `crs` property.
- * A single-valued primary-key attribute (`attr.isId`) is marked with the
- * custom `x-core-primaryKey: true` annotation so the flag survives in the
- * schema (consumers such as the PostGIS config-adapter derive the table's
- * PRIMARY KEY from it; plain JSON Schema validators ignore it). An array-valued
- * attribute cannot back a primary key, so the marker is not emitted for it.
+ * `x-core-primaryKey` marks the primary key, except on array attributes,
+ * which cannot back one.
  */
 const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, string>): JsonSchemaObject => {
   const crs = attr.meta?.gisInfo?.crs
@@ -174,21 +171,10 @@ const isAttributeRequired = (attr: UMLAttribute): boolean => {
   return lower >= 1
 }
 
-/**
- * An array-valued attribute cannot be a primary key: it maps to a JSONB column
- * downstream, which cannot back a primary key. A primary-key attribute with a
- * many multiplicity (`*`, `n..*`) is therefore invalid and must be surfaced to
- * the user instead of being silently dropped on export.
- */
+/** A many multiplicity maps to a JSONB array column, which cannot back a primary key. */
 export const isPrimaryKeyMultiplicityInvalid = (attr: UMLAttribute): boolean =>
   !!attr.isId && isMany(parseMultiplicity(attr.multiplicity).upper)
 
-/**
- * Names of attributes across the diagram that are marked as primary key but
- * have a many multiplicity, i.e. an invalid primary-key/array combination.
- * Empty when the diagram is valid. Used to block save/export and to flag the
- * offending attributes in the inspector.
- */
 export const findInvalidPrimaryKeyAttributeNames = (diagram: UMLDiagram): string[] => {
   const invalid: string[] = []
   for (const node of diagram.nodes) {
