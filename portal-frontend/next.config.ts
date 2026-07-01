@@ -6,7 +6,9 @@ const nextConfig: NextConfig = {
     // We run ESLint in CI, so we don't need to run it during production builds.
     ignoreDuringBuilds: true,
   },
-  // Security headers are now handled by middleware for proper per-request nonce generation
+  // Security headers (CSP etc.) are set in middleware for proper per-request nonce generation.
+  // Cache-Control: no-store is emitted automatically by Next.js for dynamic routes in production,
+  // so no headers() entry is needed here.
 
   // pino uses thread-stream to spawn a worker with an absolute path resolved at build time.
   // Bundling pino/pino-pretty would embed the build-time path (e.g., /ROOT/node_modules/...)
