@@ -102,6 +102,7 @@ const mockHasPermission = (permissions: PermissionName[]) => {
     hasPermission: (permission: string) => permissions.includes(permission as PermissionName),
     hasAnyPermission: (...perms: string[]) => perms.some(p => permissions.includes(p as PermissionName)),
     hasScopedPermission: () => false,
+    hasPermissionInScope: () => false,
   })
 }
 
@@ -434,6 +435,12 @@ describe('RoleDetails', () => {
     beforeEach(() => {
       mockRoleResponse = { data: { data: mockRole }, isFetching: false, refetch: vi.fn(), error: null }
       mockSubTabValue = 'basicInformation'
+      vi.mocked(useGetAssignments).mockReturnValue({
+        data: null,
+        refetch: vi.fn(),
+        isFetching: false,
+        error: null,
+      } as never)
     })
 
     it('shows delete button in edit mode when user has ROLE_DELETE and ROLE_UPDATE', () => {
@@ -442,11 +449,25 @@ describe('RoleDetails', () => {
       expect(screen.getByRole('button', { name: 'securityArea.deleteButton' })).toBeInTheDocument()
     })
 
-    it('opens delete confirmation modal when delete button is clicked', async () => {
+    it('opens delete confirmation modal when delete button is clicked and role has no assignments', async () => {
       render(<RoleDetails roleId="role-1" />)
       fireEvent.click(screen.getByTestId('editButton'))
       fireEvent.click(screen.getByRole('button', { name: 'securityArea.deleteButton' }))
       await waitFor(() => expect(screen.getByTestId('exitWarningModal')).toBeInTheDocument())
+    })
+
+    it('opens delete error modal immediately when delete button is clicked and role has assignments', async () => {
+      vi.mocked(useGetAssignments).mockReturnValue({
+        data: { data: [{ id: 'a-1', group: { id: 'g-1' } }] },
+        refetch: vi.fn(),
+        isFetching: false,
+        error: null,
+      } as never)
+      render(<RoleDetails roleId="role-1" />)
+      fireEvent.click(screen.getByTestId('editButton'))
+      fireEvent.click(screen.getByRole('button', { name: 'securityArea.deleteButton' }))
+      await waitFor(() => expect(screen.getByTestId('infoModal')).toBeInTheDocument())
+      expect(mockDeleteMutate).not.toHaveBeenCalled()
     })
 
     it('cancels delete when Cancel is clicked in the confirmation modal', async () => {
@@ -502,7 +523,7 @@ describe('RoleDetails', () => {
       })
     })
 
-    it('opens delete error dialog when delete fails with a generic error', async () => {
+    it('shows error toast when delete fails with a generic error', async () => {
       mockDeleteMutate.mockImplementation((_id: string, { onError }: { onError: (e: unknown) => void }) =>
         onError(makeAxiosError(500)),
       )
@@ -512,7 +533,7 @@ describe('RoleDetails', () => {
       await waitFor(() => expect(screen.getByTestId('exitWarningModal')).toBeInTheDocument())
       fireEvent.click(screen.getByRole('button', { name: 'deleteConfirmModal.confirm' }))
       await waitFor(() => {
-        expect(screen.getByText('deleteErrorModal.title')).toBeInTheDocument()
+        expect(toast.error).toHaveBeenCalledWith('errors.deleteError')
       })
     })
   })

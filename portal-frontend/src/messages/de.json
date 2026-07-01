@@ -801,10 +801,9 @@
         "description": "Diese Aktion kann nicht rückgängig gemacht werden.",
         "confirm": "Löschen"
       },
-      "deleteErrorModal": {
+      "infoModal": {
         "title": "Rolle kann nicht gelöscht werden",
-        "description": "Zuerst müssen alle Zuordnungen zu Gruppen und Geltungsbereichen entfernt werden.",
-        "close": "Schliessen"
+        "description": "Zuerst müssen alle Zuordnungen zu Gruppen und Geltungsbereichen entfernt werden."
       }
     },
     "permissionsTab": {
@@ -879,7 +878,8 @@
     },
     "errors": {
       "createError": "Beim Anlegen der Rolle ist ein Fehler aufgetreten",
-      "updateError": "Beim Aktualisieren der Rolle ist ein Fehler aufgetreten"
+      "updateError": "Beim Aktualisieren der Rolle ist ein Fehler aufgetreten",
+      "deleteError": "Beim Löschen der Rolle ist ein Fehler aufgetreten"
     },
     "success": {
       "assignmentSuccess": "Die Zuweisungen wurden erfolgreich aktualisiert"
