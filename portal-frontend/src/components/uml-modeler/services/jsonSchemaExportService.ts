@@ -25,7 +25,15 @@
  */
 
 import type { UMLDiagram } from '../types/diagram'
-import type { UMLAttribute, UMLClass, UMLElement, UMLEnumeration, UMLRelationship, UMLType } from '../types/uml'
+import type { UMLAttribute, UMLElement, UMLEnumeration, UMLRelationship, UMLType } from '../types/uml'
+import { hasAttributes } from '../types/uml'
+import {
+  classifyStructuralEdge,
+  collectContainedIds,
+  collectParentIds,
+  parseMultiplicity,
+  selectRootElement,
+} from './umlContainment'
 
 const JSON_SCHEMA_DIALECT = 'https://json-schema.org/draft/2020-12/schema'
 const BASE_MODEL_URI = 'http://civitas.org/model'
@@ -65,6 +73,9 @@ const GEOMETRY_TYPES = new Set([
  */
 const GEOJSON_REF_BASE = 'https://geojson.org/schema'
 
+/** Lower-cases the first character, leaving the rest untouched. */
+const lowerFirst = (value: string): string => value.charAt(0).toLowerCase() + value.slice(1)
+
 /**
  * Sanitizes a name for use in URIs and `$defs` keys.
  */
@@ -75,31 +86,6 @@ export const sanitizeName = (name: string): string => {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
 }
-
-/**
- * Parses a multiplicity string into lower/upper numeric bounds.
- * `upper === Infinity` represents an unbounded (`*`) upper bound.
- */
-const parseMultiplicity = (multiplicity?: string): { lower: number; upper: number } => {
-  if (!multiplicity) return { lower: 1, upper: 1 }
-
-  const trimmed = multiplicity.trim()
-  if (trimmed === '*') return { lower: 0, upper: Infinity }
-
-  const rangeMatch = trimmed.match(/^(\d+|\*)\.\.(\d+|\*)$/)
-  if (rangeMatch) {
-    const lower = rangeMatch[1] === '*' ? 0 : Number(rangeMatch[1])
-    const upper = rangeMatch[2] === '*' ? Infinity : Number(rangeMatch[2])
-    return { lower, upper }
-  }
-
-  const single = Number(trimmed)
-  if (!Number.isNaN(single)) return { lower: single, upper: single }
-
-  return { lower: 1, upper: 1 }
-}
-
-const isMany = (upper: number): boolean => upper === Infinity || upper > 1
 
 /**
  * Converts a single UML type into a JSON Schema fragment.
@@ -140,7 +126,7 @@ const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, stri
   const { lower, upper } = parseMultiplicity(attr.multiplicity)
 
   let schema: JsonSchemaObject
-  if (isMany(upper)) {
+  if (upper > 1) {
     schema = { type: 'array', items: baseSchema }
     if (lower >= 1) schema.minItems = lower
     if (upper !== Infinity) schema.maxItems = upper
@@ -163,9 +149,6 @@ const isAttributeRequired = (attr: UMLAttribute): boolean => {
   const { lower } = parseMultiplicity(attr.multiplicity)
   return lower >= 1
 }
-
-const hasAttributes = (element: UMLElement): element is UMLClass =>
-  'attributes' in element && Array.isArray((element as UMLClass).attributes)
 
 /**
  * Builds the object schema (properties/required) for a class-like element,
@@ -195,26 +178,26 @@ const buildClassSchema = (
     }
   }
 
-  // The composition/aggregation diamond (= the container) is drawn at the edge target, so the
-  // target embeds the source. Association has no diamond and keeps its drawn direction.
-  for (const edge of diagram.edges) {
-    const rel = edge.data.relationship
-    if (!['association', 'aggregation', 'composition'].includes(rel.type)) continue
+  for (const edge of diagram.edges ?? []) {
+    const rel = edge.data?.relationship
+    if (!rel) continue
+    const containment = classifyStructuralEdge(rel)
+    if (!containment || containment.containerId !== element.id) continue
 
-    const isContainerAtTarget = rel.type === 'aggregation' || rel.type === 'composition'
-    if (isContainerAtTarget ? rel.target !== element.id : rel.source !== element.id) continue
-
-    const partId = isContainerAtTarget ? rel.source : rel.target
-    const partDefKey = classDefKeyById.get(partId)
+    const partDefKey = classDefKeyById.get(containment.partId)
     if (!partDefKey) continue
 
-    const role = isContainerAtTarget ? rel.sourceRole : rel.targetRole
-    const multiplicity = isContainerAtTarget ? rel.sourceMultiplicity : rel.targetMultiplicity
-    const propName = role || sanitizeName(partDefKey) || partDefKey
-    const { lower, upper } = parseMultiplicity(multiplicity)
+    const partElement = (diagram.nodes ?? []).find(node => node.data?.element?.id === containment.partId)?.data?.element
+    const propName =
+      containment.role ||
+      rel.name ||
+      (partElement ? lowerFirst(partElement.name) : '') ||
+      sanitizeName(partDefKey) ||
+      partDefKey
+    const { lower, upper } = parseMultiplicity(containment.multiplicity)
     const ref: JsonSchemaObject = { $ref: `#/$defs/${partDefKey}` }
 
-    if (isMany(upper)) {
+    if (upper > 1) {
       const arraySchema: JsonSchemaObject = { type: 'array', items: ref }
       if (lower >= 1) arraySchema.minItems = lower
       properties[propName] = arraySchema
@@ -233,13 +216,9 @@ const buildClassSchema = (
   if (element.documentation) ownSchema.description = element.documentation
   if (required.length > 0) ownSchema.required = required
 
-  // Inheritance: subclass uses allOf [parent $ref, own schema]
   const parentRefs: JsonSchemaObject[] = []
-  for (const edge of diagram.edges) {
-    const rel = edge.data.relationship
-    if (rel.source !== element.id) continue
-    if (rel.type !== 'inheritance' && rel.type !== 'realization') continue
-    const parentDefKey = classDefKeyById.get(rel.target)
+  for (const parentId of collectParentIds(diagram, element.id)) {
+    const parentDefKey = classDefKeyById.get(parentId)
     if (parentDefKey) parentRefs.push({ $ref: `#/$defs/${parentDefKey}` })
   }
 
@@ -251,38 +230,10 @@ const buildClassSchema = (
 }
 
 /**
- * Selects the single root element of the diagram's class hierarchy: a non-enumeration class not
- * embedded by another. Among candidates the class whose name matches the diagram name is preferred,
- * otherwise the first. Falls back to the first element when no candidate exists (e.g. a fully
- * circular hierarchy or an enumeration-only diagram).
- */
-const selectRootElement = (diagram: UMLDiagram, elements: UMLElement[]): UMLElement | undefined => {
-  if (elements.length === 0) return undefined
-
-  // composition/aggregation embed the source (diamond/container sits at the target); inheritance/
-  // realization embed the target (parent).
-  const containedIds = new Set<string>()
-  for (const edge of diagram.edges) {
-    const rel = edge.data.relationship
-    if (rel.type === 'composition' || rel.type === 'aggregation') {
-      containedIds.add(rel.source)
-    } else if (rel.type === 'inheritance' || rel.type === 'realization') {
-      containedIds.add(rel.target)
-    }
-  }
-
-  const candidates = elements.filter(element => element.type !== 'enumeration' && !containedIds.has(element.id))
-  const pool = candidates.length > 0 ? candidates : elements.filter(e => e.type !== 'enumeration')
-  if (pool.length === 0) return elements[0]
-
-  return pool.find(element => element.name === diagram.name) ?? pool[0]
-}
-
-/**
  * Main export function - converts a UMLDiagram into a JSON Schema document.
  */
 export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): JsonSchemaObject => {
-  const elements = diagram.nodes.map(node => node.data.element)
+  const elements = (diagram.nodes ?? []).map(node => node.data?.element).filter((e): e is UMLElement => !!e)
 
   // Map every class element id to a stable `$defs` key.
   const classDefKeyById = new Map<string, string>()
@@ -302,7 +253,7 @@ export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): Json
   const sanitizedName = sanitizeName(diagram.name) || 'untitled'
   const id = modelUri || `${BASE_MODEL_URI}/${sanitizedName}`
 
-  const rootElement = selectRootElement(diagram, elements)
+  const rootElement = selectRootElement(elements, collectContainedIds(diagram), diagram.name)
 
   const schema: JsonSchemaObject = {
     $id: id,
