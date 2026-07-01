@@ -191,6 +191,8 @@ describe('exportToJsonSchema', () => {
 
     expect(properties.ids).toEqual({ type: 'array', items: { type: 'string' } })
     expect(properties.ids).not.toHaveProperty('x-core-primaryKey')
+    // A many-valued isId cannot be a primary key, so it must not force required either.
+    expect(schema.required ?? []).not.toContain('ids')
   })
 
   it('marks every member of a composite primary key', () => {

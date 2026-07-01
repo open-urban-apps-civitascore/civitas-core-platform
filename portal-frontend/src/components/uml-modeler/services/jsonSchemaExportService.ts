@@ -166,8 +166,8 @@ const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, stri
  * Determines whether an attribute is required.
  */
 const isAttributeRequired = (attr: UMLAttribute): boolean => {
-  if (attr.isId) return true
-  const { lower } = parseMultiplicity(attr.multiplicity)
+  const { lower, upper } = parseMultiplicity(attr.multiplicity)
+  if (attr.isId && !isMany(upper)) return true
   return lower >= 1
 }
 
