@@ -16,12 +16,12 @@
  * - Associations/aggregation/composition map to a `$ref` property (an array
  *   `$ref` for many multiplicities).
  *
- * Root selection: the diagram is always exported as a single JSON Schema
- * document (one root class plus `$defs`). The root is the class that is not
- * contained by any other class via composition, aggregation, inheritance, or
- * realization; every other class is emitted under `$defs` and linked via
- * `$ref`. When ambiguous, the class matching the diagram name is preferred,
- * falling back to the first class node.
+ * Root: the document root is the data structure itself, titled after the
+ * diagram. Every class is emitted under `$defs`; the root class (the one not
+ * contained by any other via composition, aggregation, inheritance, or
+ * realization) is referenced from the document root via a `$ref` property, so
+ * the structure's name — not an arbitrary class — is always the top level. An
+ * enumeration-only diagram keeps its `enum` at the document root instead.
  */
 
 import type { UMLDiagram } from '../types/diagram'
@@ -290,32 +290,48 @@ export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): Json
     return schema
   }
 
-  // Merge the root class schema into the document root. The root class keeps its
-  // own title rather than being overwritten by the diagram name.
+  if (rootElement.type !== 'enumeration') {
+    schema.properties = {
+      [sanitizeName(rootElement.name) || (classDefKeyById.get(rootElement.id) as string)]: {
+        $ref: `#/$defs/${classDefKeyById.get(rootElement.id)}`,
+      },
+    }
+    schema.$defs = buildDefs(elements, diagram, classDefKeyById)
+    return schema
+  }
+
   const rootSchema = buildClassSchema(rootElement, diagram, classDefKeyById)
   Object.assign(schema, rootSchema)
-  // buildClassSchema does not emit `type` for enumerations, so the
-  // pre-initialized `type: 'object'` must be removed explicitly.
-  if (rootElement.type === 'enumeration') {
-    delete schema.type
-  }
+  // buildClassSchema omits `type` for enumerations, so drop the pre-initialized `type: 'object'`.
+  delete schema.type
   schema.$id = id
   schema.$schema = JSON_SCHEMA_DIALECT
   schema.title = rootElement.name || diagram.name
 
-  // Emit every non-root element into $defs.
-  const defs: JsonSchemaObject = {}
-  for (const element of elements) {
-    if (element.id === rootElement.id) continue
-    const defKey = classDefKeyById.get(element.id)
-    if (!defKey) continue
-    defs[defKey] = buildClassSchema(element, diagram, classDefKeyById)
-  }
+  const defs = buildDefs(
+    elements.filter(e => e.id !== rootElement.id),
+    diagram,
+    classDefKeyById,
+  )
   if (Object.keys(defs).length > 0) {
     schema.$defs = defs
   }
 
   return schema
+}
+
+const buildDefs = (
+  elements: UMLElement[],
+  diagram: UMLDiagram,
+  classDefKeyById: Map<string, string>,
+): JsonSchemaObject => {
+  const defs: JsonSchemaObject = {}
+  for (const element of elements) {
+    const defKey = classDefKeyById.get(element.id)
+    if (!defKey) continue
+    defs[defKey] = buildClassSchema(element, diagram, classDefKeyById)
+  }
+  return defs
 }
 
 /**
