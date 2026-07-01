@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.postgis;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -365,6 +366,182 @@ class PostgisSagaHandlerTest {
               .orElseThrow();
       assertTrue(createTable.contains("\"station_id\" TEXT NOT NULL"));
       assertTrue(createTable.contains("\"temperature\" TEXT NOT NULL"));
+    }
+
+    @Test
+    void provisionSinkDerivesPrimaryKeyFromXCorePrimaryKeyMarker() throws Exception {
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of("tableName", "sensor_observations"),
+                      "dataStructure",
+                      Map.of(
+                          "properties",
+                          Map.of(
+                              "station_id", Map.of("type", "string", "x-core-primaryKey", true),
+                              "temperature", Map.of("type", "string"))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      String createTable =
+          sql.getAllValues().stream()
+              .filter(s -> s.startsWith("CREATE TABLE"))
+              .findFirst()
+              .orElseThrow();
+      assertTrue(createTable.contains("PRIMARY KEY (\"station_id\")"));
+    }
+
+    @Test
+    void explicitConfigurationPrimaryKeyOverridesSchemaMarker() throws Exception {
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of(
+                          "tableName", "sensor_observations", "primaryKey", List.of("temperature")),
+                      "dataStructure",
+                      Map.of(
+                          "properties",
+                          Map.of(
+                              "station_id", Map.of("type", "string", "x-core-primaryKey", true),
+                              "temperature", Map.of("type", "string"))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      String createTable =
+          sql.getAllValues().stream()
+              .filter(s -> s.startsWith("CREATE TABLE"))
+              .findFirst()
+              .orElseThrow();
+      assertTrue(createTable.contains("PRIMARY KEY (\"temperature\")"));
+    }
+
+    @Test
+    void derivedPrimaryKeyAbsentFromExplicitColumnsIsDropped() throws Exception {
+      // Explicit configuration.columns are used as-is; the schema still marks a property that is
+      // not among those columns. The derived PK must be filtered out so CREATE TABLE stays valid.
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of(
+                          "tableName",
+                          "sensor_observations",
+                          "columns",
+                          List.of(Map.of("name", "temperature", "type", "TEXT"))),
+                      "dataStructure",
+                      Map.of(
+                          "properties",
+                          Map.of(
+                              "station_id", Map.of("type", "string", "x-core-primaryKey", true),
+                              "temperature", Map.of("type", "string"))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      String createTable =
+          sql.getAllValues().stream()
+              .filter(s -> s.startsWith("CREATE TABLE"))
+              .findFirst()
+              .orElseThrow();
+      assertTrue(createTable.contains("\"temperature\" TEXT"));
+      assertFalse(
+          createTable.contains("PRIMARY KEY"), "expected no primary key clause: " + createTable);
+    }
+
+    @Test
+    void partialCompositeDerivedPrimaryKeyIsDiscardedEntirely() throws Exception {
+      // A composite schema key (tenant_id + station_id) where explicit columns only contain one
+      // component must NOT collapse to PRIMARY KEY (tenant_id): that would tighten uniqueness.
+      // The whole derived key is discarded instead.
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of(
+                          "tableName",
+                          "sensor_observations",
+                          "columns",
+                          List.of(Map.of("name", "tenant_id", "type", "TEXT"))),
+                      "dataStructure",
+                      Map.of(
+                          "properties",
+                          Map.of(
+                              "tenant_id", Map.of("type", "string", "x-core-primaryKey", true),
+                              "station_id",
+                                  Map.of("type", "string", "x-core-primaryKey", true))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      String createTable =
+          sql.getAllValues().stream()
+              .filter(s -> s.startsWith("CREATE TABLE"))
+              .findFirst()
+              .orElseThrow();
+      assertFalse(
+          createTable.contains("PRIMARY KEY"),
+          "partial composite key must be discarded entirely: " + createTable);
+    }
+
+    @Test
+    void emptyExplicitPrimaryKeyFallsBackToSchemaMarker() throws Exception {
+      // An explicit but empty configuration.primaryKey is treated as absent, so the schema-derived
+      // marker still applies (the override contract is specifically a *non-empty* list).
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of("tableName", "sensor_observations", "primaryKey", List.of()),
+                      "dataStructure",
+                      Map.of(
+                          "properties",
+                          Map.of(
+                              "station_id", Map.of("type", "string", "x-core-primaryKey", true),
+                              "temperature", Map.of("type", "string"))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      String createTable =
+          sql.getAllValues().stream()
+              .filter(s -> s.startsWith("CREATE TABLE"))
+              .findFirst()
+              .orElseThrow();
+      assertTrue(createTable.contains("PRIMARY KEY (\"station_id\")"));
     }
 
     @Test

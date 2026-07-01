@@ -23,6 +23,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.owasp.encoder.Encode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Derives the table columns for a PostGIS sink from the JSON Schema the portal-backend stores on
@@ -35,6 +38,10 @@ import java.util.regex.Pattern;
  * EPSG:25832}), defaulting to 4326 (the GeoServer handler's CRS default). Any other {@code $ref} is
  * a nested object and maps to {@code JSONB}.
  *
+ * <p>A non-excluded property carrying {@code x-core-primaryKey: true} contributes its name to the
+ * table's primary key, in schema property order. A non-scalar column (geometry, {@code JSONB}
+ * object/array) cannot back a B-tree primary key, so such a marker is skipped.
+ *
  * <p>Names in {@code excludedNames} (explicitly configured geometry columns) are skipped so they
  * are not duplicated as derived columns.
  *
@@ -46,6 +53,8 @@ import java.util.regex.Pattern;
  */
 public final class DataStructureTableMapper {
 
+  private static final Logger logger = LoggerFactory.getLogger(DataStructureTableMapper.class);
+
   private static final int DEFAULT_SRID = 4326;
 
   /** Geometry properties reference a GeoJSON schema under this host; the type is the file name. */
@@ -54,13 +63,17 @@ public final class DataStructureTableMapper {
   /** Extracts the numeric SRID from a CRS identifier such as {@code EPSG:25832}. */
   private static final Pattern EPSG_CODE = Pattern.compile("(?i)EPSG:+\\s*(\\d+)");
 
+  /** JSON Schema has no standard primary-key keyword; this custom marker flags the PK property. */
+  private static final String PRIMARY_KEY_MARKER = "x-core-primaryKey";
+
   private static final String[] LOCAL_DEF_PREFIXES = {"#/$defs/", "#/definitions/"};
 
   private DataStructureTableMapper() {}
 
-  /** Derived non-spatial and geometry columns for one sink table. */
   public record TableColumns(
-      List<ColumnConfig> columns, List<GeometryColumnConfig> geometryColumns) {}
+      List<ColumnConfig> columns,
+      List<GeometryColumnConfig> geometryColumns,
+      List<String> primaryKey) {}
 
   /**
    * @throws IllegalArgumentException if the schema contains no usable definition with properties
@@ -76,6 +89,7 @@ public final class DataStructureTableMapper {
 
     List<ColumnConfig> columns = new ArrayList<>();
     List<GeometryColumnConfig> geometryColumns = new ArrayList<>();
+    List<String> primaryKey = new ArrayList<>();
     for (Map.Entry<String, Object> property : properties.entrySet()) {
       String name = property.getKey();
       if (excludedNames.contains(name)) {
@@ -83,9 +97,16 @@ public final class DataStructureTableMapper {
       }
       Map<String, Object> spec = mapValue(property.getValue());
       Boolean nullable = required.contains(name) ? false : null;
+      boolean markedPrimaryKey = Boolean.TRUE.equals(spec.get(PRIMARY_KEY_MARKER));
 
       GeometryType geometryType = geometryType(stringValue(spec.get("$ref")));
       if (geometryType != null) {
+        if (markedPrimaryKey) {
+          logger.warn(
+              "Ignoring x-core-primaryKey on property '{}': a geometry column cannot back a"
+                  + " B-tree primary key",
+              Encode.forJava(name));
+        }
         Integer srid = sridFromCrs(spec.get("crs"));
         geometryColumns.add(
             new GeometryColumnConfig(
@@ -93,9 +114,20 @@ public final class DataStructureTableMapper {
         continue;
       }
       ColumnType type = columnType(spec);
+      if (markedPrimaryKey) {
+        if (type == ColumnType.JSONB) {
+          logger.warn(
+              "Ignoring x-core-primaryKey on property '{}': a {} column cannot back a B-tree"
+                  + " primary key",
+              Encode.forJava(name),
+              type);
+        } else {
+          primaryKey.add(name);
+        }
+      }
       columns.add(new ColumnConfig(name, type, null, null, null, nullable));
     }
-    return new TableColumns(columns, geometryColumns);
+    return new TableColumns(columns, geometryColumns, primaryKey);
   }
 
   /** Merged {@code properties} (column name → spec) and unioned {@code required} for one table. */
