@@ -137,6 +137,60 @@ class DataStructureSchemaTest {
   }
 
   @Test
+  void wrapperRootResolvesToTheReferencedClass() {
+    var resolved =
+        DataStructureSchema.resolveDefinition(
+            json(
+                """
+                { "title": "MyStructure",
+                  "type": "object",
+                  "properties": { "trafficsensor": { "$ref": "#/$defs/TrafficSensor" } },
+                  "$defs": {
+                    "TrafficSensor": {
+                      "properties": {
+                        "stationId":   { "type": "string" },
+                        "temperature": { "type": "number" } },
+                      "required": ["stationId"] } } }
+                """));
+    assertEquals(List.of("stationId", "temperature"), List.copyOf(resolved.properties().keySet()));
+    assertEquals(List.of("stationId"), List.copyOf(resolved.required()));
+  }
+
+  @Test
+  void wrapperRootResolvesInheritanceOfTheReferencedClass() {
+    var resolved =
+        DataStructureSchema.resolveDefinition(
+            json(
+                """
+                { "title": "MyStructure",
+                  "properties": { "dog": { "$ref": "#/$defs/Dog" } },
+                  "$defs": {
+                    "Animal": { "properties": { "id": { "type": "string" } } },
+                    "Dog": {
+                      "allOf": [ { "$ref": "#/$defs/Animal" } ],
+                      "properties": { "breed": { "type": "string" } } } } }
+                """));
+    assertEquals(List.of("id", "breed"), List.copyOf(resolved.properties().keySet()));
+  }
+
+  @Test
+  void wrapperMarkerResolvesThroughToTheReferencedClass() {
+    assertEquals(
+        List.of("stationId"),
+        DataStructureSchema.primaryKeyColumns(
+            json(
+                """
+                { "title": "MyStructure",
+                  "properties": { "trafficsensor": { "$ref": "#/$defs/TrafficSensor" } },
+                  "$defs": {
+                    "TrafficSensor": {
+                      "properties": {
+                        "stationId":   { "type": "string", "x-core-primaryKey": true },
+                        "temperature": { "type": "number" } } } } }
+                """)));
+  }
+
+  @Test
   void markerOnObjectOrArrayPropertyIsDropped() {
     // object/array properties map to JSONB, which likewise cannot back a primary key
     assertTrue(
@@ -164,5 +218,29 @@ class DataStructureSchemaTest {
                     { "properties": { "station_id": { "type": "string" } } } ] }
                 """));
     assertTrue(resolved.properties().containsKey("station_id"));
+  }
+
+  @Test
+  void singleRefPropertyWithSiblingsIsNotAWrapper() {
+    // A single property that carries more than a bare $ref (here a crs) is a real column, not the
+    // wrapper indirection, so it is not resolved through to the referenced class.
+    var resolved =
+        DataStructureSchema.resolveDefinition(
+            json(
+                """
+                { "title": "Sensor",
+                  "properties": {
+                    "location": { "$ref": "#/$defs/Point", "crs": "EPSG:25832" } },
+                  "$defs": { "Point": { "properties": { "x": { "type": "number" } } } } }
+                """));
+    assertEquals(List.of("location"), List.copyOf(resolved.properties().keySet()));
+  }
+
+  @Test
+  void singleScalarPropertyIsNotAWrapper() {
+    var resolved =
+        DataStructureSchema.resolveDefinition(
+            json("{ \"title\": \"T\", \"properties\": { \"id\": { \"type\": \"string\" } } }"));
+    assertEquals(List.of("id"), List.copyOf(resolved.properties().keySet()));
   }
 }

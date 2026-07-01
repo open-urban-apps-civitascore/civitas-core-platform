@@ -48,15 +48,22 @@ public final class DataStructureSchema {
 
   /**
    * Resolves the table definition into merged properties/required, following {@code allOf}
-   * inheritance. The root is the entry point when it carries {@code properties} or {@code allOf};
-   * otherwise the single (or title-matching) named definition is selected and then merged (so a
-   * named definition with its own {@code allOf} is resolved too).
+   * inheritance. When the root is the data-structure wrapper — a single property whose value is a
+   * local {@code $ref} into {@code $defs}/{@code definitions} — the referenced class is the table.
+   * Otherwise the root is the entry point when it carries {@code properties} or {@code allOf}; else
+   * the single (or title-matching) named definition is selected and then merged (so a named
+   * definition with its own {@code allOf} is resolved too).
    *
    * @throws IllegalArgumentException if no usable definition can be selected unambiguously, or a
    *     parent {@code $ref} is not a resolvable local definition
    */
   public static ResolvedDefinition resolveDefinition(Map<String, Object> schema) {
     Map<String, Object> definitions = definitions(schema);
+
+    Map<String, Object> wrapped = wrappedRootDefinition(schema, definitions);
+    if (wrapped != null) {
+      return mergeDefinition(wrapped, definitions);
+    }
 
     if (!propertiesOf(schema).isEmpty() || schema.get("allOf") instanceof List<?>) {
       ResolvedDefinition merged = mergeDefinition(schema, definitions);
@@ -67,6 +74,34 @@ public final class DataStructureSchema {
 
     Map<String, Object> selected = selectDefinitionNode(schema, definitions);
     return mergeDefinition(selected, definitions);
+  }
+
+  /**
+   * The class definition a data-structure wrapper root points at, or null if the root is not a
+   * wrapper. The wrapper root (the data structure itself, titled after the diagram) holds exactly
+   * one property whose only content is a local {@code $ref} into {@code $defs}/{@code definitions};
+   * the referenced class carries the real columns. A root with its own {@code allOf} or with any
+   * property that is more than a bare local {@code $ref} is a normal definition, not a wrapper.
+   */
+  private static Map<String, Object> wrappedRootDefinition(
+      Map<String, Object> schema, Map<String, Object> definitions) {
+    if (schema.get("allOf") instanceof List<?>) {
+      return null;
+    }
+    Map<String, Object> properties = propertiesOf(schema);
+    if (properties.size() != 1) {
+      return null;
+    }
+    Map<String, Object> property = mapValue(properties.values().iterator().next());
+    if (property.size() != 1) {
+      return null;
+    }
+    String key = localDefName(stringValue(property.get("$ref")));
+    if (key == null) {
+      return null;
+    }
+    Map<String, Object> target = mapValue(definitions.get(key));
+    return target.isEmpty() ? null : target;
   }
 
   /**
@@ -247,9 +282,13 @@ public final class DataStructureSchema {
   }
 
   /**
-   * Local definition key from {@code #/$defs/<Name>} or {@code #/definitions/<Name>}, else null.
+   * Local definition key from {@code #/$defs/<Name>} or {@code #/definitions/<Name>}, else null
+   * (including a null or non-local ref).
    */
   private static String localDefName(String ref) {
+    if (ref == null) {
+      return null;
+    }
     for (String prefix : LOCAL_DEF_PREFIXES) {
       if (ref.startsWith(prefix)) {
         return ref.substring(prefix.length());
