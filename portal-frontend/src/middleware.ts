@@ -119,7 +119,8 @@ export default auth(req => {
   // Set CSP header with dynamic nonces
   response.headers.set('Content-Security-Policy', (isProduction ? productionCSP : developmentCSP).join('; '))
 
-  // Set other security headers
+  // Set other security headers. Cache-Control: no-store is provided by Next.js for dynamic routes
+  // (see next.config.ts), so it is not set here.
   response.headers.set('X-Content-Type-Options', 'nosniff')
   response.headers.set('X-Frame-Options', 'DENY')
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')

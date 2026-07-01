@@ -590,6 +590,122 @@ describe('exportToJsonSchema', () => {
     expect((schema.$defs as Record<string, Record<string, unknown>>).Reading).toMatchObject({ title: 'Reading' })
     expect(schema.title).toBe('TrafficSensor')
   })
+
+  const cls = (id: string, name: string, attrs: { id: string; name: string; type?: string }[]) => ({
+    id: `node-${id}`,
+    type: 'class' as const,
+    position: { x: 0, y: 0 },
+    data: {
+      element: {
+        id,
+        name,
+        type: 'class' as const,
+        attributes: attrs.map(a => ({ visibility: 'public' as const, type: 'String', ...a })),
+        operations: [],
+      },
+      label: name,
+    },
+  })
+
+  const inhEdge = (
+    id: string,
+    source: string,
+    target: string,
+    type: 'inheritance' | 'realization' = 'inheritance',
+  ) => ({
+    id: `edge-${id}`,
+    type,
+    source: `node-${source}`,
+    target: `node-${target}`,
+    data: { relationship: { id: `rel-${id}`, type, source, target }, label: '', isSelected: false, isDirty: false },
+  })
+
+  it('roots on the subclass and emits allOf referencing the parent for inheritance', () => {
+    const diagram = baseDiagram({
+      name: 'Animal',
+      nodes: [
+        cls('animal', 'Animal', [{ id: 'a1', name: 'name' }]),
+        cls('dog', 'Dog', [{ id: 'a2', name: 'breed' }]),
+      ] as unknown as UMLDiagram['nodes'],
+      edges: [inhEdge('1', 'dog', 'animal')],
+    } as Partial<UMLDiagram>)
+
+    const schema = exportToJsonSchema(diagram)
+    expect(schema.title).toBe('Dog')
+    expect(schema.allOf).toEqual([
+      { $ref: '#/$defs/Animal' },
+      expect.objectContaining({ type: 'object', title: 'Dog' }),
+    ])
+    expect((schema.$defs as Record<string, unknown>).Animal).toBeDefined()
+  })
+
+  it('handles realization like inheritance', () => {
+    const diagram = baseDiagram({
+      name: 'IFace',
+      nodes: [
+        cls('iface', 'IFace', [{ id: 'a1', name: 'y' }]),
+        cls('impl', 'Impl', [{ id: 'a2', name: 'x' }]),
+      ] as unknown as UMLDiagram['nodes'],
+      edges: [inhEdge('1', 'impl', 'iface', 'realization')],
+    } as Partial<UMLDiagram>)
+
+    const schema = exportToJsonSchema(diagram)
+    expect(schema.title).toBe('Impl')
+    expect(schema.allOf).toEqual([{ $ref: '#/$defs/IFace' }, expect.objectContaining({ title: 'Impl' })])
+  })
+
+  it('roots on the leaf for multi-level inheritance', () => {
+    const diagram = baseDiagram({
+      name: 'Base',
+      nodes: [
+        cls('base', 'Base', [{ id: 'a1', name: 'a' }]),
+        cls('mid', 'Mid', [{ id: 'a2', name: 'b' }]),
+        cls('leaf', 'Leaf', [{ id: 'a3', name: 'c' }]),
+      ] as unknown as UMLDiagram['nodes'],
+      edges: [inhEdge('1', 'mid', 'base'), inhEdge('2', 'leaf', 'mid')],
+    } as Partial<UMLDiagram>)
+
+    const schema = exportToJsonSchema(diagram)
+    expect(schema.title).toBe('Leaf')
+    expect(schema.allOf).toEqual([{ $ref: '#/$defs/Mid' }, expect.objectContaining({ title: 'Leaf' })])
+    expect((schema.$defs as Record<string, Record<string, unknown>>).Mid.allOf).toEqual([
+      { $ref: '#/$defs/Base' },
+      expect.objectContaining({ title: 'Mid' }),
+    ])
+  })
+
+  it('emits one allOf parent ref per parent for multiple inheritance', () => {
+    const diagram = baseDiagram({
+      name: 'Leaf',
+      nodes: [
+        cls('p1', 'P1', [{ id: 'a1', name: 'x' }]),
+        cls('p2', 'P2', [{ id: 'a2', name: 'y' }]),
+        cls('leaf', 'Leaf', [{ id: 'a3', name: 'own' }]),
+      ] as unknown as UMLDiagram['nodes'],
+      edges: [inhEdge('1', 'leaf', 'p1'), inhEdge('2', 'leaf', 'p2')],
+    } as Partial<UMLDiagram>)
+
+    const schema = exportToJsonSchema(diagram)
+    expect(schema.title).toBe('Leaf')
+    expect(schema.allOf).toEqual([
+      { $ref: '#/$defs/P1' },
+      { $ref: '#/$defs/P2' },
+      expect.objectContaining({ title: 'Leaf' }),
+    ])
+  })
+
+  it('matches the root by diagram name case-insensitively', () => {
+    const diagram = baseDiagram({
+      name: 'beta',
+      nodes: [
+        cls('a', 'Alpha', [{ id: 'a1', name: 'a1' }]),
+        cls('b', 'Beta', [{ id: 'a2', name: 'b1' }]),
+      ] as unknown as UMLDiagram['nodes'],
+      edges: [],
+    } as Partial<UMLDiagram>)
+
+    expect(exportToJsonSchema(diagram).title).toBe('Beta')
+  })
 })
 
 describe('canMultiplicityBePrimaryKey', () => {

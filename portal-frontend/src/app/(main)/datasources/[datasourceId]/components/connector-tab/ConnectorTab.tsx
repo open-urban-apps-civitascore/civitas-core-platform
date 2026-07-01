@@ -65,6 +65,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
               name={`configuration.${property.key}` as Path<DatasourceFormDraft>}
               placeholder={property.placeholder ?? ''}
               type={property.type}
+              inputType={property.inputType}
               options={property.options?.map(option => ({ value: option, label: option }))}
               shouldShowErrors
               required={property.required}

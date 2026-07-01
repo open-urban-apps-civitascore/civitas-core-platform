@@ -14,7 +14,9 @@ import de.civitascore.configadapter.model.postgis.ColumnType;
 import de.civitascore.configadapter.model.postgis.GeometryColumnConfig;
 import de.civitascore.configadapter.model.postgis.GeometryType;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -35,6 +37,12 @@ import java.util.regex.Pattern;
  *
  * <p>Names in {@code excludedNames} (explicitly configured geometry columns) are skipped so they
  * are not duplicated as derived columns.
+ *
+ * <p>A subclass's own properties live outside the root (under {@code allOf}), so columns are
+ * gathered by resolving {@code allOf} branches and their local {@code $ref} parents, not just the
+ * root {@code properties}. Inherited columns come first, and on a name collision the subclass wins
+ * the column type while the column keeps its first-seen position. A property-level {@code $ref}
+ * stays {@code JSONB}; only node-level parents are followed.
  */
 public final class DataStructureTableMapper {
 
@@ -46,6 +54,8 @@ public final class DataStructureTableMapper {
   /** Extracts the numeric SRID from a CRS identifier such as {@code EPSG:25832}. */
   private static final Pattern EPSG_CODE = Pattern.compile("(?i)EPSG:+\\s*(\\d+)");
 
+  private static final String[] LOCAL_DEF_PREFIXES = {"#/$defs/", "#/definitions/"};
+
   private DataStructureTableMapper() {}
 
   /** Derived non-spatial and geometry columns for one sink table. */
@@ -56,16 +66,13 @@ public final class DataStructureTableMapper {
    * @throws IllegalArgumentException if the schema contains no usable definition with properties
    */
   public static TableColumns deriveColumns(Map<String, Object> schema, Set<String> excludedNames) {
-    Map<String, Object> definition = selectDefinition(schema);
-    Map<String, Object> properties = mapValue(definition.get("properties"));
+    ResolvedDefinition resolved = resolveDefinition(schema);
+    Map<String, Object> properties = resolved.properties();
     if (properties.isEmpty()) {
       throw new IllegalArgumentException(
           "dataStructure JSON Schema has no properties; cannot derive sink table columns");
     }
-    List<String> required =
-        definition.get("required") instanceof List<?> list
-            ? list.stream().map(String::valueOf).toList()
-            : List.of();
+    List<String> required = List.copyOf(resolved.required());
 
     List<ColumnConfig> columns = new ArrayList<>();
     List<GeometryColumnConfig> geometryColumns = new ArrayList<>();
@@ -91,12 +98,37 @@ public final class DataStructureTableMapper {
     return new TableColumns(columns, geometryColumns);
   }
 
-  /** Root {@code properties} if present, else the single (or title-matching) definition. */
-  private static Map<String, Object> selectDefinition(Map<String, Object> schema) {
-    if (!mapValue(schema.get("properties")).isEmpty()) {
-      return schema;
-    }
+  /** Merged {@code properties} (column name → spec) and unioned {@code required} for one table. */
+  private record ResolvedDefinition(
+      LinkedHashMap<String, Object> properties, LinkedHashSet<String> required) {}
+
+  /**
+   * Resolves the table definition into merged properties/required, following {@code allOf}
+   * inheritance. The root is the entry point when it carries {@code properties} or {@code allOf};
+   * otherwise the single (or title-matching) named definition is selected and then merged (so a
+   * named definition with its own {@code allOf} is resolved too).
+   */
+  private static ResolvedDefinition resolveDefinition(Map<String, Object> schema) {
     Map<String, Object> definitions = definitions(schema);
+
+    if (!mapValue(schema.get("properties")).isEmpty() || schema.get("allOf") instanceof List<?>) {
+      ResolvedDefinition merged = mergeDefinition(schema, definitions);
+      if (!merged.properties().isEmpty()) {
+        return merged;
+      }
+    }
+
+    Map<String, Object> selected = selectDefinitionNode(schema, definitions);
+    return mergeDefinition(selected, definitions);
+  }
+
+  /**
+   * Selects the single (or title-matching) named definition. Unlike the root entry in {@link
+   * #resolveDefinition}, this never inspects root {@code properties}; it only chooses among {@code
+   * $defs}/{@code definitions}.
+   */
+  private static Map<String, Object> selectDefinitionNode(
+      Map<String, Object> schema, Map<String, Object> definitions) {
     if (definitions.size() == 1) {
       return mapValue(definitions.values().iterator().next());
     }
@@ -114,8 +146,69 @@ public final class DataStructureTableMapper {
             : "dataStructure JSON Schema has "
                 + definitions.size()
                 + " definitions and none matches the title '"
-                + stringValue(schema.get("title"))
+                + title
                 + "'; the sink table mapping requires exactly one");
+  }
+
+  /**
+   * Recursively merges a definition node's {@code allOf} branches, local {@code $ref} parents, and
+   * own {@code properties}/{@code required} into a single resolved definition.
+   */
+  private static ResolvedDefinition mergeDefinition(
+      Map<String, Object> node, Map<String, Object> definitions) {
+    LinkedHashMap<String, Object> properties = new LinkedHashMap<>();
+    LinkedHashSet<String> required = new LinkedHashSet<>();
+    collectInto(node, definitions, new HashSet<>(), properties, required);
+    return new ResolvedDefinition(properties, required);
+  }
+
+  private static void collectInto(
+      Map<String, Object> node,
+      Map<String, Object> definitions,
+      Set<String> visitedRefs,
+      LinkedHashMap<String, Object> properties,
+      LinkedHashSet<String> required) {
+    if (node.get("allOf") instanceof List<?> branches) {
+      for (Object branch : branches) {
+        collectInto(mapValue(branch), definitions, visitedRefs, properties, required);
+      }
+    }
+
+    String ref = stringValue(node.get("$ref"));
+    if (ref != null && geometryType(ref) == null) {
+      String key = localDefName(ref);
+      if (key == null) {
+        throw new IllegalArgumentException(
+            "dataStructure JSON Schema parent $ref '"
+                + ref
+                + "' is not a local definition reference");
+      }
+      if (visitedRefs.add(key)) {
+        Map<String, Object> target = mapValue(definitions.get(key));
+        if (target.isEmpty()) {
+          throw new IllegalArgumentException(
+              "dataStructure JSON Schema parent $ref '" + ref + "' resolves to no definition");
+        }
+        collectInto(target, definitions, visitedRefs, properties, required);
+      }
+    }
+
+    properties.putAll(mapValue(node.get("properties")));
+    if (node.get("required") instanceof List<?> list) {
+      list.forEach(value -> required.add(String.valueOf(value)));
+    }
+  }
+
+  /**
+   * Local definition key from {@code #/$defs/<Name>} or {@code #/definitions/<Name>}, else null.
+   */
+  private static String localDefName(String ref) {
+    for (String prefix : LOCAL_DEF_PREFIXES) {
+      if (ref.startsWith(prefix)) {
+        return ref.substring(prefix.length());
+      }
+    }
+    return null;
   }
 
   /**
