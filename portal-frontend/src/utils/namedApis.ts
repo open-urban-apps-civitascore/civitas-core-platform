@@ -1,6 +1,6 @@
 import proj4 from 'proj4'
 
-import { UMLClass } from '@/components/uml-modeler/types/uml'
+import { GEOJSON_REF_BASE } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import { crsOptions } from '@/const/crs'
 import { DataSink } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
@@ -95,6 +95,22 @@ export const buildOwsPayload = (data: OwsApiFormData): NamedApiPayload => ({
   description: data.baseInfo.description || undefined,
 })
 
+type SchemaProperty = { $ref?: string; crs?: string }
+type SchemaObject = { properties?: Record<string, SchemaProperty>; $defs?: Record<string, SchemaObject> }
+
+// Scans the root `properties` and every `$defs` entry's `properties` for a
+// geometry property (GeoJSON `$ref`) carrying a `crs` annotation (see
+// jsonSchemaExportService.ts). Returns the first CRS found, or '' if none.
+const findNativeCRS = (schema?: SchemaObject): string => {
+  const propertyGroups = [schema?.properties, ...Object.values(schema?.$defs ?? {}).map(def => def.properties)]
+  for (const properties of propertyGroups) {
+    for (const property of Object.values(properties ?? {})) {
+      if (property.$ref?.startsWith(GEOJSON_REF_BASE) && property.crs) return property.crs
+    }
+  }
+  return ''
+}
+
 export const getNativeCRSFromDataSink = (
   dataSinkId: string,
   postgisDataSinks: DataSink[],
@@ -102,9 +118,9 @@ export const getNativeCRSFromDataSink = (
 ): string => {
   const dataSink = postgisDataSinks.find(d => d.id === dataSinkId)
   const datastructure = postgisDatastructures.find(d => d.id === dataSink?.configuration.dataStructureVersion.id)
-  const umlClass = datastructure?.styles?.nodes?.[0]?.data?.element as UMLClass | undefined
-  return umlClass?.attributes?.find(a => a.meta?.gisInfo?.crs)?.meta?.gisInfo?.crs ?? ''
+  return findNativeCRS(datastructure?.model as SchemaObject | undefined)
 }
+
 export const mapApiStyleToFormData = (styles: Style[]): StyleFormData[] =>
   styles.map(style => ({
     id: style.id,
