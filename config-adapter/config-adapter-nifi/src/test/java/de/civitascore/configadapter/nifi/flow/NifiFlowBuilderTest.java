@@ -86,7 +86,11 @@ class NifiFlowBuilderTest {
         SourceType.MQTT,
         Map.of("Broker URI", "tcp://mosquitto:1883", "Topic Filter", "sensors/+/temp"),
         SinkType.FROST,
-        Map.of(NifiFlowBuilder.FROST_BASE_URL, "http://frost:8080/FROST-Server/v1.1"),
+        Map.of(
+            NifiFlowBuilder.FROST_BASE_URL,
+            "http://frost:8080/FROST-Server/v1.1",
+            NifiFlowBuilder.FROST_PROJECT_ID,
+            "7"),
         // FROST: the source delivers the STA envelope; no record mapping (find-or-create works on
         // the raw JSON).
         List.of(),
@@ -338,6 +342,23 @@ class NifiFlowBuilderTest {
   }
 
   @Test
+  void frostSinkWithoutProjectIdIsRejected() {
+    // Every FROST flow must be project-scoped; a missing id fails the build rather than silently
+    // producing a server-root flow that the dataset's named API cannot see.
+    FlowBuildSpec spec =
+        new FlowBuildSpec(
+            "pipeline-frost-noproject",
+            SourceType.MQTT,
+            Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", "t"),
+            SinkType.FROST,
+            Map.of(NifiFlowBuilder.FROST_BASE_URL, "http://frost:8080/FROST-Server/v1.1"),
+            List.of(),
+            Map.of(),
+            null);
+    assertThrows(FatalAdapterException.class, () -> builder.build(spec));
+  }
+
+  @Test
   void routesFrostSinkWriteFailuresToLogSink() throws Exception {
     JsonNode flow = build(frostSink());
 
@@ -398,7 +419,11 @@ class NifiFlowBuilderTest {
             SourceType.MQTT,
             Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", "t"),
             SinkType.FROST,
-            Map.of(NifiFlowBuilder.FROST_BASE_URL, "http://frost:8080/x"),
+            Map.of(
+                NifiFlowBuilder.FROST_BASE_URL,
+                "http://frost:8080/x",
+                NifiFlowBuilder.FROST_PROJECT_ID,
+                "7"),
             mapping(),
             Map.of(),
             null);
@@ -443,7 +468,11 @@ class NifiFlowBuilderTest {
             SourceType.SQL,
             Map.of("Table Name", "events"),
             SinkType.FROST,
-            Map.of(NifiFlowBuilder.FROST_BASE_URL, "http://frost:8080"),
+            Map.of(
+                NifiFlowBuilder.FROST_BASE_URL,
+                "http://frost:8080",
+                NifiFlowBuilder.FROST_PROJECT_ID,
+                "7"),
             List.of(),
             Map.of(
                 "SourceConnectionPool",
@@ -594,12 +623,12 @@ class NifiFlowBuilderTest {
     // only reader + writer (no DBCP for a FROST/HTTP sink)
     assertEquals(2, flow.get("flowContents").get("controllerServices").size());
 
-    // the base URL drives the per-stage URLs (/Things…), not a single /Observations POST
+    // the base URL + project id drive the per-stage URLs, not a single /Observations POST
     JsonNode get = componentByProperty(flow, "InvokeHTTP", "HTTP Method", "GET");
     assertTrue(
         get.get("properties")
             .get("HTTP URL")
             .asText()
-            .startsWith("http://frost:8080/FROST-Server/v1.1/Things"));
+            .startsWith("http://frost:8080/FROST-Server/v1.1/Projects(7)/Things"));
   }
 }
