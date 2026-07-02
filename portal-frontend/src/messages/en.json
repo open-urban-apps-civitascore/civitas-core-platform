@@ -921,7 +921,7 @@
     "errors": {
       "invalidDsn": "Enter a valid URI (e.g. postgres://host:5432/db)",
       "invalidBrokerUrl": "Enter a valid broker URL (e.g. tcp://broker:1883)",
-      "topicInvalidChars": "The topic must not contain commas or spaces.",
+      "topicInvalidChars": "The topic must not contain commas, semicolons or spaces.",
       "topicSingle": "Only one topic is allowed.",
       "creationError": "An error occurred while creating the Data source.",
       "updateError": "An error occurred while updating the Data source.",

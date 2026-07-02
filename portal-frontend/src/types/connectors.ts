@@ -48,7 +48,7 @@ export const MqttApiResponseSchema = z.object({
 })
 
 /* Form schemas for edit */
-const singleTopic = z.string().regex(/^[^,\s]*$/, 'datasources.errors.topicInvalidChars')
+const singleTopic = z.string().regex(/^[^,;\s]*$/, 'datasources.errors.topicInvalidChars')
 
 const MqttBaseSchema = z.object({
   urls: z.string().trim(),
