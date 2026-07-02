@@ -83,6 +83,9 @@ services:
       POSTGIS_JDBC_URL: jdbc:postgresql://civitas-geoserver-db:5432/geoserver
       POSTGIS_JDBC_USER: geoserver
       POSTGIS_JDBC_PASSWORD: geoserver
+      # Dev master key for decrypting ENC(...) credentials at deploy time; must match
+      # portal-backend's civitas.master-key.
+      CIVITAS_MASTER_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     networks:
       - civitas-network
       # PostGIS DDL + GeoServer datastore live on the GeoServer stack's internal network

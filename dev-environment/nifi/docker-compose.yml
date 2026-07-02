@@ -57,6 +57,10 @@ services:
       start_period: 90s
     networks:
       - civitas-network
+      # The NiFi PostGIS sink (PutDatabaseRecord) writes to civitas-geoserver-db, which lives on
+      # the GeoServer stack's internal network — without this attachment the sink fails with
+      # UnknownHostException and records are dropped to the DLQ log.
+      - geoserver-internal
 
 volumes:
   nifi_database_repository:
@@ -70,4 +74,8 @@ volumes:
 networks:
   civitas-network:
     name: civitas-network
+    external: true
+  # Created by dev-environment/geoserver (start-portal-dev.sh brings that stack up first).
+  geoserver-internal:
+    name: geoserver_geoserver-internal
     external: true

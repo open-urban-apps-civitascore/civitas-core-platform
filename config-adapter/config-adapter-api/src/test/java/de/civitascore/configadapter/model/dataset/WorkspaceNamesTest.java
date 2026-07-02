@@ -24,9 +24,22 @@ class WorkspaceNamesTest {
     assertEquals("ds_123", WorkspaceNames.fromDatasetId("ds-123"));
     assertEquals("my_dataset_1", WorkspaceNames.fromDatasetId("My Dataset 1"));
     assertEquals("ds_abc123", WorkspaceNames.fromDatasetId("DS:ABC123"));
+  }
+
+  @Test
+  @DisplayName("fromDatasetId prefixes digit-initial names with ds_ (XML NCName rule)")
+  void fromDatasetId_prefixesDigitInitial() {
+    // GeoServer publishes the workspace as an XML namespace prefix; an NCName must not start
+    // with a digit, so digit-initial UUIDs get a letter prefix.
     assertEquals(
-        "550e8400_e29b_41d4_a716_446655440000",
+        "ds_550e8400_e29b_41d4_a716_446655440000",
         WorkspaceNames.fromDatasetId("550e8400-e29b-41d4-a716-446655440000"));
+    assertEquals("ds_1abc", WorkspaceNames.fromDatasetId("1abc"));
+    // Letter- and underscore-initial names are valid NCNames and stay unprefixed.
+    assertEquals(
+        "f47ac10b_58cc_4372_a567_0e02b2c3d479",
+        WorkspaceNames.fromDatasetId("f47ac10b-58cc-4372-a567-0e02b2c3d479"));
+    assertEquals("_1abc", WorkspaceNames.fromDatasetId("_1abc"));
   }
 
   @Test
@@ -34,6 +47,9 @@ class WorkspaceNamesTest {
   void fromDatasetId_idempotentOnNormalizedInput() {
     String normalized = "ds_abc_123";
     assertEquals(normalized, WorkspaceNames.fromDatasetId(normalized));
+    // A previously prefixed digit-initial name is letter-initial and thus stable too.
+    String prefixed = WorkspaceNames.fromDatasetId("550e8400-e29b-41d4-a716-446655440000");
+    assertEquals(prefixed, WorkspaceNames.fromDatasetId(prefixed));
   }
 
   @Test

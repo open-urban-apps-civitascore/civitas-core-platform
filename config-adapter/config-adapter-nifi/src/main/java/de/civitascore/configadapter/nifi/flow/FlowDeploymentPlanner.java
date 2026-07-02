@@ -242,7 +242,7 @@ public class FlowDeploymentPlanner {
     Map<String, Map<String, String>> sensitive = new LinkedHashMap<>();
 
     bindSource(sourceType, source, sourceProperties, controllerServiceProperties, sensitive);
-    bindSink(sink, sinkProperties, controllerServiceProperties, sensitive);
+    bindSink(request, sink, sinkProperties, controllerServiceProperties, sensitive);
 
     String processGroupName = "pipeline-" + request.pipelineId();
     String snapshot =
@@ -671,6 +671,7 @@ public class FlowDeploymentPlanner {
   }
 
   private void bindSink(
+      PipelineDeploymentRequest request,
       SinkSpec sink,
       Map<String, String> sinkProperties,
       Map<String, Map<String, String>> controllerServiceProperties,
@@ -698,11 +699,12 @@ public class FlowDeploymentPlanner {
         }
         bindPlatformDbcp(controllerServiceProperties, sensitive);
       }
-      case FROST -> bindFrost(sinkProperties);
+      case FROST -> bindFrost(request, sinkProperties);
     }
   }
 
-  private void bindFrost(Map<String, String> sinkProperties) throws FatalAdapterException {
+  private void bindFrost(PipelineDeploymentRequest request, Map<String, String> sinkProperties)
+      throws FatalAdapterException {
     if (frostBaseUrl == null || frostBaseUrl.isBlank()) {
       // A localhost fallback would deploy a flow that silently posts observations into the void.
       throw new FatalAdapterException(
@@ -712,6 +714,9 @@ public class FlowDeploymentPlanner {
     // The base URL feeds the find-or-create sub-flow (NifiFlowBuilder), which derives the per-stage
     // URLs (/Things, /Datastreams, /Observations) — not a single POST endpoint.
     sinkProperties.put(NifiFlowBuilder.FROST_BASE_URL, frostBaseUrl);
+    // The saga's project id scopes those URLs to the dataset's FROST project; the request record
+    // guarantees it is present and numeric for a FROST sink.
+    sinkProperties.put(NifiFlowBuilder.FROST_PROJECT_ID, request.frostProjectId());
   }
 
   private void bindPlatformDbcp(

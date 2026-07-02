@@ -295,6 +295,45 @@ class NifiFlowBuilderTest {
   }
 
   @Test
+  void frostProjectIdScopesTheFindOrCreateFlow() throws Exception {
+    // With the saga's project id, Things live under /Projects(n) (visible through the dataset's
+    // project-scoped named API) and the Datastream lookup is filtered by Thing/Projects/id — the
+    // projects plugin has no /Projects(n)/Datastreams collection, and an unfiltered lookup could
+    // match another dataset's Datastream on a reference collision.
+    FlowBuildSpec unscoped = frostSink();
+    JsonNode flow =
+        build(
+            new FlowBuildSpec(
+                unscoped.processGroupName(),
+                unscoped.sourceType(),
+                unscoped.sourceProperties(),
+                SinkType.FROST,
+                Map.of(
+                    NifiFlowBuilder.FROST_BASE_URL,
+                    "http://frost:8080/FROST-Server/v1.1",
+                    NifiFlowBuilder.FROST_PROJECT_ID,
+                    "7"),
+                List.of(),
+                Map.of(),
+                null));
+
+    assertTrue(
+        hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/Projects(7)/Things?$filter="),
+        "Thing lookup is project-scoped");
+    JsonNode post = componentByProperty(flow, "InvokeHTTP", "HTTP Method", "POST");
+    assertTrue(
+        post.get("properties").get("HTTP URL").asText().endsWith("/Projects(7)/Things")
+            || hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/Projects(7)/Things"),
+        "Thing POST is project-scoped");
+    assertTrue(
+        hasProcessor(flow, "InvokeHTTP", "HTTP URL", "Thing/Projects/id%20eq%207"),
+        "Datastream lookup filters on the project");
+    assertTrue(
+        hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/FROST-Server/v1.1/Observations"),
+        "Observation POST stays at the root (scope flows via the Datastream)");
+  }
+
+  @Test
   void routesFrostSinkWriteFailuresToLogSink() throws Exception {
     JsonNode flow = build(frostSink());
 

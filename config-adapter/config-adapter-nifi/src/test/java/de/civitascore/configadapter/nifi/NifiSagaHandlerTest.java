@@ -237,6 +237,7 @@ class NifiSagaHandlerTest {
             """
             { "type": "EXECUTE_STEP", "sagaId": "saga-frost", "stepId": "deploy-pipelines",
               "adapter": "nifi", "operation": "DEPLOY_PIPELINES",
+              "projectId": "5",
               "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
               "datasinks": [],
               "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
@@ -251,7 +252,34 @@ class NifiSagaHandlerTest {
     // a FROST default sink consumes the raw STA envelope — no mapping node (a mapping would be
     // rejected; see frostSinkWithMappingIsRejected in FlowDeploymentPlannerTest)
     assertEquals("STEP_COMPLETED", result.type());
-    verify(restClient).deployFlow(any(DeploymentPlan.class));
+    ArgumentCaptor<DeploymentPlan> plan = ArgumentCaptor.forClass(DeploymentPlan.class);
+    verify(restClient).deployFlow(plan.capture());
+    // the saga's projectId scopes the flow to the dataset's FROST project
+    assertTrue(plan.getValue().snapshotJson().contains("/Projects(5)/Things"));
+  }
+
+  @Test
+  void frostDeployWithoutProjectIdFailsTheStep() throws Exception {
+    // Without the FROST create-project step's result the flow would post to the server root,
+    // invisible through the dataset's named API — fail the saga instead of deploying it.
+    Map<String, Object> payload =
+        map(
+            """
+            { "type": "EXECUTE_STEP", "sagaId": "saga-frost", "stepId": "deploy-pipelines",
+              "adapter": "nifi", "operation": "DEPLOY_PIPELINES",
+              "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
+              "datasinks": [],
+              "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
+                "data": { "nodes": [
+                    { "id": "s", "type": "start", "data": {} },
+                    { "id": "e", "type": "end", "data": {} } ],
+                  "edges": [ { "id": "e1", "source": "s", "target": "e" } ] } } ] }
+            """);
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals("STEP_FAILED", result.type());
+    verify(restClient, times(0)).deployFlow(any());
   }
 
   @Test

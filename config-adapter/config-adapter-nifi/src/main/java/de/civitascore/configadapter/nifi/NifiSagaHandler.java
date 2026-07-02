@@ -80,6 +80,9 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   private static final String FIELD_ID = "id";
   private static final String FIELD_ACTION = "action";
   private static final String FIELD_DATA = "data";
+  // Saga-wide variable set by the FROST create/update-project step and propagated into every later
+  // step's payload; scopes a FROST flow to the dataset's project.
+  private static final String FIELD_PROJECT_ID = "projectId";
 
   private static final String ACTION_ADD = "ADD";
   private static final String ACTION_UPDATE = "UPDATE";
@@ -189,12 +192,13 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     try {
       List<Datasource> datasources = extractDatasources(command);
       List<Map<String, Object>> datasinks = extractMaps(command, FIELD_DATASINKS);
+      String projectId = optionalProjectId(command);
       List<String> pipelineIds = new ArrayList<>();
       List<String> processGroupIds = new ArrayList<>();
 
       for (Map<String, Object> pipeline : extractMaps(command, FIELD_DATA_PIPELINES)) {
         String id = requireString(pipeline, FIELD_ID);
-        processGroupIds.add(deployPipeline(id, pipeline, datasources, datasinks));
+        processGroupIds.add(deployPipeline(id, pipeline, datasources, datasinks, projectId));
         pipelineIds.add(id);
       }
 
@@ -211,10 +215,11 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     try {
       List<Datasource> datasources = extractDatasources(command);
       List<Map<String, Object>> datasinks = extractMaps(command, FIELD_DATASINKS);
+      String projectId = optionalProjectId(command);
       List<String> processedIds = new ArrayList<>();
 
       for (Map<String, Object> pipeline : extractMaps(command, FIELD_DATA_PIPELINES)) {
-        processedIds.add(applyPipelineAction(pipeline, datasources, datasinks));
+        processedIds.add(applyPipelineAction(pipeline, datasources, datasinks, projectId));
       }
 
       Map<String, Object> data = Map.of(FIELD_PIPELINE_IDS, processedIds);
@@ -232,12 +237,14 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   private String applyPipelineAction(
       Map<String, Object> pipeline,
       List<Datasource> datasources,
-      List<Map<String, Object>> datasinks)
+      List<Map<String, Object>> datasinks,
+      String projectId)
       throws FatalAdapterException, RetryableAdapterException {
     String id = requireString(pipeline, FIELD_ID);
     String action = requireString(pipeline, FIELD_ACTION);
     switch (action) {
-      case ACTION_ADD, ACTION_UPDATE -> deployPipeline(id, pipeline, datasources, datasinks);
+      case ACTION_ADD, ACTION_UPDATE ->
+          deployPipeline(id, pipeline, datasources, datasinks, projectId);
       case ACTION_DELETE -> nifiClient.deleteFlowByName(processGroupName(id));
       default ->
           throw new FatalAdapterException(
@@ -265,8 +272,10 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     try {
       List<Datasource> datasources = extractDatasources(command);
       List<Map<String, Object>> datasinks = extractMaps(command, FIELD_DATASINKS);
+      String projectId = optionalProjectId(command);
       for (Map<String, Object> pipeline : extractMaps(command, FIELD_DATA_PIPELINES)) {
-        deployPipeline(requireString(pipeline, FIELD_ID), pipeline, datasources, datasinks);
+        deployPipeline(
+            requireString(pipeline, FIELD_ID), pipeline, datasources, datasinks, projectId);
       }
       return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
     } catch (FatalAdapterException | RetryableAdapterException e) {
@@ -280,7 +289,8 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       String id,
       Map<String, Object> pipeline,
       List<Datasource> datasources,
-      List<Map<String, Object>> datasinks)
+      List<Map<String, Object>> datasinks,
+      String projectId)
       throws FatalAdapterException, RetryableAdapterException {
     Object rawData = pipeline.get(FIELD_DATA);
     // A missing graph (null) is a valid provide-style pipeline (empty graph). A present-but-non-map
@@ -299,8 +309,27 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     }
     Datasource source = resolveSource(datasources);
     SinkSpec sink = resolveSink(datasinks);
-    var plan = planner.plan(new PipelineDeploymentRequest(id, graphData, source, sink));
+    // A FROST flow must be scoped to the dataset's project — unscoped it would post to the server
+    // root, invisible to the project-scoped named API. The id is a saga-wide variable from the
+    // FROST create/update-project step, so its absence means a mis-ordered or hand-crafted saga.
+    if (sink.type() == SinkType.FROST && (projectId == null || projectId.isBlank())) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD,
+          "FROST sink requires the saga's '"
+              + FIELD_PROJECT_ID
+              + "' (result of the FROST create-project step)");
+    }
+    var plan =
+        planner.plan(
+            new PipelineDeploymentRequest(
+                id, graphData, source, sink, sink.type() == SinkType.FROST ? projectId : null));
     return nifiClient.deployFlow(plan);
+  }
+
+  /** The saga's FROST project id from the command payload, or null when absent. */
+  private static String optionalProjectId(SagaCommandMessage command) {
+    Object value = command.payload().get(FIELD_PROJECT_ID);
+    return value == null ? null : String.valueOf(value);
   }
 
   private static Datasource resolveSource(List<Datasource> datasources)

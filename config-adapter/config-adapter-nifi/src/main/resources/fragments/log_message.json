@@ -14,7 +14,7 @@
   "properties": {
     "log-level": "warn",
     "log-prefix": "civitas-pipeline-dlq",
-    "log-message": "Dropped a record that failed JSON conversion or RecordPath mapping"
+    "log-message": "Dropped a record: httpStatus=${invokehttp.status.code} ${invokehttp.status.message} exception=${invokehttp.java.exception.class}: ${invokehttp.java.exception.message} dbError=${putdatabaserecord.error} file=${uuid}"
   },
   "propertyDescriptors": {
     "log-level": {
