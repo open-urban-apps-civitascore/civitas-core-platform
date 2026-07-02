@@ -15,8 +15,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
@@ -29,21 +27,12 @@ import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.DockerClientFactory;
-import org.testcontainers.containers.FixedHostPortGenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
 
 /**
  * Real-NiFi integration test: deploys a curated MQTT→PostGIS flow — produced by the full
@@ -55,73 +44,19 @@ import org.testcontainers.containers.wait.strategy.Wait;
  * <p>Skipped automatically when Docker is unavailable (so {@code mvn verify} stays green on hosts
  * without Docker). Runs as a failsafe {@code *IT} test.
  */
-class NifiDeploymentIT {
+class NifiDeploymentIT extends AbstractNifiIT {
 
   private static final int HOST_PORT = 18443;
-  private static final String USER = "admin";
-  private static final String PASSWORD = "ctsNiFiTestPassword123";
-
-  private static FixedHostPortGenericContainer<?> nifi;
-  private static Client httpClient;
-  private static NifiRestClient client;
-
-  private final ObjectMapper mapper = new ObjectMapper();
 
   @BeforeAll
-  static void startNifi() {
-    assumeTrue(
-        DockerClientFactory.instance().isDockerAvailable(),
-        "Docker not available — skipping NiFi IT");
-
-    // In CI the Docker daemon is remote (DinD), so published ports are reachable on the resolved
-    // Docker host, not localhost. Use that host both for the client URL and for NiFi's
-    // proxy-host whitelist (Host-header check), so authenticate() does not get a connection
-    // refused.
-    String dockerHost = DockerClientFactory.instance().dockerHostIpAddress();
-
-    nifi =
-        new FixedHostPortGenericContainer<>("apache/nifi:2.9.0")
-            .withFixedExposedPort(HOST_PORT, 8443)
-            .withEnv("SINGLE_USER_CREDENTIALS_USERNAME", USER)
-            .withEnv("SINGLE_USER_CREDENTIALS_PASSWORD", PASSWORD)
-            .withEnv("NIFI_WEB_HTTPS_PORT", "8443")
-            .withEnv(
-                "NIFI_WEB_PROXY_HOST", dockerHost + ":" + HOST_PORT + ",localhost:" + HOST_PORT)
-            .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(5)));
-    nifi.start();
-
-    httpClient =
-        ClientBuilder.newBuilder()
-            .sslContext(trustAll())
-            .hostnameVerifier((host, session) -> true)
-            .build();
-    client =
-        new NifiRestClient("https://" + dockerHost + ":" + HOST_PORT, USER, PASSWORD, httpClient);
-
-    // NiFi keeps initialising after the port opens; poll the REST API until it authenticates.
-    await()
-        .atMost(Duration.ofMinutes(3))
-        .pollInterval(Duration.ofSeconds(5))
-        .ignoreExceptions()
-        .until(
-            () -> {
-              client.authenticate();
-              return true;
-            });
+  static void startStack() {
+    assumeTrue(dockerAvailable(), "Docker not available — skipping NiFi IT");
+    startNifi(HOST_PORT);
   }
 
   @AfterAll
-  static void stopNifi() {
-    if (httpClient != null) {
-      httpClient.close();
-    }
-    if (nifi != null) {
-      nifi.stop();
-    }
-  }
-
-  private Map<String, Object> map(String json) throws Exception {
-    return mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+  static void stopStack() {
+    stopNifi();
   }
 
   private DeploymentPlan buildPlan() throws Exception {
@@ -242,29 +177,5 @@ class NifiDeploymentIT {
     assertTrue(client.findProcessGroupByName(rootId, plan.processGroupName()).isPresent());
 
     client.deleteFlowByName(plan.processGroupName());
-  }
-
-  private static SSLContext trustAll() {
-    try {
-      TrustManager[] trust = {
-        new X509TrustManager() {
-          @Override
-          public void checkClientTrusted(java.security.cert.X509Certificate[] c, String t) {}
-
-          @Override
-          public void checkServerTrusted(java.security.cert.X509Certificate[] c, String t) {}
-
-          @Override
-          public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-            return new java.security.cert.X509Certificate[0];
-          }
-        }
-      };
-      SSLContext context = SSLContext.getInstance("TLS");
-      context.init(null, trust, new SecureRandom());
-      return context;
-    } catch (Exception e) {
-      throw new IllegalStateException(e);
-    }
   }
 }

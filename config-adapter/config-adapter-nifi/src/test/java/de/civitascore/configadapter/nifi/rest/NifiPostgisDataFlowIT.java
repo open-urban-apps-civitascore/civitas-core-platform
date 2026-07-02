@@ -13,8 +13,6 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
@@ -27,11 +25,7 @@ import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
 import java.io.File;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -39,9 +33,6 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
@@ -49,8 +40,6 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.DockerClientFactory;
-import org.testcontainers.containers.FixedHostPortGenericContainer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -70,11 +59,9 @@ import org.testcontainers.utility.MountableFile;
  * postgres}). The PostgreSQL JDBC driver is mounted into the NiFi container at the path the DBCP
  * fragment expects ({@code /opt/nifi/drivers/postgresql.jar}). Skipped when Docker is unavailable.
  */
-class NifiPostgisDataFlowIT {
+class NifiPostgisDataFlowIT extends AbstractNifiIT {
 
   private static final int HOST_PORT = 18445;
-  private static final String USER = "admin";
-  private static final String PASSWORD = "ctsNiFiTestPassword123";
   private static final String TOPIC = "civitas/it/postgis";
   private static final String GEO_TOPIC = "civitas/it/postgis-geo";
   private static final String GEO_25832_TOPIC = "civitas/it/postgis-geo-25832";
@@ -85,25 +72,10 @@ class NifiPostgisDataFlowIT {
   private static Network network;
   private static GenericContainer<?> mosquitto;
   private static PostgreSQLContainer<?> postgres;
-  private static FixedHostPortGenericContainer<?> nifi;
-  private static Client httpClient;
-  private static NifiRestClient client;
-
-  /**
-   * Host on which published container ports are reachable. In CI the Docker daemon is remote
-   * (DinD), so this resolves to the Docker host rather than localhost.
-   */
-  private static String dockerHost;
-
-  private final ObjectMapper mapper = new ObjectMapper();
 
   @BeforeAll
   static void startStack() throws Exception {
-    assumeTrue(
-        DockerClientFactory.instance().isDockerAvailable(),
-        "Docker not available — skipping NiFi/PostGIS data-flow IT");
-
-    dockerHost = DockerClientFactory.instance().dockerHostIpAddress();
+    assumeTrue(dockerAvailable(), "Docker not available — skipping NiFi/PostGIS data-flow IT");
 
     network = Network.newNetwork();
 
@@ -128,48 +100,19 @@ class NifiPostgisDataFlowIT {
     postgres.start();
     createTable();
 
-    nifi =
-        new FixedHostPortGenericContainer<>("apache/nifi:2.9.0")
-            .withFixedExposedPort(HOST_PORT, 8443)
-            .withNetwork(network)
-            .withEnv("SINGLE_USER_CREDENTIALS_USERNAME", USER)
-            .withEnv("SINGLE_USER_CREDENTIALS_PASSWORD", PASSWORD)
-            .withEnv("NIFI_WEB_HTTPS_PORT", "8443")
-            .withEnv(
-                "NIFI_WEB_PROXY_HOST", dockerHost + ":" + HOST_PORT + ",localhost:" + HOST_PORT)
-            // the DBCP fragment loads the driver from this path
-            .withCopyFileToContainer(
-                MountableFile.forHostPath(postgresDriverJar()), "/opt/nifi/drivers/postgresql.jar")
-            .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(5)));
-    nifi.start();
-
-    httpClient =
-        ClientBuilder.newBuilder()
-            .sslContext(trustAll())
-            .hostnameVerifier((host, session) -> true)
-            .build();
-    client =
-        new NifiRestClient("https://" + dockerHost + ":" + HOST_PORT, USER, PASSWORD, httpClient);
-
-    await()
-        .atMost(Duration.ofMinutes(3))
-        .pollInterval(Duration.ofSeconds(5))
-        .ignoreExceptions()
-        .until(
-            () -> {
-              client.authenticate();
-              return true;
-            });
+    // the DBCP fragment loads the JDBC driver from this path
+    startNifi(
+        HOST_PORT,
+        network,
+        container ->
+            container.withCopyFileToContainer(
+                MountableFile.forHostPath(postgresDriverJar()),
+                "/opt/nifi/drivers/postgresql.jar"));
   }
 
   @AfterAll
   static void stopStack() {
-    if (httpClient != null) {
-      httpClient.close();
-    }
-    if (nifi != null) {
-      nifi.stop();
-    }
+    stopNifi();
     if (postgres != null) {
       postgres.stop();
     }
@@ -447,10 +390,6 @@ class NifiPostgisDataFlowIT {
     }
   }
 
-  private Map<String, Object> map(String json) throws Exception {
-    return mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
-  }
-
   /** Minimal retained-message MQTT publisher. */
   private static final class MqttPublisher implements AutoCloseable {
     private final MqttClient mqtt;
@@ -476,32 +415,6 @@ class NifiPostgisDataFlowIT {
         mqtt.disconnect();
       }
       mqtt.close();
-    }
-  }
-
-  private static SSLContext trustAll() {
-    try {
-      SSLContext ctx = SSLContext.getInstance("TLS");
-      ctx.init(
-          null,
-          new TrustManager[] {
-            new X509TrustManager() {
-              @Override
-              public void checkClientTrusted(X509Certificate[] chain, String authType) {}
-
-              @Override
-              public void checkServerTrusted(X509Certificate[] chain, String authType) {}
-
-              @Override
-              public X509Certificate[] getAcceptedIssuers() {
-                return new X509Certificate[0];
-              }
-            }
-          },
-          new SecureRandom());
-      return ctx;
-    } catch (Exception e) {
-      throw new IllegalStateException("cannot build trust-all SSL context", e);
     }
   }
 }
