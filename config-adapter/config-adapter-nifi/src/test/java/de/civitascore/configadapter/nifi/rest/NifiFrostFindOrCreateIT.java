@@ -172,17 +172,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                             "{\"name\":\"find-or-create-it\",\"description\":\"IT project\"}"))
                     .build(),
                 HttpResponse.BodyHandlers.ofString());
-    Matcher matcher =
-        Pattern.compile("Projects\\((\\d+)\\)")
-            .matcher(response.headers().firstValue("Location").orElse(""));
-    if (matcher.find()) {
-      return Long.parseLong(matcher.group(1));
-    }
-    throw new IllegalStateException(
-        "could not create FROST project (status "
-            + response.statusCode()
-            + "): "
-            + response.body());
+    return idFromLocation(response, "Projects");
   }
 
   @AfterAll

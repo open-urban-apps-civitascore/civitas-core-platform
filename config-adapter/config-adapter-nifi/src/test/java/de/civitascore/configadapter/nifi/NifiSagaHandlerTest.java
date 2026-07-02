@@ -230,25 +230,36 @@ class NifiSagaHandlerTest {
     verify(restClient).deleteFlowByName(eq("pipeline-p-2"));
   }
 
-  @Test
-  void deployWithoutDatasinkDefaultsToFrost() throws Exception {
-    when(restClient.deployFlow(any())).thenReturn("pg-frost");
-    Map<String, Object> payload =
+  /**
+   * A FROST-default-sink command (no datasink): the shared payload of the FROST deploy tests.
+   * {@code projectIdField} is a raw JSON member line (e.g. {@code "projectId": "5",}) or empty for
+   * an absent id.
+   */
+  private SagaCommandMessage frostCommand(String operation, String action, String projectIdField)
+      throws Exception {
+    return SagaCommandMessage.fromMap(
         map(
             """
-            { "type": "EXECUTE_STEP", "sagaId": "saga-frost", "stepId": "deploy-pipelines",
-              "adapter": "nifi", "operation": "DEPLOY_PIPELINES",
-              "projectId": "5",
+            { "type": "EXECUTE_STEP", "sagaId": "saga-frost", "stepId": "pipelines",
+              "adapter": "nifi", "operation": "%s",
+              %s
               "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
               "datasinks": [],
-              "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
+              "dataPipelines": [ { "id": "p-1", "version": "1", "action": "%s",
                 "data": { "nodes": [
                     { "id": "s", "type": "start", "data": {} },
                     { "id": "e", "type": "end", "data": {} } ],
                   "edges": [ { "id": "e1", "source": "s", "target": "e" } ] } } ] }
-            """);
+            """
+                .formatted(operation, projectIdField, action)));
+  }
 
-    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+  @Test
+  void deployWithoutDatasinkDefaultsToFrost() throws Exception {
+    when(restClient.deployFlow(any())).thenReturn("pg-frost");
+
+    SagaCommandResult result =
+        handler.handle(frostCommand("DEPLOY_PIPELINES", "ADD", "\"projectId\": \"5\","));
 
     // a FROST default sink consumes the raw STA envelope — no mapping node (a mapping would be
     // rejected; see frostSinkWithMappingIsRejected in FlowDeploymentPlannerTest)
@@ -262,22 +273,9 @@ class NifiSagaHandlerTest {
   @Test
   void updateThreadsProjectIdIntoRedeployedFrostFlow() throws Exception {
     when(restClient.deployFlow(any())).thenReturn("pg-frost-upd");
-    Map<String, Object> payload =
-        map(
-            """
-            { "type": "EXECUTE_STEP", "sagaId": "saga-upd", "stepId": "update-pipelines",
-              "adapter": "nifi", "operation": "UPDATE_PIPELINES",
-              "projectId": "9",
-              "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
-              "datasinks": [],
-              "dataPipelines": [ { "id": "p-1", "version": "2", "action": "UPDATE",
-                "data": { "nodes": [
-                    { "id": "s", "type": "start", "data": {} },
-                    { "id": "e", "type": "end", "data": {} } ],
-                  "edges": [ { "id": "e1", "source": "s", "target": "e" } ] } } ] }
-            """);
 
-    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+    SagaCommandResult result =
+        handler.handle(frostCommand("UPDATE_PIPELINES", "UPDATE", "\"projectId\": \"9\","));
 
     assertEquals("STEP_COMPLETED", result.type());
     ArgumentCaptor<DeploymentPlan> plan = ArgumentCaptor.forClass(DeploymentPlan.class);
@@ -289,22 +287,8 @@ class NifiSagaHandlerTest {
   void frostDeployWithNonNumericProjectIdFailsTheStep() throws Exception {
     // A present-but-non-numeric id must fail the step through the safe-external-message path
     // (never deploy, never leak the raw value across the result topic).
-    Map<String, Object> payload =
-        map(
-            """
-            { "type": "EXECUTE_STEP", "sagaId": "saga-frost", "stepId": "deploy-pipelines",
-              "adapter": "nifi", "operation": "DEPLOY_PIPELINES",
-              "projectId": "1) or true",
-              "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
-              "datasinks": [],
-              "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
-                "data": { "nodes": [
-                    { "id": "s", "type": "start", "data": {} },
-                    { "id": "e", "type": "end", "data": {} } ],
-                  "edges": [ { "id": "e1", "source": "s", "target": "e" } ] } } ] }
-            """);
-
-    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+    SagaCommandResult result =
+        handler.handle(frostCommand("DEPLOY_PIPELINES", "ADD", "\"projectId\": \"1) or true\","));
 
     assertEquals("STEP_FAILED", result.type());
     assertFalse(result.error().contains("1) or true"), "raw payload value must not leak");
@@ -315,21 +299,7 @@ class NifiSagaHandlerTest {
   void frostDeployWithoutProjectIdFailsTheStep() throws Exception {
     // Without the FROST create-project step's result the flow would post to the server root,
     // invisible through the dataset's named API — fail the saga instead of deploying it.
-    Map<String, Object> payload =
-        map(
-            """
-            { "type": "EXECUTE_STEP", "sagaId": "saga-frost", "stepId": "deploy-pipelines",
-              "adapter": "nifi", "operation": "DEPLOY_PIPELINES",
-              "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
-              "datasinks": [],
-              "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
-                "data": { "nodes": [
-                    { "id": "s", "type": "start", "data": {} },
-                    { "id": "e", "type": "end", "data": {} } ],
-                  "edges": [ { "id": "e1", "source": "s", "target": "e" } ] } } ] }
-            """);
-
-    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+    SagaCommandResult result = handler.handle(frostCommand("DEPLOY_PIPELINES", "ADD", ""));
 
     assertEquals("STEP_FAILED", result.type());
     verify(restClient, times(0)).deployFlow(any());
