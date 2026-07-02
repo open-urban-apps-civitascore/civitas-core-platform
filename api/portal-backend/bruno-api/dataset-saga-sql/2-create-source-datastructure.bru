@@ -46,7 +46,7 @@ docs {
 
   Creates the source DataStructure ("SQL Saga Source Structure"). Its version (step 3) holds a JSON Schema with scalar `lon`/`lat`/`stationid` fields — the raw shape the SQL source rows arrive in and the input the pipeline's `geoPoint` op reads (`$.lon`, `$.lat`). The datasource is patched to this version before release.
 
-  **Expected Response:** 201 Created, body contains `id`. 409 if it already exists (idempotent).
+  **Expected Response:** 201 Created, body contains `id`. A 409 means a previous run leaked (the test asserts a strict 201 and fails).
 
   **Post-condition:** Save `sqlSourceDataStructureId` from `body.id`.
 

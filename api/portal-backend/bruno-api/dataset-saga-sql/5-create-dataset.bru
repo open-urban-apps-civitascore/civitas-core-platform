@@ -45,7 +45,7 @@ docs {
 
   Creates the dataset ("SQL Saga DataSet") that will be staged, released (triggering the DATASET_CREATE saga), and later unreleased (triggering DATASET_DELETE). The POSTGIS DataSink (step 6) and the pipeline (step 7) are both nested under this dataset.
 
-  **Expected Response:** 201 Created, body contains `id`. 409 if it already existed (idempotent).
+  **Expected Response:** 201 Created, body contains `id`. A 409 means a previous run leaked (the test asserts a strict 201 and fails).
 
   **Post-condition:** Save `sqlDataSetId` from `body.id`.
 

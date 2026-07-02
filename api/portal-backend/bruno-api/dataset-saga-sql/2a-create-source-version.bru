@@ -62,7 +62,7 @@ docs {
 
   Creates version 1.0.0 of the source structure. The model is a JSON Schema with scalar `lon`/`lat`/`stationid` fields (no geometry) — this is the input shape the `geoPoint` op consumes.
 
-  **Expected Response:** 201 Created, body contains `id`. 409 if it already exists.
+  **Expected Response:** 201 Created, body contains `id`. A 409 means a previous run leaked (the test asserts a strict 201 and fails).
 
   **Post-condition:** Saves `sqlSourceVersionId` from `body.id` (used by step 4a to configure the datasource and as the mapping `source` URN version in step 7).
 

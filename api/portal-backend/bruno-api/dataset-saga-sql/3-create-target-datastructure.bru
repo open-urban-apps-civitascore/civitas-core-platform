@@ -46,7 +46,7 @@ docs {
 
   Creates the target DataStructure ("SQL Saga Target Structure"). Its version (step 3a) holds a JSON Schema with a `geo` property that `$ref`s the GeoJSON Point schema. The PostGIS adapter turns that ref into a `GEOMETRY(POINT,4326)` column when the saga provisions the sink table. The POSTGIS DataSink (step 6) references this version.
 
-  **Expected Response:** 201 Created, body contains `id`. 409 if it already exists (idempotent).
+  **Expected Response:** 201 Created, body contains `id`. A 409 means a previous run leaked (the test asserts a strict 201 and fails).
 
   **Post-condition:** Save `sqlTargetDataStructureId` from `body.id`.
 

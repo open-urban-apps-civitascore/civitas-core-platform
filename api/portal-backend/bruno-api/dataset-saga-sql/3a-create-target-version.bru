@@ -61,7 +61,7 @@ docs {
 
   Creates version 1.0.0 of the target structure. The `geo` property `$ref`s `https://geojson.org/schema/Point.json`; without a `crs` hint the PostGIS adapter defaults the geometry column SRID to 4326, producing `GEOMETRY(POINT,4326)`. `stationid` becomes a text column. This is the schema the POSTGIS DataSink's table is derived from.
 
-  **Expected Response:** 201 Created, body contains `id`. 409 if it already exists.
+  **Expected Response:** 201 Created, body contains `id`. A 409 means a previous run leaked (the test asserts a strict 201 and fails).
 
   **Post-condition:** Saves `sqlTargetVersionId` from `body.id` (referenced by the DataSink in step 6 and as the mapping `target` URN version in step 7).
 
