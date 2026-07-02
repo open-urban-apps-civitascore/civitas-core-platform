@@ -133,6 +133,11 @@ public abstract class BaseEventPublishingIntegrationTest extends BaseKeycloakInt
     }
   }
 
+  // Unlike cleanupKeycloakUsers, this deletes every group unconditionally: the civitas-core realm
+  // is created empty per test run (ensureCivitasCoreRealmExists) and only ever holds groups synced
+  // by the tests, so there is no non-test group to preserve. Test group names are heterogeneous
+  // ("Init Test Admins", "syncgrp<ms>", "Test Group <ms>", ...) with no common prefix, so scoping
+  // by name would silently leak groups whenever a new test introduces a new naming pattern.
   private void cleanupKeycloakGroups() {
     try {
       List<org.keycloak.representations.idm.GroupRepresentation> groups =
