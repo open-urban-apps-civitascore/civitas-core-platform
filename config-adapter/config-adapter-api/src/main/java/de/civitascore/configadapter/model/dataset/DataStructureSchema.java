@@ -82,6 +82,9 @@ public final class DataStructureSchema {
    * one property whose only content is a local {@code $ref} into {@code $defs}/{@code definitions};
    * the referenced class carries the real columns. A root with its own {@code allOf} or with any
    * property that is more than a bare local {@code $ref} is a normal definition, not a wrapper.
+   *
+   * @throws IllegalArgumentException if the root is a wrapper but its {@code $ref} target is absent
+   *     from {@code definitions}
    */
   private static Map<String, Object> wrappedRootDefinition(
       Map<String, Object> schema, Map<String, Object> definitions) {
@@ -96,12 +99,20 @@ public final class DataStructureSchema {
     if (property.size() != 1) {
       return null;
     }
-    String key = localDefName(stringValue(property.get("$ref")));
+    String ref = stringValue(property.get("$ref"));
+    String key = localDefName(ref);
     if (key == null) {
       return null;
     }
+    // The root is unambiguously a wrapper (its sole property is a local $ref); a target that is
+    // absent or empty is a broken schema, not a non-wrapper. Falling back to the legacy path would
+    // derive a table from the unresolved wrapper, so reject it here like collectInto does.
     Map<String, Object> target = mapValue(definitions.get(key));
-    return target.isEmpty() ? null : target;
+    if (target.isEmpty()) {
+      throw new IllegalArgumentException(
+          "dataStructure JSON Schema wrapper $ref '" + ref + "' resolves to no definition");
+    }
+    return target;
   }
 
   /**

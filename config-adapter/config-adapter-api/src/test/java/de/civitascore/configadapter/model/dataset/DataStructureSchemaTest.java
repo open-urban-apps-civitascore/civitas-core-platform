@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.model.dataset;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -234,6 +235,22 @@ class DataStructureSchemaTest {
                   "$defs": { "Point": { "properties": { "x": { "type": "number" } } } } }
                 """));
     assertEquals(List.of("location"), List.copyOf(resolved.properties().keySet()));
+  }
+
+  @Test
+  void wrapperRootWithMissingRefTargetIsRejected() {
+    // A wrapper root pointing at a $ref absent from $defs is a broken schema; rejecting it here
+    // stops resolveDefinition from silently deriving a table from the unresolved wrapper.
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            DataStructureSchema.resolveDefinition(
+                json(
+                    """
+                    { "title": "MyStructure",
+                      "properties": { "trafficsensor": { "$ref": "#/$defs/TrafficSensor" } },
+                      "$defs": {} }
+                    """)));
   }
 
   @Test
