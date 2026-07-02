@@ -62,6 +62,23 @@ describe('requiredFieldPaths', () => {
     ).toEqual([])
   })
 
+  it('emits the container path when a required object has only optional children', () => {
+    expect(
+      requiredFieldPaths(
+        tree([
+          node({
+            path: '$.loc',
+            name: 'loc',
+            type: 'object',
+            portType: 'object',
+            required: true,
+            children: [node({ path: '$.loc.alt', name: 'alt', required: false })],
+          }),
+        ]),
+      ),
+    ).toEqual(['$.loc'])
+  })
+
   it('emits array element leaf paths with the [] segment', () => {
     expect(
       requiredFieldPaths(

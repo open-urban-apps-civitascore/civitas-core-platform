@@ -124,26 +124,19 @@ export const SqlApiResponseSchema = z.object({
 })
 
 const SqlBaseSchema = z.object({
-  driver: z.enum([
-    'postgres',
-    'mysql',
-    'clickhouse',
-    'mssql',
-    'sqlite',
-    'oracle',
-    'snowflake',
-    'trino',
-    'gocosmos',
-    'spanner',
-  ]),
+  // Only PostgreSQL is wired in the NiFi pipeline engine, so the form offers no other driver. The
+  // wide driver list stays in SqlApiResponseSchema so loading a legacy datasource that still names
+  // another driver does not fail.
+  driver: z.literal('postgres'),
   dsn: z.string().trim(),
   table: z.string().trim(),
   columns: z.string().trim(),
   where: z.string().trim(),
-  // prefix/suffix/init_statement/conn_max_* are Redpanda-Connect fields the NiFi engine does not
-  // honor (issue #1779): the form no longer offers them and the adapter rejects them, so they are
-  // not part of the form schema. They remain in SqlApiResponseSchema so loading a legacy datasource
-  // that still carries them does not fail (unknown keys are stripped on save).
+  // prefix/suffix/init_statement are Redpanda-Connect query fields the NiFi engine does not honor;
+  // conn_max_* are its pool-tuning fields. The adapter rejects prefix/suffix/init_statement and
+  // ignores conn_max_*, and the form no longer offers any of them, so they are not part of the form
+  // schema. They remain in SqlApiResponseSchema so loading a legacy datasource that still carries
+  // them does not fail (unknown keys are stripped on save).
   user: z.string().trim(),
   password: z.string().trim(),
 })

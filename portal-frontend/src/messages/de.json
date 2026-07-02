@@ -1162,8 +1162,8 @@
     },
     "cronPanel": {
       "cronExpression": "CRON-Ausdruck",
-      "invalidCron": "Ungültiger CRON-Ausdruck. Muss 6- oder 7-Feld Quartz-Syntax sein (Sekunden Minuten Stunden Tag-des-Monats Monat Wochentag [Jahr]).",
-      "cronHint": "Ein CRON-Ausdruck legt fest, wann die Pipeline automatisch ausgeführt werden soll.",
+      "invalidCron": "Ungültiger CRON-Ausdruck. Muss 6-Feld NiFi-Syntax sein (Sekunden Minuten Stunden Tag-des-Monats Monat Wochentag).",
+      "cronHint": "Ein CRON-Ausdruck legt fest, wann die Pipeline automatisch ausgeführt werden soll. Sechs Felder, kein Jahr. Für den Wochentag bevorzugt Namen (MON–SUN) verwenden; Zahlen sind 0–7, wobei 0 und 7 für Sonntag stehen.",
       "learnCron": "Über CRON-Ausdrücke erfahren",
       "currentExpression": "Aktueller Ausdruck"
     },
@@ -1229,11 +1229,16 @@
         "startNodeRequired": "Pipeline muss mindestens einen Start-Knoten haben",
         "endNodeRequired": "Pipeline muss mindestens einen End-Knoten haben",
         "nodeNotConfigured": "{label} ist nicht konfiguriert",
-        "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6- oder 7-Feld Quartz-Syntax sein.",
+        "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld NiFi-Syntax sein.",
         "orphanNode": "{label} ist mit keinem anderen Knoten verbunden",
         "minimumFunctionalNodes": "Pipeline muss mindestens einen funktionalen Knoten zwischen Start und Ende haben",
         "duplicateTableName": "Zwei Geo-Persistenz-Speicher dürfen nicht den gleichen Namen haben",
         "cronMqttIncompatible": "Ein CRON-Trigger kann nicht mit einer MQTT-Datenquelle verwendet werden. Bitte eine SQL-Quelle (Pull) verwenden.",
+        "cronSourceConnectorUnknown": "Der Quell-Konnektor konnte nicht ermittelt werden; ein CRON-Trigger funktioniert nur mit einer SQL-Quelle (Pull), nicht mit MQTT.",
+        "sqlSourceNoScheduleDefaultPoll": "Diese SQL-Quelle hat keinen CRON-Knoten und pollt im Standardintervall (alle 5 Minuten). Für einen expliziten Zeitplan bitte einen CRON-Knoten hinzufügen.",
+        "frostSinkNoMapping": "Ein FROST-Speicher übernimmt die Quelldaten unverändert und unterstützt kein Feld-Mapping — bitte den Mapping-Knoten entfernen.",
+        "sqlSourceToFrost": "Eine SQL-Quelle kann nicht in einen FROST-Speicher schreiben; FROST benötigt eine SensorThings-Quelle (MQTT).",
+        "nodeNotWired": "{label} muss mit einer eingehenden und einer ausgehenden Kante verbunden sein",
         "mappingRequiredFieldsMissing": "{label} weist nicht alle Pflicht-Zielfelder zu: {fields}",
         "mappingNotSaved": "{label} hat kein gespeichertes Feld-Mapping — bitte den Mapping-Editor öffnen und speichern"
       }

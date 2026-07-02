@@ -87,7 +87,8 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       key: 'driver',
       type: 'select',
       label: { label: 'Driver', labelHint: '' },
-      // Only postgres is supported by the pipeline engine (the backend rejects other drivers).
+      // Only postgres is wired in the pipeline engine; the adapter rejects any other driver at
+      // deploy, so the form offers just this one.
       options: ['postgres'],
       defaultValue: 'postgres',
       required: true,

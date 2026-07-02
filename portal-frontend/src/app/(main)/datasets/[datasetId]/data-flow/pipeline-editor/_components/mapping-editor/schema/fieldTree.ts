@@ -4,6 +4,10 @@ import type { FieldNode, SchemaTree } from '../_types'
  * The paths of the required leaf fields. Recurses only into required objects/arrays, so an optional
  * container does not force its children to be mapped. Used to snapshot the target's required fields
  * on the mapping node for synchronous pipeline validation.
+ *
+ * A required container whose children are all optional contributes no leaf path, yet the sink still
+ * gets a NOT NULL column for it — so the container's own path is recorded in that case, forcing the
+ * user to map it and preventing a deploy that then fails every record at write time.
  */
 export const requiredFieldPaths = (tree: SchemaTree): string[] => {
   const paths: string[] = []
@@ -11,7 +15,9 @@ export const requiredFieldPaths = (tree: SchemaTree): string[] => {
     for (const field of fields) {
       if (!field.required) continue
       if (field.children && field.children.length > 0) {
+        const before = paths.length
         walk(field.children)
+        if (paths.length === before) paths.push(field.path)
       } else {
         paths.push(field.path)
       }

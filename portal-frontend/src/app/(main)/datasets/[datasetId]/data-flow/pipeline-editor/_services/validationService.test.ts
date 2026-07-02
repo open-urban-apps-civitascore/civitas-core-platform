@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Pipeline, PipelineNode } from '../_types/pipeline'
 import { createEmptyPipeline } from './pipelineService'
-import { isValidQuartzCron, validatePipeline } from './validationService'
+import { isValidNifiCron, validatePipeline } from './validationService'
 
 const CRON_MQTT_KEY = 'validation.messages.cronMqttIncompatible'
 
@@ -45,35 +45,36 @@ const mappingNode = (
   data: { label: 'Mapping', configured, mappingConfig: { fields, positions: {} }, targetRequiredFields },
 })
 
-describe('isValidQuartzCron', () => {
+describe('isValidNifiCron', () => {
   it('accepts a 6-field expression', () => {
-    expect(isValidQuartzCron('0 0 6 * * ?')).toBe(true)
+    expect(isValidNifiCron('0 0 6 * * ?')).toBe(true)
   })
 
-  it('accepts a 7-field expression with an optional year (matches the backend)', () => {
-    expect(isValidQuartzCron('0 0 6 * * ? 2026')).toBe(true)
-    expect(isValidQuartzCron('0 0 6 * * ? *')).toBe(true)
+  it('rejects a 7-field expression with a year (NiFi 2.x dropped the Quartz year field)', () => {
+    expect(isValidNifiCron('0 0 6 * * ? 2026')).toBe(false)
+    expect(isValidNifiCron('0 0 6 * * ? *')).toBe(false)
   })
 
-  it('rejects a 5-field (non-Quartz) expression', () => {
-    expect(isValidQuartzCron('0 0 * * *')).toBe(false)
+  it('rejects a 5-field expression', () => {
+    expect(isValidNifiCron('0 0 * * *')).toBe(false)
   })
 
-  it('rejects an 8-field expression and a malformed year', () => {
-    expect(isValidQuartzCron('0 0 6 * * ? 2026 extra')).toBe(false)
-    expect(isValidQuartzCron('0 0 6 * * ? 20')).toBe(false)
+  it('accepts Spring day-of-week 0 (Sunday); rejects out-of-range 8', () => {
+    expect(isValidNifiCron('0 0 6 * * 0')).toBe(true)
+    expect(isValidNifiCron('0 0 6 * * 7')).toBe(true)
+    expect(isValidNifiCron('0 0 6 * * 8')).toBe(false)
   })
 
   it('validates per-field ranges, not just the field count', () => {
-    expect(isValidQuartzCron('0 0 25 * * ?')).toBe(false) // hour out of range (>23)
-    expect(isValidQuartzCron('0 60 6 * * ?')).toBe(false) // minute out of range (>59)
-    expect(isValidQuartzCron('0 0 6 32 * ?')).toBe(false) // day-of-month out of range (>31)
-    expect(isValidQuartzCron('0 0 6 * 13 ?')).toBe(false) // month out of range (>12)
+    expect(isValidNifiCron('0 0 25 * * ?')).toBe(false) // hour out of range (>23)
+    expect(isValidNifiCron('0 60 6 * * ?')).toBe(false) // minute out of range (>59)
+    expect(isValidNifiCron('0 0 6 32 * ?')).toBe(false) // day-of-month out of range (>31)
+    expect(isValidNifiCron('0 0 6 * 13 ?')).toBe(false) // month out of range (>12)
   })
 
   it('accepts ranges, steps, lists and named months/days', () => {
-    expect(isValidQuartzCron('0 0/15 9-17 ? * MON-FRI')).toBe(true)
-    expect(isValidQuartzCron('0 0 6 1,15 JAN,JUL ?')).toBe(true)
+    expect(isValidNifiCron('0 0/15 9-17 ? * MON-FRI')).toBe(true)
+    expect(isValidNifiCron('0 0 6 1,15 JAN,JUL ?')).toBe(true)
   })
 })
 
@@ -145,5 +146,84 @@ describe('validateCronRequiresNonMqttSource', () => {
 
   it('does not flag a pipeline without a CRON node', () => {
     expect(hasCronMqttError(pipelineWith([source('MQTT')]))).toBe(false)
+  })
+
+  it('warns (does not error) when a CRON source connector is unknown', () => {
+    const unknownSource: TestNode = {
+      id: 'src-1',
+      type: 'dataSource',
+      data: { label: 'Source', configured: true, entityType: 'datasource', entityMetadata: {} },
+    }
+    const result = validatePipeline(pipelineWith([cronNode, unknownSource]))
+    expect(result.errors.some(error => error.messageKey === CRON_MQTT_KEY)).toBe(false)
+    expect(
+      result.warnings.some(warning => warning.messageKey === 'validation.messages.cronSourceConnectorUnknown'),
+    ).toBe(true)
+  })
+})
+
+describe('sink/source combination rules mirror the deploy engine', () => {
+  const frostSink: TestNode = { id: 'frost-1', type: 'frost', data: { label: 'FROST', configured: true } }
+  const mapping: TestNode = {
+    id: 'map-1',
+    type: 'mapping',
+    data: {
+      label: 'Mapping',
+      configured: true,
+      mappingConfig: { fields: {}, positions: {} },
+      targetRequiredFields: [],
+    },
+  }
+
+  const has = (pipeline: Pipeline, key: string): boolean =>
+    validatePipeline(pipeline).errors.some(error => error.messageKey === key)
+
+  it('rejects a FROST sink combined with a mapping node', () => {
+    expect(has(pipelineWith([frostSink, mapping]), 'validation.messages.frostSinkNoMapping')).toBe(true)
+  })
+
+  it('rejects a SQL source writing to a FROST sink', () => {
+    expect(has(pipelineWith([source('SQL'), frostSink]), 'validation.messages.sqlSourceToFrost')).toBe(true)
+  })
+
+  it('allows an MQTT source writing to a FROST sink', () => {
+    expect(has(pipelineWith([source('MQTT'), frostSink]), 'validation.messages.sqlSourceToFrost')).toBe(false)
+  })
+})
+
+describe('validateCronAndMappingWired', () => {
+  const NOT_WIRED_KEY = 'validation.messages.nodeNotWired'
+
+  const wire = (nodes: TestNode[], edges: { id: string; source: string; target: string }[]): Pipeline => ({
+    ...pipelineWith(nodes),
+    edges,
+  })
+
+  it('flags a cron node with only an incoming edge', () => {
+    const pipeline = wire(
+      [
+        { id: 's', type: 'start', data: {} },
+        { id: 'c', type: 'cron', data: { label: 'CRON' } },
+      ],
+      [{ id: 'e1', source: 's', target: 'c' }],
+    )
+    const errors = validatePipeline(pipeline).errors.filter(error => error.messageKey === NOT_WIRED_KEY)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('c')
+  })
+
+  it('accepts a cron node wired both ways', () => {
+    const pipeline = wire(
+      [
+        { id: 's', type: 'start', data: {} },
+        { id: 'c', type: 'cron', data: { label: 'CRON' } },
+        { id: 'e', type: 'end', data: {} },
+      ],
+      [
+        { id: 'e1', source: 's', target: 'c' },
+        { id: 'e2', source: 'c', target: 'e' },
+      ],
+    )
+    expect(validatePipeline(pipeline).errors.some(error => error.messageKey === NOT_WIRED_KEY)).toBe(false)
   })
 })
