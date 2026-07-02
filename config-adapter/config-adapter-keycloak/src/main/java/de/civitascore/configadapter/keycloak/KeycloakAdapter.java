@@ -90,6 +90,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
 
     RoleSyncHelper roleSyncHelper = new RoleSyncHelper();
+    GroupSyncHelper groupSyncHelper = new GroupSyncHelper();
     ResultPublisher resultPublisher =
         (event, successCode, resourceId) ->
             publishSuccessResult(event, successCode.toString(), resourceId);
@@ -106,6 +107,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
                     objectMapper,
                     resultPublisher,
                     roleSyncHelper,
+                    groupSyncHelper,
                     invitationClientId,
                     invitationRedirectUri),
             ResourceType.ROLE,

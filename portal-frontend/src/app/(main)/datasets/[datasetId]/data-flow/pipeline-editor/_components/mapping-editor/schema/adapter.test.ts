@@ -27,6 +27,13 @@ const edge = (
   data: { relationship: { type, source, target, ...roles } },
 })
 
+/** Inheritance/realization edge: source is the subclass, target is the parent. */
+const inhEdge = (source: string, target: string, type: 'inheritance' | 'realization' = 'inheritance') => ({
+  source,
+  target,
+  data: { relationship: { type, source, target } },
+})
+
 describe('umlDiagramToSchemaTree — required derivation', () => {
   const diagram = {
     nodes: [
@@ -150,5 +157,151 @@ describe('umlDiagramToSchemaTree', () => {
 
   it('returns an empty tree for a null diagram', () => {
     expect(umlDiagramToSchemaTree(null, 'fallback')).toEqual({ name: 'fallback', fields: [] })
+  })
+
+  it('roots on the subclass and inlines inherited attributes (inherited first)', () => {
+    const diagram = {
+      nodes: [classNode('animal', 'Animal', [{ name: 'name' }]), classNode('dog', 'Dog', [{ name: 'breed' }])],
+      edges: [inhEdge('dog', 'animal')],
+    } as unknown as UMLDiagram
+
+    const tree = umlDiagramToSchemaTree(diagram, 'animal')
+    expect(tree.name).toBe('Dog')
+    expect(tree.fields.map(f => f.name)).toEqual(['name', 'breed'])
+    expect(tree.fields.map(f => f.path)).toEqual(['$.name', '$.breed'])
+  })
+
+  it('handles realization the same way as inheritance', () => {
+    const diagram = {
+      nodes: [classNode('iface', 'IFace', [{ name: 'y' }]), classNode('impl', 'Impl', [{ name: 'x' }])],
+      edges: [inhEdge('impl', 'iface', 'realization')],
+    } as unknown as UMLDiagram
+
+    const tree = umlDiagramToSchemaTree(diagram, 'iface')
+    expect(tree.name).toBe('Impl')
+    expect(tree.fields.map(f => f.name)).toEqual(['y', 'x'])
+  })
+
+  it('inlines multi-level inheritance (A → B → C) top-down', () => {
+    const diagram = {
+      nodes: [
+        classNode('base', 'Base', [{ name: 'a' }]),
+        classNode('mid', 'Mid', [{ name: 'b' }]),
+        classNode('leaf', 'Leaf', [{ name: 'c' }]),
+      ],
+      edges: [inhEdge('mid', 'base'), inhEdge('leaf', 'mid')],
+    } as unknown as UMLDiagram
+
+    const tree = umlDiagramToSchemaTree(diagram, 'leaf')
+    expect(tree.name).toBe('Leaf')
+    expect(tree.fields.map(f => f.name)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('inlines multiple inheritance in parent-edge order', () => {
+    const diagram = {
+      nodes: [
+        classNode('p1', 'P1', [{ name: 'x' }]),
+        classNode('p2', 'P2', [{ name: 'y' }]),
+        classNode('leaf', 'Leaf', [{ name: 'own' }]),
+      ],
+      edges: [inhEdge('leaf', 'p1'), inhEdge('leaf', 'p2')],
+    } as unknown as UMLDiagram
+
+    const tree = umlDiagramToSchemaTree(diagram, 'leaf')
+    expect(tree.name).toBe('Leaf')
+    expect(tree.fields.map(f => f.name)).toEqual(['x', 'y', 'own'])
+  })
+
+  it('lets the subclass override an inherited attribute of the same name (keeping position)', () => {
+    const diagram = {
+      nodes: [
+        classNode('parent', 'Parent', [{ name: 'value', type: 'String' }]),
+        classNode('child', 'Child', [{ name: 'value', type: 'Integer' }]),
+      ],
+      edges: [inhEdge('child', 'parent')],
+    } as unknown as UMLDiagram
+
+    const tree = umlDiagramToSchemaTree(diagram, 'child')
+    expect(tree.fields.map(f => f.name)).toEqual(['value'])
+    expect(tree.fields[0].type).toBe('int')
+  })
+
+  it('lets the first parent win an attribute-name collision across parents', () => {
+    const diagram = {
+      nodes: [
+        classNode('p1', 'P1', [{ name: 'code', type: 'String' }]),
+        classNode('p2', 'P2', [{ name: 'code', type: 'Integer' }]),
+        classNode('leaf', 'Leaf', [{ name: 'own' }]),
+      ],
+      edges: [inhEdge('leaf', 'p1'), inhEdge('leaf', 'p2')],
+    } as unknown as UMLDiagram
+
+    const tree = umlDiagramToSchemaTree(diagram, 'leaf')
+    expect(tree.fields.map(f => f.name)).toEqual(['code', 'own'])
+    expect(tree.fields[0].type).toBe('str')
+  })
+
+  it('combines inheritance (inlined) with composition (nested)', () => {
+    const diagram = {
+      nodes: [
+        classNode('vehicle', 'Vehicle', [{ name: 'vin' }]),
+        classNode('car', 'Car', [{ name: 'doors' }]),
+        classNode('engine', 'Engine', [{ name: 'power' }]),
+      ],
+      edges: [inhEdge('car', 'vehicle'), edge('composition', 'engine', 'car', { sourceRole: 'engine' })],
+    } as unknown as UMLDiagram
+
+    const tree = umlDiagramToSchemaTree(diagram, 'car')
+    expect(tree.name).toBe('Car')
+    expect(tree.fields.map(f => f.name)).toEqual(['vin', 'doors', 'engine'])
+    expect(tree.fields.find(f => f.name === 'engine')?.children?.map(c => c.name)).toEqual(['power'])
+  })
+
+  it('inlines a structural child that hangs off an inherited parent', () => {
+    const diagram = {
+      nodes: [
+        classNode('vehicle', 'Vehicle', [{ name: 'vin' }]),
+        classNode('car', 'Car', [{ name: 'doors' }]),
+        classNode('engine', 'Engine', [{ name: 'power' }]),
+      ],
+      edges: [inhEdge('car', 'vehicle'), edge('composition', 'engine', 'vehicle', { sourceRole: 'engine' })],
+    } as unknown as UMLDiagram
+
+    const tree = umlDiagramToSchemaTree(diagram, 'car')
+    expect(tree.name).toBe('Car')
+    expect(tree.fields.map(f => f.name)).toEqual(['vin', 'doors', 'engine'])
+    expect(tree.fields.find(f => f.name === 'engine')?.children?.map(c => c.name)).toEqual(['power'])
+  })
+
+  it('terminates on a cyclic inheritance and emits each attribute once', () => {
+    const diagram = {
+      nodes: [classNode('a', 'A', [{ name: 'a1' }]), classNode('b', 'B', [{ name: 'b1' }])],
+      edges: [inhEdge('a', 'b'), inhEdge('b', 'a')],
+    } as unknown as UMLDiagram
+
+    const tree = umlDiagramToSchemaTree(diagram, 'a')
+    const names = tree.fields.map(f => f.name)
+    expect(new Set(names).size).toBe(names.length)
+    expect(names).toContain('a1')
+    expect(names).toContain('b1')
+  })
+
+  it('never roots on the inheritance parent even when fallbackName matches it', () => {
+    const diagram = {
+      nodes: [classNode('animal', 'Animal', [{ name: 'name' }]), classNode('dog', 'Dog', [{ name: 'breed' }])],
+      edges: [inhEdge('dog', 'animal')],
+    } as unknown as UMLDiagram
+
+    expect(umlDiagramToSchemaTree(diagram, 'animal').name).toBe('Dog')
+  })
+
+  it('prefers the diagram name over the fallbackName when both could match a root', () => {
+    const diagram = {
+      name: 'Beta',
+      nodes: [classNode('a', 'Alpha', [{ name: 'a1' }]), classNode('b', 'Beta', [{ name: 'b1' }])],
+      edges: [],
+    } as unknown as UMLDiagram
+
+    expect(umlDiagramToSchemaTree(diagram, 'alpha').name).toBe('Beta')
   })
 })

@@ -17,6 +17,7 @@ import {
 } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
+import { canMultiplicityBePrimaryKey } from '../../services/jsonSchemaExportService'
 import {
   type UMLAttribute,
   type UMLElement,
@@ -223,7 +224,13 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
               <label className="block text-xs font-medium text-gray-600 mb-1">Cardinality</label>
               <BasicSelect
                 options={getMultiplicityOptions(attribute.multiplicity)}
-                onValueChange={e => updateAttribute(attribute.id, { multiplicity: cardinalityForStorage(e) })}
+                onValueChange={e => {
+                  const multiplicity = cardinalityForStorage(e)
+                  updateAttribute(attribute.id, {
+                    multiplicity,
+                    ...(canMultiplicityBePrimaryKey(multiplicity) ? {} : { isId: false }),
+                  })
+                }}
                 value={cardinalityForDisplay(attribute.multiplicity)}
                 triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                 size="sm"
@@ -285,20 +292,21 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
               </label>
             </div>
 
-            {/* Primary key checkbox */}
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id={`static-${attribute.id}`}
-                checked={attribute.isId}
-                onChange={e => updateAttribute(attribute.id, { isId: e.target.checked })}
-                className="mr-2"
-                disabled={isReadOnly}
-              />
-              <label htmlFor={`static-${attribute.id}`} className="text-xs text-gray-600">
-                {`Primary Key {id}`}
-              </label>
-            </div>
+            {canMultiplicityBePrimaryKey(attribute.multiplicity) && (
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id={`primary-key-${attribute.id}`}
+                  checked={attribute.isId || false}
+                  onChange={e => updateAttribute(attribute.id, { isId: e.target.checked })}
+                  className="mr-2"
+                  disabled={isReadOnly}
+                />
+                <label htmlFor={`primary-key-${attribute.id}`} className="text-xs text-gray-600">
+                  Primary Key {'{id}'}
+                </label>
+              </div>
+            )}
           </div>
         ))}
 

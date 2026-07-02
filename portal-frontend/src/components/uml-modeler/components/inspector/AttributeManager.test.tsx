@@ -14,6 +14,10 @@ vi.mock('../../hooks/use-read-only', () => ({
   useReadOnly: () => ({ isReadOnly: false }),
 }))
 
+vi.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => key,
+}))
+
 const NODE_ID = 'node-1'
 
 const elementWith = (attribute: Partial<UMLAttribute>): UMLClass => ({
@@ -72,5 +76,61 @@ describe('AttributeManager cardinality dropdown', () => {
     openCardinality()
     expect(screen.getByRole('option', { name: '*' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: '1..*' })).toBeInTheDocument()
+  })
+})
+
+describe('AttributeManager primary key', () => {
+  beforeEach(() => updateNode.mockClear())
+
+  it('shows the Primary Key checkbox for an exactly-one attribute', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWith({ multiplicity: '1' })} />)
+    expect(screen.getByText(/Primary Key/)).toBeInTheDocument()
+  })
+
+  it('hides the Primary Key checkbox for an optional (0..1) attribute', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWith({ multiplicity: '0..1' })} />)
+    expect(screen.queryByText(/Primary Key/)).not.toBeInTheDocument()
+  })
+
+  it('hides the Primary Key checkbox for a multivalued attribute', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWith({ multiplicity: '1..*' })} />)
+    expect(screen.queryByText(/Primary Key/)).not.toBeInTheDocument()
+  })
+
+  it('reflects isId in the checkbox checked state', () => {
+    const { rerender } = render(<AttributeManager nodeId={NODE_ID} element={elementWith({ isId: true })} />)
+    expect(screen.getByRole('checkbox', { name: /Primary Key/ })).toBeChecked()
+
+    rerender(<AttributeManager nodeId={NODE_ID} element={elementWith({ isId: undefined })} />)
+    expect(screen.getByRole('checkbox', { name: /Primary Key/ })).not.toBeChecked()
+  })
+
+  it('sets isId when the checkbox is checked', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWith({ isId: false })} />)
+    fireEvent.click(screen.getByRole('checkbox', { name: /Primary Key/ }))
+
+    expect(updateNode).toHaveBeenCalledWith(NODE_ID, {
+      attributes: [expect.objectContaining({ id: 'a1', isId: true })],
+    })
+  })
+
+  it('clears isId when the checkbox is unchecked', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWith({ isId: true })} />)
+    fireEvent.click(screen.getByRole('checkbox', { name: /Primary Key/ }))
+
+    expect(updateNode).toHaveBeenCalledWith(NODE_ID, {
+      attributes: [expect.objectContaining({ id: 'a1', isId: false })],
+    })
+  })
+
+  it.each(['0..1', '1..*'])('clears isId when the cardinality changes to %s', cardinality => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWith({ isId: true })} />)
+    const combobox = within(cardinalityField()).getByRole('combobox')
+    fireEvent.click(combobox)
+    fireEvent.click(screen.getByRole('option', { name: cardinality }))
+
+    expect(updateNode).toHaveBeenCalledWith(NODE_ID, {
+      attributes: [expect.objectContaining({ id: 'a1', multiplicity: cardinality, isId: false })],
+    })
   })
 })

@@ -68,7 +68,7 @@ import org.slf4j.LoggerFactory;
  *     "tableName": "sensor_readings",    // required; the table GeoServer reads
  *     "columns": [ {name,type,...} ],    // optional explicit override (see below)
  *     "geometryColumns": [ {name,geometryType,srid,...} ],
- *     "primaryKey": ["id"],
+ *     "primaryKey": ["id"],              // optional override (non-empty); else derived from schema
  *     "indexes": [ {...} ],
  *     "readRole": { "name":"ds_42_geo", "canLogin":true,
  *                   "password":"ENC(...)", "privileges":["USAGE"] } },  // optional GeoServer role
@@ -77,7 +77,9 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Columns come from explicit {@code configuration.columns} when present, otherwise derived from
  * {@code dataStructure} via {@link DataStructureTableMapper}; at least one column or geometry
- * column must result for provisioning (deprovisioning needs only the identifiers).
+ * column must result for provisioning (deprovisioning needs only the identifiers). The primary key
+ * comes from explicit {@code configuration.primaryKey} when present, otherwise from the {@code
+ * x-core-primaryKey} markers in {@code dataStructure}.
  *
  * <p>{@code PROVISION_SINK} creates schema (if given), table, and read role + grants for each sink
  * in one transaction; {@code DEPROVISION_SINK} drops the table and role (schemas are left, as they
@@ -395,6 +397,9 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       @SuppressWarnings("unchecked")
       Map<String, Object> dataStructure =
           sink.get("dataStructure") instanceof Map<?, ?> model ? (Map<String, Object>) model : null;
+      // The primary key only matters when the table is created (PROVISION). For DEPROVISION
+      // (requireColumns=false) columns are intentionally not derived, so deriving/validating a PK
+      // there would wrongly fail — the table is being dropped, not built.
       if (requireColumns && columns.isEmpty() && dataStructure != null) {
         Set<String> geometryNames = new HashSet<>();
         for (GeometryColumnConfig geometry : geometryColumns) {
@@ -408,30 +413,32 @@ public class PostgisSagaHandler implements SagaCommandHandler {
           geometryColumns.addAll(derived.geometryColumns());
         }
       }
-      // The primary key only matters when the table is created (PROVISION). For DEPROVISION
-      // (requireColumns=false) columns are intentionally not derived, so deriving/validating a PK
-      // there would wrongly fail — the table is being dropped, not built.
-      List<String> primaryKey = List.of();
-      if (requireColumns) {
-        // Shared resolver so the table PRIMARY KEY stays identical to the NiFi UPSERT Update Keys:
-        // explicit configuration wins, otherwise the schema's x-core-primaryKey marker.
-        primaryKey = DataStructureSchema.resolvePrimaryKey(config.get("primaryKey"), dataStructure);
-        // The primary key must reference actual table columns; otherwise the emitted PRIMARY
-        // KEY(...) would name a missing column and provisioning fails with broken DDL. This can
-        // happen when columns are configured explicitly but the marker points at an omitted one.
-        if (primaryKey != null && !primaryKey.isEmpty()) {
-          Set<String> columnNames = new HashSet<>();
-          columns.forEach(column -> columnNames.add(column.name()));
-          geometryColumns.forEach(geometry -> columnNames.add(geometry.name()));
-          List<String> missingKeyColumns =
-              primaryKey.stream().filter(key -> !columnNames.contains(key)).toList();
-          if (!missingKeyColumns.isEmpty()) {
-            throw new IllegalArgumentException(
-                "POSTGIS data sink '"
-                    + tableName
-                    + "' primary key references column(s) not present in the table: "
-                    + missingKeyColumns);
-          }
+
+      // Explicit configuration wins; otherwise the schema's x-core-primaryKey marker via the shared
+      // resolver — the same "explicit wins, else marker" rule the NiFi adapter uses, so the table
+      // PRIMARY KEY and the NiFi UPSERT keys cannot diverge.
+      List<String> primaryKey =
+          requireColumns
+              ? DataStructureSchema.resolvePrimaryKey(config.get("primaryKey"), dataStructure)
+              : List.of();
+      // The primary key must reference actual table columns; otherwise the emitted PRIMARY KEY(...)
+      // would name a missing column and provisioning fails with broken DDL. This can happen when
+      // columns are configured explicitly but a primary-key column (marked or explicit) is omitted
+      // —
+      // including a partial composite key, which would also silently tighten the table's
+      // uniqueness.
+      if (!primaryKey.isEmpty()) {
+        Set<String> columnNames = new HashSet<>();
+        columns.forEach(column -> columnNames.add(column.name()));
+        geometryColumns.forEach(geometry -> columnNames.add(geometry.name()));
+        List<String> missingKeyColumns =
+            primaryKey.stream().filter(key -> !columnNames.contains(key)).toList();
+        if (!missingKeyColumns.isEmpty()) {
+          throw new IllegalArgumentException(
+              "POSTGIS data sink '"
+                  + tableName
+                  + "' primary key references column(s) not present in the table: "
+                  + missingKeyColumns);
         }
       }
 

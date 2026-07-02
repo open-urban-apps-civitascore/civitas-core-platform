@@ -801,10 +801,9 @@
         "description": "Diese Aktion kann nicht rückgängig gemacht werden.",
         "confirm": "Löschen"
       },
-      "deleteErrorModal": {
+      "infoModal": {
         "title": "Rolle kann nicht gelöscht werden",
-        "description": "Zuerst müssen alle Zuordnungen zu Gruppen und Geltungsbereichen entfernt werden.",
-        "close": "Schliessen"
+        "description": "Zuerst müssen alle Zuordnungen zu Gruppen und Geltungsbereichen entfernt werden."
       }
     },
     "permissionsTab": {
@@ -879,7 +878,8 @@
     },
     "errors": {
       "createError": "Beim Anlegen der Rolle ist ein Fehler aufgetreten",
-      "updateError": "Beim Aktualisieren der Rolle ist ein Fehler aufgetreten"
+      "updateError": "Beim Aktualisieren der Rolle ist ein Fehler aufgetreten",
+      "deleteError": "Beim Löschen der Rolle ist ein Fehler aufgetreten"
     },
     "success": {
       "assignmentSuccess": "Die Zuweisungen wurden erfolgreich aktualisiert"
@@ -1101,7 +1101,7 @@
   },
   "pipelineEditor": {
     "title": "Pipeline Editor",
-    "subtitle": "Definiert, wie Daten ingestiert, transformiert und persistiert werden",
+    "subtitle": "Definiert, wie Daten aufgenommen, transformiert und gespeichert werden",
     "canvas": {
       "noPipeline": "Keine Pipeline verfügbar"
     },
@@ -1119,9 +1119,9 @@
       "start": "Start",
       "end": "Ende",
       "dataSource": "Datenquelle",
-      "cronTrigger": "CRON-Trigger",
-      "frostStorage": "FROST-Server",
-      "geoPersistence": "Geo-Persistenz",
+      "cronTrigger": "Geplanter Trigger",
+      "frostStorage": "Sensordaten-Speicher",
+      "geoPersistence": "Geodaten-Speicher",
       "mapping": "Mapping"
     },
     "palette": {
@@ -1141,14 +1141,14 @@
       "flowEndDesc": "Pipeline-Endpunkt. Ausführung endet hier.",
       "dataSource": "Datenquelle",
       "dataSourceDesc": "Datenquelle auswählen",
-      "cron": "CRON",
-      "cronDesc": "Geplanter Trigger. Führt Pipeline nach Zeitplan aus.",
-      "frostServer": "FROST Server",
-      "frostServerDesc": "SensorThings API persistence",
-      "geoPersistence": "Geo-Persistenz",
-      "geoPersistenceDesc": "WFS/WMS Geo-Daten-Persistenz.",
+      "cron": "Geplanter Trigger",
+      "cronDesc": "Pipeline nach Zeitplan ausführen",
+      "frostServer": "Sensordaten-Speicher",
+      "frostServerDesc": "Für SensorThings API",
+      "geoPersistence": "Geodaten-Speicher",
+      "geoPersistenceDesc": "Für WFS/WMS API",
       "mapping": "Mapping",
-      "mappingDesc": "Bloblang-Datentransformation. Daten zuordnen und transformieren."
+      "mappingDesc": "Datenstrukturen mappen"
     },
     "controlPanel": {
       "entryPoint": "Pipeline-Einstiegspunkt",
@@ -1180,14 +1180,14 @@
       "noPermission": "Keine Berechtigung zum Lesen von Datenquellen"
     },
     "frostPanel": {
-      "details": "FROST Server Details",
+      "details": "Sensordaten-Speicher Details",
       "serverName": "Servername",
       "serverUrl": "Server-URL",
-      "internalServer": "Interner Frost Server",
+      "internalServer": "Interner Server",
       "version": "Version"
     },
     "geoPersistencePanel": {
-      "title": "Geo-Persistenz",
+      "title": "Geodaten-Speicher",
       "tableName": "Tabellenname",
       "tableNamePlaceholder": "Tabellennamen eingeben...",
       "dataStructureVersion": "Datenstruktur-Version",

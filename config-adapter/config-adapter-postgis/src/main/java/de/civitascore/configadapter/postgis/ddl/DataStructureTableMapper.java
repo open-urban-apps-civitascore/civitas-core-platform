@@ -22,6 +22,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Derives the table columns for a PostGIS sink from the JSON Schema the portal-backend stores on
@@ -34,6 +36,10 @@ import java.util.regex.Pattern;
  * EPSG:25832}), defaulting to 4326 (the GeoServer handler's CRS default). Any other {@code $ref} is
  * a nested object and maps to {@code JSONB}.
  *
+ * <p>A non-excluded property carrying {@code x-core-primaryKey: true} contributes its name to the
+ * table's primary key, in schema property order. A non-scalar column (geometry, {@code JSONB}
+ * object/array) cannot back a B-tree primary key, so such a marker is skipped.
+ *
  * <p>Names in {@code excludedNames} (explicitly configured geometry columns) are skipped so they
  * are not duplicated as derived columns.
  *
@@ -45,6 +51,8 @@ import java.util.regex.Pattern;
  */
 public final class DataStructureTableMapper {
 
+  private static final Logger logger = LoggerFactory.getLogger(DataStructureTableMapper.class);
+
   private static final int DEFAULT_SRID = 4326;
 
   /** Geometry properties reference a GeoJSON schema under this host; the type is the file name. */
@@ -55,9 +63,10 @@ public final class DataStructureTableMapper {
 
   private DataStructureTableMapper() {}
 
-  /** Derived non-spatial and geometry columns for one sink table. */
   public record TableColumns(
-      List<ColumnConfig> columns, List<GeometryColumnConfig> geometryColumns) {}
+      List<ColumnConfig> columns,
+      List<GeometryColumnConfig> geometryColumns,
+      List<String> primaryKey) {}
 
   /**
    * @throws IllegalArgumentException if the schema contains no usable definition with properties
@@ -73,6 +82,15 @@ public final class DataStructureTableMapper {
               + " table columns");
     }
     List<String> required = List.copyOf(resolved.required());
+    // The primary-key LIST is derived centrally by DataStructureSchema (shared by the PostGIS and
+    // NiFi adapters, non-scalar markers already dropped) so the table PRIMARY KEY and the NiFi
+    // UPSERT keys cannot diverge. An excluded name (an explicitly configured geometry column, not a
+    // derived scalar column here) is dropped from the key too.
+    List<String> primaryKey =
+        DataStructureSchema.primaryKeyColumns(schema).stream()
+            .filter(name -> !excludedNames.contains(name))
+            .toList();
+    Set<String> primaryKeyNames = Set.copyOf(primaryKey);
 
     List<ColumnConfig> columns = new ArrayList<>();
     List<GeometryColumnConfig> geometryColumns = new ArrayList<>();
@@ -82,12 +100,8 @@ public final class DataStructureTableMapper {
         continue;
       }
       Map<String, Object> spec = mapValue(property.getValue());
-      // A primary-key column must be NOT NULL even if the schema's `required` list omits it; the
-      // x-core-primaryKey marker therefore also forces non-nullability here. The PK column LIST
-      // itself is derived centrally by DataStructureSchema (used by both the PostGIS and NiFi
-      // adapters) so the table PRIMARY KEY and the UPSERT keys cannot diverge.
-      boolean isPrimaryKey = Boolean.TRUE.equals(spec.get(DataStructureSchema.PRIMARY_KEY_MARKER));
-      Boolean nullable = (required.contains(name) || isPrimaryKey) ? false : null;
+      // A primary-key column must be NOT NULL even if the schema's `required` list omits it.
+      Boolean nullable = (required.contains(name) || primaryKeyNames.contains(name)) ? false : null;
 
       GeometryType geometryType = geometryType(stringValue(spec.get("$ref")));
       if (geometryType != null) {
@@ -97,10 +111,9 @@ public final class DataStructureTableMapper {
                 name, geometryType, srid != null ? srid : DEFAULT_SRID, null, nullable));
         continue;
       }
-      ColumnType type = columnType(spec);
-      columns.add(new ColumnConfig(name, type, null, null, null, nullable));
+      columns.add(new ColumnConfig(name, columnType(spec), null, null, null, nullable));
     }
-    return new TableColumns(columns, geometryColumns);
+    return new TableColumns(columns, geometryColumns, primaryKey);
   }
 
   /**
