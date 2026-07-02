@@ -75,6 +75,14 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
           + DS_NAME
           + "\"}}]}";
 
+  // An observation whose Datastream (reference+name) was never provisioned: the lookup resolves
+  // nothing, so the flow must route it to the error sink and never POST it.
+  private static final String NO_DS_TOPIC = "civitas/it/frost-obs-nods";
+  private static final String OBS_ENVELOPE_UNKNOWN_DS =
+      "{\"things\":[],\"observations\":[{\"result\":9.9,"
+          + "\"phenomenonTime\":\"2026-01-01T00:00:00Z\","
+          + "\"parameters\":{\"reference\":\"DS-REF-MISSING\",\"name\":\"DS-MISSING\"}}]}";
+
   private static Network network;
   private static GenericContainer<?> mosquitto;
   private static GenericContainer<?> postgis;
@@ -237,6 +245,48 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
               + ". NiFi bulletins:\n"
               + bulletins(),
           e);
+    }
+  }
+
+  @Test
+  void observationWithNoMatchingDatastreamIsNotPosted() throws Exception {
+    // The observation leg looks up the Datastream by reference+name; when none exists it must route
+    // the record to the error sink — it must NOT create the Datastream (the pipeline never creates
+    // one) and therefore never POST the observation. A shared FROST instance means the global
+    // Observation count is churned by the sibling test, so the isolation-safe proof is that no
+    // Datastream ever appears for the missing reference.
+    assertEquals(
+        0,
+        countDatastreamsByFilter("DS-REF-MISSING", "DS-MISSING"),
+        "precondition: the referenced Datastream must not exist");
+
+    String snapshot =
+        new NifiFlowBuilder()
+            .build(
+                new FlowBuildSpec(
+                    "pipeline-frost-nods-it",
+                    SourceType.MQTT,
+                    Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", NO_DS_TOPIC),
+                    SinkType.FROST,
+                    Map.of(NifiFlowBuilder.FROST_BASE_URL, "http://frost:8080" + FROST_PATH),
+                    List.of(),
+                    Map.of(),
+                    null));
+    client.deployFlow(new DeploymentPlan("pipeline-frost-nods-it", snapshot, Map.of()));
+
+    // Publish the unmatched observation repeatedly while the flow starts, giving it ample time to
+    // consume and route through the lookup. The Datastream must never appear: the pipeline does not
+    // create one, so an unmatched reference is dropped to the error sink, not written.
+    String brokerUrl = "tcp://" + dockerHost + ":" + mosquitto.getMappedPort(1883);
+    try (MqttPublisher publisher = new MqttPublisher(brokerUrl, "civitas-it-frost-nods")) {
+      for (int i = 0; i < 10; i++) {
+        publisher.publish(NO_DS_TOPIC, OBS_ENVELOPE_UNKNOWN_DS);
+        Thread.sleep(3000);
+        assertEquals(
+            0,
+            countDatastreamsByFilter("DS-REF-MISSING", "DS-MISSING"),
+            "the pipeline must not create a Datastream for an unmatched reference");
+      }
     }
   }
 

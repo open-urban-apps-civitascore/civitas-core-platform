@@ -720,6 +720,45 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
+  void sqlSourceProbeReceivesTheDecryptedPassword() throws Exception {
+    // The probe must connect with the real password, not the ENC(...) ciphertext: binding the raw
+    // token would make the probe fail to authenticate (or, worse, mask a bad credential). Capture
+    // what the probe is handed and assert it is the decrypted secret.
+    byte[] key = stretchedKey();
+    String enc =
+        "ENC("
+            + CredentialEncryptor.encrypt(
+                SECRET, key, CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT)
+            + ")";
+    Datasource source = sqlSourceBasic();
+    source.handleUnknownProperty("password", enc);
+
+    String[] probedPassword = {null};
+    FlowDeploymentPlanner.SqlSourceProbe capturingProbe =
+        (jdbcUrl, user, password) -> probedPassword[0] = password;
+
+    try (CredentialResolver resolver = new CredentialResolver(key)) {
+      FlowDeploymentPlanner planner =
+          new FlowDeploymentPlanner(
+              new GraphParser(),
+              new MappingConfigParser(),
+              new RecordPathCompiler(),
+              new NifiFlowBuilder(),
+              resolver,
+              new FlowDeploymentPlanner.PlatformSinkConfig(
+                  "jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
+              "http://frost:8080/FROST-Server/v1.1",
+              capturingProbe);
+
+      planner.plan(
+          new PipelineDeploymentRequest(
+              "p-sql-probe", graphWithMapping(), source, postgisSinkWithPk()));
+    }
+
+    assertEquals(SECRET, probedPassword[0], "probe must receive the decrypted password");
+  }
+
+  @Test
   void postgisSinkWithoutPlatformConnectionIsRejected() throws Exception {
     FlowDeploymentPlanner noDbPlanner =
         new FlowDeploymentPlanner(
