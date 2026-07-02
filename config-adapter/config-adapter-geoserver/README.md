@@ -458,7 +458,9 @@ de.civitascore.dataset.geoserver.result
 ```
 
 `PROVISION_WORKSPACE` derives the workspace name from `datasetId` via `toWorkspaceName()`:
-lowercases and replaces all non-alphanumeric/non-underscore characters with `_`.
+lowercases, replaces all non-alphanumeric/non-underscore characters with `_`, and prefixes the
+result with `ds_` when it would start with a digit (the workspace is emitted as an XML namespace
+prefix in OGC capabilities documents, and an NCName must not start with a digit).
 
 Only datasinks with `"type": "POSTGIS"` are provisioned as feature types; other sink types
 are skipped. From each sink's `configuration`, only `tableName`, `crs`, and `projectionPolicy`

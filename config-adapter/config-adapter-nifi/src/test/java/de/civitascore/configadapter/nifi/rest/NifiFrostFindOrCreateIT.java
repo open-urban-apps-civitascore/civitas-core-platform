@@ -94,12 +94,14 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
   private static GenericContainer<?> mosquitto;
   private static GenericContainer<?> postgis;
   private static GenericContainer<?> frost;
+  // The FROST project the deployed flows are scoped to (mirrors the saga's create-project step).
+  private static long projectId;
 
   private final HttpClient http = HttpClient.newHttpClient();
 
   @BeforeAll
   @SuppressWarnings("resource")
-  static void startStack() {
+  static void startStack() throws Exception {
     assumeTrue(dockerAvailable(), "Docker not available — skipping NiFi/FROST find-or-create IT");
 
     network = Network.newNetwork();
@@ -145,8 +147,42 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                     .forStatusCode(200)
                     .withStartupTimeout(Duration.ofMinutes(2)));
     frost.start();
+    projectId = createProject();
 
     startNifi(HOST_PORT, network);
+  }
+
+  /** Creates the FROST project the flows are scoped to and returns its {@code @iot.id}. */
+  private static long createProject() throws Exception {
+    HttpResponse<String> response =
+        HttpClient.newHttpClient()
+            .send(
+                HttpRequest.newBuilder()
+                    .uri(
+                        URI.create(
+                            "http://"
+                                + frost.getHost()
+                                + ":"
+                                + frost.getMappedPort(8080)
+                                + FROST_PATH
+                                + "/Projects"))
+                    .header("Content-Type", "application/json")
+                    .POST(
+                        HttpRequest.BodyPublishers.ofString(
+                            "{\"name\":\"find-or-create-it\",\"description\":\"IT project\"}"))
+                    .build(),
+                HttpResponse.BodyHandlers.ofString());
+    Matcher matcher =
+        Pattern.compile("Projects\\((\\d+)\\)")
+            .matcher(response.headers().firstValue("Location").orElse(""));
+    if (matcher.find()) {
+      return Long.parseLong(matcher.group(1));
+    }
+    throw new IllegalStateException(
+        "could not create FROST project (status "
+            + response.statusCode()
+            + "): "
+            + response.body());
   }
 
   @AfterAll
@@ -176,7 +212,11 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                     SourceType.MQTT,
                     Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", TOPIC),
                     SinkType.FROST,
-                    Map.of(NifiFlowBuilder.FROST_BASE_URL, "http://frost:8080" + FROST_PATH),
+                    Map.of(
+                        NifiFlowBuilder.FROST_BASE_URL,
+                        "http://frost:8080" + FROST_PATH,
+                        NifiFlowBuilder.FROST_PROJECT_ID,
+                        String.valueOf(projectId)),
                     List.of(),
                     Map.of(),
                     null));
@@ -227,7 +267,11 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                     SourceType.MQTT,
                     Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", OBS_TOPIC),
                     SinkType.FROST,
-                    Map.of(NifiFlowBuilder.FROST_BASE_URL, "http://frost:8080" + FROST_PATH),
+                    Map.of(
+                        NifiFlowBuilder.FROST_BASE_URL,
+                        "http://frost:8080" + FROST_PATH,
+                        NifiFlowBuilder.FROST_PROJECT_ID,
+                        String.valueOf(projectId)),
                     List.of(),
                     Map.of(),
                     null));
@@ -275,7 +319,11 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                     SourceType.MQTT,
                     Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", NO_DS_TOPIC),
                     SinkType.FROST,
-                    Map.of(NifiFlowBuilder.FROST_BASE_URL, "http://frost:8080" + FROST_PATH),
+                    Map.of(
+                        NifiFlowBuilder.FROST_BASE_URL,
+                        "http://frost:8080" + FROST_PATH,
+                        NifiFlowBuilder.FROST_PROJECT_ID,
+                        String.valueOf(projectId)),
                     List.of(),
                     Map.of(),
                     null));
@@ -314,7 +362,10 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     return "http://" + dockerHost + ":" + frost.getMappedPort(8080) + FROST_PATH + path;
   }
 
-  /** Counts FROST Things whose {@code properties/reference} equals the given value. */
+  /**
+   * Counts Things with the given {@code properties/reference} inside the IT project — the scoped
+   * flow must create them there, not at the server root.
+   */
   private int countThings(String reference) throws Exception {
     String filter =
         URLEncoder.encode("properties/reference eq '" + reference + "'", StandardCharsets.UTF_8)
@@ -322,7 +373,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     HttpResponse<String> response =
         http.send(
             HttpRequest.newBuilder()
-                .uri(URI.create(frostUrl("/Things?$filter=" + filter)))
+                .uri(URI.create(frostUrl("/Projects(" + projectId + ")/Things?$filter=" + filter)))
                 .GET()
                 .build(),
             HttpResponse.BodyHandlers.ofString());
@@ -359,10 +410,31 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
   }
 
   /**
-   * Deep-inserts a Datastream (with Thing+Sensor+ObservedProperty) and returns its {@code @iot.id}.
+   * Provisions a Datastream inside the IT project and returns its {@code @iot.id}. Two steps: the
+   * Thing is created under {@code /Projects(n)/Things} (the scoped flow's Datastream lookup filters
+   * on {@code Thing/Projects/id}, so the Thing must be project-linked), then the Datastream (with
+   * Sensor+ObservedProperty) is nested under that Thing.
    */
   private long createDatastream() throws Exception {
-    String body =
+    String thingBody =
+        "{\"name\":\"T-IT\",\"description\":\"obs-leg IT thing\","
+            + "\"properties\":{\"reference\":\"T-REF-IT\"},"
+            // a Location lets FROST auto-generate the Observation's FeatureOfInterest
+            + "\"Locations\":[{\"name\":\"loc\",\"description\":\"loc\","
+            + "\"encodingType\":\"application/geo+json\","
+            + "\"location\":{\"type\":\"Point\",\"coordinates\":[8.4,49.0]}}]}";
+    long thingId =
+        idFromLocation(
+            http.send(
+                HttpRequest.newBuilder()
+                    .uri(URI.create(frostUrl("/Projects(" + projectId + ")/Things")))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(thingBody))
+                    .build(),
+                HttpResponse.BodyHandlers.ofString()),
+            "Things");
+
+    String dsBody =
         "{\"name\":\""
             + DS_NAME
             + "\",\"description\":\"obs-leg IT\","
@@ -371,32 +443,33 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
             + "\"properties\":{\"reference\":\""
             + DS_REFERENCE
             + "\"},"
-            + "\"Thing\":{\"name\":\"T-IT\",\"description\":\"obs-leg IT thing\","
-            + "\"properties\":{\"reference\":\"T-REF-IT\"},"
-            // a Location lets FROST auto-generate the Observation's FeatureOfInterest
-            + "\"Locations\":[{\"name\":\"loc\",\"description\":\"loc\","
-            + "\"encodingType\":\"application/geo+json\","
-            + "\"location\":{\"type\":\"Point\",\"coordinates\":[8.4,49.0]}}]},"
             + "\"Sensor\":{\"name\":\"Sensor-IT\",\"description\":\"s\","
             + "\"encodingType\":\"application/pdf\",\"metadata\":\"http://example.org/s\"},"
             + "\"ObservedProperty\":{\"name\":\"Temperature\","
             + "\"definition\":\"http://example.org/temp\",\"description\":\"t\"}}";
-    HttpResponse<String> response =
+    return idFromLocation(
         http.send(
             HttpRequest.newBuilder()
-                .uri(URI.create(frostUrl("/Datastreams")))
+                .uri(URI.create(frostUrl("/Things(" + thingId + ")/Datastreams")))
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .POST(HttpRequest.BodyPublishers.ofString(dsBody))
                 .build(),
-            HttpResponse.BodyHandlers.ofString());
+            HttpResponse.BodyHandlers.ofString()),
+        "Datastreams");
+  }
+
+  /** Extracts the entity id from a FROST create response's {@code Location} header. */
+  private static long idFromLocation(HttpResponse<String> response, String collection) {
     Matcher matcher =
-        Pattern.compile("Datastreams\\((\\d+)\\)")
+        Pattern.compile(collection + "\\((\\d+)\\)")
             .matcher(response.headers().firstValue("Location").orElse(""));
     if (matcher.find()) {
       return Long.parseLong(matcher.group(1));
     }
     throw new IllegalStateException(
-        "could not determine created Datastream id (status "
+        "could not determine created "
+            + collection
+            + " id (status "
             + response.statusCode()
             + "): "
             + response.body());

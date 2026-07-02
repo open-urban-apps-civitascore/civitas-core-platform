@@ -66,6 +66,9 @@ services:
       - "5434:5432"
     networks:
       - geoserver-internal
+      # The NiFi PostGIS sink (PutDatabaseRecord in deployed pipelines) writes into this
+      # database and reaches it by container name over civitas-network.
+      - civitas-network
 
   rabbitmq:
     image: rabbitmq:3.13.3-alpine
