@@ -119,6 +119,8 @@ const typeToSchema = (type: UMLType, classDefKeyById: Map<string, string>, crs?:
  * multiplicity (arrays) and default values.
  * For geometry attributes, the CRS string from `attr.meta.gisInfo.crs` is
  * forwarded to `typeToSchema` and emitted as a sibling `crs` property.
+ * `x-core-primaryKey` marks the primary key, except on array attributes,
+ * which cannot back one.
  */
 const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, string>): JsonSchemaObject => {
   const crs = attr.meta?.gisInfo?.crs
@@ -126,7 +128,8 @@ const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, stri
   const { lower, upper } = parseMultiplicity(attr.multiplicity)
 
   let schema: JsonSchemaObject
-  if (upper > 1) {
+  const isMultivalued = upper > 1
+  if (isMultivalued) {
     schema = { type: 'array', items: baseSchema }
     if (lower >= 1) schema.minItems = lower
     if (upper !== Infinity) schema.maxItems = upper
@@ -138,6 +141,10 @@ const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, stri
     schema.default = attr.defaultValue
   }
 
+  if (attr.isId && !isMultivalued) {
+    schema['x-core-primaryKey'] = true
+  }
+
   return schema
 }
 
@@ -145,9 +152,18 @@ const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, stri
  * Determines whether an attribute is required.
  */
 const isAttributeRequired = (attr: UMLAttribute): boolean => {
-  if (attr.isId) return true
-  const { lower } = parseMultiplicity(attr.multiplicity)
+  const { lower, upper } = parseMultiplicity(attr.multiplicity)
+  if (attr.isId && upper <= 1) return true
   return lower >= 1
+}
+
+/**
+ * A primary key must be exactly one mandatory value: a many multiplicity is an array, and an
+ * optional one (`0..1`) is nullable — neither can be (part of) a primary key.
+ */
+export const canMultiplicityBePrimaryKey = (multiplicity?: string): boolean => {
+  const { lower, upper } = parseMultiplicity(multiplicity)
+  return lower >= 1 && upper === 1
 }
 
 /**

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality } from '../constants/umlTypes'
 import type { UMLDiagram } from '../types/diagram'
-import { exportToJsonSchema, sanitizeName } from './jsonSchemaExportService'
+import { canMultiplicityBePrimaryKey, exportToJsonSchema, sanitizeName } from './jsonSchemaExportService'
 
 const baseDiagram = (overrides?: Partial<UMLDiagram>): UMLDiagram => ({
   id: 'diagram-1',
@@ -78,7 +78,7 @@ describe('exportToJsonSchema', () => {
     const schema = exportToJsonSchema(baseDiagram())
     const properties = schema.properties as Record<string, Record<string, unknown>>
 
-    expect(properties.stationId).toEqual({ type: 'string' })
+    expect(properties.stationId).toEqual({ type: 'string', 'x-core-primaryKey': true })
     expect(properties.temperature).toEqual({ type: 'number' })
   })
 
@@ -146,13 +146,87 @@ describe('exportToJsonSchema', () => {
     const properties = schema.properties as Record<string, Record<string, unknown>>
 
     // stationId has no multiplicity set -> plain scalar, and required.
-    expect(properties.stationId).toEqual({ type: 'string' })
+    expect(properties.stationId).toEqual({ type: 'string', 'x-core-primaryKey': true })
     expect(schema.required).toContain('stationId')
   })
 
   it('adds id attributes to required', () => {
     const schema = exportToJsonSchema(baseDiagram())
     expect(schema.required).toEqual(['stationId'])
+  })
+
+  it('marks id attributes with x-core-primaryKey on the property', () => {
+    const schema = exportToJsonSchema(baseDiagram())
+    const properties = schema.properties as Record<string, Record<string, unknown>>
+
+    expect(properties.stationId['x-core-primaryKey']).toBe(true)
+    expect(properties.temperature).not.toHaveProperty('x-core-primaryKey')
+  })
+
+  it('does not emit x-core-primaryKey for an array-valued id attribute', () => {
+    const diagram = baseDiagram({
+      nodes: [
+        {
+          id: 'node-1',
+          type: 'class',
+          position: { x: 0, y: 0 },
+          data: {
+            element: {
+              id: 'elem-1',
+              name: 'TrafficSensor',
+              type: 'class',
+              attributes: [
+                { id: 'a1', name: 'ids', type: 'String', visibility: 'public', isId: true, multiplicity: '*' },
+              ],
+              operations: [],
+            },
+            label: 'TrafficSensor',
+          },
+        },
+      ],
+    })
+
+    const schema = exportToJsonSchema(diagram)
+    const properties = schema.properties as Record<string, Record<string, unknown>>
+
+    expect(properties.ids).toEqual({ type: 'array', items: { type: 'string' } })
+    expect(properties.ids).not.toHaveProperty('x-core-primaryKey')
+    // A many-valued isId cannot be a primary key, so it must not force required either.
+    expect(schema.required ?? []).not.toContain('ids')
+  })
+
+  it('marks every member of a composite primary key', () => {
+    const diagram = baseDiagram({
+      nodes: [
+        {
+          id: 'node-1',
+          type: 'class',
+          position: { x: 0, y: 0 },
+          data: {
+            element: {
+              id: 'elem-1',
+              name: 'TrafficSensor',
+              type: 'class',
+              attributes: [
+                { id: 'a1', name: 'tenantId', type: 'String', visibility: 'public', isId: true },
+                { id: 'a2', name: 'stationId', type: 'String', visibility: 'public', isId: true },
+                { id: 'a3', name: 'temperature', type: 'Double', visibility: 'public', multiplicity: '0..1' },
+              ],
+              operations: [],
+            },
+            label: 'TrafficSensor',
+          },
+        },
+      ],
+    })
+
+    const schema = exportToJsonSchema(diagram)
+    const properties = schema.properties as Record<string, Record<string, unknown>>
+
+    expect(properties.tenantId['x-core-primaryKey']).toBe(true)
+    expect(properties.stationId['x-core-primaryKey']).toBe(true)
+    expect(properties.temperature).not.toHaveProperty('x-core-primaryKey')
+    expect(schema.required).toEqual(['tenantId', 'stationId'])
   })
 
   it('carries documentation into description', () => {
@@ -631,5 +705,23 @@ describe('exportToJsonSchema', () => {
     } as Partial<UMLDiagram>)
 
     expect(exportToJsonSchema(diagram).title).toBe('Beta')
+  })
+})
+
+describe('canMultiplicityBePrimaryKey', () => {
+  it('is true only for exactly-one (1 or unset)', () => {
+    expect(canMultiplicityBePrimaryKey('1')).toBe(true)
+    expect(canMultiplicityBePrimaryKey(undefined)).toBe(true)
+  })
+
+  it('is false for optional (0..1) — a primary key cannot be nullable', () => {
+    expect(canMultiplicityBePrimaryKey('0..1')).toBe(false)
+  })
+
+  it('is false for many multiplicities (unbounded and bounded)', () => {
+    expect(canMultiplicityBePrimaryKey('*')).toBe(false)
+    expect(canMultiplicityBePrimaryKey('1..*')).toBe(false)
+    expect(canMultiplicityBePrimaryKey('2')).toBe(false)
+    expect(canMultiplicityBePrimaryKey('1..5')).toBe(false)
   })
 })
