@@ -33,8 +33,8 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
     {
       key: 'topics',
       type: 'input',
-      label: { label: 'Topics', labelHint: 'commaSeparated' },
-      placeholder: 'foo/bar, sensors/#',
+      label: { label: 'Topic', labelHint: null },
+      placeholder: 'foo/bar',
       defaultValue: '',
       required: true,
     },
