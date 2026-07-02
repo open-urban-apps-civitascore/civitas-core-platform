@@ -92,6 +92,7 @@ public class FlowableSagaTestHelper implements AutoCloseable {
                 "apisix.api.host", "api.civitas.test",
                 "apisix.api.public.url", "https://api.civitas.test",
                 "apisix.plugin.config.id", "auth-plugin-default",
+                "apisix.service.id", "svc-frost-server",
                 "apisix.frost.api.key", "test-api-key")));
 
     postgisHandler = new PostgisSagaHandler();
