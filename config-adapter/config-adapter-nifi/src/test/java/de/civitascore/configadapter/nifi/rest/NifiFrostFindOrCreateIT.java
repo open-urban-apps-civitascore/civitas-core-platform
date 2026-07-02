@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.awaitility.core.ConditionTimeoutException;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
@@ -78,10 +79,16 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
   // An observation whose Datastream (reference+name) was never provisioned: the lookup resolves
   // nothing, so the flow must route it to the error sink and never POST it.
   private static final String NO_DS_TOPIC = "civitas/it/frost-obs-nods";
+  private static final String MISSING_DS_REFERENCE = "DS-REF-MISSING";
+  private static final String MISSING_DS_NAME = "DS-MISSING";
   private static final String OBS_ENVELOPE_UNKNOWN_DS =
       "{\"things\":[],\"observations\":[{\"result\":9.9,"
           + "\"phenomenonTime\":\"2026-01-01T00:00:00Z\","
-          + "\"parameters\":{\"reference\":\"DS-REF-MISSING\",\"name\":\"DS-MISSING\"}}]}";
+          + "\"parameters\":{\"reference\":\""
+          + MISSING_DS_REFERENCE
+          + "\",\"name\":\""
+          + MISSING_DS_NAME
+          + "\"}}]}";
 
   private static Network network;
   private static GenericContainer<?> mosquitto;
@@ -238,7 +245,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                 publisher.publish(OBS_TOPIC, OBS_ENVELOPE);
                 return countObservations(datastreamId) >= 1;
               });
-    } catch (org.awaitility.core.ConditionTimeoutException e) {
+    } catch (ConditionTimeoutException e) {
       throw new AssertionError(
           "observation did not land in Datastream "
               + datastreamId
@@ -257,7 +264,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     // Datastream ever appears for the missing reference.
     assertEquals(
         0,
-        countDatastreamsByFilter("DS-REF-MISSING", "DS-MISSING"),
+        countDatastreamsByFilter(MISSING_DS_REFERENCE, MISSING_DS_NAME),
         "precondition: the referenced Datastream must not exist");
 
     String snapshot =
@@ -284,7 +291,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
         Thread.sleep(3000);
         assertEquals(
             0,
-            countDatastreamsByFilter("DS-REF-MISSING", "DS-MISSING"),
+            countDatastreamsByFilter(MISSING_DS_REFERENCE, MISSING_DS_NAME),
             "the pipeline must not create a Datastream for an unmatched reference");
       }
     }

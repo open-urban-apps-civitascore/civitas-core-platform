@@ -31,7 +31,7 @@
     "Data Record Path": null,
     "Statement Type Record Path": null,
     "Column Name Translation Pattern": null,
-    "Column Name Translation Strategy": "REMOVE_UNDERSCORE",
+    "Column Name Translation Strategy": null,
     "Binary String Format": "UTF-8",
     "Unmatched Column Behavior": "Ignore Unmatched Columns",
     "Database Type": "Generic",
