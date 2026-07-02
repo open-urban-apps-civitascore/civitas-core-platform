@@ -73,6 +73,7 @@ class NifiSagaHandlerTest {
               "stepId": "deploy-pipelines",
               "adapter": "nifi",
               "operation": "DEPLOY_PIPELINES",
+              "projectId": "5",
               "datasources": [
                 { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] }
               ],
@@ -256,6 +257,58 @@ class NifiSagaHandlerTest {
     verify(restClient).deployFlow(plan.capture());
     // the saga's projectId scopes the flow to the dataset's FROST project
     assertTrue(plan.getValue().snapshotJson().contains("/Projects(5)/Things"));
+  }
+
+  @Test
+  void updateThreadsProjectIdIntoRedeployedFrostFlow() throws Exception {
+    when(restClient.deployFlow(any())).thenReturn("pg-frost-upd");
+    Map<String, Object> payload =
+        map(
+            """
+            { "type": "EXECUTE_STEP", "sagaId": "saga-upd", "stepId": "update-pipelines",
+              "adapter": "nifi", "operation": "UPDATE_PIPELINES",
+              "projectId": "9",
+              "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
+              "datasinks": [],
+              "dataPipelines": [ { "id": "p-1", "version": "2", "action": "UPDATE",
+                "data": { "nodes": [
+                    { "id": "s", "type": "start", "data": {} },
+                    { "id": "e", "type": "end", "data": {} } ],
+                  "edges": [ { "id": "e1", "source": "s", "target": "e" } ] } } ] }
+            """);
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals("STEP_COMPLETED", result.type());
+    ArgumentCaptor<DeploymentPlan> plan = ArgumentCaptor.forClass(DeploymentPlan.class);
+    verify(restClient).deployFlow(plan.capture());
+    assertTrue(plan.getValue().snapshotJson().contains("/Projects(9)/Things"));
+  }
+
+  @Test
+  void frostDeployWithNonNumericProjectIdFailsTheStep() throws Exception {
+    // A present-but-non-numeric id must fail the step through the safe-external-message path
+    // (never deploy, never leak the raw value across the result topic).
+    Map<String, Object> payload =
+        map(
+            """
+            { "type": "EXECUTE_STEP", "sagaId": "saga-frost", "stepId": "deploy-pipelines",
+              "adapter": "nifi", "operation": "DEPLOY_PIPELINES",
+              "projectId": "1) or true",
+              "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
+              "datasinks": [],
+              "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
+                "data": { "nodes": [
+                    { "id": "s", "type": "start", "data": {} },
+                    { "id": "e", "type": "end", "data": {} } ],
+                  "edges": [ { "id": "e1", "source": "s", "target": "e" } ] } } ] }
+            """);
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals("STEP_FAILED", result.type());
+    assertFalse(result.error().contains("1) or true"), "raw payload value must not leak");
+    verify(restClient, times(0)).deployFlow(any());
   }
 
   @Test

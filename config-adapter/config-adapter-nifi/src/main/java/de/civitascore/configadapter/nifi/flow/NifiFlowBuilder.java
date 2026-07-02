@@ -55,7 +55,9 @@ public class NifiFlowBuilder {
    * find-or-create sub-flow is project-scoped: Things are looked up and created under {@code
    * /Projects(n)} so they are visible through the dataset's project-scoped named API, and the
    * Datastream lookup filters on {@code Thing/Projects/id} (the projects plugin exposes no direct
-   * {@code /Projects(n)/Datastreams} collection). Absent → legacy unscoped (server-root) shape.
+   * {@code /Projects(n)/Datastreams} collection). Absent → unscoped (server-root) fallback, used
+   * only by callers that supply no project id (direct builder use in tests); saga deployments
+   * always carry one.
    */
   public static final String FROST_PROJECT_ID = "Frost Project Id";
 

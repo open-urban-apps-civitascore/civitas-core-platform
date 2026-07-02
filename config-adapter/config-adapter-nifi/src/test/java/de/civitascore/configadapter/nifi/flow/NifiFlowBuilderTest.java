@@ -320,11 +320,15 @@ class NifiFlowBuilderTest {
     assertTrue(
         hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/Projects(7)/Things?$filter="),
         "Thing lookup is project-scoped");
-    JsonNode post = componentByProperty(flow, "InvokeHTTP", "HTTP Method", "POST");
-    assertTrue(
-        post.get("properties").get("HTTP URL").asText().endsWith("/Projects(7)/Things")
-            || hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/Projects(7)/Things"),
-        "Thing POST is project-scoped");
+    boolean thingPostScoped = false;
+    for (JsonNode c : flow.get("flowContents").get("processors")) {
+      if (c.path("type").asText().endsWith("InvokeHTTP")
+          && c.path("properties").path("HTTP Method").asText().equals("POST")
+          && c.path("properties").path("HTTP URL").asText().endsWith("/Projects(7)/Things")) {
+        thingPostScoped = true;
+      }
+    }
+    assertTrue(thingPostScoped, "Thing POST is project-scoped");
     assertTrue(
         hasProcessor(flow, "InvokeHTTP", "HTTP URL", "Thing/Projects/id%20eq%207"),
         "Datastream lookup filters on the project");

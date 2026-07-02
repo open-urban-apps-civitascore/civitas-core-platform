@@ -319,11 +319,17 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
               + FIELD_PROJECT_ID
               + "' (result of the FROST create-project step)");
     }
-    var plan =
-        planner.plan(
-            new PipelineDeploymentRequest(
-                id, graphData, source, sink, sink.type() == SinkType.FROST ? projectId : null));
-    return nifiClient.deployFlow(plan);
+    PipelineDeploymentRequest request;
+    try {
+      request =
+          new PipelineDeploymentRequest(
+              id, graphData, source, sink, sink.type() == SinkType.FROST ? projectId : null);
+    } catch (IllegalArgumentException e) {
+      // e.g. a non-numeric projectId; keep the raw detail internal and publish only the safe
+      // external message for the error code.
+      throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, e, e.getMessage());
+    }
+    return nifiClient.deployFlow(planner.plan(request));
   }
 
   /** The saga's FROST project id from the command payload, or null when absent. */

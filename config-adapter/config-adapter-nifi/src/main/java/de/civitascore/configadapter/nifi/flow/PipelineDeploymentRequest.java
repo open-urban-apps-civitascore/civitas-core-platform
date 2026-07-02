@@ -42,9 +42,10 @@ public record PipelineDeploymentRequest(
     Objects.requireNonNull(sink, "sink");
     // The project id is interpolated into NiFi processor URLs and $filter expressions, so it must
     // be the numeric id FROST's create-project step returned — anything else is a mis-wired
-    // payload (or an injection attempt). Without it a FROST flow would post to the server root,
-    // invisible to the dataset's project-scoped named API. A non-FROST sink carrying one is a
-    // meaningless state (mirrors SinkSpec.primaryKeyColumns).
+    // payload (or an injection attempt). The numeric check assumes FROST-Server's default LONG
+    // entity-id type; revisit it before ever operating FROST with string ids. Without the id a
+    // FROST flow would post to the server root, invisible to the dataset's project-scoped named
+    // API. A non-FROST sink carrying one is a meaningless state.
     if (sink.type() == SinkType.FROST) {
       if (frostProjectId == null || frostProjectId.isBlank()) {
         throw new IllegalArgumentException("a FROST sink requires a non-blank frostProjectId");
