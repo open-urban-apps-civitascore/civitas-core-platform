@@ -96,13 +96,26 @@ export const buildOwsPayload = (data: OwsApiFormData): NamedApiPayload => ({
 })
 
 type SchemaProperty = { $ref?: string; crs?: string }
-type SchemaObject = { properties?: Record<string, SchemaProperty>; $defs?: Record<string, SchemaObject> }
+type SchemaObject = {
+  properties?: Record<string, SchemaProperty>
+  $defs?: Record<string, SchemaObject>
+  allOf?: SchemaObject[]
+}
 
-// Scans the root `properties` and every `$defs` entry's `properties` for a
-// geometry property (GeoJSON `$ref`) carrying a `crs` annotation (see
-// jsonSchemaExportService.ts). Returns the first CRS found, or '' if none.
+// Collects every `properties` map belonging to a schema
+const collectPropertyMaps = (schema?: SchemaObject): Record<string, SchemaProperty>[] => {
+  if (!schema) return []
+  return [...(schema.properties ? [schema.properties] : []), ...(schema.allOf ?? []).flatMap(collectPropertyMaps)]
+}
+
+// Scans the root schema and every `$defs` entry (including their `allOf`
+// branches) for a geometry property (GeoJSON `$ref`) carrying a `crs`
+// annotation. Returns the first CRS found, or '' if none.
 const findNativeCRS = (schema?: SchemaObject): string => {
-  const propertyGroups = [schema?.properties, ...Object.values(schema?.$defs ?? {}).map(def => def.properties)]
+  const propertyGroups = [
+    ...collectPropertyMaps(schema),
+    ...Object.values(schema?.$defs ?? {}).flatMap(collectPropertyMaps),
+  ]
   for (const properties of propertyGroups) {
     for (const property of Object.values(properties ?? {})) {
       if (property.$ref?.startsWith(GEOJSON_REF_BASE) && property.crs) return property.crs

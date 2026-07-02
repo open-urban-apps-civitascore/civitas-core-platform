@@ -84,6 +84,37 @@ const modelWithCRSInDefs = {
   },
 } as unknown as DatastructureVersion['model']
 
+const modelWithCRSInRootAllOf = {
+  allOf: [
+    { $ref: '#/$defs/BaseClass' },
+    {
+      type: 'object',
+      properties: {
+        geom: { $ref: 'https://geojson.org/schema/Point.json', crs: 'EPSG:25832' },
+      },
+    },
+  ],
+} as unknown as DatastructureVersion['model']
+
+const modelWithCRSInDefsAllOf = {
+  properties: {
+    location: { $ref: '#/$defs/MyClass' },
+  },
+  $defs: {
+    MyClass: {
+      allOf: [
+        { $ref: '#/$defs/BaseClass' },
+        {
+          type: 'object',
+          properties: {
+            geom: { $ref: 'https://geojson.org/schema/Point.json', crs: 'EPSG:25832' },
+          },
+        },
+      ],
+    },
+  },
+} as unknown as DatastructureVersion['model']
+
 describe('mapFormLayerToPayload', () => {
   it('computes latLonBoundingBox from nativeBoundingBox and CRS', () => {
     const [result] = mapFormLayerToPayload([makeLayer({ crs: 'EPSG:4326' })])
@@ -142,6 +173,24 @@ describe('getNativeCRSFromDataSink', () => {
       '00000000-0000-0000-0000-000000000010',
       [makeDataSink()],
       [makeDatastructureVersion(modelWithCRSInDefs)],
+    )
+    expect(result).toBe('EPSG:25832')
+  })
+
+  it('returns the CRS from an allOf branch on the root schema (inheritance)', () => {
+    const result = getNativeCRSFromDataSink(
+      '00000000-0000-0000-0000-000000000010',
+      [makeDataSink()],
+      [makeDatastructureVersion(modelWithCRSInRootAllOf)],
+    )
+    expect(result).toBe('EPSG:25832')
+  })
+
+  it('returns the CRS from an allOf branch inside a $defs entry (inheritance)', () => {
+    const result = getNativeCRSFromDataSink(
+      '00000000-0000-0000-0000-000000000010',
+      [makeDataSink()],
+      [makeDatastructureVersion(modelWithCRSInDefsAllOf)],
     )
     expect(result).toBe('EPSG:25832')
   })
