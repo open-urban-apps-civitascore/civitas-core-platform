@@ -1157,11 +1157,11 @@
       "cron": "Scheduled Trigger",
       "cronDesc": "Run pipeline on schedule",
       "frostServer": "Sensor Data Storage",
-      "frostServerDesc": "for SensorThings API",
+      "frostServerDesc": "For SensorThings API",
       "geoPersistence": "Geospatial Data Storage",
-      "geoPersistenceDesc": "for WFS/WMS API",
+      "geoPersistenceDesc": "For WFS/WMS API",
       "mapping": "Mapping",
-      "mappingDesc": "map Data structures"
+      "mappingDesc": "Map Data structures"
     },
     "controlPanel": {
       "entryPoint": "Pipeline Entry Point",
