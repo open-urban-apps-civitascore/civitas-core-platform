@@ -229,7 +229,7 @@ const validateCronExpression: ValidationRule = {
       if (node.type === PIPELINE_NODE_TYPES.Cron && isCronNodeData(node.data)) {
         const expression = node.data.cronExpression?.trim()
         if (expression && !isValidQuartzCron(expression)) {
-          const label = node.data.label || 'CRON'
+          const label = node.data.label || 'Scheduled Trigger'
           errors.push({
             id: crypto.randomUUID(),
             type: 'node',
