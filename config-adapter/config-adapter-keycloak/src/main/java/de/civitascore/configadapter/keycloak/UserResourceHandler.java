@@ -53,6 +53,7 @@ class UserResourceHandler implements KeycloakResourceHandler {
   private final ObjectMapper objectMapper;
   private final ResultPublisher resultPublisher;
   private final RoleSyncHelper roleSyncHelper;
+  private final GroupSyncHelper groupSyncHelper;
   private final String invitationClientId;
   private final String invitationRedirectUri;
 
@@ -61,12 +62,14 @@ class UserResourceHandler implements KeycloakResourceHandler {
       ObjectMapper objectMapper,
       ResultPublisher resultPublisher,
       RoleSyncHelper roleSyncHelper,
+      GroupSyncHelper groupSyncHelper,
       String invitationClientId,
       String invitationRedirectUri) {
     this.keycloakClient = keycloakClient;
     this.objectMapper = objectMapper;
     this.resultPublisher = resultPublisher;
     this.roleSyncHelper = roleSyncHelper;
+    this.groupSyncHelper = groupSyncHelper;
     this.invitationClientId = invitationClientId;
     this.invitationRedirectUri = invitationRedirectUri;
   }
@@ -150,8 +153,10 @@ class UserResourceHandler implements KeycloakResourceHandler {
 
       List<String> realmRolesToAssign = userRep.getRealmRoles();
       Map<String, List<String>> clientRolesToAssign = userRep.getClientRoles();
+      List<String> groupsToAssign = userRep.getGroups();
       userRep.setRealmRoles(null);
       userRep.setClientRoles(null);
+      userRep.setGroups(null);
 
       RealmResource realmResource = keycloakClient.realm(realm);
 
@@ -163,6 +168,7 @@ class UserResourceHandler implements KeycloakResourceHandler {
 
       roleSyncHelper.syncRealmRoles(realmRolesSet, roleMapping, realmResource);
       roleSyncHelper.syncClientRoles(clientRolesToAssign, roleMapping, realmResource);
+      groupSyncHelper.syncUserGroups(groupsToAssign, userId, realmResource);
 
       logger.info(
           "{} (ID: {}) in realm: {}",
@@ -182,7 +188,11 @@ class UserResourceHandler implements KeycloakResourceHandler {
     } catch (FatalAdapterException | RetryableAdapterException e) {
       throw e;
     } catch (Exception e) {
-      logger.error("Failed to process user in realm: {}", Encode.forJava(realm), e);
+      logger.error(
+          "Failed to process user in realm: {} ({})",
+          Encode.forJava(realm),
+          e.getClass().getSimpleName(),
+          e);
       throw new FatalAdapterException(errorCode, e, maskPII(e.getMessage()));
     }
   }

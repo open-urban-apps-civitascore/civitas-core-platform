@@ -5,13 +5,9 @@ import de.civitascore.configadapter.model.idm.UserConfig;
 import de.civitascore.configadapter.model.idm.UserConfig.CredentialConfig;
 import de.civitascore.portal.configuration.EventProperties;
 import de.civitascore.portal.configuration.KeycloakProperties;
-import de.civitascore.portal.model.embedded.ScopeType;
-import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.User;
-import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.GroupRepository;
-import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.service.ConfigEventPublisherService;
 import java.util.HashMap;
@@ -31,9 +27,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Conditional initializer (active only under the {@code init} profile) that seeds groups and users
- * from application configuration properties. For users without a pre-existing external ID, a
- * Keycloak user is created via the config adapter event pipeline.
+ * Conditional initializer (active only under the {@code init} profile) that seeds users from
+ * application configuration properties. Groups are created by {@link GroupInitializer} which runs
+ * earlier. For users without a pre-existing external ID, a Keycloak user is created via the config
+ * adapter event pipeline.
  */
 @Component
 @Profile("init")
@@ -43,8 +40,6 @@ public class UserInitializer {
   private final InitProperties properties;
   private final UserRepository userRepository;
   private final GroupRepository groupRepository;
-  private final RoleRepository roleRepository;
-  private final AssignmentRepository assignmentRepository;
   private final ConfigEventPublisherService configEventPublisher;
   private final Environment environment;
   private final KeycloakProperties keycloakProperties;
@@ -54,8 +49,6 @@ public class UserInitializer {
       InitProperties properties,
       UserRepository userRepository,
       GroupRepository groupRepository,
-      RoleRepository roleRepository,
-      AssignmentRepository assignmentRepository,
       ConfigEventPublisherService configEventPublisher,
       Environment environment,
       KeycloakProperties keycloakProperties,
@@ -63,8 +56,6 @@ public class UserInitializer {
     this.properties = properties;
     this.userRepository = userRepository;
     this.groupRepository = groupRepository;
-    this.roleRepository = roleRepository;
-    this.assignmentRepository = assignmentRepository;
     this.configEventPublisher = configEventPublisher;
     this.environment = environment;
     this.keycloakProperties = keycloakProperties;
@@ -72,84 +63,29 @@ public class UserInitializer {
   }
 
   /**
-   * Initializes groups and users from configuration after the application context is fully ready.
-   * Groups are created first so that users can reference them during setup.
+   * Initializes users from configuration after the application context is fully ready. Groups are
+   * already created and synced to Keycloak by {@link GroupInitializer} which runs earlier
+   * ({@code @Order(10)}).
    */
   @EventListener(ApplicationReadyEvent.class)
   @Transactional
   public void initialize() {
-    if (properties.getGroups().isEmpty() && properties.getUsers().isEmpty()) {
-      log.debug("No users or groups configured — skipping init");
+    if (properties.getUsers().isEmpty()) {
+      log.debug("No users configured — skipping init");
       return;
     }
 
-    log.info("Starting user and group initialization");
+    log.info("Starting user initialization");
 
-    Map<String, Group> groupsByName = initializeGroups();
-    initializeUsers(groupsByName);
-
-    log.info("User and group initialization completed");
-  }
-
-  private Map<String, Group> initializeGroups() {
+    // Groups are already created by GroupInitializer — load them from DB
     Map<String, Group> groupsByName = new HashMap<>();
-
     for (InitProperties.GroupEntry entry : properties.getGroups()) {
-      Group group =
-          groupRepository
-              .findByName(entry.getName())
-              .orElseGet(
-                  () -> {
-                    Group newGroup = new Group();
-                    newGroup.setName(entry.getName());
-                    newGroup.setDescription(entry.getDescription());
-                    Group saved = groupRepository.save(newGroup);
-                    log.info("Created group '{}'", entry.getName());
-                    return saved;
-                  });
-
-      groupsByName.put(entry.getName(), group);
-
-      if (entry.getRoleName() != null) {
-        createAssignmentIfAbsent(group, entry.getRoleName(), entry.getScopeType());
-      }
+      groupRepository.findByName(entry.getName()).ifPresent(g -> groupsByName.put(g.getName(), g));
     }
 
-    return groupsByName;
-  }
+    initializeUsers(groupsByName);
 
-  private void createAssignmentIfAbsent(Group group, String roleName, ScopeType scopeType) {
-    roleRepository
-        .findByName(roleName)
-        .ifPresentOrElse(
-            role -> {
-              boolean exists =
-                  scopeType == null
-                      ? assignmentRepository.existsByGroupAndRoleAndScopeTypeIsNull(group, role)
-                      : assignmentRepository.existsByGroupAndRoleAndScopeType(
-                          group, role, scopeType);
-              if (exists) {
-                log.debug(
-                    "Assignment for group '{}' and role '{}' already exists — skipping",
-                    group.getName(),
-                    role.getName());
-                return;
-              }
-              Assignment assignment = new Assignment();
-              assignment.setGroup(group);
-              assignment.setRole(role);
-              assignment.setScopeType(scopeType);
-              assignmentRepository.save(assignment);
-              log.info(
-                  "Created assignment for group '{}' with role '{}'",
-                  group.getName(),
-                  role.getName());
-            },
-            () ->
-                log.warn(
-                    "Role '{}' not found for group '{}' — skipping assignment",
-                    roleName,
-                    group.getName()));
+    log.info("User initialization completed");
   }
 
   private void initializeUsers(Map<String, Group> groupsByName) {
