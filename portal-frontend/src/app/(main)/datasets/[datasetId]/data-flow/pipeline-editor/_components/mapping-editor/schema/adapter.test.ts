@@ -3,9 +3,14 @@ import { describe, expect, it } from 'vitest'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 
 import { umlDiagramToSchemaTree } from './adapter'
+import { requiredFieldPaths } from './fieldTree'
 
 /** Minimal class node for the diagram fixtures below. */
-const classNode = (id: string, name: string, attributes: { name: string; type?: string; isId?: boolean }[]) => ({
+const classNode = (
+  id: string,
+  name: string,
+  attributes: { name: string; type?: string; isId?: boolean; multiplicity?: string }[],
+) => ({
   id,
   data: { element: { id, name, type: 'class', attributes: attributes.map(a => ({ type: 'String', ...a })) } },
 })
@@ -27,6 +32,35 @@ const inhEdge = (source: string, target: string, type: 'inheritance' | 'realizat
   source,
   target,
   data: { relationship: { type, source, target } },
+})
+
+describe('umlDiagramToSchemaTree — required derivation', () => {
+  const diagram = {
+    nodes: [
+      classNode('t', 'Thing', [
+        { name: 'id', isId: true },
+        { name: 'name', multiplicity: '1' },
+        { name: 'nick', multiplicity: '0..1' },
+        { name: 'tags', multiplicity: '1..*' },
+        { name: 'note' },
+      ]),
+    ],
+    edges: [],
+  } as unknown as UMLDiagram
+
+  it('marks fields required from {id} and multiplicity lower bound', () => {
+    const tree = umlDiagramToSchemaTree(diagram, 'thing')
+    const required = (name: string) => tree.fields.find(f => f.name === name)?.required
+    expect(required('id')).toBe(true) // {id}
+    expect(required('name')).toBe(true) // 1
+    expect(required('nick')).toBe(false) // 0..1 optional
+    expect(required('tags')).toBe(true) // 1..*
+    expect(required('note')).toBe(true) // unset = single required
+  })
+
+  it('requiredFieldPaths returns only the required field paths', () => {
+    expect(requiredFieldPaths(umlDiagramToSchemaTree(diagram, 'thing'))).toEqual(['$.id', '$.name', '$.tags', '$.note'])
+  })
 })
 
 describe('umlDiagramToSchemaTree', () => {

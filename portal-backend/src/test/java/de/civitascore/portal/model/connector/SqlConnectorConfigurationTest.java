@@ -63,6 +63,18 @@ class SqlConnectorConfigurationTest {
     }
 
     @Test
+    @DisplayName("Should preserve sslmode (TLS) while stripping credentials from a postgres DSN")
+    void shouldPreserveSslModeAndStripCredentials() {
+      // SSL to the source DB is configured via the dsn's sslmode; the credential-stripping URI
+      // round-trip must keep the query so it survives to the deployed JDBC connection
+      SqlConnectorConfiguration config = new SqlConnectorConfiguration();
+      config.setDsn("postgres://reader:secret@db:5432/in?sslmode=require");
+
+      assertThat(config.getDsn()).isEqualTo("postgres://db:5432/in?sslmode=require");
+      assertThat(config.getPassword()).isNull();
+    }
+
+    @Test
     @DisplayName("Should preserve query params in clean DSN")
     void shouldPreserveQueryParams() {
       SqlConnectorConfiguration config = new SqlConnectorConfiguration();

@@ -369,72 +369,11 @@ class PostgisSagaHandlerTest {
     }
 
     @Test
-    void provisionSinkDerivesPrimaryKeyFromXCorePrimaryKeyMarker() throws Exception {
-      Map<String, Object> trigger =
-          Map.of(
-              "datasinks",
-              List.of(
-                  Map.of(
-                      "type",
-                      "POSTGIS",
-                      "configuration",
-                      Map.of("tableName", "sensor_observations"),
-                      "dataStructure",
-                      Map.of(
-                          "properties",
-                          Map.of(
-                              "station_id", Map.of("type", "string", "x-core-primaryKey", true),
-                              "temperature", Map.of("type", "string"))))));
-
-      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
-
-      assertEquals("STEP_COMPLETED", result.type());
-      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
-      String createTable =
-          sql.getAllValues().stream()
-              .filter(s -> s.startsWith("CREATE TABLE"))
-              .findFirst()
-              .orElseThrow();
-      assertTrue(createTable.contains("PRIMARY KEY (\"station_id\")"));
-    }
-
-    @Test
-    void explicitConfigurationPrimaryKeyOverridesSchemaMarker() throws Exception {
-      Map<String, Object> trigger =
-          Map.of(
-              "datasinks",
-              List.of(
-                  Map.of(
-                      "type",
-                      "POSTGIS",
-                      "configuration",
-                      Map.of(
-                          "tableName", "sensor_observations", "primaryKey", List.of("temperature")),
-                      "dataStructure",
-                      Map.of(
-                          "properties",
-                          Map.of(
-                              "station_id", Map.of("type", "string", "x-core-primaryKey", true),
-                              "temperature", Map.of("type", "string"))))));
-
-      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
-
-      assertEquals("STEP_COMPLETED", result.type());
-      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
-      String createTable =
-          sql.getAllValues().stream()
-              .filter(s -> s.startsWith("CREATE TABLE"))
-              .findFirst()
-              .orElseThrow();
-      assertTrue(createTable.contains("PRIMARY KEY (\"temperature\")"));
-    }
-
-    @Test
-    void derivedPrimaryKeyAbsentFromExplicitColumnsIsDropped() throws Exception {
-      // Explicit configuration.columns are used as-is; the schema still marks a property that is
-      // not among those columns. The derived PK must be filtered out so CREATE TABLE stays valid.
+    void provisionSinkDerivesPrimaryKeyFromMarkerEvenWithExplicitColumns() throws Exception {
+      // H1: the PK is derived from x-core-primaryKey even when columns are explicitly configured,
+      // so
+      // the table PRIMARY KEY matches the NiFi UPSERT Update Keys (no ON CONFLICT against a
+      // constraint-less table). (Composite-key ORDER is covered by DataStructureSchemaTest.)
       Map<String, Object> trigger =
           Map.of(
               "datasinks",
@@ -447,7 +386,9 @@ class PostgisSagaHandlerTest {
                           "tableName",
                           "sensor_observations",
                           "columns",
-                          List.of(Map.of("name", "temperature", "type", "TEXT"))),
+                          List.of(
+                              Map.of("name", "station_id", "type", "TEXT"),
+                              Map.of("name", "temperature", "type", "TEXT"))),
                       "dataStructure",
                       Map.of(
                           "properties",
@@ -465,16 +406,79 @@ class PostgisSagaHandlerTest {
               .filter(s -> s.startsWith("CREATE TABLE"))
               .findFirst()
               .orElseThrow();
-      assertTrue(createTable.contains("\"temperature\" TEXT"));
-      assertFalse(
-          createTable.contains("PRIMARY KEY"), "expected no primary key clause: " + createTable);
+      assertTrue(createTable.contains("PRIMARY KEY (\"station_id\")"), createTable);
     }
 
     @Test
-    void partialCompositeDerivedPrimaryKeyIsDiscardedEntirely() throws Exception {
+    void explicitConfigPrimaryKeyOverridesMarker() throws Exception {
+      // an explicit configuration.primaryKey wins over the x-core-primaryKey marker (same
+      // precedence
+      // as the NiFi adapter) — the table PRIMARY KEY is the explicit column, not the marked one
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of("tableName", "obs", "primaryKey", List.of("v")),
+                      "dataStructure",
+                      Map.of(
+                          "properties",
+                          Map.of(
+                              "id", Map.of("type", "string", "x-core-primaryKey", true),
+                              "v", Map.of("type", "string"))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      String createTable =
+          sql.getAllValues().stream()
+              .filter(s -> s.startsWith("CREATE TABLE"))
+              .findFirst()
+              .orElseThrow();
+      assertTrue(createTable.contains("PRIMARY KEY (\"v\")"), createTable);
+      assertFalse(createTable.contains("PRIMARY KEY (\"id\")"), createTable);
+    }
+
+    @Test
+    void primaryKeyReferencingMissingColumnIsRejected() {
+      // explicit columns omit the x-core-primaryKey field → a PRIMARY KEY referencing a missing
+      // column would be emitted; reject with a clear error instead of broken DDL
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of(
+                          "tableName",
+                          "obs",
+                          "columns",
+                          List.of(Map.of("name", "temperature", "type", "TEXT"))),
+                      "dataStructure",
+                      Map.of(
+                          "properties",
+                          Map.of(
+                              "station_id", Map.of("type", "string", "x-core-primaryKey", true),
+                              "temperature", Map.of("type", "string"))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_FAILED", result.type());
+      assertTrue(result.error().contains("not present in the table"));
+    }
+
+    @Test
+    void partialCompositeDerivedPrimaryKeyReferencingMissingColumnIsRejected() {
       // A composite schema key (tenant_id + station_id) where explicit columns only contain one
-      // component must NOT collapse to PRIMARY KEY (tenant_id): that would tighten uniqueness.
-      // The whole derived key is discarded instead.
+      // component must not collapse to PRIMARY KEY (tenant_id): that would silently tighten
+      // uniqueness. The missing component is rejected rather than dropped.
       Map<String, Object> trigger =
           Map.of(
               "datasinks",
@@ -498,17 +502,8 @@ class PostgisSagaHandlerTest {
 
       SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
 
-      assertEquals("STEP_COMPLETED", result.type());
-      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
-      String createTable =
-          sql.getAllValues().stream()
-              .filter(s -> s.startsWith("CREATE TABLE"))
-              .findFirst()
-              .orElseThrow();
-      assertFalse(
-          createTable.contains("PRIMARY KEY"),
-          "partial composite key must be discarded entirely: " + createTable);
+      assertEquals("STEP_FAILED", result.type());
+      assertTrue(result.error().contains("not present in the table"));
     }
 
     @Test
@@ -553,6 +548,28 @@ class PostgisSagaHandlerTest {
 
       assertEquals("STEP_FAILED", result.type());
       assertTrue(result.error().contains("at least one POSTGIS data sink"));
+    }
+
+    @Test
+    void nonListDatasinksFailsStep() {
+      // a present-but-non-list datasinks is a corrupt payload; it must fail loud, not be treated as
+      // "no sinks"
+      SagaCommandResult result =
+          handler.handle(execute("PROVISION_SINK", Map.of("datasinks", "not-a-list")));
+
+      assertEquals("STEP_FAILED", result.type());
+      assertTrue(result.error().contains("datasinks must be a list"), result.error());
+    }
+
+    @Test
+    void nonObjectDatasinkEntryFailsStep() {
+      // one malformed entry must fail the whole command, not silently drop it and provision a
+      // partial set the saga still reports as success
+      SagaCommandResult result =
+          handler.handle(execute("PROVISION_SINK", Map.of("datasinks", List.of("not-an-object"))));
+
+      assertEquals("STEP_FAILED", result.type());
+      assertTrue(result.error().contains("datasinks entries must be objects"), result.error());
     }
 
     @Test
@@ -604,6 +621,32 @@ class PostgisSagaHandlerTest {
       assertTrue(
           sql.getAllValues().stream()
               .anyMatch(s -> s.startsWith("DROP TABLE \"ds_42\".\"sensor_readings\"")));
+    }
+
+    @Test
+    void deprovisionSinkWithPrimaryKeyMarkerSchemaSucceeds() throws Exception {
+      // regression: the delete trigger carries the dataStructure (with an x-core-primaryKey marker)
+      // but no explicit columns. Deprovision must NOT derive/validate the PK (the table is being
+      // dropped, not built) — otherwise "PK not in columns" would wrongly fail the delete saga.
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of("schema", "ds_42", "tableName", "sensor_readings"),
+                      "dataStructure",
+                      Map.of(
+                          "properties",
+                          Map.of(
+                              "stationid", Map.of("type", "string", "x-core-primaryKey", true),
+                              "temperature", Map.of("type", "string"))))));
+
+      SagaCommandResult result = handler.handle(compensate("DEPROVISION_SINK", trigger));
+
+      assertEquals("COMPENSATION_COMPLETED", result.type());
     }
 
     private Map<String, Object> postgisSinkTrigger() {

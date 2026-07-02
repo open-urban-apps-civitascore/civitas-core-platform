@@ -43,6 +43,30 @@ class PipelineDeploymentRequestTest {
   }
 
   @Test
+  void primaryKeyColumnsOnNonPostgisSinkAreRejected() {
+    // PK columns only drive the PostGIS UPSERT; carrying them on a FROST sink is a meaningless
+    // state
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new SinkSpec(SinkType.FROST, null, java.util.List.of("id")));
+  }
+
+  @Test
+  void primaryKeyColumnsAreTrimmedAndDeduplicated() {
+    // names are joined verbatim into NiFi Update Keys → trim + de-duplicate (preserving order)
+    SinkSpec sink =
+        new SinkSpec(SinkType.POSTGIS, "t", java.util.List.of(" tenant ", "id", "tenant"));
+    assertEquals(java.util.List.of("tenant", "id"), sink.primaryKeyColumns());
+  }
+
+  @Test
+  void blankPrimaryKeyColumnIsRejected() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new SinkSpec(SinkType.POSTGIS, "t", java.util.List.of("id", "  ")));
+  }
+
+  @Test
   void graphDataIsDefensivelyCopiedAndUnmodifiable() {
     Map<String, Object> mutable = new HashMap<>();
     mutable.put("nodes", new ArrayList<>());

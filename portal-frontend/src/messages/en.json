@@ -1175,8 +1175,8 @@
     },
     "cronPanel": {
       "cronExpression": "CRON Expression",
-      "invalidCron": "Invalid cron expression. Must be 6-field Quartz syntax (seconds minutes hours day-of-month month day-of-week).",
-      "cronHint": "A CRON expression defines when the pipeline should run automatically.",
+      "invalidCron": "Invalid cron expression. Must be 6-field NiFi syntax (seconds minutes hours day-of-month month day-of-week).",
+      "cronHint": "A CRON expression defines when the pipeline should run automatically. Six fields, no year. For the weekday, prefer names (MON–SUN); numbers are 0–7 with 0 and 7 meaning Sunday.",
       "learnCron": "Learn about CRON expressions",
       "currentExpression": "Current Expression"
     },
@@ -1242,10 +1242,18 @@
         "startNodeRequired": "Pipeline must have at least one Start node",
         "endNodeRequired": "Pipeline must have at least one End node",
         "nodeNotConfigured": "{label} is not configured",
-        "invalidCronExpression": "{label} has an invalid cron expression. Must be a 6-field Quartz syntax.",
+        "invalidCronExpression": "{label} has an invalid cron expression. Must be 6-field NiFi syntax.",
         "orphanNode": "{label} is not connected to any other node",
         "minimumFunctionalNodes": "Pipeline must have at least one functional node between Start and End",
-        "duplicateTableName": "Two Geo Persistence tables must not have the same name"
+        "duplicateTableName": "Two Geo Persistence tables must not have the same name",
+        "cronMqttIncompatible": "A CRON trigger cannot be used with an MQTT data source. Use a SQL (pull) source instead.",
+        "cronSourceConnectorUnknown": "Could not verify the source connector; a CRON trigger only works with a SQL (pull) source, not MQTT.",
+        "sqlSourceNoScheduleDefaultPoll": "This SQL source has no CRON node and will poll on the default schedule (every 5 minutes). Add a CRON node to set an explicit schedule.",
+        "frostSinkNoMapping": "A FROST sink consumes the source data as-is and does not support a field mapping — remove the mapping node.",
+        "sqlSourceToFrost": "A SQL source cannot write to a FROST sink; FROST requires a SensorThings (MQTT) source.",
+        "nodeNotWired": "{label} must be connected with both an incoming and an outgoing edge",
+        "mappingRequiredFieldsMissing": "{label} does not map all required target fields: {fields}",
+        "mappingNotSaved": "{label} has no saved field mapping — open the mapping editor and save it"
       }
     },
     "toolbar": {

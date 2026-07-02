@@ -155,6 +155,12 @@ export interface MappingNodeData extends BasePipelineNodeData {
   targetName?: string
   /** The single saved artifact produced by the mapping editor. */
   mappingConfig: MappingConfig
+  /**
+   * Snapshot of the required target-field paths (e.g. {@code $.name}) at mapping-save time. Lets the
+   * synchronous, pure pipeline validation check that every required target field is assigned without
+   * re-fetching the target schema. {@code undefined} on legacy nodes saved before this existed.
+   */
+  targetRequiredFields?: string[]
 }
 
 // ============================================================================

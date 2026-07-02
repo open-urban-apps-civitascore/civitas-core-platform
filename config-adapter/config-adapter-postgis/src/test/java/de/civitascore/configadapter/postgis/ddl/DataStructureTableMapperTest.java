@@ -71,6 +71,46 @@ class DataStructureTableMapperTest {
   }
 
   @Test
+  void primaryKeyColumnIsForcedNotNullEvenWhenNotInRequired() {
+    // a field marked x-core-primaryKey must be NOT NULL even if `required` omits it; an unmarked,
+    // non-required field stays nullable. (The PK column LIST itself is derived by
+    // DataStructureSchema.)
+    Map<String, Object> schema =
+        json(
+            """
+            { "properties": {
+                "id":   { "type": "string", "x-core-primaryKey": true },
+                "name": { "type": "string" } } }
+            """);
+
+    Map<String, ColumnConfig> named =
+        byName(DataStructureTableMapper.deriveColumns(schema, Set.of()));
+
+    assertEquals(false, named.get("id").nullable());
+    assertTrue(named.get("name").isNullable());
+  }
+
+  @Test
+  void compositePrimaryKeyColumnsAreAllNotNull() {
+    // every x-core-primaryKey column is forced NOT NULL, not just the first
+    Map<String, Object> schema =
+        json(
+            """
+            { "properties": {
+                "tenant": { "type": "string", "x-core-primaryKey": true },
+                "id":     { "type": "string", "x-core-primaryKey": true },
+                "v":      { "type": "string" } } }
+            """);
+
+    Map<String, ColumnConfig> named =
+        byName(DataStructureTableMapper.deriveColumns(schema, Set.of()));
+
+    assertEquals(false, named.get("tenant").nullable());
+    assertEquals(false, named.get("id").nullable());
+    assertTrue(named.get("v").isNullable());
+  }
+
+  @Test
   void rootPropertiesWithFormatsAndScalarTypes() {
     Map<String, Object> schema =
         json(
@@ -308,7 +348,7 @@ class DataStructureTableMapperTest {
         assertThrows(
             IllegalArgumentException.class,
             () -> DataStructureTableMapper.deriveColumns(schema, Set.of()));
-    assertTrue(error.getMessage().contains("no properties"));
+    assertTrue(error.getMessage().contains("no usable definition"));
   }
 
   @Test

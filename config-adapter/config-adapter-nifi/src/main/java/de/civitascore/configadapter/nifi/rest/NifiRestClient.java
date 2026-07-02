@@ -122,6 +122,7 @@ public class NifiRestClient implements AutoCloseable {
       enableControllerServices(pgId);
       awaitControllerServicesEnabled(pgId);
       startProcessGroup(pgId);
+      awaitProcessorsRunning(pgId);
     } catch (FatalAdapterException | RetryableAdapterException e) {
       bestEffortDelete(rootId, plan.processGroupName());
       throw e;
@@ -482,6 +483,87 @@ public class NifiRestClient implements AutoCloseable {
     body.put("state", "RUNNING");
     body.put("disconnectedNodeAcknowledged", false);
     put(API + "/flow/process-groups/" + pgId, body, "start process group");
+  }
+
+  /**
+   * Blocks until every processor in the group is RUNNING, failing fast if any is INVALID. Starting
+   * the group only returns the REST status of the bulk request — it does not confirm the processors
+   * actually reached a valid, running state. Without this a processor left INVALID (e.g. a cron
+   * that passed the field-count check but is syntactically wrong) would make the saga report
+   * success while the flow never runs. Mirrors {@link #awaitControllerServicesState}.
+   */
+  private void awaitProcessorsRunning(String pgId)
+      throws FatalAdapterException, RetryableAdapterException {
+    for (int attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
+      if (processorsAllRunning(pgId)) {
+        return;
+      }
+      try {
+        Thread.sleep(POLL_INTERVAL_MS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RetryableAdapterException(
+            AdapterErrorCode.NIFI_ERROR, e, "interrupted while waiting for processors to start");
+      }
+    }
+    throw new RetryableAdapterException(
+        AdapterErrorCode.NIFI_ERROR,
+        "processors did not reach RUNNING state in time; current states: "
+            + describeProcessorStates(pgId));
+  }
+
+  /**
+   * Whether every processor in the group is RUNNING. An INVALID processor will never run, so
+   * polling for it is pointless: fail fast and FATALLY (a retryable timeout would loop forever
+   * under redelivery) with its NiFi validation errors. An empty processor list means the flow has
+   * not materialized yet — keep polling.
+   */
+  private boolean processorsAllRunning(String pgId)
+      throws FatalAdapterException, RetryableAdapterException {
+    JsonNode processors =
+        getJson(API + "/process-groups/" + pgId + "/processors", "list processors")
+            .path("processors");
+    if (processors.isEmpty()) {
+      return false;
+    }
+    boolean allRunning = true;
+    for (JsonNode processor : processors) {
+      JsonNode component = processor.path("component");
+      if ("INVALID".equals(component.path("validationStatus").asText())) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_FLOW_ERROR,
+            "processor '"
+                + component.path("name").asText()
+                + "' is INVALID and will never run: "
+                + validationErrors(component));
+      }
+      if (!"Running".equals(processor.path("status").path("runStatus").asText())) {
+        allRunning = false;
+      }
+    }
+    return allRunning;
+  }
+
+  /** Lists each processor as {@code name=runStatus(validationStatus)} for diagnostics. */
+  private String describeProcessorStates(String pgId)
+      throws FatalAdapterException, RetryableAdapterException {
+    JsonNode processors =
+        getJson(API + "/process-groups/" + pgId + "/processors", "list processors")
+            .path("processors");
+    StringBuilder description = new StringBuilder();
+    for (JsonNode processor : processors) {
+      if (description.length() > 0) {
+        description.append(", ");
+      }
+      description
+          .append(processor.path("component").path("name").asText())
+          .append('=')
+          .append(processor.path("status").path("runStatus").asText())
+          .append('(')
+          .append(processor.path("component").path("validationStatus").asText())
+          .append(')');
+    }
+    return description.toString();
   }
 
   private void stopAndDeleteProcessGroup(ProcessGroupRef group)

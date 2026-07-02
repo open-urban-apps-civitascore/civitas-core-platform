@@ -1,0 +1,154 @@
+{
+  "name": "QueryDatabaseTableRecord",
+  "comments": "",
+  "position": {
+    "x": 0.0,
+    "y": 0.0
+  },
+  "type": "org.apache.nifi.processors.standard.QueryDatabaseTableRecord",
+  "bundle": {
+    "group": "org.apache.nifi",
+    "artifact": "nifi-standard-nar",
+    "version": "2.9.0"
+  },
+  "properties": {
+    "Database Connection Pooling Service": "${CS:SourceConnectionPool}",
+    "db-fetch-db-type": "PostgreSQL",
+    "Table Name": "",
+    "Columns to Return": null,
+    "Additional WHERE Clause": null,
+    "Custom Query": null,
+    "Maximum-value Columns": null,
+    "Record Writer": "${CS:JsonRecordSetWriter}",
+    "Max Wait Time": "0 seconds",
+    "Fetch Size": "0",
+    "qdbtr-max-rows": "0",
+    "qdbtr-output-batch-size": "0",
+    "qdbtr-max-frags": "0",
+    "dbf-normalize": "false",
+    "dbf-user-logical-types": "false"
+  },
+  "propertyDescriptors": {
+    "Database Connection Pooling Service": {
+      "name": "Database Connection Pooling Service",
+      "displayName": "Database Connection Pooling Service",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "db-fetch-db-type": {
+      "name": "db-fetch-db-type",
+      "displayName": "Database Type",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Table Name": {
+      "name": "Table Name",
+      "displayName": "Table Name",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Columns to Return": {
+      "name": "Columns to Return",
+      "displayName": "Columns to Return",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Additional WHERE Clause": {
+      "name": "Additional WHERE Clause",
+      "displayName": "Additional WHERE Clause",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Custom Query": {
+      "name": "Custom Query",
+      "displayName": "Custom Query",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Maximum-value Columns": {
+      "name": "Maximum-value Columns",
+      "displayName": "Maximum-value Columns",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Record Writer": {
+      "name": "Record Writer",
+      "displayName": "Record Writer",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Max Wait Time": {
+      "name": "Max Wait Time",
+      "displayName": "Max Wait Time",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Fetch Size": {
+      "name": "Fetch Size",
+      "displayName": "Fetch Size",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "qdbtr-max-rows": {
+      "name": "qdbtr-max-rows",
+      "displayName": "Max Rows Per Flow File",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "qdbtr-output-batch-size": {
+      "name": "qdbtr-output-batch-size",
+      "displayName": "Output Batch Size",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "qdbtr-max-frags": {
+      "name": "qdbtr-max-frags",
+      "displayName": "Maximum Number of Fragments",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "dbf-normalize": {
+      "name": "dbf-normalize",
+      "displayName": "Normalize Table/Column Names",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "dbf-user-logical-types": {
+      "name": "dbf-user-logical-types",
+      "displayName": "Use Avro Logical Types",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    }
+  },
+  "style": {},
+  "schedulingPeriod": "0 */5 * * * ?",
+  "schedulingStrategy": "CRON_DRIVEN",
+  "executionNode": "PRIMARY",
+  "penaltyDuration": "30 sec",
+  "yieldDuration": "1 sec",
+  "bulletinLevel": "WARN",
+  "runDurationMillis": 0,
+  "concurrentlySchedulableTaskCount": 1,
+  "autoTerminatedRelationships": [],
+  "scheduledState": "ENABLED",
+  "retryCount": 10,
+  "retriedRelationships": [],
+  "backoffMechanism": "PENALIZE_FLOWFILE",
+  "maxBackoffPeriod": "10 mins",
+  "componentType": "PROCESSOR"
+}

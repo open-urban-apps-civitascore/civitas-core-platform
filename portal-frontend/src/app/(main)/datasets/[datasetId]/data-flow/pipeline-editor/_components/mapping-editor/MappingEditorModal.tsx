@@ -26,7 +26,7 @@ import { compileCanvas, decompileConfig, SOURCE_NODE_ID, TARGET_NODE_ID } from '
 import { TransformInspector } from './inspector/TransformInspector'
 import { MegaNode } from './nodes/MegaNode'
 import { umlDiagramToSchemaTree } from './schema/adapter'
-import { flattenTree, objectFieldsCompatible } from './schema/fieldTree'
+import { flattenTree, objectFieldsCompatible, requiredFieldPaths } from './schema/fieldTree'
 import { computeStatus } from './status'
 import type { MappingTransformDef } from './transforms'
 import { concatInputPorts, LITERAL_DEFAULT_TYPE, literalOutputPort, mappingRegistry } from './transforms'
@@ -45,7 +45,7 @@ interface MappingEditorModalProps {
   source: SchemaRef
   target: SchemaRef
   config: MappingConfig
-  onSave: (config: MappingConfig) => void
+  onSave: (config: MappingConfig, targetRequiredFields: string[]) => void
 }
 
 const FULLSCREEN =
@@ -301,13 +301,16 @@ export const MappingEditorModal = ({
 
   const handleSave = () => {
     const { fields, positions } = compileCanvas(nodes, edges)
-    onSave({
-      $schema: 'https://civitasconnect.digital/core/mapping/v1',
-      source: `urn:core:datastructure:${source.datastructureId}:${source.versionId}`,
-      target: `urn:core:datastructure:${target.datastructureId}:${target.versionId}`,
-      fields,
-      positions,
-    })
+    onSave(
+      {
+        $schema: 'https://civitasconnect.digital/core/mapping/v1',
+        source: `urn:core:datastructure:${source.datastructureId}:${source.versionId}`,
+        target: `urn:core:datastructure:${target.datastructureId}:${target.versionId}`,
+        fields,
+        positions,
+      },
+      requiredFieldPaths(targetTree),
+    )
     onOpenChange(false)
   }
 

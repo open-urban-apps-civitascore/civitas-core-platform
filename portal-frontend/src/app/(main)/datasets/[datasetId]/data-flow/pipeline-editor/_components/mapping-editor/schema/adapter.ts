@@ -1,4 +1,5 @@
 import type { PortType } from '@/components/node-editor/types'
+import { isAttributeRequired } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import {
   classifyStructuralEdge,
   collectContainedIds,
@@ -148,6 +149,7 @@ const buildFields = (el: UMLElement, base: string, index: DiagramIndex, visited:
   for (const attr of mergeInherited(el, index, visited, attributeEntries).values()) {
     const path = `${base}.${attr.name}`
     const ref = resolveRef(attr.type, index)
+    const required = isAttributeRequired(attr)
     if (ref && hasAttributes(ref) && !visited.has(ref.id)) {
       const type: FieldType = isManyMultiplicity(attr.multiplicity) ? 'array' : 'object'
       fields.push({
@@ -155,11 +157,12 @@ const buildFields = (el: UMLElement, base: string, index: DiagramIndex, visited:
         name: attr.name,
         type,
         portType: portTypeFor(type),
+        required,
         children: buildFields(ref, path + (type === 'array' ? '[]' : ''), index, new Set([...visited, el.id])),
       })
     } else {
       const type = scalarType(attr.type)
-      fields.push({ path, name: attr.name, type, portType: portTypeFor(type) })
+      fields.push({ path, name: attr.name, type, portType: portTypeFor(type), required })
     }
   }
 
@@ -172,6 +175,9 @@ const buildFields = (el: UMLElement, base: string, index: DiagramIndex, visited:
       name: rel.name,
       type,
       portType: portTypeFor(type),
+      // Relationship lower bound is not threaded here; treat nested relations as optional so they
+      // don't force a mapping (scalar attribute requiredness is what matters in practice).
+      required: false,
       children: buildFields(rel.target, path + (type === 'array' ? '[]' : ''), index, new Set([...visited, el.id])),
     })
   }

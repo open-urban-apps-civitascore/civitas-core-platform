@@ -111,42 +111,107 @@ class GraphParserTest {
   }
 
   @Test
-  void cronTriggerNodeIsRejected() throws Exception {
-    // a cron node carries a schedule the adapter cannot honor yet — reject rather than deploy a
-    // pipeline that silently ignores the cron expression
+  void cronTriggerNodeIsParsedAndExposesItsSchedule() throws Exception {
+    // the parser tolerates a cron node like any other; its cronExpression is exposed via
+    // triggerCron() to drive the source schedule (no longer rejected)
     PipelineGraph graph =
         parser.parse(
             map(
                 """
                 { "nodes": [
-                    { "id": "n-cron", "type": "cron", "data": { "cronExpression": "0 0 * * *" } },
+                    { "id": "n-start", "type": "start", "data": {} },
+                    { "id": "n-cron", "type": "cron", "data": { "cronExpression": "0 0 6 * * ?" } },
                     { "id": "n-src", "type": "dataSource", "data": {} },
                     { "id": "n-map", "type": "mapping",
                       "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } },
                     { "id": "n-frost", "type": "frost", "data": {} } ],
                   "edges": [
-                    { "id": "e1", "source": "n-src", "target": "n-map" },
-                    { "id": "e2", "source": "n-map", "target": "n-frost" } ] }
+                    { "id": "e0", "source": "n-start", "target": "n-cron" },
+                    { "id": "e1", "source": "n-cron", "target": "n-src" },
+                    { "id": "e2", "source": "n-src", "target": "n-map" },
+                    { "id": "e3", "source": "n-map", "target": "n-frost" } ] }
                 """));
 
-    assertThrows(IllegalStateException.class, graph::transformNode);
+    assertEquals(5, graph.nodes().size());
+    assertEquals(Optional.of("0 0 6 * * ?"), graph.triggerCron());
   }
 
   @Test
-  void missingNodeIdIsRejectedCleanly() throws Exception {
-    // a node without an id must fail with a clean error, not an NPE deeper in the wiring checks
+  void detachedCronNodeIsRejected() throws Exception {
+    // a cron node with no edges is not part of the flow; it must not silently schedule the source
     PipelineGraph graph =
         parser.parse(
             map(
                 """
                 { "nodes": [
-                    { "type": "dataSource", "data": {} },
+                    { "id": "n-cron", "type": "cron", "data": { "cronExpression": "0 0 6 * * ?" } },
+                    { "id": "n-src", "type": "dataSource", "data": {} },
+                    { "id": "n-frost", "type": "frost", "data": {} } ],
+                  "edges": [ { "id": "e1", "source": "n-src", "target": "n-frost" } ] }
+                """));
+
+    assertThrows(IllegalStateException.class, graph::triggerCron);
+  }
+
+  @Test
+  void triggerCronIsEmptyWithoutACronNode() throws Exception {
+    PipelineGraph graph =
+        parser.parse(
+            map(
+                """
+                { "nodes": [
                     { "id": "n-map", "type": "mapping",
                       "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } } ],
                   "edges": [] }
                 """));
 
-    assertThrows(IllegalStateException.class, graph::transformNode);
+    assertEquals(Optional.empty(), graph.triggerCron());
+  }
+
+  @Test
+  void multipleCronNodesAreRejected() throws Exception {
+    PipelineGraph graph =
+        parser.parse(
+            map(
+                """
+                { "nodes": [
+                    { "id": "c1", "type": "cron", "data": { "cronExpression": "0 0 6 * * ?" } },
+                    { "id": "c2", "type": "cron", "data": { "cronExpression": "0 0 7 * * ?" } } ],
+                  "edges": [] }
+                """));
+
+    assertThrows(IllegalStateException.class, graph::triggerCron);
+  }
+
+  @Test
+  void cronNodeWithBlankExpressionIsRejected() throws Exception {
+    PipelineGraph graph =
+        parser.parse(
+            map(
+                """
+                { "nodes": [
+                    { "id": "c1", "type": "cron", "data": { "cronExpression": "  " } } ],
+                  "edges": [] }
+                """));
+
+    assertThrows(IllegalStateException.class, graph::triggerCron);
+  }
+
+  @Test
+  void missingNodeIdIsRejectedCleanly() throws Exception {
+    // a node without an id must fail with a clean error at construction, not an NPE deeper in the
+    // wiring checks
+    Map<String, Object> data =
+        map(
+            """
+            { "nodes": [
+                { "type": "dataSource", "data": {} },
+                { "id": "n-map", "type": "mapping",
+                  "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } } ],
+              "edges": [] }
+            """);
+
+    assertThrows(IllegalStateException.class, () -> parser.parse(data));
   }
 
   @Test
@@ -227,36 +292,34 @@ class GraphParserTest {
   @Test
   void edgeToUnknownNodeIdIsRejected() throws Exception {
     // an edge endpoint that is not a declared node (e.g. a deleted node) must not be treated as a
-    // valid terminal
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [
-                    { "id": "n-src", "type": "dataSource", "data": {} },
-                    { "id": "n-map", "type": "mapping",
-                      "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } } ],
-                  "edges": [
-                    { "id": "e1", "source": "n-src", "target": "n-map" },
-                    { "id": "e2", "source": "n-map", "target": "ghost-deleted" } ] }
-                """));
+    // valid terminal — rejected at construction
+    Map<String, Object> data =
+        map(
+            """
+            { "nodes": [
+                { "id": "n-src", "type": "dataSource", "data": {} },
+                { "id": "n-map", "type": "mapping",
+                  "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } } ],
+              "edges": [
+                { "id": "e1", "source": "n-src", "target": "n-map" },
+                { "id": "e2", "source": "n-map", "target": "ghost-deleted" } ] }
+            """);
 
-    assertThrows(IllegalStateException.class, graph::transformNode);
+    assertThrows(IllegalStateException.class, () -> parser.parse(data));
   }
 
   @Test
   void edgeToUnknownNodeIsRejectedEvenWithoutMapping() throws Exception {
     // graph-integrity checks apply to provide-style/no-mapping graphs too — a dangling edge must
-    // fail loud, consistent with the mapping case
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [ { "id": "n-src", "type": "dataSource", "data": {} } ],
-                  "edges": [ { "id": "e1", "source": "n-src", "target": "ghost-deleted" } ] }
-                """));
+    // fail loud at construction, consistent with the mapping case
+    Map<String, Object> data =
+        map(
+            """
+            { "nodes": [ { "id": "n-src", "type": "dataSource", "data": {} } ],
+              "edges": [ { "id": "e1", "source": "n-src", "target": "ghost-deleted" } ] }
+            """);
 
-    assertThrows(IllegalStateException.class, graph::transformNode);
+    assertThrows(IllegalStateException.class, () -> parser.parse(data));
   }
 
   @Test

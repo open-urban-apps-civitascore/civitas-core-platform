@@ -155,12 +155,13 @@ describe('exportToJsonSchema', () => {
     expect(schema.required).toEqual(['stationId'])
   })
 
-  it('marks id attributes with x-core-primaryKey on the property', () => {
+  it('marks the {id} attribute with x-core-primaryKey, others not', () => {
     const schema = exportToJsonSchema(baseDiagram())
     const properties = schema.properties as Record<string, Record<string, unknown>>
-
+    // conceptual identity marker for adapters (PostGIS UPSERT, FROST reference, …)
     expect(properties.stationId['x-core-primaryKey']).toBe(true)
     expect(properties.temperature).not.toHaveProperty('x-core-primaryKey')
+    expect(properties.tags).not.toHaveProperty('x-core-primaryKey')
   })
 
   it('does not emit x-core-primaryKey for an array-valued id attribute', () => {
@@ -195,38 +196,82 @@ describe('exportToJsonSchema', () => {
     expect(schema.required ?? []).not.toContain('ids')
   })
 
-  it('marks every member of a composite primary key', () => {
-    const diagram = baseDiagram({
-      nodes: [
-        {
-          id: 'node-1',
-          type: 'class',
-          position: { x: 0, y: 0 },
-          data: {
-            element: {
-              id: 'elem-1',
-              name: 'TrafficSensor',
-              type: 'class',
-              attributes: [
-                { id: 'a1', name: 'tenantId', type: 'String', visibility: 'public', isId: true },
-                { id: 'a2', name: 'stationId', type: 'String', visibility: 'public', isId: true },
-                { id: 'a3', name: 'temperature', type: 'Double', visibility: 'public', multiplicity: '0..1' },
-              ],
-              operations: [],
+  it('does not emit x-core-primaryKey or required for an optional (0..1) id attribute', () => {
+    // A 0..1 isId is nullable, so it cannot back a primary key. The editor normally clears isId on
+    // such an attribute, but an imported/edge-authored model may still carry it — the export must
+    // gate on the multiplicity, not just on isId.
+    const schema = exportToJsonSchema(
+      baseDiagram({
+        nodes: [
+          {
+            id: 'node-1',
+            type: 'class',
+            position: { x: 0, y: 0 },
+            data: {
+              element: {
+                id: 'elem-1',
+                name: 'TrafficSensor',
+                type: 'class',
+                attributes: [
+                  {
+                    id: 'a1',
+                    name: 'optId',
+                    type: 'String',
+                    visibility: 'public',
+                    isId: true,
+                    multiplicity: '0..1',
+                  },
+                ],
+                operations: [],
+              },
+              label: 'TrafficSensor',
             },
-            label: 'TrafficSensor',
           },
-        },
-      ],
-    })
-
-    const schema = exportToJsonSchema(diagram)
+        ],
+      }),
+    )
     const properties = schema.properties as Record<string, Record<string, unknown>>
+    expect(properties.optId).not.toHaveProperty('x-core-primaryKey')
+    expect(schema.required ?? []).not.toContain('optId')
+  })
 
-    expect(properties.tenantId['x-core-primaryKey']).toBe(true)
-    expect(properties.stationId['x-core-primaryKey']).toBe(true)
-    expect(properties.temperature).not.toHaveProperty('x-core-primaryKey')
-    expect(schema.required).toEqual(['tenantId', 'stationId'])
+  it('marks every {id} attribute with x-core-primaryKey for a composite key', () => {
+    const schema = exportToJsonSchema(
+      baseDiagram({
+        nodes: [
+          {
+            id: 'node-1',
+            type: 'class',
+            position: { x: 0, y: 0 },
+            data: {
+              element: {
+                id: 'elem-1',
+                name: 'Composite',
+                type: 'class',
+                attributes: [
+                  { id: 'a1', name: 'tenant', type: 'String', visibility: 'public', isId: true },
+                  { id: 'a2', name: 'id', type: 'String', visibility: 'public', isId: true },
+                  {
+                    id: 'a3',
+                    name: 'value',
+                    type: 'String',
+                    visibility: 'public',
+                    multiplicity: '0..1',
+                  },
+                ],
+                operations: [],
+              },
+              label: 'Composite',
+            },
+          },
+        ],
+      }),
+    )
+    const properties = schema.properties as Record<string, Record<string, unknown>>
+    expect(properties.tenant['x-core-primaryKey']).toBe(true)
+    expect(properties.id['x-core-primaryKey']).toBe(true)
+    expect(properties.value).not.toHaveProperty('x-core-primaryKey')
+    expect(schema.required).toEqual(['tenant', 'id'])
   })
 
   it('carries documentation into description', () => {

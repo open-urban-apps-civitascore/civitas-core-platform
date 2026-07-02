@@ -11,10 +11,12 @@ package de.civitascore.configadapter.nifi.flow;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
@@ -47,8 +49,35 @@ class NifiFlowBuilderTest {
         mapping,
         Map.of(
             "PostGISConnectionPool",
+            Map.of("Database Connection URL", "jdbc:postgresql://db:5432/x", "Database User", "u")),
+        null);
+  }
+
+  /**
+   * A SQL-source → PostGIS-sink flow. Mirrors the {@code datasources/contract} SQL config shape
+   * ({@code table}/{@code columns}/{@code where}): the source pulls records from a table over a
+   * dedicated source-side connection pool, the sink writes them to PostGIS over its own pool.
+   */
+  private FlowBuildSpec sqlToPostgis() {
+    return sqlToPostgis(null);
+  }
+
+  private FlowBuildSpec sqlToPostgis(String sourceCron) {
+    return new FlowBuildSpec(
+        "pipeline-sql",
+        SourceType.SQL,
+        Map.of("Table Name", "events", "Columns to Return", "*"),
+        SinkType.POSTGIS,
+        Map.of("Table Name", "sensor_observations"),
+        mapping(),
+        Map.of(
+            "SourceConnectionPool",
             Map.of(
-                "Database Connection URL", "jdbc:postgresql://db:5432/x", "Database User", "u")));
+                "Database Connection URL", "jdbc:postgresql://src:5432/in",
+                "Database User", "reader"),
+            "PostGISConnectionPool",
+            Map.of("Database Connection URL", "jdbc:postgresql://db:5432/x", "Database User", "u")),
+        sourceCron);
   }
 
   private FlowBuildSpec frostSink() {
@@ -57,11 +86,36 @@ class NifiFlowBuilderTest {
         SourceType.MQTT,
         Map.of("Broker URI", "tcp://mosquitto:1883", "Topic Filter", "sensors/+/temp"),
         SinkType.FROST,
-        Map.of(
-            "HTTP Method", "POST",
-            "HTTP URL", "http://frost:8080/FROST-Server/v1.1/Observations"),
-        mapping(),
-        Map.of());
+        Map.of(NifiFlowBuilder.FROST_BASE_URL, "http://frost:8080/FROST-Server/v1.1"),
+        // FROST: the source delivers the STA envelope; no record mapping (find-or-create works on
+        // the raw JSON).
+        List.of(),
+        Map.of(),
+        null);
+  }
+
+  /** Whether any processor of the given type has a property whose value contains the substring. */
+  private boolean hasProcessor(
+      JsonNode flow, String typeSuffix, String property, String substring) {
+    for (JsonNode c : flow.get("flowContents").get("processors")) {
+      if (c.path("type").asText().endsWith(typeSuffix)
+          && c.path("properties").path(property).asText().contains(substring)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** First processor of the given type whose property equals the value, or null. */
+  private JsonNode componentByProperty(
+      JsonNode flow, String typeSuffix, String property, String value) {
+    for (JsonNode c : flow.get("flowContents").get("processors")) {
+      if (c.path("type").asText().endsWith(typeSuffix)
+          && value.equals(c.path("properties").path(property).asText())) {
+        return c;
+      }
+    }
+    return null;
   }
 
   private JsonNode component(JsonNode flow, String array, String typeSuffix) {
@@ -189,23 +243,76 @@ class NifiFlowBuilderTest {
   }
 
   @Test
+  void buildsFrostFindOrCreateSubFlow() throws Exception {
+    // FROST is no longer a single POST: per Thing in the STA envelope, look up by reference and
+    // POST
+    // only if absent. Assert the find-or-create stages and their wiring exist.
+    JsonNode flow = build(frostSink());
+
+    JsonNode split = component(flow, "processors", "SplitJson");
+    assertEquals(
+        "$.things", split.get("properties").get("JsonPath Expression").asText(), "splits things");
+
+    JsonNode get = componentByProperty(flow, "InvokeHTTP", "HTTP Method", "GET");
+    assertTrue(
+        get.get("properties")
+            .get("HTTP URL")
+            .asText()
+            .contains("/Things?$filter=properties/reference"),
+        "looks up the Thing by reference");
+
+    JsonNode route = component(flow, "processors", "RouteOnAttribute");
+    assertEquals(
+        "${frost.id:isEmpty()}",
+        route.get("properties").get("new").asText(),
+        "routes to 'new' only when no @iot.id resolved");
+
+    JsonNode post = componentByProperty(flow, "InvokeHTTP", "HTTP Method", "POST");
+    assertTrue(
+        post.get("properties").get("HTTP URL").asText().endsWith("/Things"), "POSTs a new Thing");
+    // restore-then-POST: the captured entity body is written back before the POST
+    JsonNode restore = component(flow, "processors", "ReplaceText");
+    assertEquals("${frost.body}", restore.get("properties").get("Replacement Value").asText());
+  }
+
+  @Test
+  void buildsFrostObservationLeg() throws Exception {
+    // Second leg: resolve the observation's Datastream by reference+name and POST the observation
+    // with the resolved @iot.id merged in.
+    JsonNode flow = build(frostSink());
+
+    assertTrue(
+        hasProcessor(flow, "SplitJson", "JsonPath Expression", "$.observations"),
+        "splits observations");
+    assertTrue(
+        hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/Datastreams?$filter="),
+        "looks up the Datastream by reference+name");
+    assertTrue(
+        hasProcessor(flow, "InvokeHTTP", "HTTP URL", "/Observations"), "POSTs the observation");
+    assertTrue(
+        hasProcessor(flow, "ReplaceText", "Replacement Value", "\"Datastream\""),
+        "merges the resolved Datastream id into the observation");
+  }
+
+  @Test
   void routesFrostSinkWriteFailuresToLogSink() throws Exception {
     JsonNode flow = build(frostSink());
 
-    JsonNode sink = component(flow, "processors", "InvokeHTTP");
     String logId = component(flow, "processors", "LogMessage").get("identifier").asText();
-    String sinkId = sink.get("identifier").asText();
+    // the terminal write is the POST; its failure-side relationships must route to the log sink
+    JsonNode post = componentByProperty(flow, "InvokeHTTP", "HTTP Method", "POST");
+    String postId = post.get("identifier").asText();
 
     for (String relationship : List.of("Failure", "Retry", "No Retry")) {
       assertFalse(
-          autoTerminates(sink, relationship), "InvokeHTTP must not auto-terminate " + relationship);
+          autoTerminates(post, relationship), "POST must not auto-terminate " + relationship);
       assertTrue(
-          hasConnection(flow, sinkId, logId, relationship),
-          "InvokeHTTP " + relationship + " must route to the log sink");
+          hasConnection(flow, postId, logId, relationship),
+          "POST " + relationship + " must route to the log sink");
     }
     // the HTTP response itself is still discarded — only write failures are routed
-    assertTrue(autoTerminates(sink, "Response"), "InvokeHTTP Response stays terminated");
-    assertTrue(autoTerminates(sink, "Original"), "InvokeHTTP Original stays terminated");
+    assertTrue(autoTerminates(post, "Response"), "POST Response stays terminated");
+    assertTrue(autoTerminates(post, "Original"), "POST Original stays terminated");
   }
 
   private boolean autoTerminates(JsonNode processor, String relationship) {
@@ -233,6 +340,100 @@ class NifiFlowBuilderTest {
       }
     }
     return false;
+  }
+
+  @Test
+  void frostSinkDefensivelyDropsRecordMapping() throws Exception {
+    // Defensive low-level behavior: a record-based UpdateRecord cannot run in the raw-JSON
+    // find-or-create path, so the builder builds none even if mapping properties are passed. In
+    // production this combination never reaches the builder — FlowDeploymentPlanner rejects a FROST
+    // sink with a configured mapping (see frostSinkWithMappingIsRejected) — so the mapping is never
+    // silently honored end-to-end.
+    FlowBuildSpec spec =
+        new FlowBuildSpec(
+            "pipeline-frost-map",
+            SourceType.MQTT,
+            Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", "t"),
+            SinkType.FROST,
+            Map.of(NifiFlowBuilder.FROST_BASE_URL, "http://frost:8080/x"),
+            mapping(),
+            Map.of(),
+            null);
+    JsonNode flow = build(spec);
+    for (JsonNode processor : flow.get("flowContents").get("processors")) {
+      assertFalse(
+          processor.path("type").asText().endsWith("UpdateRecord"),
+          "FROST find-or-create must not build a record-mapping processor");
+    }
+  }
+
+  @Test
+  void routesFrostIntermediateFailuresToLogSink() throws Exception {
+    // No silent data loss inside the find-or-create sub-flow: every Split/Extract/Replace stage's
+    // 'failure' must route to the LogMessage error sink, not stay auto-terminated.
+    JsonNode flow = build(frostSink());
+    String logId = component(flow, "processors", "LogMessage").get("identifier").asText();
+    for (String type : List.of("SplitJson", "EvaluateJsonPath", "ReplaceText")) {
+      boolean seen = false;
+      for (JsonNode c : flow.get("flowContents").get("processors")) {
+        if (!c.path("type").asText().endsWith(type)) {
+          continue;
+        }
+        seen = true;
+        assertFalse(autoTerminates(c, "failure"), type + " must not auto-terminate failure");
+        assertTrue(
+            hasConnection(flow, c.get("identifier").asText(), logId, "failure"),
+            type + " failure must route to the log sink");
+      }
+      assertTrue(seen, "expected at least one " + type + " in the FROST sub-flow");
+    }
+  }
+
+  @Test
+  void frostSinkWithSqlSourceIsRejected() {
+    // FROST consumes the STA envelope an MQTT source delivers; a SQL source emits plain records
+    // that
+    // SplitJson would never match, so the combination is rejected rather than silently empty.
+    FlowBuildSpec spec =
+        new FlowBuildSpec(
+            "pipeline-frost-sql",
+            SourceType.SQL,
+            Map.of("Table Name", "events"),
+            SinkType.FROST,
+            Map.of(NifiFlowBuilder.FROST_BASE_URL, "http://frost:8080"),
+            List.of(),
+            Map.of(
+                "SourceConnectionPool",
+                Map.of("Database Connection URL", "jdbc:postgresql://s/in")),
+            null);
+    assertThrows(FatalAdapterException.class, () -> builder.build(spec));
+  }
+
+  @Test
+  void frostFilterEscapesSingleQuotesForOData() throws Exception {
+    // A reference/name containing a single quote must not break the OData $filter: the value is
+    // quote-doubled (OData escape) before urlEncode, so O'Brien stays a valid literal.
+    JsonNode flow = build(frostSink());
+    boolean thing = false;
+    boolean datastream = false;
+    for (JsonNode c : flow.get("flowContents").get("processors")) {
+      String url = c.path("properties").path("HTTP URL").asText("");
+      if (url.contains("/Things?$filter=")) {
+        thing = true;
+        assertTrue(
+            url.contains("frost.ref:replaceAll(\"'\",\"''\")"),
+            "Things filter must OData-escape single quotes in the reference");
+      }
+      if (url.contains("/Datastreams?$filter=")) {
+        datastream = true;
+        assertTrue(
+            url.contains("frost.ref:replaceAll(\"'\",\"''\")"), "Datastream ref must escape");
+        assertTrue(
+            url.contains("frost.name:replaceAll(\"'\",\"''\")"), "Datastream name must escape");
+      }
+    }
+    assertTrue(thing, "expected a Things lookup GET");
+    assertTrue(datastream, "expected a Datastreams lookup GET");
   }
 
   @Test
@@ -275,16 +476,87 @@ class NifiFlowBuilderTest {
   }
 
   @Test
-  void buildsFrostSinkChainWithoutDbcp() throws Exception {
+  void buildsSqlSourceChainCronScheduled() throws Exception {
+    // a SQL source flow reads records from the configured table on a cron schedule
+    JsonNode flow = build(sqlToPostgis());
+
+    // the entry processor reads records from the configured table via a DB query — not ConsumeMQTT
+    JsonNode source = component(flow, "processors", "QueryDatabaseTableRecord");
+    assertEquals(
+        "events",
+        source.get("properties").get("Table Name").asText(),
+        "SQL source must query the configured table");
+
+    // a SQL source is pull-based: it must run on a schedule, never free-running at TIMER_DRIVEN
+    // 0 sec (which would hammer the database as fast as the engine can trigger it)
+    assertEquals(
+        "CRON_DRIVEN",
+        source.path("schedulingStrategy").asText(),
+        "a pull-based SQL source must be cron-scheduled, not timer-driven");
+  }
+
+  @Test
+  void sqlSourceChainOmitsConvertAndMqtt() throws Exception {
+    JsonNode flow = build(sqlToPostgis());
+
+    // SQL records come straight from the source — no ConsumeMQTT, no ConvertRecord step
+    JsonNode procs = flow.get("flowContents").get("processors");
+    for (JsonNode p : procs) {
+      String type = p.path("type").asText();
+      assertFalse(type.endsWith("ConsumeMQTT"), "no MQTT source in a SQL flow");
+      assertFalse(type.endsWith("ConvertRecord"), "SQL source already emits records");
+    }
+    // QueryDatabaseTableRecord -> UpdateRecord(mapping) -> PutDatabaseRecord + LogMessage error
+    // sink
+    assertEquals(4, procs.size());
+    // reader, writer, source DBCP, sink DBCP
+    assertEquals(4, flow.get("flowContents").get("controllerServices").size());
+  }
+
+  @Test
+  void sqlSourceResolvesItsOwnConnectionPool() throws Exception {
+    String json = builder.build(sqlToPostgis());
+    assertFalse(json.contains("${CS:"), "no unresolved controller-service tokens");
+
+    JsonNode flow = mapper.readTree(json);
+    JsonNode source = component(flow, "processors", "QueryDatabaseTableRecord");
+    String poolRef = source.get("properties").get("Database Connection Pooling Service").asText();
+    boolean found = false;
+    for (JsonNode cs : flow.get("flowContents").get("controllerServices")) {
+      if (cs.get("identifier").asText().equals(poolRef)
+          && "SourceConnectionPool".equals(cs.get("name").asText())) {
+        found = true;
+      }
+    }
+    assertTrue(found, "source DBCP reference must point to the SourceConnectionPool service");
+  }
+
+  @Test
+  void cronOverridesSourceSchedule() throws Exception {
+    JsonNode flow = build(sqlToPostgis("0 15 10 * * ?"));
+    JsonNode source = component(flow, "processors", "QueryDatabaseTableRecord");
+    assertEquals("CRON_DRIVEN", source.get("schedulingStrategy").asText());
+    assertEquals(
+        "0 15 10 * * ?",
+        source.get("schedulingPeriod").asText(),
+        "explicit cron node overrides the fragment's default schedule");
+  }
+
+  @Test
+  void buildsFrostFindOrCreateChainWithoutDbcp() throws Exception {
     JsonNode flow = build(frostSink());
-    // ConsumeMQTT -> ConvertRecord -> UpdateRecord -> InvokeHTTP, plus the LogMessage error sink
-    assertEquals(5, flow.get("flowContents").get("processors").size());
+    // ConsumeMQTT + LogMessage + Thing leg (split, body, ref, GET, id, route, restore, POST = 8)
+    // + Observation leg (split, body, ref, GET, id, route, restore, inject, POST = 9) = 19
+    assertEquals(19, flow.get("flowContents").get("processors").size());
     // only reader + writer (no DBCP for a FROST/HTTP sink)
     assertEquals(2, flow.get("flowContents").get("controllerServices").size());
 
-    JsonNode invoke = component(flow, "processors", "InvokeHTTP").get("properties");
-    assertEquals(
-        "http://frost:8080/FROST-Server/v1.1/Observations", invoke.get("HTTP URL").asText());
-    assertEquals("POST", invoke.get("HTTP Method").asText());
+    // the base URL drives the per-stage URLs (/Things…), not a single /Observations POST
+    JsonNode get = componentByProperty(flow, "InvokeHTTP", "HTTP Method", "GET");
+    assertTrue(
+        get.get("properties")
+            .get("HTTP URL")
+            .asText()
+            .startsWith("http://frost:8080/FROST-Server/v1.1/Things"));
   }
 }

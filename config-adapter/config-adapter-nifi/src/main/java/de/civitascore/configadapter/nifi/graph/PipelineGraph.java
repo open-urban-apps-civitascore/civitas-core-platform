@@ -26,8 +26,8 @@ import java.util.Set;
  * ({@code dataSource}, {@code frost}, {@code geoPersistence}) and control nodes ({@code start},
  * {@code end}); the adapter consumes only the {@code mapping} node here (sources and sinks ride in
  * the trigger's top-level {@code datasources}/{@code datasinks} arrays), so it tolerates those node
- * kinds. A {@code cron} scheduling node is rejected, since the adapter cannot yet honor its
- * schedule.
+ * kinds. A {@code cron} scheduling node carries the {@code cronExpression} that drives the source
+ * processor's schedule (see {@link #triggerCron()}).
  *
  * @param nodes the graph nodes
  * @param edges the graph edges
@@ -37,8 +37,11 @@ public record PipelineGraph(List<GraphNode> nodes, List<GraphEdge> edges) {
   /** The node kind that carries a {@code mappingConfig}. */
   public static final String TYPE_MAPPING = "mapping";
 
-  /** A scheduling trigger node — carries a {@code cronExpression} the adapter cannot yet honor. */
+  /** A scheduling trigger node — carries the {@code cronExpression} that schedules the source. */
   private static final String TYPE_CRON = "cron";
+
+  /** The node-data key holding a {@code cron} node's schedule. */
+  private static final String KEY_CRON_EXPRESSION = "cronExpression";
 
   /**
    * Pure control node kinds (no data flows through them). The remaining kinds — {@code dataSource},
@@ -50,6 +53,10 @@ public record PipelineGraph(List<GraphNode> nodes, List<GraphEdge> edges) {
   public PipelineGraph {
     nodes = List.copyOf(Objects.requireNonNull(nodes, "nodes"));
     edges = List.copyOf(Objects.requireNonNull(edges, "edges"));
+    // Graph-integrity checks run at construction so a corrupt payload always fails loud, regardless
+    // of whether a caller later inspects the mapping or the cron node.
+    requireValidNodeIds(nodes);
+    requireKnownEdgeEndpoints(nodes, edges);
   }
 
   /**
@@ -83,15 +90,10 @@ public record PipelineGraph(List<GraphNode> nodes, List<GraphEdge> edges) {
    * than silently applied. More than one mapping node is also rejected (ambiguous transform).
    *
    * @return the mapping node, or empty if the pipeline has none
-   * @throws IllegalStateException on multiple mapping nodes, an edge to an unknown node, or a
-   *     mapping that is not wired into the single functional component
+   * @throws IllegalStateException on multiple mapping nodes, or a mapping that is not wired into
+   *     the single functional component
    */
   public Optional<GraphNode> transformNode() {
-    // graph-integrity checks run for every graph (mapping or not) so a corrupt payload always
-    // fails loud, never silently
-    requireValidNodeIds();
-    requireKnownEdgeEndpoints();
-    rejectUnsupportedTriggers();
     List<GraphNode> mappings = nodes.stream().filter(n -> TYPE_MAPPING.equals(n.type())).toList();
     if (mappings.size() > 1) {
       throw new IllegalStateException(
@@ -118,7 +120,7 @@ public record PipelineGraph(List<GraphNode> nodes, List<GraphEdge> edges) {
   /**
    * Rejects nodes with a missing/blank id or a duplicate id (a corrupt graph, not an NPE later).
    */
-  private void requireValidNodeIds() {
+  private static void requireValidNodeIds(List<GraphNode> nodes) {
     Set<String> seen = new HashSet<>();
     for (GraphNode node : nodes) {
       String id = node.id();
@@ -132,18 +134,42 @@ public record PipelineGraph(List<GraphNode> nodes, List<GraphEdge> edges) {
   }
 
   /**
-   * Rejects scheduling triggers the adapter cannot yet honor. A {@code cron} node carries a {@code
-   * cronExpression}, but the flow runs timer-driven at {@code 0 sec} — deploying would silently
-   * ignore the schedule, so fail loudly until NiFi scheduling is wired.
+   * The schedule of the (optional, single) {@code cron} trigger node, used to drive the source
+   * processor's NiFi schedule. A pipeline with no cron node returns empty (the source keeps its
+   * built-in schedule). More than one cron node is rejected (ambiguous schedule), as is a cron node
+   * with a missing/blank {@code cronExpression} (a corrupt payload that would otherwise deploy
+   * unscheduled).
+   *
+   * @return the cron expression, or empty if the pipeline has no cron node
+   * @throws IllegalStateException on multiple cron nodes or a blank/missing cron expression
    */
-  private void rejectUnsupportedTriggers() {
-    if (nodes.stream().anyMatch(n -> TYPE_CRON.equals(n.type()))) {
-      throw new IllegalStateException("cron scheduling is not supported yet");
+  public Optional<String> triggerCron() {
+    List<GraphNode> crons = nodes.stream().filter(n -> TYPE_CRON.equals(n.type())).toList();
+    if (crons.size() > 1) {
+      throw new IllegalStateException(
+          "pipeline graph has " + crons.size() + " cron nodes; at most one is supported");
     }
+    if (crons.isEmpty()) {
+      return Optional.empty();
+    }
+    GraphNode cron = crons.get(0);
+    // A cron node only schedules the source when it is actually wired into the flow. A detached
+    // (unwired) cron must not silently schedule the source — or make an MQTT plan fail with "cron
+    // not supported" — so reject it, mirroring the mapping connectivity check.
+    if (!isWired(cron.id())) {
+      throw new IllegalStateException(
+          "the cron node is not wired into the flow (it needs both an incoming and an outgoing"
+              + " edge)");
+    }
+    Object expression = cron.data().get(KEY_CRON_EXPRESSION);
+    if (!(expression instanceof String text) || text.isBlank()) {
+      throw new IllegalStateException("cron node has no cronExpression");
+    }
+    return Optional.of(text.trim());
   }
 
   /** Rejects any edge whose endpoints are not declared, non-null {@code nodes[].id} values. */
-  private void requireKnownEdgeEndpoints() {
+  private static void requireKnownEdgeEndpoints(List<GraphNode> nodes, List<GraphEdge> edges) {
     Set<String> nodeIds = new HashSet<>();
     for (GraphNode node : nodes) {
       nodeIds.add(node.id());

@@ -18,10 +18,12 @@ import de.civitascore.configadapter.exception.AdapterException;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.model.dataset.DataStructureSchema;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner;
 import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner.PlatformSinkConfig;
+import de.civitascore.configadapter.nifi.flow.JdbcSqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
@@ -132,7 +134,8 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
             new NifiFlowBuilder(),
             credentialResolver,
             platformSink,
-            getProperty("frost.url", null));
+            getProperty("frost.url", null),
+            new JdbcSqlSourceProbe());
 
     if (this.nifiClient == null) {
       Client jaxrs = client() != null ? client() : createClient();
@@ -211,14 +214,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       List<String> processedIds = new ArrayList<>();
 
       for (Map<String, Object> pipeline : extractMaps(command, FIELD_DATA_PIPELINES)) {
-        String id = requireString(pipeline, FIELD_ID);
-        String action = requireString(pipeline, FIELD_ACTION);
-        switch (action) {
-          case ACTION_ADD, ACTION_UPDATE -> deployPipeline(id, pipeline, datasources, datasinks);
-          case ACTION_DELETE -> nifiClient.deleteFlowByName(processGroupName(id));
-          default -> throw new IllegalArgumentException("Unknown pipeline action: " + action);
-        }
-        processedIds.add(id);
+        processedIds.add(applyPipelineAction(pipeline, datasources, datasinks));
       }
 
       Map<String, Object> data = Map.of(FIELD_PIPELINE_IDS, processedIds);
@@ -226,6 +222,28 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     } catch (FatalAdapterException | RetryableAdapterException e) {
       return pipelineError(command, OP_UPDATE, isCompensation, e);
     }
+  }
+
+  /**
+   * Applies one pipeline's action (ADD/UPDATE deploy, DELETE remove) and returns its id. Extracted
+   * from {@link #handleUpdate} so the unknown-action {@code FatalAdapterException} is thrown in a
+   * different method than the catch that converts it (no exception-as-flow-control).
+   */
+  private String applyPipelineAction(
+      Map<String, Object> pipeline,
+      List<Datasource> datasources,
+      List<Map<String, Object>> datasinks)
+      throws FatalAdapterException, RetryableAdapterException {
+    String id = requireString(pipeline, FIELD_ID);
+    String action = requireString(pipeline, FIELD_ACTION);
+    switch (action) {
+      case ACTION_ADD, ACTION_UPDATE -> deployPipeline(id, pipeline, datasources, datasinks);
+      case ACTION_DELETE -> nifiClient.deleteFlowByName(processGroupName(id));
+      default ->
+          throw new FatalAdapterException(
+              AdapterErrorCode.INVALID_PAYLOAD, "Unknown pipeline action: " + action);
+    }
+    return id;
   }
 
   private SagaCommandResult handleDelete(SagaCommandMessage command) {
@@ -264,9 +282,21 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       List<Datasource> datasources,
       List<Map<String, Object>> datasinks)
       throws FatalAdapterException, RetryableAdapterException {
-    @SuppressWarnings("unchecked")
-    Map<String, Object> graphData =
-        pipeline.get(FIELD_DATA) instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
+    Object rawData = pipeline.get(FIELD_DATA);
+    // A missing graph (null) is a valid provide-style pipeline (empty graph). A present-but-non-map
+    // graph is a corrupt payload: silently treating it as empty would deploy a bare flow the user
+    // never described, so reject it.
+    Map<String, Object> graphData;
+    if (rawData == null) {
+      graphData = Map.of();
+    } else if (rawData instanceof Map<?, ?> map) {
+      @SuppressWarnings("unchecked")
+      Map<String, Object> typed = (Map<String, Object>) map;
+      graphData = typed;
+    } else {
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD, "pipeline '" + FIELD_DATA + "' must be an object");
+    }
     Datasource source = resolveSource(datasources);
     SinkSpec sink = resolveSink(datasinks);
     var plan = planner.plan(new PipelineDeploymentRequest(id, graphData, source, sink));
@@ -309,7 +339,31 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     if (sink.get("configuration") instanceof Map<?, ?> config) {
       tableName = asString(((Map<String, Object>) config).get("tableName"));
     }
-    return new SinkSpec(type, tableName);
+    // The primary key only drives the PostGIS PutDatabaseRecord UPSERT; deriving it for other sink
+    // types would be unused and (per SinkSpec's invariant) rejected, so only POSTGIS gets one.
+    List<String> primaryKey = type == SinkType.POSTGIS ? resolvePrimaryKey(sink) : List.of();
+    return new SinkSpec(type, tableName, primaryKey);
+  }
+
+  /**
+   * The sink's primary-key columns via the shared {@link DataStructureSchema#resolvePrimaryKey}
+   * "explicit wins, else marker" rule, so the PutDatabaseRecord UPSERT {@code Update Keys} are
+   * identical to the PostGIS table's PRIMARY KEY (single source of truth, no divergence).
+   */
+  @SuppressWarnings("unchecked")
+  private static List<String> resolvePrimaryKey(Map<String, Object> sink)
+      throws FatalAdapterException {
+    Object explicit =
+        sink.get("configuration") instanceof Map<?, ?> config
+            ? ((Map<String, Object>) config).get("primaryKey")
+            : null;
+    Map<String, Object> schema =
+        sink.get("dataStructure") instanceof Map<?, ?> ds ? (Map<String, Object>) ds : null;
+    try {
+      return DataStructureSchema.resolvePrimaryKey(explicit, schema);
+    } catch (IllegalArgumentException e) {
+      throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, e, e.getMessage());
+    }
   }
 
   private static String processGroupName(String pipelineId) {
@@ -333,16 +387,25 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   }
 
   @SuppressWarnings("unchecked")
-  private static List<Map<String, Object>> extractMaps(SagaCommandMessage command, String key) {
+  private static List<Map<String, Object>> extractMaps(SagaCommandMessage command, String key)
+      throws FatalAdapterException {
     Object value = command.payload().getOrDefault(key, List.of());
     if (!(value instanceof List<?> list)) {
-      throw new IllegalArgumentException(key + " is not a list");
+      throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, key + " must be a list");
     }
-    List<Map<String, Object>> result = new ArrayList<>();
+    // Validate every element up front rather than silently dropping a non-Map entry: a malformed
+    // entry must fail the whole command (INVALID_PAYLOAD), not yield a partial deployment that the
+    // saga would still report as success.
+    List<Map<String, Object>> result = new ArrayList<>(list.size());
     for (Object item : list) {
-      if (item instanceof Map<?, ?> map) {
-        result.add((Map<String, Object>) map);
+      if (!(item instanceof Map<?, ?> map)) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.INVALID_PAYLOAD,
+            key
+                + " must contain only objects, got: "
+                + (item == null ? "null" : item.getClass().getSimpleName()));
       }
+      result.add((Map<String, Object>) map);
     }
     return result;
   }
@@ -370,10 +433,14 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     return result;
   }
 
-  private static String requireString(Map<String, Object> map, String field) {
+  private static String requireString(Map<String, Object> map, String field)
+      throws FatalAdapterException {
     Object value = map.get(field);
-    if (!(value instanceof String s)) {
-      throw new IllegalArgumentException("pipeline entry missing string field: " + field);
+    if (!(value instanceof String s) || s.isBlank()) {
+      // a blank id/action is as unusable as a missing one (e.g. a blank id → "pipeline-" group name
+      // that could collide or mis-target), so reject it up front
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD, "pipeline entry missing string field: " + field);
     }
     return s;
   }

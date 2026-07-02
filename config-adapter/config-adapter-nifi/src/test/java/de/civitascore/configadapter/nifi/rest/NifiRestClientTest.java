@@ -63,6 +63,18 @@ class NifiRestClientTest {
             .willReturn(aResponse().withStatus(201).withBody("jwt-token")));
   }
 
+  /** A single VALID, Running processor so the post-start processor health check passes. */
+  private void stubRunningProcessors() {
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/pg-1/processors"))
+            .willReturn(
+                json(
+                    "{ \"processors\": [ { \"id\": \"proc-1\", \"component\": { \"name\":"
+                        + " \"QueryDatabaseTableRecord\", \"validationStatus\": \"VALID\" },"
+                        + " \"status\": { \"runStatus\": \"Running\" },"
+                        + " \"revision\": { \"version\": 1 } } ] }")));
+  }
+
   @Test
   void deployFlowRunsFullSequenceAndPushesSecretPostUpload() throws Exception {
     stubAuth();
@@ -84,6 +96,7 @@ class NifiRestClientTest {
                         + " \"type\": \"org.apache.nifi.dbcp.DBCPConnectionPool\","
                         + " \"state\": \"ENABLED\" },"
                         + " \"revision\": { \"version\": 3 } } ] }")));
+    stubRunningProcessors();
     server.stubFor(put(urlEqualTo("/nifi-api/controller-services/cs-1")).willReturn(json("{}")));
     server.stubFor(
         put(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
@@ -337,6 +350,7 @@ class NifiRestClientTest {
                     "{ \"controllerServices\": [ { \"id\": \"cs-1\", \"component\": { \"name\":"
                         + " \"JsonTreeReader\", \"type\": \"t\", \"state\": \"ENABLED\" },"
                         + " \"revision\": { \"version\": 1 } } ] }")));
+    stubRunningProcessors();
     server.stubFor(
         put(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
             .willReturn(json("{}")));
@@ -379,6 +393,7 @@ class NifiRestClientTest {
                         + " { \"id\": \"cs-2\", \"component\": { \"name\": \"OtherPool\","
                         + " \"type\": \"org.apache.nifi.dbcp.DBCPConnectionPool\", \"state\":"
                         + " \"ENABLED\" }, \"revision\": { \"version\": 1 } } ] }")));
+    stubRunningProcessors();
     server.stubFor(put(urlEqualTo("/nifi-api/controller-services/cs-1")).willReturn(json("{}")));
     server.stubFor(put(urlEqualTo("/nifi-api/controller-services/cs-2")).willReturn(json("{}")));
     server.stubFor(
@@ -424,13 +439,16 @@ class NifiRestClientTest {
                     "{ \"controllerServices\": [ { \"id\": \"cs-r\", \"component\": { \"name\":"
                         + " \"JsonTreeReader\", \"type\": \"t\", \"state\": \"ENABLED\" },"
                         + " \"revision\": { \"version\": 1 } } ] }")));
-    // the ConsumeMQTT processor is where the Password lives
+    // the ConsumeMQTT processor is where the Password lives; VALID + Running so the post-start
+    // processor health check passes
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/pg-1/processors"))
             .willReturn(
                 json(
                     "{ \"processors\": [ { \"id\": \"proc-1\", \"component\": { \"name\":"
-                        + " \"ConsumeMQTT\" }, \"revision\": { \"version\": 4 } } ] }")));
+                        + " \"ConsumeMQTT\", \"validationStatus\": \"VALID\" },"
+                        + " \"status\": { \"runStatus\": \"Running\" },"
+                        + " \"revision\": { \"version\": 4 } } ] }")));
     server.stubFor(put(urlEqualTo("/nifi-api/processors/proc-1")).willReturn(json("{}")));
     server.stubFor(
         put(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
@@ -478,6 +496,51 @@ class NifiRestClientTest {
             "pipeline-x",
             "{ \"flowContents\": { \"name\": \"pipeline-x\" } }",
             Map.of("NoSuchComponent", Map.of("Password", "orphan-secret")));
+
+    assertThrows(FatalAdapterException.class, () -> client.deployFlow(plan));
+  }
+
+  @Test
+  void invalidProcessorAfterStartFailsTheDeploy() throws Exception {
+    // starting the group returns only an HTTP status; a processor left INVALID (e.g. a bad cron)
+    // would otherwise make the saga report success while the flow never runs. The post-start check
+    // must fail the deploy with the processor's validation state.
+    stubAuth();
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/root-1"))
+            .willReturn(json("{ \"processGroupFlow\": { \"flow\": { \"processGroups\": [] } } }")));
+    server.stubFor(
+        post(urlPathEqualTo("/nifi-api/process-groups/root-1/process-groups/upload"))
+            .willReturn(json("{ \"id\": \"pg-1\" }")));
+    // an already-ENABLED controller service so the enable step passes and the deploy reaches the
+    // post-start processor health check
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(
+                json(
+                    "{ \"controllerServices\": [ { \"id\": \"cs-1\", \"component\": { \"name\":"
+                        + " \"JsonTreeReader\", \"type\": \"t\", \"state\": \"ENABLED\" },"
+                        + " \"revision\": { \"version\": 1 } } ] }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/pg-1/processors"))
+            .willReturn(
+                json(
+                    "{ \"processors\": [ { \"id\": \"proc-1\", \"component\": { \"name\":"
+                        + " \"QueryDatabaseTableRecord\", \"validationStatus\": \"INVALID\","
+                        + " \"validationErrors\": [ \"'Scheduling Period' is invalid\" ] },"
+                        + " \"status\": { \"runStatus\": \"Stopped\" },"
+                        + " \"revision\": { \"version\": 1 } } ] }")));
+    server.stubFor(
+        put(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json("{}")));
+    server.stubFor(put(urlEqualTo("/nifi-api/flow/process-groups/pg-1")).willReturn(json("{}")));
+
+    DeploymentPlan plan =
+        new DeploymentPlan(
+            "pipeline-x", "{ \"flowContents\": { \"name\": \"pipeline-x\" } }", Map.of());
 
     assertThrows(FatalAdapterException.class, () -> client.deployFlow(plan));
   }

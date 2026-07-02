@@ -13,7 +13,7 @@ import { useTranslations } from 'next-intl'
 
 import { Input } from '@/components/ui/input'
 
-import { isValidQuartzCron } from '../../../_services/validationService'
+import { isValidNifiCron } from '../../../_services/validationService'
 import type { CronNodeData } from '../../../_types/nodes'
 
 interface CronPanelProps {
@@ -28,11 +28,11 @@ export const CronPanel: React.FC<CronPanelProps> = ({ data, onUpdate }) => {
     const trimmed = expression.trim()
     onUpdate({
       cronExpression: expression,
-      configured: trimmed !== '' && isValidQuartzCron(trimmed),
+      configured: trimmed !== '' && isValidNifiCron(trimmed),
     })
   }
 
-  const hasValidationError = !!data.cronExpression?.trim() && !isValidQuartzCron(data.cronExpression.trim())
+  const hasValidationError = !!data.cronExpression?.trim() && !isValidNifiCron(data.cronExpression.trim())
 
   return (
     <div className="space-y-4 p-4">

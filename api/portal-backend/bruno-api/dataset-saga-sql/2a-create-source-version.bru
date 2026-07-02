@@ -1,0 +1,74 @@
+meta {
+  name: 2a. Create Source DataStructure Version
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{sqlSourceDataStructureId}}
+}
+
+body:json {
+  {
+    "dataStructureVersionSource": "OWN",
+    "version": "1.0.0",
+    "description": "Source version with scalar lon/lat for geoPoint input",
+    "modelName": "GeoSensorSource",
+    "model": {
+      "$id": "http://civitas.org/model/GeoSensorSource/1.0.0",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "GeoSensorSource",
+      "type": "object",
+      "properties": {
+        "stationid": { "type": "string" },
+        "lon": { "type": "number" },
+        "lat": { "type": "number" }
+      },
+      "required": ["stationid"]
+    },
+    "styles": {}
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sqlSourceVersionId', res.body.id);
+  }
+}
+
+tests {
+  test("Version created", function() {
+    const status = res.getStatus();
+    // 201=created. This collection assumes a clean DB per run (CI uses an ephemeral stack); a 409
+    // would mean a previous run leaked — fail loudly rather than carry a stale id downstream.
+    expect(status).to.equal(201);
+  });
+
+  test("Has id", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.id).to.be.a('string');
+    }
+  });
+}
+
+docs {
+  **SQL saga step 2a** — Precondition: `sqlSourceDataStructureId` is set (step 2).
+
+  Creates version 1.0.0 of the source structure. The model is a JSON Schema with scalar `lon`/`lat`/`stationid` fields (no geometry) — this is the input shape the `geoPoint` op consumes.
+
+  **Expected Response:** 201 Created, body contains `id`. A 409 means a previous run leaked (the test asserts a strict 201 and fails).
+
+  **Post-condition:** Saves `sqlSourceVersionId` from `body.id` (used by step 4a to configure the datasource and as the mapping `source` URN version in step 7).
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Version record created in `portal_backend` DB, linked to the source DataStructure |
+}

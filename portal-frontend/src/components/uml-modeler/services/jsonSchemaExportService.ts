@@ -119,8 +119,8 @@ const typeToSchema = (type: UMLType, classDefKeyById: Map<string, string>, crs?:
  * multiplicity (arrays) and default values.
  * For geometry attributes, the CRS string from `attr.meta.gisInfo.crs` is
  * forwarded to `typeToSchema` and emitted as a sibling `crs` property.
- * `x-core-primaryKey` marks the primary key, except on array attributes,
- * which cannot back one.
+ * `x-core-primaryKey` marks the primary key, only on a mandatory single-valued
+ * attribute (an array or optional value cannot back one).
  */
 const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, string>): JsonSchemaObject => {
   const crs = attr.meta?.gisInfo?.crs
@@ -141,7 +141,13 @@ const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, stri
     schema.default = attr.defaultValue
   }
 
-  if (attr.isId && !isMultivalued) {
+  // Conceptual identity marker (engine-neutral): the UML "{id}" attribute is the entity's primary
+  // key. Adapters interpret it technically (PostGIS PRIMARY KEY + UPSERT, FROST reference key, …);
+  // the editor stays unaware of any concrete implementation. JSON Schema has no native PK keyword,
+  // so the platform extension keyword 'x-core-primaryKey' carries it. Only a mandatory single value
+  // can back a key, so an array- or optional-valued isId (e.g. an imported/edge-authored 0..1) is
+  // not marked.
+  if (attr.isId && canMultiplicityBePrimaryKey(attr.multiplicity)) {
     schema['x-core-primaryKey'] = true
   }
 
@@ -149,12 +155,13 @@ const attributeToSchema = (attr: UMLAttribute, classDefKeyById: Map<string, stri
 }
 
 /**
- * Determines whether an attribute is required.
+ * Determines whether an attribute is required. A valid primary-key {@code isId} is always required;
+ * otherwise requiredness follows the multiplicity lower bound (so an optional single-valued isId,
+ * which cannot be a key, stays optional).
  */
-const isAttributeRequired = (attr: UMLAttribute): boolean => {
-  const { lower, upper } = parseMultiplicity(attr.multiplicity)
-  if (attr.isId && upper <= 1) return true
-  return lower >= 1
+export const isAttributeRequired = (attr: UMLAttribute): boolean => {
+  if (attr.isId && canMultiplicityBePrimaryKey(attr.multiplicity)) return true
+  return parseMultiplicity(attr.multiplicity).lower >= 1
 }
 
 /**

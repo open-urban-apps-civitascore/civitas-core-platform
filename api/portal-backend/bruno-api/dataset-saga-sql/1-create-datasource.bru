@@ -1,0 +1,80 @@
+meta {
+  name: 1. Create DataSource (SQL)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "SQL Saga Geo Source",
+    "description": "SQL (JDBC) pull source — geo sensor demo rows (lon/lat scalars)",
+    "connectorType": "SQL",
+    "configuration": {
+      "driver": "postgres",
+      "dsn": "postgres://postgres-sink:5432/geosink",
+      "user": "geosink",
+      "password": "geosink",
+      "table": "saga_sql_input",
+      "columns": ["*"]
+    },
+    "dataStructureVersionId": null,
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sqlDataSourceId', res.body.id);
+  }
+}
+
+tests {
+  test("DataSource created", function() {
+    const status = res.getStatus();
+    // 201=created. This collection assumes a clean DB per run (CI uses an ephemeral stack); a 409
+    // would mean a previous run leaked — fail loudly rather than carry a stale id downstream.
+    expect(status).to.equal(201);
+  });
+
+  test("Has SQL connector type", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.connectorType).to.equal('SQL');
+    }
+  });
+}
+
+docs {
+  **SQL saga step 1** — Prerequisites: create supporting resources before triggering the saga.
+
+  Creates a **SQL (JDBC) pull datasource** ("SQL Saga Geo Source"). This is the one and only
+  difference from the `dataset-saga-postgis` collection (which uses an MQTT source) — everything
+  downstream (datastructures, dataset, POSTGIS sink, geoPoint pipeline) is identical, so any failure
+  is attributable to the SQL **source** alone.
+
+  The config mirrors the `datasources/contract` SQL shape (`driver`/`dsn`/`user`/`password`/`table`/
+  `columns`), which the backend already accepts and round-trips at the API level.
+
+  **Acceptance intent (TDD):** the pipeline engine cannot yet deploy a SQL source — the NiFi adapter
+  throws `SQL source not yet supported` (`NifiFlowBuilder.sourceFragment`). This collection is the
+  end-to-end **red** gate for that gap: it is expected to fail at the dataset-release deploy (step 9
+  / verify step 10) until the SQL source is implemented, at which point it turns green. It mirrors the
+  red unit test `NifiFlowBuilderTest.buildsSqlSourceChainCronScheduled`.
+
+  **Expected Response:** 201 Created, body contains `id` and `connectorType: "SQL"`.
+
+  **Post-condition:** Save `sqlDataSourceId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource record created in `portal_backend` DB with status `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}

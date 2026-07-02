@@ -10,8 +10,10 @@
 package de.civitascore.configadapter.nifi.flow;
 
 import de.civitascore.configadapter.model.dataset.Datasource;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -46,8 +48,11 @@ public record PipelineDeploymentRequest(
    *
    * @param type the sink type
    * @param tableName the target table (POSTGIS), or null
+   * @param primaryKeyColumns the target's primary-key columns (from the data structure's {@code
+   *     x-core-primaryKey} marker); empty for INSERT semantics, non-empty switches
+   *     PutDatabaseRecord to UPSERT keyed on these columns so repeated reads do not duplicate rows
    */
-  public record SinkSpec(SinkType type, String tableName) {
+  public record SinkSpec(SinkType type, String tableName, List<String> primaryKeyColumns) {
     public SinkSpec {
       Objects.requireNonNull(type, "type");
       // A PostGIS sink without a table name is an invalid state: PutDatabaseRecord would have no
@@ -56,6 +61,38 @@ public record PipelineDeploymentRequest(
       if (type == SinkType.POSTGIS && (tableName == null || tableName.isBlank())) {
         throw new IllegalArgumentException("POSTGIS sink requires a non-blank tableName");
       }
+      // These names are joined verbatim into NiFi's "Update Keys", so normalize them here: trim,
+      // reject blank entries (a broken UPSERT config otherwise), and de-duplicate while preserving
+      // order.
+      primaryKeyColumns = sanitizeKeyColumns(primaryKeyColumns);
+      // Primary-key columns only drive the PostGIS PutDatabaseRecord UPSERT; a non-POSTGIS sink
+      // carrying them is a meaningless state, so reject it rather than let it pass unused.
+      if (type != SinkType.POSTGIS && !primaryKeyColumns.isEmpty()) {
+        throw new IllegalArgumentException(
+            "primaryKeyColumns are only valid for a POSTGIS sink, not " + type);
+      }
+    }
+
+    private static List<String> sanitizeKeyColumns(List<String> keys) {
+      if (keys == null) {
+        return List.of();
+      }
+      List<String> sanitized = new ArrayList<>();
+      for (String key : keys) {
+        if (key == null || key.isBlank()) {
+          throw new IllegalArgumentException("primaryKeyColumns must not contain blank entries");
+        }
+        String trimmed = key.trim();
+        if (!sanitized.contains(trimmed)) {
+          sanitized.add(trimmed);
+        }
+      }
+      return List.copyOf(sanitized);
+    }
+
+    /** A sink without an explicit primary key (INSERT semantics). */
+    public SinkSpec(SinkType type, String tableName) {
+      this(type, tableName, List.of());
     }
   }
 }

@@ -15,6 +15,7 @@ import de.civitascore.configadapter.adapter.SagaCommandHandler;
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
+import de.civitascore.configadapter.model.dataset.DataStructureSchema;
 import de.civitascore.configadapter.model.postgis.ColumnConfig;
 import de.civitascore.configadapter.model.postgis.DbRoleConfig;
 import de.civitascore.configadapter.model.postgis.GeometryColumnConfig;
@@ -393,50 +394,51 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       List<GeometryColumnConfig> geometryColumns =
           convertList(config.get("geometryColumns"), GeometryColumnConfig.class);
       List<ColumnConfig> columns = convertList(config.get("columns"), ColumnConfig.class);
-      List<String> derivedPrimaryKey = List.of();
-      if (requireColumns && sink.get("dataStructure") instanceof Map<?, ?> model) {
+      @SuppressWarnings("unchecked")
+      Map<String, Object> dataStructure =
+          sink.get("dataStructure") instanceof Map<?, ?> model ? (Map<String, Object>) model : null;
+      // The primary key only matters when the table is created (PROVISION). For DEPROVISION
+      // (requireColumns=false) columns are intentionally not derived, so deriving/validating a PK
+      // there would wrongly fail — the table is being dropped, not built.
+      if (requireColumns && columns.isEmpty() && dataStructure != null) {
         Set<String> geometryNames = new HashSet<>();
         for (GeometryColumnConfig geometry : geometryColumns) {
           geometryNames.add(geometry.name());
         }
-        @SuppressWarnings("unchecked")
-        Map<String, Object> dataStructure = (Map<String, Object>) model;
         DataStructureTableMapper.TableColumns derived =
             DataStructureTableMapper.deriveColumns(dataStructure, geometryNames);
-        derivedPrimaryKey = derived.primaryKey();
-        if (columns.isEmpty()) {
-          columns = derived.columns();
-          if (!derived.geometryColumns().isEmpty()) {
-            geometryColumns = new ArrayList<>(geometryColumns);
-            geometryColumns.addAll(derived.geometryColumns());
-          }
+        columns = derived.columns();
+        if (!derived.geometryColumns().isEmpty()) {
+          geometryColumns = new ArrayList<>(geometryColumns);
+          geometryColumns.addAll(derived.geometryColumns());
         }
       }
 
-      // A partial composite key would silently change the table's uniqueness semantics, so the
-      // derived key is used only when every one of its columns exists on the table.
-      List<String> primaryKey = stringList(config.get("primaryKey"));
-      if (primaryKey == null || primaryKey.isEmpty()) {
+      // Explicit configuration wins; otherwise the schema's x-core-primaryKey marker via the shared
+      // resolver — the same "explicit wins, else marker" rule the NiFi adapter uses, so the table
+      // PRIMARY KEY and the NiFi UPSERT keys cannot diverge.
+      List<String> primaryKey =
+          requireColumns
+              ? DataStructureSchema.resolvePrimaryKey(config.get("primaryKey"), dataStructure)
+              : List.of();
+      // The primary key must reference actual table columns; otherwise the emitted PRIMARY KEY(...)
+      // would name a missing column and provisioning fails with broken DDL. This can happen when
+      // columns are configured explicitly but a primary-key column (marked or explicit) is omitted
+      // —
+      // including a partial composite key, which would also silently tighten the table's
+      // uniqueness.
+      if (!primaryKey.isEmpty()) {
         Set<String> columnNames = new HashSet<>();
-        for (ColumnConfig column : columns) {
-          columnNames.add(column.name());
-        }
-        List<String> missing = new ArrayList<>();
-        for (String pkColumn : derivedPrimaryKey) {
-          if (!columnNames.contains(pkColumn)) {
-            missing.add(pkColumn);
-          }
-        }
-        if (missing.isEmpty()) {
-          primaryKey = new ArrayList<>(derivedPrimaryKey);
-        } else {
-          primaryKey = List.of();
-          logger.warn(
-              "Discarding schema-derived primary key {} for table '{}': column(s) {} are not on the"
-                  + " table",
-              Encode.forJava(derivedPrimaryKey.toString()),
-              Encode.forJava(tableName),
-              Encode.forJava(missing.toString()));
+        columns.forEach(column -> columnNames.add(column.name()));
+        geometryColumns.forEach(geometry -> columnNames.add(geometry.name()));
+        List<String> missingKeyColumns =
+            primaryKey.stream().filter(key -> !columnNames.contains(key)).toList();
+        if (!missingKeyColumns.isEmpty()) {
+          throw new IllegalArgumentException(
+              "POSTGIS data sink '"
+                  + tableName
+                  + "' primary key references column(s) not present in the table: "
+                  + missingKeyColumns);
         }
       }
 
@@ -503,20 +505,22 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   }
 
   @SuppressWarnings("unchecked")
-  private static List<String> stringList(Object raw) {
-    return raw instanceof List<?> list ? (List<String>) list : null;
-  }
-
-  @SuppressWarnings("unchecked")
   private static List<Map<String, Object>> mapList(Map<String, Object> payload, String key) {
-    if (!(payload.get(key) instanceof List<?> list)) {
+    Object raw = payload.get(key);
+    if (raw == null) {
       return List.of();
     }
-    List<Map<String, Object>> result = new ArrayList<>();
+    if (!(raw instanceof List<?> list)) {
+      throw new IllegalArgumentException(key + " must be a list");
+    }
+    List<Map<String, Object>> result = new ArrayList<>(list.size());
     for (Object item : list) {
-      if (item instanceof Map<?, ?> map) {
-        result.add((Map<String, Object>) map);
+      // Reject a non-map entry rather than silently dropping it: a malformed entry must fail the
+      // whole command, not yield a partial provision the saga still reports as success.
+      if (!(item instanceof Map<?, ?> map)) {
+        throw new IllegalArgumentException(key + " entries must be objects");
       }
+      result.add((Map<String, Object>) map);
     }
     return result;
   }
