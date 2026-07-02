@@ -121,6 +121,36 @@ class DataStructureSchemaTest {
   }
 
   @Test
+  void markerOnRefPropertyIsDropped() {
+    // a $ref property maps to a geometry/JSONB column, which cannot back a B-tree primary key, so
+    // its marker is ignored rather than yielding a key both adapters would fail to create
+    assertEquals(
+        List.of("id"),
+        DataStructureSchema.primaryKeyColumns(
+            json(
+                """
+                { "properties": {
+                    "id":  { "type": "string", "x-core-primaryKey": true },
+                    "geo": { "$ref": "https://geojson.org/schema/Point.json",
+                             "x-core-primaryKey": true } } }
+                """)));
+  }
+
+  @Test
+  void markerOnObjectOrArrayPropertyIsDropped() {
+    // object/array properties map to JSONB, which likewise cannot back a primary key
+    assertTrue(
+        DataStructureSchema.primaryKeyColumns(
+                json(
+                    """
+                    { "properties": {
+                        "nested": { "type": "object", "x-core-primaryKey": true },
+                        "list":   { "type": "array", "x-core-primaryKey": true } } }
+                    """))
+            .isEmpty());
+  }
+
+  @Test
   void externalRefParentInAllOfIsSkippedNotRejected() {
     // A class whose allOf lists an external (non-local) $ref parent — e.g. a GeoJSON geometry
     // schema — must resolve its own properties rather than throw; only local $refs are followed.

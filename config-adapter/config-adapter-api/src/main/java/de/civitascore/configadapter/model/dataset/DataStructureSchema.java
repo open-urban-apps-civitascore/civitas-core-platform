@@ -73,6 +73,10 @@ public final class DataStructureSchema {
    * The property names marked {@code x-core-primaryKey} in the resolved definition, in declaration
    * order; empty if the schema is null, marks none, or cannot be resolved (the column derivation
    * surfaces an unresolvable schema as an error — the primary key is best-effort here).
+   *
+   * <p>A marker on a non-scalar property (a {@code $ref}, or an {@code object}/{@code array} type —
+   * i.e. a geometry or JSONB column downstream) cannot back a B-tree primary key, so it is dropped
+   * with a warning rather than yielding a key both adapters would fail to create.
    */
   @SuppressWarnings("unchecked")
   public static List<String> primaryKeyColumns(Map<String, Object> schema) {
@@ -93,12 +97,33 @@ public final class DataStructureSchema {
     }
     List<String> keys = new ArrayList<>();
     for (Map.Entry<String, Object> entry : properties.entrySet()) {
-      if (entry.getValue() instanceof Map<?, ?> spec
-          && Boolean.TRUE.equals(((Map<String, Object>) spec).get(PRIMARY_KEY_MARKER))) {
-        keys.add(entry.getKey());
+      if (!(entry.getValue() instanceof Map<?, ?> map)
+          || !Boolean.TRUE.equals(((Map<String, Object>) map).get(PRIMARY_KEY_MARKER))) {
+        continue;
       }
+      Map<String, Object> spec = (Map<String, Object>) map;
+      if (!isScalar(spec)) {
+        LOG.warn(
+            "Ignoring x-core-primaryKey on property '{}': a non-scalar (geometry/JSONB) column"
+                + " cannot back a primary key",
+            Encode.forJava(entry.getKey()));
+        continue;
+      }
+      keys.add(entry.getKey());
     }
     return List.copyOf(keys);
+  }
+
+  /**
+   * Whether a property spec maps to a scalar column. A {@code $ref} (a GeoJSON geometry or a nested
+   * object) and an {@code object}/{@code array} type are non-scalar; everything else is scalar.
+   */
+  private static boolean isScalar(Map<String, Object> spec) {
+    if (spec.containsKey("$ref")) {
+      return false;
+    }
+    String type = stringValue(spec.get("type"));
+    return !"object".equals(type) && !"array".equals(type);
   }
 
   /**
