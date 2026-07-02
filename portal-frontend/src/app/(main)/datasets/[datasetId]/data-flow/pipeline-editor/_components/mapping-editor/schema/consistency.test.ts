@@ -146,17 +146,32 @@ const resolveTopLevelProperties = (node: JsonSchema | undefined, defs: Record<st
   return names
 }
 
+/** The single root class the virtual document root references, i.e. the `$defs` key of its one $ref property. */
+const rootClassOf = (schema: JsonSchema): string | undefined => {
+  const ref = Object.values(schema.properties ?? {})
+    .map(value => (value as JsonSchema).$ref)
+    .find((r): r is string => !!r?.startsWith('#/$defs/'))
+  return ref?.slice('#/$defs/'.length)
+}
+
 describe('root-selection consistency (adapter vs generator)', () => {
-  it.each(fixtures)('agrees on the root for $label', ({ diagram }) => {
+  // The generator's document root is the (virtual) data structure, titled after the diagram; it is
+  // not itself a class. The editor adapter still roots on the single root class, which the generator
+  // references via its one $ref property — so the adapter root equals that referenced class.
+  it.each(fixtures)('agrees on the root class for $label', ({ diagram }) => {
     const adapterRoot = umlDiagramToSchemaTree(diagram, diagram.name).name
-    const generatorRoot = exportToJsonSchema(diagram).title as string
-    expect(adapterRoot).toBe(generatorRoot)
+    const generatorRootClass = rootClassOf(exportToJsonSchema(diagram) as JsonSchema)
+    expect(adapterRoot).toBe(generatorRootClass)
   })
 
   it.each(fixtures)('agrees on the root field set for $label', ({ diagram }) => {
     const adapterFields = umlDiagramToSchemaTree(diagram, diagram.name).fields.map(f => f.name)
     const schema = exportToJsonSchema(diagram) as JsonSchema
-    const generatorFields = resolveTopLevelProperties(schema, schema.$defs ?? {})
+    const defs = schema.$defs ?? {}
+    const rootClass = rootClassOf(schema)
+    // Compare against the referenced root class's fields, not the virtual root (which only holds the
+    // single $ref property).
+    const generatorFields = resolveTopLevelProperties(rootClass ? defs[rootClass] : undefined, defs)
     expect([...adapterFields].sort()).toEqual([...generatorFields].sort())
   })
 })
