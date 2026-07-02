@@ -32,7 +32,6 @@ import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -73,13 +72,20 @@ public class GroupInitializer {
   private final EventProperties eventProperties;
 
   /**
-   * Persists each Keycloak-confirmed {@code externalId} in its own committed transaction. A group
-   * whose sync succeeds must not lose its {@code externalId} because a <em>later</em> group's sync
-   * throws and rolls back the surrounding {@link #initialize()} transaction — otherwise the group
-   * would be re-picked by {@code findByExternalIdIsNull()} on the next startup and its
-   * GROUP_CREATED event republished for an object that already exists in Keycloak.
+   * Programmatic transaction boundary for the initializer. {@link #initialize()} deliberately runs
+   * <em>without</em> a surrounding transaction: each externalId is committed in its own transaction
+   * so that a group whose sync succeeds cannot lose its {@code externalId} when a <em>later</em>
+   * group's sync throws — otherwise the succeeded group would be re-picked by {@code
+   * findByExternalIdIsNull()} on the next startup and its GROUP_CREATED event republished for an
+   * object that already exists in Keycloak.
+   *
+   * <p>Self-invocation cannot honor {@code @Transactional} (Spring's proxy is bypassed on internal
+   * calls), so the boundaries are drawn programmatically instead. {@code Group} carries a JPA
+   * {@code @Version}; a single long-lived transaction that also re-saved each group in a nested
+   * {@code REQUIRES_NEW} transaction would leave the outer transaction holding a stale version and
+   * fail with an {@code ObjectOptimisticLockingFailureException} — hence no outer transaction.
    */
-  private final TransactionTemplate externalIdTxTemplate;
+  private final TransactionTemplate txTemplate;
 
   public GroupInitializer(
       GroupRepository groupRepository,
@@ -97,15 +103,15 @@ public class GroupInitializer {
     this.initProperties = initProperties;
     this.keycloakProperties = keycloakProperties;
     this.eventProperties = eventProperties;
-    this.externalIdTxTemplate = new TransactionTemplate(transactionManager);
-    this.externalIdTxTemplate.setPropagationBehavior(TransactionTemplate.PROPAGATION_REQUIRES_NEW);
+    this.txTemplate = new TransactionTemplate(transactionManager);
   }
 
   @EventListener(ApplicationReadyEvent.class)
   @Order(ORDER)
-  @Transactional
   public void initialize() {
-    initProperties.ifPresent(this::createGroupsFromConfig);
+    initProperties.ifPresent(
+        properties ->
+            txTemplate.executeWithoutResult(status -> createGroupsFromConfig(properties)));
     syncUnsyncedGroups();
   }
 
@@ -177,24 +183,33 @@ public class GroupInitializer {
   }
 
   private void syncUnsyncedGroups() {
-    List<Group> unsyncedGroups = groupRepository.findByExternalIdIsNull();
+    // Load the unsynced groups and resolve their parent-depth inside a short read-only transaction:
+    // depth() walks the full parentGroup chain, which is lazy, and the network round-trips below
+    // must run outside any transaction so that each externalId can commit independently.
+    Map<Integer, List<Group>> byDepth =
+        txTemplate.execute(
+            status -> {
+              List<Group> unsyncedGroups = groupRepository.findByExternalIdIsNull();
+              if (unsyncedGroups.isEmpty()) {
+                return Map.of();
+              }
+              // Group by parent-depth so each layer's events can be fired in parallel while
+              // preserving the parent-before-child ordering needed for nested groups (parent
+              // externalId must already exist before a child can reference it).
+              return unsyncedGroups.stream()
+                  .sorted(Comparator.comparingInt(this::depth))
+                  .collect(Collectors.groupingBy(this::depth));
+            });
 
-    if (unsyncedGroups.isEmpty()) {
+    if (byDepth.isEmpty()) {
       log.debug("All groups already synced to Keycloak — skipping catch-up");
       return;
     }
 
-    // Group by parent-depth so each layer's events can be fired in parallel while preserving the
-    // parent-before-child ordering needed for nested groups (parent externalId must already exist
-    // before a child can reference it).
-    Map<Integer, List<Group>> byDepth =
-        unsyncedGroups.stream()
-            .sorted(Comparator.comparingInt(this::depth))
-            .collect(Collectors.groupingBy(this::depth));
-
+    int unsyncedCount = byDepth.values().stream().mapToInt(List::size).sum();
     log.info(
         "Syncing {} unsynced groups to Keycloak across {} depth layer(s)",
-        unsyncedGroups.size(),
+        unsyncedCount,
         byDepth.size());
 
     for (Map.Entry<Integer, List<Group>> layer : new java.util.TreeMap<>(byDepth).entrySet()) {
@@ -265,11 +280,11 @@ public class GroupInitializer {
   }
 
   private void persistExternalId(Group group, String externalId) {
-    externalIdTxTemplate.executeWithoutResult(
-        status -> {
-          group.setExternalId(externalId);
-          groupRepository.save(group);
-        });
+    // Commits in its own transaction (there is no surrounding one). The in-memory instance is
+    // updated too so a child group in a later depth layer reads its parent's freshly assigned
+    // externalId via GroupService.buildGroupConfig.
+    group.setExternalId(externalId);
+    txTemplate.executeWithoutResult(status -> groupRepository.save(group));
   }
 
   /**
