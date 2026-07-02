@@ -486,6 +486,28 @@ class PostgisSagaHandlerTest {
     }
 
     @Test
+    void nonListDatasinksFailsStep() {
+      // a present-but-non-list datasinks is a corrupt payload; it must fail loud, not be treated as
+      // "no sinks"
+      SagaCommandResult result =
+          handler.handle(execute("PROVISION_SINK", Map.of("datasinks", "not-a-list")));
+
+      assertEquals("STEP_FAILED", result.type());
+      assertTrue(result.error().contains("datasinks must be a list"), result.error());
+    }
+
+    @Test
+    void nonObjectDatasinkEntryFailsStep() {
+      // one malformed entry must fail the whole command, not silently drop it and provision a
+      // partial set the saga still reports as success
+      SagaCommandResult result =
+          handler.handle(execute("PROVISION_SINK", Map.of("datasinks", List.of("not-an-object"))));
+
+      assertEquals("STEP_FAILED", result.type());
+      assertTrue(result.error().contains("datasinks entries must be objects"), result.error());
+    }
+
+    @Test
     void deprovisionSinkDropsRoleAndTableButNotSchema() throws Exception {
       SagaCommandResult result =
           handler.handle(compensate("DEPROVISION_SINK", postgisSinkTrigger()));

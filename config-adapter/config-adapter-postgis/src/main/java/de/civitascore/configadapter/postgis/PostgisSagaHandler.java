@@ -411,14 +411,11 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       // The primary key only matters when the table is created (PROVISION). For DEPROVISION
       // (requireColumns=false) columns are intentionally not derived, so deriving/validating a PK
       // there would wrongly fail — the table is being dropped, not built.
-      List<String> primaryKey = stringList(config.get("primaryKey"));
+      List<String> primaryKey = List.of();
       if (requireColumns) {
-        // Explicit configuration wins; otherwise derive the primary key from the schema's
-        // x-core-primaryKey marker — via the SHARED DataStructureSchema so the table PRIMARY KEY is
-        // identical to the NiFi UPSERT Update Keys.
-        if ((primaryKey == null || primaryKey.isEmpty()) && dataStructure != null) {
-          primaryKey = DataStructureSchema.primaryKeyColumns(dataStructure);
-        }
+        // Shared resolver so the table PRIMARY KEY stays identical to the NiFi UPSERT Update Keys:
+        // explicit configuration wins, otherwise the schema's x-core-primaryKey marker.
+        primaryKey = DataStructureSchema.resolvePrimaryKey(config.get("primaryKey"), dataStructure);
         // The primary key must reference actual table columns; otherwise the emitted PRIMARY
         // KEY(...) would name a missing column and provisioning fails with broken DDL. This can
         // happen when columns are configured explicitly but the marker points at an omitted one.
@@ -501,20 +498,22 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   }
 
   @SuppressWarnings("unchecked")
-  private static List<String> stringList(Object raw) {
-    return raw instanceof List<?> list ? (List<String>) list : null;
-  }
-
-  @SuppressWarnings("unchecked")
   private static List<Map<String, Object>> mapList(Map<String, Object> payload, String key) {
-    if (!(payload.get(key) instanceof List<?> list)) {
+    Object raw = payload.get(key);
+    if (raw == null) {
       return List.of();
     }
-    List<Map<String, Object>> result = new ArrayList<>();
+    if (!(raw instanceof List<?> list)) {
+      throw new IllegalArgumentException(key + " must be a list");
+    }
+    List<Map<String, Object>> result = new ArrayList<>(list.size());
     for (Object item : list) {
-      if (item instanceof Map<?, ?> map) {
-        result.add((Map<String, Object>) map);
+      // Reject a non-map entry rather than silently dropping it: a malformed entry must fail the
+      // whole command, not yield a partial provision the saga still reports as success.
+      if (!(item instanceof Map<?, ?> map)) {
+        throw new IllegalArgumentException(key + " entries must be objects");
       }
+      result.add((Map<String, Object>) map);
     }
     return result;
   }

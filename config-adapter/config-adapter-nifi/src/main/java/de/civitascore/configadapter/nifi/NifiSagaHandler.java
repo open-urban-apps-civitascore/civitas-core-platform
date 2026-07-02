@@ -282,9 +282,21 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       List<Datasource> datasources,
       List<Map<String, Object>> datasinks)
       throws FatalAdapterException, RetryableAdapterException {
-    @SuppressWarnings("unchecked")
-    Map<String, Object> graphData =
-        pipeline.get(FIELD_DATA) instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
+    Object rawData = pipeline.get(FIELD_DATA);
+    // A missing graph (null) is a valid provide-style pipeline (empty graph). A present-but-non-map
+    // graph is a corrupt payload: silently treating it as empty would deploy a bare flow the user
+    // never described, so reject it.
+    Map<String, Object> graphData;
+    if (rawData == null) {
+      graphData = Map.of();
+    } else if (rawData instanceof Map<?, ?> map) {
+      @SuppressWarnings("unchecked")
+      Map<String, Object> typed = (Map<String, Object>) map;
+      graphData = typed;
+    } else {
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD, "pipeline '" + FIELD_DATA + "' must be an object");
+    }
     Datasource source = resolveSource(datasources);
     SinkSpec sink = resolveSink(datasinks);
     var plan = planner.plan(new PipelineDeploymentRequest(id, graphData, source, sink));
@@ -334,35 +346,24 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * The sink's primary-key columns: an explicit <b>non-empty</b> {@code configuration.primaryKey}
-   * if present, otherwise the data structure's {@code x-core-primaryKey} marker — derived by the
-   * shared {@link DataStructureSchema} so the PutDatabaseRecord UPSERT {@code Update Keys} are
-   * identical to the PostGIS table's PRIMARY KEY (single source of truth, no divergence). An
-   * explicit empty list is treated like absent and falls back to the schema, matching the PostGIS
-   * adapter exactly.
+   * The sink's primary-key columns via the shared {@link DataStructureSchema#resolvePrimaryKey}
+   * "explicit wins, else marker" rule, so the PutDatabaseRecord UPSERT {@code Update Keys} are
+   * identical to the PostGIS table's PRIMARY KEY (single source of truth, no divergence).
    */
   @SuppressWarnings("unchecked")
   private static List<String> resolvePrimaryKey(Map<String, Object> sink)
       throws FatalAdapterException {
-    if (sink.get("configuration") instanceof Map<?, ?> config
-        && ((Map<String, Object>) config).get("primaryKey") instanceof List<?> explicit
-        && !explicit.isEmpty()) {
-      List<String> keys = new ArrayList<>();
-      for (Object entry : explicit) {
-        // Reject malformed entries rather than String.valueOf-ing them: a number/blank would become
-        // a bogus UPSERT key instead of failing fast.
-        if (!(entry instanceof String key) || key.isBlank()) {
-          throw new FatalAdapterException(
-              AdapterErrorCode.INVALID_PAYLOAD,
-              "configuration.primaryKey must contain only non-blank strings");
-        }
-        keys.add(key);
-      }
-      return keys;
+    Object explicit =
+        sink.get("configuration") instanceof Map<?, ?> config
+            ? ((Map<String, Object>) config).get("primaryKey")
+            : null;
+    Map<String, Object> schema =
+        sink.get("dataStructure") instanceof Map<?, ?> ds ? (Map<String, Object>) ds : null;
+    try {
+      return DataStructureSchema.resolvePrimaryKey(explicit, schema);
+    } catch (IllegalArgumentException e) {
+      throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, e, e.getMessage());
     }
-    return sink.get("dataStructure") instanceof Map<?, ?> ds
-        ? DataStructureSchema.primaryKeyColumns((Map<String, Object>) ds)
-        : List.of();
   }
 
   private static String processGroupName(String pipelineId) {

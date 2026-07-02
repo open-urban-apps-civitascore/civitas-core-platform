@@ -194,6 +194,25 @@ class NifiSagaHandlerTest {
   }
 
   @Test
+  void presentButNonObjectPipelineDataIsRejected() throws Exception {
+    // a null 'data' is a valid provide-style pipeline (empty graph), but a present-but-non-object
+    // 'data' is corrupt — coercing it to an empty graph would deploy a bare flow the user never
+    // described, so it must fail loud rather than silently.
+    SagaCommandResult result =
+        handler.handle(
+            SagaCommandMessage.fromMap(
+                map(
+                    """
+                    { "type": "EXECUTE_STEP", "sagaId": "s", "stepId": "d", "adapter": "nifi",
+                      "operation": "DEPLOY_PIPELINES",
+                      "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
+                      "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD", "data": "not-an-object" } ] }
+                    """)));
+    assertEquals("STEP_FAILED", result.type());
+    verify(restClient, times(0)).deployFlow(any());
+  }
+
+  @Test
   void deleteDispatchesByProcessGroupName() throws Exception {
     Map<String, Object> payload =
         map(

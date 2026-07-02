@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -57,6 +58,27 @@ public class FlowDeploymentPlanner {
    * A PostgreSQL positional {@code $1} or numeric {@code :1} bind placeholder (not a {@code ::}).
    */
   private static final Pattern POSITIONAL_PLACEHOLDER = Pattern.compile("\\$\\d|(?<!:):\\d");
+
+  /**
+   * Query parameters allowed in a tenant SQL {@code dsn}. Deliberately an allowlist, not a
+   * blocklist: the pre-deploy JDBC probe (and the deployed flow) connect to this fully
+   * tenant-controlled URL, and several PgJDBC parameters take a class name that the driver loads
+   * and instantiates ({@code socketFactory}, {@code sslfactory}, {@code
+   * authenticationPluginClassName}, {@code sslhostnameverifier}, …) — a code-execution / SSRF
+   * surface. Cert-file TLS ({@code sslcert}/{@code sslkey}/{@code sslrootcert}) is also excluded:
+   * this adapter cannot provision the files, so {@code sslmode} without client certificates is the
+   * supported form.
+   */
+  private static final Set<String> ALLOWED_DSN_PARAMS =
+      Set.of(
+          "sslmode",
+          "connecttimeout",
+          "sockettimeout",
+          "logintimeout",
+          "tcpkeepalive",
+          "applicationname",
+          "currentschema",
+          "readonly");
 
   private final ObjectMapper mapper = new ObjectMapper();
   private final GraphParser graphParser;
@@ -154,7 +176,14 @@ public class FlowDeploymentPlanner {
    * @throws FatalAdapterException if the source/sink is unsupported or the mapping is invalid
    */
   public DeploymentPlan plan(PipelineDeploymentRequest request) throws FatalAdapterException {
-    PipelineGraph graph = graphParser.parse(request.graphData());
+    PipelineGraph graph;
+    try {
+      graph = graphParser.parse(request.graphData());
+    } catch (IllegalStateException e) {
+      // a corrupt graph payload (missing/duplicate node id, edge to an unknown node) — rejected at
+      // construction so a malformed graph never deploys silently
+      throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, e, e.getMessage());
+    }
     Optional<MappingConfig> mapping = parseMapping(graph);
     Optional<String> sourceCron = parseTriggerCron(graph);
     SinkSpec sink = request.sink();
@@ -202,8 +231,9 @@ public class FlowDeploymentPlanner {
         && sink.primaryKeyColumns().isEmpty()) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          "a SQL source writing to PostGIS requires a primary key on the target (x-core-primaryKey)"
-              + " so re-read rows are de-duplicated; none was resolved");
+          "a SQL source writing to PostGIS requires a primary key on the target data structure (mark"
+              + " the identifying attribute with the UML {id} flag) so re-read rows are"
+              + " de-duplicated; none was resolved");
     }
 
     Map<String, String> sourceProperties = new LinkedHashMap<>();
@@ -268,18 +298,19 @@ public class FlowDeploymentPlanner {
   }
 
   /**
-   * Whether {@code expression} is a NiFi (Quartz) cron — 6 or 7 whitespace-separated fields ({@code
-   * sec min hour day-of-month month day-of-week [year]}). NiFi itself validates the field syntax on
-   * deploy; this only guards the field count so an obviously malformed value fails the plan early
-   * rather than the remote NiFi REST call. Mirrors the 6-or-7-field check in the editor's {@code
-   * validationService.isValidQuartzCron}. Package-private for unit testing.
+   * Whether {@code expression} is a NiFi cron — exactly 6 whitespace-separated fields ({@code sec
+   * min hour day-of-month month day-of-week}). NiFi 2.x replaced Quartz with Spring's cron parser,
+   * which dropped Quartz's optional 7th "year" field; a year-qualified expression passes a 7-field
+   * count here but is then rejected inside NiFi at deploy as an opaque saga failure. NiFi itself
+   * validates the field syntax; this only guards the field count so an obviously malformed value
+   * fails the plan early rather than the remote NiFi REST call. Mirrors the 6-field check in the
+   * editor's {@code validationService.isValidQuartzCron}. Package-private for unit testing.
    */
   static boolean isValidNifiCron(String expression) {
     if (expression == null || expression.isBlank()) {
       return false;
     }
-    int fields = expression.trim().split("\\s+").length;
-    return fields == 6 || fields == 7;
+    return expression.trim().split("\\s+").length == 6;
   }
 
   private void bindSource(
@@ -315,19 +346,7 @@ public class FlowDeploymentPlanner {
       Map<String, Map<String, String>> sensitive)
       throws FatalAdapterException {
     rejectUnsupportedSqlFields(decrypted);
-
-    String table = trimmedString(decrypted.get("table"));
-    if (table.isEmpty()) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_TEMPLATE_ERROR, "SQL source requires a non-empty 'table'");
-    }
-    sourceProperties.put("Table Name", table);
-    // empty / "*" means all columns — QueryDatabaseTableRecord's default; only set a specific list
-    List<String> columns = trimmedNonBlank(decrypted.get("columns"));
-    if (!columns.isEmpty() && !columns.equals(List.of("*"))) {
-      sourceProperties.put("Columns to Return", String.join(",", columns));
-    }
-    putIfPresent(sourceProperties, "Additional WHERE Clause", decrypted.get("where"));
+    bindSqlQuery(decrypted, sourceProperties);
 
     // NOTE: a cron-recurring SQL source re-reads the whole table each run. Duplicate prevention is
     // handled sink-side (PutDatabaseRecord UPSERT keyed on the target's x-core-primaryKey), not in
@@ -379,6 +398,39 @@ public class FlowDeploymentPlanner {
     sqlSourceProbe.probe(jdbcUrl, trimmedString(decrypted.get("user")), passwordOf(decrypted));
   }
 
+  /**
+   * Binds the QueryDatabaseTableRecord query properties ({@code table}/{@code columns}/{@code
+   * where}). Table is required; an empty/{@code *} column list means all columns (the processor
+   * default); a blank {@code where} is not bound (NiFi would emit an invalid {@code WHERE ()}).
+   * Each value is checked for a NiFi Expression Language reference first (see {@link
+   * #rejectExpressionLanguage}).
+   */
+  private static void bindSqlQuery(
+      Map<String, Object> decrypted, Map<String, String> sourceProperties)
+      throws FatalAdapterException {
+    String table = trimmedString(decrypted.get("table"));
+    if (table.isEmpty()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR, "SQL source requires a non-empty 'table'");
+    }
+    rejectExpressionLanguage("table", table);
+    sourceProperties.put("Table Name", table);
+
+    List<String> columns = trimmedNonBlank(decrypted.get("columns"));
+    for (String column : columns) {
+      rejectExpressionLanguage("columns", column);
+    }
+    if (!columns.isEmpty() && !columns.equals(List.of("*"))) {
+      sourceProperties.put("Columns to Return", String.join(",", columns));
+    }
+
+    String where = trimmedString(decrypted.get("where"));
+    rejectExpressionLanguage("where", where);
+    if (!where.isEmpty()) {
+      sourceProperties.put("Additional WHERE Clause", where);
+    }
+  }
+
   private static String passwordOf(Map<String, Object> decrypted) {
     Object password = decrypted.get("password");
     return password == null ? null : String.valueOf(password);
@@ -389,9 +441,8 @@ public class FlowDeploymentPlanner {
    * dropping them. {@code prefix}/{@code suffix}/{@code init_statement} are Redpanda Connect (the
    * former engine) query concepts with no QueryDatabaseTableRecord equivalent; a {@code where}
    * carrying a bind placeholder ({@code :name} or {@code ?}) would reach NiFi as unbound, invalid
-   * SQL; and cert-file TLS ({@code sslcert}/{@code sslkey}/{@code sslrootcert}) needs files this
-   * adapter cannot provision into NiFi ({@code sslmode} alone is fine — PgJDBC honors it in the
-   * URL).
+   * SQL; and the {@code dsn} query string is restricted to an allowlist of safe parameters (see
+   * {@link #rejectUnknownDsnParams}).
    */
   private static void rejectUnsupportedSqlFields(Map<String, Object> config)
       throws FatalAdapterException {
@@ -407,12 +458,32 @@ public class FlowDeploymentPlanner {
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           "SQL 'where' must be literal SQL without bind placeholders (':name' or '?')");
     }
-    String dsn = trimmedString(config.get("dsn")).toLowerCase(Locale.ROOT);
-    if (dsn.contains("sslcert=") || dsn.contains("sslkey=") || dsn.contains("sslrootcert=")) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          "SQL source cert-file TLS (sslcert/sslkey/sslrootcert) is not supported; use sslmode"
-              + " without client certificates");
+    rejectUnknownDsnParams(trimmedString(config.get("dsn")));
+  }
+
+  /**
+   * Rejects a {@code dsn} whose query string carries a parameter outside {@link
+   * #ALLOWED_DSN_PARAMS}.
+   */
+  private static void rejectUnknownDsnParams(String dsn) throws FatalAdapterException {
+    int query = dsn.indexOf('?');
+    if (query < 0) {
+      return;
+    }
+    for (String pair : dsn.substring(query + 1).split("&")) {
+      if (pair.isEmpty()) {
+        continue;
+      }
+      int eq = pair.indexOf('=');
+      String name = (eq < 0 ? pair : pair.substring(0, eq)).trim().toLowerCase(Locale.ROOT);
+      if (!ALLOWED_DSN_PARAMS.contains(name)) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+            "SQL source dsn parameter not allowed: '"
+                + name
+                + "'; permitted parameters are "
+                + ALLOWED_DSN_PARAMS);
+      }
     }
   }
 
@@ -444,6 +515,24 @@ public class FlowDeploymentPlanner {
   }
 
   /**
+   * Rejects a NiFi Expression Language reference ({@code ${...}}) in a value bound verbatim into a
+   * QueryDatabaseTableRecord property. Those properties evaluate EL in the environment scope, so a
+   * tenant-supplied {@code table}/{@code columns}/{@code where} carrying {@code
+   * ${SINGLE_USER_CREDENTIALS_PASSWORD}} would have the config-adapter's own NiFi admin password
+   * expanded and sent in the SQL to the tenant's source DB — an environment-variable exfiltration
+   * path. {@code $$} is EL's own literal escape for a {@code $}, so it is not a reference and is
+   * allowed through.
+   */
+  private static void rejectExpressionLanguage(String field, String value)
+      throws FatalAdapterException {
+    if (value != null && value.replace("$$", "").contains("${")) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "SQL source '" + field + "' must not contain a NiFi expression reference ('${...}')");
+    }
+  }
+
+  /**
    * Converts a portal SQL {@code dsn} ({@code postgres://[user[:pw]@]host:port/db[?params]}) to the
    * JDBC URL the DBCP pool expects ({@code jdbc:postgresql://host:port/db[?params]}). User/password
    * carried in the DSN userinfo are dropped here — they are bound separately as Database User /
@@ -459,11 +548,29 @@ public class FlowDeploymentPlanner {
       return null;
     }
     String withoutScheme = text.replaceFirst("(?i)^(postgres|postgresql)://", "");
-    int at = withoutScheme.indexOf('@');
+    // Strip userinfo only within the authority (before the path/query). An '@' in a query parameter
+    // value (e.g. ?options=...) must not be mistaken for the userinfo separator and truncate the
+    // URL, so split off the path/query first.
+    int authorityEnd = indexOfAny(withoutScheme, '/', '?');
+    String authority = authorityEnd < 0 ? withoutScheme : withoutScheme.substring(0, authorityEnd);
+    String rest = authorityEnd < 0 ? "" : withoutScheme.substring(authorityEnd);
+    int at = authority.lastIndexOf('@');
     if (at >= 0) {
-      withoutScheme = withoutScheme.substring(at + 1);
+      authority = authority.substring(at + 1);
     }
-    return "jdbc:postgresql://" + withoutScheme;
+    return "jdbc:postgresql://" + authority + rest;
+  }
+
+  /** The first index of any of {@code chars} in {@code text}, or -1 if none is present. */
+  private static int indexOfAny(String text, char... chars) {
+    int best = -1;
+    for (char c : chars) {
+      int index = text.indexOf(c);
+      if (index >= 0 && (best < 0 || index < best)) {
+        best = index;
+      }
+    }
+    return best;
   }
 
   /**
@@ -578,6 +685,10 @@ public class FlowDeploymentPlanner {
         // it so a cron-recurring source that re-reads rows updates instead of duplicating them.
         // NiFi
         // does not derive the conflict key from the table PK — it must be given via Update Keys.
+        // The PutDatabaseRecord fragment quotes identifiers and does NOT translate field names: the
+        // PostGIS table is created with quoted (case-preserving) identifiers, so an UPSERT of a
+        // camelCase key would otherwise emit an unquoted "ON CONFLICT (stationId)" that PostgreSQL
+        // folds to "stationid" and rejects as a missing column.
         if (!sink.primaryKeyColumns().isEmpty()) {
           sinkProperties.put("Statement Type", "UPSERT");
           sinkProperties.put("Update Keys", String.join(",", sink.primaryKeyColumns()));

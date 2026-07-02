@@ -199,19 +199,19 @@ class GraphParserTest {
 
   @Test
   void missingNodeIdIsRejectedCleanly() throws Exception {
-    // a node without an id must fail with a clean error, not an NPE deeper in the wiring checks
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [
-                    { "type": "dataSource", "data": {} },
-                    { "id": "n-map", "type": "mapping",
-                      "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } } ],
-                  "edges": [] }
-                """));
+    // a node without an id must fail with a clean error at construction, not an NPE deeper in the
+    // wiring checks
+    Map<String, Object> data =
+        map(
+            """
+            { "nodes": [
+                { "type": "dataSource", "data": {} },
+                { "id": "n-map", "type": "mapping",
+                  "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } } ],
+              "edges": [] }
+            """);
 
-    assertThrows(IllegalStateException.class, graph::transformNode);
+    assertThrows(IllegalStateException.class, () -> parser.parse(data));
   }
 
   @Test
@@ -292,36 +292,34 @@ class GraphParserTest {
   @Test
   void edgeToUnknownNodeIdIsRejected() throws Exception {
     // an edge endpoint that is not a declared node (e.g. a deleted node) must not be treated as a
-    // valid terminal
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [
-                    { "id": "n-src", "type": "dataSource", "data": {} },
-                    { "id": "n-map", "type": "mapping",
-                      "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } } ],
-                  "edges": [
-                    { "id": "e1", "source": "n-src", "target": "n-map" },
-                    { "id": "e2", "source": "n-map", "target": "ghost-deleted" } ] }
-                """));
+    // valid terminal — rejected at construction
+    Map<String, Object> data =
+        map(
+            """
+            { "nodes": [
+                { "id": "n-src", "type": "dataSource", "data": {} },
+                { "id": "n-map", "type": "mapping",
+                  "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } } ],
+              "edges": [
+                { "id": "e1", "source": "n-src", "target": "n-map" },
+                { "id": "e2", "source": "n-map", "target": "ghost-deleted" } ] }
+            """);
 
-    assertThrows(IllegalStateException.class, graph::transformNode);
+    assertThrows(IllegalStateException.class, () -> parser.parse(data));
   }
 
   @Test
   void edgeToUnknownNodeIsRejectedEvenWithoutMapping() throws Exception {
     // graph-integrity checks apply to provide-style/no-mapping graphs too — a dangling edge must
-    // fail loud, consistent with the mapping case
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [ { "id": "n-src", "type": "dataSource", "data": {} } ],
-                  "edges": [ { "id": "e1", "source": "n-src", "target": "ghost-deleted" } ] }
-                """));
+    // fail loud at construction, consistent with the mapping case
+    Map<String, Object> data =
+        map(
+            """
+            { "nodes": [ { "id": "n-src", "type": "dataSource", "data": {} } ],
+              "edges": [ { "id": "e1", "source": "n-src", "target": "ghost-deleted" } ] }
+            """);
 
-    assertThrows(IllegalStateException.class, graph::transformNode);
+    assertThrows(IllegalStateException.class, () -> parser.parse(data));
   }
 
   @Test

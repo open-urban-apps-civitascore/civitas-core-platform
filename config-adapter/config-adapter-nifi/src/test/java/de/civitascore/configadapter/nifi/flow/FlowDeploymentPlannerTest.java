@@ -266,6 +266,28 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
+  void whereWithExpressionLanguageReferenceIsRejected() throws Exception {
+    // a NiFi Expression Language reference in 'where' is evaluated in the environment scope and
+    // would
+    // exfiltrate an env var (e.g. the NiFi admin password) into the SQL sent to the tenant DB
+    Datasource source = sqlSourceBasic();
+    source.handleUnknownProperty("where", "1=0 OR x='${SINGLE_USER_CREDENTIALS_PASSWORD}'");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-sql-el", graphWithMapping(), source, postgisSinkWithPk())));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          ex.getErrorCode());
+    }
+  }
+
+  @Test
   void whereWithPostgresCastIsAllowed() throws Exception {
     // a PostgreSQL '::' type cast is valid literal SQL, not a ':name' placeholder — must NOT be
     // rejected
@@ -388,6 +410,45 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-sql-mtls", graphWithMapping(), source, postgisSinkWithPk())));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          ex.getErrorCode());
+    }
+  }
+
+  @Test
+  void allowlistedNonSslModeDsnParamIsAccepted() throws Exception {
+    // guards the allowlist happy-path: a permitted parameter other than sslmode must pass and be
+    // preserved, so accidentally dropping one from ALLOWED_DSN_PARAMS is caught, not only rejection
+    Datasource source = sqlSourceBasic();
+    source.handleUnknownProperty("dsn", "postgres://srcdb:5432/in?applicationname=civitas");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      DeploymentPlan plan =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-sql-appname", graphWithMapping(), source, postgisSinkWithPk()));
+      assertTrue(
+          plan.snapshotJson().contains("jdbc:postgresql://srcdb:5432/in?applicationname=civitas"),
+          "allowlisted parameter preserved in the JDBC URL");
+    }
+  }
+
+  @Test
+  void classLoadingDsnParamIsRejected() throws Exception {
+    // a PgJDBC parameter that loads a class (socketFactory) is a code-execution/SSRF surface on the
+    // tenant-controlled probe URL — reject anything outside the safe parameter allowlist
+    Datasource source = sqlSourceBasic();
+    source.handleUnknownProperty("dsn", "postgres://srcdb:5432/in?socketFactory=org.example.Evil");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-sql-sf", graphWithMapping(), source, postgisSinkWithPk())));
       assertEquals(
           de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           ex.getErrorCode());
@@ -841,20 +902,25 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
-  void sevenFieldQuartzCronWithYearIsAccepted() throws Exception {
-    // Quartz allows an optional 7th field (year); a valid 7-field expression must be accepted
+  void sevenFieldYearQualifiedCronIsRejected() throws Exception {
+    // NiFi 2.x replaced Quartz with Spring's cron parser, which dropped the optional 7th (year)
+    // field. A year-qualified expression must fail the plan here rather than be accepted and then
+    // rejected inside NiFi at deploy as an opaque saga failure.
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
-      String snapshot =
-          planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest(
-                      "p-cron7",
-                      graphWithCron("0 0 6 * * ? 2026"),
-                      sqlSource(null),
-                      postgisSinkWithPk()))
-              .snapshotJson();
-      var sourceProc = processorOfType(snapshot, "QueryDatabaseTableRecord");
-      assertEquals("0 0 6 * * ? 2026", sourceProc.path("schedulingPeriod").asText());
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-cron7",
+                              graphWithCron("0 0 6 * * ? 2026"),
+                              sqlSource(null),
+                              postgisSinkWithPk())));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          ex.getErrorCode());
     }
   }
 
@@ -1122,6 +1188,16 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
+  void dsnToJdbcUrlStripsUserinfoWithoutTruncatingAnAtInAQueryParam() {
+    // the userinfo separator is only the '@' inside the authority; an '@' inside a query-parameter
+    // value must survive, not truncate the URL
+    assertEquals(
+        "jdbc:postgresql://host:5432/db?applicationname=x@y",
+        FlowDeploymentPlanner.postgresDsnToJdbcUrl(
+            "postgres://u:p@host:5432/db?applicationname=x@y"));
+  }
+
+  @Test
   void unsupportedSourceSinkCombinationIsRejected() throws Exception {
     Datasource source = new Datasource();
     source.setId("x");
@@ -1136,6 +1212,32 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p1", graphWithMapping(), source, postgisSink())));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          ex.getErrorCode());
+    }
+  }
+
+  @Test
+  void corruptGraphIsRejectedAsFatalTemplateError() throws Exception {
+    // The graph-integrity failure (here an edge to an unknown node) surfaces from parse() as an
+    // IllegalStateException; the planner must re-wrap it into a typed FatalAdapterException rather
+    // than let an unchecked exception escape the saga.
+    Map<String, Object> ghostEdgeGraph =
+        map(
+            """
+            { "nodes": [ { "id": "n-start", "type": "start", "data": {} } ],
+              "edges": [ { "id": "e1", "source": "n-start", "target": "n-missing" } ] }
+            """);
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-corrupt", ghostEdgeGraph, sqlSourceBasic(), postgisSinkWithPk())));
       assertEquals(
           de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           ex.getErrorCode());

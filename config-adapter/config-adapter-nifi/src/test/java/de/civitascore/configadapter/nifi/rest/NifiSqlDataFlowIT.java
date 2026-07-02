@@ -279,6 +279,48 @@ class NifiSqlDataFlowIT {
         "UPSERT on the primary key must keep exactly one row despite repeated reads");
   }
 
+  @Test
+  void upsertsCamelCaseColumnsAgainstQuotedIdentifiers() throws Exception {
+    // the sink table uses quoted camelCase identifiers ("stationId"/"tempValue"), the normal UML
+    // style. The UPSERT ON CONFLICT key must resolve against the quoted identifier, not a
+    // lowercase-folded one — this is the case the earlier all-lowercase tests could not surface.
+    Map<String, Object> graph =
+        map(
+            """
+            { "nodes": [
+                { "id": "s", "type": "start", "data": {} },
+                { "id": "c", "type": "cron", "data": { "cronExpression": "%s" } },
+                { "id": "m", "type": "mapping", "data": { "mappingConfig": {
+                    "fields": { "$.stationId": "$.stationId", "$.tempValue": "$.tempValue" } } } },
+                { "id": "e", "type": "end", "data": {} } ],
+              "edges": [
+                { "id": "e1", "source": "s", "target": "c" },
+                { "id": "e2", "source": "c", "target": "m" },
+                { "id": "e3", "source": "m", "target": "e" } ] }
+            """
+                .formatted(CRON_EVERY_SECOND));
+
+    deploy(
+        "sql-mixedcase-it",
+        graph,
+        sqlSource("mixed_input"),
+        new SinkSpec(SinkType.POSTGIS, "mixedObservation", List.of("stationId")));
+
+    await()
+        .atMost(Duration.ofSeconds(90))
+        .pollInterval(Duration.ofSeconds(2))
+        .ignoreExceptions()
+        .until(
+            () ->
+                count("SELECT count(*) FROM \"mixedObservation\" WHERE \"stationId\" = 'M1'") >= 1);
+
+    Thread.sleep(Duration.ofSeconds(8).toMillis());
+    assertEquals(
+        1,
+        count("SELECT count(*) FROM \"mixedObservation\" WHERE \"stationId\" = 'M1'"),
+        "UPSERT on a quoted camelCase primary key must keep exactly one row across repeated reads");
+  }
+
   private void deploy(
       String pipelineId, Map<String, Object> graph, Datasource source, SinkSpec sink)
       throws Exception {
@@ -369,6 +411,19 @@ class NifiSqlDataFlowIT {
       st.execute("INSERT INTO geo_input (id, stationid, lon, lat) VALUES (1, 'G1', '8.4', '49.0')");
       st.execute(
           "CREATE TABLE geo_observation (stationid text PRIMARY KEY, geom geometry(Point,4326))");
+
+      // Mixed-case source and sink with QUOTED (case-preserving) identifiers, exactly as the
+      // PostGIS
+      // adapter's DDL emits them. This exercises the UPSERT ON CONFLICT path against a camelCase
+      // key
+      // — the normal UML style — which an unquoted PutDatabaseRecord would fold to lowercase and
+      // fail on.
+      st.execute("CREATE TABLE mixed_input (id bigint, \"stationId\" text, \"tempValue\" text)");
+      st.execute(
+          "INSERT INTO mixed_input (id, \"stationId\", \"tempValue\") VALUES (1, 'M1', '42')");
+      st.execute(
+          "CREATE TABLE \"mixedObservation\" (\"stationId\" text PRIMARY KEY, \"tempValue\""
+              + " integer)");
     }
   }
 

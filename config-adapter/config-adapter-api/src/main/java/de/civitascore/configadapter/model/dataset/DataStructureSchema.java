@@ -16,6 +16,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.owasp.encoder.Encode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Engine-neutral reads over a DataStructure JSON Schema (the model the portal stores on a
@@ -29,6 +32,8 @@ import java.util.Set;
  * columns and the primary key are always derived from the same definition and cannot diverge.
  */
 public final class DataStructureSchema {
+
+  private static final Logger LOG = LoggerFactory.getLogger(DataStructureSchema.class);
 
   /** JSON Schema extension keyword carrying the conceptual primary key (UML {@code {id}}). */
   public static final String PRIMARY_KEY_MARKER = "x-core-primaryKey";
@@ -78,6 +83,12 @@ public final class DataStructureSchema {
     try {
       properties = resolveDefinition(schema).properties();
     } catch (IllegalArgumentException unresolvable) {
+      // Best-effort here (the column derivation surfaces an unresolvable schema as a hard error),
+      // but log the cause: swallowing it silently can leave a table without the primary key its
+      // marker intended — no dedup, no constraint — with no diagnostic trail.
+      LOG.warn(
+          "Could not resolve data structure schema to derive its primary key: {}",
+          Encode.forJava(String.valueOf(unresolvable.getMessage())));
       return List.of();
     }
     List<String> keys = new ArrayList<>();
@@ -88,6 +99,34 @@ public final class DataStructureSchema {
       }
     }
     return List.copyOf(keys);
+  }
+
+  /**
+   * The sink's primary-key columns from the single "explicit wins, else marker" rule shared by the
+   * PostGIS and NiFi adapters, so the PostGIS table PRIMARY KEY and the NiFi UPSERT Update Keys are
+   * always identical. A <b>non-empty</b> {@code explicitPrimaryKey} is used verbatim after
+   * validating that every entry is a non-blank string; an absent/empty explicit list falls back to
+   * the schema's {@code x-core-primaryKey} marker (empty if the schema is null or marks none).
+   *
+   * @param explicitPrimaryKey the raw {@code configuration.primaryKey} value (any type; only a
+   *     non-empty {@code List} counts as explicit)
+   * @param schema the data structure JSON Schema, or null
+   * @throws IllegalArgumentException if an explicit entry is not a non-blank string
+   */
+  public static List<String> resolvePrimaryKey(
+      Object explicitPrimaryKey, Map<String, Object> schema) {
+    if (explicitPrimaryKey instanceof List<?> explicit && !explicit.isEmpty()) {
+      List<String> keys = new ArrayList<>(explicit.size());
+      for (Object entry : explicit) {
+        if (!(entry instanceof String key) || key.isBlank()) {
+          throw new IllegalArgumentException(
+              "configuration.primaryKey must contain only non-blank strings");
+        }
+        keys.add(key);
+      }
+      return List.copyOf(keys);
+    }
+    return primaryKeyColumns(schema);
   }
 
   /**
@@ -143,9 +182,13 @@ public final class DataStructureSchema {
     }
 
     String ref = stringValue(node.get("$ref"));
-    if (ref != null) {
+    if (ref != null && !isExternalSchemaUri(ref)) {
       String key = localDefName(ref);
       if (key == null) {
+        // A relative/file $ref (e.g. common.json#/$defs/Base) is a real inheritance intent this
+        // resolver cannot follow — silently skipping it would drop the parent's columns and build
+        // an
+        // incomplete table, so reject it rather than fail late at write time.
         throw new IllegalArgumentException(
             "dataStructure JSON Schema parent $ref '"
                 + ref
@@ -165,6 +208,17 @@ public final class DataStructureSchema {
     if (node.get("required") instanceof List<?> list) {
       list.forEach(value -> required.add(String.valueOf(value)));
     }
+  }
+
+  /**
+   * Whether {@code ref} is an absolute external schema URI (e.g. a GeoJSON geometry schema {@code
+   * https://geojson.org/schema/Point.json}). Such a parent branch carries no table columns of its
+   * own and is not part of this resolver's inheritance model, so it is skipped rather than
+   * followed. A local {@code #/...} or relative/file {@code $ref} is NOT external and is handled by
+   * the caller.
+   */
+  private static boolean isExternalSchemaUri(String ref) {
+    return ref.startsWith("http://") || ref.startsWith("https://");
   }
 
   /**

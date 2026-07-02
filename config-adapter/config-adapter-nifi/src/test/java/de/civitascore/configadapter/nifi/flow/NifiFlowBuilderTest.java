@@ -477,9 +477,7 @@ class NifiFlowBuilderTest {
 
   @Test
   void buildsSqlSourceChainCronScheduled() throws Exception {
-    // RED until the SQL source is implemented: today NifiFlowBuilder.sourceFragment(SQL) throws
-    // "SQL source not yet supported", so build() fails before producing a snapshot. This test is
-    // the executable spec for the fix — what the SQL source flow must look like.
+    // a SQL source flow reads records from the configured table on a cron schedule
     JsonNode flow = build(sqlToPostgis());
 
     // the entry processor reads records from the configured table via a DB query — not ConsumeMQTT

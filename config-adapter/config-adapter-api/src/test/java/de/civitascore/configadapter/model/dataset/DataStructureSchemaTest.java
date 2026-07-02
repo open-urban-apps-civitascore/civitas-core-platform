@@ -119,4 +119,20 @@ class DataStructureSchemaTest {
                 json("{ \"properties\": { \"id\": { \"x-core-primaryKey\": \"true\" } } }"))
             .isEmpty());
   }
+
+  @Test
+  void externalRefParentInAllOfIsSkippedNotRejected() {
+    // A class whose allOf lists an external (non-local) $ref parent — e.g. a GeoJSON geometry
+    // schema — must resolve its own properties rather than throw; only local $refs are followed.
+    DataStructureSchema.ResolvedDefinition resolved =
+        DataStructureSchema.resolveDefinition(
+            json(
+                """
+                { "title": "Station",
+                  "allOf": [
+                    { "$ref": "https://geojson.org/schema/Point.json" },
+                    { "properties": { "station_id": { "type": "string" } } } ] }
+                """));
+    assertTrue(resolved.properties().containsKey("station_id"));
+  }
 }

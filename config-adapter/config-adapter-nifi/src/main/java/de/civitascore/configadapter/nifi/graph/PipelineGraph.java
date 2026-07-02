@@ -53,6 +53,10 @@ public record PipelineGraph(List<GraphNode> nodes, List<GraphEdge> edges) {
   public PipelineGraph {
     nodes = List.copyOf(Objects.requireNonNull(nodes, "nodes"));
     edges = List.copyOf(Objects.requireNonNull(edges, "edges"));
+    // Graph-integrity checks run at construction so a corrupt payload always fails loud, regardless
+    // of whether a caller later inspects the mapping or the cron node.
+    requireValidNodeIds(nodes);
+    requireKnownEdgeEndpoints(nodes, edges);
   }
 
   /**
@@ -86,14 +90,10 @@ public record PipelineGraph(List<GraphNode> nodes, List<GraphEdge> edges) {
    * than silently applied. More than one mapping node is also rejected (ambiguous transform).
    *
    * @return the mapping node, or empty if the pipeline has none
-   * @throws IllegalStateException on multiple mapping nodes, an edge to an unknown node, or a
-   *     mapping that is not wired into the single functional component
+   * @throws IllegalStateException on multiple mapping nodes, or a mapping that is not wired into
+   *     the single functional component
    */
   public Optional<GraphNode> transformNode() {
-    // graph-integrity checks run for every graph (mapping or not) so a corrupt payload always
-    // fails loud, never silently
-    requireValidNodeIds();
-    requireKnownEdgeEndpoints();
     List<GraphNode> mappings = nodes.stream().filter(n -> TYPE_MAPPING.equals(n.type())).toList();
     if (mappings.size() > 1) {
       throw new IllegalStateException(
@@ -120,7 +120,7 @@ public record PipelineGraph(List<GraphNode> nodes, List<GraphEdge> edges) {
   /**
    * Rejects nodes with a missing/blank id or a duplicate id (a corrupt graph, not an NPE later).
    */
-  private void requireValidNodeIds() {
+  private static void requireValidNodeIds(List<GraphNode> nodes) {
     Set<String> seen = new HashSet<>();
     for (GraphNode node : nodes) {
       String id = node.id();
@@ -169,7 +169,7 @@ public record PipelineGraph(List<GraphNode> nodes, List<GraphEdge> edges) {
   }
 
   /** Rejects any edge whose endpoints are not declared, non-null {@code nodes[].id} values. */
-  private void requireKnownEdgeEndpoints() {
+  private static void requireKnownEdgeEndpoints(List<GraphNode> nodes, List<GraphEdge> edges) {
     Set<String> nodeIds = new HashSet<>();
     for (GraphNode node : nodes) {
       nodeIds.add(node.id());
