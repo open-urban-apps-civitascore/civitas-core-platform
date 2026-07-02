@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -73,12 +74,12 @@ class GroupConfigJacksonTest {
     GroupConfig original = new GroupConfig();
     original.setName("Engineers");
 
-    // Round-trip via Jackson once to capture the polymorphism discriminator the writer adds,
-    // then splice in an unknown field — the reader must tolerate the unknown without failing.
-    String json = objectMapper.writeValueAsString(original);
-    String tampered = json.replaceFirst("\\{", "{\"unknownField\":\"oh no\",");
+    // Serialize to a tree so the polymorphism discriminator the writer adds is preserved,
+    // then add an unknown sibling field — the reader must tolerate the unknown without failing.
+    ObjectNode node = (ObjectNode) objectMapper.valueToTree(original);
+    node.put("unknownField", "oh no");
 
-    GroupConfig deserialized = objectMapper.readValue(tampered, GroupConfig.class);
+    GroupConfig deserialized = objectMapper.treeToValue(node, GroupConfig.class);
 
     assertEquals("Engineers", deserialized.getName());
   }
