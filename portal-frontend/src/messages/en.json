@@ -1114,7 +1114,7 @@
   },
   "pipelineEditor": {
     "title": "Pipeline Editor",
-    "subtitle": "Defines how data is ingested, transformed, and persisted",
+    "subtitle": "Defines how data is ingested, transformed, and stored",
     "canvas": {
       "noPipeline": "No pipeline available"
     },
@@ -1132,9 +1132,9 @@
       "start": "Start",
       "end": "End",
       "dataSource": "Data source",
-      "cronTrigger": "CRON Trigger",
-      "frostStorage": "FROST Server",
-      "geoPersistence": "Geo Persistence",
+      "cronTrigger": "Scheduled Trigger",
+      "frostStorage": "Sensor Data Storage",
+      "geoPersistence": "Geospatial Data Storage",
       "mapping": "Mapping"
     },
     "palette": {
@@ -1154,14 +1154,14 @@
       "flowEndDesc": "Pipeline exit point. Execution ends here.",
       "dataSource": "Data source",
       "dataSourceDesc": "Select data source.",
-      "cron": "CRON",
-      "cronDesc": "Scheduled trigger. Executes pipeline on schedule.",
-      "frostServer": "FROST Server",
-      "frostServerDesc": "SensorThings API persistence. Store or retrieve data.",
-      "geoPersistence": "Geo Persistence",
-      "geoPersistenceDesc": "OWS geo data persistence.",
+      "cron": "Scheduled Trigger",
+      "cronDesc": "Run pipeline on schedule",
+      "frostServer": "Sensor Data Storage",
+      "frostServerDesc": "for SensorThings API",
+      "geoPersistence": "Geospatial Data Storage",
+      "geoPersistenceDesc": "for WFS/WMS API",
       "mapping": "Mapping",
-      "mappingDesc": "Bloblang data transformation. Map and transform data."
+      "mappingDesc": "map Data structures"
     },
     "controlPanel": {
       "entryPoint": "Pipeline Entry Point",
@@ -1193,14 +1193,14 @@
       "noPermission": "No permission to read datasources"
     },
     "frostPanel": {
-      "details": "FROST Server Details",
+      "details": "Sensor Data Storage Details",
       "serverName": "Server Name",
       "serverUrl": "Server URL",
-      "internalServer": "Internal Frost Server",
+      "internalServer": "Internal Server",
       "version": "Version"
     },
     "geoPersistencePanel": {
-      "title": "Geo Persistence",
+      "title": "Geospatial Data Storage",
       "tableName": "Table Name",
       "tableNamePlaceholder": "Enter table name...",
       "dataStructureVersion": "Data Structure Version",

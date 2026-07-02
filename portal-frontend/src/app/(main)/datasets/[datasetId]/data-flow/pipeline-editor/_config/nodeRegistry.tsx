@@ -183,7 +183,7 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
     inspectorKey: 'cronTrigger',
     handles: { left: true, right: true },
     createDefaultData: (): CronNodeData => ({
-      label: 'CRON',
+      label: 'Scheduled Trigger',
       configured: false,
       cronExpression: '',
     }),
@@ -200,10 +200,10 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
     inspectorKey: 'frostStorage',
     handles: { left: true, right: true },
     createDefaultData: (): FrostNodeData => ({
-      label: 'Frost Server',
+      label: 'Sensor Data Storage',
       configured: true,
       entityType: ENTITY_TYPES.Frost,
-      serverName: 'Frost Server',
+      serverName: 'Sensor Data Storage',
       serverUrl: '',
       version: '1.1',
     }),
@@ -222,7 +222,7 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
     inspectorKey: 'geoPersistence',
     handles: { left: true, right: true },
     createDefaultData: (): GeoPersistenceNodeData => ({
-      label: 'Geo Persistence',
+      label: 'Geospatial Data Storage',
       configured: false,
       entityType: ENTITY_TYPES.Persistence,
       tableName: '',
