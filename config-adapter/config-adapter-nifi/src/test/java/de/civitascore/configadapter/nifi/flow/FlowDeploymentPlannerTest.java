@@ -572,10 +572,36 @@ class FlowDeploymentPlannerTest {
                               "p-frost-map",
                               graphWithMapping(),
                               mqttSource(null),
-                              new SinkSpec(SinkType.FROST, null))));
+                              new SinkSpec(SinkType.FROST, null),
+                              "1")));
       assertEquals(
           de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           ex.getErrorCode());
+    }
+  }
+
+  @Test
+  void frostSinkIsScopedToTheSagaProject() throws Exception {
+    // the flow must target the dataset's FROST project: Things under /Projects(n), the Datastream
+    // lookup filtered by Thing/Projects/id — root-scoped writes would be invisible through the
+    // project-scoped named API
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      DeploymentPlan plan =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-frost-scoped",
+                      graphWithoutMapping(),
+                      mqttSource(null),
+                      new SinkSpec(SinkType.FROST, null),
+                      "7"));
+      String snapshot = plan.snapshotJson();
+      assertTrue(
+          snapshot.contains("/Projects(7)/Things"),
+          "Thing leg must be scoped to the saga's project");
+      assertTrue(
+          snapshot.contains("Thing/Projects/id%20eq%207"),
+          "Datastream lookup must be filtered by the saga's project");
     }
   }
 
@@ -830,7 +856,8 @@ class FlowDeploymentPlannerTest {
                         "p-nofrost",
                         graphWithoutMapping(),
                         mqttSource(null),
-                        new SinkSpec(SinkType.FROST, null))));
+                        new SinkSpec(SinkType.FROST, null),
+                        "1")));
     assertEquals(
         de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }

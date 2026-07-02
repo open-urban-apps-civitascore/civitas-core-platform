@@ -49,6 +49,16 @@ public class NifiFlowBuilder {
    */
   public static final String FROST_BASE_URL = "Frost Base URL";
 
+  /**
+   * Sink-property key carrying the dataset's FROST project id (numeric, from the saga's
+   * create-project step; set by {@code FlowDeploymentPlanner.bindFrost}). Required for every FROST
+   * sink — the build fails without it. It scopes the find-or-create sub-flow: Things are looked up
+   * and created under {@code /Projects(n)} so they are visible through the dataset's project-scoped
+   * named API, and the Datastream lookup filters on {@code Thing/Projects/id} (the projects plugin
+   * exposes no direct {@code /Projects(n)/Datastreams} collection).
+   */
+  public static final String FROST_PROJECT_ID = "Frost Project Id";
+
   /** InvokeHTTP failure-side relationships routed to the error sink (find-or-create stages). */
   private static final List<String> HTTP_FAILURE_RELATIONSHIPS =
       List.of("Failure", "Retry", "No Retry");
@@ -514,8 +524,22 @@ public class NifiFlowBuilder {
       Processor errorSink)
       throws FatalAdapterException {
     String base = spec.sinkProperties().getOrDefault(FROST_BASE_URL, "");
-    buildThingLeg(base, pgId, csIdByName, processors, connections, upstream, errorSink);
-    buildObservationLeg(base, pgId, csIdByName, processors, connections, upstream, errorSink);
+    String projectId = spec.sinkProperties().get(FROST_PROJECT_ID);
+    // Every FROST flow is project-scoped: an unscoped flow would write to the server root,
+    // invisible to the dataset's named API and open to cross-dataset reference collisions — so a
+    // missing project id fails the build instead of degrading silently.
+    if (projectId == null || projectId.isBlank()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "FROST sink requires the '" + FROST_PROJECT_ID + "' sink property");
+    }
+    // Things live inside the dataset's FROST project so they are reachable through the
+    // project-scoped named API; Observations stay at the root — their scope flows through the
+    // resolved Datastream (whose lookup is project-filtered below).
+    String thingBase = base + "/Projects(" + projectId + ")";
+    buildThingLeg(thingBase, pgId, csIdByName, processors, connections, upstream, errorSink);
+    buildObservationLeg(
+        base, projectId, pgId, csIdByName, processors, connections, upstream, errorSink);
   }
 
   /** Things leg: find by reference, POST only when absent (idempotent create). */
@@ -561,9 +585,15 @@ public class NifiFlowBuilder {
     routeHttpFailures(pgId, connections, post, errorSink);
   }
 
-  /** Observations leg: find the Datastream, merge its id into the observation, POST (else log). */
+  /**
+   * Observations leg: find the Datastream, merge its id into the observation, POST (else log). The
+   * lookup filters on {@code Thing/Projects/id} so a reference collision with another dataset's
+   * Datastream cannot route observations across datasets (the projects plugin has no {@code
+   * /Projects(n)/Datastreams} collection to scope the path itself).
+   */
   private void buildObservationLeg(
       String base,
+      String projectId,
       String pgId,
       Map<String, String> csIdByName,
       ArrayNode processors,
@@ -586,7 +616,9 @@ public class NifiFlowBuilder {
                 base
                     + "/Datastreams?$filter=properties/reference%20eq%20"
                     + "'${frost.ref:replaceAll(\"'\",\"''\"):urlEncode()}'"
-                    + "%20and%20name%20eq%20'${frost.name:replaceAll(\"'\",\"''\"):urlEncode()}'",
+                    + "%20and%20name%20eq%20'${frost.name:replaceAll(\"'\",\"''\"):urlEncode()}'"
+                    + "%20and%20Thing/Projects/id%20eq%20"
+                    + projectId,
                 "found",
                 "${frost.id:isEmpty():not()}"));
     // A missing Datastream must not be dropped silently.

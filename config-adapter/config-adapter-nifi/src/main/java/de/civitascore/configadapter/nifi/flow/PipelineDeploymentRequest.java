@@ -24,20 +24,50 @@ import java.util.Objects;
  * @param graphData the engine-neutral pipeline graph ({@code dataPipelines[].data})
  * @param source the resolved source datasource (with possibly encrypted credentials)
  * @param sink the resolved sink specification
+ * @param frostProjectId the dataset's FROST project id (from the saga's create-project step);
+ *     required for a FROST sink — it scopes the find-or-create flow to the dataset's project — and
+ *     must be null for any other sink
  */
 public record PipelineDeploymentRequest(
-    String pipelineId, Map<String, Object> graphData, Datasource source, SinkSpec sink) {
+    String pipelineId,
+    Map<String, Object> graphData,
+    Datasource source,
+    SinkSpec sink,
+    String frostProjectId) {
 
   public PipelineDeploymentRequest {
     if (pipelineId == null || pipelineId.isBlank()) {
       throw new IllegalArgumentException("pipelineId must be non-blank");
     }
     Objects.requireNonNull(sink, "sink");
+    // The project id is interpolated into NiFi processor URLs and $filter expressions, so it must
+    // be the numeric id FROST's create-project step returned — anything else is a mis-wired
+    // payload (or an injection attempt). The numeric check assumes FROST-Server's default LONG
+    // entity-id type; revisit it before ever operating FROST with string ids. Without the id a
+    // FROST flow would post to the server root, invisible to the dataset's project-scoped named
+    // API. A non-FROST sink carrying one is a meaningless state.
+    if (sink.type() == SinkType.FROST) {
+      if (frostProjectId == null || frostProjectId.isBlank()) {
+        throw new IllegalArgumentException("a FROST sink requires a non-blank frostProjectId");
+      }
+      if (!frostProjectId.matches("\\d+")) {
+        throw new IllegalArgumentException("frostProjectId must be numeric: " + frostProjectId);
+      }
+    } else if (frostProjectId != null) {
+      throw new IllegalArgumentException(
+          "frostProjectId is only valid for a FROST sink, not " + sink.type());
+    }
     // Defensively copy the caller's graph map so the record does not alias mutable external state
     // (consistent with MappingConfig). A LinkedHashMap keeps node/edge order and tolerates the null
     // values that arbitrary JSON graphs may carry; Map.copyOf would reject those.
     graphData =
         graphData == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(graphData));
+  }
+
+  /** A request without a FROST project id (non-FROST sinks). */
+  public PipelineDeploymentRequest(
+      String pipelineId, Map<String, Object> graphData, Datasource source, SinkSpec sink) {
+    this(pipelineId, graphData, source, sink, null);
   }
 
   /**

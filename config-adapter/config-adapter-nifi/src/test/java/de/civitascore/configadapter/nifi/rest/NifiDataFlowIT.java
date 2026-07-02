@@ -54,6 +54,8 @@ import org.testcontainers.utility.DockerImageName;
 class NifiDataFlowIT extends AbstractNifiIT {
 
   private static final int HOST_PORT = 18444;
+  // The FROST project id the deployed flows are scoped to (required by the builder).
+  private static final String PROJECT_ID = "1";
   private static final String ENVELOPE =
       "{\"things\":[{\"name\":\"Sensor S1\",\"properties\":{\"reference\":\"S1\"}}]}";
   private static final String ENVELOPE_OBS =
@@ -110,30 +112,30 @@ class NifiDataFlowIT extends AbstractNifiIT {
   @Test
   void findOrCreatePostsNewThingWhenLookupIsEmpty() throws Exception {
     String basePath = "/new";
-    stub(getStub(basePath + "/Things", "{\"value\":[]}"));
-    stub(postStub(basePath + "/Things", 201));
+    stub(getStub(thingsPath(basePath), "{\"value\":[]}"));
+    stub(postStub(thingsPath(basePath), 201));
     deployFrost("pipeline-frost-new", "civitas/it/thing-new", basePath);
 
     // NiFi must look the Thing up by reference and — finding none — POST the Thing.
     publishUntil(
         "civitas/it/thing-new",
         "civitas-it-new",
-        () -> postedBodyContains(basePath + "/Things", "\"reference\":\"S1\""));
+        () -> postedBodyContains(thingsPath(basePath), "\"reference\":\"S1\""));
   }
 
   @Test
   void findOrCreateSkipsPostWhenThingExists() throws Exception {
     String basePath = "/exists";
-    stub(getStub(basePath + "/Things", "{\"value\":[{\"@iot.id\":42}]}"));
-    stub(postStub(basePath + "/Things", 201));
+    stub(getStub(thingsPath(basePath), "{\"value\":[{\"@iot.id\":42}]}"));
+    stub(postStub(thingsPath(basePath), 201));
     deployFrost("pipeline-frost-exists", "civitas/it/thing-exists", basePath);
 
     // The lookup resolves an existing @iot.id, so the Thing must NOT be re-created.
     publishUntil(
-        "civitas/it/thing-exists", "civitas-it-exists", () -> getReceived(basePath + "/Things"));
+        "civitas/it/thing-exists", "civitas-it-exists", () -> getReceived(thingsPath(basePath)));
     Thread.sleep(Duration.ofSeconds(5).toMillis());
     assertFalse(
-        postedTo(basePath + "/Things"), "an existing Thing must not be POSTed again (idempotency)");
+        postedTo(thingsPath(basePath)), "an existing Thing must not be POSTed again (idempotency)");
   }
 
   @Test
@@ -158,8 +160,8 @@ class NifiDataFlowIT extends AbstractNifiIT {
   @Test
   void frostWriteFailureRaisesErrorBulletin() throws Exception {
     String basePath = "/fail";
-    stub(getStub(basePath + "/Things", "{\"value\":[]}"));
-    stub(postStub(basePath + "/Things", 500));
+    stub(getStub(thingsPath(basePath), "{\"value\":[]}"));
+    stub(postStub(thingsPath(basePath), 500));
     deployFrost("pipeline-frost-fail", "civitas/it/thing-fail", basePath);
 
     // A failing POST (HTTP 500) must route to the LogMessage error sink (WARN bulletin), not
@@ -192,11 +194,20 @@ class NifiDataFlowIT extends AbstractNifiIT {
                     SourceType.MQTT,
                     Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", topic),
                     SinkType.FROST,
-                    Map.of(NifiFlowBuilder.FROST_BASE_URL, "http://sink:8080" + basePath),
+                    Map.of(
+                        NifiFlowBuilder.FROST_BASE_URL,
+                        "http://sink:8080" + basePath,
+                        NifiFlowBuilder.FROST_PROJECT_ID,
+                        PROJECT_ID),
                     List.of(),
                     Map.of(),
                     null));
     client.deployFlow(new DeploymentPlan(pipelineId, snapshot, Map.of()));
+  }
+
+  /** The Thing legs are project-scoped; Datastream/Observation stubs stay at the base path. */
+  private static String thingsPath(String basePath) {
+    return basePath + "/Projects(" + PROJECT_ID + ")/Things";
   }
 
   /**

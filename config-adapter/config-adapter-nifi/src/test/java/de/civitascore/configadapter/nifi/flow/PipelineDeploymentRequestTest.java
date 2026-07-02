@@ -43,6 +43,36 @@ class PipelineDeploymentRequestTest {
   }
 
   @Test
+  void frostSinkRequiresANumericProjectId() {
+    // The id scopes the flow to the dataset's FROST project and is interpolated into processor
+    // URLs/$filters — missing or non-numeric values must be unrepresentable.
+    SinkSpec frost = new SinkSpec(SinkType.FROST, null);
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new PipelineDeploymentRequest("p", Map.of(), null, frost));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new PipelineDeploymentRequest("p", Map.of(), null, frost, " "));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new PipelineDeploymentRequest("p", Map.of(), null, frost, "1) or true"));
+    assertEquals(
+        "42", new PipelineDeploymentRequest("p", Map.of(), null, frost, "42").frostProjectId());
+  }
+
+  @Test
+  void projectIdOnNonFrostSinkIsRejected() {
+    SinkSpec postgis = new SinkSpec(SinkType.POSTGIS, "t");
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new PipelineDeploymentRequest("p", Map.of(), null, postgis, "1"));
+    // the convenience constructor (no project id) stays valid for non-FROST sinks
+    assertEquals(
+        SinkType.POSTGIS,
+        new PipelineDeploymentRequest("p", Map.of(), null, postgis).sink().type());
+  }
+
+  @Test
   void primaryKeyColumnsOnNonPostgisSinkAreRejected() {
     // PK columns only drive the PostGIS UPSERT; carrying them on a FROST sink is a meaningless
     // state
@@ -73,7 +103,7 @@ class PipelineDeploymentRequestTest {
 
     PipelineDeploymentRequest request =
         new PipelineDeploymentRequest(
-            "p-1", mutable, new Datasource(), new SinkSpec(SinkType.FROST, null));
+            "p-1", mutable, new Datasource(), new SinkSpec(SinkType.FROST, null), "1");
 
     // mutating the caller's map after construction must not leak into the record
     mutable.put("edges", new ArrayList<>());
@@ -85,7 +115,7 @@ class PipelineDeploymentRequestTest {
   void nullGraphDataBecomesEmptyMap() {
     PipelineDeploymentRequest request =
         new PipelineDeploymentRequest(
-            "p-1", null, new Datasource(), new SinkSpec(SinkType.FROST, null));
+            "p-1", null, new Datasource(), new SinkSpec(SinkType.FROST, null), "1");
     assertTrue(request.graphData().isEmpty());
   }
 }
