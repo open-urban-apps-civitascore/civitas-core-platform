@@ -31,7 +31,9 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Initializes groups and syncs them to Keycloak. Runs on every startup:
@@ -70,6 +72,15 @@ public class GroupInitializer {
   private final KeycloakProperties keycloakProperties;
   private final EventProperties eventProperties;
 
+  /**
+   * Persists each Keycloak-confirmed {@code externalId} in its own committed transaction. A group
+   * whose sync succeeds must not lose its {@code externalId} because a <em>later</em> group's sync
+   * throws and rolls back the surrounding {@link #initialize()} transaction — otherwise the group
+   * would be re-picked by {@code findByExternalIdIsNull()} on the next startup and its
+   * GROUP_CREATED event republished for an object that already exists in Keycloak.
+   */
+  private final TransactionTemplate externalIdTxTemplate;
+
   public GroupInitializer(
       GroupRepository groupRepository,
       RoleRepository roleRepository,
@@ -77,7 +88,8 @@ public class GroupInitializer {
       ConfigEventPublisherService configEventPublisher,
       Optional<InitProperties> initProperties,
       KeycloakProperties keycloakProperties,
-      EventProperties eventProperties) {
+      EventProperties eventProperties,
+      PlatformTransactionManager transactionManager) {
     this.groupRepository = groupRepository;
     this.roleRepository = roleRepository;
     this.assignmentRepository = assignmentRepository;
@@ -85,6 +97,8 @@ public class GroupInitializer {
     this.initProperties = initProperties;
     this.keycloakProperties = keycloakProperties;
     this.eventProperties = eventProperties;
+    this.externalIdTxTemplate = new TransactionTemplate(transactionManager);
+    this.externalIdTxTemplate.setPropagationBehavior(TransactionTemplate.PROPAGATION_REQUIRES_NEW);
   }
 
   @EventListener(ApplicationReadyEvent.class)
@@ -103,6 +117,11 @@ public class GroupInitializer {
     log.info("Creating groups from init configuration");
 
     for (InitProperties.GroupEntry entry : properties.getGroups()) {
+      if (Strings.isBlank(entry.getName())) {
+        log.error("Skipping group entry with null or blank name in init configuration");
+        continue;
+      }
+
       Group group =
           groupRepository
               .findByName(entry.getName())
@@ -188,7 +207,14 @@ public class GroupInitializer {
   private void syncLayerInParallel(int depth, List<Group> groupsAtDepth) {
     List<PendingSync> pending = new ArrayList<>(groupsAtDepth.size());
     for (Group group : groupsAtDepth) {
-      GroupConfig groupConfig = GroupService.buildGroupConfig(group);
+      GroupConfig groupConfig;
+      try {
+        groupConfig = GroupService.buildGroupConfig(group);
+      } catch (IllegalStateException e) {
+        // Corrupt row (null/blank name) — skip it so one bad group cannot abort the whole sweep.
+        log.error("Skipping group id={} — invalid state: {}", group.getId(), e.getMessage());
+        continue;
+      }
       CompletableFuture<ConfigResultEvent> future =
           configEventPublisher.publishGroupCreated(keycloakProperties.targetRealm(), groupConfig);
       pending.add(new PendingSync(group, future));
@@ -210,8 +236,7 @@ public class GroupInitializer {
       if (result != null
           && result.status() == ConfigResultEvent.Status.SUCCESS
           && !Strings.isBlank(result.resourceId())) {
-        group.setExternalId(result.resourceId());
-        groupRepository.save(group);
+        persistExternalId(group, result.resourceId());
         log.info(
             "Synced group '{}' to Keycloak, externalId={}", group.getName(), result.resourceId());
       } else if (result != null) {
@@ -237,6 +262,14 @@ public class GroupInitializer {
     } catch (ExecutionException e) {
       log.error("Failed to sync group '{}' to Keycloak", group.getName(), e);
     }
+  }
+
+  private void persistExternalId(Group group, String externalId) {
+    externalIdTxTemplate.executeWithoutResult(
+        status -> {
+          group.setExternalId(externalId);
+          groupRepository.save(group);
+        });
   }
 
   /**

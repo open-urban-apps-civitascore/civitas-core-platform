@@ -31,6 +31,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("GroupInitializer Tests")
@@ -40,6 +41,7 @@ class GroupInitializerTest {
   @Mock private RoleRepository roleRepository;
   @Mock private AssignmentRepository assignmentRepository;
   @Mock private ConfigEventPublisherService configEventPublisher;
+  @Mock private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
   private static final String TARGET_REALM = "test-realm";
   private static final String AUTH_SERVER_URL = "http://keycloak:8080";
@@ -51,6 +53,9 @@ class GroupInitializerTest {
 
   @BeforeEach
   void setUp() {
+    org.mockito.Mockito.lenient()
+        .when(transactionManager.getTransaction(any()))
+        .thenReturn(new SimpleTransactionStatus());
     initializer =
         new GroupInitializer(
             groupRepository,
@@ -59,7 +64,8 @@ class GroupInitializerTest {
             configEventPublisher,
             Optional.empty(),
             KEYCLOAK_PROPERTIES,
-            new EventProperties(CONFIG_ADAPTER_TIMEOUT_SECONDS));
+            new EventProperties(CONFIG_ADAPTER_TIMEOUT_SECONDS),
+            transactionManager);
   }
 
   private Group group(String name) {
@@ -206,6 +212,26 @@ class GroupInitializerTest {
       verify(groupRepository, times(1)).save(any());
       assertThat(ok.getExternalId()).isEqualTo("kc-ok-id");
       assertThat(broken.getExternalId()).isNull();
+    }
+
+    @Test
+    @DisplayName("skips a group with a blank name and still syncs the rest of the layer")
+    void shouldSkipGroupWithBlankNameAndContinue() {
+      Group blank = group("");
+      Group ok = group("Ok");
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of(blank, ok));
+
+      // buildGroupConfig throws IllegalStateException for the blank-named group before any
+      // publish, so only the valid group reaches the publisher.
+      when(configEventPublisher.publishGroupCreated(eq("test-realm"), any(GroupConfig.class)))
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-ok-id")));
+
+      initializer.initialize();
+
+      verify(configEventPublisher, times(1)).publishGroupCreated(eq("test-realm"), any());
+      verify(groupRepository, times(1)).save(any());
+      assertThat(ok.getExternalId()).isEqualTo("kc-ok-id");
+      assertThat(blank.getExternalId()).isNull();
     }
 
     @Test
