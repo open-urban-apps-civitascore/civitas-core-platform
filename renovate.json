@@ -56,33 +56,51 @@
     },
     {
       "description": "Group Spring Boot dependencies",
-      "matchPackagePatterns": ["^org\\.springframework"],
       "groupName": "Spring Boot dependencies",
       "matchFileNames": ["portal-backend/**", "config-adapter/**"],
+      "matchPackageNames": [
+        "/^org\\.springframework/"
+      ],
       "dependencyDashboardApproval": false
     },
     {
       "description": "Group React ecosystem",
-      "matchPackagePatterns": ["^react", "^@types/react"],
       "groupName": "React ecosystem",
-      "matchFileNames": ["portal-frontend/**"]
+      "matchFileNames": ["portal-frontend/**"],
+      "matchPackageNames": [
+        "/^react/",
+        "/^@types/react/"
+      ]
     },
     {
       "description": "Group Next.js related packages",
-      "matchPackageNames": ["next"],
-      "matchPackagePatterns": ["^@next/", "^next-"],
+      "matchPackageNames": ["next", "/^@next//", "/^next-/"],
       "groupName": "Next.js",
       "matchFileNames": ["portal-frontend/**"]
     },
     {
       "description": "Group testing libraries",
-      "matchPackagePatterns": ["^@testing-library/", "^vitest", "^@vitest/", "^@playwright/", "junit", "mockito"],
-      "groupName": "testing libraries"
+      "groupName": "testing libraries",
+      "matchPackageNames": [
+        "/^@testing-library//",
+        "/^vitest/",
+        "/^@vitest//",
+        "/^@playwright//",
+        "/junit/",
+        "/mockito/"
+      ]
     },
     {
       "description": "Group linting and formatting tools",
-      "matchPackagePatterns": ["^eslint", "^@eslint/", "^prettier", "^@prettier/", "checkstyle", "spotbugs"],
-      "groupName": "linting and formatting"
+      "groupName": "linting and formatting",
+      "matchPackageNames": [
+        "/^eslint/",
+        "/^@eslint//",
+        "/^prettier/",
+        "/^@prettier//",
+        "/checkstyle/",
+        "/spotbugs/"
+      ]
     },
     {
       "description": "Pin Docker digests",
