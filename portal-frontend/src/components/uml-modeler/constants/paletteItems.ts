@@ -34,11 +34,4 @@ export const RELATIONSHIP_PALETTE_ITEMS = [
     description: 'Filled diamond (strong ownership)',
     icon: 'diamond',
   },
-  {
-    id: 'dependency',
-    type: 'dependency' as const,
-    label: 'Dependency',
-    description: 'Dashed arrow (temporary relationship)',
-    icon: 'moveRight',
-  },
 ]
