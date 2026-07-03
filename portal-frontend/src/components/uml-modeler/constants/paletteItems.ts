@@ -10,13 +10,6 @@ export const ELEMENT_PALETTE_ITEMS = [
     icon: 'box',
   },
   {
-    id: 'interface',
-    type: 'interface' as UMLElementType,
-    label: 'Interface',
-    description: 'UML Interface with operations only',
-    icon: 'puzzle',
-  },
-  {
     id: 'abstractClass',
     type: 'abstractClass' as UMLElementType,
     label: 'Abstract Class',
