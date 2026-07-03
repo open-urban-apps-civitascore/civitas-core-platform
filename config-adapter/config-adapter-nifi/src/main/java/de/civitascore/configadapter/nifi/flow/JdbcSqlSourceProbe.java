@@ -11,7 +11,6 @@ package de.civitascore.configadapter.nifi.flow;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
-import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner.SqlSourceProbe;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;

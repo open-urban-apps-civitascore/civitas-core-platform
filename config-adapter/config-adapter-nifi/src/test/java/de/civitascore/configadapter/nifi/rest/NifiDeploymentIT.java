@@ -20,13 +20,11 @@ import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner;
 import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner.PlatformSinkConfig;
-import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder;
+import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.SinkType;
-import de.civitascore.configadapter.nifi.graph.GraphParser;
-import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
-import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
+import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -84,12 +82,9 @@ class NifiDeploymentIT extends AbstractNifiIT {
             """);
 
     FlowDeploymentPlanner planner =
-        new FlowDeploymentPlanner(
-            new GraphParser(),
-            new MappingConfigParser(),
-            new RecordPathCompiler(),
-            new NifiFlowBuilder(),
+        NifiTestFixtures.planner(
             new CredentialResolver(new byte[0]),
+            SqlSourceProbe.NO_OP,
             new PlatformSinkConfig(
                 "jdbc:postgresql://localhost:5432/civitas", "nifi", "nifi-db-secret"),
             "http://localhost:8080/FROST-Server/v1.1");
@@ -155,12 +150,9 @@ class NifiDeploymentIT extends AbstractNifiIT {
             """);
 
     FlowDeploymentPlanner planner =
-        new FlowDeploymentPlanner(
-            new GraphParser(),
-            new MappingConfigParser(),
-            new RecordPathCompiler(),
-            new NifiFlowBuilder(),
+        NifiTestFixtures.planner(
             new CredentialResolver(new byte[0]),
+            SqlSourceProbe.NO_OP,
             null,
             "http://localhost:8080/FROST-Server/v1.1");
     DeploymentPlan plan =

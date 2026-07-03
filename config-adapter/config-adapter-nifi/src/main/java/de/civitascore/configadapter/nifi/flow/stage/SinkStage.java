@@ -43,7 +43,9 @@ public interface SinkStage {
     return input() == SinkInput.RECORDS;
   }
 
-  /** The rejection message when the graph carries a mapping but {@link #acceptsMapping} is false. */
+  /**
+   * The rejection message when the graph carries a mapping but {@link #acceptsMapping} is false.
+   */
   default String mappingRejectionMessage() {
     return "sink does not support a record mapping";
   }

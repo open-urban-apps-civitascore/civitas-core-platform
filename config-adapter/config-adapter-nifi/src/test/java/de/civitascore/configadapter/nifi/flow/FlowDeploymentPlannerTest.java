@@ -34,9 +34,6 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
-import de.civitascore.configadapter.nifi.graph.GraphParser;
-import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
-import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -318,24 +315,14 @@ class FlowDeploymentPlannerTest {
   void sqlSourceConnectionProbeFailureFailsLoud() throws Exception {
     // #3: an unreachable / mis-credentialed source must fail the plan loudly, not deploy a flow
     // that silently produces no data
-    FlowDeploymentPlanner.SqlSourceProbe failing =
+    SqlSourceProbe failing =
         (url, user, pw) -> {
           throw new FatalAdapterException(
               de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
               "unreachable: " + url);
         };
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
-      FlowDeploymentPlanner probing =
-          new FlowDeploymentPlanner(
-              new GraphParser(),
-              new MappingConfigParser(),
-              new RecordPathCompiler(),
-              new NifiFlowBuilder(),
-              resolver,
-              new FlowDeploymentPlanner.PlatformSinkConfig(
-                  "jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
-              "http://frost:8080/FROST-Server/v1.1",
-              failing);
+      FlowDeploymentPlanner probing = planner(resolver, failing);
       FatalAdapterException ex =
           assertThrows(
               FatalAdapterException.class,
@@ -597,23 +584,12 @@ class FlowDeploymentPlannerTest {
     source.handleUnknownProperty("password", enc);
 
     String[] probedPassword = {null};
-    FlowDeploymentPlanner.SqlSourceProbe capturingProbe =
-        (jdbcUrl, user, password) -> probedPassword[0] = password;
+    SqlSourceProbe capturingProbe = (jdbcUrl, user, password) -> probedPassword[0] = password;
 
     try (CredentialResolver resolver = new CredentialResolver(key)) {
-      FlowDeploymentPlanner planner =
-          new FlowDeploymentPlanner(
-              new GraphParser(),
-              new MappingConfigParser(),
-              new RecordPathCompiler(),
-              new NifiFlowBuilder(),
-              resolver,
-              new FlowDeploymentPlanner.PlatformSinkConfig(
-                  "jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
-              "http://frost:8080/FROST-Server/v1.1",
-              capturingProbe);
+      FlowDeploymentPlanner probing = planner(resolver, capturingProbe);
 
-      planner.plan(
+      probing.plan(
           new PipelineDeploymentRequest(
               "p-sql-probe", graphWithMapping(), source, postgisSinkWithPk()));
     }
@@ -624,12 +600,9 @@ class FlowDeploymentPlannerTest {
   @Test
   void postgisSinkWithoutPlatformConnectionIsRejected() throws Exception {
     FlowDeploymentPlanner noDbPlanner =
-        new FlowDeploymentPlanner(
-            new GraphParser(),
-            new MappingConfigParser(),
-            new RecordPathCompiler(),
-            new NifiFlowBuilder(),
+        NifiTestFixtures.planner(
             new CredentialResolver(stretchedKey()),
+            SqlSourceProbe.NO_OP,
             null,
             "http://frost:8080/FROST-Server/v1.1");
     FatalAdapterException ex =
@@ -675,12 +648,9 @@ class FlowDeploymentPlannerTest {
     // A null FROST base URL must fail fast — otherwise the flow would deploy and silently POST
     // observations to a bogus/empty URL.
     FlowDeploymentPlanner noFrostPlanner =
-        new FlowDeploymentPlanner(
-            new GraphParser(),
-            new MappingConfigParser(),
-            new RecordPathCompiler(),
-            new NifiFlowBuilder(),
+        NifiTestFixtures.planner(
             new CredentialResolver(stretchedKey()),
+            SqlSourceProbe.NO_OP,
             new FlowDeploymentPlanner.PlatformSinkConfig(
                 "jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
             null);
@@ -1088,16 +1058,6 @@ class FlowDeploymentPlannerTest {
     // null / blank pass through untouched
     assertNull(FlowDeploymentPlanner.withStringtypeUnspecified(null));
     assertEquals("", FlowDeploymentPlanner.withStringtypeUnspecified(""));
-  }
-
-  @Test
-  void dsnToJdbcUrlStripsUserinfoWithoutTruncatingAnAtInAQueryParam() {
-    // the userinfo separator is only the '@' inside the authority; an '@' inside a query-parameter
-    // value must survive, not truncate the URL
-    assertEquals(
-        "jdbc:postgresql://host:5432/db?applicationname=x@y",
-        FlowDeploymentPlanner.postgresDsnToJdbcUrl(
-            "postgres://u:p@host:5432/db?applicationname=x@y"));
   }
 
   @Test

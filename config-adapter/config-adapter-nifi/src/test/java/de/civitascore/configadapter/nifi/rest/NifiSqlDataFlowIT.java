@@ -21,12 +21,11 @@ import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner;
 import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner.PlatformSinkConfig;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder;
+import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.SinkType;
-import de.civitascore.configadapter.nifi.graph.GraphParser;
-import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
-import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
+import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -275,12 +274,9 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
     byte[] key = CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
     try (CredentialResolver resolver = new CredentialResolver(key)) {
       FlowDeploymentPlanner planner =
-          new FlowDeploymentPlanner(
-              new GraphParser(),
-              new MappingConfigParser(),
-              new RecordPathCompiler(),
-              new NifiFlowBuilder(),
+          NifiTestFixtures.planner(
               resolver,
+              SqlSourceProbe.NO_OP,
               new PlatformSinkConfig("jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
               null);
       DeploymentPlan plan =

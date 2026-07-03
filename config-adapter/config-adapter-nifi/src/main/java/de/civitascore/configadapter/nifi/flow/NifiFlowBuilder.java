@@ -9,7 +9,6 @@
  */
 package de.civitascore.configadapter.nifi.flow;
 
-import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.applySchedule;
 import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.removeAutoTerminated;
 import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.setProp;
 
@@ -22,6 +21,8 @@ import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.flow.stage.BuildContext;
 import de.civitascore.configadapter.nifi.flow.stage.Fragment;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
+import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
+import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.ReplacementStrategy;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import java.nio.charset.StandardCharsets;
@@ -70,10 +71,12 @@ public class NifiFlowBuilder {
   private static final String WRITER = "JsonRecordSetWriter";
   private static final String DBCP = "PostGISConnectionPool";
 
-  /** Friendly name of the source-side DB connection pool (SQL pull sources). */
-  private static final String SOURCE_DBCP = "SourceConnectionPool";
-
   private final ObjectMapper mapper = new ObjectMapper();
+  private final StageRegistry registry;
+
+  public NifiFlowBuilder(StageRegistry registry) {
+    this.registry = registry;
+  }
 
   /**
    * The resolved inputs for one flow.
@@ -155,9 +158,10 @@ public class NifiFlowBuilder {
 
     BuildContext ctx =
         new BuildContext(mapper, pgId, spec, processors, controllerServices, connections);
+    SourceStage sourceStage = registry.source(spec.sourceType());
 
     // Controller services first — processors reference them by id.
-    addControllerServices(ctx, spec);
+    addControllerServices(ctx, sourceStage, spec);
 
     // Processor chain: source -> [convert] -> [mapping...] -> sink. A mapping may need more than
     // one
@@ -179,9 +183,7 @@ public class NifiFlowBuilder {
           "FROST sink requires an MQTT SensorThings source; a SQL source does not emit the STA"
               + " envelope");
     }
-    Processor source =
-        ctx.loadProcessor(sourceFragment(spec.sourceType()), sqlSource ? "success" : "Message");
-    applySchedule(source, spec.sourceCron());
+    Processor source = sourceStage.build(ctx).exit();
     // ConvertRecord turns raw MQTT bytes into records; a SQL source already emits records, and the
     // FROST find-or-create works on the raw JSON envelope (SplitJson/EvaluateJsonPath) — so both
     // skip the convert step.
@@ -200,7 +202,6 @@ public class NifiFlowBuilder {
       prefix.add(convert);
     }
     prefix.addAll(mappingProcessors);
-    bindProperties(prefix, spec);
     for (int i = 0; i < prefix.size(); i++) {
       ctx.addProcessor(prefix.get(i));
       if (i > 0) {
@@ -223,17 +224,16 @@ public class NifiFlowBuilder {
   // ─── Controller services ────────────────────────────────────────────────────
 
   /**
-   * Adds the controller services the flow needs: the JSON reader/writer always, a source-side DB
-   * pool for a SQL pull source, and the sink DB pool for a PostGIS sink.
+   * Adds the controller services the flow needs: the JSON reader/writer always (they are chain
+   * infrastructure referenced by convert/mapping fragments), then the source stage's own services,
+   * then the sink DB pool for a PostGIS sink. The order is part of the byte-stable snapshot
+   * contract.
    */
-  private void addControllerServices(BuildContext ctx, FlowBuildSpec spec)
+  private void addControllerServices(BuildContext ctx, SourceStage sourceStage, FlowBuildSpec spec)
       throws FatalAdapterException {
     ctx.addControllerService(Fragment.JSON_TREE_READER, READER);
     ctx.addControllerService(Fragment.JSON_RECORD_SET_WRITER, WRITER);
-    if (spec.sourceType() == SourceType.SQL) {
-      // SQL pull source reads records over its own DB connection pool.
-      ctx.addControllerService(Fragment.DBCP_CONNECTION_POOL, SOURCE_DBCP);
-    }
+    sourceStage.registerControllerServices(ctx);
     if (spec.sinkType() == SinkType.POSTGIS) {
       ctx.addControllerService(Fragment.DBCP_CONNECTION_POOL, DBCP);
     }
@@ -263,17 +263,9 @@ public class NifiFlowBuilder {
     return result;
   }
 
-  private void bindProperties(List<Processor> chain, FlowBuildSpec spec) {
-    for (Processor processor : chain) {
-      String type = processor.node().path("type").asText();
-      ObjectNode props = (ObjectNode) processor.node().get("properties");
-      if (type.endsWith("ConsumeMQTT") || type.endsWith("QueryDatabaseTableRecord")) {
-        spec.sourceProperties().forEach(props::put);
-      } else if (type.endsWith("PutDatabaseRecord") || type.endsWith("InvokeHTTP")) {
-        spec.sinkProperties().forEach(props::put);
-      }
-      // UpdateRecord properties are applied in buildMappingProcessors (per strategy group).
-    }
+  private void bindSinkProperties(Processor sink, FlowBuildSpec spec) {
+    ObjectNode props = (ObjectNode) sink.node().get("properties");
+    spec.sinkProperties().forEach(props::put);
   }
 
   private void applyMapping(
@@ -371,7 +363,7 @@ public class NifiFlowBuilder {
       buildFrostFindOrCreate(ctx, spec, tail, errorSink);
     } else {
       Processor sink = ctx.loadProcessor(sinkFragment(spec.sinkType()), null);
-      bindProperties(List.of(sink), spec);
+      bindSinkProperties(sink, spec);
       ctx.addProcessor(sink);
       ctx.addChainConnection(tail, sink);
       wireErrorSink(ctx, convert, mappingProcessors, sink, spec.sinkType());
@@ -421,8 +413,7 @@ public class NifiFlowBuilder {
   }
 
   /** Things leg: find by reference, POST only when absent (idempotent create). */
-  private void buildThingLeg(
-      BuildContext ctx, String base, Processor upstream, Processor errorSink)
+  private void buildThingLeg(BuildContext ctx, String base, Processor upstream, Processor errorSink)
       throws FatalAdapterException {
     Processor route =
         buildLookup(
@@ -598,13 +589,6 @@ public class NifiFlowBuilder {
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
-
-  private static Fragment sourceFragment(SourceType sourceType) {
-    return switch (sourceType) {
-      case MQTT -> Fragment.CONSUME_MQTT;
-      case SQL -> Fragment.QUERY_DATABASE_TABLE_RECORD;
-    };
-  }
 
   private static Fragment sinkFragment(SinkType sinkType) {
     return switch (sinkType) {

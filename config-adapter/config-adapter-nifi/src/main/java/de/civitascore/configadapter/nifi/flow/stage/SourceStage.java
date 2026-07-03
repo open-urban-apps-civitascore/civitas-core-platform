@@ -28,9 +28,11 @@ public interface SourceStage {
 
   /**
    * The rejection message when the graph carries a cron trigger but this source lacks {@link
-   * SourceCapability#SUPPORTS_CRON}.
+   * SourceCapability#SUPPORTS_CRON}. Never consulted for sources that declare the capability.
    */
-  String cronRejectionMessage();
+  default String cronRejectionMessage() {
+    return "cron scheduling is not supported for source type " + type();
+  }
 
   /**
    * Plan-time half: validates the datasource, decrypts credentials, and fills the property maps.

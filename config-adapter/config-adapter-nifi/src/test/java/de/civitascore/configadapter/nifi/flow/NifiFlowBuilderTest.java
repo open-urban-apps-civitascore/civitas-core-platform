@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
 class NifiFlowBuilderTest {
 
   private final ObjectMapper mapper = new ObjectMapper();
-  private final NifiFlowBuilder builder = new NifiFlowBuilder();
+  private final NifiFlowBuilder builder = NifiTestFixtures.flowBuilder();
 
   private JsonNode build(FlowBuildSpec spec) throws Exception {
     return mapper.readTree(builder.build(spec));

@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
+import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
 import jakarta.ws.rs.core.Response;
@@ -195,7 +196,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
   @Test
   void findOrCreateCreatesThingExactlyOnceAcrossRepeatedMessages() throws Exception {
     String snapshot =
-        new NifiFlowBuilder()
+        NifiTestFixtures.flowBuilder()
             .build(
                 new FlowBuildSpec(
                     "pipeline-frost-it",
@@ -250,7 +251,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
         "FROST must resolve the Datastream by reference+name");
 
     String snapshot =
-        new NifiFlowBuilder()
+        NifiTestFixtures.flowBuilder()
             .build(
                 new FlowBuildSpec(
                     "pipeline-frost-obs-it",
@@ -302,7 +303,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
         "precondition: the referenced Datastream must not exist");
 
     String snapshot =
-        new NifiFlowBuilder()
+        NifiTestFixtures.flowBuilder()
             .build(
                 new FlowBuildSpec(
                     "pipeline-frost-nods-it",

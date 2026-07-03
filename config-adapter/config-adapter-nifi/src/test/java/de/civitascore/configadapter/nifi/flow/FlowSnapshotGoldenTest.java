@@ -196,7 +196,7 @@ class FlowSnapshotGoldenTest {
   }
 
   private void verifyBuilder(String name, FlowBuildSpec spec) throws Exception {
-    verify(name, new NifiFlowBuilder().build(spec));
+    verify(name, NifiTestFixtures.flowBuilder().build(spec));
   }
 
   private void verify(String name, String snapshot) throws Exception {

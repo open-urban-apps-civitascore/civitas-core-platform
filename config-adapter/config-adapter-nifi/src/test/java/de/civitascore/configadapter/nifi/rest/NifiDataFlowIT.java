@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
+import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
 import jakarta.ws.rs.core.Response;
@@ -187,7 +188,7 @@ class NifiDataFlowIT extends AbstractNifiIT {
 
   private void deployFrost(String pipelineId, String topic, String basePath) throws Exception {
     String snapshot =
-        new NifiFlowBuilder()
+        NifiTestFixtures.flowBuilder()
             .build(
                 new FlowBuildSpec(
                     pipelineId,
