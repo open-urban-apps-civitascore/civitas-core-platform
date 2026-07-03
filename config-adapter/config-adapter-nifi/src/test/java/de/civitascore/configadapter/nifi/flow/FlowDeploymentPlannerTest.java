@@ -24,7 +24,6 @@ import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.sqlSourceW
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.stretchedKey;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -651,8 +650,7 @@ class FlowDeploymentPlannerTest {
         NifiTestFixtures.planner(
             new CredentialResolver(stretchedKey()),
             SqlSourceProbe.NO_OP,
-            new FlowDeploymentPlanner.PlatformSinkConfig(
-                "jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
+            new PlatformSinkConfig("jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
             null);
     FatalAdapterException ex =
         assertThrows(
@@ -1040,25 +1038,6 @@ class FlowDeploymentPlannerTest {
   // Note: a FROST sink with a geoPoint (or any) mapping is now rejected wholesale by
   // frostSinkWithMappingIsRejected — a FROST sink consumes the raw STA envelope and has no mapping
   // stage — so the former geoPoint-specific FROST rejection test is subsumed by it.
-
-  @Test
-  void withStringtypeUnspecifiedCoversAllBranches() {
-    // no query string → append with '?'
-    assertEquals(
-        "jdbc:postgresql://db:5432/civitas?stringtype=unspecified",
-        FlowDeploymentPlanner.withStringtypeUnspecified("jdbc:postgresql://db:5432/civitas"));
-    // existing query string → append with '&'
-    assertEquals(
-        "jdbc:postgresql://db:5432/civitas?ssl=true&stringtype=unspecified",
-        FlowDeploymentPlanner.withStringtypeUnspecified(
-            "jdbc:postgresql://db:5432/civitas?ssl=true"));
-    // already present → unchanged (idempotent, no double-append)
-    String already = "jdbc:postgresql://db:5432/civitas?stringtype=unspecified";
-    assertEquals(already, FlowDeploymentPlanner.withStringtypeUnspecified(already));
-    // null / blank pass through untouched
-    assertNull(FlowDeploymentPlanner.withStringtypeUnspecified(null));
-    assertEquals("", FlowDeploymentPlanner.withStringtypeUnspecified(""));
-  }
 
   @Test
   void unsupportedSourceSinkCombinationIsRejected() throws Exception {

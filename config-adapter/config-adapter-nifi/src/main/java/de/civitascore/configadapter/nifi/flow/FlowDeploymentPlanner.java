@@ -25,7 +25,6 @@ import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,19 +37,13 @@ import java.util.Optional;
  */
 public class FlowDeploymentPlanner {
 
-  private static final String DBCP = "PostGISConnectionPool";
-
   private final ObjectMapper mapper = new ObjectMapper();
   private final GraphParser graphParser;
   private final MappingConfigParser mappingConfigParser;
   private final RecordPathCompiler recordPathCompiler;
   private final NifiFlowBuilder flowBuilder;
   private final StageRegistry registry;
-  private final PlatformSinkConfig platformSink;
   private final String frostBaseUrl;
-
-  /** Platform-managed sink connection (not a tenant credential). */
-  public record PlatformSinkConfig(String postgisUrl, String postgisUser, String postgisPassword) {}
 
   /**
    * Creates a planner.
@@ -60,7 +53,6 @@ public class FlowDeploymentPlanner {
    * @param recordPathCompiler the RecordPath compiler
    * @param flowBuilder the NiFi flow builder
    * @param registry the deployable source/sink stages
-   * @param platformSink the platform sink connection (may be null)
    * @param frostBaseUrl the FROST SensorThings base URL for FROST sinks (may be null)
    */
   public FlowDeploymentPlanner(
@@ -69,14 +61,12 @@ public class FlowDeploymentPlanner {
       RecordPathCompiler recordPathCompiler,
       NifiFlowBuilder flowBuilder,
       StageRegistry registry,
-      PlatformSinkConfig platformSink,
       String frostBaseUrl) {
     this.graphParser = graphParser;
     this.mappingConfigParser = mappingConfigParser;
     this.recordPathCompiler = recordPathCompiler;
     this.flowBuilder = flowBuilder;
     this.registry = registry;
-    this.platformSink = platformSink;
     this.frostBaseUrl = frostBaseUrl;
   }
 
@@ -150,8 +140,7 @@ public class FlowDeploymentPlanner {
 
     PlanContext out = new PlanContext();
     registry.source(sourceType).bind(source, out);
-    bindSink(
-        request, sink, out.sinkProperties(), out.controllerServiceProperties(), out.sensitive());
+    bindSink(request, sink, out);
 
     String processGroupName = "pipeline-" + request.pipelineId();
     String snapshot =
@@ -222,36 +211,11 @@ public class FlowDeploymentPlanner {
     return expression.trim().split("\\s+").length == 6;
   }
 
-  private void bindSink(
-      PipelineDeploymentRequest request,
-      SinkSpec sink,
-      Map<String, String> sinkProperties,
-      Map<String, Map<String, String>> controllerServiceProperties,
-      Map<String, Map<String, String>> sensitive)
+  private void bindSink(PipelineDeploymentRequest request, SinkSpec sink, PlanContext out)
       throws FatalAdapterException {
     switch (sink.type()) {
-      case POSTGIS -> {
-        // SinkSpec guarantees a non-blank tableName for POSTGIS (the invalid state is rejected at
-        // construction), so PutDatabaseRecord always has a target here.
-        sinkProperties.put("Table Name", sink.tableName());
-        // With a primary key (the data structure's x-core-primaryKey marker), write UPSERT keyed on
-        // it so a cron-recurring source that re-reads rows updates instead of duplicating them.
-        // NiFi
-        // does not derive the conflict key from the table PK — it must be given via Update Keys.
-        // The PutDatabaseRecord fragment quotes identifiers and does NOT translate field names: the
-        // PostGIS table is created with quoted (case-preserving) identifiers, so an UPSERT of a
-        // camelCase key would otherwise emit an unquoted "ON CONFLICT (stationId)" that PostgreSQL
-        // folds to "stationid" and rejects as a missing column.
-        if (!sink.primaryKeyColumns().isEmpty()) {
-          sinkProperties.put("Statement Type", "UPSERT");
-          sinkProperties.put("Update Keys", String.join(",", sink.primaryKeyColumns()));
-          // UPSERT needs the PostgreSQL DatabaseAdapter to emit ON CONFLICT; the default "Generic"
-          // adapter throws "UPSERT not supported" and routes every record to failure.
-          sinkProperties.put("Database Type", "PostgreSQL");
-        }
-        bindPlatformDbcp(controllerServiceProperties, sensitive);
-      }
-      case FROST -> bindFrost(request, sinkProperties);
+      case POSTGIS -> registry.sink(sink.type()).bind(request, out);
+      case FROST -> bindFrost(request, out.sinkProperties());
     }
   }
 
@@ -271,40 +235,6 @@ public class FlowDeploymentPlanner {
     sinkProperties.put(NifiFlowBuilder.FROST_PROJECT_ID, request.frostProjectId());
   }
 
-  private void bindPlatformDbcp(
-      Map<String, Map<String, String>> controllerServiceProperties,
-      Map<String, Map<String, String>> sensitive)
-      throws FatalAdapterException {
-    if (platformSink == null
-        || platformSink.postgisUrl() == null
-        || platformSink.postgisUrl().isBlank()) {
-      // A POSTGIS flow without a DB connection URL would deploy but never enable its DBCP service.
-      throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          "POSTGIS sink configured but no platform database connection URL is available");
-    }
-    Map<String, String> dbcp = new LinkedHashMap<>();
-    // Intentionally applied to every PostGIS sink (not only geoPoint flows): unspecified is benign
-    // for non-geometry columns and is what lets a geoPoint WKT bind into a geometry column.
-    putIfPresent(
-        dbcp, "Database Connection URL", withStringtypeUnspecified(platformSink.postgisUrl()));
-    putIfPresent(dbcp, "Database User", platformSink.postgisUser());
-    if (!dbcp.isEmpty()) {
-      controllerServiceProperties.put(DBCP, dbcp);
-    }
-    if (platformSink.postgisPassword() != null) {
-      sensitive
-          .computeIfAbsent(DBCP, k -> new LinkedHashMap<>())
-          .put("Password", platformSink.postgisPassword());
-    }
-  }
-
-  private static void putIfPresent(Map<String, String> target, String key, Object value) {
-    if (value != null) {
-      target.put(key, String.valueOf(value));
-    }
-  }
-
   private static FatalAdapterException template(String combination) {
     return new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, combination);
   }
@@ -315,19 +245,5 @@ public class FlowDeploymentPlanner {
       case POSTGIS -> GeometryEncoding.WKT;
       case FROST -> GeometryEncoding.GEOJSON;
     };
-  }
-
-  /**
-   * Ensures the PostGIS JDBC URL carries {@code stringtype=unspecified}, so PutDatabaseRecord's
-   * string-bound WKT reaches a {@code geometry} column. With PgJDBC's default ({@code VARCHAR}) the
-   * value is sent as {@code varchar}, which has no implicit cast to {@code geometry} →
-   * type-mismatch error; {@code unspecified} sends it untyped so the server parses the WKT. Benign
-   * for non-geometry columns. Package-private for unit testing.
-   */
-  static String withStringtypeUnspecified(String url) {
-    if (url == null || url.isBlank() || url.contains("stringtype=")) {
-      return url;
-    }
-    return url + (url.contains("?") ? '&' : '?') + "stringtype=unspecified";
   }
 }

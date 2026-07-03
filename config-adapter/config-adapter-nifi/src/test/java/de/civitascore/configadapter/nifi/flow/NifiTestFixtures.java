@@ -17,6 +17,7 @@ import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.MqttSourceStage;
+import de.civitascore.configadapter.nifi.flow.stage.PostgisSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.SqlSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
@@ -44,14 +45,16 @@ public final class NifiTestFixtures {
     return CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
   }
 
-  public static StageRegistry stageRegistry(CredentialResolver resolver, SqlSourceProbe probe) {
+  public static StageRegistry stageRegistry(
+      CredentialResolver resolver, SqlSourceProbe probe, PlatformSinkConfig platformSink) {
     return new StageRegistry(
-        List.of(new MqttSourceStage(resolver), new SqlSourceStage(resolver, probe)), List.of());
+        List.of(new MqttSourceStage(resolver), new SqlSourceStage(resolver, probe)),
+        List.of(new PostgisSinkStage(platformSink)));
   }
 
   /** A builder over stages whose bind halves are never exercised (build-level tests). */
   public static NifiFlowBuilder flowBuilder() {
-    return new NifiFlowBuilder(stageRegistry(null, SqlSourceProbe.NO_OP));
+    return new NifiFlowBuilder(stageRegistry(null, SqlSourceProbe.NO_OP, null));
   }
 
   static FlowDeploymentPlanner planner(CredentialResolver resolver) {
@@ -62,24 +65,22 @@ public final class NifiTestFixtures {
     return planner(
         resolver,
         probe,
-        new FlowDeploymentPlanner.PlatformSinkConfig(
-            "jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
+        new PlatformSinkConfig("jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
         "http://frost:8080/FROST-Server/v1.1");
   }
 
   public static FlowDeploymentPlanner planner(
       CredentialResolver resolver,
       SqlSourceProbe probe,
-      FlowDeploymentPlanner.PlatformSinkConfig platformSink,
+      PlatformSinkConfig platformSink,
       String frostBaseUrl) {
-    StageRegistry registry = stageRegistry(resolver, probe);
+    StageRegistry registry = stageRegistry(resolver, probe, platformSink);
     return new FlowDeploymentPlanner(
         new GraphParser(),
         new MappingConfigParser(),
         new RecordPathCompiler(),
         new NifiFlowBuilder(registry),
         registry,
-        platformSink,
         frostBaseUrl);
   }
 

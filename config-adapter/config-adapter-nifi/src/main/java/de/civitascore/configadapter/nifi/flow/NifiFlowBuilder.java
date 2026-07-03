@@ -70,7 +70,6 @@ public class NifiFlowBuilder {
 
   private static final String READER = "JsonTreeReader";
   private static final String WRITER = "JsonRecordSetWriter";
-  private static final String DBCP = "PostGISConnectionPool";
 
   private final ObjectMapper mapper = new ObjectMapper();
   private final StageRegistry registry;
@@ -226,7 +225,7 @@ public class NifiFlowBuilder {
     ctx.addControllerService(Fragment.JSON_RECORD_SET_WRITER, WRITER);
     sourceStage.registerControllerServices(ctx);
     if (spec.sinkType() == SinkType.POSTGIS) {
-      ctx.addControllerService(Fragment.DBCP_CONNECTION_POOL, DBCP);
+      registry.sink(spec.sinkType()).registerControllerServices(ctx);
     }
   }
 
@@ -250,55 +249,7 @@ public class NifiFlowBuilder {
     return transforms;
   }
 
-  private void bindSinkProperties(Processor sink, FlowBuildSpec spec) {
-    ObjectNode props = (ObjectNode) sink.node().get("properties");
-    spec.sinkProperties().forEach(props::put);
-  }
-
   // ─── Error routing ──────────────────────────────────────────────────────────
-
-  /**
-   * Routes the {@code failure} relationships of the record processors AND the sink's own write
-   * failures to a LogMessage sink (WARN + bulletin) instead of auto-terminating them. Otherwise a
-   * malformed message, an unmappable record, or a failed write to FROST/PostGIS would be dropped
-   * silently — invisible, undiagnosable data loss, which is exactly what must not happen at the
-   * sink. The graph shape is intentionally stable: swapping LogMessage for a durable/recoverable
-   * dead-letter sink is a later, isolated change.
-   *
-   * <p>The source is not wired here: ConsumeMQTT emits only {@code Message} and
-   * QueryDatabaseTableRecord only {@code success} — neither has a parse-failure relationship to
-   * route. {@code convert} is {@code null} for a SQL source (which emits records directly, so no
-   * ConvertRecord step exists); its failure edge is then simply absent. Consequently a SQL-source
-   * <em>runtime</em> failure (DB unreachable after deploy, query error) surfaces as a NiFi
-   * processor bulletin, not as an error-sink record; deploy-time config errors are caught earlier
-   * by the {@code JdbcSqlSourceProbe} and the bind-time guards in {@code FlowDeploymentPlanner}.
-   */
-  private void wireErrorSink(
-      BuildContext ctx, List<Processor> failureSources, Processor sink, SinkType sinkType)
-      throws FatalAdapterException {
-    Processor errorSink = ctx.loadProcessor(Fragment.LOG_MESSAGE, null);
-    ctx.addProcessor(errorSink);
-    for (Processor failureSource : failureSources) {
-      ctx.addConnection(failureSource, errorSink, "failure");
-    }
-    // The sink fragments auto-terminate their failure relationships by default; un-terminate them
-    // (NiFi forbids a relationship being both auto-terminated and connected) and route them to the
-    // same error sink so a failed write is logged, not lost.
-    for (String relationship : sinkFailureRelationships(sinkType)) {
-      removeAutoTerminated(sink, relationship);
-      ctx.addConnection(sink, errorSink, relationship);
-    }
-  }
-
-  /** The sink processor's failure-side relationships, by sink type. */
-  private static List<String> sinkFailureRelationships(SinkType sinkType) {
-    return switch (sinkType) {
-      // InvokeHTTP: Original/Response stay terminated (the HTTP response is not consumed).
-      case FROST -> List.of("Failure", "Retry", "No Retry");
-      // PutDatabaseRecord: success stays terminated (the record landed).
-      case POSTGIS -> List.of("failure", "retry");
-    };
-  }
 
   /**
    * Wires the sink stage onto the prefix tail: a FROST find-or-create sub-flow, or a single linear
@@ -315,11 +266,7 @@ public class NifiFlowBuilder {
       }
       buildFrostFindOrCreate(ctx, spec, tail, errorSink);
     } else {
-      Processor sink = ctx.loadProcessor(sinkFragment(spec.sinkType()), null);
-      bindSinkProperties(sink, spec);
-      ctx.addProcessor(sink);
-      ctx.addChainConnection(tail, sink);
-      wireErrorSink(ctx, failureSources, sink, spec.sinkType());
+      registry.sink(spec.sinkType()).build(ctx, tail, failureSources);
     }
   }
 
@@ -542,13 +489,6 @@ public class NifiFlowBuilder {
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
-
-  private static Fragment sinkFragment(SinkType sinkType) {
-    return switch (sinkType) {
-      case POSTGIS -> Fragment.PUT_DATABASE_RECORD;
-      case FROST -> Fragment.INVOKE_HTTP;
-    };
-  }
 
   private static String deterministicId(String seed) {
     return UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8)).toString();
