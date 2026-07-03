@@ -7,9 +7,8 @@ import { UML_STEREOTYPES } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
 import type { UMLNode } from '../../types/diagram'
-import { hasAttributes, hasOperations } from '../../types/uml'
+import { hasAttributes } from '../../types/uml'
 import { AttributeManager } from './AttributeManager'
-import { OperationManager } from './OperationManager'
 
 interface NodePropertyEditorProps {
   node: UMLNode
@@ -18,7 +17,7 @@ interface NodePropertyEditorProps {
 export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({ node }) => {
   const { updateNode } = useActiveDiagram()
   const { isReadOnly } = useReadOnly()
-  const [activeSection, setActiveSection] = useState<'basic' | 'attributes' | 'operations' | 'literals'>('basic')
+  const [activeSection, setActiveSection] = useState<'basic' | 'attributes' | 'literals'>('basic')
 
   const element = node.data.element
 
@@ -100,18 +99,6 @@ export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({ node }) 
             Attributes
           </button>
         )}
-        {hasOperations(element) && (
-          <button
-            onClick={() => setActiveSection('operations')}
-            className={`px-3 py-2 text-sm font-medium border-b-2 ${
-              activeSection === 'operations'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Operations
-          </button>
-        )}
         {element.type === 'enumeration' && (
           <button
             onClick={() => setActiveSection('literals')}
@@ -167,10 +154,6 @@ export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({ node }) 
 
         {activeSection === 'attributes' && hasAttributes(element) && (
           <AttributeManager nodeId={node.id} element={element} />
-        )}
-
-        {activeSection === 'operations' && hasOperations(element) && (
-          <OperationManager nodeId={node.id} element={element} />
         )}
 
         {activeSection === 'literals' && element.type === 'enumeration' && 'literals' in element && (
