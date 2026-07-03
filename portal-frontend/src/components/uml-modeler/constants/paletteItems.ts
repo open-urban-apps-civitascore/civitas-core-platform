@@ -28,13 +28,6 @@ export const RELATIONSHIP_PALETTE_ITEMS = [
     icon: 'arrowUpRight',
   },
   {
-    id: 'aggregation',
-    type: 'aggregation' as const,
-    label: 'Aggregation',
-    description: 'Hollow diamond (has-a, weak ownership)',
-    icon: 'gem',
-  },
-  {
     id: 'composition',
     type: 'composition' as const,
     label: 'Composition',
