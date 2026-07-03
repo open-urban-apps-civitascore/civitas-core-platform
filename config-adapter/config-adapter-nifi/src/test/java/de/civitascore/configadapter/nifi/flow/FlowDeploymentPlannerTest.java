@@ -9,16 +9,27 @@
  */
 package de.civitascore.configadapter.nifi.flow;
 
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.graphWithCron;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.graphWithGeoPoint;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.graphWithMapping;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.graphWithoutMapping;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.map;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.mqttSource;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.planner;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.postgisSink;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.postgisSinkWithPk;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.sqlSource;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.sqlSourceBasic;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.sqlSourceWith;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.stretchedKey;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.crypto.CredentialEncryptor;
-import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
@@ -32,112 +43,9 @@ import org.junit.jupiter.api.Test;
 
 class FlowDeploymentPlannerTest {
 
-  private static final String MASTER_KEY_HEX =
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
   private static final String SECRET = "sup3r-s3cret-mqtt-pw";
 
   private final ObjectMapper mapper = new ObjectMapper();
-
-  private byte[] stretchedKey() throws Exception {
-    return CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
-  }
-
-  private FlowDeploymentPlanner planner(CredentialResolver resolver) {
-    return new FlowDeploymentPlanner(
-        new GraphParser(),
-        new MappingConfigParser(),
-        new RecordPathCompiler(),
-        new NifiFlowBuilder(),
-        resolver,
-        new FlowDeploymentPlanner.PlatformSinkConfig(
-            "jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
-        "http://frost:8080/FROST-Server/v1.1");
-  }
-
-  private Map<String, Object> map(String json) throws Exception {
-    return mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
-  }
-
-  private Map<String, Object> graphWithMapping() throws Exception {
-    return map(
-        """
-        {
-          "nodes": [
-            { "id": "n-start", "type": "start", "data": {} },
-            { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                "fields": {
-                  "$.station_id": "$.station_id",
-                  "$.temperature": "$.temperature",
-                  "$.observed_at": { "op": "toDate", "input": "$.ts", "pattern": "yyyy-MM-dd" }
-                } } } },
-            { "id": "n-end", "type": "end", "data": {} }
-          ],
-          "edges": [
-            { "id": "e1", "source": "n-start", "target": "n-map" },
-            { "id": "e2", "source": "n-map", "target": "n-end" }
-          ]
-        }
-        """);
-  }
-
-  private Map<String, Object> graphWithGeoPoint() throws Exception {
-    return map(
-        """
-        {
-          "nodes": [
-            { "id": "n-start", "type": "start", "data": {} },
-            { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                "fields": {
-                  "$.location": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" }
-                } } } },
-            { "id": "n-end", "type": "end", "data": {} }
-          ],
-          "edges": [
-            { "id": "e1", "source": "n-start", "target": "n-map" },
-            { "id": "e2", "source": "n-map", "target": "n-end" }
-          ]
-        }
-        """);
-  }
-
-  /**
-   * A graph with no mapping node (source feeds the sink directly) — e.g. a FROST find-or-create.
-   */
-  private Map<String, Object> graphWithoutMapping() throws Exception {
-    return map(
-        """
-        {
-          "nodes": [
-            { "id": "n-start", "type": "start", "data": {} },
-            { "id": "n-end", "type": "end", "data": {} }
-          ],
-          "edges": [ { "id": "e1", "source": "n-start", "target": "n-end" } ]
-        }
-        """);
-  }
-
-  private Datasource mqttSource(String encryptedPassword) {
-    Datasource source = new Datasource();
-    source.setId("a1");
-    source.setType("MQTT");
-    // the portal connector shape: urls/topics are lists, user/client_id/qos scalars
-    source.handleUnknownProperty("urls", List.of("tcp://mosquitto:1883"));
-    source.handleUnknownProperty("topics", List.of("sensors/+/temp"));
-    source.handleUnknownProperty("user", "mqttuser");
-    source.handleUnknownProperty("client_id", "civitas-it");
-    source.handleUnknownProperty("qos", 1);
-    source.handleUnknownProperty("password", encryptedPassword);
-    return source;
-  }
-
-  private SinkSpec postgisSink() {
-    return new SinkSpec(SinkType.POSTGIS, "sensor_observations");
-  }
-
-  /** A PostGIS sink with a primary key — required for a cron-scheduled (re-reading) SQL source. */
-  private SinkSpec postgisSinkWithPk() {
-    return new SinkSpec(SinkType.POSTGIS, "sensor_observations", List.of("id"));
-  }
 
   /** The first processor of the given type in a flow snapshot. */
   private com.fasterxml.jackson.databind.JsonNode processorOfType(
@@ -149,55 +57,6 @@ class FlowDeploymentPlannerTest {
       }
     }
     throw new AssertionError("no processor of type " + typeSuffix);
-  }
-
-  private Datasource sqlSource(String encryptedPassword) {
-    Datasource source = new Datasource();
-    source.setId("s1");
-    source.setType("SQL");
-    // the portal SQL connector shape (see datasources/contract)
-    source.handleUnknownProperty("driver", "postgres");
-    source.handleUnknownProperty("dsn", "postgres://reader@srcdb:5432/in");
-    source.handleUnknownProperty("user", "reader");
-    source.handleUnknownProperty("table", "events");
-    source.handleUnknownProperty("columns", List.of("*"));
-    source.handleUnknownProperty("password", encryptedPassword);
-    return source;
-  }
-
-  /** A SQL datasource with explicit connector fields (any may be null to omit it). */
-  private Datasource sqlSourceWith(String driver, String table, Object columns, String where) {
-    Datasource source = new Datasource();
-    source.setId("s2");
-    source.setType("SQL");
-    source.handleUnknownProperty("dsn", "postgres://reader@srcdb:5432/in");
-    source.handleUnknownProperty("user", "reader");
-    if (driver != null) {
-      source.handleUnknownProperty("driver", driver);
-    }
-    if (table != null) {
-      source.handleUnknownProperty("table", table);
-    }
-    if (columns != null) {
-      source.handleUnknownProperty("columns", columns);
-    }
-    if (where != null) {
-      source.handleUnknownProperty("where", where);
-    }
-    return source;
-  }
-
-  /** A basic, valid SQL datasource (postgres) for negative/WHERE tests. */
-  private Datasource sqlSourceBasic() {
-    Datasource source = new Datasource();
-    source.setId("s3");
-    source.setType("SQL");
-    source.handleUnknownProperty("driver", "postgres");
-    source.handleUnknownProperty("dsn", "postgres://reader@srcdb:5432/in");
-    source.handleUnknownProperty("user", "reader");
-    source.handleUnknownProperty("table", "events");
-    source.handleUnknownProperty("columns", List.of("*"));
-    return source;
   }
 
   @Test
@@ -686,28 +545,6 @@ class FlowDeploymentPlannerTest {
           de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           ex.getErrorCode());
     }
-  }
-
-  /** A start → cron → mapping → end graph (cron wired into the functional component). */
-  private Map<String, Object> graphWithCron(String cronExpression) throws Exception {
-    return map(
-        """
-        {
-          "nodes": [
-            { "id": "n-start", "type": "start", "data": {} },
-            { "id": "n-cron", "type": "cron", "data": { "cronExpression": "%s" } },
-            { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                "fields": { "$.a": "$.b" } } } },
-            { "id": "n-end", "type": "end", "data": {} }
-          ],
-          "edges": [
-            { "id": "e1", "source": "n-start", "target": "n-cron" },
-            { "id": "e2", "source": "n-cron", "target": "n-map" },
-            { "id": "e3", "source": "n-map", "target": "n-end" }
-          ]
-        }
-        """
-            .formatted(cronExpression));
   }
 
   @Test

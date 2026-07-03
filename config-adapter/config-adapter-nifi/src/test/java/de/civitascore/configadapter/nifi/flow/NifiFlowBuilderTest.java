@@ -9,6 +9,10 @@
  */
 package de.civitascore.configadapter.nifi.flow;
 
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.frostSink;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.mapping;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.mqttToPostgis;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.sqlToPostgis;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -18,8 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
-import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
-import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -29,73 +31,8 @@ class NifiFlowBuilderTest {
   private final ObjectMapper mapper = new ObjectMapper();
   private final NifiFlowBuilder builder = new NifiFlowBuilder();
 
-  private List<UpdateRecordProperty> mapping() {
-    return List.of(
-        new UpdateRecordProperty(
-            "/title", "/name", RecordPathCompiler.ReplacementStrategy.RECORD_PATH_VALUE));
-  }
-
   private JsonNode build(FlowBuildSpec spec) throws Exception {
     return mapper.readTree(builder.build(spec));
-  }
-
-  private FlowBuildSpec mqttToPostgis(List<UpdateRecordProperty> mapping) {
-    return new FlowBuildSpec(
-        "pipeline-abc",
-        SourceType.MQTT,
-        Map.of("Broker URI", "tcp://mosquitto:1883", "Topic Filter", "sensors/+/temp"),
-        SinkType.POSTGIS,
-        Map.of("Table Name", "sensor_observations"),
-        mapping,
-        Map.of(
-            "PostGISConnectionPool",
-            Map.of("Database Connection URL", "jdbc:postgresql://db:5432/x", "Database User", "u")),
-        null);
-  }
-
-  /**
-   * A SQL-source → PostGIS-sink flow. Mirrors the {@code datasources/contract} SQL config shape
-   * ({@code table}/{@code columns}/{@code where}): the source pulls records from a table over a
-   * dedicated source-side connection pool, the sink writes them to PostGIS over its own pool.
-   */
-  private FlowBuildSpec sqlToPostgis() {
-    return sqlToPostgis(null);
-  }
-
-  private FlowBuildSpec sqlToPostgis(String sourceCron) {
-    return new FlowBuildSpec(
-        "pipeline-sql",
-        SourceType.SQL,
-        Map.of("Table Name", "events", "Columns to Return", "*"),
-        SinkType.POSTGIS,
-        Map.of("Table Name", "sensor_observations"),
-        mapping(),
-        Map.of(
-            "SourceConnectionPool",
-            Map.of(
-                "Database Connection URL", "jdbc:postgresql://src:5432/in",
-                "Database User", "reader"),
-            "PostGISConnectionPool",
-            Map.of("Database Connection URL", "jdbc:postgresql://db:5432/x", "Database User", "u")),
-        sourceCron);
-  }
-
-  private FlowBuildSpec frostSink() {
-    return new FlowBuildSpec(
-        "pipeline-frost",
-        SourceType.MQTT,
-        Map.of("Broker URI", "tcp://mosquitto:1883", "Topic Filter", "sensors/+/temp"),
-        SinkType.FROST,
-        Map.of(
-            NifiFlowBuilder.FROST_BASE_URL,
-            "http://frost:8080/FROST-Server/v1.1",
-            NifiFlowBuilder.FROST_PROJECT_ID,
-            "7"),
-        // FROST: the source delivers the STA envelope; no record mapping (find-or-create works on
-        // the raw JSON).
-        List.of(),
-        Map.of(),
-        null);
   }
 
   /** Whether any processor of the given type has a property whose value contains the substring. */
