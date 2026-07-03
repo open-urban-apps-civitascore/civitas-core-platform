@@ -10,13 +10,6 @@ export const ELEMENT_PALETTE_ITEMS = [
     icon: 'box',
   },
   {
-    id: 'abstractClass',
-    type: 'abstractClass' as UMLElementType,
-    label: 'Abstract Class',
-    description: 'UML Abstract Class with abstract operations',
-    icon: 'boxSelect',
-  },
-  {
     id: 'enumeration',
     type: 'enumeration' as UMLElementType,
     label: 'Enumeration',
