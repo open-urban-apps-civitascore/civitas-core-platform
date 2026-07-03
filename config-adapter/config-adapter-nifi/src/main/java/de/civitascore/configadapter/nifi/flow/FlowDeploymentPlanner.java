@@ -43,7 +43,6 @@ public class FlowDeploymentPlanner {
   private final RecordPathCompiler recordPathCompiler;
   private final NifiFlowBuilder flowBuilder;
   private final StageRegistry registry;
-  private final String frostBaseUrl;
 
   /**
    * Creates a planner.
@@ -53,21 +52,18 @@ public class FlowDeploymentPlanner {
    * @param recordPathCompiler the RecordPath compiler
    * @param flowBuilder the NiFi flow builder
    * @param registry the deployable source/sink stages
-   * @param frostBaseUrl the FROST SensorThings base URL for FROST sinks (may be null)
    */
   public FlowDeploymentPlanner(
       GraphParser graphParser,
       MappingConfigParser mappingConfigParser,
       RecordPathCompiler recordPathCompiler,
       NifiFlowBuilder flowBuilder,
-      StageRegistry registry,
-      String frostBaseUrl) {
+      StageRegistry registry) {
     this.graphParser = graphParser;
     this.mappingConfigParser = mappingConfigParser;
     this.recordPathCompiler = recordPathCompiler;
     this.flowBuilder = flowBuilder;
     this.registry = registry;
-    this.frostBaseUrl = frostBaseUrl;
   }
 
   /**
@@ -140,7 +136,7 @@ public class FlowDeploymentPlanner {
 
     PlanContext out = new PlanContext();
     registry.source(sourceType).bind(source, out);
-    bindSink(request, sink, out);
+    registry.sink(sink.type()).bind(request, out);
 
     String processGroupName = "pipeline-" + request.pipelineId();
     String snapshot =
@@ -209,30 +205,6 @@ public class FlowDeploymentPlanner {
       return false;
     }
     return expression.trim().split("\\s+").length == 6;
-  }
-
-  private void bindSink(PipelineDeploymentRequest request, SinkSpec sink, PlanContext out)
-      throws FatalAdapterException {
-    switch (sink.type()) {
-      case POSTGIS -> registry.sink(sink.type()).bind(request, out);
-      case FROST -> bindFrost(request, out.sinkProperties());
-    }
-  }
-
-  private void bindFrost(PipelineDeploymentRequest request, Map<String, String> sinkProperties)
-      throws FatalAdapterException {
-    if (frostBaseUrl == null || frostBaseUrl.isBlank()) {
-      // A localhost fallback would deploy a flow that silently posts observations into the void.
-      throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          "FROST sink requires the FROST base URL (nifi.frost.url) to be configured");
-    }
-    // The base URL feeds the find-or-create sub-flow (NifiFlowBuilder), which derives the per-stage
-    // URLs (/Things, /Datastreams, /Observations) — not a single POST endpoint.
-    sinkProperties.put(NifiFlowBuilder.FROST_BASE_URL, frostBaseUrl);
-    // The saga's project id scopes those URLs to the dataset's FROST project; the request record
-    // guarantees it is present and numeric for a FROST sink.
-    sinkProperties.put(NifiFlowBuilder.FROST_PROJECT_ID, request.frostProjectId());
   }
 
   private static FatalAdapterException template(String combination) {

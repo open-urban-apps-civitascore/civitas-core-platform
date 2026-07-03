@@ -19,6 +19,7 @@ import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
+import de.civitascore.configadapter.nifi.flow.stage.FrostSinkStage;
 import jakarta.ws.rs.core.Response;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -204,9 +205,9 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                     Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", TOPIC),
                     SinkType.FROST,
                     Map.of(
-                        NifiFlowBuilder.FROST_BASE_URL,
+                        FrostSinkStage.FROST_BASE_URL,
                         "http://frost:8080" + FROST_PATH,
-                        NifiFlowBuilder.FROST_PROJECT_ID,
+                        FrostSinkStage.FROST_PROJECT_ID,
                         String.valueOf(projectId)),
                     List.of(),
                     Map.of(),
@@ -259,9 +260,9 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                     Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", OBS_TOPIC),
                     SinkType.FROST,
                     Map.of(
-                        NifiFlowBuilder.FROST_BASE_URL,
+                        FrostSinkStage.FROST_BASE_URL,
                         "http://frost:8080" + FROST_PATH,
-                        NifiFlowBuilder.FROST_PROJECT_ID,
+                        FrostSinkStage.FROST_PROJECT_ID,
                         String.valueOf(projectId)),
                     List.of(),
                     Map.of(),
@@ -311,9 +312,9 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                     Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", NO_DS_TOPIC),
                     SinkType.FROST,
                     Map.of(
-                        NifiFlowBuilder.FROST_BASE_URL,
+                        FrostSinkStage.FROST_BASE_URL,
                         "http://frost:8080" + FROST_PATH,
-                        NifiFlowBuilder.FROST_PROJECT_ID,
+                        FrostSinkStage.FROST_PROJECT_ID,
                         String.valueOf(projectId)),
                     List.of(),
                     Map.of(),

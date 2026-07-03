@@ -16,6 +16,7 @@ import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.FrostSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.MqttSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.PostgisSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.SqlSourceStage;
@@ -46,15 +47,18 @@ public final class NifiTestFixtures {
   }
 
   public static StageRegistry stageRegistry(
-      CredentialResolver resolver, SqlSourceProbe probe, PlatformSinkConfig platformSink) {
+      CredentialResolver resolver,
+      SqlSourceProbe probe,
+      PlatformSinkConfig platformSink,
+      String frostBaseUrl) {
     return new StageRegistry(
         List.of(new MqttSourceStage(resolver), new SqlSourceStage(resolver, probe)),
-        List.of(new PostgisSinkStage(platformSink)));
+        List.of(new PostgisSinkStage(platformSink), new FrostSinkStage(frostBaseUrl)));
   }
 
   /** A builder over stages whose bind halves are never exercised (build-level tests). */
   public static NifiFlowBuilder flowBuilder() {
-    return new NifiFlowBuilder(stageRegistry(null, SqlSourceProbe.NO_OP, null));
+    return new NifiFlowBuilder(stageRegistry(null, SqlSourceProbe.NO_OP, null, null));
   }
 
   static FlowDeploymentPlanner planner(CredentialResolver resolver) {
@@ -74,14 +78,13 @@ public final class NifiTestFixtures {
       SqlSourceProbe probe,
       PlatformSinkConfig platformSink,
       String frostBaseUrl) {
-    StageRegistry registry = stageRegistry(resolver, probe, platformSink);
+    StageRegistry registry = stageRegistry(resolver, probe, platformSink, frostBaseUrl);
     return new FlowDeploymentPlanner(
         new GraphParser(),
         new MappingConfigParser(),
         new RecordPathCompiler(),
         new NifiFlowBuilder(registry),
-        registry,
-        frostBaseUrl);
+        registry);
   }
 
   static Map<String, Object> map(String json) throws Exception {
@@ -308,9 +311,9 @@ public final class NifiTestFixtures {
         Map.of("Broker URI", "tcp://mosquitto:1883", "Topic Filter", "sensors/+/temp"),
         SinkType.FROST,
         Map.of(
-            NifiFlowBuilder.FROST_BASE_URL,
+            FrostSinkStage.FROST_BASE_URL,
             "http://frost:8080/FROST-Server/v1.1",
-            NifiFlowBuilder.FROST_PROJECT_ID,
+            FrostSinkStage.FROST_PROJECT_ID,
             "7"),
         // FROST: the source delivers the STA envelope; no record mapping (find-or-create works on
         // the raw JSON).

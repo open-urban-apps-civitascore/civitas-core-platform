@@ -20,6 +20,7 @@ import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
+import de.civitascore.configadapter.nifi.flow.stage.FrostSinkStage;
 import jakarta.ws.rs.core.Response;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -196,9 +197,9 @@ class NifiDataFlowIT extends AbstractNifiIT {
                     Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", topic),
                     SinkType.FROST,
                     Map.of(
-                        NifiFlowBuilder.FROST_BASE_URL,
+                        FrostSinkStage.FROST_BASE_URL,
                         "http://sink:8080" + basePath,
-                        NifiFlowBuilder.FROST_PROJECT_ID,
+                        FrostSinkStage.FROST_PROJECT_ID,
                         PROJECT_ID),
                     List.of(),
                     Map.of(),
