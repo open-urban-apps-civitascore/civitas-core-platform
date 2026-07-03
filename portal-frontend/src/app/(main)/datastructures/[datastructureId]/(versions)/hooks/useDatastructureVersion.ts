@@ -1,7 +1,6 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AxiosError } from 'axios'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
@@ -36,6 +35,7 @@ import {
   parseDatastructureVersionFormData,
 } from '@/utils/datastructures'
 import { pickDirtyValues } from '@/utils/form'
+import { buildDataStructureUrn } from '@/utils/urn'
 
 export const defaultDatastructureVersionFormData: DatastructureVersionFormData = {
   id: '',
@@ -50,6 +50,7 @@ export const defaultDatastructureVersionFormData: DatastructureVersionFormData =
 
 interface UseDatastructureVersionProps {
   datastructureId: string
+  dataStructureName: string
   version: DatastructureVersion | null
   isCreateMode: boolean
   onCreateVersion?: (data: DatastructureVersion) => void
@@ -57,7 +58,7 @@ interface UseDatastructureVersionProps {
 }
 
 export const useDatastructureVersion = ({
-  datastructureId,
+  dataStructureName,
   version,
   isCreateMode,
   onCreateVersion,
@@ -98,10 +99,8 @@ export const useDatastructureVersion = ({
 
   const statusWatch = form.watch('dataStructureVersionStatus')
   const nodesWatch = form.watch('nodes')
-  const versionWatch = form.watch('version')
 
   const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
-  const modelUri = `http://civitas.org/model/${datastructureId}/${versionWatch}`
 
   useEffect(() => {
     form.setValue('modelName', modelName || null, { shouldDirty: shouldMarkModelFieldsDirty })
@@ -285,6 +284,9 @@ export const useDatastructureVersion = ({
 
     try {
       const sessionDiagram = nodesWatch.length > 0 ? activeSession?.diagram || null : null
+      const modelUri = sessionDiagram
+        ? buildDataStructureUrn(dataStructureName, datastructureId, parsed.data.version)
+        : undefined
       const { model } = sessionDiagram ? buildUMLModelPayload(sessionDiagram, modelUri) : { model: null }
       const payload = mapDatastructureVersionFormToApiData(parsed.data, sessionDiagram, model)
 
@@ -297,7 +299,8 @@ export const useDatastructureVersion = ({
       }
       return true
     } catch (error: unknown) {
-      console.error('An error occurred while submitting datastructure version data.', (error as AxiosError).message)
+      console.error('An error occurred while submitting datastructure version data.', error)
+      toast.error(tCommon('errors.unexpectedError'))
       return false
     }
   }

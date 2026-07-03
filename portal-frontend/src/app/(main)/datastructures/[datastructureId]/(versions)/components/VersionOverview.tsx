@@ -113,6 +113,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     version,
     isCreateMode,
     datastructureId: datastructure.id,
+    dataStructureName: datastructure.name,
     onCreateVersion: redirectAfterVersionCreation,
     canSetAvailable,
   })

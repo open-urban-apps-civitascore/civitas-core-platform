@@ -19,6 +19,7 @@ import type { PortType, TransformNodeData } from '@/components/node-editor/types
 import { buildRegistry } from '@/components/node-editor/types'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { buildDataStructureUrn } from '@/utils/urn'
 
 import type { MappingConfig } from './_types'
 import { ARRAY_EDGE_STYLE } from './_types'
@@ -301,11 +302,15 @@ export const MappingEditorModal = ({
 
   const handleSave = () => {
     const { fields, positions } = compileCanvas(nodes, edges)
+    // A selectable source/target is always a released version, so name and
+    // version are present. If buildDataStructureUrn throws here, the platform is
+    // in an unexpected state (a released DataStructure without name/version) —
+    // let it surface rather than silently emitting a malformed URN.
     onSave(
       {
         $schema: 'https://civitasconnect.digital/core/mapping/v1',
-        source: `urn:core:datastructure:${source.datastructureId}:${source.versionId}`,
-        target: `urn:core:datastructure:${target.datastructureId}:${target.versionId}`,
+        source: buildDataStructureUrn(source.name ?? '', source.datastructureId, sourceQuery.data?.data?.version ?? ''),
+        target: buildDataStructureUrn(target.name ?? '', target.datastructureId, targetQuery.data?.data?.version ?? ''),
         fields,
         positions,
       },
@@ -321,7 +326,7 @@ export const MappingEditorModal = ({
       <DialogTitle className="text-base">{name || t('toolbar.title')}</DialogTitle>
       <span className="text-center text-xs text-muted-foreground">{t('toolbar.status', { mapped, unmapped })}</span>
       <div className="flex items-center justify-end gap-2">
-        <Button size="sm" onClick={handleSave}>
+        <Button size="sm" onClick={handleSave} disabled={!isReady}>
           {tCommon('actions.apply')}
         </Button>
         <Button size="sm" variant="outline" onClick={() => onOpenChange(false)}>

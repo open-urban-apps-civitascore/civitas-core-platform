@@ -66,15 +66,13 @@ export interface MappingConfig {
   /** JSON Schema URI — always "https://civitasconnect.digital/core/mapping/v1" */
   $schema?: string
   /**
-   * Versioned CORE URN of the source DataStructure.
-   * Format: urn:core:datastructure:<datastructureId>:<versionId>
-   * (exact segment layout to be confirmed by schema owner)
+   * Versioned CORE URN of the source DataStructure, built via
+   * `buildDataStructureUrn` from `@/utils/urn`.
    */
   source?: string
   /**
-   * Versioned CORE URN of the target DataStructure.
-   * Format: urn:core:datastructure:<datastructureId>:<versionId>
-   * (exact segment layout to be confirmed by schema owner)
+   * Versioned CORE URN of the target DataStructure, built via
+   * `buildDataStructureUrn` from `@/utils/urn`.
    */
   target?: string
   fields: Record<string, ValueNode>
