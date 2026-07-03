@@ -37,7 +37,7 @@ export const stringifyStringArray = (v: unknown): string | undefined => {
 
 export const MqttApiResponseSchema = z.object({
   urls: z.array(z.string()).nullable().optional(),
-  topics: z.array(z.string()).nullable().optional(),
+  topics: z.array(z.string()).max(1).nullable().optional(),
   client_id: z.string().nullable().optional(),
   qos: QosSchema.nullable().optional(),
   connect_timeout: z.string().nullable().optional(),
@@ -48,9 +48,11 @@ export const MqttApiResponseSchema = z.object({
 })
 
 /* Form schemas for edit */
+const singleTopic = z.string().regex(/^[^,;\s]*$/, 'datasources.errors.topicInvalidChars')
+
 const MqttBaseSchema = z.object({
   urls: z.string().trim(),
-  topics: z.string().trim(),
+  topics: singleTopic,
   client_id: z.string().trim(),
   qos: QosSchema,
   connect_timeout: z.string().trim(),
@@ -84,14 +86,19 @@ const brokerUrlArray = (inner: z.ZodTypeAny) =>
 
 export const MqttLooseSchema = MqttBaseSchema.partial().extend({
   urls: brokerUrlArray(z.array(z.string()).optional()),
-  topics: z.preprocess(parseStringArray, z.array(z.string()).optional()),
+  topics: singleTopic
+    .optional()
+    .transform(parseStringArray)
+    .pipe(z.array(z.string()).max(1, 'datasources.errors.topicSingle').optional()),
 })
 
 export const MqttStrictSchema = MqttBaseSchema.partial()
   .required({ qos: true })
   .extend({
     urls: brokerUrlArray(z.array(z.string()).min(1, 'common.errors.required')),
-    topics: z.preprocess(parseStringArray, z.array(z.string()).min(1, 'common.errors.required')),
+    topics: singleTopic
+      .transform(v => parseStringArray(v) ?? [])
+      .pipe(z.array(z.string()).min(1, 'common.errors.required').max(1, 'datasources.errors.topicSingle')),
   })
 
 export const MqttApiToFormSchema = MqttApiResponseSchema.transform(({ urls, topics, tls, qos, ...rest }) => ({
