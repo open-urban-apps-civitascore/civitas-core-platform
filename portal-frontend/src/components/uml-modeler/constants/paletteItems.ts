@@ -28,13 +28,6 @@ export const RELATIONSHIP_PALETTE_ITEMS = [
     icon: 'arrowUpRight',
   },
   {
-    id: 'association',
-    type: 'association' as const,
-    label: 'Association',
-    description: 'Solid line with arrow (uses/knows about)',
-    icon: 'arrowRight',
-  },
-  {
     id: 'aggregation',
     type: 'aggregation' as const,
     label: 'Aggregation',
