@@ -563,7 +563,7 @@ public class NifiFlowBuilder {
             new FrostLeg(
                 "thing",
                 "$.things",
-                Map.of("frost.ref", "$.properties.reference"),
+                List.of(Map.entry("frost.ref", "$.properties.reference")),
                 base
                     + "/Things?$filter=properties/reference%20eq%20"
                     + "'${frost.ref:replaceAll(\"'\",\"''\"):urlEncode()}'",
@@ -612,7 +612,9 @@ public class NifiFlowBuilder {
             new FrostLeg(
                 "obs",
                 "$.observations",
-                Map.of("frost.ref", "$.parameters.reference", "frost.name", "$.parameters.name"),
+                List.of(
+                    Map.entry("frost.ref", "$.parameters.reference"),
+                    Map.entry("frost.name", "$.parameters.name")),
                 base
                     + "/Datastreams?$filter=properties/reference%20eq%20"
                     + "'${frost.ref:replaceAll(\"'\",\"''\"):urlEncode()}'"
@@ -654,11 +656,15 @@ public class NifiFlowBuilder {
     routeHttpFailures(pgId, connections, post, errorSink);
   }
 
-  /** The per-leg parameters of a find-or-create lookup chain. */
+  /**
+   * The per-leg parameters of a find-or-create lookup chain. {@code refProps} is an ordered list,
+   * not a map: the keys are dynamic properties absent from the fragment, so they are appended to
+   * the processor JSON in iteration order — and the snapshot must be byte-deterministic.
+   */
   private record FrostLeg(
       String disc,
       String splitPath,
-      Map<String, String> refProps,
+      List<Map.Entry<String, String>> refProps,
       String getUrl,
       String routeRelationship,
       String routeCondition) {}
@@ -681,7 +687,7 @@ public class NifiFlowBuilder {
       throws FatalAdapterException {
     String disc = leg.disc();
     String splitPath = leg.splitPath();
-    Map<String, String> refProps = leg.refProps();
+    List<Map.Entry<String, String>> refProps = leg.refProps();
     String getUrl = leg.getUrl();
     String routeRelationship = leg.routeRelationship();
     String routeCondition = leg.routeCondition();
@@ -695,7 +701,7 @@ public class NifiFlowBuilder {
 
     Processor extractRef =
         loadProcessor("evaluate_json_path", pgId, csIdByName, "matched", disc + "Ref");
-    for (Map.Entry<String, String> ref : refProps.entrySet()) {
+    for (Map.Entry<String, String> ref : refProps) {
       setProp(extractRef, ref.getKey(), ref.getValue());
     }
 
