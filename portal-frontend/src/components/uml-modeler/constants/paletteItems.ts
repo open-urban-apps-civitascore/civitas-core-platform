@@ -28,13 +28,6 @@ export const RELATIONSHIP_PALETTE_ITEMS = [
     icon: 'arrowUpRight',
   },
   {
-    id: 'realization',
-    type: 'realization' as const,
-    label: 'Realization',
-    description: 'Dashed hollow triangle (implements interface)',
-    icon: 'moveUpRight',
-  },
-  {
     id: 'association',
     type: 'association' as const,
     label: 'Association',
