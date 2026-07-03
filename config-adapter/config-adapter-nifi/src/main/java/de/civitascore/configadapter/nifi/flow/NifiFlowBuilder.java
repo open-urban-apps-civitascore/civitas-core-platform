@@ -9,17 +9,21 @@
  */
 package de.civitascore.configadapter.nifi.flow;
 
+import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.applySchedule;
+import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.removeAutoTerminated;
+import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.setProp;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.nifi.flow.stage.BuildContext;
+import de.civitascore.configadapter.nifi.flow.stage.Fragment;
+import de.civitascore.configadapter.nifi.flow.stage.Processor;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.ReplacementStrategy;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -39,7 +43,6 @@ import java.util.UUID;
  */
 public class NifiFlowBuilder {
 
-  private static final String CS_TOKEN_PREFIX = "${CS:";
   private static final String STRATEGY_PROPERTY = "Replacement Value Strategy";
 
   /**
@@ -112,8 +115,6 @@ public class NifiFlowBuilder {
     }
   }
 
-  private record Processor(ObjectNode node, String id, String outRelationship) {}
-
   /**
    * Builds the flow snapshot for the given spec.
    *
@@ -152,9 +153,11 @@ public class NifiFlowBuilder {
     ArrayNode controllerServices = flow.putArray("controllerServices");
     ArrayNode connections = flow.putArray("connections");
 
+    BuildContext ctx =
+        new BuildContext(mapper, pgId, spec, processors, controllerServices, connections);
+
     // Controller services first — processors reference them by id.
-    Map<String, String> csIdByName = new LinkedHashMap<>();
-    addControllerServices(controllerServices, pgId, csIdByName, spec);
+    addControllerServices(ctx, spec);
 
     // Processor chain: source -> [convert] -> [mapping...] -> sink. A mapping may need more than
     // one
@@ -177,21 +180,17 @@ public class NifiFlowBuilder {
               + " envelope");
     }
     Processor source =
-        loadProcessor(
-            sourceFragment(spec.sourceType()), pgId, csIdByName, sqlSource ? "success" : "Message");
+        ctx.loadProcessor(sourceFragment(spec.sourceType()), sqlSource ? "success" : "Message");
     applySchedule(source, spec.sourceCron());
     // ConvertRecord turns raw MQTT bytes into records; a SQL source already emits records, and the
     // FROST find-or-create works on the raw JSON envelope (SplitJson/EvaluateJsonPath) — so both
     // skip the convert step.
     Processor convert =
-        (sqlSource || frostSink)
-            ? null
-            : loadProcessor("convert_record", pgId, csIdByName, "success");
+        (sqlSource || frostSink) ? null : ctx.loadProcessor(Fragment.CONVERT_RECORD, "success");
     // FROST find-or-create works on the raw JSON envelope; a record-based UpdateRecord mapping
     // cannot run in that path (it would re-wrap the envelope). The source delivers the final STA
     // shape, so a mapping node is not applied for a FROST sink.
-    List<Processor> mappingProcessors =
-        frostSink ? List.of() : buildMappingProcessors(spec, pgId, csIdByName);
+    List<Processor> mappingProcessors = frostSink ? List.of() : buildMappingProcessors(ctx, spec);
 
     // Common prefix: source -> [convert] -> [mapping...]. The sink stage differs: PostGIS/MQTT is a
     // single terminal processor (linear), FROST is a multi-stage find-or-create sub-flow.
@@ -203,14 +202,13 @@ public class NifiFlowBuilder {
     prefix.addAll(mappingProcessors);
     bindProperties(prefix, spec);
     for (int i = 0; i < prefix.size(); i++) {
-      processors.add(prefix.get(i).node());
+      ctx.addProcessor(prefix.get(i));
       if (i > 0) {
-        connections.add(connection(pgId, prefix.get(i - 1), prefix.get(i)));
+        ctx.addChainConnection(prefix.get(i - 1), prefix.get(i));
       }
     }
     Processor tail = prefix.get(prefix.size() - 1);
-    wireSinkStage(
-        spec, pgId, csIdByName, processors, connections, tail, convert, mappingProcessors);
+    wireSinkStage(ctx, spec, tail, convert, mappingProcessors);
 
     ObjectNode root = mapper.createObjectNode();
     root.set("flowContents", flow);
@@ -222,108 +220,22 @@ public class NifiFlowBuilder {
     return serialize(root);
   }
 
-  // ─── Fragment loading ───────────────────────────────────────────────────────
+  // ─── Controller services ────────────────────────────────────────────────────
 
   /**
    * Adds the controller services the flow needs: the JSON reader/writer always, a source-side DB
    * pool for a SQL pull source, and the sink DB pool for a PostGIS sink.
    */
-  private void addControllerServices(
-      ArrayNode controllerServices, String pgId, Map<String, String> csIdByName, FlowBuildSpec spec)
+  private void addControllerServices(BuildContext ctx, FlowBuildSpec spec)
       throws FatalAdapterException {
-    addControllerService(controllerServices, "json_tree_reader", pgId, READER, csIdByName, spec);
-    addControllerService(
-        controllerServices, "json_record_set_writer", pgId, WRITER, csIdByName, spec);
+    ctx.addControllerService(Fragment.JSON_TREE_READER, READER);
+    ctx.addControllerService(Fragment.JSON_RECORD_SET_WRITER, WRITER);
     if (spec.sourceType() == SourceType.SQL) {
       // SQL pull source reads records over its own DB connection pool.
-      addControllerService(
-          controllerServices, "dbcp_connection_pool", pgId, SOURCE_DBCP, csIdByName, spec);
+      ctx.addControllerService(Fragment.DBCP_CONNECTION_POOL, SOURCE_DBCP);
     }
     if (spec.sinkType() == SinkType.POSTGIS) {
-      addControllerService(
-          controllerServices, "dbcp_connection_pool", pgId, DBCP, csIdByName, spec);
-    }
-  }
-
-  private void addControllerService(
-      ArrayNode target,
-      String fragment,
-      String pgId,
-      String friendlyName,
-      Map<String, String> csIdByName,
-      FlowBuildSpec spec)
-      throws FatalAdapterException {
-    ObjectNode node = loadFragment(fragment);
-    node.put("identifier", deterministicId(pgId + ":cs:" + friendlyName));
-    node.put("groupIdentifier", pgId);
-    // stamp the friendly name so the REST client can match sensitive properties by name post-upload
-    node.put("name", friendlyName);
-    ObjectNode props = (ObjectNode) node.get("properties");
-    spec.controllerServiceProperties().getOrDefault(friendlyName, Map.of()).forEach(props::put);
-    target.add(node);
-    csIdByName.put(friendlyName, node.get("identifier").asText());
-  }
-
-  private Processor loadProcessor(
-      String fragment, String pgId, Map<String, String> csIdByName, String outRelationship)
-      throws FatalAdapterException {
-    return loadProcessor(fragment, pgId, csIdByName, outRelationship, "");
-  }
-
-  /**
-   * Loads a processor fragment with a deterministic id. The {@code discriminator} keeps ids unique
-   * when the same fragment is instantiated more than once (e.g. one UpdateRecord per strategy).
-   */
-  private Processor loadProcessor(
-      String fragment,
-      String pgId,
-      Map<String, String> csIdByName,
-      String outRelationship,
-      String discriminator)
-      throws FatalAdapterException {
-    ObjectNode node = loadFragment(fragment);
-    String seed = pgId + ":proc:" + fragment + (discriminator.isEmpty() ? "" : ":" + discriminator);
-    String id = deterministicId(seed);
-    node.put("identifier", id);
-    node.put("groupIdentifier", pgId);
-    resolveControllerServiceReferences(node, csIdByName);
-    return new Processor(node, id, outRelationship);
-  }
-
-  /** Replaces {@code ${CS:Name}} property tokens with the assigned controller-service id. */
-  private void resolveControllerServiceReferences(
-      ObjectNode component, Map<String, String> csIdByName) throws FatalAdapterException {
-    JsonNode properties = component.get("properties");
-    if (!(properties instanceof ObjectNode props)) {
-      return;
-    }
-    var fields = props.fields();
-    while (fields.hasNext()) {
-      Map.Entry<String, JsonNode> entry = fields.next();
-      JsonNode value = entry.getValue();
-      if (value.isTextual() && value.asText().startsWith(CS_TOKEN_PREFIX)) {
-        String name =
-            value.asText().substring(CS_TOKEN_PREFIX.length(), value.asText().length() - 1);
-        String id = csIdByName.get(name);
-        if (id == null) {
-          throw new FatalAdapterException(
-              AdapterErrorCode.NIFI_FLOW_ERROR, "unresolved controller-service reference: " + name);
-        }
-        props.put(entry.getKey(), id);
-      }
-    }
-  }
-
-  private ObjectNode loadFragment(String fragment) throws FatalAdapterException {
-    String resource = "fragments/" + fragment + ".json";
-    try (InputStream in = getClass().getClassLoader().getResourceAsStream(resource)) {
-      if (in == null) {
-        throw new FatalAdapterException(
-            AdapterErrorCode.NIFI_FLOW_ERROR, "missing NiFi component fragment: " + resource);
-      }
-      return (ObjectNode) mapper.readTree(new String(in.readAllBytes(), StandardCharsets.UTF_8));
-    } catch (IOException e) {
-      throw new FatalAdapterException(AdapterErrorCode.NIFI_FLOW_ERROR, e, "reading " + resource);
+      ctx.addControllerService(Fragment.DBCP_CONNECTION_POOL, DBCP);
     }
   }
 
@@ -334,8 +246,7 @@ public class NifiFlowBuilder {
    * single strategy per processor, so a mapping that mixes {@code const} (literal-value) with
    * copies/concats (record-path-value) is split across processors chained in sequence.
    */
-  private List<Processor> buildMappingProcessors(
-      FlowBuildSpec spec, String pgId, Map<String, String> csIdByName)
+  private List<Processor> buildMappingProcessors(BuildContext ctx, FlowBuildSpec spec)
       throws FatalAdapterException {
     Map<ReplacementStrategy, List<UpdateRecordProperty>> byStrategy = new LinkedHashMap<>();
     for (UpdateRecordProperty property : spec.mappingProperties()) {
@@ -344,7 +255,7 @@ public class NifiFlowBuilder {
     List<Processor> result = new ArrayList<>();
     for (Map.Entry<ReplacementStrategy, List<UpdateRecordProperty>> group : byStrategy.entrySet()) {
       Processor processor =
-          loadProcessor("update_record", pgId, csIdByName, "success", group.getKey().name());
+          ctx.loadProcessor(Fragment.UPDATE_RECORD, "success", group.getKey().name());
       applyMapping(
           (ObjectNode) processor.node().get("properties"), group.getKey(), group.getValue());
       result.add(processor);
@@ -404,29 +315,26 @@ public class NifiFlowBuilder {
    * by the {@code JdbcSqlSourceProbe} and the bind-time guards in {@code FlowDeploymentPlanner}.
    */
   private void wireErrorSink(
-      String pgId,
-      Map<String, String> csIdByName,
-      ArrayNode processors,
-      ArrayNode connections,
+      BuildContext ctx,
       Processor convert,
       List<Processor> mappingProcessors,
       Processor sink,
       SinkType sinkType)
       throws FatalAdapterException {
-    Processor errorSink = loadProcessor("log_message", pgId, csIdByName, null);
-    processors.add(errorSink.node());
+    Processor errorSink = ctx.loadProcessor(Fragment.LOG_MESSAGE, null);
+    ctx.addProcessor(errorSink);
     if (convert != null) {
-      connections.add(connection(pgId, convert, errorSink, "failure"));
+      ctx.addConnection(convert, errorSink, "failure");
     }
     for (Processor mapping : mappingProcessors) {
-      connections.add(connection(pgId, mapping, errorSink, "failure"));
+      ctx.addConnection(mapping, errorSink, "failure");
     }
     // The sink fragments auto-terminate their failure relationships by default; un-terminate them
     // (NiFi forbids a relationship being both auto-terminated and connected) and route them to the
     // same error sink so a failed write is logged, not lost.
     for (String relationship : sinkFailureRelationships(sinkType)) {
-      removeAutoTerminated(sink.node(), relationship);
-      connections.add(connection(pgId, sink, errorSink, relationship));
+      removeAutoTerminated(sink, relationship);
+      ctx.addConnection(sink, errorSink, relationship);
     }
   }
 
@@ -440,56 +348,33 @@ public class NifiFlowBuilder {
     };
   }
 
-  /** Removes a relationship from a processor's {@code autoTerminatedRelationships}, if present. */
-  private static void removeAutoTerminated(ObjectNode processorNode, String relationship) {
-    JsonNode auto = processorNode.get("autoTerminatedRelationships");
-    if (auto instanceof ArrayNode array) {
-      for (int i = array.size() - 1; i >= 0; i--) {
-        if (relationship.equals(array.get(i).asText())) {
-          array.remove(i);
-        }
-      }
-    }
-  }
-
   /**
    * Wires the sink stage onto the prefix tail: a FROST find-or-create sub-flow, or a single linear
    * terminal sink (PostGIS). Both route their write failures to a shared LogMessage error sink.
    */
   private void wireSinkStage(
+      BuildContext ctx,
       FlowBuildSpec spec,
-      String pgId,
-      Map<String, String> csIdByName,
-      ArrayNode processors,
-      ArrayNode connections,
       Processor tail,
       Processor convert,
       List<Processor> mappingProcessors)
       throws FatalAdapterException {
     if (spec.sinkType() == SinkType.FROST) {
-      Processor errorSink = loadProcessor("log_message", pgId, csIdByName, null);
-      processors.add(errorSink.node());
+      Processor errorSink = ctx.loadProcessor(Fragment.LOG_MESSAGE, null);
+      ctx.addProcessor(errorSink);
       if (convert != null) {
-        connections.add(connection(pgId, convert, errorSink, "failure"));
+        ctx.addConnection(convert, errorSink, "failure");
       }
       for (Processor mapping : mappingProcessors) {
-        connections.add(connection(pgId, mapping, errorSink, "failure"));
+        ctx.addConnection(mapping, errorSink, "failure");
       }
-      buildFrostFindOrCreate(spec, pgId, csIdByName, processors, connections, tail, errorSink);
+      buildFrostFindOrCreate(ctx, spec, tail, errorSink);
     } else {
-      Processor sink = loadProcessor(sinkFragment(spec.sinkType()), pgId, csIdByName, null);
+      Processor sink = ctx.loadProcessor(sinkFragment(spec.sinkType()), null);
       bindProperties(List.of(sink), spec);
-      processors.add(sink.node());
-      connections.add(connection(pgId, tail, sink));
-      wireErrorSink(
-          pgId,
-          csIdByName,
-          processors,
-          connections,
-          convert,
-          mappingProcessors,
-          sink,
-          spec.sinkType());
+      ctx.addProcessor(sink);
+      ctx.addChainConnection(tail, sink);
+      wireErrorSink(ctx, convert, mappingProcessors, sink, spec.sinkType());
     }
   }
 
@@ -515,13 +400,7 @@ public class NifiFlowBuilder {
    * response, or failed write is logged, never silently dropped.
    */
   private void buildFrostFindOrCreate(
-      FlowBuildSpec spec,
-      String pgId,
-      Map<String, String> csIdByName,
-      ArrayNode processors,
-      ArrayNode connections,
-      Processor upstream,
-      Processor errorSink)
+      BuildContext ctx, FlowBuildSpec spec, Processor upstream, Processor errorSink)
       throws FatalAdapterException {
     String base = spec.sinkProperties().getOrDefault(FROST_BASE_URL, "");
     String projectId = spec.sinkProperties().get(FROST_PROJECT_ID);
@@ -537,27 +416,17 @@ public class NifiFlowBuilder {
     // project-scoped named API; Observations stay at the root — their scope flows through the
     // resolved Datastream (whose lookup is project-filtered below).
     String thingBase = base + "/Projects(" + projectId + ")";
-    buildThingLeg(thingBase, pgId, csIdByName, processors, connections, upstream, errorSink);
-    buildObservationLeg(
-        base, projectId, pgId, csIdByName, processors, connections, upstream, errorSink);
+    buildThingLeg(ctx, thingBase, upstream, errorSink);
+    buildObservationLeg(ctx, base, projectId, upstream, errorSink);
   }
 
   /** Things leg: find by reference, POST only when absent (idempotent create). */
   private void buildThingLeg(
-      String base,
-      String pgId,
-      Map<String, String> csIdByName,
-      ArrayNode processors,
-      ArrayNode connections,
-      Processor upstream,
-      Processor errorSink)
+      BuildContext ctx, String base, Processor upstream, Processor errorSink)
       throws FatalAdapterException {
     Processor route =
         buildLookup(
-            pgId,
-            csIdByName,
-            processors,
-            connections,
+            ctx,
             upstream,
             errorSink,
             new FrostLeg(
@@ -570,19 +439,19 @@ public class NifiFlowBuilder {
                 "new",
                 "${frost.id:isEmpty()}"));
 
-    Processor restore = loadProcessor("replace_text", pgId, csIdByName, "success", "thingRestore");
+    Processor restore = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "thingRestore");
     setProp(restore, "Replacement Value", "${frost.body}");
-    Processor post = loadProcessor("invoke_http", pgId, csIdByName, null, "thingPost");
+    Processor post = ctx.loadProcessor(Fragment.INVOKE_HTTP, null, "thingPost");
     setProp(post, "HTTP Method", "POST");
     setProp(post, "HTTP URL", base + "/Things");
     setProp(post, "Request Content-Type", "application/json");
 
-    processors.add(restore.node());
-    processors.add(post.node());
-    connections.add(connection(pgId, route, restore));
-    connections.add(connection(pgId, restore, post));
-    routeFailure(pgId, connections, restore, errorSink);
-    routeHttpFailures(pgId, connections, post, errorSink);
+    ctx.addProcessor(restore);
+    ctx.addProcessor(post);
+    ctx.addChainConnection(route, restore);
+    ctx.addChainConnection(restore, post);
+    ctx.routeFailure(restore, errorSink);
+    routeHttpFailures(ctx, post, errorSink);
   }
 
   /**
@@ -592,21 +461,11 @@ public class NifiFlowBuilder {
    * /Projects(n)/Datastreams} collection to scope the path itself).
    */
   private void buildObservationLeg(
-      String base,
-      String projectId,
-      String pgId,
-      Map<String, String> csIdByName,
-      ArrayNode processors,
-      ArrayNode connections,
-      Processor upstream,
-      Processor errorSink)
+      BuildContext ctx, String base, String projectId, Processor upstream, Processor errorSink)
       throws FatalAdapterException {
     Processor route =
         buildLookup(
-            pgId,
-            csIdByName,
-            processors,
-            connections,
+            ctx,
             upstream,
             errorSink,
             new FrostLeg(
@@ -624,10 +483,10 @@ public class NifiFlowBuilder {
                 "found",
                 "${frost.id:isEmpty():not()}"));
     // A missing Datastream must not be dropped silently.
-    removeAutoTerminated(route.node(), "unmatched");
-    connections.add(connection(pgId, route, errorSink, "unmatched"));
+    removeAutoTerminated(route, "unmatched");
+    ctx.addConnection(route, errorSink, "unmatched");
 
-    Processor restore = loadProcessor("replace_text", pgId, csIdByName, "success", "obsRestore");
+    Processor restore = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "obsRestore");
     setProp(restore, "Replacement Value", "${frost.body}");
     // Merge the resolved Datastream id as the first key of the observation object (no Jolt/script):
     // a regex replace of the leading brace injects "Datastream":{"@iot.id":<id>},. This assumes the
@@ -636,24 +495,24 @@ public class NifiFlowBuilder {
     // it is never `{}`); the appended comma would otherwise produce a trailing comma. The
     // Datastream
     // @iot.id is numeric in FROST's default config, so it is injected unquoted.
-    Processor inject = loadProcessor("replace_text", pgId, csIdByName, "success", "obsInject");
+    Processor inject = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "obsInject");
     setProp(inject, "Replacement Strategy", "Regex Replace");
     setProp(inject, "Search Value", "^\\{");
     setProp(inject, "Replacement Value", "{\"Datastream\":{\"@iot.id\":${frost.id}},");
-    Processor post = loadProcessor("invoke_http", pgId, csIdByName, null, "obsPost");
+    Processor post = ctx.loadProcessor(Fragment.INVOKE_HTTP, null, "obsPost");
     setProp(post, "HTTP Method", "POST");
     setProp(post, "HTTP URL", base + "/Observations");
     setProp(post, "Request Content-Type", "application/json");
 
-    processors.add(restore.node());
-    processors.add(inject.node());
-    processors.add(post.node());
-    connections.add(connection(pgId, route, restore));
-    connections.add(connection(pgId, restore, inject));
-    connections.add(connection(pgId, inject, post));
-    routeFailure(pgId, connections, restore, errorSink);
-    routeFailure(pgId, connections, inject, errorSink);
-    routeHttpFailures(pgId, connections, post, errorSink);
+    ctx.addProcessor(restore);
+    ctx.addProcessor(inject);
+    ctx.addProcessor(post);
+    ctx.addChainConnection(route, restore);
+    ctx.addChainConnection(restore, inject);
+    ctx.addChainConnection(inject, post);
+    ctx.routeFailure(restore, errorSink);
+    ctx.routeFailure(inject, errorSink);
+    routeHttpFailures(ctx, post, errorSink);
   }
 
   /**
@@ -677,13 +536,7 @@ public class NifiFlowBuilder {
    * the route processor so the caller attaches its leg-specific tail.
    */
   private Processor buildLookup(
-      String pgId,
-      Map<String, String> csIdByName,
-      ArrayNode processors,
-      ArrayNode connections,
-      Processor upstream,
-      Processor errorSink,
-      FrostLeg leg)
+      BuildContext ctx, Processor upstream, Processor errorSink, FrostLeg leg)
       throws FatalAdapterException {
     String disc = leg.disc();
     String splitPath = leg.splitPath();
@@ -691,139 +544,72 @@ public class NifiFlowBuilder {
     String getUrl = leg.getUrl();
     String routeRelationship = leg.routeRelationship();
     String routeCondition = leg.routeCondition();
-    Processor split = loadProcessor("split_json", pgId, csIdByName, "split", disc + "Split");
+    Processor split = ctx.loadProcessor(Fragment.SPLIT_JSON, "split", disc + "Split");
     setProp(split, "JsonPath Expression", splitPath);
 
     Processor extractBody =
-        loadProcessor("evaluate_json_path", pgId, csIdByName, "matched", disc + "Body");
+        ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Body");
     setProp(extractBody, "Return Type", "json");
     setProp(extractBody, "frost.body", "$");
 
-    Processor extractRef =
-        loadProcessor("evaluate_json_path", pgId, csIdByName, "matched", disc + "Ref");
+    Processor extractRef = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Ref");
     for (Map.Entry<String, String> ref : refProps) {
       setProp(extractRef, ref.getKey(), ref.getValue());
     }
 
-    Processor get = loadProcessor("invoke_http", pgId, csIdByName, "Response", disc + "Get");
+    Processor get = ctx.loadProcessor(Fragment.INVOKE_HTTP, "Response", disc + "Get");
     setProp(get, "HTTP Method", "GET");
     setProp(get, "HTTP URL", getUrl);
 
-    Processor extractId =
-        loadProcessor("evaluate_json_path", pgId, csIdByName, "matched", disc + "Id");
+    Processor extractId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Id");
     setProp(extractId, "frost.id", "$.value[0]['@iot.id']");
 
     Processor route =
-        loadProcessor("route_on_attribute", pgId, csIdByName, routeRelationship, disc + "Route");
+        ctx.loadProcessor(Fragment.ROUTE_ON_ATTRIBUTE, routeRelationship, disc + "Route");
     setProp(route, routeRelationship, routeCondition);
 
     for (Processor p : List.of(split, extractBody, extractRef, get, extractId, route)) {
-      processors.add(p.node());
+      ctx.addProcessor(p);
     }
-    connections.add(connection(pgId, upstream, split));
-    connections.add(connection(pgId, split, extractBody));
-    connections.add(connection(pgId, extractBody, extractRef));
-    connections.add(connection(pgId, extractRef, get));
-    removeAutoTerminated(get.node(), "Response");
-    connections.add(connection(pgId, get, extractId));
-    connections.add(connection(pgId, extractId, route));
+    ctx.addChainConnection(upstream, split);
+    ctx.addChainConnection(split, extractBody);
+    ctx.addChainConnection(extractBody, extractRef);
+    ctx.addChainConnection(extractRef, get);
+    removeAutoTerminated(get, "Response");
+    ctx.addChainConnection(get, extractId);
+    ctx.addChainConnection(extractId, route);
     for (String relationship : HTTP_FAILURE_RELATIONSHIPS) {
-      removeAutoTerminated(get.node(), relationship);
-      connections.add(connection(pgId, get, errorSink, relationship));
+      removeAutoTerminated(get, relationship);
+      ctx.addConnection(get, errorSink, relationship);
     }
     // A malformed envelope (split) or an unparseable lookup response (extract) must be logged, not
     // dropped — route every intermediate 'failure' to the error sink.
     for (Processor stage : List.of(split, extractBody, extractRef, extractId)) {
-      routeFailure(pgId, connections, stage, errorSink);
+      ctx.routeFailure(stage, errorSink);
     }
     return route;
   }
 
-  private void routeHttpFailures(
-      String pgId, ArrayNode connections, Processor http, Processor errorSink) {
+  private void routeHttpFailures(BuildContext ctx, Processor http, Processor errorSink) {
     for (String relationship : HTTP_FAILURE_RELATIONSHIPS) {
-      removeAutoTerminated(http.node(), relationship);
-      connections.add(connection(pgId, http, errorSink, relationship));
+      removeAutoTerminated(http, relationship);
+      ctx.addConnection(http, errorSink, relationship);
     }
-  }
-
-  /**
-   * Routes a processor's single {@code failure} relationship to the error sink (no silent drop).
-   */
-  private void routeFailure(
-      String pgId, ArrayNode connections, Processor processor, Processor errorSink) {
-    removeAutoTerminated(processor.node(), "failure");
-    connections.add(connection(pgId, processor, errorSink, "failure"));
-  }
-
-  private static void setProp(Processor processor, String key, String value) {
-    ((ObjectNode) processor.node().get("properties")).put(key, value);
-  }
-
-  // ─── Connections ────────────────────────────────────────────────────────────
-
-  private ObjectNode connection(String pgId, Processor source, Processor destination) {
-    return connection(pgId, source, destination, source.outRelationship());
-  }
-
-  private ObjectNode connection(
-      String pgId, Processor source, Processor destination, String relationship) {
-    ObjectNode connection = mapper.createObjectNode();
-    connection.put(
-        "identifier",
-        deterministicId(
-            pgId + ":conn:" + source.id() + ":" + relationship + "->" + destination.id()));
-    ObjectNode src = connection.putObject("source");
-    src.put("id", source.id());
-    src.put("type", "PROCESSOR");
-    src.put("groupId", pgId);
-    ObjectNode dst = connection.putObject("destination");
-    dst.put("id", destination.id());
-    dst.put("type", "PROCESSOR");
-    dst.put("groupId", pgId);
-    connection.put("groupIdentifier", pgId);
-    ArrayNode rels = connection.putArray("selectedRelationships");
-    rels.add(relationship);
-    connection.put("backPressureObjectThreshold", 10_000);
-    connection.put("backPressureDataSizeThreshold", "1 GB");
-    connection.put("flowFileExpiration", "0 sec");
-    connection.put("loadBalanceStrategy", "DO_NOT_LOAD_BALANCE");
-    connection.put("loadBalanceCompression", "DO_NOT_COMPRESS");
-    connection.put("labelIndex", 0);
-    connection.put("zIndex", 0);
-    connection.putArray("prioritizers");
-    connection.putArray("bends");
-    connection.put("componentType", "CONNECTION");
-    return connection;
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
 
-  private static String sourceFragment(SourceType sourceType) {
+  private static Fragment sourceFragment(SourceType sourceType) {
     return switch (sourceType) {
-      case MQTT -> "consume_mqtt";
-      case SQL -> "query_database_table_record";
+      case MQTT -> Fragment.CONSUME_MQTT;
+      case SQL -> Fragment.QUERY_DATABASE_TABLE_RECORD;
     };
   }
 
-  /**
-   * Switches the entry processor to cron-driven scheduling. A {@code null} cron leaves the source
-   * fragment's built-in schedule (timer-driven for MQTT, the fragment default for SQL). Only the
-   * source's schedule drives the flow — downstream processors stay timer-driven and run when
-   * FlowFiles arrive in their queues.
-   */
-  private static void applySchedule(Processor source, String cron) {
-    if (cron == null) {
-      return;
-    }
-    source.node().put("schedulingStrategy", "CRON_DRIVEN");
-    source.node().put("schedulingPeriod", cron);
-  }
-
-  private static String sinkFragment(SinkType sinkType) {
+  private static Fragment sinkFragment(SinkType sinkType) {
     return switch (sinkType) {
-      case POSTGIS -> "put_database_record";
-      case FROST -> "invoke_http";
+      case POSTGIS -> Fragment.PUT_DATABASE_RECORD;
+      case FROST -> Fragment.INVOKE_HTTP;
     };
   }
 
