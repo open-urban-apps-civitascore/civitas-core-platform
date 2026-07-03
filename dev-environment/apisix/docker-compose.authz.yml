@@ -38,6 +38,8 @@ services:
     image: openpolicyagent/opa:1.14.0-static
     container_name: civitas-opa
     restart: always
+    environment:
+      FROST_API_HOST: ${FROST_API_HOST:-api.localhost}
     command:
       - "run"
       - "--server"

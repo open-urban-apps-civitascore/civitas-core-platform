@@ -12,6 +12,9 @@ import data.civitas.authz
 import data.civitas.authz.open_data
 import data.test.helpers.mock_http
 
+# Injected as the FROST host guard (no bundle default; supplied at runtime via FROST_API_HOST).
+frost_api_host := "api.localhost"
+
 # =============================================================================
 # REQUEST BUILDERS
 # =============================================================================
@@ -108,12 +111,14 @@ mock_open_with_perm(req) := {"status_code": 200, "body": mock_http.user_with_sco
 test_grant_true_for_anonymous_open_frost_payload if {
 	open_data.is_open_data_grant with http.send as mock_open
 		with data.config as mock_http.mock_config
+		with data.backends.frost_server.api_host as frost_api_host
 		with input as frost_anon_request("GET", "/v1/datasets/dataset-abc")
 }
 
 test_grant_false_when_dataset_not_open if {
 	not open_data.is_open_data_grant with http.send as mock_not_open
 		with data.config as mock_http.mock_config
+		with data.backends.frost_server.api_host as frost_api_host
 		with input as frost_anon_request("GET", "/v1/datasets/dataset-abc")
 }
 
@@ -132,6 +137,7 @@ test_grant_false_for_non_eligible_endpoint if {
 test_grant_false_on_fetcher_outage if {
 	not open_data.is_open_data_grant with http.send as mock_attrs_outage
 		with data.config as mock_http.mock_config
+		with data.backends.frost_server.api_host as frost_api_host
 		with input as frost_anon_request("GET", "/v1/datasets/dataset-abc")
 }
 
@@ -142,6 +148,7 @@ test_grant_false_on_fetcher_outage if {
 test_anonymous_open_frost_payload_allowed if {
 	result := authz.decision with http.send as mock_open
 		with data.config as mock_http.mock_config
+		with data.backends.frost_server.api_host as frost_api_host
 		with input as frost_anon_request("GET", "/v1/datasets/dataset-abc")
 	result.allow == true
 	result.reason == "open_data"
@@ -156,6 +163,7 @@ test_anonymous_open_frost_payload_allowed if {
 test_anonymous_open_ows_payload_allowed if {
 	result := authz.decision with http.send as mock_open
 		with data.config as mock_http.mock_config
+		with data.backends.frost_server.api_host as frost_api_host
 		with input as frost_anon_request("GET", "/v1/datasets/dataset-abc/map")
 	result.allow == true
 	result.reason == "open_data"
@@ -192,6 +200,7 @@ test_anonymous_discovery_denied if {
 test_anonymous_non_open_frost_denied_401 if {
 	result := authz.decision with http.send as mock_not_open
 		with data.config as mock_http.mock_config
+		with data.backends.frost_server.api_host as frost_api_host
 		with input as frost_anon_request("GET", "/v1/datasets/dataset-abc")
 	result.allow == false
 	result.reason == "missing_user_context"
@@ -230,6 +239,7 @@ test_anonymous_unknown_endpoint_denied_401 if {
 test_anonymous_open_frost_failsecure_on_outage if {
 	result := authz.decision with http.send as mock_attrs_outage
 		with data.config as mock_http.mock_config
+		with data.backends.frost_server.api_host as frost_api_host
 		with input as frost_anon_request("GET", "/v1/datasets/dataset-abc")
 	result.allow == false
 	result.reason == "missing_user_context"
@@ -244,6 +254,7 @@ test_anonymous_open_frost_failsecure_on_outage if {
 test_authenticated_with_permission_uses_permission_path if {
 	result := authz.decision with http.send as mock_open_with_perm
 		with data.config as mock_http.mock_config
+		with data.backends.frost_server.api_host as frost_api_host
 		with input as frost_auth_request("GET", "/v1/datasets/dataset-abc")
 	result.allow == true
 	result.reason == "permission_granted"
@@ -253,6 +264,7 @@ test_authenticated_with_permission_uses_permission_path if {
 test_authenticated_without_permission_denied_403 if {
 	result := authz.decision with http.send as mock_not_open
 		with data.config as mock_http.mock_config
+		with data.backends.frost_server.api_host as frost_api_host
 		with input as frost_auth_request("GET", "/v1/datasets/dataset-abc")
 	result.allow == false
 	result.reason == "permission_denied"
@@ -273,6 +285,7 @@ mock_user_context_down(req) := {"status_code": 503, "body": {}} if {
 test_authenticated_repo_down_denied_403 if {
 	result := authz.decision with http.send as mock_user_context_down
 		with data.config as mock_http.mock_config
+		with data.backends.frost_server.api_host as frost_api_host
 		with input as frost_auth_request("GET", "/v1/datasets/dataset-abc")
 	result.allow == false
 	result.reason == "missing_user_context"
@@ -289,6 +302,7 @@ test_authenticated_repo_down_denied_403 if {
 test_anonymous_open_on_null_permission_endpoint_allowed if {
 	result := authz.decision with http.send as mock_open
 		with data.config as mock_http.mock_config
+		with data.backends.frost_server.api_host as frost_api_host
 		with data.backends.frost_server.endpoints as {"/v1/datasets/{id}": {"GET": null, "_open_data": true}}
 		with input as frost_anon_request("GET", "/v1/datasets/dataset-abc")
 	result.allow == true
@@ -299,6 +313,7 @@ test_anonymous_open_on_null_permission_endpoint_allowed if {
 test_anonymous_non_open_on_null_permission_endpoint_denied if {
 	result := authz.decision with http.send as mock_not_open
 		with data.config as mock_http.mock_config
+		with data.backends.frost_server.api_host as frost_api_host
 		with data.backends.frost_server.endpoints as {"/v1/datasets/{id}": {"GET": null, "_open_data": true}}
 		with input as frost_anon_request("GET", "/v1/datasets/dataset-abc")
 	result.allow == false

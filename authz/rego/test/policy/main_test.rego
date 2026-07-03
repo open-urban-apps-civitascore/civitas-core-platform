@@ -366,8 +366,7 @@ test_scope_dataset_apis_discovery_wrong_scope_denied if {
 # DATASET_PAYLOAD_READ, not the broader metadata DATASET_READ.
 # =============================================================================
 
-# A published-data request reaching FROST through APISIX: frost-server service, gateway Host
-# (data.backends.frost_server.api_host = api.localhost), authenticated user.
+# Authenticated FROST published-data request (gateway Host = api.localhost).
 frost_dataplane_request(method, path) := {
 	"request": {
 		"method": method,
@@ -387,6 +386,7 @@ test_frost_dataplane_requires_payload_read if {
 	result := authz.decision with http.send as mock_send_dataset_abc_payload_reader
 		with data.config as mock_http.mock_config
 		with input as frost_dataplane_request("GET", "/v1/datasets/dataset-abc")
+		with data.backends.frost_server.api_host as "api.localhost"
 	result.required_permissions == {"DATASET_PAYLOAD_READ"}
 }
 
@@ -395,6 +395,7 @@ test_frost_dataplane_payload_read_allowed if {
 	result := authz.decision with http.send as mock_send_dataset_abc_payload_reader
 		with data.config as mock_http.mock_config
 		with input as frost_dataplane_request("GET", "/v1/datasets/dataset-abc")
+		with data.backends.frost_server.api_host as "api.localhost"
 	result.allow == true
 	result.reason == "permission_granted"
 }
@@ -404,6 +405,7 @@ test_frost_dataplane_metadata_read_denied if {
 	result := authz.decision with http.send as mock_send_dataset_abc_reader
 		with data.config as mock_http.mock_config
 		with input as frost_dataplane_request("GET", "/v1/datasets/dataset-abc")
+		with data.backends.frost_server.api_host as "api.localhost"
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -413,6 +415,7 @@ test_frost_dataplane_wrong_scope_denied if {
 	result := authz.decision with http.send as mock_send_dataset_abc_payload_reader
 		with data.config as mock_http.mock_config
 		with input as frost_dataplane_request("GET", "/v1/datasets/other-dataset")
+		with data.backends.frost_server.api_host as "api.localhost"
 	result.allow == false
 	result.reason == "permission_denied"
 }

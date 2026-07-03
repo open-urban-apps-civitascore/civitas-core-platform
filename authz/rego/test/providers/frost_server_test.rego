@@ -190,6 +190,59 @@ test_path_pattern_unconfigured_api_host_rejected if {
 }
 
 # =============================================================================
+# API HOST RESOLUTION TESTS (FROST_API_HOST env override)
+# =============================================================================
+
+# The FROST_API_HOST environment variable is the canonical override and MUST
+# take precedence over the (dev-only) backend data `api_host` value.
+test_api_host_from_env_takes_precedence if {
+	result := frost_server.api_host with opa.runtime as {"env": {"FROST_API_HOST": "api.env.test"}}
+		with data.backends.frost_server.api_host as "api.data.test"
+	result == "api.env.test"
+}
+
+# A request on the env-configured host must match, even when the data value differs.
+test_path_pattern_matches_env_host if {
+	result := frost_server.path_pattern with input as frost_request_host("GET", "/v1/datasets/abc-123", "api.env.test")
+		with opa.runtime as {"env": {"FROST_API_HOST": "api.env.test"}}
+		with data.backends.frost_server.api_host as "api.data.test"
+	result == "/v1/datasets/{id}"
+}
+
+# The env host is normalised (case-insensitive, port-stripped) like everything else.
+test_api_host_from_env_normalised if {
+	result := frost_server.api_host with opa.runtime as {"env": {"FROST_API_HOST": "Api.Env.Test:9080"}}
+		with data.backends.frost_server.api_host as ""
+	result == "api.env.test"
+}
+
+# When FROST_API_HOST is empty, fall back to the backend data value.
+test_api_host_falls_back_to_data_when_env_empty if {
+	result := frost_server.api_host with opa.runtime as {"env": {"FROST_API_HOST": ""}}
+		with data.backends.frost_server.api_host as "api.data.test"
+	result == "api.data.test"
+}
+
+# When neither env nor data is set, api_host is empty (fail-closed).
+test_api_host_empty_when_unconfigured if {
+	result := frost_server.api_host with opa.runtime as {"env": {}}
+		with data.backends.frost_server.api_host as ""
+	result == ""
+}
+
+# config_error surfaces a clear operator message when nothing is configured.
+test_config_error_when_unconfigured if {
+	frost_server.config_error with opa.runtime as {"env": {}}
+		with data.backends.frost_server.api_host as ""
+}
+
+# config_error must be undefined once the env var is set.
+test_no_config_error_when_env_set if {
+	not frost_server.config_error with opa.runtime as {"env": {"FROST_API_HOST": "api.env.test"}}
+		with data.backends.frost_server.api_host as ""
+}
+
+# =============================================================================
 # SCOPE ENFORCEMENT TESTS
 # =============================================================================
 

@@ -61,11 +61,39 @@ host_without_port(raw) := lower(split(raw, ":")[0]) if {
 	not startswith(raw, "[")
 }
 
+# Configured API host, resolved from (priority order):
+#   1. FROST_API_HOST env var (opa.runtime().env) — production source.
+#   2. data.backends.frost_server.api_host — test-only fallback (not shipped in
+#      the bundle; injected via `with data...` in tests).
+# Empty when neither is set → fail closed. See `config_error`.
+
+default raw_api_host := ""
+
+raw_api_host := host if {
+	host := opa.runtime().env.FROST_API_HOST
+	host != ""
+}
+
+raw_api_host := data.backends.frost_server.api_host if {
+	not env_api_host_set
+	data.backends.frost_server.api_host
+}
+
+# True when FROST_API_HOST is present and non-empty in the runtime environment.
+env_api_host_set if {
+	host := opa.runtime().env.FROST_API_HOST
+	host != ""
+}
+
 # Configured API host (normalised). Empty if unconfigured → fail-closed.
 default api_host := ""
 
-api_host := host_without_port(data.backends.frost_server.api_host) if {
-	data.backends.frost_server.api_host
+api_host := host_without_port(raw_api_host) if {
+	raw_api_host != ""
+}
+
+config_error := "FROST_API_HOST is not set: the FROST provider host guard is fail-closed and will DENY all FROST payload requests. Set the FROST_API_HOST environment variable (deployment Helm value / dev-environment compose) to the public API host, e.g. api.<domain>." if {
+	api_host == ""
 }
 
 # Incoming request's Host header (normalised, empty if missing).
