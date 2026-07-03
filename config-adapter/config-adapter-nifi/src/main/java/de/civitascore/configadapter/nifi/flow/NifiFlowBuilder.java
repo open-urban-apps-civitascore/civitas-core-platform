@@ -19,15 +19,18 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.flow.stage.BuildContext;
+import de.civitascore.configadapter.nifi.flow.stage.ConvertRecordStage;
 import de.civitascore.configadapter.nifi.flow.stage.Fragment;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
+import de.civitascore.configadapter.nifi.flow.stage.RecordMappingStage;
+import de.civitascore.configadapter.nifi.flow.stage.SourceCapability;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
-import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.ReplacementStrategy;
+import de.civitascore.configadapter.nifi.flow.stage.StageResult;
+import de.civitascore.configadapter.nifi.flow.stage.TransformStage;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -43,8 +46,6 @@ import java.util.UUID;
  * post-upload.
  */
 public class NifiFlowBuilder {
-
-  private static final String STRATEGY_PROPERTY = "Replacement Value Strategy";
 
   /**
    * Sink-property key carrying the FROST SensorThings base URL into the find-or-create sub-flow
@@ -183,25 +184,15 @@ public class NifiFlowBuilder {
           "FROST sink requires an MQTT SensorThings source; a SQL source does not emit the STA"
               + " envelope");
     }
-    Processor source = sourceStage.build(ctx).exit();
-    // ConvertRecord turns raw MQTT bytes into records; a SQL source already emits records, and the
-    // FROST find-or-create works on the raw JSON envelope (SplitJson/EvaluateJsonPath) — so both
-    // skip the convert step.
-    Processor convert =
-        (sqlSource || frostSink) ? null : ctx.loadProcessor(Fragment.CONVERT_RECORD, "success");
-    // FROST find-or-create works on the raw JSON envelope; a record-based UpdateRecord mapping
-    // cannot run in that path (it would re-wrap the envelope). The source delivers the final STA
-    // shape, so a mapping node is not applied for a FROST sink.
-    List<Processor> mappingProcessors = frostSink ? List.of() : buildMappingProcessors(ctx, spec);
-
     // Common prefix: source -> [convert] -> [mapping...]. The sink stage differs: PostGIS/MQTT is a
     // single terminal processor (linear), FROST is a multi-stage find-or-create sub-flow.
-    List<Processor> prefix = new ArrayList<>();
-    prefix.add(source);
-    if (convert != null) {
-      prefix.add(convert);
+    List<Processor> prefix = new ArrayList<>(sourceStage.build(ctx).chain());
+    List<Processor> failureSources = new ArrayList<>();
+    for (TransformStage transform : transformsFor(sourceStage, spec)) {
+      StageResult result = transform.build(ctx);
+      prefix.addAll(result.chain());
+      failureSources.addAll(result.failureSources());
     }
-    prefix.addAll(mappingProcessors);
     for (int i = 0; i < prefix.size(); i++) {
       ctx.addProcessor(prefix.get(i));
       if (i > 0) {
@@ -209,7 +200,7 @@ public class NifiFlowBuilder {
       }
     }
     Processor tail = prefix.get(prefix.size() - 1);
-    wireSinkStage(ctx, spec, tail, convert, mappingProcessors);
+    wireSinkStage(ctx, spec, tail, failureSources);
 
     ObjectNode root = mapper.createObjectNode();
     root.set("flowContents", flow);
@@ -239,53 +230,29 @@ public class NifiFlowBuilder {
     }
   }
 
-  // ─── Property binding ───────────────────────────────────────────────────────
+  // ─── Transforms ─────────────────────────────────────────────────────────────
 
   /**
-   * One {@code UpdateRecord} per replacement-value strategy, in first-seen order. NiFi allows a
-   * single strategy per processor, so a mapping that mixes {@code const} (literal-value) with
-   * copies/concats (record-path-value) is split across processors chained in sequence.
+   * The transforms between source and sink, derived structurally. ConvertRecord turns a raw source
+   * payload into records — skipped when the source already emits records or the sink consumes the
+   * raw JSON envelope (the FROST find-or-create works on SplitJson/EvaluateJsonPath, and a
+   * record-based UpdateRecord mapping cannot run in that path: it would re-wrap the envelope).
    */
-  private List<Processor> buildMappingProcessors(BuildContext ctx, FlowBuildSpec spec)
-      throws FatalAdapterException {
-    Map<ReplacementStrategy, List<UpdateRecordProperty>> byStrategy = new LinkedHashMap<>();
-    for (UpdateRecordProperty property : spec.mappingProperties()) {
-      byStrategy.computeIfAbsent(property.strategy(), k -> new ArrayList<>()).add(property);
+  private List<TransformStage> transformsFor(SourceStage source, FlowBuildSpec spec) {
+    boolean rawJsonSink = spec.sinkType() == SinkType.FROST;
+    List<TransformStage> transforms = new ArrayList<>();
+    if (!rawJsonSink && !source.capabilities().contains(SourceCapability.EMITS_RECORDS)) {
+      transforms.add(new ConvertRecordStage());
     }
-    List<Processor> result = new ArrayList<>();
-    for (Map.Entry<ReplacementStrategy, List<UpdateRecordProperty>> group : byStrategy.entrySet()) {
-      Processor processor =
-          ctx.loadProcessor(Fragment.UPDATE_RECORD, "success", group.getKey().name());
-      applyMapping(
-          (ObjectNode) processor.node().get("properties"), group.getKey(), group.getValue());
-      result.add(processor);
+    if (!rawJsonSink && !spec.mappingProperties().isEmpty()) {
+      transforms.add(new RecordMappingStage());
     }
-    return result;
+    return transforms;
   }
 
   private void bindSinkProperties(Processor sink, FlowBuildSpec spec) {
     ObjectNode props = (ObjectNode) sink.node().get("properties");
     spec.sinkProperties().forEach(props::put);
-  }
-
-  private void applyMapping(
-      ObjectNode props,
-      ReplacementStrategy strategy,
-      List<UpdateRecordProperty> mappingProperties) {
-    List<String> stale = new ArrayList<>();
-    props
-        .fieldNames()
-        .forEachRemaining(
-            name -> {
-              if (name.startsWith("/")) {
-                stale.add(name);
-              }
-            });
-    stale.forEach(props::remove);
-    props.put(STRATEGY_PROPERTY, strategy.nifiValue());
-    for (UpdateRecordProperty property : mappingProperties) {
-      props.put(property.recordPath(), property.value());
-    }
   }
 
   // ─── Error routing ──────────────────────────────────────────────────────────
@@ -307,19 +274,12 @@ public class NifiFlowBuilder {
    * by the {@code JdbcSqlSourceProbe} and the bind-time guards in {@code FlowDeploymentPlanner}.
    */
   private void wireErrorSink(
-      BuildContext ctx,
-      Processor convert,
-      List<Processor> mappingProcessors,
-      Processor sink,
-      SinkType sinkType)
+      BuildContext ctx, List<Processor> failureSources, Processor sink, SinkType sinkType)
       throws FatalAdapterException {
     Processor errorSink = ctx.loadProcessor(Fragment.LOG_MESSAGE, null);
     ctx.addProcessor(errorSink);
-    if (convert != null) {
-      ctx.addConnection(convert, errorSink, "failure");
-    }
-    for (Processor mapping : mappingProcessors) {
-      ctx.addConnection(mapping, errorSink, "failure");
+    for (Processor failureSource : failureSources) {
+      ctx.addConnection(failureSource, errorSink, "failure");
     }
     // The sink fragments auto-terminate their failure relationships by default; un-terminate them
     // (NiFi forbids a relationship being both auto-terminated and connected) and route them to the
@@ -345,20 +305,13 @@ public class NifiFlowBuilder {
    * terminal sink (PostGIS). Both route their write failures to a shared LogMessage error sink.
    */
   private void wireSinkStage(
-      BuildContext ctx,
-      FlowBuildSpec spec,
-      Processor tail,
-      Processor convert,
-      List<Processor> mappingProcessors)
+      BuildContext ctx, FlowBuildSpec spec, Processor tail, List<Processor> failureSources)
       throws FatalAdapterException {
     if (spec.sinkType() == SinkType.FROST) {
       Processor errorSink = ctx.loadProcessor(Fragment.LOG_MESSAGE, null);
       ctx.addProcessor(errorSink);
-      if (convert != null) {
-        ctx.addConnection(convert, errorSink, "failure");
-      }
-      for (Processor mapping : mappingProcessors) {
-        ctx.addConnection(mapping, errorSink, "failure");
+      for (Processor failureSource : failureSources) {
+        ctx.addConnection(failureSource, errorSink, "failure");
       }
       buildFrostFindOrCreate(ctx, spec, tail, errorSink);
     } else {
@@ -366,7 +319,7 @@ public class NifiFlowBuilder {
       bindSinkProperties(sink, spec);
       ctx.addProcessor(sink);
       ctx.addChainConnection(tail, sink);
-      wireErrorSink(ctx, convert, mappingProcessors, sink, spec.sinkType());
+      wireErrorSink(ctx, failureSources, sink, spec.sinkType());
     }
   }
 
