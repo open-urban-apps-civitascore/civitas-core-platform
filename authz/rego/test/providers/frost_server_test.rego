@@ -230,18 +230,6 @@ test_api_host_empty_when_unconfigured if {
 	result == ""
 }
 
-# config_error surfaces a clear operator message when nothing is configured.
-test_config_error_when_unconfigured if {
-	frost_server.config_error with opa.runtime as {"env": {}}
-		with data.backends.frost_server.api_host as ""
-}
-
-# config_error must be undefined once the env var is set.
-test_no_config_error_when_env_set if {
-	not frost_server.config_error with opa.runtime as {"env": {"FROST_API_HOST": "api.env.test"}}
-		with data.backends.frost_server.api_host as ""
-}
-
 # =============================================================================
 # SCOPE ENFORCEMENT TESTS
 # =============================================================================
