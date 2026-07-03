@@ -16,11 +16,13 @@ import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
+import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
+import de.civitascore.configadapter.nifi.flow.stage.SourceCapability;
+import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
-import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
@@ -85,21 +87,16 @@ public class FlowDeploymentPlanner {
     Optional<MappingConfig> mapping = parseMapping(graph);
     Optional<String> sourceCron = parseTriggerCron(graph);
     SinkSpec sink = request.sink();
-    // A FROST sink runs the find-or-create on the raw SensorThings envelope and has no
-    // record-mapping
-    // stage — a configured mapping would be silently ignored. Reject the combination rather than
-    // deploy a flow whose transformation never runs.
-    if (sink.type() == SinkType.FROST && mapping.isPresent()) {
+    SinkStage sinkStage = registry.sink(sink.type());
+    if (mapping.isPresent() && !sinkStage.acceptsMapping()) {
       throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          "a FROST sink does not support a record mapping; the SensorThings envelope from the source"
-              + " is consumed as-is");
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR, sinkStage.mappingRejectionMessage());
     }
     // compile() throws a checked FatalAdapterException (an op may be unrenderable for the sink),
     // which a lambda in Optional.map() cannot propagate — hence the explicit isPresent() branch.
     List<UpdateRecordProperty> mappingProperties =
         mapping.isPresent()
-            ? recordPathCompiler.compile(mapping.get(), geometryEncoding(sink.type()))
+            ? recordPathCompiler.compile(mapping.get(), sinkStage.geometryEncoding())
             : List.of();
 
     Datasource source = request.source();
@@ -108,14 +105,12 @@ public class FlowDeploymentPlanner {
     }
     SourceType sourceType =
         SourceType.fromRaw(source.getType()).orElseThrow(() -> template(source.getType()));
+    SourceStage sourceStage = registry.source(sourceType);
 
-    // Cron schedules the source processor. ConsumeMQTT is push-based (it self-triggers on broker
-    // messages), so a cron there would only throttle the drain, not the data — reject rather than
-    // deploy a misleading schedule. Cron belongs on a pull source (SQL).
-    if (sourceCron.isPresent() && sourceType == SourceType.MQTT) {
+    if (sourceCron.isPresent()
+        && !sourceStage.capabilities().contains(SourceCapability.SUPPORTS_CRON)) {
       throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          "cron scheduling is not supported for push-based MQTT sources");
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR, sourceStage.cronRejectionMessage());
     }
 
     // A SQL source ALWAYS re-reads the whole table on a recurring schedule — an explicit cron, or
@@ -135,8 +130,8 @@ public class FlowDeploymentPlanner {
     }
 
     PlanContext out = new PlanContext();
-    registry.source(sourceType).bind(source, out);
-    registry.sink(sink.type()).bind(request, out);
+    sourceStage.bind(source, out);
+    sinkStage.bind(request, out);
 
     String processGroupName = "pipeline-" + request.pipelineId();
     String snapshot =
@@ -209,13 +204,5 @@ public class FlowDeploymentPlanner {
 
   private static FatalAdapterException template(String combination) {
     return new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, combination);
-  }
-
-  /** The geometry encoding a sink expects: PostGIS parses WKT, FROST expects GeoJSON. */
-  private static GeometryEncoding geometryEncoding(SinkType sinkType) {
-    return switch (sinkType) {
-      case POSTGIS -> GeometryEncoding.WKT;
-      case FROST -> GeometryEncoding.GEOJSON;
-    };
   }
 }

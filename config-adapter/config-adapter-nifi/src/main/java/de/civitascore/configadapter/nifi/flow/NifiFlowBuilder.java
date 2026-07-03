@@ -20,6 +20,8 @@ import de.civitascore.configadapter.nifi.flow.stage.ConvertRecordStage;
 import de.civitascore.configadapter.nifi.flow.stage.Fragment;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
 import de.civitascore.configadapter.nifi.flow.stage.RecordMappingStage;
+import de.civitascore.configadapter.nifi.flow.stage.SinkInput;
+import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.SourceCapability;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
@@ -34,13 +36,12 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Builds a NiFi 2.x flow-snapshot JSON programmatically by composing curated per-component building
- * blocks (one processor/controller-service fragment each) according to the engine-neutral pipeline
- * graph. This is the single place that knows NiFi specifics: the adapter only ever emits known-safe
- * processors (ConsumeMQTT, ConvertRecord, UpdateRecord with RecordPath, PutDatabaseRecord, …) —
- * never scripting or Jolt — so a constrained graph can never smuggle arbitrary processors in. The
- * produced snapshot carries no secrets; sensitive controller-service properties are pushed
- * post-upload.
+ * Builds a NiFi 2.x flow-snapshot JSON by orchestrating the registered stages along the fixed chain
+ * source → [convert] → [mapping...] → sink. All type knowledge lives in the stages; the builder
+ * owns the chain order, the controller-service phase, and the snapshot envelope. Components are
+ * minted exclusively from the curated fragment whitelist (never scripting), so a constrained graph
+ * can never smuggle arbitrary processors in. The produced snapshot carries no secrets; sensitive
+ * controller-service properties are pushed post-upload.
  */
 public class NifiFlowBuilder {
 
@@ -135,9 +136,11 @@ public class NifiFlowBuilder {
     BuildContext ctx =
         new BuildContext(mapper, pgId, spec, processors, controllerServices, connections);
     SourceStage sourceStage = registry.source(spec.sourceType());
+    SinkStage sinkStage = registry.sink(spec.sinkType());
+    requireSourceCapabilities(sourceStage, sinkStage);
 
     // Controller services first — processors reference them by id.
-    addControllerServices(ctx, sourceStage, spec);
+    addControllerServices(ctx, sourceStage, sinkStage);
 
     // Processor chain: source -> [convert] -> [mapping...] -> sink. A mapping may need more than
     // one
@@ -147,23 +150,11 @@ public class NifiFlowBuilder {
     // raw
     // bytes on 'Message'; the SQL source (QueryDatabaseTableRecord) already emits records on
     // 'success', so it is wired straight into the mapping/sink with no convert.
-    boolean sqlSource = spec.sourceType() == SourceType.SQL;
-    boolean frostSink = spec.sinkType() == SinkType.FROST;
-    // The FROST find-or-create works on the SensorThings envelope ($.things/$.observations) that an
-    // MQTT STA source delivers. A SQL source emits plain table records, which SplitJson would never
-    // match — the flow would silently produce nothing. Reject the combination rather than deploy
-    // it.
-    if (frostSink && sqlSource) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          "FROST sink requires an MQTT SensorThings source; a SQL source does not emit the STA"
-              + " envelope");
-    }
     // Common prefix: source -> [convert] -> [mapping...]. The sink stage differs: PostGIS/MQTT is a
     // single terminal processor (linear), FROST is a multi-stage find-or-create sub-flow.
     List<Processor> prefix = new ArrayList<>(sourceStage.build(ctx).chain());
     List<Processor> failureSources = new ArrayList<>();
-    for (TransformStage transform : transformsFor(sourceStage, spec)) {
+    for (TransformStage transform : transformsFor(sourceStage, sinkStage, spec)) {
       StageResult result = transform.build(ctx);
       prefix.addAll(result.chain());
       failureSources.addAll(result.failureSources());
@@ -175,7 +166,7 @@ public class NifiFlowBuilder {
       }
     }
     Processor tail = prefix.get(prefix.size() - 1);
-    registry.sink(spec.sinkType()).build(ctx, tail, failureSources);
+    sinkStage.build(ctx, tail, failureSources);
 
     ObjectNode root = mapper.createObjectNode();
     root.set("flowContents", flow);
@@ -195,13 +186,22 @@ public class NifiFlowBuilder {
    * then the sink DB pool for a PostGIS sink. The order is part of the byte-stable snapshot
    * contract.
    */
-  private void addControllerServices(BuildContext ctx, SourceStage sourceStage, FlowBuildSpec spec)
+  private void addControllerServices(BuildContext ctx, SourceStage sourceStage, SinkStage sinkStage)
       throws FatalAdapterException {
     ctx.addControllerService(Fragment.JSON_TREE_READER, READER);
     ctx.addControllerService(Fragment.JSON_RECORD_SET_WRITER, WRITER);
     sourceStage.registerControllerServices(ctx);
-    if (spec.sinkType() == SinkType.POSTGIS) {
-      registry.sink(spec.sinkType()).registerControllerServices(ctx);
+    sinkStage.registerControllerServices(ctx);
+  }
+
+  /** Rejects a source/sink combination whose declared capabilities do not line up. */
+  private static void requireSourceCapabilities(SourceStage source, SinkStage sink)
+      throws FatalAdapterException {
+    for (Map.Entry<SourceCapability, String> required :
+        sink.requiredSourceCapabilities().entrySet()) {
+      if (!source.capabilities().contains(required.getKey())) {
+        throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, required.getValue());
+      }
     }
   }
 
@@ -213,13 +213,14 @@ public class NifiFlowBuilder {
    * raw JSON envelope (the FROST find-or-create works on SplitJson/EvaluateJsonPath, and a
    * record-based UpdateRecord mapping cannot run in that path: it would re-wrap the envelope).
    */
-  private List<TransformStage> transformsFor(SourceStage source, FlowBuildSpec spec) {
-    boolean rawJsonSink = spec.sinkType() == SinkType.FROST;
+  private List<TransformStage> transformsFor(
+      SourceStage source, SinkStage sink, FlowBuildSpec spec) {
     List<TransformStage> transforms = new ArrayList<>();
-    if (!rawJsonSink && !source.capabilities().contains(SourceCapability.EMITS_RECORDS)) {
+    if (sink.input() == SinkInput.RECORDS
+        && !source.capabilities().contains(SourceCapability.EMITS_RECORDS)) {
       transforms.add(new ConvertRecordStage());
     }
-    if (!rawJsonSink && !spec.mappingProperties().isEmpty()) {
+    if (sink.input() == SinkInput.RECORDS && !spec.mappingProperties().isEmpty()) {
       transforms.add(new RecordMappingStage());
     }
     return transforms;

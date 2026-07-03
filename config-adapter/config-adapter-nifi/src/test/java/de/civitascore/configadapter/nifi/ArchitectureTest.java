@@ -24,9 +24,9 @@ import com.tngtech.archunit.lang.ArchRule;
 class ArchitectureTest {
 
   /**
-   * Security invariant: tenant transforms must be expressible in RecordPath only. No part of the
-   * adapter may pull in Jolt, scripting, or a JVM scripting engine — those are arbitrary-code
-   * vectors Nila Löber's analysis ruled out for 2.0.
+   * Scripting engines are arbitrary-code vectors and stay banned. Jolt is not scripting and the
+   * team has cleared it in principle, but nothing uses it yet — it stays in this rule so
+   * introducing it is a conscious, reviewed decision rather than a drive-by dependency.
    */
   @ArchTest
   static final ArchRule noScriptingOrJolt =
@@ -35,7 +35,21 @@ class ArchitectureTest {
           .dependOnClassesThat()
           .resideInAnyPackage(
               "..jolt..", "..bazaarvoice..", "..groovy..", "javax.script..", "..nashorn..")
-          .because("NiFi flows must use RecordPath only — no Jolt and no in-band scripting");
+          .because(
+              "in-band scripting is banned; Jolt would be a new, deliberate transform decision");
+
+  /**
+   * Stages assemble the flow snapshot; deploying it is the REST client's job. Keeping the stage
+   * layer transport-free preserves the plan/deploy split the DeploymentPlan contract relies on.
+   */
+  @ArchTest
+  static final ArchRule stageLayerIsTransportFree =
+      noClasses()
+          .that()
+          .resideInAPackage("..nifi.flow.stage..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage("..nifi.rest..", "jakarta.ws.rs..");
 
   /** The mapping layer is pure transformation logic — it must not reach into HTTP/REST concerns. */
   @ArchTest
