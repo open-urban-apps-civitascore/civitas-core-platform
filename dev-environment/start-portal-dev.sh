@@ -492,18 +492,41 @@ fi
 
 # Ensure the Flowable saga database exists (config-adapter's embedded engine).
 # PostgreSQL has no "CREATE DATABASE IF NOT EXISTS", so guard with a catalog check.
-# Unlike init scripts (docker-entrypoint-initdb.d, which only run on a fresh volume),
-# this runs on every start — so it also provisions the database on existing volumes
-# created before Flowable was introduced. Idempotent, same spirit as Flyway below.
+# On a fresh volume the database is created race-free by postgres/initdb/; this block
+# covers PRE-EXISTING volumes (created before Flowable was introduced) where the init
+# scripts no longer run. It also retries: pg_isready can report "ready" while the
+# entrypoint is still finishing its bootstrap, so a single CREATE DATABASE may transiently
+# fail — we retry instead of silently warning. Idempotent, same spirit as Flyway below.
 echo "  Ensuring Flowable database exists..."
-if docker exec civitas-postgres-portal psql -U admin -d portal_backend -tAc \
-    "SELECT 1 FROM pg_database WHERE datname='flowable'" 2>/dev/null | grep -q 1; then
-    echo "  Flowable database already present"
-elif docker exec civitas-postgres-portal psql -U admin -d portal_backend -c \
-    "CREATE DATABASE flowable OWNER admin" >/dev/null 2>&1; then
-    echo "  Flowable database created"
-else
-    echo "  WARNING: Could not create Flowable database (config-adapter may fail to start)"
+FLOWABLE_DB_READY=false
+for i in $(seq 1 10); do
+    if docker exec civitas-postgres-portal psql -U admin -d portal_backend -tAc \
+        "SELECT 1 FROM pg_database WHERE datname='flowable'" 2>/dev/null | grep -q 1; then
+        echo "  Flowable database already present"
+        FLOWABLE_DB_READY=true
+        break
+    fi
+    CREATE_OUTPUT=$(docker exec civitas-postgres-portal psql -U admin -d portal_backend -c \
+        "CREATE DATABASE flowable OWNER admin" 2>&1)
+    if echo "$CREATE_OUTPUT" | grep -q "CREATE DATABASE"; then
+        echo "  Flowable database created"
+        FLOWABLE_DB_READY=true
+        break
+    fi
+    # A concurrent creator (init script / another start) may have won the race meanwhile.
+    if echo "$CREATE_OUTPUT" | grep -q "already exists"; then
+        echo "  Flowable database already present"
+        FLOWABLE_DB_READY=true
+        break
+    fi
+    sleep 1
+done
+if [ "$FLOWABLE_DB_READY" = false ]; then
+    echo "  ERROR: Could not create Flowable database after 10 attempts; last psql output:"
+    echo "    $CREATE_OUTPUT"
+    echo "  config-adapter will fail to start — create it manually with:"
+    echo "    docker exec civitas-postgres-portal psql -U admin -d portal_backend -c 'CREATE DATABASE flowable OWNER admin'"
+    exit 1
 fi
 
 echo "  Running database migrations..."

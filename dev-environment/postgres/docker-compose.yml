@@ -19,6 +19,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_portal_data:/var/lib/postgresql/data
+      # Bootstrap the Flowable saga database on a fresh volume (runs after init, race-free).
+      - ./initdb:/docker-entrypoint-initdb.d:ro
     networks:
       - civitas-network
     healthcheck:
