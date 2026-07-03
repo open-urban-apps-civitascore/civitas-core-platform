@@ -16,6 +16,7 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
  * convert or mapping step exists is a structural function of source capabilities, sink input shape,
  * and the compiled mapping — not of a node type.
  */
+@FunctionalInterface
 public interface TransformStage {
 
   /**
