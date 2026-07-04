@@ -28,6 +28,7 @@ import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
 import de.civitascore.configadapter.nifi.flow.stage.StageResult;
 import de.civitascore.configadapter.nifi.flow.stage.TransformStage;
+import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -71,6 +72,8 @@ public class NifiFlowBuilder {
    *     friendly name
    * @param sourceCron the cron (Quartz) schedule for the source processor, or {@code null} to keep
    *     the source fragment's built-in schedule
+   * @param staEnvelope the compiled STA envelope rebuild plan for a mapped FROST sink, or {@code
+   *     null} for every other flow
    */
   public record FlowBuildSpec(
       String processGroupName,
@@ -80,7 +83,8 @@ public class NifiFlowBuilder {
       Map<String, String> sinkProperties,
       List<UpdateRecordProperty> mappingProperties,
       Map<String, Map<String, String>> controllerServiceProperties,
-      String sourceCron) {
+      String sourceCron,
+      FrostEnvelopePlan staEnvelope) {
     public FlowBuildSpec {
       Objects.requireNonNull(processGroupName, "processGroupName");
       Objects.requireNonNull(sourceType, "sourceType");
@@ -93,6 +97,12 @@ public class NifiFlowBuilder {
           Map.copyOf(
               Objects.requireNonNull(controllerServiceProperties, "controllerServiceProperties"));
       // sourceCron is intentionally nullable — most flows keep the fragment's built-in schedule.
+      // The envelope plan exists exactly for a mapped FROST sink; any other carrier is a mis-wired
+      // spec (same discipline as frostProjectId on PipelineDeploymentRequest).
+      if (staEnvelope != null && (sinkType != SinkType.FROST || mappingProperties.isEmpty())) {
+        throw new IllegalArgumentException(
+            "staEnvelope is only valid for a FROST sink with a record mapping");
+      }
     }
   }
 
@@ -220,15 +230,13 @@ public class NifiFlowBuilder {
     // The builder is reachable directly (golden tests), not only through the planner: a compiled
     // mapping heading into a raw-JSON sink without an envelope rebuild would silently vanish
     // inside the envelope — fail the build instead.
-    if (mapped && sink.input() == SinkInput.RAW_JSON) {
+    if (mapped && sink.input() == SinkInput.RAW_JSON && spec.staEnvelope() == null) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           "a record mapping was compiled for a raw-JSON sink but no envelope plan was built");
     }
     List<TransformStage> transforms = new ArrayList<>();
-    boolean recordChain =
-        sink.input() == SinkInput.RECORDS
-            || (mapped && sink.mappingSupport() == MappingSupport.ENVELOPE);
+    boolean recordChain = sink.input() == SinkInput.RECORDS || spec.staEnvelope() != null;
     if (recordChain && !source.capabilities().contains(SourceCapability.EMITS_RECORDS)) {
       transforms.add(new ConvertRecordStage());
     }

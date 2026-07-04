@@ -203,6 +203,7 @@ class NifiDataFlowIT extends AbstractNifiIT {
                         PROJECT_ID),
                     List.of(),
                     Map.of(),
+                    null,
                     null));
     client.deployFlow(new DeploymentPlan(pipelineId, snapshot, Map.of()));
   }

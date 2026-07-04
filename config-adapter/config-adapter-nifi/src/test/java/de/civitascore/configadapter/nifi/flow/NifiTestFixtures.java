@@ -22,9 +22,14 @@ import de.civitascore.configadapter.nifi.flow.stage.PostgisSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.SqlSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
+import de.civitascore.configadapter.nifi.mapping.ConversionOp;
+import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
+import de.civitascore.configadapter.nifi.mapping.StaEnvelopeCompiler;
+import de.civitascore.configadapter.nifi.mapping.ValueNode;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -274,6 +279,7 @@ public final class NifiTestFixtures {
         Map.of(
             "PostGISConnectionPool",
             Map.of("Database Connection URL", "jdbc:postgresql://db:5432/x", "Database User", "u")),
+        null,
         null);
   }
 
@@ -301,7 +307,8 @@ public final class NifiTestFixtures {
                 "Database User", "reader"),
             "PostGISConnectionPool",
             Map.of("Database Connection URL", "jdbc:postgresql://db:5432/x", "Database User", "u")),
-        sourceCron);
+        sourceCron,
+        null);
   }
 
   static FlowBuildSpec frostSink() {
@@ -319,6 +326,42 @@ public final class NifiTestFixtures {
         // the raw JSON).
         List.of(),
         Map.of(),
+        null,
         null);
+  }
+
+  /**
+   * A mapped MQTT→FROST flow: the compiled flat mapping (mixed strategies via the const) plus the
+   * envelope rebuild plan, both produced by the real {@link StaEnvelopeCompiler} so the golden pins
+   * the actual compiler output.
+   */
+  static FlowBuildSpec frostSinkWithMapping() throws Exception {
+    Map<String, ValueNode> fields = new LinkedHashMap<>();
+    fields.put("$.things[].name", new ValueNode.CopyNode("$.station"));
+    fields.put("$.things[].description", new ValueNode.ConstNode("imported station", null));
+    fields.put("$.things[].properties.reference", new ValueNode.CopyNode("$.ref"));
+    fields.put(
+        "$.observations[].result",
+        new ValueNode.ConvertNode(ConversionOp.TO_FLOAT, new ValueNode.CopyNode("$.temp"), null));
+    fields.put("$.observations[].phenomenonTime", new ValueNode.CopyNode("$.ts"));
+    fields.put("$.observations[].parameters.reference", new ValueNode.CopyNode("$.ref"));
+    fields.put("$.observations[].parameters.name", new ValueNode.CopyNode("$.dsName"));
+    StaEnvelopeCompiler.EnvelopeCompilation compilation =
+        new StaEnvelopeCompiler(new RecordPathCompiler())
+            .compile(new MappingConfig(null, null, fields));
+    return new FlowBuildSpec(
+        "pipeline-frost-mapping",
+        SourceType.MQTT,
+        Map.of("Broker URI", "tcp://mosquitto:1883", "Topic Filter", "sensors/+/temp"),
+        SinkType.FROST,
+        Map.of(
+            FrostSinkStage.FROST_BASE_URL,
+            "http://frost:8080/FROST-Server/v1.1",
+            FrostSinkStage.FROST_PROJECT_ID,
+            "7"),
+        compilation.flatProperties(),
+        Map.of(),
+        null,
+        compilation.plan());
   }
 }

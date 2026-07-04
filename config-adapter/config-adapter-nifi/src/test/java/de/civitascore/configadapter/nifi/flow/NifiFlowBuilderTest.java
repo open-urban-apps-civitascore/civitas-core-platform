@@ -257,6 +257,7 @@ class NifiFlowBuilderTest {
                     "7"),
                 List.of(),
                 Map.of(),
+                null,
                 null));
 
     assertTrue(
@@ -292,6 +293,7 @@ class NifiFlowBuilderTest {
             Map.of(FrostSinkStage.FROST_BASE_URL, "http://frost:8080/FROST-Server/v1.1"),
             List.of(),
             Map.of(),
+            null,
             null);
     assertThrows(FatalAdapterException.class, () -> builder.build(spec));
   }
@@ -362,6 +364,7 @@ class NifiFlowBuilderTest {
                 "7"),
             mapping(),
             Map.of(),
+            null,
             null);
     FatalAdapterException ex = assertThrows(FatalAdapterException.class, () -> builder.build(spec));
     assertTrue(
@@ -411,6 +414,7 @@ class NifiFlowBuilderTest {
             Map.of(
                 "SourceConnectionPool",
                 Map.of("Database Connection URL", "jdbc:postgresql://s/in")),
+            null,
             null);
     assertThrows(FatalAdapterException.class, () -> builder.build(spec));
   }
@@ -546,6 +550,73 @@ class NifiFlowBuilderTest {
         "0 15 10 * * ?",
         source.get("schedulingPeriod").asText(),
         "explicit cron node overrides the fragment's default schedule");
+  }
+
+  @Test
+  void buildsFrostEnvelopeRegionForMappedFlow() throws Exception {
+    // A mapped FROST flow rebuilds the record into the STA envelope before the legs: the record
+    // chain (Convert + UpdateRecord) runs, then split $[*] → capture (flat keys) → ReplaceText
+    // (generated template) feeds both find-or-create legs.
+    JsonNode flow = build(NifiTestFixtures.frostSinkWithMapping());
+
+    // throws if absent: the MQTT payload must be converted to records for the mapping
+    component(flow, "processors", "ConvertRecord");
+    JsonNode update = component(flow, "processors", "UpdateRecord");
+    assertEquals(
+        "/station",
+        update.get("properties").get("/sta_0_name").asText(),
+        "mapping writes the flat intermediate fields");
+
+    JsonNode split = componentByProperty(flow, "SplitJson", "JsonPath Expression", "$[*]");
+    assertTrue(split != null, "record-writer array must be split into single records");
+    JsonNode capture = componentByProperty(flow, "EvaluateJsonPath", "sta_0_name", "$.sta_0_name");
+    assertTrue(capture != null, "flat fields must be captured into attributes");
+    assertTrue(
+        hasProcessor(flow, "ReplaceText", "Replacement Value", "\"things\":[{\"name\":"),
+        "content must be replaced with the generated envelope template");
+
+    // the envelope rebuild feeds BOTH legs — their splits consume from the ReplaceText
+    JsonNode thingSplit = componentByProperty(flow, "SplitJson", "JsonPath Expression", "$.things");
+    JsonNode obsSplit =
+        componentByProperty(flow, "SplitJson", "JsonPath Expression", "$.observations");
+    JsonNode envelope = null;
+    for (JsonNode c : flow.get("flowContents").get("processors")) {
+      if (c.path("type").asText().endsWith("ReplaceText")
+          && c.path("properties").path("Replacement Value").asText().startsWith("{\"things\"")) {
+        envelope = c;
+      }
+    }
+    assertTrue(envelope != null, "envelope ReplaceText must exist");
+    assertTrue(
+        hasConnection(
+            flow,
+            envelope.get("identifier").asText(),
+            thingSplit.get("identifier").asText(),
+            "success"),
+        "Thing leg consumes the rebuilt envelope");
+    assertTrue(
+        hasConnection(
+            flow,
+            envelope.get("identifier").asText(),
+            obsSplit.get("identifier").asText(),
+            "success"),
+        "Observation leg consumes the rebuilt envelope");
+  }
+
+  @Test
+  void routesFrostEnvelopeRegionFailuresToLogSink() throws Exception {
+    // No silent drop in the rebuild region: staRecordSplit/staCapture/staEnvelope route 'failure'
+    // to the error sink.
+    JsonNode flow = build(NifiTestFixtures.frostSinkWithMapping());
+    String logId = component(flow, "processors", "LogMessage").get("identifier").asText();
+    JsonNode split = componentByProperty(flow, "SplitJson", "JsonPath Expression", "$[*]");
+    JsonNode capture = componentByProperty(flow, "EvaluateJsonPath", "sta_0_name", "$.sta_0_name");
+    for (JsonNode processor : List.of(split, capture)) {
+      assertFalse(autoTerminates(processor, "failure"), "must not auto-terminate failure");
+      assertTrue(
+          hasConnection(flow, processor.get("identifier").asText(), logId, "failure"),
+          "envelope-region failure must route to the log sink");
+    }
   }
 
   @Test

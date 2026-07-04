@@ -78,6 +78,11 @@ class FlowSnapshotGoldenTest {
     verifyBuilder("builder-mqtt-frost", frostSink());
   }
 
+  @Test
+  void builderMqttToFrostWithMapping() throws Exception {
+    verifyBuilder("builder-mqtt-frost-mapping", NifiTestFixtures.frostSinkWithMapping());
+  }
+
   // ── planner level: PipelineDeploymentRequest → plan (snapshot + sensitive map) ──
 
   @Test

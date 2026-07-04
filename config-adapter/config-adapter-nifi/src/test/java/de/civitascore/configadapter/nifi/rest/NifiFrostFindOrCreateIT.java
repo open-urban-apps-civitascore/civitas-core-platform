@@ -211,6 +211,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                         String.valueOf(projectId)),
                     List.of(),
                     Map.of(),
+                    null,
                     null));
     client.deployFlow(new DeploymentPlan("pipeline-frost-it", snapshot, Map.of()));
 
@@ -266,6 +267,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                         String.valueOf(projectId)),
                     List.of(),
                     Map.of(),
+                    null,
                     null));
     client.deployFlow(new DeploymentPlan("pipeline-frost-obs-it", snapshot, Map.of()));
 
@@ -318,6 +320,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                         String.valueOf(projectId)),
                     List.of(),
                     Map.of(),
+                    null,
                     null));
     client.deployFlow(new DeploymentPlan("pipeline-frost-nods-it", snapshot, Map.of()));
 

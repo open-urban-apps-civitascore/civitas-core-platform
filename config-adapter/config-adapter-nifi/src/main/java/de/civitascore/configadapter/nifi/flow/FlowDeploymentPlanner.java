@@ -145,7 +145,8 @@ public class FlowDeploymentPlanner {
                 out.sinkProperties(),
                 mappingProperties,
                 out.controllerServiceProperties(),
-                sourceCron.orElse(null)));
+                sourceCron.orElse(null),
+                null));
 
     return new DeploymentPlan(processGroupName, snapshot, Map.copyOf(out.sensitive()));
   }

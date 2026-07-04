@@ -16,6 +16,7 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.SinkType;
+import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import java.util.List;
 import java.util.Map;
@@ -149,8 +150,46 @@ public final class FrostSinkStage implements SinkStage {
     // project-scoped named API; Observations stay at the root — their scope flows through the
     // resolved Datastream (whose lookup is project-filtered below).
     String thingBase = base + "/Projects(" + projectId + ")";
-    buildThingLeg(ctx, thingBase, upstreamTail, errorSink);
-    buildObservationLeg(ctx, base, projectId, upstreamTail, errorSink);
+    Processor upstream = buildEnvelopeRegion(ctx, upstreamTail, errorSink);
+    buildThingLeg(ctx, thingBase, upstream, errorSink);
+    buildObservationLeg(ctx, base, projectId, upstream, errorSink);
+  }
+
+  /**
+   * The envelope-rebuild pre-region for a mapped flow: split the record-writer array into single
+   * records ({@code $[*]} — the JsonRecordSetWriter always writes an array, and a SQL source
+   * delivers many records per FlowFile; this is also what enforces 1 record = 1 STA element),
+   * capture the flat mapped fields into FlowFile attributes, and ReplaceText the content with the
+   * generated envelope template so the unchanged find-or-create legs consume their usual shape. A
+   * passthrough flow (no mapping) returns {@code upstreamTail} untouched — that path stays
+   * byte-identical.
+   */
+  private Processor buildEnvelopeRegion(
+      BuildContext ctx, Processor upstreamTail, Processor errorSink) throws FatalAdapterException {
+    FrostEnvelopePlan plan = ctx.spec().staEnvelope();
+    if (plan == null) {
+      return upstreamTail;
+    }
+    Processor split = ctx.loadProcessor(Fragment.SPLIT_JSON, "split", "staRecordSplit");
+    setProp(split, "JsonPath Expression", "$[*]");
+    Processor capture = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", "staCapture");
+    for (String key : plan.flatKeys()) {
+      setProp(capture, key, "$." + key);
+    }
+    Processor envelope = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "staEnvelope");
+    setProp(envelope, "Replacement Value", plan.template());
+
+    ctx.addProcessor(split);
+    ctx.addProcessor(capture);
+    ctx.addProcessor(envelope);
+    ctx.addChainConnection(upstreamTail, split);
+    ctx.addChainConnection(split, capture);
+    ctx.addChainConnection(capture, envelope);
+    // A record that fails to split, capture or rebuild must be logged, never dropped silently.
+    ctx.routeFailure(split, errorSink);
+    ctx.routeFailure(capture, errorSink);
+    ctx.routeFailure(envelope, errorSink);
+    return envelope;
   }
 
   /** Things leg: find by reference, POST only when absent (idempotent create). */
