@@ -65,7 +65,7 @@ public final class FrostSinkStage implements SinkStage {
   }
 
   @Override
-  public Map<SourceCapability, String> requiredSourceCapabilities() {
+  public Map<SourceCapability, String> requiredSourceCapabilities(boolean mappingPresent) {
     // The find-or-create works on the SensorThings envelope ($.things/$.observations). A source
     // emitting plain records (e.g. SQL table rows) would never match SplitJson — the flow would
     // silently produce nothing. Reject the combination rather than deploy it.

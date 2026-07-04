@@ -52,7 +52,7 @@ public final class PostgisSinkStage implements SinkStage {
   }
 
   @Override
-  public Map<SourceCapability, String> requiredSourceCapabilities() {
+  public Map<SourceCapability, String> requiredSourceCapabilities(boolean mappingPresent) {
     return Map.of();
   }
 

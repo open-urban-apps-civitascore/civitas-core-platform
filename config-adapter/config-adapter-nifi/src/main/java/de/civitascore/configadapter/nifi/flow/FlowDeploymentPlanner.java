@@ -15,6 +15,7 @@ import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.MappingSupport;
 import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
 import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.SourceCapability;
@@ -88,7 +89,7 @@ public class FlowDeploymentPlanner {
     Optional<String> sourceCron = parseTriggerCron(graph);
     SinkSpec sink = request.sink();
     SinkStage sinkStage = registry.sink(sink.type());
-    if (mapping.isPresent() && !sinkStage.acceptsMapping()) {
+    if (mapping.isPresent() && sinkStage.mappingSupport() == MappingSupport.NONE) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR, sinkStage.mappingRejectionMessage());
     }

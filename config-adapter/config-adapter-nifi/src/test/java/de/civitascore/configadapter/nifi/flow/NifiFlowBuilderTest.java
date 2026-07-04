@@ -345,12 +345,10 @@ class NifiFlowBuilderTest {
   }
 
   @Test
-  void frostSinkDefensivelyDropsRecordMapping() throws Exception {
-    // Defensive low-level behavior: a record-based UpdateRecord cannot run in the raw-JSON
-    // find-or-create path, so the builder builds none even if mapping properties are passed. In
-    // production this combination never reaches the builder — FlowDeploymentPlanner rejects a FROST
-    // sink with a configured mapping (see frostSinkWithMappingIsRejected) — so the mapping is never
-    // silently honored end-to-end.
+  void frostSinkWithMappingButNoEnvelopePlanIsRejected() {
+    // The builder is reachable directly (not only through the planner): a compiled mapping heading
+    // into the raw-JSON find-or-create without an envelope rebuild would silently vanish inside
+    // the envelope — the build must fail instead of dropping the transformation.
     FlowBuildSpec spec =
         new FlowBuildSpec(
             "pipeline-frost-map",
@@ -365,12 +363,10 @@ class NifiFlowBuilderTest {
             mapping(),
             Map.of(),
             null);
-    JsonNode flow = build(spec);
-    for (JsonNode processor : flow.get("flowContents").get("processors")) {
-      assertFalse(
-          processor.path("type").asText().endsWith("UpdateRecord"),
-          "FROST find-or-create must not build a record-mapping processor");
-    }
+    FatalAdapterException ex = assertThrows(FatalAdapterException.class, () -> builder.build(spec));
+    assertTrue(
+        ex.getMessage()
+            .contains("a record mapping was compiled for a raw-JSON sink but no envelope plan"));
   }
 
   @Test

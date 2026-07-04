@@ -67,7 +67,7 @@ class StageRegistryTest {
       }
 
       @Override
-      public Map<SourceCapability, String> requiredSourceCapabilities() {
+      public Map<SourceCapability, String> requiredSourceCapabilities(boolean mappingPresent) {
         return Map.of();
       }
 

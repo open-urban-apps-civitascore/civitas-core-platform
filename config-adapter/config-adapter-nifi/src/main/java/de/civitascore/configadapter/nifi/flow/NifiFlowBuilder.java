@@ -18,6 +18,7 @@ import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.flow.stage.BuildContext;
 import de.civitascore.configadapter.nifi.flow.stage.ConvertRecordStage;
 import de.civitascore.configadapter.nifi.flow.stage.Fragment;
+import de.civitascore.configadapter.nifi.flow.stage.MappingSupport;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
 import de.civitascore.configadapter.nifi.flow.stage.RecordMappingStage;
 import de.civitascore.configadapter.nifi.flow.stage.SinkInput;
@@ -137,7 +138,7 @@ public class NifiFlowBuilder {
         new BuildContext(mapper, pgId, spec, processors, controllerServices, connections);
     SourceStage sourceStage = registry.source(spec.sourceType());
     SinkStage sinkStage = registry.sink(spec.sinkType());
-    requireSourceCapabilities(sourceStage, sinkStage);
+    requireSourceCapabilities(sourceStage, sinkStage, !spec.mappingProperties().isEmpty());
 
     // Controller services first — processors reference them by id.
     addControllerServices(ctx, sourceStage, sinkStage);
@@ -195,10 +196,10 @@ public class NifiFlowBuilder {
   }
 
   /** Rejects a source/sink combination whose declared capabilities do not line up. */
-  private static void requireSourceCapabilities(SourceStage source, SinkStage sink)
-      throws FatalAdapterException {
+  private static void requireSourceCapabilities(
+      SourceStage source, SinkStage sink, boolean mappingPresent) throws FatalAdapterException {
     for (Map.Entry<SourceCapability, String> required :
-        sink.requiredSourceCapabilities().entrySet()) {
+        sink.requiredSourceCapabilities(mappingPresent).entrySet()) {
       if (!source.capabilities().contains(required.getKey())) {
         throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, required.getValue());
       }
@@ -208,19 +209,30 @@ public class NifiFlowBuilder {
   // ─── Transforms ─────────────────────────────────────────────────────────────
 
   /**
-   * The transforms between source and sink, derived structurally. ConvertRecord turns a raw source
-   * payload into records — skipped when the source already emits records or the sink consumes the
-   * raw JSON envelope (the FROST find-or-create works on SplitJson/EvaluateJsonPath, and a
-   * record-based UpdateRecord mapping cannot run in that path: it would re-wrap the envelope).
+   * The transforms between source and sink, derived structurally. The record chain (ConvertRecord
+   * when the source does not already emit records, then the mapping) runs for a records sink — and
+   * also for a raw-JSON sink in {@link MappingSupport#ENVELOPE} mode, whose sink-owned pre-region
+   * rebuilds the mapped records into its envelope.
    */
-  private List<TransformStage> transformsFor(
-      SourceStage source, SinkStage sink, FlowBuildSpec spec) {
+  private List<TransformStage> transformsFor(SourceStage source, SinkStage sink, FlowBuildSpec spec)
+      throws FatalAdapterException {
+    boolean mapped = !spec.mappingProperties().isEmpty();
+    // The builder is reachable directly (golden tests), not only through the planner: a compiled
+    // mapping heading into a raw-JSON sink without an envelope rebuild would silently vanish
+    // inside the envelope — fail the build instead.
+    if (mapped && sink.input() == SinkInput.RAW_JSON) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "a record mapping was compiled for a raw-JSON sink but no envelope plan was built");
+    }
     List<TransformStage> transforms = new ArrayList<>();
-    if (sink.input() == SinkInput.RECORDS
-        && !source.capabilities().contains(SourceCapability.EMITS_RECORDS)) {
+    boolean recordChain =
+        sink.input() == SinkInput.RECORDS
+            || (mapped && sink.mappingSupport() == MappingSupport.ENVELOPE);
+    if (recordChain && !source.capabilities().contains(SourceCapability.EMITS_RECORDS)) {
       transforms.add(new ConvertRecordStage());
     }
-    if (sink.input() == SinkInput.RECORDS && !spec.mappingProperties().isEmpty()) {
+    if (mapped) {
       transforms.add(new RecordMappingStage());
     }
     return transforms;

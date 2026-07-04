@@ -31,20 +31,24 @@ public interface SinkStage {
 
   /**
    * Capabilities the source must declare for this sink to work, each with the exact rejection
-   * message thrown when it is missing.
+   * message thrown when it is missing. A requirement may depend on whether the graph carries a
+   * record mapping — a mapping can synthesize a payload shape the source alone would have to emit.
+   *
+   * @param mappingPresent whether the pipeline graph carries a record mapping
    */
-  Map<SourceCapability, String> requiredSourceCapabilities();
+  Map<SourceCapability, String> requiredSourceCapabilities(boolean mappingPresent);
 
   /** The geometry encoding the mapping compiler must emit for this sink's target format. */
   GeometryEncoding geometryEncoding();
 
-  /** Whether a record mapping may run in front of this sink. */
-  default boolean acceptsMapping() {
-    return input() == SinkInput.RECORDS;
+  /** How a record mapping may run in front of this sink. */
+  default MappingSupport mappingSupport() {
+    return input() == SinkInput.RECORDS ? MappingSupport.RECORD_PATH : MappingSupport.NONE;
   }
 
   /**
-   * The rejection message when the graph carries a mapping but {@link #acceptsMapping} is false.
+   * The rejection message when the graph carries a mapping but {@link #mappingSupport} is {@link
+   * MappingSupport#NONE}.
    */
   default String mappingRejectionMessage() {
     return "sink does not support a record mapping";
