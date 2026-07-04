@@ -329,7 +329,9 @@ public class DataSetSagaPublisher {
 
     for (UUID id : previousIds) {
       if (!currentMap.containsKey(id)) {
-        result.add(new DataPipeline(id.toString(), "0", PipelineAction.DELETE.name(), null));
+        result.add(
+            new DataPipeline(
+                id.toString(), "0", PipelineAction.DELETE.name(), null, List.of(), List.of()));
       }
     }
 
@@ -404,7 +406,13 @@ public class DataSetSagaPublisher {
         // inline mappingConfig) and is forwarded to the config-adapter as-is (the engine-neutral
         // contract / intermediate representation). The config-adapter (NiFi) is the only place
         // engine specifics appear.
-        pipeline.getModel());
+        pipeline.getModel(),
+        // Sorted so the payload is deterministic — the entity relations are unordered sets.
+        pipeline.getDataSources().stream().map(ds -> ds.getId().toString()).sorted().toList(),
+        dataSinkRepository.findByPipelineId(pipeline.getId()).stream()
+            .map(sink -> sink.getId().toString())
+            .sorted()
+            .toList());
   }
 
   /**
