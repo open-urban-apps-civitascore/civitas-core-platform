@@ -11,8 +11,9 @@ package de.civitascore.configadapter.nifi.flow.stage;
 
 /**
  * The payload shape a sink consumes. Drives the convert and record-mapping decisions structurally:
- * a {@code RAW_JSON} sink suppresses both, a {@code RECORDS} sink gets a ConvertRecord step
- * whenever the source does not already emit records.
+ * a {@code RECORDS} sink gets a ConvertRecord step whenever the source does not already emit
+ * records; a {@code RAW_JSON} sink suppresses the record chain unless a mapping with an envelope
+ * rebuild plan ({@link MappingSupport#ENVELOPE}) pulls it in.
  */
 public enum SinkInput {
   RECORDS,

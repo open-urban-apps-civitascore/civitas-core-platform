@@ -36,9 +36,10 @@ import java.util.Optional;
 
 /**
  * Turns one resolved pipeline (graph + source + sink) into a {@link DeploymentPlan}: it compiles
- * the mapping to RecordPath, resolves the source/sink processor properties, decrypts secrets
- * (collected separately for a post-upload REST push), and delegates the NiFi flow assembly to
- * {@link NifiFlowBuilder} (programmatic composition of building blocks per the graph).
+ * the mapping to RecordPath (directly for a records sink, or via the STA envelope compiler for a
+ * mapped FROST sink), resolves the source/sink processor properties, decrypts secrets (collected
+ * separately for a post-upload REST push), and delegates the NiFi flow assembly to {@link
+ * NifiFlowBuilder} (programmatic composition of building blocks per the graph).
  */
 public class FlowDeploymentPlanner {
 

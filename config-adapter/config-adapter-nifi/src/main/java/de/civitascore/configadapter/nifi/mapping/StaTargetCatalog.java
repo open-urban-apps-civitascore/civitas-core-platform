@@ -22,6 +22,25 @@ import java.util.stream.Collectors;
  */
 public final class StaTargetCatalog {
 
+  private static final List<StaTarget> TARGETS =
+      List.of(
+          new StaTarget("$.things[].name", StaGroup.THINGS, StaJsonType.STRING, true),
+          new StaTarget("$.things[].description", StaGroup.THINGS, StaJsonType.STRING, true),
+          new StaTarget(
+              "$.things[].properties.reference", StaGroup.THINGS, StaJsonType.STRING, true),
+          new StaTarget("$.observations[].result", StaGroup.OBSERVATIONS, StaJsonType.ANY, true),
+          new StaTarget(
+              "$.observations[].phenomenonTime", StaGroup.OBSERVATIONS, StaJsonType.STRING, false),
+          new StaTarget(
+              "$.observations[].resultTime", StaGroup.OBSERVATIONS, StaJsonType.STRING, false),
+          new StaTarget(
+              "$.observations[].parameters.reference",
+              StaGroup.OBSERVATIONS,
+              StaJsonType.STRING,
+              true),
+          new StaTarget(
+              "$.observations[].parameters.name", StaGroup.OBSERVATIONS, StaJsonType.STRING, true));
+
   /** The two envelope groups; each mapped record contributes one element per mapped group. */
   public enum StaGroup {
     THINGS("$.things[]", "things"),
@@ -73,25 +92,6 @@ public final class StaTargetCatalog {
       return path.substring(group.pathPrefix().length() + 1);
     }
   }
-
-  private static final List<StaTarget> TARGETS =
-      List.of(
-          new StaTarget("$.things[].name", StaGroup.THINGS, StaJsonType.STRING, true),
-          new StaTarget("$.things[].description", StaGroup.THINGS, StaJsonType.STRING, true),
-          new StaTarget(
-              "$.things[].properties.reference", StaGroup.THINGS, StaJsonType.STRING, true),
-          new StaTarget("$.observations[].result", StaGroup.OBSERVATIONS, StaJsonType.ANY, true),
-          new StaTarget(
-              "$.observations[].phenomenonTime", StaGroup.OBSERVATIONS, StaJsonType.STRING, false),
-          new StaTarget(
-              "$.observations[].resultTime", StaGroup.OBSERVATIONS, StaJsonType.STRING, false),
-          new StaTarget(
-              "$.observations[].parameters.reference",
-              StaGroup.OBSERVATIONS,
-              StaJsonType.STRING,
-              true),
-          new StaTarget(
-              "$.observations[].parameters.name", StaGroup.OBSERVATIONS, StaJsonType.STRING, true));
 
   private StaTargetCatalog() {}
 

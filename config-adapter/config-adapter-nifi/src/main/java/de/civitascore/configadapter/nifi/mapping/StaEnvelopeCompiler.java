@@ -20,6 +20,7 @@ import de.civitascore.configadapter.nifi.mapping.ValueNode.ConvertNode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -41,6 +42,11 @@ import java.util.stream.Collectors;
  */
 public class StaEnvelopeCompiler {
 
+  /** Flat keys must be valid as RecordPath/Avro field, JsonPath segment, attribute and EL ref. */
+  private static final int MAX_LEAF_LENGTH = 40;
+
+  private final RecordPathCompiler recordPathCompiler;
+
   /**
    * The two halves of one compilation: the flat mapping properties (for the UpdateRecord chain) and
    * the envelope plan (for the sink's rebuild region).
@@ -51,11 +57,6 @@ public class StaEnvelopeCompiler {
       flatProperties = List.copyOf(flatProperties);
     }
   }
-
-  /** Flat keys must be valid as RecordPath/Avro field, JsonPath segment, attribute and EL ref. */
-  private static final int MAX_LEAF_LENGTH = 40;
-
-  private final RecordPathCompiler recordPathCompiler;
 
   public StaEnvelopeCompiler(RecordPathCompiler recordPathCompiler) {
     this.recordPathCompiler = recordPathCompiler;
@@ -78,7 +79,8 @@ public class StaEnvelopeCompiler {
     Map<String, String> flatKeyByPath = new LinkedHashMap<>();
     int index = 0;
     for (String path : mapping.fields().keySet()) {
-      flatKeyByPath.put(path, "sta_" + index++ + "_" + leafOf(path));
+      flatKeyByPath.put(path, "sta_" + index + "_" + leafOf(path));
+      index++;
     }
 
     List<UpdateRecordProperty> flatProperties = new ArrayList<>();
@@ -273,7 +275,9 @@ public class StaEnvelopeCompiler {
    */
   private static String leafOf(String path) {
     String leaf =
-        path.substring(path.lastIndexOf('.') + 1).toLowerCase().replaceAll("[^a-z0-9_]", "");
+        path.substring(path.lastIndexOf('.') + 1)
+            .toLowerCase(Locale.ROOT)
+            .replaceAll("[^a-z0-9_]", "");
     return leaf.length() > MAX_LEAF_LENGTH ? leaf.substring(0, MAX_LEAF_LENGTH) : leaf;
   }
 
