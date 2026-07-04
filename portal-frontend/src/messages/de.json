@@ -1238,8 +1238,9 @@
         "cronMqttIncompatible": "Ein CRON-Trigger kann nicht mit einer MQTT-Datenquelle verwendet werden. Bitte eine SQL-Quelle (Pull) verwenden.",
         "cronSourceConnectorUnknown": "Der Quell-Konnektor konnte nicht ermittelt werden; ein CRON-Trigger funktioniert nur mit einer SQL-Quelle (Pull), nicht mit MQTT.",
         "sqlSourceNoScheduleDefaultPoll": "Diese SQL-Quelle hat keinen CRON-Knoten und pollt im Standardintervall (alle 5 Minuten). Für einen expliziten Zeitplan bitte einen CRON-Knoten hinzufügen.",
-        "frostSinkNoMapping": "Ein FROST-Speicher übernimmt die Quelldaten unverändert und unterstützt kein Feld-Mapping — bitte den Mapping-Knoten entfernen.",
-        "sqlSourceToFrost": "Eine SQL-Quelle kann nicht in einen FROST-Speicher schreiben; FROST benötigt eine SensorThings-Quelle (MQTT).",
+        "sqlSourceToFrost": "Eine SQL-Quelle kann nur über ein Feld-Mapping in einen FROST-Speicher schreiben — bitte einen Mapping-Knoten hinzufügen oder eine SensorThings-Quelle (MQTT) verwenden.",
+        "frostMappingNoStaElement": "{label} muss mindestens ein SensorThings-Element abbilden ($.things[] oder $.observations[])",
+        "frostMappingGroupIncomplete": "{label} bildet {group} ab, aber es fehlen Pflichtfelder: {fields}",
         "nodeNotWired": "{label} muss mit einer eingehenden und einer ausgehenden Kante verbunden sein",
         "mappingRequiredFieldsMissing": "{label} weist nicht alle Pflicht-Zielfelder zu: {fields}",
         "mappingNotSaved": "{label} hat kein gespeichertes Feld-Mapping — bitte den Mapping-Editor öffnen und speichern"
