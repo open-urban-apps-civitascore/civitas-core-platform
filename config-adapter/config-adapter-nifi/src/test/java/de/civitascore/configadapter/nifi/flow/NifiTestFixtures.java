@@ -234,6 +234,57 @@ public final class NifiTestFixtures {
             .formatted(sinkType));
   }
 
+  /** Two chained mapping nodes in front of a PostGIS sink (rename, then derive). */
+  static Map<String, Object> graphWithChainedMappings() throws Exception {
+    return map(
+        """
+        {
+          "nodes": [
+            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
+            { "id": "n-map1", "type": "mapping", "data": { "mappingConfig": {
+                "fields": { "$.station_id": "$.id", "$.temperature": "$.temp" } } } },
+            { "id": "n-map2", "type": "mapping", "data": { "mappingConfig": {
+                "fields": { "$.unit": { "op": "const", "value": "celsius" } } } } },
+            { "id": "n-sink", "type": "geoPersistence", "data": { "entityId": "sink-1" } }
+          ],
+          "edges": [
+            { "id": "e1", "source": "n-src", "target": "n-map1" },
+            { "id": "e2", "source": "n-map1", "target": "n-map2" },
+            { "id": "e3", "source": "n-map2", "target": "n-sink" }
+          ]
+        }
+        """);
+  }
+
+  /**
+   * Two chained mapping nodes in front of a FROST sink: the first is a plain record transform, the
+   * LAST carries the STA envelope target paths.
+   */
+  static Map<String, Object> graphWithChainedFrostMappings() throws Exception {
+    return map(
+        """
+        {
+          "nodes": [
+            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
+            { "id": "n-map1", "type": "mapping", "data": { "mappingConfig": {
+                "fields": { "$.station": "$.station_raw", "$.ref": "$.ref_raw" } } } },
+            { "id": "n-map2", "type": "mapping", "data": { "mappingConfig": {
+                "fields": {
+                  "$.things[].name": "$.station",
+                  "$.things[].description": { "op": "const", "value": "imported station" },
+                  "$.things[].properties.reference": "$.ref"
+                } } } },
+            { "id": "n-sink", "type": "frost", "data": { "entityId": "sink-1" } }
+          ],
+          "edges": [
+            { "id": "e1", "source": "n-src", "target": "n-map1" },
+            { "id": "e2", "source": "n-map1", "target": "n-map2" },
+            { "id": "e3", "source": "n-map2", "target": "n-sink" }
+          ]
+        }
+        """);
+  }
+
   /** A full chain with the cron trigger wired in front of the source. */
   static Map<String, Object> graphWithCron(String cronExpression) throws Exception {
     return map(

@@ -215,6 +215,42 @@ class FlowSnapshotGoldenTest {
   }
 
   @Test
+  void plannerSqlToPostgisWithChainedMappings() throws Exception {
+    // Two mapping nodes materialize as two UpdateRecord chains in flow order; the second node's
+    // processor ids carry the chain-index discriminator while the first keeps the pre-chain ids.
+    byte[] key = stretchedKey();
+    try (CredentialResolver resolver = new CredentialResolver(key)) {
+      DeploymentPlan plan =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "golden-sql-chained",
+                      NifiTestFixtures.graphWithChainedMappings(),
+                      sqlSource(enc(key)),
+                      postgisSinkWithPk()));
+      verify("planner-sql-postgis-chained", plan.snapshotJson());
+    }
+  }
+
+  @Test
+  void plannerMqttToFrostWithChainedMappings() throws Exception {
+    // The last mapping before the FROST sink carries the STA target paths (envelope compilation);
+    // the first stays a plain record transform in front of it.
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      DeploymentPlan plan =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "golden-frost-chained",
+                      NifiTestFixtures.graphWithChainedFrostMappings(),
+                      mqttSource(null),
+                      new SinkSpec(SinkType.FROST, null),
+                      "7"));
+      verify("planner-mqtt-frost-chained", plan.snapshotJson());
+    }
+  }
+
+  @Test
   void plannerMqttToPostgisWithGeoPoint() throws Exception {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       DeploymentPlan plan =
