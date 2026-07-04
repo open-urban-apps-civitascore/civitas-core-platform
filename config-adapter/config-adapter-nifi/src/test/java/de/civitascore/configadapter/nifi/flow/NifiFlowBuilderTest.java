@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.nifi.flow;
 
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.compiled;
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.frostSink;
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.mapping;
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.mqttToPostgis;
@@ -23,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.stage.FrostSinkStage;
+import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -347,6 +349,42 @@ class NifiFlowBuilderTest {
   }
 
   @Test
+  void chainedMappingsMaterializePerNodeWithStableFirstIds() throws Exception {
+    FlowBuildSpec single = mqttToPostgis(mapping());
+    FlowBuildSpec chained =
+        new FlowBuildSpec(
+            single.processGroupName(),
+            single.sourceType(),
+            single.sourceProperties(),
+            single.sinkType(),
+            single.sinkProperties(),
+            List.of(new CompiledMapping(mapping()), new CompiledMapping(mapping())),
+            single.controllerServiceProperties(),
+            null,
+            null);
+
+    List<String> singleIds = updateRecordIds(build(single));
+    List<String> chainedIds = updateRecordIds(build(chained));
+
+    assertEquals(1, singleIds.size());
+    assertEquals(2, chainedIds.size());
+    // The first chain position keeps the pre-chain discriminator, so existing single-mapping
+    // flows map back to the same NiFi component across the upgrade (redeploy idempotency).
+    assertEquals(singleIds.get(0), chainedIds.get(0));
+    assertFalse(chainedIds.get(0).equals(chainedIds.get(1)));
+  }
+
+  private List<String> updateRecordIds(JsonNode flow) {
+    List<String> ids = new java.util.ArrayList<>();
+    for (JsonNode c : flow.get("flowContents").get("processors")) {
+      if (c.path("type").asText().endsWith("UpdateRecord")) {
+        ids.add(c.get("identifier").asText());
+      }
+    }
+    return ids;
+  }
+
+  @Test
   void frostSinkWithMappingButNoEnvelopePlanIsRejected() {
     // The builder is reachable directly (not only through the planner): a compiled mapping heading
     // into the raw-JSON find-or-create without an envelope rebuild would silently vanish inside
@@ -362,7 +400,7 @@ class NifiFlowBuilderTest {
                 "http://frost:8080/x",
                 FrostSinkStage.FROST_PROJECT_ID,
                 "7"),
-            mapping(),
+            compiled(mapping()),
             Map.of(),
             null,
             null);

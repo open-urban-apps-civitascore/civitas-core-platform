@@ -11,6 +11,7 @@ package de.civitascore.configadapter.nifi.flow.stage;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.ReplacementStrategy;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import java.util.ArrayList;
@@ -19,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The compiled record mapping as a chain of {@code UpdateRecord} processors — one per
+ * One mapping node's compiled unit as a chain of {@code UpdateRecord} processors — one per
  * replacement-value strategy, in first-seen order. NiFi allows a single strategy per processor, so
  * a mapping that mixes {@code const} (literal-value) with copies/concats (record-path-value) is
  * split across processors chained in sequence.
@@ -28,16 +29,35 @@ public final class RecordMappingStage implements TransformStage {
 
   private static final String STRATEGY_PROPERTY = "Replacement Value Strategy";
 
+  private final CompiledMapping mapping;
+  private final int chainIndex;
+
+  /**
+   * Creates the stage for one mapping node.
+   *
+   * @param mapping the node's compiled unit
+   * @param chainIndex the node's position in the mapping chain; part of the deterministic
+   *     processor-id seed for every chain position after the first, so a redeploy maps each
+   *     UpdateRecord back to the same NiFi component. The first position stays discriminated by
+   *     strategy alone — the pre-chain id scheme — so existing single-mapping flows keep their
+   *     component ids across the upgrade.
+   */
+  public RecordMappingStage(CompiledMapping mapping, int chainIndex) {
+    this.mapping = mapping;
+    this.chainIndex = chainIndex;
+  }
+
   @Override
   public StageResult build(BuildContext ctx) throws FatalAdapterException {
     Map<ReplacementStrategy, List<UpdateRecordProperty>> byStrategy = new LinkedHashMap<>();
-    for (UpdateRecordProperty property : ctx.spec().mappingProperties()) {
+    for (UpdateRecordProperty property : mapping.properties()) {
       byStrategy.computeIfAbsent(property.strategy(), k -> new ArrayList<>()).add(property);
     }
     List<Processor> result = new ArrayList<>();
     for (Map.Entry<ReplacementStrategy, List<UpdateRecordProperty>> group : byStrategy.entrySet()) {
-      Processor processor =
-          ctx.loadProcessor(Fragment.UPDATE_RECORD, "success", group.getKey().name());
+      String discriminator =
+          chainIndex == 0 ? group.getKey().name() : group.getKey().name() + ":" + chainIndex;
+      Processor processor = ctx.loadProcessor(Fragment.UPDATE_RECORD, "success", discriminator);
       applyMapping(
           (ObjectNode) processor.node().get("properties"), group.getKey(), group.getValue());
       result.add(processor);

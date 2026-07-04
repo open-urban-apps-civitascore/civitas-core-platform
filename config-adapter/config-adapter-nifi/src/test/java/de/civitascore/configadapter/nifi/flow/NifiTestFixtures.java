@@ -22,6 +22,7 @@ import de.civitascore.configadapter.nifi.flow.stage.PostgisSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.SqlSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
+import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.ConversionOp;
 import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
@@ -297,6 +298,11 @@ public final class NifiTestFixtures {
     return new SinkSpec(SinkType.POSTGIS, "sensor_observations", List.of("id"));
   }
 
+  /** Wraps one node's compiled properties as the spec's mapping-unit list (empty stays empty). */
+  static List<CompiledMapping> compiled(List<UpdateRecordProperty> properties) {
+    return properties.isEmpty() ? List.of() : List.of(new CompiledMapping(properties));
+  }
+
   static List<UpdateRecordProperty> mapping() {
     return List.of(
         new UpdateRecordProperty(
@@ -324,7 +330,7 @@ public final class NifiTestFixtures {
         Map.of("Broker URI", "tcp://mosquitto:1883", "Topic Filter", "sensors/+/temp"),
         SinkType.POSTGIS,
         Map.of("Table Name", "sensor_observations"),
-        mapping,
+        compiled(mapping),
         Map.of(
             "PostGISConnectionPool",
             Map.of("Database Connection URL", "jdbc:postgresql://db:5432/x", "Database User", "u")),
@@ -348,7 +354,7 @@ public final class NifiTestFixtures {
         Map.of("Table Name", "events", "Columns to Return", "*"),
         SinkType.POSTGIS,
         Map.of("Table Name", "sensor_observations"),
-        mapping(),
+        compiled(mapping()),
         Map.of(
             "SourceConnectionPool",
             Map.of(
@@ -408,7 +414,7 @@ public final class NifiTestFixtures {
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
             "7"),
-        compilation.flatProperties(),
+        compiled(compilation.flatProperties()),
         Map.of(),
         null,
         compilation.plan());

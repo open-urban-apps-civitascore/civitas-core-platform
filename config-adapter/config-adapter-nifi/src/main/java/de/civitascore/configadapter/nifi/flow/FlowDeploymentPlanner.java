@@ -23,11 +23,11 @@ import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
+import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
 import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
-import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import de.civitascore.configadapter.nifi.mapping.StaEnvelopeCompiler;
 import java.util.List;
 import java.util.Map;
@@ -99,7 +99,7 @@ public class FlowDeploymentPlanner {
     }
     // compile() throws a checked FatalAdapterException (an op may be unrenderable for the sink),
     // which a lambda in Optional.map() cannot propagate — hence the explicit isPresent() branches.
-    List<UpdateRecordProperty> mappingProperties = List.of();
+    List<CompiledMapping> mappings = List.of();
     FrostEnvelopePlan staEnvelope = null;
     if (mapping.isPresent()) {
       if (sinkStage.mappingSupport() == MappingSupport.ENVELOPE) {
@@ -107,10 +107,13 @@ public class FlowDeploymentPlanner {
         // sink's build half turns into the split/capture/ReplaceText pre-region.
         StaEnvelopeCompiler.EnvelopeCompilation compilation =
             staEnvelopeCompiler.compile(mapping.get());
-        mappingProperties = compilation.flatProperties();
+        mappings = List.of(new CompiledMapping(compilation.flatProperties()));
         staEnvelope = compilation.plan();
       } else {
-        mappingProperties = recordPathCompiler.compile(mapping.get(), sinkStage.geometryEncoding());
+        mappings =
+            List.of(
+                new CompiledMapping(
+                    recordPathCompiler.compile(mapping.get(), sinkStage.geometryEncoding())));
       }
     }
 
@@ -156,7 +159,7 @@ public class FlowDeploymentPlanner {
                 out.sourceProperties(),
                 sink.type(),
                 out.sinkProperties(),
-                mappingProperties,
+                mappings,
                 out.controllerServiceProperties(),
                 sourceCron.orElse(null),
                 staEnvelope));
