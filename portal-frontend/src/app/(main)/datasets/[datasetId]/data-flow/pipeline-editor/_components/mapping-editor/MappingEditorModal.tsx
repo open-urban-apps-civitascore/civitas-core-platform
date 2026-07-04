@@ -331,7 +331,11 @@ export const MappingEditorModal = ({
         $schema: 'https://civitasconnect.digital/core/mapping/v1',
         source: buildDataStructureUrn(source.name ?? '', source.datastructureId, sourceQuery.data?.data?.version ?? ''),
         target: targetRef
-          ? buildDataStructureUrn(targetRef.name ?? '', targetRef.datastructureId, targetQuery.data?.data?.version ?? '')
+          ? buildDataStructureUrn(
+              targetRef.name ?? '',
+              targetRef.datastructureId,
+              targetQuery.data?.data?.version ?? '',
+            )
           : (staticTarget?.urn ?? ''),
         fields,
         positions,
