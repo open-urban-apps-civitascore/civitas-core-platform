@@ -88,7 +88,12 @@ public class RecordPathCompiler {
     return List.copyOf(properties);
   }
 
-  private UpdateRecordProperty compileField(
+  /**
+   * Compiles a single field rule against an explicit destination — the flat-compilation entry point
+   * for {@link StaEnvelopeCompiler}, which redirects each rule into an intermediate root-level
+   * field instead of the mapping's own target path.
+   */
+  UpdateRecordProperty compileField(
       String destination, ValueNode node, GeometryEncoding geometryEncoding)
       throws FatalAdapterException {
     if (node instanceof ConstNode constant) {
