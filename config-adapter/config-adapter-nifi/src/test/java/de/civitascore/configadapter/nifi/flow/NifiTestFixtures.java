@@ -139,6 +139,55 @@ public final class NifiTestFixtures {
   }
 
   /**
+   * A mapping node targeting the STA envelope catalog paths (things + observations, mixed
+   * strategies via the const).
+   */
+  static Map<String, Object> graphWithFrostMapping() throws Exception {
+    return map(
+        """
+        {
+          "nodes": [
+            { "id": "n-start", "type": "start", "data": {} },
+            { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
+                "fields": {
+                  "$.things[].name": "$.station",
+                  "$.things[].description": { "op": "const", "value": "imported station" },
+                  "$.things[].properties.reference": "$.ref",
+                  "$.observations[].result": { "op": "toFloat", "input": "$.temp" },
+                  "$.observations[].phenomenonTime": "$.ts",
+                  "$.observations[].parameters.reference": "$.ref",
+                  "$.observations[].parameters.name": "$.dsName"
+                } } } },
+            { "id": "n-end", "type": "end", "data": {} }
+          ],
+          "edges": [
+            { "id": "e1", "source": "n-start", "target": "n-map" },
+            { "id": "e2", "source": "n-map", "target": "n-end" }
+          ]
+        }
+        """);
+  }
+
+  /** A mapping node targeting only {@code $.things[].name} — misses the required lookup key. */
+  static Map<String, Object> graphWithIncompleteFrostMapping() throws Exception {
+    return map(
+        """
+        {
+          "nodes": [
+            { "id": "n-start", "type": "start", "data": {} },
+            { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
+                "fields": { "$.things[].name": "$.station" } } } },
+            { "id": "n-end", "type": "end", "data": {} }
+          ],
+          "edges": [
+            { "id": "e1", "source": "n-start", "target": "n-map" },
+            { "id": "e2", "source": "n-map", "target": "n-end" }
+          ]
+        }
+        """);
+  }
+
+  /**
    * A graph with no mapping node (source feeds the sink directly) — e.g. a FROST find-or-create.
    */
   static Map<String, Object> graphWithoutMapping() throws Exception {

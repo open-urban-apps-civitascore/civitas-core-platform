@@ -403,9 +403,9 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
-  void frostSinkWithMappingIsRejected() throws Exception {
-    // a FROST sink consumes the raw SensorThings envelope; a configured record mapping would be
-    // silently ignored by the builder — reject rather than deploy a no-op transformation
+  void frostMappingOutsideTheStaCatalogIsRejected() throws Exception {
+    // FROST accepts a mapping now, but only onto the closed STA target catalog — free target paths
+    // (here the PostGIS-shaped graphWithMapping) can never become envelope JSON keys
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       FatalAdapterException ex =
           assertThrows(
@@ -420,8 +420,120 @@ class FlowDeploymentPlannerTest {
                               new SinkSpec(SinkType.FROST, null),
                               "1")));
       assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_MAPPING_ERROR,
+          ex.getErrorCode());
+      assertTrue(ex.getMessage().contains("unsupported FROST mapping target path"));
+    }
+  }
+
+  @Test
+  void frostMappingMissingLookupKeysIsRejected() throws Exception {
+    // A mapped group must cover its required lookup keys — otherwise the flow deploys and routes
+    // every message to the error sink, invisible to the tenant. Fail the plan instead.
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-frost-incomplete",
+                              NifiTestFixtures.graphWithIncompleteFrostMapping(),
+                              mqttSource(null),
+                              new SinkSpec(SinkType.FROST, null),
+                              "1")));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_MAPPING_ERROR,
+          ex.getErrorCode());
+      assertTrue(
+          ex.getMessage()
+              .contains(
+                  "a FROST mapping targeting $.things[] must also map: $.things[].description,"
+                      + " $.things[].properties.reference"));
+    }
+  }
+
+  @Test
+  void sqlToFrostWithoutMappingIsRejected() throws Exception {
+    // Without a mapping the find-or-create consumes the source's envelope as-is; a SQL source emits
+    // plain records, so the combination stays rejected — with the hint that a mapping now unlocks
+    // it
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-sql-frost-nomap",
+                              graphWithoutMapping(),
+                              sqlSource(null),
+                              new SinkSpec(SinkType.FROST, null),
+                              "1")));
+      assertEquals(
           de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           ex.getErrorCode());
+      assertTrue(
+          ex.getMessage()
+              .contains(
+                  "FROST sink without a record mapping requires a source that emits the"
+                      + " SensorThings envelope (MQTT)"));
+    }
+  }
+
+  @Test
+  void mqttToFrostWithMappingIsPlanned() throws Exception {
+    // MQTT delivers raw bytes, so the mapped FROST flow needs the record chain (ConvertRecord +
+    // UpdateRecord) before the envelope rebuild region.
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-mqtt-frost-map",
+                      NifiTestFixtures.graphWithFrostMapping(),
+                      mqttSource(null),
+                      new SinkSpec(SinkType.FROST, null),
+                      "7"))
+              .snapshotJson();
+      processorOfType(snapshot, "ConvertRecord");
+      assertEquals(
+          "$[*]",
+          processorOfType(snapshot, "SplitJson")
+              .path("properties")
+              .path("JsonPath Expression")
+              .asText(),
+          "the record-writer array is split before the legs");
+      assertTrue(snapshot.contains("/sta_0_name"), "flat mapping fields are bound");
+      assertTrue(
+          snapshot.contains("${sta_2_reference:escapeJson()}"),
+          "the envelope template references the captured attributes");
+    }
+  }
+
+  @Test
+  void sqlToFrostWithMappingIsPlanned() throws Exception {
+    // A SQL source already emits records (no convert), needs no primary key for FROST (the PK
+    // guard is PostGIS-specific), and is accepted because the mapping rebuilds the envelope.
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-sql-frost-map",
+                      NifiTestFixtures.graphWithFrostMapping(),
+                      sqlSource(null),
+                      new SinkSpec(SinkType.FROST, null),
+                      "7"))
+              .snapshotJson();
+      processorOfType(snapshot, "QueryDatabaseTableRecord");
+      assertFalse(snapshot.contains("ConvertRecord"), "SQL records need no convert step");
+      // quotes inside the bound template are JSON-escaped in the snapshot, so match a quote-free
+      // placeholder instead of the raw template bytes
+      assertTrue(
+          snapshot.contains("${sta_2_reference:escapeJson()}"), "envelope template is bound");
     }
   }
 

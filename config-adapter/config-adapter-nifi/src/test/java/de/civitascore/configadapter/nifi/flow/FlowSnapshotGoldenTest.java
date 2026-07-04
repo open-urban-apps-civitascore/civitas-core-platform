@@ -178,6 +178,43 @@ class FlowSnapshotGoldenTest {
   }
 
   @Test
+  void plannerMqttToFrostWithMapping() throws Exception {
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      DeploymentPlan plan =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "golden-frost-map",
+                      NifiTestFixtures.graphWithFrostMapping(),
+                      mqttSource(null),
+                      new SinkSpec(SinkType.FROST, null),
+                      "7"));
+      verify("planner-mqtt-frost-mapping", plan.snapshotJson());
+      assertEquals(Map.of(), plan.sensitivePropsByComponent());
+    }
+  }
+
+  @Test
+  void plannerSqlToFrostWithMapping() throws Exception {
+    byte[] key = stretchedKey();
+    try (CredentialResolver resolver = new CredentialResolver(key)) {
+      DeploymentPlan plan =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "golden-sql-frost-map",
+                      NifiTestFixtures.graphWithFrostMapping(),
+                      sqlSource(enc(key)),
+                      new SinkSpec(SinkType.FROST, null),
+                      "7"));
+      verify("planner-sql-frost-mapping", plan.snapshotJson());
+      assertEquals(
+          Map.of("SourceConnectionPool", Map.of("Password", SECRET)),
+          plan.sensitivePropsByComponent());
+    }
+  }
+
+  @Test
   void plannerMqttToPostgisWithGeoPoint() throws Exception {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       DeploymentPlan plan =

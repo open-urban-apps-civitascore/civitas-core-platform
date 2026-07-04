@@ -24,10 +24,12 @@ import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
+import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
 import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
+import de.civitascore.configadapter.nifi.mapping.StaEnvelopeCompiler;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -44,6 +46,7 @@ public class FlowDeploymentPlanner {
   private final GraphParser graphParser;
   private final MappingConfigParser mappingConfigParser;
   private final RecordPathCompiler recordPathCompiler;
+  private final StaEnvelopeCompiler staEnvelopeCompiler;
   private final NifiFlowBuilder flowBuilder;
   private final StageRegistry registry;
 
@@ -65,6 +68,7 @@ public class FlowDeploymentPlanner {
     this.graphParser = graphParser;
     this.mappingConfigParser = mappingConfigParser;
     this.recordPathCompiler = recordPathCompiler;
+    this.staEnvelopeCompiler = new StaEnvelopeCompiler(recordPathCompiler);
     this.flowBuilder = flowBuilder;
     this.registry = registry;
   }
@@ -94,11 +98,21 @@ public class FlowDeploymentPlanner {
           AdapterErrorCode.NIFI_TEMPLATE_ERROR, sinkStage.mappingRejectionMessage());
     }
     // compile() throws a checked FatalAdapterException (an op may be unrenderable for the sink),
-    // which a lambda in Optional.map() cannot propagate — hence the explicit isPresent() branch.
-    List<UpdateRecordProperty> mappingProperties =
-        mapping.isPresent()
-            ? recordPathCompiler.compile(mapping.get(), sinkStage.geometryEncoding())
-            : List.of();
+    // which a lambda in Optional.map() cannot propagate — hence the explicit isPresent() branches.
+    List<UpdateRecordProperty> mappingProperties = List.of();
+    FrostEnvelopePlan staEnvelope = null;
+    if (mapping.isPresent()) {
+      if (sinkStage.mappingSupport() == MappingSupport.ENVELOPE) {
+        // Raw-JSON sink: compile into flat intermediate fields plus the envelope rebuild plan the
+        // sink's build half turns into the split/capture/ReplaceText pre-region.
+        StaEnvelopeCompiler.EnvelopeCompilation compilation =
+            staEnvelopeCompiler.compile(mapping.get());
+        mappingProperties = compilation.flatProperties();
+        staEnvelope = compilation.plan();
+      } else {
+        mappingProperties = recordPathCompiler.compile(mapping.get(), sinkStage.geometryEncoding());
+      }
+    }
 
     Datasource source = request.source();
     if (source == null) {
@@ -146,7 +160,7 @@ public class FlowDeploymentPlanner {
                 mappingProperties,
                 out.controllerServiceProperties(),
                 sourceCron.orElse(null),
-                null));
+                staEnvelope));
 
     return new DeploymentPlan(processGroupName, snapshot, Map.copyOf(out.sensitive()));
   }

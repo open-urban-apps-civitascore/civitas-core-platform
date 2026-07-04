@@ -22,10 +22,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * FROST SensorThings sink: a find-or-create sub-flow instead of a single terminal processor. It
- * consumes the raw STA envelope ({@code $.things}/{@code $.observations}) the source delivers, so
- * convert and record mapping are structurally suppressed and the source must declare {@link
- * SourceCapability#EMITS_STA_ENVELOPE}.
+ * FROST SensorThings sink: a find-or-create sub-flow instead of a single terminal processor,
+ * consuming the STA envelope ({@code $.things}/{@code $.observations}) in one of two modes.
+ * <b>Passthrough</b> (no mapping): the source must deliver the envelope itself ({@link
+ * SourceCapability#EMITS_STA_ENVELOPE}, MQTT). <b>Envelope rebuild</b> (record mapping present,
+ * {@link MappingSupport#ENVELOPE}): any source works — the mapped record's flat fields are rebuilt
+ * into the envelope by a generated ReplaceText template before the legs.
  */
 public final class FrostSinkStage implements SinkStage {
 
@@ -67,13 +69,17 @@ public final class FrostSinkStage implements SinkStage {
 
   @Override
   public Map<SourceCapability, String> requiredSourceCapabilities(boolean mappingPresent) {
-    // The find-or-create works on the SensorThings envelope ($.things/$.observations). A source
-    // emitting plain records (e.g. SQL table rows) would never match SplitJson — the flow would
-    // silently produce nothing. Reject the combination rather than deploy it.
+    // With a mapping, the envelope is rebuilt from the mapped record — any source works (including
+    // SQL). Without one, the find-or-create consumes the source's envelope as-is
+    // ($.things/$.observations): a source emitting plain records would never match SplitJson and
+    // the flow would silently produce nothing, so the passthrough case keeps the requirement.
+    if (mappingPresent) {
+      return Map.of();
+    }
     return Map.of(
         SourceCapability.EMITS_STA_ENVELOPE,
-        "FROST sink requires an MQTT SensorThings source; a SQL source does not emit the STA"
-            + " envelope");
+        "FROST sink without a record mapping requires a source that emits the SensorThings"
+            + " envelope (MQTT); add a record mapping or use an MQTT SensorThings source");
   }
 
   @Override
@@ -82,12 +88,10 @@ public final class FrostSinkStage implements SinkStage {
   }
 
   @Override
-  public String mappingRejectionMessage() {
-    // The find-or-create runs on the raw envelope; there is no record-mapping stage in that path,
-    // so a configured mapping would be silently ignored — reject rather than deploy a flow whose
-    // transformation never runs.
-    return "a FROST sink does not support a record mapping; the SensorThings envelope from the"
-        + " source is consumed as-is";
+  public MappingSupport mappingSupport() {
+    // Raw-JSON sink, but a mapping is accepted: the compiled flat fields are rebuilt into the
+    // envelope by the pre-region in build(...), driven by the plan's staEnvelope.
+    return MappingSupport.ENVELOPE;
   }
 
   @Override
