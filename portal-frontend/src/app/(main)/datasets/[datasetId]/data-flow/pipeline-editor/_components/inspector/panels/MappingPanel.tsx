@@ -103,14 +103,16 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
   const { pipeline } = useActivePipeline()
 
   // A pipeline writing to FROST maps onto the fixed SensorThings envelope — the target is the
-  // adapter's closed STA catalog, not a user-selected datastructure.
-  const hasFrostSink = pipeline?.nodes.some(node => node.type === PIPELINE_NODE_TYPES.Frost) ?? false
+  // adapter's closed STA catalog, not a user-selected datastructure. The output picker below is
+  // replaced by that fixed target, so the user cannot (and need not) select one.
+  const hasFixedStaTarget = pipeline?.nodes.some(node => node.type === PIPELINE_NODE_TYPES.Frost) ?? false
 
   const sourceKey =
     data.sourceDatastructureId && data.sourceVersionId ? `${data.sourceDatastructureId}/${data.sourceVersionId}` : null
   const targetKey =
     data.targetDatastructureId && data.targetVersionId ? `${data.targetDatastructureId}/${data.targetVersionId}` : null
-  const canOpen = Boolean(data.label.trim() && sourceKey && (hasFrostSink || targetKey))
+  const hasTarget = hasFixedStaTarget || Boolean(targetKey)
+  const canOpen = Boolean(data.label.trim() && sourceKey && hasTarget)
 
   // The node is "configured" (deployable) ONLY after the field mapping has been saved (handleSave).
   // The name and the source/target selection alone never mark it configured — otherwise a node with
@@ -147,7 +149,7 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
       mappingConfig: config,
       targetRequiredFields,
       configured: true,
-      ...(hasFrostSink ? { targetName: STA_TARGET_NAME } : {}),
+      ...(hasFixedStaTarget ? { targetName: STA_TARGET_NAME } : {}),
     })
 
   return (
@@ -164,7 +166,7 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
         name={data.sourceName}
         onSelect={handleSource}
       />
-      {hasFrostSink ? (
+      {hasFixedStaTarget ? (
         <div className="space-y-2">
           <Label>{t('outputDatastructure')}</Label>
           <p className="text-sm text-muted-foreground">{t('staTargetFixed', { name: STA_TARGET_NAME })}</p>
@@ -194,7 +196,7 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
             name: data.sourceName,
           }}
           target={
-            hasFrostSink
+            hasFixedStaTarget
               ? { urn: STA_TARGET_URN, name: STA_TARGET_NAME, tree: staTargetSchemaTree() }
               : {
                   datastructureId: data.targetDatastructureId!,
