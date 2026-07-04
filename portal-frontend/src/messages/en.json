@@ -1224,6 +1224,7 @@
       "selectDatastructure": "Select datastructure…",
       "inputDatastructure": "Input datastructure",
       "outputDatastructure": "Output datastructure",
+      "staTargetFixed": "{name} — fixed by the FROST sink",
       "openMappingEditor": "Open mapping editor"
     },
     "entitySelector": {
@@ -1251,8 +1252,9 @@
         "cronMqttIncompatible": "A CRON trigger cannot be used with an MQTT data source. Use a SQL (pull) source instead.",
         "cronSourceConnectorUnknown": "Could not verify the source connector; a CRON trigger only works with a SQL (pull) source, not MQTT.",
         "sqlSourceNoScheduleDefaultPoll": "This SQL source has no CRON node and will poll on the default schedule (every 5 minutes). Add a CRON node to set an explicit schedule.",
-        "frostSinkNoMapping": "A FROST sink consumes the source data as-is and does not support a field mapping — remove the mapping node.",
-        "sqlSourceToFrost": "A SQL source cannot write to a FROST sink; FROST requires a SensorThings (MQTT) source.",
+        "sqlSourceToFrost": "A SQL source can only write to a FROST sink through a field mapping — add a mapping node or use a SensorThings (MQTT) source.",
+        "frostMappingNoStaElement": "{label} must map at least one SensorThings element ($.things[] or $.observations[])",
+        "frostMappingGroupIncomplete": "{label} maps {group} but misses required fields: {fields}",
         "nodeNotWired": "{label} must be connected with both an incoming and an outgoing edge",
         "mappingRequiredFieldsMissing": "{label} does not map all required target fields: {fields}",
         "mappingNotSaved": "{label} has no saved field mapping — open the mapping editor and save it"
