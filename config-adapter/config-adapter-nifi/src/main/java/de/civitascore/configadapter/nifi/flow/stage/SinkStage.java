@@ -14,7 +14,7 @@ import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
 /**
  * A self-describing pipeline sink. One implementation per {@link SinkType}, owning both halves of
@@ -26,24 +26,33 @@ public interface SinkStage {
   /** The registry key. */
   SinkType type();
 
-  /** The payload shape this sink consumes — drives convert and mapping insertion structurally. */
-  SinkInput input();
+  /**
+   * The payload forms this sink can consume — drives the compatibility check and the convert and
+   * mapping insertion structurally. May depend on whether a record mapping runs upstream, because a
+   * mapping can synthesize a form the source alone would have to emit. A sink accepting {@link
+   * PayloadForm#RECORDS} implicitly also accepts every {@link PayloadForm#CONVERTIBLE_TO_RECORDS}
+   * form (the flow builder inserts the convert step).
+   *
+   * @param mappedUpstream whether the pipeline graph carries a record mapping
+   */
+  Set<PayloadForm> acceptedInputs(boolean mappedUpstream);
 
   /**
-   * Capabilities the source must declare for this sink to work, each with the exact rejection
-   * message thrown when it is missing. A requirement may depend on whether the graph carries a
-   * record mapping — a mapping can synthesize a payload shape the source alone would have to emit.
-   *
-   * @param mappingPresent whether the pipeline graph carries a record mapping
+   * The rejection message when the source's output form is neither accepted nor convertible to an
+   * accepted form.
    */
-  Map<SourceCapability, String> requiredSourceCapabilities(boolean mappingPresent);
+  default String inputRejectionMessage(boolean mappedUpstream) {
+    return "sink " + type() + " cannot consume the payload form emitted by the source";
+  }
 
   /** The geometry encoding the mapping compiler must emit for this sink's target format. */
   GeometryEncoding geometryEncoding();
 
   /** How a record mapping may run in front of this sink. */
   default MappingSupport mappingSupport() {
-    return input() == SinkInput.RECORDS ? MappingSupport.RECORD_PATH : MappingSupport.NONE;
+    return acceptedInputs(false).contains(PayloadForm.RECORDS)
+        ? MappingSupport.RECORD_PATH
+        : MappingSupport.NONE;
   }
 
   /**

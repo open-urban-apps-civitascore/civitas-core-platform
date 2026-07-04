@@ -19,11 +19,10 @@ import de.civitascore.configadapter.nifi.flow.stage.BuildContext;
 import de.civitascore.configadapter.nifi.flow.stage.ConvertRecordStage;
 import de.civitascore.configadapter.nifi.flow.stage.Fragment;
 import de.civitascore.configadapter.nifi.flow.stage.MappingSupport;
+import de.civitascore.configadapter.nifi.flow.stage.PayloadForm;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
 import de.civitascore.configadapter.nifi.flow.stage.RecordMappingStage;
-import de.civitascore.configadapter.nifi.flow.stage.SinkInput;
 import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
-import de.civitascore.configadapter.nifi.flow.stage.SourceCapability;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
 import de.civitascore.configadapter.nifi.flow.stage.StageResult;
@@ -35,6 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -148,7 +148,7 @@ public class NifiFlowBuilder {
         new BuildContext(mapper, pgId, spec, processors, controllerServices, connections);
     SourceStage sourceStage = registry.source(spec.sourceType());
     SinkStage sinkStage = registry.sink(spec.sinkType());
-    requireSourceCapabilities(sourceStage, sinkStage, !spec.mappingProperties().isEmpty());
+    requireCompatibleSource(sourceStage, sinkStage, !spec.mappingProperties().isEmpty());
 
     // Controller services first — processors reference them by id.
     addControllerServices(ctx, sourceStage, sinkStage);
@@ -205,14 +205,17 @@ public class NifiFlowBuilder {
     sinkStage.registerControllerServices(ctx);
   }
 
-  /** Rejects a source/sink combination whose declared capabilities do not line up. */
-  private static void requireSourceCapabilities(
+  /** Rejects a source whose emitted payload form the sink can neither consume nor convert. */
+  private static void requireCompatibleSource(
       SourceStage source, SinkStage sink, boolean mappingPresent) throws FatalAdapterException {
-    for (Map.Entry<SourceCapability, String> required :
-        sink.requiredSourceCapabilities(mappingPresent).entrySet()) {
-      if (!source.capabilities().contains(required.getKey())) {
-        throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, required.getValue());
-      }
+    PayloadForm offered = source.output();
+    Set<PayloadForm> accepted = sink.acceptedInputs(mappingPresent);
+    boolean convertible =
+        accepted.contains(PayloadForm.RECORDS)
+            && PayloadForm.CONVERTIBLE_TO_RECORDS.contains(offered);
+    if (!accepted.contains(offered) && !convertible) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR, sink.inputRejectionMessage(mappingPresent));
     }
   }
 
@@ -220,24 +223,25 @@ public class NifiFlowBuilder {
 
   /**
    * The transforms between source and sink, derived structurally. The record chain (ConvertRecord
-   * when the source does not already emit records, then the mapping) runs for a records sink — and
-   * also for a raw-JSON sink in {@link MappingSupport#ENVELOPE} mode, whose sink-owned pre-region
-   * rebuilds the mapped records into its envelope.
+   * when the source does not already emit records, then the mapping) runs whenever the sink
+   * consumes {@link PayloadForm#RECORDS} for this flow — which for an {@link
+   * MappingSupport#ENVELOPE} sink is exactly the mapped case, whose sink-owned pre-region rebuilds
+   * the mapped records into its envelope.
    */
   private List<TransformStage> transformsFor(SourceStage source, SinkStage sink, FlowBuildSpec spec)
       throws FatalAdapterException {
     boolean mapped = !spec.mappingProperties().isEmpty();
     // The builder is reachable directly (golden tests), not only through the planner: a compiled
-    // mapping heading into a raw-JSON sink without an envelope rebuild would silently vanish
-    // inside the envelope — fail the build instead.
-    if (mapped && sink.input() == SinkInput.RAW_JSON && spec.staEnvelope() == null) {
+    // mapping heading into an envelope-mode sink without an envelope rebuild plan would silently
+    // vanish inside the envelope — fail the build instead.
+    if (mapped && sink.mappingSupport() == MappingSupport.ENVELOPE && spec.staEnvelope() == null) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           "a record mapping was compiled for a raw-JSON sink but no envelope plan was built");
     }
     List<TransformStage> transforms = new ArrayList<>();
-    boolean recordChain = sink.input() == SinkInput.RECORDS || spec.staEnvelope() != null;
-    if (recordChain && !source.capabilities().contains(SourceCapability.EMITS_RECORDS)) {
+    boolean recordChain = sink.acceptedInputs(mapped).contains(PayloadForm.RECORDS);
+    if (recordChain && source.output() != PayloadForm.RECORDS) {
       transforms.add(new ConvertRecordStage());
     }
     if (mapped) {

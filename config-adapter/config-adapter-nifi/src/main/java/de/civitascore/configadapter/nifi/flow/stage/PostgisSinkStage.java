@@ -21,6 +21,7 @@ import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * PostGIS sink: a single terminal PutDatabaseRecord writing over the platform-managed DB connection
@@ -47,13 +48,8 @@ public final class PostgisSinkStage implements SinkStage {
   }
 
   @Override
-  public SinkInput input() {
-    return SinkInput.RECORDS;
-  }
-
-  @Override
-  public Map<SourceCapability, String> requiredSourceCapabilities(boolean mappingPresent) {
-    return Map.of();
+  public Set<PayloadForm> acceptedInputs(boolean mappedUpstream) {
+    return Set.of(PayloadForm.RECORDS);
   }
 
   @Override

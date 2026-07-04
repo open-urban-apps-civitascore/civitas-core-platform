@@ -83,8 +83,14 @@ public final class SqlSourceStage implements SourceStage {
   }
 
   @Override
-  public Set<SourceCapability> capabilities() {
-    return Set.of(SourceCapability.EMITS_RECORDS, SourceCapability.SUPPORTS_CRON);
+  public PayloadForm output() {
+    return PayloadForm.RECORDS;
+  }
+
+  @Override
+  public boolean acceptsSchedule() {
+    // QueryDatabaseTableRecord is pull-based — a cron on the entry processor is meaningful.
+    return true;
   }
 
   /**

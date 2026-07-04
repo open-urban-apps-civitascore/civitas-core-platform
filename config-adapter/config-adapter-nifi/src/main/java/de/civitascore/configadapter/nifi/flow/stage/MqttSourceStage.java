@@ -21,14 +21,13 @@ import de.civitascore.configadapter.nifi.flow.SourceType;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * MQTT push source: ConsumeMQTT subscribing to a single topic filter. Delivers the SensorThings
- * envelope raw — records only exist after a ConvertRecord step, so the stage does not declare
- * {@link SourceCapability#EMITS_RECORDS}.
+ * envelope raw — records only exist after a ConvertRecord step, so the stage declares {@link
+ * PayloadForm#STA_ENVELOPE}, not {@code RECORDS}.
  */
 public final class MqttSourceStage implements SourceStage {
 
@@ -51,8 +50,8 @@ public final class MqttSourceStage implements SourceStage {
   }
 
   @Override
-  public Set<SourceCapability> capabilities() {
-    return Set.of(SourceCapability.EMITS_STA_ENVELOPE);
+  public PayloadForm output() {
+    return PayloadForm.STA_ENVELOPE;
   }
 
   @Override

@@ -12,7 +12,6 @@ package de.civitascore.configadapter.nifi.flow.stage;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.flow.SourceType;
-import java.util.Set;
 
 /**
  * A self-describing pipeline source. One implementation per {@link SourceType}, owning both halves
@@ -24,11 +23,20 @@ public interface SourceStage {
   /** The registry key. */
   SourceType type();
 
-  Set<SourceCapability> capabilities();
+  /** The payload form this source emits. */
+  PayloadForm output();
 
   /**
-   * The rejection message when the graph carries a cron trigger but this source lacks {@link
-   * SourceCapability#SUPPORTS_CRON}. Never consulted for sources that declare the capability.
+   * Whether a cron schedule on the entry processor is meaningful. Only pull-based sources accept
+   * one; push-based sources self-trigger and reject a cron via {@link #cronRejectionMessage()}.
+   */
+  default boolean acceptsSchedule() {
+    return false;
+  }
+
+  /**
+   * The rejection message when the graph carries a cron trigger but this source does not accept a
+   * schedule. Never consulted for sources with {@link #acceptsSchedule()}.
    */
   default String cronRejectionMessage() {
     return "cron scheduling is not supported for source type " + type();

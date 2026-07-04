@@ -21,7 +21,6 @@ import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -35,8 +34,8 @@ class StageRegistryTest {
       }
 
       @Override
-      public Set<SourceCapability> capabilities() {
-        return Set.of();
+      public PayloadForm output() {
+        return PayloadForm.RECORDS;
       }
 
       @Override
@@ -62,13 +61,8 @@ class StageRegistryTest {
       }
 
       @Override
-      public SinkInput input() {
-        return SinkInput.RECORDS;
-      }
-
-      @Override
-      public Map<SourceCapability, String> requiredSourceCapabilities(boolean mappingPresent) {
-        return Map.of();
+      public Set<PayloadForm> acceptedInputs(boolean mappedUpstream) {
+        return Set.of(PayloadForm.RECORDS);
       }
 
       @Override

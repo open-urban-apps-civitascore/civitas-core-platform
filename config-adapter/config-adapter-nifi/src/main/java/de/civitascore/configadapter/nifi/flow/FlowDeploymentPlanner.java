@@ -18,7 +18,6 @@ import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec
 import de.civitascore.configadapter.nifi.flow.stage.MappingSupport;
 import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
 import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
-import de.civitascore.configadapter.nifi.flow.stage.SourceCapability;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
@@ -123,8 +122,7 @@ public class FlowDeploymentPlanner {
         SourceType.fromRaw(source.getType()).orElseThrow(() -> template(source.getType()));
     SourceStage sourceStage = registry.source(sourceType);
 
-    if (sourceCron.isPresent()
-        && !sourceStage.capabilities().contains(SourceCapability.SUPPORTS_CRON)) {
+    if (sourceCron.isPresent() && !sourceStage.acceptsSchedule()) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR, sourceStage.cronRejectionMessage());
     }

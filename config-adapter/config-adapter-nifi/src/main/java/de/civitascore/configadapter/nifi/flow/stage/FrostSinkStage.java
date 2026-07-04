@@ -20,14 +20,15 @@ import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * FROST SensorThings sink: a find-or-create sub-flow instead of a single terminal processor,
  * consuming the STA envelope ({@code $.things}/{@code $.observations}) in one of two modes.
  * <b>Passthrough</b> (no mapping): the source must deliver the envelope itself ({@link
- * SourceCapability#EMITS_STA_ENVELOPE}, MQTT). <b>Envelope rebuild</b> (record mapping present,
- * {@link MappingSupport#ENVELOPE}): any source works — the mapped record's flat fields are rebuilt
- * into the envelope by a generated ReplaceText template before the legs.
+ * PayloadForm#STA_ENVELOPE}, MQTT). <b>Envelope rebuild</b> (record mapping present, {@link
+ * MappingSupport#ENVELOPE}): any source works — the mapped record's flat fields are rebuilt into
+ * the envelope by a generated ReplaceText template before the legs.
  */
 public final class FrostSinkStage implements SinkStage {
 
@@ -63,23 +64,20 @@ public final class FrostSinkStage implements SinkStage {
   }
 
   @Override
-  public SinkInput input() {
-    return SinkInput.RAW_JSON;
+  public Set<PayloadForm> acceptedInputs(boolean mappedUpstream) {
+    // With a mapping, the envelope is rebuilt from the mapped record — any record-convertible
+    // source works (including SQL). Without one, the find-or-create consumes the source's envelope
+    // as-is ($.things/$.observations): a source emitting plain records would never match SplitJson
+    // and the flow would silently produce nothing, so passthrough demands the envelope itself.
+    return mappedUpstream ? Set.of(PayloadForm.RECORDS) : Set.of(PayloadForm.STA_ENVELOPE);
   }
 
   @Override
-  public Map<SourceCapability, String> requiredSourceCapabilities(boolean mappingPresent) {
-    // With a mapping, the envelope is rebuilt from the mapped record — any source works (including
-    // SQL). Without one, the find-or-create consumes the source's envelope as-is
-    // ($.things/$.observations): a source emitting plain records would never match SplitJson and
-    // the flow would silently produce nothing, so the passthrough case keeps the requirement.
-    if (mappingPresent) {
-      return Map.of();
-    }
-    return Map.of(
-        SourceCapability.EMITS_STA_ENVELOPE,
-        "FROST sink without a record mapping requires a source that emits the SensorThings"
-            + " envelope (MQTT); add a record mapping or use an MQTT SensorThings source");
+  public String inputRejectionMessage(boolean mappedUpstream) {
+    // Only reachable in passthrough mode: with a mapping every payload form is RECORDS or
+    // convertible, so no rejection can occur.
+    return "FROST sink without a record mapping requires a source that emits the SensorThings"
+        + " envelope (MQTT); add a record mapping or use an MQTT SensorThings source";
   }
 
   @Override

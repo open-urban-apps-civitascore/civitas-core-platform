@@ -13,8 +13,9 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import java.util.List;
 
 /**
- * Turns a raw (non-record) source payload into records. Inserted only when the source does not
- * declare {@link SourceCapability#EMITS_RECORDS} and the sink consumes {@link SinkInput#RECORDS}.
+ * Turns a raw (non-record) source payload into records. Inserted structurally, never user-modelled:
+ * only when the source emits a {@link PayloadForm#CONVERTIBLE_TO_RECORDS} form and the sink
+ * consumes {@link PayloadForm#RECORDS}.
  */
 public final class ConvertRecordStage implements TransformStage {
 
