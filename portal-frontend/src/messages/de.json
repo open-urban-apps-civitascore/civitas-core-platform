@@ -1211,7 +1211,6 @@
       "selectDatastructure": "Datenstruktur auswählen…",
       "inputDatastructure": "Eingangs-Datenstruktur",
       "outputDatastructure": "Ausgangs-Datenstruktur",
-      "staTargetFixed": "{name} — vorgegeben durch den FROST-Speicher",
       "openMappingEditor": "Mapping-Editor öffnen"
     },
     "entitySelector": {

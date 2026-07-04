@@ -1224,7 +1224,6 @@
       "selectDatastructure": "Select datastructure…",
       "inputDatastructure": "Input datastructure",
       "outputDatastructure": "Output datastructure",
-      "staTargetFixed": "{name} — fixed by the FROST sink",
       "openMappingEditor": "Open mapping editor"
     },
     "entitySelector": {

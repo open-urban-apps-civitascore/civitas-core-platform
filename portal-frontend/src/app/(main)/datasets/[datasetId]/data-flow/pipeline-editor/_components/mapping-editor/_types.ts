@@ -20,12 +20,7 @@ export type GeometryType =
   | 'MultiPolygon'
   | 'GeometryCollection'
 
-/**
- * `any` is a scalar wildcard (SensorThings' `result` accepts any scalar type): it matches every
- * scalar subtype in the port-compatibility checks. Only static target schemas use it — UML-derived
- * trees always carry a concrete type.
- */
-export type FieldType = 'str' | 'int' | 'float' | 'bool' | 'date' | 'any' | GeometryType | 'array' | 'object'
+export type FieldType = 'str' | 'int' | 'float' | 'bool' | 'date' | GeometryType | 'array' | 'object'
 
 export interface FieldNode {
   /** JSONPath, e.g. "$.klassen[].name" */

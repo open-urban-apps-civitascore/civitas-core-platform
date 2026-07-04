@@ -469,7 +469,38 @@ const validateSqlSourceNotToFrost: ValidationRule = {
 }
 
 /**
- * Rule: a mapping in front of a FROST sink targets the fixed STA envelope, whose required-ness is
+ * Whether the given node has a downstream path (following edge direction) to a FROST sink node. A
+ * mapping's target mode depends on the sink it actually feeds — a FROST node standing unconnected
+ * elsewhere on the canvas must not flip an unrelated mapping onto the STA envelope. Shared with the
+ * MappingPanel, which fixes the mapping target to the STA envelope on the same condition.
+ */
+export const hasFrostSinkDownstream = (pipeline: Pick<Pipeline, 'nodes' | 'edges'>, nodeId: string): boolean => {
+  const frostIds = new Set(pipeline.nodes.filter(node => node.type === PIPELINE_NODE_TYPES.Frost).map(node => node.id))
+  if (frostIds.size === 0) return false
+
+  const outgoing = new Map<string, string[]>()
+  pipeline.edges.forEach(edge => {
+    const targets = outgoing.get(edge.source) ?? []
+    targets.push(edge.target)
+    outgoing.set(edge.source, targets)
+  })
+
+  const queue = [nodeId]
+  const visited = new Set(queue)
+  while (queue.length > 0) {
+    for (const next of outgoing.get(queue.shift()!) ?? []) {
+      if (frostIds.has(next)) return true
+      if (!visited.has(next)) {
+        visited.add(next)
+        queue.push(next)
+      }
+    }
+  }
+  return false
+}
+
+/**
+ * Rule: a mapping feeding a FROST sink targets the fixed STA envelope, whose required-ness is
  * conditional per group — once a group ($.things[] / $.observations[]) is mapped at all, its
  * required paths (most importantly the find-or-create lookup keys) must all be assigned, and at
  * least one group must be mapped. The unconditional `targetRequiredFields` snapshot cannot express
@@ -479,16 +510,16 @@ const validateSqlSourceNotToFrost: ValidationRule = {
 const validateFrostMappingCoversStaGroups: ValidationRule = {
   id: 'frost-mapping-sta-group-coverage',
   name: 'FROST Mapping Covers STA Groups',
-  description: 'A FROST mapping must cover the required paths of every STA group it touches',
+  description: 'A mapping feeding a FROST sink must cover the required paths of every STA group it touches',
   validate: (pipeline: Pipeline) => {
     const errors: PipelineValidationError[] = []
-    const hasFrostSink = pipeline.nodes.some(node => node.type === PIPELINE_NODE_TYPES.Frost)
-    if (!hasFrostSink) return { errors, warnings: [] }
 
     pipeline.nodes.forEach(node => {
       if (!isMappingNodeData(node.data)) return
       // a not-yet-configured/saved node is reported by other rules; avoid double errors
       if (!node.data.configured || node.data.targetRequiredFields === undefined) return
+      // only a mapping that actually feeds the FROST sink targets the STA envelope
+      if (!hasFrostSinkDownstream(pipeline, node.id)) return
       const label = node.data.label || node.type
 
       const assigned = Object.entries(node.data.mappingConfig?.fields ?? {})

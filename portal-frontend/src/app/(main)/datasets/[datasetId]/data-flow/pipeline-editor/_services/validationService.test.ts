@@ -206,17 +206,23 @@ describe('sink/source combination rules mirror the deploy engine', () => {
     const NO_ELEMENT_KEY = 'validation.messages.frostMappingNoStaElement'
     const GROUP_KEY = 'validation.messages.frostMappingGroupIncomplete'
 
+    /** The mapping node wired into the FROST sink — the condition under which the rule applies. */
+    const wiredToFrost = (mapping: TestNode): Pipeline => ({
+      ...pipelineWith([frostSink, mapping]),
+      edges: [{ id: 'e1', source: mapping.id, target: frostSink.id }] as Pipeline['edges'],
+    })
+
     it('rejects a FROST mapping that maps no STA element at all', () => {
-      expect(has(pipelineWith([frostSink, staMapping({})]), NO_ELEMENT_KEY)).toBe(true)
+      expect(has(wiredToFrost(staMapping({})), NO_ELEMENT_KEY)).toBe(true)
     })
 
     it('accepts a mapping fully covering the touched group and leaving the other unmapped', () => {
-      const result = validatePipeline(pipelineWith([frostSink, staMapping(fullThingsFields)]))
+      const result = validatePipeline(wiredToFrost(staMapping(fullThingsFields)))
       expect(result.errors.some(e => e.messageKey === NO_ELEMENT_KEY || e.messageKey === GROUP_KEY)).toBe(false)
     })
 
     it('rejects a touched group missing its required lookup keys, naming them', () => {
-      const result = validatePipeline(pipelineWith([frostSink, staMapping({ '$.things[].name': '$.station' })]))
+      const result = validatePipeline(wiredToFrost(staMapping({ '$.things[].name': '$.station' })))
       const errors = result.errors.filter(e => e.messageKey === GROUP_KEY)
       expect(errors).toHaveLength(1)
       expect(errors[0].elementId).toBe('map-1')
@@ -226,10 +232,9 @@ describe('sink/source combination rules mirror the deploy engine', () => {
 
     it('checks every touched group independently', () => {
       const result = validatePipeline(
-        pipelineWith([
-          frostSink,
+        wiredToFrost(
           staMapping({ ...fullThingsFields, '$.observations[].result': { op: 'toFloat', input: '$.temp' } }),
-        ]),
+        ),
       )
       const errors = result.errors.filter(e => e.messageKey === GROUP_KEY)
       expect(errors).toHaveLength(1)
@@ -237,6 +242,23 @@ describe('sink/source combination rules mirror the deploy engine', () => {
       expect(errors[0].messageParams?.fields).toBe(
         '$.observations[].parameters.reference, $.observations[].parameters.name',
       )
+    })
+
+    it('finds the FROST sink transitively downstream, not only via a direct edge', () => {
+      const mapping = staMapping({})
+      const between: TestNode = { id: 'geo-1', type: 'geoPersistence', data: { label: 'Geo', configured: true } }
+      const pipeline: Pipeline = {
+        ...pipelineWith([frostSink, mapping, between]),
+        edges: [
+          { id: 'e1', source: mapping.id, target: between.id },
+          { id: 'e2', source: between.id, target: frostSink.id },
+        ] as Pipeline['edges'],
+      }
+      expect(has(pipeline, NO_ELEMENT_KEY)).toBe(true)
+    })
+
+    it('ignores a mapping that does not feed the FROST sink (unconnected FROST node on the canvas)', () => {
+      expect(has(pipelineWith([frostSink, staMapping({})]), NO_ELEMENT_KEY)).toBe(false)
     })
 
     it('does not run without a FROST sink (regular datastructure targets have their own rule)', () => {
@@ -249,7 +271,7 @@ describe('sink/source combination rules mirror the deploy engine', () => {
         type: 'mapping',
         data: { label: 'Mapping', configured: true, mappingConfig: { fields: {}, positions: {} } },
       }
-      expect(has(pipelineWith([frostSink, unsaved]), NO_ELEMENT_KEY)).toBe(false)
+      expect(has(wiredToFrost(unsaved), NO_ELEMENT_KEY)).toBe(false)
     })
   })
 })

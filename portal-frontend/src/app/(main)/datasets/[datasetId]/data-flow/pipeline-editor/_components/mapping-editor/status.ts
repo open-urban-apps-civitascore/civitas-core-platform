@@ -88,12 +88,7 @@ export const computeStatus = (
       // carries the concrete field type, so comparing it to the target's `type` catches it directly.
       const hasCategoryMismatch = !!src && src.type !== field.portType
       const hasSubtypeMismatch =
-        !!src &&
-        (field.portType === 'scalar' || field.portType === 'geometry') &&
-        !!src.sub &&
-        // 'any' (STA result) is a scalar wildcard — every scalar subtype matches
-        field.type !== 'any' &&
-        src.sub !== field.type
+        !!src && (field.portType === 'scalar' || field.portType === 'geometry') && !!src.sub && src.sub !== field.type
       const isMismatch = hasCategoryMismatch || hasSubtypeMismatch
 
       targetPortStatus[path] = isMismatch ? 'mismatch' : 'mapped'

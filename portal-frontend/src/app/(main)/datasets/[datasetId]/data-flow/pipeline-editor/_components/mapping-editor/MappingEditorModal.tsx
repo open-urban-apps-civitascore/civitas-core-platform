@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { buildDataStructureUrn } from '@/utils/urn'
 
-import type { MappingConfig, SchemaTree } from './_types'
+import type { MappingConfig } from './_types'
 import { ARRAY_EDGE_STYLE } from './_types'
 import { compileCanvas, decompileConfig, SOURCE_NODE_ID, TARGET_NODE_ID } from './compile'
 import { TransformInspector } from './inspector/TransformInspector'
@@ -38,28 +38,13 @@ export interface SchemaRef {
   name?: string
 }
 
-/**
- * A fixed target schema (e.g. the STA envelope for FROST sinks): the tree is a constant instead of
- * being derived from a fetched datastructure version, and the saved mapping carries the given
- * pseudo-URN as its target.
- */
-export interface StaticSchema {
-  urn: string
-  name: string
-  tree: SchemaTree
-}
-
-export type TargetSchema = SchemaRef | StaticSchema
-
-const isStaticSchema = (target: TargetSchema): target is StaticSchema => 'tree' in target
-
 interface MappingEditorModalProps {
   // eslint-disable-next-line react/boolean-prop-naming -- matches the Dialog `open` API
   open: boolean
   onOpenChange: (open: boolean) => void
   name: string
   source: SchemaRef
-  target: TargetSchema
+  target: SchemaRef
   config: MappingConfig
   onSave: (config: MappingConfig, targetRequiredFields: string[]) => void
 }
@@ -102,18 +87,15 @@ export const MappingEditorModal = ({
     [translatedRegistry],
   )
 
-  const staticTarget = isStaticSchema(target) ? target : null
-  const targetRef = isStaticSchema(target) ? null : target
-
   const sourceQuery = useGetDatastructureVersion({
     datastructureId: source.datastructureId,
     versionId: source.versionId,
     isEnabled: open,
   })
   const targetQuery = useGetDatastructureVersion({
-    datastructureId: targetRef?.datastructureId ?? '',
-    versionId: targetRef?.versionId ?? '',
-    isEnabled: open && !!targetRef,
+    datastructureId: target.datastructureId,
+    versionId: target.versionId,
+    isEnabled: open,
   })
 
   const sourceTree = useMemo(
@@ -121,8 +103,8 @@ export const MappingEditorModal = ({
     [sourceQuery.data, source.name],
   )
   const targetTree = useMemo(
-    () => staticTarget?.tree ?? umlDiagramToSchemaTree(targetQuery.data?.data?.styles, target.name ?? 'target'),
-    [staticTarget, targetQuery.data, target.name],
+    () => umlDiagramToSchemaTree(targetQuery.data?.data?.styles, target.name ?? 'target'),
+    [targetQuery.data, target.name],
   )
   const sourceFields = useMemo(() => flattenTree(sourceTree), [sourceTree])
   const targetFields = useMemo(() => flattenTree(targetTree), [targetTree])
@@ -133,7 +115,7 @@ export const MappingEditorModal = ({
   const nextId = useRef(0)
   const initialized = useRef(false)
 
-  const isReady = !!sourceQuery.data?.data && (!!staticTarget || !!targetQuery.data?.data)
+  const isReady = !!sourceQuery.data?.data && !!targetQuery.data?.data
 
   useEffect(() => {
     if (!open) {
@@ -175,14 +157,12 @@ export const MappingEditorModal = ({
    * Two ports are compatible when:
    *  - both have the same portType category (scalar / geometry / array / object)
    *  - AND for scalar/geometry ports: the subtype matches exactly (int↔int, str↔str, Point↔Point, …)
-   *    — type conversions must go through an explicit conversion node. The `any` subtype (STA
-   *    `result`) is a wildcard accepting every scalar.
+   *    — type conversions must go through an explicit conversion node.
    */
   const portsCompatible = useCallback(
     (from: { type: PortType; sub?: string } | null, to: { type: PortType; sub?: string } | null): boolean => {
       if (!from || !to) return false
       if (from.type !== to.type) return false
-      if (from.sub === 'any' || to.sub === 'any') return true
       if ((from.type === 'scalar' || from.type === 'geometry') && from.sub && to.sub && from.sub !== to.sub)
         return false
       return true
@@ -330,20 +310,11 @@ export const MappingEditorModal = ({
       {
         $schema: 'https://civitasconnect.digital/core/mapping/v1',
         source: buildDataStructureUrn(source.name ?? '', source.datastructureId, sourceQuery.data?.data?.version ?? ''),
-        target: targetRef
-          ? buildDataStructureUrn(
-              targetRef.name ?? '',
-              targetRef.datastructureId,
-              targetQuery.data?.data?.version ?? '',
-            )
-          : (staticTarget?.urn ?? ''),
+        target: buildDataStructureUrn(target.name ?? '', target.datastructureId, targetQuery.data?.data?.version ?? ''),
         fields,
         positions,
       },
-      // A static target's required-ness is conditional per group (STA: lookup keys required only
-      // once the group is mapped), which the unconditional snapshot cannot express — the pipeline
-      // validation owns it (validateFrostMappingCoversStaGroups), so the snapshot stays empty.
-      staticTarget ? [] : requiredFieldPaths(targetTree),
+      requiredFieldPaths(targetTree),
     )
     onOpenChange(false)
   }

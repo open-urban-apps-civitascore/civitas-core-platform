@@ -17,11 +17,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-import { STA_TARGET_NAME, STA_TARGET_URN, staTargetSchemaTree } from '../../../_constants/staTargetCatalog'
-import { useActivePipeline } from '../../../_hooks/use-active-pipeline'
 import { usePipelinePermissions } from '../../../_hooks/use-pipeline-permissions'
 import type { MappingNodeData } from '../../../_types/nodes'
-import { PIPELINE_NODE_TYPES } from '../../../_types/pipeline'
 import { emptyMappingConfig, type MappingConfig } from '../../mapping-editor/_types'
 import { MappingEditorModal } from '../../mapping-editor/MappingEditorModal'
 
@@ -100,19 +97,12 @@ interface MappingPanelProps {
 export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
   const t = useTranslations('pipelineEditor.mappingPanel')
   const [isEditorOpen, setIsEditorOpen] = useState(false)
-  const { pipeline } = useActivePipeline()
-
-  // A pipeline writing to FROST maps onto the fixed SensorThings envelope — the target is the
-  // adapter's closed STA catalog, not a user-selected datastructure. The output picker below is
-  // replaced by that fixed target, so the user cannot (and need not) select one.
-  const hasFixedStaTarget = pipeline?.nodes.some(node => node.type === PIPELINE_NODE_TYPES.Frost) ?? false
 
   const sourceKey =
     data.sourceDatastructureId && data.sourceVersionId ? `${data.sourceDatastructureId}/${data.sourceVersionId}` : null
   const targetKey =
     data.targetDatastructureId && data.targetVersionId ? `${data.targetDatastructureId}/${data.targetVersionId}` : null
-  const hasTarget = hasFixedStaTarget || Boolean(targetKey)
-  const canOpen = Boolean(data.label.trim() && sourceKey && hasTarget)
+  const canOpen = Boolean(data.label.trim() && sourceKey && targetKey)
 
   // The node is "configured" (deployable) ONLY after the field mapping has been saved (handleSave).
   // The name and the source/target selection alone never mark it configured — otherwise a node with
@@ -145,12 +135,7 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
     })
 
   const handleSave = (config: MappingConfig, targetRequiredFields: string[]) =>
-    onUpdate({
-      mappingConfig: config,
-      targetRequiredFields,
-      configured: true,
-      ...(hasFixedStaTarget ? { targetName: STA_TARGET_NAME } : {}),
-    })
+    onUpdate({ mappingConfig: config, targetRequiredFields, configured: true })
 
   return (
     <div className="space-y-4 p-4">
@@ -166,20 +151,13 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
         name={data.sourceName}
         onSelect={handleSource}
       />
-      {hasFixedStaTarget ? (
-        <div className="space-y-2">
-          <Label>{t('outputDatastructure')}</Label>
-          <p className="text-sm text-muted-foreground">{t('staTargetFixed', { name: STA_TARGET_NAME })}</p>
-        </div>
-      ) : (
-        <DatastructureField
-          label={t('outputDatastructure')}
-          placeholder={t('selectDatastructure')}
-          selectedKey={targetKey}
-          name={data.targetName}
-          onSelect={handleTarget}
-        />
-      )}
+      <DatastructureField
+        label={t('outputDatastructure')}
+        placeholder={t('selectDatastructure')}
+        selectedKey={targetKey}
+        name={data.targetName}
+        onSelect={handleTarget}
+      />
 
       <Button className="w-full" disabled={!canOpen} onClick={() => setIsEditorOpen(true)}>
         {t('openMappingEditor')}
@@ -195,15 +173,11 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
             versionId: data.sourceVersionId!,
             name: data.sourceName,
           }}
-          target={
-            hasFixedStaTarget
-              ? { urn: STA_TARGET_URN, name: STA_TARGET_NAME, tree: staTargetSchemaTree() }
-              : {
-                  datastructureId: data.targetDatastructureId!,
-                  versionId: data.targetVersionId!,
-                  name: data.targetName,
-                }
-          }
+          target={{
+            datastructureId: data.targetDatastructureId!,
+            versionId: data.targetVersionId!,
+            name: data.targetName,
+          }}
           config={data.mappingConfig}
           onSave={handleSave}
         />
