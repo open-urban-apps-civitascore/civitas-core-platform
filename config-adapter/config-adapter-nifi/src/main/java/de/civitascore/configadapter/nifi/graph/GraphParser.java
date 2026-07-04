@@ -19,8 +19,9 @@ import java.util.Map;
 public class GraphParser {
 
   /**
-   * Parses a pipeline graph. A {@code null} or empty map yields an empty graph rather than failing,
-   * so provide-style or malformed entries are handled gracefully by the caller.
+   * Parses a pipeline graph. A {@code null} or empty map yields an empty graph rather than failing
+   * here — the {@link FlowPath} derivation rejects it with its own message (an empty graph names no
+   * datasource), which is more actionable than a parse error.
    *
    * @param data the raw graph map ({@code viewport}/{@code nodes}/{@code edges})
    * @return the parsed graph
