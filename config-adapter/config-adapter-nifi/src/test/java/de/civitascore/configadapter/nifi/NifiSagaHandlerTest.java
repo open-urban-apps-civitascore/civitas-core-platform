@@ -85,14 +85,15 @@ class NifiSagaHandlerTest {
               ],
               "dataPipelines": [
                 { "id": "p-1", "version": "1", "action": "ADD",
+                  "dataSourceIds": ["ds-1"], "dataSinkIds": ["sk-1"],
                   "data": { "nodes": [
-                      { "id": "s", "type": "start", "data": {} },
+                      { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } },
                       { "id": "m", "type": "mapping",
                         "data": { "mappingConfig": { "fields": { "$.id": "$.id" } } } },
-                      { "id": "e", "type": "end", "data": {} } ],
+                      { "id": "sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } } ],
                     "edges": [
-                      { "id": "e1", "source": "s", "target": "m" },
-                      { "id": "e2", "source": "m", "target": "e" } ] } }
+                      { "id": "e1", "source": "src", "target": "m" },
+                      { "id": "e2", "source": "m", "target": "sink" } ] } }
               ]
             }
             """);
@@ -124,12 +125,13 @@ class NifiSagaHandlerTest {
               "operation": "DEPLOY_PIPELINES",
               "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
               "datasinks": [ { "id": "sk-1", "type": "POSTGIS", "configuration": %s, "dataStructure": %s } ],
-              "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD", "data": {
-                  "nodes": [ { "id": "s", "type": "start", "data": {} },
+              "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
+                "dataSourceIds": ["ds-1"], "dataSinkIds": ["sk-1"], "data": {
+                  "nodes": [ { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } },
                     { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": { "$.id": "$.id" } } } },
-                    { "id": "e", "type": "end", "data": {} } ],
-                  "edges": [ { "id": "e1", "source": "s", "target": "m" },
-                    { "id": "e2", "source": "m", "target": "e" } ] } } ] }
+                    { "id": "sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } } ],
+                  "edges": [ { "id": "e1", "source": "src", "target": "m" },
+                    { "id": "e2", "source": "m", "target": "sink" } ] } } ] }
             """
                 .formatted(configJson, dataStructureJson)));
   }
@@ -196,9 +198,8 @@ class NifiSagaHandlerTest {
 
   @Test
   void presentButNonObjectPipelineDataIsRejected() throws Exception {
-    // a null 'data' is a valid provide-style pipeline (empty graph), but a present-but-non-object
-    // 'data' is corrupt — coercing it to an empty graph would deploy a bare flow the user never
-    // described, so it must fail loud rather than silently.
+    // a present-but-non-object 'data' is corrupt — coercing it to an empty graph would misreport
+    // the failure as a missing datasource node instead of the real payload corruption.
     SagaCommandResult result =
         handler.handle(
             SagaCommandMessage.fromMap(
@@ -231,9 +232,8 @@ class NifiSagaHandlerTest {
   }
 
   /**
-   * A FROST-default-sink command (no datasink): the shared payload of the FROST deploy tests.
-   * {@code projectIdField} is a raw JSON member line (e.g. {@code "projectId": "5",}) or empty for
-   * an absent id.
+   * A FROST-sink command: the shared payload of the FROST deploy tests. {@code projectIdField} is a
+   * raw JSON member line (e.g. {@code "projectId": "5",}) or empty for an absent id.
    */
   private SagaCommandMessage frostCommand(String operation, String action, String projectIdField)
       throws Exception {
@@ -244,25 +244,26 @@ class NifiSagaHandlerTest {
               "adapter": "nifi", "operation": "%s",
               %s
               "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
-              "datasinks": [],
+              "datasinks": [ { "id": "sk-f", "type": "FROST", "configuration": {} } ],
               "dataPipelines": [ { "id": "p-1", "version": "1", "action": "%s",
+                "dataSourceIds": ["ds-1"], "dataSinkIds": ["sk-f"],
                 "data": { "nodes": [
-                    { "id": "s", "type": "start", "data": {} },
-                    { "id": "e", "type": "end", "data": {} } ],
-                  "edges": [ { "id": "e1", "source": "s", "target": "e" } ] } } ] }
+                    { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } },
+                    { "id": "sink", "type": "frost", "data": { "entityId": "sk-f" } } ],
+                  "edges": [ { "id": "e1", "source": "src", "target": "sink" } ] } } ] }
             """
                 .formatted(operation, projectIdField, action)));
   }
 
   @Test
-  void deployWithoutDatasinkDefaultsToFrost() throws Exception {
+  void deployResolvesFrostSinkNodeAndScopesFlowToProject() throws Exception {
     when(restClient.deployFlow(any())).thenReturn("pg-frost");
 
     SagaCommandResult result =
         handler.handle(frostCommand("DEPLOY_PIPELINES", "ADD", "\"projectId\": \"5\","));
 
-    // a FROST default sink consumes the raw STA envelope — no mapping node (a mapping would be
-    // rejected; see frostSinkWithMappingIsRejected in FlowDeploymentPlannerTest)
+    // the graph's frost sink node resolves against the datasinks catalog; the passthrough flow
+    // consumes the raw STA envelope (no mapping node)
     assertEquals("STEP_COMPLETED", result.type());
     ArgumentCaptor<DeploymentPlan> plan = ArgumentCaptor.forClass(DeploymentPlan.class);
     verify(restClient).deployFlow(plan.capture());
@@ -409,6 +410,128 @@ class NifiSagaHandlerTest {
 
     SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
     assertEquals("STEP_FAILED", result.type());
+  }
+
+  @Test
+  void unreferencedDatasinkInCatalogIsInert() throws Exception {
+    // A datasink of the dataset that no pipeline references must not affect the deploy — the
+    // catalog is dataset-wide, the association is per pipeline. (Previously any second entry
+    // failed every pipeline with a dataset-wide cardinality error.)
+    when(restClient.deployFlow(any())).thenReturn("pg-1");
+    Map<String, Object> payload =
+        map(
+            """
+            { "type": "EXECUTE_STEP", "sagaId": "s", "stepId": "d", "adapter": "nifi",
+              "operation": "DEPLOY_PIPELINES",
+              "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
+              "datasinks": [
+                { "id": "sk-1", "type": "POSTGIS", "configuration": { "tableName": "obs" },
+                  "dataStructure": { "properties": { "id": { "type": "string" } } } },
+                { "id": "sk-unused", "type": "POSTGIS", "configuration": { "tableName": "other" } }
+              ],
+              "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
+                "dataSourceIds": ["ds-1"], "dataSinkIds": ["sk-1"],
+                "data": { "nodes": [
+                    { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } },
+                    { "id": "sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } } ],
+                  "edges": [ { "id": "e1", "source": "src", "target": "sink" } ] } } ] }
+            """);
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals("STEP_COMPLETED", result.type());
+    verify(restClient, times(1)).deployFlow(any());
+  }
+
+  @Test
+  void pipelinesResolveTheirOwnSources() throws Exception {
+    // Two pipelines with different datasources deploy independently — the per-pipeline
+    // association picks each one's source from the catalog. (Previously the dataset-wide
+    // exactly-one check failed every pipeline of such a dataset.)
+    when(restClient.deployFlow(any())).thenReturn("pg-1", "pg-2");
+    Map<String, Object> payload =
+        map(
+            """
+            { "type": "EXECUTE_STEP", "sagaId": "s", "stepId": "d", "adapter": "nifi",
+              "operation": "DEPLOY_PIPELINES",
+              "datasources": [
+                { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["a/+"] },
+                { "id": "ds-2", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["b/+"] }
+              ],
+              "datasinks": [
+                { "id": "sk-1", "type": "POSTGIS", "configuration": { "tableName": "t1" } },
+                { "id": "sk-2", "type": "POSTGIS", "configuration": { "tableName": "t2" } }
+              ],
+              "dataPipelines": [
+                { "id": "p-1", "version": "1", "action": "ADD",
+                  "dataSourceIds": ["ds-1"], "dataSinkIds": ["sk-1"],
+                  "data": { "nodes": [
+                      { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } },
+                      { "id": "sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } } ],
+                    "edges": [ { "id": "e1", "source": "src", "target": "sink" } ] } },
+                { "id": "p-2", "version": "1", "action": "ADD",
+                  "dataSourceIds": ["ds-2"], "dataSinkIds": ["sk-2"],
+                  "data": { "nodes": [
+                      { "id": "src", "type": "dataSource", "data": { "entityId": "ds-2" } },
+                      { "id": "sink", "type": "geoPersistence", "data": { "entityId": "sk-2" } } ],
+                    "edges": [ { "id": "e1", "source": "src", "target": "sink" } ] } }
+              ] }
+            """);
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals("STEP_COMPLETED", result.type());
+    assertEquals(List.of("p-1", "p-2"), result.resultData().get("pipelineIds"));
+    verify(restClient, times(2)).deployFlow(any());
+  }
+
+  @Test
+  void pipelineWithoutSinkNodeFailsTheStep() throws Exception {
+    // The graph is authoritative and there is no implicit platform-FROST default any more: a
+    // pipeline without a wired sink node cannot deploy.
+    Map<String, Object> payload =
+        map(
+            """
+            { "type": "EXECUTE_STEP", "sagaId": "s", "stepId": "d", "adapter": "nifi",
+              "operation": "DEPLOY_PIPELINES", "projectId": "5",
+              "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
+              "datasinks": [],
+              "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
+                "dataSourceIds": ["ds-1"], "dataSinkIds": [],
+                "data": { "nodes": [
+                    { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } } ],
+                  "edges": [] } } ] }
+            """);
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals("STEP_FAILED", result.type());
+    verify(restClient, times(0)).deployFlow(any());
+  }
+
+  @Test
+  void graphEntityIdMissingFromPipelineAssociationFailsTheStep() throws Exception {
+    // The graph's source node must reference an entity the pipeline actually declares — a
+    // divergence between graph and dataSourceIds is a corrupt payload, not something to heal.
+    Map<String, Object> payload =
+        map(
+            """
+            { "type": "EXECUTE_STEP", "sagaId": "s", "stepId": "d", "adapter": "nifi",
+              "operation": "DEPLOY_PIPELINES",
+              "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
+              "datasinks": [ { "id": "sk-1", "type": "POSTGIS", "configuration": { "tableName": "obs" } } ],
+              "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
+                "dataSourceIds": ["ds-other"], "dataSinkIds": ["sk-1"],
+                "data": { "nodes": [
+                    { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } },
+                    { "id": "sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } } ],
+                  "edges": [ { "id": "e1", "source": "src", "target": "sink" } ] } } ] }
+            """);
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals("STEP_FAILED", result.type());
+    verify(restClient, times(0)).deployFlow(any());
   }
 
   @Test

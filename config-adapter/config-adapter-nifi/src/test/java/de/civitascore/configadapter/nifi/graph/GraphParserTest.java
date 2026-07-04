@@ -10,17 +10,18 @@
 package de.civitascore.configadapter.nifi.graph;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Parsing and payload-integrity contract of {@link GraphParser}/{@link PipelineGraph}. The flow
+ * semantics derived from a parsed graph are covered by {@link FlowPathTest}.
+ */
 class GraphParserTest {
 
   private final ObjectMapper mapper = new ObjectMapper();
@@ -53,29 +54,7 @@ class GraphParserTest {
 
     assertEquals(3, graph.nodes().size());
     assertEquals(2, graph.edges().size());
-  }
-
-  @Test
-  void findsMappingNodeWiredBetweenStartAndEnd() throws Exception {
-    PipelineGraph graph = parser.parse(map(WI1513_GRAPH));
-
-    Optional<GraphNode> mapping = graph.transformNode();
-    assertTrue(mapping.isPresent());
-    assertEquals("n-map", mapping.get().id());
-    assertTrue(mapping.get().data().containsKey("mappingConfig"));
-  }
-
-  @Test
-  void provideStyleWithoutMappingNodeDoesNotThrow() throws Exception {
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [ { "id": "n-start", "type": "start", "data": {} } ], "edges": [] }
-                """));
-
-    assertFalse(graph.transformNode().isPresent());
-    assertEquals(1, graph.nodes().size());
+    assertTrue(graph.nodes().get(1).data().containsKey("mappingConfig"));
   }
 
   @Test
@@ -84,117 +63,6 @@ class GraphParserTest {
 
     assertTrue(graph.nodes().isEmpty());
     assertTrue(graph.edges().isEmpty());
-    assertFalse(graph.transformNode().isPresent());
-  }
-
-  @Test
-  void toleratesRealFrontendNodeTypesAndFindsMapping() throws Exception {
-    // the editor emits dataSource/frost/geoPersistence nodes too; the adapter consumes only the
-    // mapping node and must tolerate the rest rather than reject the graph
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [
-                    { "id": "n-src", "type": "dataSource", "data": {} },
-                    { "id": "n-map", "type": "mapping",
-                      "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } },
-                    { "id": "n-geo", "type": "geoPersistence", "data": {} } ],
-                  "edges": [
-                    { "id": "e1", "source": "n-src", "target": "n-map" },
-                    { "id": "e2", "source": "n-map", "target": "n-geo" } ] }
-                """));
-
-    Optional<GraphNode> mapping = graph.transformNode();
-    assertTrue(mapping.isPresent());
-    assertEquals("n-map", mapping.get().id());
-  }
-
-  @Test
-  void cronTriggerNodeIsParsedAndExposesItsSchedule() throws Exception {
-    // the parser tolerates a cron node like any other; its cronExpression is exposed via
-    // triggerCron() to drive the source schedule (no longer rejected)
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [
-                    { "id": "n-start", "type": "start", "data": {} },
-                    { "id": "n-cron", "type": "cron", "data": { "cronExpression": "0 0 6 * * ?" } },
-                    { "id": "n-src", "type": "dataSource", "data": {} },
-                    { "id": "n-map", "type": "mapping",
-                      "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } },
-                    { "id": "n-frost", "type": "frost", "data": {} } ],
-                  "edges": [
-                    { "id": "e0", "source": "n-start", "target": "n-cron" },
-                    { "id": "e1", "source": "n-cron", "target": "n-src" },
-                    { "id": "e2", "source": "n-src", "target": "n-map" },
-                    { "id": "e3", "source": "n-map", "target": "n-frost" } ] }
-                """));
-
-    assertEquals(5, graph.nodes().size());
-    assertEquals(Optional.of("0 0 6 * * ?"), graph.triggerCron());
-  }
-
-  @Test
-  void detachedCronNodeIsRejected() throws Exception {
-    // a cron node with no edges is not part of the flow; it must not silently schedule the source
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [
-                    { "id": "n-cron", "type": "cron", "data": { "cronExpression": "0 0 6 * * ?" } },
-                    { "id": "n-src", "type": "dataSource", "data": {} },
-                    { "id": "n-frost", "type": "frost", "data": {} } ],
-                  "edges": [ { "id": "e1", "source": "n-src", "target": "n-frost" } ] }
-                """));
-
-    assertThrows(IllegalStateException.class, graph::triggerCron);
-  }
-
-  @Test
-  void triggerCronIsEmptyWithoutACronNode() throws Exception {
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [
-                    { "id": "n-map", "type": "mapping",
-                      "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } } ],
-                  "edges": [] }
-                """));
-
-    assertEquals(Optional.empty(), graph.triggerCron());
-  }
-
-  @Test
-  void multipleCronNodesAreRejected() throws Exception {
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [
-                    { "id": "c1", "type": "cron", "data": { "cronExpression": "0 0 6 * * ?" } },
-                    { "id": "c2", "type": "cron", "data": { "cronExpression": "0 0 7 * * ?" } } ],
-                  "edges": [] }
-                """));
-
-    assertThrows(IllegalStateException.class, graph::triggerCron);
-  }
-
-  @Test
-  void cronNodeWithBlankExpressionIsRejected() throws Exception {
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [
-                    { "id": "c1", "type": "cron", "data": { "cronExpression": "  " } } ],
-                  "edges": [] }
-                """));
-
-    assertThrows(IllegalStateException.class, graph::triggerCron);
   }
 
   @Test
@@ -215,78 +83,17 @@ class GraphParserTest {
   }
 
   @Test
-  void multipleMappingNodesAreRejected() throws Exception {
-    // the adapter builds a single transform; two mapping nodes are ambiguous and must fail loudly
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [
-                    { "id": "n-map1", "type": "mapping", "data": { "mappingConfig": {} } },
-                    { "id": "n-map2", "type": "mapping", "data": { "mappingConfig": {} } } ],
-                  "edges": [] }
-                """));
+  void duplicateNodeIdIsRejected() throws Exception {
+    Map<String, Object> data =
+        map(
+            """
+            { "nodes": [
+                { "id": "n-1", "type": "dataSource", "data": {} },
+                { "id": "n-1", "type": "mapping", "data": {} } ],
+              "edges": [] }
+            """);
 
-    assertThrows(IllegalStateException.class, graph::transformNode);
-  }
-
-  @Test
-  void disconnectedMappingNodeIsRejected() throws Exception {
-    // a mapping node not wired between a source and a sink must not be silently applied
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [
-                    { "id": "n-src", "type": "dataSource", "data": {} },
-                    { "id": "n-frost", "type": "frost", "data": {} },
-                    { "id": "n-map", "type": "mapping",
-                      "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } } ],
-                  "edges": [ { "id": "e1", "source": "n-src", "target": "n-frost" } ] }
-                """));
-
-    assertThrows(IllegalStateException.class, graph::transformNode);
-  }
-
-  @Test
-  void mappingMissingOutgoingEdgeIsRejected() throws Exception {
-    // wired in but not out (dangling) is also not a valid source→sink path
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [
-                    { "id": "n-src", "type": "dataSource", "data": {} },
-                    { "id": "n-map", "type": "mapping",
-                      "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } } ],
-                  "edges": [ { "id": "e1", "source": "n-src", "target": "n-map" } ] }
-                """));
-
-    assertThrows(IllegalStateException.class, graph::transformNode);
-  }
-
-  @Test
-  void mappingInSeparateComponentFromSourceSinkIsRejected() throws Exception {
-    // dataSource→frost is one component; the mapping is wired only between control nodes in a
-    // SECOND component — it is not actually in the data flow, so it must be rejected
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [
-                    { "id": "n-src", "type": "dataSource", "data": {} },
-                    { "id": "n-frost", "type": "frost", "data": {} },
-                    { "id": "n-start", "type": "start", "data": {} },
-                    { "id": "n-map", "type": "mapping",
-                      "data": { "mappingConfig": { "fields": { "$.a": "$.b" } } } },
-                    { "id": "n-end", "type": "end", "data": {} } ],
-                  "edges": [
-                    { "id": "e1", "source": "n-src", "target": "n-frost" },
-                    { "id": "e2", "source": "n-start", "target": "n-map" },
-                    { "id": "e3", "source": "n-map", "target": "n-end" } ] }
-                """));
-
-    assertThrows(IllegalStateException.class, graph::transformNode);
+    assertThrows(IllegalStateException.class, () -> parser.parse(data));
   }
 
   @Test
@@ -310,8 +117,8 @@ class GraphParserTest {
 
   @Test
   void edgeToUnknownNodeIsRejectedEvenWithoutMapping() throws Exception {
-    // graph-integrity checks apply to provide-style/no-mapping graphs too — a dangling edge must
-    // fail loud at construction, consistent with the mapping case
+    // graph-integrity checks apply to no-mapping graphs too — a dangling edge must fail loud at
+    // construction, consistent with the mapping case
     Map<String, Object> data =
         map(
             """
@@ -320,21 +127,6 @@ class GraphParserTest {
             """);
 
     assertThrows(IllegalStateException.class, () -> parser.parse(data));
-  }
-
-  @Test
-  void linearGraphWithoutMappingYieldsNoTransform() throws Exception {
-    PipelineGraph graph =
-        parser.parse(
-            map(
-                """
-                { "nodes": [
-                    { "id": "n-start", "type": "start", "data": {} },
-                    { "id": "n-end", "type": "end", "data": {} } ],
-                  "edges": [ { "id": "e1", "source": "n-start", "target": "n-end" } ] }
-                """));
-
-    assertFalse(graph.transformNode().isPresent());
   }
 
   @Test

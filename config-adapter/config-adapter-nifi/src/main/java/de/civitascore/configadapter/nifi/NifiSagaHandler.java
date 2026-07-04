@@ -33,7 +33,9 @@ import de.civitascore.configadapter.nifi.flow.stage.MqttSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.PostgisSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.SqlSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
+import de.civitascore.configadapter.nifi.graph.FlowPath;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
+import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import de.civitascore.configadapter.nifi.rest.NifiRestClient;
@@ -85,6 +87,8 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   private static final String FIELD_ID = "id";
   private static final String FIELD_ACTION = "action";
   private static final String FIELD_DATA = "data";
+  private static final String FIELD_DATA_SOURCE_IDS = "dataSourceIds";
+  private static final String FIELD_DATA_SINK_IDS = "dataSinkIds";
   // Saga-wide variable set by the FROST create/update-project step and propagated into every later
   // step's payload; scopes a FROST flow to the dataset's project.
   private static final String FIELD_PROJECT_ID = "projectId";
@@ -93,6 +97,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   private static final String ACTION_UPDATE = "UPDATE";
   private static final String ACTION_DELETE = "DELETE";
 
+  private final GraphParser graphParser = new GraphParser();
   private boolean tlsInsecure = true;
   private CredentialResolver credentialResolver;
   private FlowDeploymentPlanner planner;
@@ -303,9 +308,10 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       String projectId)
       throws FatalAdapterException, RetryableAdapterException {
     Object rawData = pipeline.get(FIELD_DATA);
-    // A missing graph (null) is a valid provide-style pipeline (empty graph). A present-but-non-map
-    // graph is a corrupt payload: silently treating it as empty would deploy a bare flow the user
-    // never described, so reject it.
+    // A present-but-non-map graph is a corrupt payload: silently treating it as empty would deploy
+    // a bare flow the user never described, so reject it. A missing graph (null) parses to an
+    // empty graph, which the path derivation below rejects with its own message — the graph is
+    // the authoritative data-flow description, a pipeline without one cannot deploy.
     Map<String, Object> graphData;
     if (rawData == null) {
       graphData = Map.of();
@@ -317,8 +323,18 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       throw new FatalAdapterException(
           AdapterErrorCode.INVALID_PAYLOAD, "pipeline '" + FIELD_DATA + "' must be an object");
     }
-    Datasource source = resolveSource(datasources);
-    SinkSpec sink = resolveSink(datasinks);
+    // The path is derived once more inside the planner for chain building; the derivation is a
+    // deterministic function of the graph, so both see the same source/sink nodes.
+    FlowPath path;
+    try {
+      path = FlowPath.of(graphParser.parse(graphData));
+    } catch (IllegalStateException e) {
+      throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, e, e.getMessage());
+    }
+    Datasource source =
+        resolveSource(path.source(), stringList(pipeline.get(FIELD_DATA_SOURCE_IDS)), datasources);
+    SinkSpec sink =
+        resolveSink(path.sink(), stringList(pipeline.get(FIELD_DATA_SINK_IDS)), datasinks);
     // A FROST flow must be scoped to the dataset's project — unscoped it would post to the server
     // root, invisible to the project-scoped named API. The id is a saga-wide variable from the
     // FROST create/update-project step, so its absence means a mis-ordered or hand-crafted saga.
@@ -348,31 +364,59 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     return value == null ? null : String.valueOf(value);
   }
 
-  private static Datasource resolveSource(List<Datasource> datasources)
+  /**
+   * Resolves the pipeline's own datasource: the graph's source node names the entity, the
+   * pipeline's {@code dataSourceIds} confirm the association, and the trigger's dataset-wide {@code
+   * datasources} array is the configuration catalog the id resolves against. Entries in the catalog
+   * that this pipeline does not reference are simply not consulted — other pipelines of the dataset
+   * may use them.
+   */
+  private static Datasource resolveSource(
+      GraphNode sourceNode, List<String> dataSourceIds, List<Datasource> datasources)
       throws FatalAdapterException {
-    if (datasources.size() == 1) {
-      return datasources.get(0);
-    }
-    throw new FatalAdapterException(
-        AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-        "expected exactly one datasource per pipeline, got " + datasources.size());
-  }
-
-  @SuppressWarnings("unchecked")
-  private static SinkSpec resolveSink(List<Map<String, Object>> datasinks)
-      throws FatalAdapterException {
-    // No explicit datasink means the pipeline posts to the platform FROST (the default sink); only
-    // POSTGIS sinks carry an explicit datasinks[] entry (table name). The sink's data structure is
-    // not consumed here — the PostGIS adapter owns the table DDL; this adapter only writes records.
-    if (datasinks.isEmpty()) {
-      return new SinkSpec(SinkType.FROST, null);
-    }
-    if (datasinks.size() != 1) {
+    String entityId = entityId(sourceNode, "datasource");
+    if (!dataSourceIds.contains(entityId)) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          "expected at most one datasink per pipeline, got " + datasinks.size());
+          "pipeline references datasource '"
+              + entityId
+              + "' that is not part of the trigger"
+              + " payload");
     }
-    Map<String, Object> sink = datasinks.get(0);
+    return datasources.stream()
+        .filter(ds -> entityId.equals(ds.getId()))
+        .findFirst()
+        .orElseThrow(
+            () ->
+                new FatalAdapterException(
+                    AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+                    "pipeline references datasource '"
+                        + entityId
+                        + "' that is not part of the"
+                        + " trigger payload"));
+  }
+
+  /** Resolves the pipeline's own datasink — same id-based catalog lookup as the source. */
+  @SuppressWarnings("unchecked")
+  private static SinkSpec resolveSink(
+      GraphNode sinkNode, List<String> dataSinkIds, List<Map<String, Object>> datasinks)
+      throws FatalAdapterException {
+    String entityId = entityId(sinkNode, "datasink");
+    Map<String, Object> sink =
+        dataSinkIds.contains(entityId)
+            ? datasinks.stream()
+                .filter(s -> entityId.equals(asString(s.get(FIELD_ID))))
+                .findFirst()
+                .orElse(null)
+            : null;
+    if (sink == null) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "pipeline references datasink '"
+              + entityId
+              + "' that is not part of the trigger"
+              + " payload");
+    }
     SinkType type =
         SinkType.fromRaw(asString(sink.get("type")))
             .orElseThrow(
@@ -388,6 +432,31 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     // types would be unused and (per SinkSpec's invariant) rejected, so only POSTGIS gets one.
     List<String> primaryKey = type == SinkType.POSTGIS ? resolvePrimaryKey(sink) : List.of();
     return new SinkSpec(type, tableName, primaryKey);
+  }
+
+  /** The graph node's configured entity id — an unconfigured node cannot be resolved. */
+  private static String entityId(GraphNode node, String role) throws FatalAdapterException {
+    Object entityId = node.data().get("entityId");
+    if (entityId instanceof String id && !id.isBlank()) {
+      return id;
+    }
+    throw new FatalAdapterException(
+        AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+        role + " node '" + node.id() + "' carries no entityId; the node is not configured");
+  }
+
+  /** The payload member as a list of its non-null string items (absent/other yields empty). */
+  private static List<String> stringList(Object raw) {
+    if (!(raw instanceof List<?> list)) {
+      return List.of();
+    }
+    List<String> values = new ArrayList<>();
+    for (Object item : list) {
+      if (item instanceof String text) {
+        values.add(text);
+      }
+    }
+    return List.copyOf(values);
   }
 
   /**

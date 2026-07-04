@@ -736,13 +736,13 @@ class FlowDeploymentPlannerTest {
         map(
             """
             { "nodes": [
-                { "id": "n-start", "type": "start", "data": {} },
+                { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.count": { "op": "toInt", "input": "$.n" } } } } },
-                { "id": "n-end", "type": "end", "data": {} } ],
+                { "id": "n-sink", "type": "geoPersistence", "data": { "entityId": "sink-1" } } ],
               "edges": [
-                { "id": "e1", "source": "n-start", "target": "n-map" },
-                { "id": "e2", "source": "n-map", "target": "n-end" } ] }
+                { "id": "e1", "source": "n-src", "target": "n-map" },
+                { "id": "e2", "source": "n-map", "target": "n-sink" } ] }
             """);
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       DeploymentPlan plan =
@@ -790,16 +790,16 @@ class FlowDeploymentPlannerTest {
         map(
             """
             { "nodes": [
-                { "id": "n-start", "type": "start", "data": {} },
+                { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
                     "fields": {
                       "$.station_id": "$.station_id",
                       "$.unit": { "op": "const", "value": "celsius" }
                     } } } },
-                { "id": "n-end", "type": "end", "data": {} } ],
+                { "id": "n-sink", "type": "geoPersistence", "data": { "entityId": "sink-1" } } ],
               "edges": [
-                { "id": "e1", "source": "n-start", "target": "n-map" },
-                { "id": "e2", "source": "n-map", "target": "n-end" } ] }
+                { "id": "e1", "source": "n-src", "target": "n-map" },
+                { "id": "e2", "source": "n-map", "target": "n-sink" } ] }
             """);
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       DeploymentPlan plan =
@@ -815,10 +815,10 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
-  void toleratesRealFrontendNodeTypes() throws Exception {
-    // the editor emits source/sink nodes (dataSource, frost, geoPersistence) alongside the mapping
-    // —
-    // the adapter must tolerate them and still build, not reject the graph
+  void unbuildableGraphTopologyIsRejectedAsTemplateError() throws Exception {
+    // The graph is the authoritative data-flow description: a second sink node wired into the
+    // flow is rejected at plan time (FlowPath), surfaced as a template error with the
+    // node-anchored message the editor mirrors.
     Map<String, Object> graph =
         map(
             """
@@ -834,11 +834,20 @@ class FlowDeploymentPlannerTest {
                 { "id": "e3", "source": "n-frost", "target": "n-geo" } ] }
             """);
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
-      DeploymentPlan plan =
-          planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest("p-real", graph, mqttSource(null), postgisSink()));
-      assertTrue(plan.snapshotJson().contains("/a")); // the mapping was still found and compiled
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-real", graph, mqttSource(null), postgisSink())));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          ex.getErrorCode());
+      assertTrue(
+          ex.getMessage().contains("pipeline graph has 2 datasink nodes; exactly one is"),
+          ex.getMessage());
     }
   }
 

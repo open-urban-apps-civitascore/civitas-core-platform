@@ -98,25 +98,34 @@ public final class NifiTestFixtures {
   }
 
   static Map<String, Object> graphWithMapping() throws Exception {
+    return graphWithMapping("geoPersistence");
+  }
+
+  static Map<String, Object> graphWithMapping(String sinkType) throws Exception {
     return map(
         """
         {
           "nodes": [
             { "id": "n-start", "type": "start", "data": {} },
+            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
             { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
                 "fields": {
                   "$.station_id": "$.station_id",
                   "$.temperature": "$.temperature",
                   "$.observed_at": { "op": "toDate", "input": "$.ts", "pattern": "yyyy-MM-dd" }
                 } } } },
+            { "id": "n-sink", "type": "%s", "data": { "entityId": "sink-1" } },
             { "id": "n-end", "type": "end", "data": {} }
           ],
           "edges": [
-            { "id": "e1", "source": "n-start", "target": "n-map" },
-            { "id": "e2", "source": "n-map", "target": "n-end" }
+            { "id": "e1", "source": "n-start", "target": "n-src" },
+            { "id": "e2", "source": "n-src", "target": "n-map" },
+            { "id": "e3", "source": "n-map", "target": "n-sink" },
+            { "id": "e4", "source": "n-sink", "target": "n-end" }
           ]
         }
-        """);
+        """
+            .formatted(sinkType));
   }
 
   static Map<String, Object> graphWithGeoPoint() throws Exception {
@@ -125,15 +134,19 @@ public final class NifiTestFixtures {
         {
           "nodes": [
             { "id": "n-start", "type": "start", "data": {} },
+            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
             { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
                 "fields": {
                   "$.location": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" }
                 } } } },
+            { "id": "n-sink", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
             { "id": "n-end", "type": "end", "data": {} }
           ],
           "edges": [
-            { "id": "e1", "source": "n-start", "target": "n-map" },
-            { "id": "e2", "source": "n-map", "target": "n-end" }
+            { "id": "e1", "source": "n-start", "target": "n-src" },
+            { "id": "e2", "source": "n-src", "target": "n-map" },
+            { "id": "e3", "source": "n-map", "target": "n-sink" },
+            { "id": "e4", "source": "n-sink", "target": "n-end" }
           ]
         }
         """);
@@ -149,6 +162,7 @@ public final class NifiTestFixtures {
         {
           "nodes": [
             { "id": "n-start", "type": "start", "data": {} },
+            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
             { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
                 "fields": {
                   "$.things[].name": "$.station",
@@ -159,11 +173,14 @@ public final class NifiTestFixtures {
                   "$.observations[].parameters.reference": "$.ref",
                   "$.observations[].parameters.name": "$.dsName"
                 } } } },
+            { "id": "n-sink", "type": "frost", "data": { "entityId": "sink-1" } },
             { "id": "n-end", "type": "end", "data": {} }
           ],
           "edges": [
-            { "id": "e1", "source": "n-start", "target": "n-map" },
-            { "id": "e2", "source": "n-map", "target": "n-end" }
+            { "id": "e1", "source": "n-start", "target": "n-src" },
+            { "id": "e2", "source": "n-src", "target": "n-map" },
+            { "id": "e3", "source": "n-map", "target": "n-sink" },
+            { "id": "e4", "source": "n-sink", "target": "n-end" }
           ]
         }
         """);
@@ -176,35 +193,48 @@ public final class NifiTestFixtures {
         {
           "nodes": [
             { "id": "n-start", "type": "start", "data": {} },
+            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
             { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
                 "fields": { "$.things[].name": "$.station" } } } },
+            { "id": "n-sink", "type": "frost", "data": { "entityId": "sink-1" } },
             { "id": "n-end", "type": "end", "data": {} }
           ],
           "edges": [
-            { "id": "e1", "source": "n-start", "target": "n-map" },
-            { "id": "e2", "source": "n-map", "target": "n-end" }
+            { "id": "e1", "source": "n-start", "target": "n-src" },
+            { "id": "e2", "source": "n-src", "target": "n-map" },
+            { "id": "e3", "source": "n-map", "target": "n-sink" },
+            { "id": "e4", "source": "n-sink", "target": "n-end" }
           ]
         }
         """);
   }
 
-  /**
-   * A graph with no mapping node (source feeds the sink directly) — e.g. a FROST find-or-create.
-   */
+  /** A graph with no mapping node — the source feeds the sink directly. */
   static Map<String, Object> graphWithoutMapping() throws Exception {
+    return graphWithoutMapping("geoPersistence");
+  }
+
+  static Map<String, Object> graphWithoutMapping(String sinkType) throws Exception {
     return map(
         """
         {
           "nodes": [
             { "id": "n-start", "type": "start", "data": {} },
+            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
+            { "id": "n-sink", "type": "%s", "data": { "entityId": "sink-1" } },
             { "id": "n-end", "type": "end", "data": {} }
           ],
-          "edges": [ { "id": "e1", "source": "n-start", "target": "n-end" } ]
+          "edges": [
+            { "id": "e1", "source": "n-start", "target": "n-src" },
+            { "id": "e2", "source": "n-src", "target": "n-sink" },
+            { "id": "e3", "source": "n-sink", "target": "n-end" }
+          ]
         }
-        """);
+        """
+            .formatted(sinkType));
   }
 
-  /** A start → cron → mapping → end graph (cron wired into the functional component). */
+  /** A full chain with the cron trigger wired in front of the source. */
   static Map<String, Object> graphWithCron(String cronExpression) throws Exception {
     return map(
         """
@@ -212,14 +242,18 @@ public final class NifiTestFixtures {
           "nodes": [
             { "id": "n-start", "type": "start", "data": {} },
             { "id": "n-cron", "type": "cron", "data": { "cronExpression": "%s" } },
+            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
             { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
                 "fields": { "$.a": "$.b" } } } },
+            { "id": "n-sink", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
             { "id": "n-end", "type": "end", "data": {} }
           ],
           "edges": [
             { "id": "e1", "source": "n-start", "target": "n-cron" },
-            { "id": "e2", "source": "n-cron", "target": "n-map" },
-            { "id": "e3", "source": "n-map", "target": "n-end" }
+            { "id": "e2", "source": "n-cron", "target": "n-src" },
+            { "id": "e3", "source": "n-src", "target": "n-map" },
+            { "id": "e4", "source": "n-map", "target": "n-sink" },
+            { "id": "e5", "source": "n-sink", "target": "n-end" }
           ]
         }
         """

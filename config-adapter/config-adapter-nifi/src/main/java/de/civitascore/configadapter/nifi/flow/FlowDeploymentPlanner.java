@@ -20,8 +20,8 @@ import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
 import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
+import de.civitascore.configadapter.nifi.graph.FlowPath;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
-import de.civitascore.configadapter.nifi.graph.PipelineGraph;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
@@ -29,6 +29,7 @@ import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import de.civitascore.configadapter.nifi.mapping.StaEnvelopeCompiler;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -81,39 +82,42 @@ public class FlowDeploymentPlanner {
    * @throws FatalAdapterException if the source/sink is unsupported or the mapping is invalid
    */
   public DeploymentPlan plan(PipelineDeploymentRequest request) throws FatalAdapterException {
-    PipelineGraph graph;
+    FlowPath path;
     try {
-      graph = graphParser.parse(request.graphData());
+      // parse() rejects a corrupt payload (missing/duplicate node id, edge to an unknown node);
+      // of() rejects an unbuildable topology — both fail loud so a malformed graph never deploys
+      // silently.
+      path = FlowPath.of(graphParser.parse(request.graphData()));
     } catch (IllegalStateException e) {
-      // a corrupt graph payload (missing/duplicate node id, edge to an unknown node) — rejected at
-      // construction so a malformed graph never deploys silently
       throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, e, e.getMessage());
     }
-    Optional<MappingConfig> mapping = parseMapping(graph);
-    Optional<String> sourceCron = parseTriggerCron(graph);
+    List<MappingConfig> mappingConfigs = parseMappings(path);
+    Optional<String> sourceCron = validatedTriggerCron(path);
     SinkSpec sink = request.sink();
     SinkStage sinkStage = registry.sink(sink.type());
-    if (mapping.isPresent() && sinkStage.mappingSupport() == MappingSupport.NONE) {
+    if (!mappingConfigs.isEmpty() && sinkStage.mappingSupport() == MappingSupport.NONE) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR, sinkStage.mappingRejectionMessage());
     }
-    // compile() throws a checked FatalAdapterException (an op may be unrenderable for the sink),
-    // which a lambda in Optional.map() cannot propagate — hence the explicit isPresent() branches.
-    List<CompiledMapping> mappings = List.of();
+    List<CompiledMapping> mappings = new ArrayList<>();
     FrostEnvelopePlan staEnvelope = null;
-    if (mapping.isPresent()) {
-      if (sinkStage.mappingSupport() == MappingSupport.ENVELOPE) {
-        // Raw-JSON sink: compile into flat intermediate fields plus the envelope rebuild plan the
-        // sink's build half turns into the split/capture/ReplaceText pre-region.
-        StaEnvelopeCompiler.EnvelopeCompilation compilation =
-            staEnvelopeCompiler.compile(mapping.get());
-        mappings = List.of(new CompiledMapping(compilation.flatProperties()));
-        staEnvelope = compilation.plan();
-      } else {
-        mappings =
-            List.of(
-                new CompiledMapping(
-                    recordPathCompiler.compile(mapping.get(), sinkStage.geometryEncoding())));
+    if (!mappingConfigs.isEmpty() && sinkStage.mappingSupport() == MappingSupport.ENVELOPE) {
+      // Raw-JSON sink: intermediate mappings stay plain record transforms; the LAST mapping before
+      // the sink carries the STA target paths and compiles into flat intermediate fields plus the
+      // envelope rebuild plan the sink's build half turns into the split/capture/ReplaceText
+      // pre-region.
+      for (MappingConfig config : mappingConfigs.subList(0, mappingConfigs.size() - 1)) {
+        mappings.add(
+            new CompiledMapping(recordPathCompiler.compile(config, sinkStage.geometryEncoding())));
+      }
+      StaEnvelopeCompiler.EnvelopeCompilation compilation =
+          staEnvelopeCompiler.compile(mappingConfigs.get(mappingConfigs.size() - 1));
+      mappings.add(new CompiledMapping(compilation.flatProperties()));
+      staEnvelope = compilation.plan();
+    } else {
+      for (MappingConfig config : mappingConfigs) {
+        mappings.add(
+            new CompiledMapping(recordPathCompiler.compile(config, sinkStage.geometryEncoding())));
       }
     }
 
@@ -167,36 +171,24 @@ public class FlowDeploymentPlanner {
     return new DeploymentPlan(processGroupName, snapshot, Map.copyOf(out.sensitive()));
   }
 
-  private Optional<MappingConfig> parseMapping(PipelineGraph graph) throws FatalAdapterException {
-    Optional<GraphNode> mappingNode;
-    try {
-      mappingNode = graph.transformNode();
-    } catch (IllegalStateException e) {
-      // an unbuildable graph topology (unsupported node kind, multiple/disconnected mapping nodes)
-      throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, e, e.getMessage());
+  /** Parses each on-path mapping node's config, in flow order. */
+  private List<MappingConfig> parseMappings(FlowPath path) throws FatalAdapterException {
+    List<MappingConfig> configs = new ArrayList<>();
+    for (GraphNode node : path.mappings()) {
+      Object rawConfig = node.data().get("mappingConfig");
+      if (rawConfig == null) {
+        // A wired mapping node must carry a config; a missing one is a corrupted payload that
+        // would otherwise deploy untransformed. (A pipeline with no mapping node at all is fine.)
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_TEMPLATE_ERROR, "mapping node has no mappingConfig");
+      }
+      configs.add(mappingConfigParser.parse(mapper.valueToTree(rawConfig)));
     }
-    if (mappingNode.isEmpty()) {
-      return Optional.empty();
-    }
-    Object rawConfig = mappingNode.get().data().get("mappingConfig");
-    if (rawConfig == null) {
-      // A wired mapping node must carry a config; a missing one is a corrupted payload that would
-      // otherwise deploy untransformed. (A pipeline with no mapping node at all is fine — handled
-      // above by the empty Optional.)
-      throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_TEMPLATE_ERROR, "mapping node has no mappingConfig");
-    }
-    return Optional.of(mappingConfigParser.parse(mapper.valueToTree(rawConfig)));
+    return configs;
   }
 
-  private Optional<String> parseTriggerCron(PipelineGraph graph) throws FatalAdapterException {
-    Optional<String> cron;
-    try {
-      cron = graph.triggerCron();
-    } catch (IllegalStateException e) {
-      // an unbuildable schedule (multiple cron nodes, blank expression)
-      throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, e, e.getMessage());
-    }
+  private Optional<String> validatedTriggerCron(FlowPath path) throws FatalAdapterException {
+    Optional<String> cron = path.triggerCron();
     if (cron.isPresent() && !isValidNifiCron(cron.get())) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR, "invalid NiFi cron expression: " + cron.get());
