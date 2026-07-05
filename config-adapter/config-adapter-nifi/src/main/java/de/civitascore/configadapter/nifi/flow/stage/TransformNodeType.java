@@ -13,7 +13,7 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.nifi.graph.NodeKind;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.CompiledTransform;
-import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
+import de.civitascore.configadapter.nifi.mapping.SinkPreRegionPlan;
 import java.util.List;
 import java.util.Objects;
 
@@ -42,12 +42,11 @@ public interface TransformNodeType {
    * The compiled units of one kind, aligned 1:1 with the nodes passed to {@link #compile}.
    *
    * @param units the chain units, one per node, in flow order
-   * @param staEnvelope the envelope rebuild plan for a mapped FROST sink, or {@code null}. The
-   *     mapped-FROST flow rebuilds records into the SensorThings envelope inside the sink's build
-   *     region, but the plan is compiled from the last mapping — so the mapping kind produces it
-   *     and the spec carries it to the sink.
+   * @param sinkPreRegion the handoff to the sink's build region, or {@code null}. Today: the STA
+   *     envelope rebuild plan a mapped FROST flow needs — compiled from the last mapping, so the
+   *     mapping kind produces it and the spec carries it to the sink, which validates it.
    */
-  record Compilation(List<CompiledTransform> units, FrostEnvelopePlan staEnvelope) {
+  record Compilation(List<CompiledTransform> units, SinkPreRegionPlan sinkPreRegion) {
     public Compilation {
       units = List.copyOf(Objects.requireNonNull(units, "units"));
     }

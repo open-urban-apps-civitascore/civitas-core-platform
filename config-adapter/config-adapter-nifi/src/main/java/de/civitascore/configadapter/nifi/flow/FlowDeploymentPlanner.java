@@ -24,7 +24,7 @@ import de.civitascore.configadapter.nifi.graph.GraphParser;
 import de.civitascore.configadapter.nifi.graph.NodeKind;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.CompiledTransform;
-import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
+import de.civitascore.configadapter.nifi.mapping.SinkPreRegionPlan;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -127,7 +127,7 @@ public class FlowDeploymentPlanner {
                 chain.units(),
                 out.controllerServiceProperties(),
                 sourceCron.orElse(null),
-                chain.staEnvelope()));
+                chain.sinkPreRegion()));
 
     return new DeploymentPlan(processGroupName, snapshot, Map.copyOf(out.sensitive()));
   }
@@ -145,20 +145,20 @@ public class FlowDeploymentPlanner {
       byKind.computeIfAbsent(kindOf(node), k -> new ArrayList<>()).add(node);
     }
     Map<NodeKind, Iterator<CompiledTransform>> unitsByKind = new LinkedHashMap<>();
-    FrostEnvelopePlan staEnvelope = null;
+    SinkPreRegionPlan sinkPreRegion = null;
     for (Map.Entry<NodeKind, List<GraphNode>> entry : byKind.entrySet()) {
       TransformNodeType nodeType = registry.transformNodeType(entry.getKey());
       Compilation compilation = nodeType.compile(entry.getValue(), sinkStage);
       unitsByKind.put(entry.getKey(), compilation.units().iterator());
-      if (compilation.staEnvelope() != null) {
-        staEnvelope = compilation.staEnvelope();
+      if (compilation.sinkPreRegion() != null) {
+        sinkPreRegion = compilation.sinkPreRegion();
       }
     }
     List<CompiledTransform> ordered = new ArrayList<>();
     for (GraphNode node : path.transforms()) {
       ordered.add(unitsByKind.get(kindOf(node)).next());
     }
-    return new Compilation(ordered, staEnvelope);
+    return new Compilation(ordered, sinkPreRegion);
   }
 
   /**

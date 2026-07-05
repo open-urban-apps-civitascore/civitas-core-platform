@@ -22,7 +22,8 @@ import java.util.Objects;
  *     the EvaluateJsonPath capture properties are appended in exactly this order (the snapshot is
  *     byte-deterministic, so no map iteration may decide it)
  */
-public record FrostEnvelopePlan(String template, List<String> flatKeys) {
+public record FrostEnvelopePlan(String template, List<String> flatKeys)
+    implements SinkPreRegionPlan {
 
   public FrostEnvelopePlan {
     Objects.requireNonNull(template, "template");

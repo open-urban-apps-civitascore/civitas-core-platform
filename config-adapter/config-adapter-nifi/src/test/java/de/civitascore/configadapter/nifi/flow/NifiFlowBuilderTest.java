@@ -25,6 +25,7 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.stage.FrostSinkStage;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
+import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -408,6 +409,27 @@ class NifiFlowBuilderTest {
     assertTrue(
         ex.getMessage()
             .contains("a record mapping was compiled for a raw-JSON sink but no envelope plan"));
+  }
+
+  @Test
+  void postgisSinkRejectsAPreRegionPlan() {
+    // The pre-region slot is sink-neutral; a sink that cannot consume the variant must fail the
+    // build instead of silently dropping the compiled transform output.
+    FlowBuildSpec spec =
+        new FlowBuildSpec(
+            "pipeline-postgis-preregion",
+            SourceType.MQTT,
+            Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", "t"),
+            SinkType.POSTGIS,
+            Map.of("Table Name", "t"),
+            compiled(mapping()),
+            Map.of(
+                "PostGISConnectionPool",
+                Map.of("Database Connection URL", "jdbc:postgresql://db:5432/x")),
+            null,
+            new FrostEnvelopePlan("{}", java.util.List.of()));
+    FatalAdapterException ex = assertThrows(FatalAdapterException.class, () -> builder.build(spec));
+    assertTrue(ex.getMessage().contains("POSTGIS sink cannot consume a pre-region plan"));
   }
 
   @Test

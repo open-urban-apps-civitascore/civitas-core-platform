@@ -19,6 +19,7 @@ import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
+import de.civitascore.configadapter.nifi.mapping.SinkPreRegionPlan;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -194,9 +195,22 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
    */
   private Processor buildEnvelopeRegion(
       BuildContext ctx, Processor upstreamTail, Processor errorSink) throws FatalAdapterException {
-    FrostEnvelopePlan plan = ctx.spec().staEnvelope();
-    if (plan == null) {
+    SinkPreRegionPlan handoff = ctx.spec().sinkPreRegion();
+    if (handoff == null) {
+      // The build is reachable directly (golden tests), not only through the planner: a compiled
+      // mapping without an envelope rebuild plan would silently vanish inside the envelope — fail
+      // the build instead.
+      if (ctx.spec().mappingPresent()) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+            "a record mapping was compiled for a raw-JSON sink but no envelope plan was built");
+      }
       return upstreamTail;
+    }
+    if (!(handoff instanceof FrostEnvelopePlan plan)) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "FROST sink cannot consume the pre-region plan " + handoff.getClass().getSimpleName());
     }
     Processor split = ctx.loadProcessor(Fragment.SPLIT_JSON, "split", "staRecordSplit");
     setProp(split, "JsonPath Expression", "$[*]");

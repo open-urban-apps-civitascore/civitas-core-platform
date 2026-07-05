@@ -145,6 +145,12 @@ public final class PostgisSinkStage implements SinkStage<PostgisSinkSpec> {
   public void build(
       BuildContext ctx, Processor upstreamTail, List<Processor> upstreamFailureSources)
       throws FatalAdapterException {
+    // A pre-region plan the sink cannot consume must fail the build: dropping it silently would
+    // swallow transform output the user configured.
+    if (ctx.spec().sinkPreRegion() != null) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR, "POSTGIS sink cannot consume a pre-region plan");
+    }
     Processor sink = ctx.loadProcessor(Fragment.PUT_DATABASE_RECORD, null);
     ctx.spec().sinkProperties().forEach((key, value) -> BuildContext.setProp(sink, key, value));
     ctx.addProcessor(sink);
