@@ -57,50 +57,54 @@ describe('node flow declarations mirror the adapter stages', () => {
 
   describe('dataSource', () => {
     const decl = NODE_FLOW_DECLARATIONS[PIPELINE_NODE_TYPES.DataSource]
+    if (decl.role !== 'source') throw new Error('dataSource must declare the source role')
 
     it('MQTT emits the SensorThings envelope and rejects a schedule (push source)', () => {
-      expect(decl.output?.(sourceData('MQTT'))).toBe('STA_ENVELOPE')
-      expect(decl.acceptsSchedule?.(sourceData('MQTT'))).toBe(false)
+      expect(decl.output(sourceData('MQTT'))).toBe('STA_ENVELOPE')
+      expect(decl.acceptsSchedule(sourceData('MQTT'))).toBe(false)
     })
 
     it('SQL emits records and accepts a schedule (pull source)', () => {
-      expect(decl.output?.(sourceData('SQL'))).toBe('RECORDS')
-      expect(decl.acceptsSchedule?.(sourceData('SQL'))).toBe(true)
+      expect(decl.output(sourceData('SQL'))).toBe('RECORDS')
+      expect(decl.acceptsSchedule(sourceData('SQL'))).toBe(true)
     })
 
     it('an unknown connector cannot be verified either way', () => {
-      expect(decl.output?.(sourceData())).toBeUndefined()
-      expect(decl.acceptsSchedule?.(sourceData())).toBeUndefined()
-      expect(decl.output?.(sourceData('HTTP'))).toBeUndefined()
-      expect(decl.acceptsSchedule?.(sourceData('HTTP'))).toBeUndefined()
+      expect(decl.output(sourceData())).toBeUndefined()
+      expect(decl.acceptsSchedule(sourceData())).toBeUndefined()
+      expect(decl.output(sourceData('HTTP'))).toBeUndefined()
+      expect(decl.acceptsSchedule(sourceData('HTTP'))).toBeUndefined()
     })
   })
 
   describe('mapping', () => {
     const decl = NODE_FLOW_DECLARATIONS[PIPELINE_NODE_TYPES.Mapping]
+    if (decl.role !== 'transform') throw new Error('mapping must declare the transform role')
 
     it('is a RECORDS → RECORDS transform', () => {
-      expect(decl.output?.(anyData)).toBe('RECORDS')
-      expect(decl.acceptedInputs?.({ mappedUpstream: false })).toEqual(['RECORDS'])
-      expect(decl.acceptedInputs?.({ mappedUpstream: true })).toEqual(['RECORDS'])
+      expect(decl.output(anyData)).toBe('RECORDS')
+      expect(decl.acceptedInputs({ mappedUpstream: false })).toEqual(['RECORDS'])
+      expect(decl.acceptedInputs({ mappedUpstream: true })).toEqual(['RECORDS'])
     })
   })
 
   describe('frost sink', () => {
     const decl = NODE_FLOW_DECLARATIONS[PIPELINE_NODE_TYPES.Frost]
+    if (decl.role !== 'sink') throw new Error('frost must declare the sink role')
 
     it('demands the envelope in passthrough mode and records with a mapping upstream', () => {
-      expect(decl.acceptedInputs?.({ mappedUpstream: false })).toEqual(['STA_ENVELOPE'])
-      expect(decl.acceptedInputs?.({ mappedUpstream: true })).toEqual(['RECORDS'])
+      expect(decl.acceptedInputs({ mappedUpstream: false })).toEqual(['STA_ENVELOPE'])
+      expect(decl.acceptedInputs({ mappedUpstream: true })).toEqual(['RECORDS'])
     })
   })
 
   describe('geoPersistence sink', () => {
     const decl = NODE_FLOW_DECLARATIONS[PIPELINE_NODE_TYPES.GeoPersistence]
+    if (decl.role !== 'sink') throw new Error('geoPersistence must declare the sink role')
 
     it('always consumes records, independent of a mapping upstream', () => {
-      expect(decl.acceptedInputs?.({ mappedUpstream: false })).toEqual(['RECORDS'])
-      expect(decl.acceptedInputs?.({ mappedUpstream: true })).toEqual(['RECORDS'])
+      expect(decl.acceptedInputs({ mappedUpstream: false })).toEqual(['RECORDS'])
+      expect(decl.acceptedInputs({ mappedUpstream: true })).toEqual(['RECORDS'])
     })
   })
 })

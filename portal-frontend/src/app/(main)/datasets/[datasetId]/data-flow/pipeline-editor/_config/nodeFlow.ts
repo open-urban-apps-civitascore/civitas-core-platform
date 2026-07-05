@@ -24,28 +24,54 @@ export const CONVERTIBLE_TO_RECORDS: ReadonlySet<PayloadForm> = new Set(['RAW_JS
 export type NodeFlowRole = 'source' | 'transform' | 'sink' | 'trigger' | 'control'
 
 /**
- * What a node type contributes to the data flow. Only wiring decides how these declarations are
- * combined — node existence on the canvas never does.
+ * The payload form the node emits. `undefined` when it cannot be determined from the node data
+ * (e.g. a source whose connector is unknown) — the caller must then skip the check rather than
+ * guess.
  */
-export interface NodeFlowDeclaration {
-  role: NodeFlowRole
+type OutputFn = (data: PipelineNodeData) => PayloadForm | undefined
+
+/**
+ * The payload forms the node consumes. `RECORDS` implicitly also admits the
+ * `CONVERTIBLE_TO_RECORDS` forms. `mappedUpstream` reflects the wiring, never node existence.
+ */
+type AcceptedInputsFn = (ctx: { mappedUpstream: boolean }) => readonly PayloadForm[]
+
+export interface SourceFlowDeclaration {
+  readonly role: 'source'
+  readonly output: OutputFn
   /**
-   * The payload form the node emits (source/transform). `undefined` when it cannot be determined
-   * from the node data (e.g. a source whose connector is unknown) — the caller must then skip the
-   * check rather than guess.
+   * Whether the node's trigger port takes a cron schedule. The port holds at most one schedule.
+   * `undefined` when the connector is unknown and it cannot be verified either way.
    */
-  output?: (data: PipelineNodeData) => PayloadForm | undefined
-  /**
-   * The payload forms the node consumes (sink/transform). `RECORDS` implicitly also admits the
-   * `CONVERTIBLE_TO_RECORDS` forms. `mappedUpstream` reflects the wiring, never node existence.
-   */
-  acceptedInputs?: (ctx: { mappedUpstream: boolean }) => readonly PayloadForm[]
-  /**
-   * Whether the node's trigger port takes a cron schedule (source only). The port holds at most
-   * one schedule. `undefined` when the connector is unknown and it cannot be verified either way.
-   */
-  acceptsSchedule?: (data: PipelineNodeData) => boolean | undefined
+  readonly acceptsSchedule: (data: PipelineNodeData) => boolean | undefined
 }
+
+export interface TransformFlowDeclaration {
+  readonly role: 'transform'
+  readonly output: OutputFn
+  readonly acceptedInputs: AcceptedInputsFn
+}
+
+export interface SinkFlowDeclaration {
+  readonly role: 'sink'
+  readonly acceptedInputs: AcceptedInputsFn
+}
+
+export interface PassiveFlowDeclaration {
+  readonly role: 'trigger' | 'control'
+}
+
+/**
+ * What a node type contributes to the data flow — a union discriminated by role, so a declaration
+ * carrying a capability its role does not have (e.g. a sink with an output) is unrepresentable.
+ * Only wiring decides how these declarations are combined — node existence on the canvas never
+ * does.
+ */
+export type NodeFlowDeclaration =
+  | SourceFlowDeclaration
+  | TransformFlowDeclaration
+  | SinkFlowDeclaration
+  | PassiveFlowDeclaration
 
 const DATA_SOURCE_OUTPUT_BY_CONNECTOR: Record<string, PayloadForm> = {
   MQTT: 'STA_ENVELOPE',
@@ -55,7 +81,7 @@ const DATA_SOURCE_OUTPUT_BY_CONNECTOR: Record<string, PayloadForm> = {
 const dataSourceConnector = (data: PipelineNodeData): string | undefined =>
   isDataSourceNodeData(data) ? data.entityMetadata?.connector : undefined
 
-export const NODE_FLOW_DECLARATIONS: Record<PipelineNodeType, NodeFlowDeclaration> = {
+export const NODE_FLOW_DECLARATIONS: Readonly<Record<PipelineNodeType, NodeFlowDeclaration>> = {
   [PIPELINE_NODE_TYPES.Start]: { role: 'control' },
   [PIPELINE_NODE_TYPES.End]: { role: 'control' },
   [PIPELINE_NODE_TYPES.Cron]: { role: 'trigger' },

@@ -81,23 +81,18 @@ export interface PipelineValidationResult {
   warnings: PipelineValidationWarning[]
 }
 
-export interface PipelineValidationError {
+interface PipelineValidationIssue<S extends 'error' | 'warning'> {
   id: string
   type: 'node' | 'edge' | 'structure'
   elementId?: string
   messageKey: string
   messageParams?: Record<string, string | number>
-  severity: 'error'
+  severity: S
 }
 
-export interface PipelineValidationWarning {
-  id: string
-  type: 'node' | 'edge' | 'structure'
-  elementId?: string
-  messageKey: string
-  messageParams?: Record<string, string | number>
-  severity: 'warning'
-}
+export type PipelineValidationError = PipelineValidationIssue<'error'>
+
+export type PipelineValidationWarning = PipelineValidationIssue<'warning'>
 
 // ============================================================================
 // Validation Rule Types
@@ -641,9 +636,11 @@ const validateEdgeCompatibility: ValidationRule = {
       const downstream = nodesById.get(edge.target)
       if (!upstream || !downstream || !isFunctionalNode(upstream) || !isFunctionalNode(downstream)) return
 
-      const acceptedInputs = flowDeclOf(downstream)?.acceptedInputs
-      if (!acceptedInputs) return
-      const offered = flowDeclOf(upstream)?.output?.(upstream.data)
+      const downstreamDecl = flowDeclOf(downstream)
+      if (!downstreamDecl || !('acceptedInputs' in downstreamDecl)) return
+      const acceptedInputs = downstreamDecl.acceptedInputs
+      const upstreamDecl = flowDeclOf(upstream)
+      const offered = upstreamDecl && 'output' in upstreamDecl ? upstreamDecl.output(upstream.data) : undefined
       // an undeterminable form (unknown source connector) cannot be verified either way
       if (offered === undefined) return
 
@@ -775,7 +772,9 @@ const validateFlowShape: ValidationRule = {
       errors.push(errorAt(cron, 'validation.messages.cronTriggerCapacity', { label: nodeLabel(cron) }))
     })
     if (schedulingCrons.length > 0) {
-      const canSchedule = flowDeclOf(source)?.acceptsSchedule?.(source.data)
+      const sourceDecl = flowDeclOf(source)
+      const canSchedule =
+        sourceDecl && 'acceptsSchedule' in sourceDecl ? sourceDecl.acceptsSchedule(source.data) : undefined
       schedulingCrons.forEach(cron => {
         if (canSchedule === false) {
           errors.push(errorAt(cron, 'validation.messages.cronMqttIncompatible'))
