@@ -212,6 +212,21 @@ describe('validateFrostMappingCoversStaGroups', () => {
       }
       expect(has(wiredToFrost(unsaved), NO_ELEMENT_KEY)).toBe(false)
     })
+
+    it('binds only to the last mapping of a chain before the FROST sink', () => {
+      const first = staMapping({})
+      const last: TestNode = { ...staMapping({}), id: 'map-2' }
+      const pipeline: Pipeline = {
+        ...pipelineWith([frostSink, first, last]),
+        edges: [
+          { id: 'e1', source: first.id, target: last.id },
+          { id: 'e2', source: last.id, target: frostSink.id },
+        ] as Pipeline['edges'],
+      }
+      const errors = validatePipeline(pipeline).errors.filter(error => error.messageKey === NO_ELEMENT_KEY)
+      expect(errors).toHaveLength(1)
+      expect(errors[0].elementId).toBe('map-2')
+    })
   })
 })
 
@@ -250,10 +265,16 @@ const geoAt = (id: string): TestNode => ({
   data: { label: id, configured: true, entityType: 'persistence', tableName: id },
 })
 
-const mappingAt = (id: string): TestNode => ({
+const mappingAt = (id: string, schema?: Record<string, unknown>): TestNode => ({
   id,
   type: 'mapping',
-  data: { label: id, configured: true, mappingConfig: { fields: {}, positions: {} }, targetRequiredFields: [] },
+  data: {
+    label: id,
+    configured: true,
+    mappingConfig: { fields: {}, positions: {} },
+    targetRequiredFields: [],
+    ...schema,
+  },
 })
 
 const cronAt = (id: string): TestNode => ({
@@ -535,6 +556,58 @@ describe('validateEdgeCompatibility', () => {
     const pipeline = graph([sourceAt('src-1'), frostAt('frost-1')], [{ source: 'src-1', target: 'frost-1' }])
     expect(errorsFor(pipeline, 'sqlSourceToFrost')).toEqual([])
     expect(errorsFor(pipeline, 'edgeFormIncompatible')).toEqual([])
+  })
+})
+
+describe('validateMappingChainStructure', () => {
+  const CHAIN_KEY = 'mappingChainStructureMismatch'
+
+  const writes = (targetId: string, targetVersion: string, targetName?: string) => ({
+    targetDatastructureId: targetId,
+    targetVersionId: targetVersion,
+    targetName,
+  })
+  const reads = (sourceId: string, sourceVersion: string, sourceName?: string) => ({
+    sourceDatastructureId: sourceId,
+    sourceVersionId: sourceVersion,
+    sourceName,
+  })
+
+  const chain = (first: TestNode, second: TestNode): Pipeline =>
+    graph(
+      [sourceAt('src-1', 'SQL'), first, second, geoAt('geo-1')],
+      [
+        { source: 'src-1', target: first.id },
+        { source: first.id, target: second.id },
+        { source: second.id, target: 'geo-1' },
+      ],
+    )
+
+  it('accepts a chain where the downstream mapping reads what the upstream one writes', () => {
+    const pipeline = chain(mappingAt('map-1', writes('ds-b', 'v1')), mappingAt('map-2', reads('ds-b', 'v1')))
+    expect(errorsFor(pipeline, CHAIN_KEY)).toEqual([])
+  })
+
+  it('rejects a broken chain at the downstream mapping, naming both datastructures', () => {
+    const pipeline = chain(
+      mappingAt('map-1', writes('ds-b', 'v1', 'Structure B')),
+      mappingAt('map-2', reads('ds-c', 'v1', 'Structure C')),
+    )
+    const errors = errorsFor(pipeline, CHAIN_KEY)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('map-2')
+    expect(errors[0].messageParams?.expected).toBe('Structure B')
+    expect(errors[0].messageParams?.actual).toBe('Structure C')
+  })
+
+  it('rejects a version mismatch on the same datastructure', () => {
+    const pipeline = chain(mappingAt('map-1', writes('ds-b', 'v1')), mappingAt('map-2', reads('ds-b', 'v2')))
+    expect(errorsFor(pipeline, CHAIN_KEY)).toHaveLength(1)
+  })
+
+  it('skips mappings whose schema selection is incomplete (nodeConfigured owns those)', () => {
+    const pipeline = chain(mappingAt('map-1'), mappingAt('map-2', reads('ds-c', 'v1')))
+    expect(errorsFor(pipeline, CHAIN_KEY)).toEqual([])
   })
 })
 

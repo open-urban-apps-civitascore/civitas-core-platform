@@ -1255,7 +1255,8 @@
         "noDataPath": "Es gibt keinen Datenfluss-Pfad von der Datenquelle zur Datensenke",
         "mappingNotOnPath": "{label} liegt nicht auf dem Datenfluss-Pfad zwischen Datenquelle und Datensenke",
         "cronTriggerCapacity": "{label} ist ein zusätzlicher Zeitplan-Trigger an der Datenquelle; der Trigger-Port fasst höchstens einen",
-        "edgeFormIncompatible": "{label} kann {form} von {upstreamLabel} nicht verarbeiten; akzeptiert wird: {accepted}"
+        "edgeFormIncompatible": "{label} kann {form} von {upstreamLabel} nicht verarbeiten; akzeptiert wird: {accepted}",
+        "mappingChainStructureMismatch": "{label} setzt die Mapping-Kette nicht fort: {upstreamLabel} gibt {expected} aus, aber {label} liest {actual}"
       }
     },
     "toolbar": {

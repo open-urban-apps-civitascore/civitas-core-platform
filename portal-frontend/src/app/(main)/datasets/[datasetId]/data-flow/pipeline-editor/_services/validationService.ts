@@ -382,57 +382,63 @@ const validateSqlSourceHasExplicitSchedule: ValidationRule = {
 }
 
 /**
- * Whether the given node has a downstream path (following edge direction) to a FROST sink node. A
- * mapping's target mode depends on the sink it actually feeds — a FROST node standing unconnected
- * elsewhere on the canvas must not flip an unrelated mapping onto the STA envelope. Shared with the
- * MappingPanel, which fixes the mapping target to the STA envelope on the same condition.
+ * The mappings that directly feed a FROST sink — the last mapping of each chain, found by walking
+ * the wiring backwards from every FROST node and stopping at the first mapping per path. In a
+ * mapping chain only this final mapping carries the STA target paths (the sink's envelope rebuild
+ * compiles exactly it); earlier mappings are ordinary record transformations. Wiring-based — a
+ * FROST node standing unconnected elsewhere on the canvas must not flip an unrelated mapping's
+ * rules.
  */
-export const hasFrostSinkDownstream = (pipeline: Pick<Pipeline, 'nodes' | 'edges'>, nodeId: string): boolean => {
-  const frostIds = new Set(pipeline.nodes.filter(node => node.type === PIPELINE_NODE_TYPES.Frost).map(node => node.id))
-  if (frostIds.size === 0) return false
+const lastMappingsBeforeFrostSinks = (pipeline: Pick<Pipeline, 'nodes' | 'edges'>): Set<string> => {
+  const result = new Set<string>()
+  const mappingIds = new Set(
+    pipeline.nodes.filter(node => node.type === PIPELINE_NODE_TYPES.Mapping).map(node => node.id),
+  )
 
-  const outgoing = new Map<string, string[]>()
+  const incoming = new Map<string, string[]>()
   pipeline.edges.forEach(edge => {
-    const targets = outgoing.get(edge.source) ?? []
-    targets.push(edge.target)
-    outgoing.set(edge.source, targets)
+    incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source])
   })
 
-  const queue = [nodeId]
+  const queue = pipeline.nodes.filter(node => node.type === PIPELINE_NODE_TYPES.Frost).map(node => node.id)
   const visited = new Set(queue)
   while (queue.length > 0) {
-    for (const next of outgoing.get(queue.shift()!) ?? []) {
-      if (frostIds.has(next)) return true
-      if (!visited.has(next)) {
-        visited.add(next)
-        queue.push(next)
+    for (const previous of incoming.get(queue.shift()!) ?? []) {
+      if (visited.has(previous)) continue
+      visited.add(previous)
+      if (mappingIds.has(previous)) {
+        result.add(previous)
+      } else {
+        queue.push(previous)
       }
     }
   }
-  return false
+  return result
 }
 
 /**
- * Rule: a mapping feeding a FROST sink targets the fixed STA envelope, whose required-ness is
- * conditional per group — once a group ($.things[] / $.observations[]) is mapped at all, its
- * required paths (most importantly the find-or-create lookup keys) must all be assigned, and at
- * least one group must be mapped. The unconditional `targetRequiredFields` snapshot cannot express
- * this (it stays empty for STA targets), so this rule owns it — mirroring the adapter's
- * server-side StaEnvelopeCompiler validation, which would otherwise fail the deploy saga.
+ * Rule: the last mapping before a FROST sink targets the STA-shaped datastructure, whose
+ * required-ness is conditional per group — once a group ($.things[] / $.observations[]) is mapped
+ * at all, its required paths (most importantly the find-or-create lookup keys) must all be
+ * assigned, and at least one group must be mapped. The unconditional `targetRequiredFields`
+ * snapshot cannot express this (it stays empty for STA targets), so this rule owns it — mirroring
+ * the adapter's server-side StaEnvelopeCompiler validation, which compiles exactly this final
+ * mapping and would otherwise fail the deploy saga. Earlier mappings of a chain are ordinary
+ * record transformations covered by the required-target-fields rule.
  */
 const validateFrostMappingCoversStaGroups: ValidationRule = {
   id: 'frost-mapping-sta-group-coverage',
   name: 'FROST Mapping Covers STA Groups',
-  description: 'A mapping feeding a FROST sink must cover the required paths of every STA group it touches',
+  description: 'The last mapping before a FROST sink must cover the required paths of every STA group it touches',
   validate: (pipeline: Pipeline) => {
     const errors: PipelineValidationError[] = []
+    const staMappingIds = lastMappingsBeforeFrostSinks(pipeline)
 
     pipeline.nodes.forEach(node => {
       if (!isMappingNodeData(node.data)) return
       // a not-yet-configured/saved node is reported by other rules; avoid double errors
       if (!node.data.configured || node.data.targetRequiredFields === undefined) return
-      // only a mapping that actually feeds the FROST sink targets the STA envelope
-      if (!hasFrostSinkDownstream(pipeline, node.id)) return
+      if (!staMappingIds.has(node.id)) return
       const label = node.data.label || node.type
 
       const assigned = Object.entries(node.data.mappingConfig?.fields ?? {})
@@ -766,6 +772,47 @@ const validateFlowShape: ValidationRule = {
   },
 }
 
+/**
+ * Rule: each mapping→mapping data edge must continue the chain — the upstream mapping writes its
+ * target datastructure (id + version), so the downstream mapping must read exactly that as its
+ * source, or its field paths resolve against a schema that never arrives. Anchored at the
+ * downstream mapping (it declares the wrong input). A mapping whose schema selection is still
+ * incomplete is left to validateNodeConfiguration.
+ */
+const validateMappingChainStructure: ValidationRule = {
+  id: 'mapping-chain-structure',
+  name: 'Mapping Chain Structure',
+  description: "Each mapping in a chain must read its predecessor's target datastructure",
+  validate: (pipeline: Pipeline) => {
+    const errors: PipelineValidationError[] = []
+    const nodesById = new Map(pipeline.nodes.map(node => [node.id, node]))
+
+    pipeline.edges.forEach(edge => {
+      const upstream = nodesById.get(edge.source)
+      const downstream = nodesById.get(edge.target)
+      if (upstream?.type !== PIPELINE_NODE_TYPES.Mapping || downstream?.type !== PIPELINE_NODE_TYPES.Mapping) return
+      if (!isMappingNodeData(upstream.data) || !isMappingNodeData(downstream.data)) return
+
+      const written = { id: upstream.data.targetDatastructureId, version: upstream.data.targetVersionId }
+      const read = { id: downstream.data.sourceDatastructureId, version: downstream.data.sourceVersionId }
+      if (!written.id || !read.id) return
+      const isSameVersion = !written.version || !read.version || written.version === read.version
+      if (written.id === read.id && isSameVersion) return
+
+      errors.push(
+        errorAt(downstream, 'validation.messages.mappingChainStructureMismatch', {
+          label: nodeLabel(downstream),
+          upstreamLabel: nodeLabel(upstream),
+          expected: upstream.data.targetName || written.id,
+          actual: downstream.data.sourceName || read.id,
+        }),
+      )
+    })
+
+    return { errors, warnings: [] }
+  },
+}
+
 /** A mapping value counts as assigned only if it is a non-blank string or a (non-null) op node. */
 const isNonEmptyMappingValue = (value: unknown): boolean =>
   typeof value === 'string' ? value.trim() !== '' : value != null
@@ -848,6 +895,7 @@ export const VALIDATION_RULES: ValidationRule[] = [
   validateUniqueGeoPersistenceTableNames,
   validateFlowShape,
   validateEdgeCompatibility,
+  validateMappingChainStructure,
   validateSqlSourceHasExplicitSchedule,
   validateFrostMappingCoversStaGroups,
   validateCronAndMappingWired,

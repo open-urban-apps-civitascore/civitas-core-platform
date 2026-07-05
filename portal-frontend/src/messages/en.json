@@ -1268,7 +1268,8 @@
         "noDataPath": "There is no data path from the data source to the data sink",
         "mappingNotOnPath": "{label} is not on the data path between the data source and the data sink",
         "cronTriggerCapacity": "{label} is an additional schedule trigger on the data source; its trigger port holds at most one",
-        "edgeFormIncompatible": "{label} cannot consume {form} from {upstreamLabel}; it accepts: {accepted}"
+        "edgeFormIncompatible": "{label} cannot consume {form} from {upstreamLabel}; it accepts: {accepted}",
+        "mappingChainStructureMismatch": "{label} does not continue the mapping chain: {upstreamLabel} outputs {expected}, but {label} reads {actual}"
       }
     },
     "toolbar": {
