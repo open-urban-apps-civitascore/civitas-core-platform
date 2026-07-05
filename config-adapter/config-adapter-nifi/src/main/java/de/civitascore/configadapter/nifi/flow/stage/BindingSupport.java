@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.nifi.flow.stage;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 
 /** Shared value coercions for the plan-time binding halves of the stages. */
@@ -29,7 +30,7 @@ public final class BindingSupport {
     }
     List<String> raw =
         value instanceof List<?> list
-            ? list.stream().map(String::valueOf).toList()
+            ? list.stream().filter(Objects::nonNull).map(String::valueOf).toList()
             : List.of(String.valueOf(value));
     return raw.stream().map(String::trim).filter(s -> !s.isEmpty()).toList();
   }
