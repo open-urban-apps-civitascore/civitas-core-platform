@@ -350,58 +350,6 @@ const validateUniqueGeoPersistenceTableNames: ValidationRule = {
 }
 
 /**
- * Rule: a CRON trigger schedules the source processor. An MQTT source is push-based (it self-
- * triggers on broker messages), so a cron there cannot drive the data — the pipeline engine rejects
- * this combination at deploy. Surface it here so the user sees it on "Validate" instead of as a
- * failed deployment. Cron belongs with a pull source (SQL). A source whose connector is unknown
- * (legacy node or a failed metadata fetch) cannot be verified either way, so it warns rather than
- * silently passing.
- */
-const validateCronRequiresNonMqttSource: ValidationRule = {
-  id: 'cron-requires-non-mqtt-source',
-  name: 'CRON Requires Non-MQTT Source',
-  description: 'A CRON trigger cannot be combined with an MQTT (push) data source',
-  validate: (pipeline: Pipeline) => {
-    const hasCron = pipeline.nodes.some(node => node.type === PIPELINE_NODE_TYPES.Cron)
-    if (!hasCron) return { errors: [], warnings: [] }
-
-    const sourceConnectors = pipeline.nodes
-      .filter(node => node.type === PIPELINE_NODE_TYPES.DataSource && isDataSourceNodeData(node.data))
-      .map(node => (isDataSourceNodeData(node.data) ? node.data.entityMetadata?.connector : undefined))
-
-    if (sourceConnectors.some(connector => connector === 'MQTT')) {
-      return {
-        errors: [
-          {
-            id: crypto.randomUUID(),
-            type: 'structure',
-            messageKey: 'validation.messages.cronMqttIncompatible',
-            severity: 'error',
-          },
-        ],
-        warnings: [],
-      }
-    }
-
-    if (sourceConnectors.some(connector => !connector)) {
-      return {
-        errors: [],
-        warnings: [
-          {
-            id: crypto.randomUUID(),
-            type: 'structure',
-            messageKey: 'validation.messages.cronSourceConnectorUnknown',
-            severity: 'warning',
-          },
-        ],
-      }
-    }
-
-    return { errors: [], warnings: [] }
-  },
-}
-
-/**
  * Rule: a SQL source with no CRON node still polls on the engine's hidden default (every 5 minutes).
  * That is easy to miss, so warn — the user can add a CRON node for an explicit schedule.
  */
@@ -429,42 +377,6 @@ const validateSqlSourceHasExplicitSchedule: ValidationRule = {
           severity: 'warning',
         },
       ],
-    }
-  },
-}
-
-/**
- * Rule: without a field mapping, a FROST sink consumes the SensorThings envelope from the source
- * as-is — only an MQTT SensorThings source emits that shape, so a mapping-less SQL→FROST pipeline
- * is rejected by the engine at deploy. With a mapping node the engine rebuilds the envelope from
- * the mapped record, so any source (including SQL) works. Surface the remaining forbidden
- * combination at edit time.
- */
-const validateSqlSourceNotToFrost: ValidationRule = {
-  id: 'sql-source-not-to-frost',
-  name: 'SQL Source Not To FROST Without Mapping',
-  description: 'A SQL source can only write to a FROST sink through a field mapping',
-  validate: (pipeline: Pipeline) => {
-    const hasFrostSink = pipeline.nodes.some(node => node.type === PIPELINE_NODE_TYPES.Frost)
-    const hasMapping = pipeline.nodes.some(node => node.type === PIPELINE_NODE_TYPES.Mapping)
-    const hasSqlSource = pipeline.nodes.some(
-      node =>
-        node.type === PIPELINE_NODE_TYPES.DataSource &&
-        isDataSourceNodeData(node.data) &&
-        node.data.entityMetadata?.connector === 'SQL',
-    )
-    if (!hasFrostSink || !hasSqlSource || hasMapping) return { errors: [], warnings: [] }
-
-    return {
-      errors: [
-        {
-          id: crypto.randomUUID(),
-          type: 'structure',
-          messageKey: 'validation.messages.sqlSourceToFrost',
-          severity: 'error',
-        },
-      ],
-      warnings: [],
     }
   },
 }
@@ -563,8 +475,10 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
 /**
  * Rule: a CRON trigger and a mapping node only take effect when wired into the flow (an incoming AND
  * an outgoing edge). The engine rejects a half-wired node at deploy; a detached node here would
- * otherwise be silently ignored or fail late. Mirrors the connectivity checks in the adapter's
- * PipelineGraph.
+ * otherwise be silently ignored or fail late. Mirrors the wiredness checks in the adapter's
+ * FlowPath derivation. Not folded into validateFlowShape: its path and trigger checks deliberately
+ * skip half-wired mappings and crons and leave them to this rule (the orphan rule only catches
+ * nodes with no edge at all).
  */
 const validateCronAndMappingWired: ValidationRule = {
   id: 'cron-mapping-wired',
@@ -934,9 +848,7 @@ export const VALIDATION_RULES: ValidationRule[] = [
   validateUniqueGeoPersistenceTableNames,
   validateFlowShape,
   validateEdgeCompatibility,
-  validateCronRequiresNonMqttSource,
   validateSqlSourceHasExplicitSchedule,
-  validateSqlSourceNotToFrost,
   validateFrostMappingCoversStaGroups,
   validateCronAndMappingWired,
   validateMappingCoversRequiredTargetFields,

@@ -4,8 +4,6 @@ import type { Pipeline, PipelineNode } from '../_types/pipeline'
 import { createEmptyPipeline } from './pipelineService'
 import { isValidNifiCron, validatePipeline } from './validationService'
 
-const CRON_MQTT_KEY = 'validation.messages.cronMqttIncompatible'
-
 interface TestNode {
   id: string
   type: string
@@ -16,21 +14,6 @@ const pipelineWith = (nodes: TestNode[]): Pipeline => ({
   ...createEmptyPipeline('test'),
   nodes: nodes.map(node => ({ ...node, position: { x: 0, y: 0 } })) as unknown as PipelineNode[],
 })
-
-const cronNode: TestNode = {
-  id: 'cron-1',
-  type: 'cron',
-  data: { label: 'CRON', configured: true, cronExpression: '0 0 6 * * ?' },
-}
-
-const source = (connector: string): TestNode => ({
-  id: 'src-1',
-  type: 'dataSource',
-  data: { label: 'Source', configured: true, entityType: 'datasource', entityMetadata: { connector } },
-})
-
-const hasCronMqttError = (pipeline: Pipeline): boolean =>
-  validatePipeline(pipeline).errors.some(error => error.messageKey === CRON_MQTT_KEY)
 
 const REQUIRED_FIELDS_KEY = 'validation.messages.mappingRequiredFieldsMissing'
 const MAPPING_NOT_SAVED_KEY = 'validation.messages.mappingNotSaved'
@@ -135,34 +118,7 @@ describe('validateMappingCoversRequiredTargetFields', () => {
   })
 })
 
-describe('validateCronRequiresNonMqttSource', () => {
-  it('rejects a CRON trigger combined with an MQTT source', () => {
-    expect(hasCronMqttError(pipelineWith([cronNode, source('MQTT')]))).toBe(true)
-  })
-
-  it('allows a CRON trigger with a SQL source', () => {
-    expect(hasCronMqttError(pipelineWith([cronNode, source('SQL')]))).toBe(false)
-  })
-
-  it('does not flag a pipeline without a CRON node', () => {
-    expect(hasCronMqttError(pipelineWith([source('MQTT')]))).toBe(false)
-  })
-
-  it('warns (does not error) when a CRON source connector is unknown', () => {
-    const unknownSource: TestNode = {
-      id: 'src-1',
-      type: 'dataSource',
-      data: { label: 'Source', configured: true, entityType: 'datasource', entityMetadata: {} },
-    }
-    const result = validatePipeline(pipelineWith([cronNode, unknownSource]))
-    expect(result.errors.some(error => error.messageKey === CRON_MQTT_KEY)).toBe(false)
-    expect(
-      result.warnings.some(warning => warning.messageKey === 'validation.messages.cronSourceConnectorUnknown'),
-    ).toBe(true)
-  })
-})
-
-describe('sink/source combination rules mirror the deploy engine', () => {
+describe('validateFrostMappingCoversStaGroups', () => {
   const frostSink: TestNode = { id: 'frost-1', type: 'frost', data: { label: 'FROST', configured: true } }
 
   const staMapping = (fields: Record<string, unknown>): TestNode => ({
@@ -185,24 +141,7 @@ describe('sink/source combination rules mirror the deploy engine', () => {
   const has = (pipeline: Pipeline, key: string): boolean =>
     validatePipeline(pipeline).errors.some(error => error.messageKey === key)
 
-  it('rejects a SQL source writing to a FROST sink without a mapping', () => {
-    expect(has(pipelineWith([source('SQL'), frostSink]), 'validation.messages.sqlSourceToFrost')).toBe(true)
-  })
-
-  it('allows a SQL source writing to a FROST sink through a mapping (the engine rebuilds the envelope)', () => {
-    expect(
-      has(
-        pipelineWith([source('SQL'), frostSink, staMapping(fullThingsFields)]),
-        'validation.messages.sqlSourceToFrost',
-      ),
-    ).toBe(false)
-  })
-
-  it('allows an MQTT source writing to a FROST sink', () => {
-    expect(has(pipelineWith([source('MQTT'), frostSink]), 'validation.messages.sqlSourceToFrost')).toBe(false)
-  })
-
-  describe('validateFrostMappingCoversStaGroups', () => {
+  describe('STA group coverage', () => {
     const NO_ELEMENT_KEY = 'validation.messages.frostMappingNoStaElement'
     const GROUP_KEY = 'validation.messages.frostMappingGroupIncomplete'
 
