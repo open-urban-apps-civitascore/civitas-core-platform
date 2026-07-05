@@ -90,15 +90,9 @@ public class StaEnvelopeCompiler {
 
     List<UpdateRecordProperty> flatProperties = new ArrayList<>();
     for (Map.Entry<String, ValueNode> field : mapping.fields().entrySet()) {
-      UpdateRecordProperty property =
-          recordPathCompiler.compileField(
-              "/" + flatKeyByPath.get(field.getKey()), field.getValue(), GeometryEncoding.GEOJSON);
-      // UpdateRecord evaluates NiFi EL in dynamic property values (both strategies), so a tenant
-      // const/separator containing ${ENV_VAR} would expand and exfiltrate into the record. $$ is
-      // EL's literal escape — same rationale as rejectExpressionLanguage in the SQL path.
       flatProperties.add(
-          new UpdateRecordProperty(
-              property.recordPath(), property.value().replace("$", "$$"), property.strategy()));
+          recordPathCompiler.compileField(
+              "/" + flatKeyByPath.get(field.getKey()), field.getValue(), GeometryEncoding.GEOJSON));
     }
 
     String template = renderTemplate(mapping, flatKeyByPath);
