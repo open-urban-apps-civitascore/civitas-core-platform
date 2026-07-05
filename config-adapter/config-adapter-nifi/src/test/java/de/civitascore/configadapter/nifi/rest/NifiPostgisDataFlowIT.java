@@ -132,13 +132,17 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
             """
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.stationid": "$.stationid", "$.count": "$.count",
                                 "$.meta": "$.meta" } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
-                { "id": "e1", "source": "s", "target": "m" },
-                { "id": "e2", "source": "m", "target": "e" } ] }
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
             """);
 
     Datasource source = new Datasource();
@@ -189,13 +193,17 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
             """
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.stationid": "$.stationid",
                                 "$.geom": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" } } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
-                { "id": "e1", "source": "s", "target": "m" },
-                { "id": "e2", "source": "m", "target": "e" } ] }
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
             """);
 
     Datasource source = new Datasource();
@@ -243,13 +251,17 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
             """
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.stationid": "$.stationid",
                                 "$.geom": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" } } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
-                { "id": "e1", "source": "s", "target": "m" },
-                { "id": "e2", "source": "m", "target": "e" } ] }
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
             """);
 
     Datasource source = new Datasource();

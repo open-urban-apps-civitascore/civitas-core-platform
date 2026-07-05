@@ -122,13 +122,17 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
                 { "id": "c", "type": "cron", "data": { "cronExpression": "%s" } },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.stationid": "$.stationid", "$.temperature": "$.temperature" } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "c" },
-                { "id": "e2", "source": "c", "target": "m" },
-                { "id": "e3", "source": "m", "target": "e" } ] }
+                { "id": "e2", "source": "c", "target": "src" },
+                { "id": "e3", "source": "src", "target": "m" },
+                { "id": "e4", "source": "m", "target": "k" },
+                { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND));
 
@@ -159,14 +163,18 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
                 { "id": "c", "type": "cron", "data": { "cronExpression": "%s" } },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.stationid": "$.stationid",
                                 "$.geom": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" } } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "c" },
-                { "id": "e2", "source": "c", "target": "m" },
-                { "id": "e3", "source": "m", "target": "e" } ] }
+                { "id": "e2", "source": "c", "target": "src" },
+                { "id": "e3", "source": "src", "target": "m" },
+                { "id": "e4", "source": "m", "target": "k" },
+                { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND));
 
@@ -194,13 +202,17 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
                 { "id": "c", "type": "cron", "data": { "cronExpression": "%s" } },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.stationid": "$.stationid", "$.temperature": "$.temperature" } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "c" },
-                { "id": "e2", "source": "c", "target": "m" },
-                { "id": "e3", "source": "m", "target": "e" } ] }
+                { "id": "e2", "source": "c", "target": "src" },
+                { "id": "e3", "source": "src", "target": "m" },
+                { "id": "e4", "source": "m", "target": "k" },
+                { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND));
 
@@ -237,13 +249,17 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
                 { "id": "c", "type": "cron", "data": { "cronExpression": "%s" } },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.stationId": "$.stationId", "$.tempValue": "$.tempValue" } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "c" },
-                { "id": "e2", "source": "c", "target": "m" },
-                { "id": "e3", "source": "m", "target": "e" } ] }
+                { "id": "e2", "source": "c", "target": "src" },
+                { "id": "e3", "source": "src", "target": "m" },
+                { "id": "e4", "source": "m", "target": "k" },
+                { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND));
 

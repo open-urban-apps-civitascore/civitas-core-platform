@@ -71,14 +71,18 @@ class NifiDeploymentIT extends AbstractNifiIT {
             """
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping",
                   "data": { "mappingConfig": { "fields": {
                     "$.station_id": "$.station_id",
                     "$.temperature": "$.temperature" } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
-                { "id": "e1", "source": "s", "target": "m" },
-                { "id": "e2", "source": "m", "target": "e" } ] }
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
             """);
 
     FlowDeploymentPlanner planner =
@@ -145,8 +149,13 @@ class NifiDeploymentIT extends AbstractNifiIT {
             """
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
+                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
-              "edges": [ { "id": "e1", "source": "s", "target": "e" } ] }
+              "edges": [
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "k" },
+                { "id": "e3", "source": "k", "target": "e" } ] }
             """);
 
     FlowDeploymentPlanner planner =

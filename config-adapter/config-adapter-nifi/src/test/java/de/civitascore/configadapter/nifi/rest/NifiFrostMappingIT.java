@@ -393,11 +393,15 @@ class NifiFrostMappingIT extends AbstractNifiIT {
             """
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": %s } } },
+                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
-                { "id": "e1", "source": "s", "target": "m" },
-                { "id": "e2", "source": "m", "target": "e" } ] }
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
             """
                 .formatted(mappingFields()));
 
@@ -418,13 +422,17 @@ class NifiFrostMappingIT extends AbstractNifiIT {
             """
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "c", "type": "cron", "data": { "cronExpression": "%s" } },
                 { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": %s } } },
+                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "c" },
-                { "id": "e2", "source": "c", "target": "m" },
-                { "id": "e3", "source": "m", "target": "e" } ] }
+                { "id": "e2", "source": "c", "target": "src" },
+                { "id": "e3", "source": "src", "target": "m" },
+                { "id": "e4", "source": "m", "target": "k" },
+                { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND, mappingFields()));
 
