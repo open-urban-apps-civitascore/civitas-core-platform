@@ -9,46 +9,40 @@
  */
 package de.civitascore.configadapter.nifi.flow;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
-import de.civitascore.configadapter.nifi.flow.stage.MappingSupport;
 import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
 import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
+import de.civitascore.configadapter.nifi.flow.stage.TransformNodeType;
+import de.civitascore.configadapter.nifi.flow.stage.TransformNodeType.Compilation;
 import de.civitascore.configadapter.nifi.graph.FlowPath;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
+import de.civitascore.configadapter.nifi.graph.NodeKind;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
-import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.CompiledTransform;
 import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
-import de.civitascore.configadapter.nifi.mapping.MappingConfig;
-import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
-import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
-import de.civitascore.configadapter.nifi.mapping.StaEnvelopeCompiler;
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * Turns one resolved pipeline (graph + source + sink) into a {@link DeploymentPlan}: it compiles
- * the mapping to RecordPath (directly for a records sink, or via the STA envelope compiler for a
- * mapped FROST sink), resolves the source/sink processor properties, decrypts secrets (collected
- * separately for a post-upload REST push), and delegates the NiFi flow assembly to {@link
- * NifiFlowBuilder} (programmatic composition of building blocks per the graph).
+ * Turns one resolved pipeline (graph + source + sink) into a {@link DeploymentPlan}: it derives the
+ * flow path, has each transform node kind compile its own nodes against the sink, resolves the
+ * source/sink processor properties, decrypts secrets (collected separately for a post-upload REST
+ * push), and delegates the NiFi flow assembly to {@link NifiFlowBuilder} (programmatic composition
+ * of building blocks per the graph).
  */
 public class FlowDeploymentPlanner {
 
-  private final ObjectMapper mapper = new ObjectMapper();
   private final GraphParser graphParser;
-  private final MappingConfigParser mappingConfigParser;
-  private final RecordPathCompiler recordPathCompiler;
-  private final StaEnvelopeCompiler staEnvelopeCompiler;
   private final NifiFlowBuilder flowBuilder;
   private final StageRegistry registry;
 
@@ -56,21 +50,12 @@ public class FlowDeploymentPlanner {
    * Creates a planner.
    *
    * @param graphParser the graph parser
-   * @param mappingConfigParser the mapping parser
-   * @param recordPathCompiler the RecordPath compiler
    * @param flowBuilder the NiFi flow builder
-   * @param registry the deployable source/sink stages
+   * @param registry the deployable source/sink stages and transform node kinds
    */
   public FlowDeploymentPlanner(
-      GraphParser graphParser,
-      MappingConfigParser mappingConfigParser,
-      RecordPathCompiler recordPathCompiler,
-      NifiFlowBuilder flowBuilder,
-      StageRegistry registry) {
+      GraphParser graphParser, NifiFlowBuilder flowBuilder, StageRegistry registry) {
     this.graphParser = graphParser;
-    this.mappingConfigParser = mappingConfigParser;
-    this.recordPathCompiler = recordPathCompiler;
-    this.staEnvelopeCompiler = new StaEnvelopeCompiler(recordPathCompiler);
     this.flowBuilder = flowBuilder;
     this.registry = registry;
   }
@@ -93,11 +78,10 @@ public class FlowDeploymentPlanner {
     } catch (IllegalStateException e) {
       throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, e, e.getMessage());
     }
-    List<MappingConfig> mappingConfigs = parseMappings(path);
     Optional<String> sourceCron = validatedTriggerCron(path);
     SinkSpec sink = request.sink();
     SinkStage sinkStage = registry.sink(sink.type());
-    CompiledChain chain = compileChain(mappingConfigs, sinkStage);
+    Compilation chain = compileTransforms(path, sinkStage);
 
     Datasource source = request.source();
     if (source == null) {
@@ -141,7 +125,7 @@ public class FlowDeploymentPlanner {
                 out.sourceProperties(),
                 sink.type(),
                 out.sinkProperties(),
-                chain.transforms(),
+                chain.units(),
                 out.controllerServiceProperties(),
                 sourceCron.orElse(null),
                 chain.staEnvelope()));
@@ -149,56 +133,38 @@ public class FlowDeploymentPlanner {
     return new DeploymentPlan(processGroupName, snapshot, Map.copyOf(out.sensitive()));
   }
 
-  /** The compiled transform chain plus the envelope rebuild plan (FROST sink only, else null). */
-  private record CompiledChain(List<CompiledTransform> transforms, FrostEnvelopePlan staEnvelope) {}
-
   /**
-   * Compiles the mapping chain against the sink's declaration. For an envelope sink the
-   * intermediate mappings stay plain record transforms while the LAST mapping before the sink
-   * carries the STA target paths and compiles into flat intermediate fields plus the envelope
-   * rebuild plan the sink's build half turns into the split/capture/ReplaceText pre-region.
+   * Has each transform node kind compile its own on-path nodes, then reassembles the units in flow
+   * order (a kind compiles its nodes as one chain, but kinds may interleave on the path). At most
+   * one kind produces a sink pre-region plan — today the mapping kind's STA envelope for a mapped
+   * FROST sink.
    */
-  private CompiledChain compileChain(List<MappingConfig> mappingConfigs, SinkStage sinkStage)
+  private Compilation compileTransforms(FlowPath path, SinkStage sinkStage)
       throws FatalAdapterException {
-    if (mappingConfigs.isEmpty()) {
-      return new CompiledChain(List.of(), null);
+    Map<NodeKind, List<GraphNode>> byKind = new LinkedHashMap<>();
+    for (GraphNode node : path.transforms()) {
+      byKind.computeIfAbsent(kindOf(node), k -> new ArrayList<>()).add(node);
     }
-    if (sinkStage.mappingSupport() == MappingSupport.NONE) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_TEMPLATE_ERROR, sinkStage.mappingRejectionMessage());
-    }
-    List<CompiledTransform> mappings = new ArrayList<>();
-    if (sinkStage.mappingSupport() == MappingSupport.ENVELOPE) {
-      for (MappingConfig config : mappingConfigs.subList(0, mappingConfigs.size() - 1)) {
-        mappings.add(
-            new CompiledMapping(recordPathCompiler.compile(config, sinkStage.geometryEncoding())));
+    Map<NodeKind, Iterator<CompiledTransform>> unitsByKind = new LinkedHashMap<>();
+    FrostEnvelopePlan staEnvelope = null;
+    for (Map.Entry<NodeKind, List<GraphNode>> entry : byKind.entrySet()) {
+      TransformNodeType nodeType = registry.transformNodeType(entry.getKey());
+      Compilation compilation = nodeType.compile(entry.getValue(), sinkStage);
+      unitsByKind.put(entry.getKey(), compilation.units().iterator());
+      if (compilation.staEnvelope() != null) {
+        staEnvelope = compilation.staEnvelope();
       }
-      StaEnvelopeCompiler.EnvelopeCompilation compilation =
-          staEnvelopeCompiler.compile(mappingConfigs.get(mappingConfigs.size() - 1));
-      mappings.add(new CompiledMapping(compilation.flatProperties()));
-      return new CompiledChain(mappings, compilation.plan());
     }
-    for (MappingConfig config : mappingConfigs) {
-      mappings.add(
-          new CompiledMapping(recordPathCompiler.compile(config, sinkStage.geometryEncoding())));
+    List<CompiledTransform> ordered = new ArrayList<>();
+    for (GraphNode node : path.transforms()) {
+      ordered.add(unitsByKind.get(kindOf(node)).next());
     }
-    return new CompiledChain(mappings, null);
+    return new Compilation(ordered, staEnvelope);
   }
 
-  /** Parses each on-path mapping node's config, in flow order. */
-  private List<MappingConfig> parseMappings(FlowPath path) throws FatalAdapterException {
-    List<MappingConfig> configs = new ArrayList<>();
-    for (GraphNode node : path.transforms()) {
-      Object rawConfig = node.data().get("mappingConfig");
-      if (rawConfig == null) {
-        // A wired mapping node must carry a config; a missing one is a corrupted payload that
-        // would otherwise deploy untransformed. (A pipeline with no mapping node at all is fine.)
-        throw new FatalAdapterException(
-            AdapterErrorCode.NIFI_TEMPLATE_ERROR, "mapping node has no mappingConfig");
-      }
-      configs.add(mappingConfigParser.parse(mapper.valueToTree(rawConfig)));
-    }
-    return configs;
+  /** The kind of an on-path transform node; the derivation already rejected unknown kinds. */
+  private static NodeKind kindOf(GraphNode node) {
+    return NodeKind.fromTypeString(node.type()).orElseThrow();
   }
 
   private Optional<String> validatedTriggerCron(FlowPath path) throws FatalAdapterException {

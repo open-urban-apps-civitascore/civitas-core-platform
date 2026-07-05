@@ -17,6 +17,7 @@ import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.FrostSinkStage;
+import de.civitascore.configadapter.nifi.flow.stage.MappingNodeType;
 import de.civitascore.configadapter.nifi.flow.stage.MqttSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.PostgisSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.SqlSourceStage;
@@ -60,7 +61,8 @@ public final class NifiTestFixtures {
       String frostBaseUrl) {
     return new StageRegistry(
         List.of(new MqttSourceStage(resolver), new SqlSourceStage(resolver, probe)),
-        List.of(new PostgisSinkStage(platformSink), new FrostSinkStage(frostBaseUrl)));
+        List.of(new PostgisSinkStage(platformSink), new FrostSinkStage(frostBaseUrl)),
+        List.of(new MappingNodeType(new MappingConfigParser(), new RecordPathCompiler())));
   }
 
   /** A builder over stages whose bind halves are never exercised (build-level tests). */
@@ -86,12 +88,7 @@ public final class NifiTestFixtures {
       PlatformSinkConfig platformSink,
       String frostBaseUrl) {
     StageRegistry registry = stageRegistry(resolver, probe, platformSink, frostBaseUrl);
-    return new FlowDeploymentPlanner(
-        new GraphParser(),
-        new MappingConfigParser(),
-        new RecordPathCompiler(),
-        new NifiFlowBuilder(registry),
-        registry);
+    return new FlowDeploymentPlanner(new GraphParser(), new NifiFlowBuilder(registry), registry);
   }
 
   static Map<String, Object> map(String json) throws Exception {

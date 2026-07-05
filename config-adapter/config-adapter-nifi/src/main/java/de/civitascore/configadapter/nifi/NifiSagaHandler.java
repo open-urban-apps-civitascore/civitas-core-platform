@@ -29,6 +29,7 @@ import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec
 import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.stage.FrostSinkStage;
+import de.civitascore.configadapter.nifi.flow.stage.MappingNodeType;
 import de.civitascore.configadapter.nifi.flow.stage.MqttSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.PostgisSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.SqlSourceStage;
@@ -146,14 +147,10 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
                 new SqlSourceStage(credentialResolver, new JdbcSqlSourceProbe())),
             List.of(
                 new PostgisSinkStage(platformSink),
-                new FrostSinkStage(getProperty("frost.url", null))));
+                new FrostSinkStage(getProperty("frost.url", null))),
+            List.of(new MappingNodeType(new MappingConfigParser(), new RecordPathCompiler())));
     this.planner =
-        new FlowDeploymentPlanner(
-            new GraphParser(),
-            new MappingConfigParser(),
-            new RecordPathCompiler(),
-            new NifiFlowBuilder(stages),
-            stages);
+        new FlowDeploymentPlanner(new GraphParser(), new NifiFlowBuilder(stages), stages);
 
     if (this.nifiClient == null) {
       Client jaxrs = client() != null ? client() : createClient();

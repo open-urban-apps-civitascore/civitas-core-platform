@@ -19,12 +19,28 @@ import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
+import de.civitascore.configadapter.nifi.graph.NodeKind;
+import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class StageRegistryTest {
+
+  private static TransformNodeType transformNodeType(NodeKind kind) {
+    return new TransformNodeType() {
+      @Override
+      public NodeKind kind() {
+        return kind;
+      }
+
+      @Override
+      public Compilation compile(List<GraphNode> ownNodes, SinkStage sink) {
+        throw new UnsupportedOperationException();
+      }
+    };
+  }
 
   private static SourceStage sourceStage(SourceType type) {
     return new SourceStage() {
@@ -81,19 +97,25 @@ class StageRegistryTest {
     };
   }
 
+  private static List<TransformNodeType> allTransformKinds() {
+    return List.of(transformNodeType(NodeKind.MAPPING));
+  }
+
   @Test
   void resolvesStagesByType() throws Exception {
     SourceStage mqtt = sourceStage(SourceType.MQTT);
     SinkStage postgis = sinkStage(SinkType.POSTGIS);
-    StageRegistry registry = new StageRegistry(List.of(mqtt), List.of(postgis));
+    TransformNodeType mapping = transformNodeType(NodeKind.MAPPING);
+    StageRegistry registry = new StageRegistry(List.of(mqtt), List.of(postgis), List.of(mapping));
 
     assertSame(mqtt, registry.source(SourceType.MQTT));
     assertSame(postgis, registry.sink(SinkType.POSTGIS));
+    assertSame(mapping, registry.transformNodeType(NodeKind.MAPPING));
   }
 
   @Test
   void unknownTypesFailWithTemplateError() {
-    StageRegistry registry = new StageRegistry(List.of(), List.of());
+    StageRegistry registry = new StageRegistry(List.of(), List.of(), allTransformKinds());
 
     FatalAdapterException sourceMiss =
         assertThrows(FatalAdapterException.class, () -> registry.source(SourceType.SQL));
@@ -109,6 +131,36 @@ class StageRegistryTest {
         IllegalArgumentException.class,
         () ->
             new StageRegistry(
-                List.of(sourceStage(SourceType.MQTT), sourceStage(SourceType.MQTT)), List.of()));
+                List.of(sourceStage(SourceType.MQTT), sourceStage(SourceType.MQTT)),
+                List.of(),
+                allTransformKinds()));
+  }
+
+  @Test
+  void uncoveredTransformKindIsRejectedAtConstruction() {
+    assertThrows(
+        IllegalArgumentException.class, () -> new StageRegistry(List.of(), List.of(), List.of()));
+  }
+
+  @Test
+  void nonTransformKindIsRejectedAtConstruction() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new StageRegistry(
+                List.of(),
+                List.of(),
+                List.of(transformNodeType(NodeKind.MAPPING), transformNodeType(NodeKind.CRON))));
+  }
+
+  @Test
+  void duplicateTransformKindIsRejectedAtConstruction() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new StageRegistry(
+                List.of(),
+                List.of(),
+                List.of(transformNodeType(NodeKind.MAPPING), transformNodeType(NodeKind.MAPPING))));
   }
 }
