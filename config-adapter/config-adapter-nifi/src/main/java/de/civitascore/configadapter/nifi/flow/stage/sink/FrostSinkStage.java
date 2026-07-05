@@ -173,8 +173,9 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
     String base = ctx.spec().sinkProperties().get(FROST_BASE_URL);
     String projectId = ctx.spec().sinkProperties().get(FROST_PROJECT_ID);
-    // The build is reachable without the bind half (golden tests, hand-composed specs), so its
-    // guarantees are re-checked here: a missing base URL would deploy relative InvokeHTTP URLs
+    // The build is reachable without the bind half (a FlowBuildSpec can be composed
+    // directly), so its guarantees are re-checked here: a missing base URL would deploy relative
+    // InvokeHTTP URLs
     // that post observations into the void, and an unscoped flow would write to the server root,
     // invisible to the dataset's named API and open to cross-dataset reference collisions.
     if (base == null || base.isBlank()) {
@@ -209,7 +210,8 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       BuildContext ctx, Processor upstreamTail, Processor errorSink) throws FatalAdapterException {
     SinkPreRegionPlan handoff = ctx.spec().sinkPreRegion();
     if (handoff == null) {
-      // The build is reachable directly (golden tests), not only through the planner: a compiled
+      // The build is reachable directly with a hand-composed spec, not only through the
+      // planner: a compiled
       // mapping without an envelope rebuild plan would silently vanish inside the envelope — fail
       // the build instead.
       if (ctx.spec().mappingPresent()) {

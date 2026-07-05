@@ -37,11 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Shared fixture factories for planner/builder tests and the golden-snapshot characterization
- * tests. The inputs built here feed byte-level snapshot comparisons, so their values are part of
- * the committed golden files — change them only together with a golden regeneration.
- */
+/** Shared fixture factories for the planner/builder tests. */
 public final class NifiTestFixtures {
 
   static final String MASTER_KEY_HEX =
@@ -393,20 +389,6 @@ public final class NifiTestFixtures {
             "/title", "/name", RecordPathCompiler.ReplacementStrategy.RECORD_PATH_VALUE));
   }
 
-  /**
-   * A mapping mixing both replacement strategies — pins the two-UpdateRecord chain and its
-   * first-seen strategy grouping order in snapshots.
-   */
-  static List<UpdateRecordProperty> mixedMapping() {
-    return List.of(
-        new UpdateRecordProperty(
-            "/title", "/name", RecordPathCompiler.ReplacementStrategy.RECORD_PATH_VALUE),
-        new UpdateRecordProperty(
-            "/source", "imported", RecordPathCompiler.ReplacementStrategy.LITERAL_VALUE),
-        new UpdateRecordProperty(
-            "/temp", "/payload/temp", RecordPathCompiler.ReplacementStrategy.RECORD_PATH_VALUE));
-  }
-
   static FlowBuildSpec mqttToPostgis(List<UpdateRecordProperty> mapping) {
     return new FlowBuildSpec(
         "pipeline-abc",
@@ -471,7 +453,7 @@ public final class NifiTestFixtures {
 
   /**
    * A mapped MQTT→FROST flow: the compiled flat mapping (mixed strategies via the const) plus the
-   * envelope rebuild plan, both produced by the real {@link StaEnvelopeCompiler} so the golden pins
+   * envelope rebuild plan, both produced by the real {@link StaEnvelopeCompiler} so the tests pin
    * the actual compiler output.
    */
   static FlowBuildSpec frostSinkWithMapping() throws Exception {

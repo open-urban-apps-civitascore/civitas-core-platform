@@ -998,7 +998,8 @@ class FlowDeploymentPlannerTest {
 
   @Test
   void unwiredMappingsAlongsideAValidPathAreRejected() throws Exception {
-    // chained mappings on the path are supported (see the chained golden snapshots); a mapping
+    // chained mappings on the path are supported (NifiFlowBuilderTest pins the chained ids); a
+    // mapping
     // that exists on the canvas but is not wired into the path would silently not be applied —
     // the derivation rejects it with the unwired-node message
     Map<String, Object> graph =
