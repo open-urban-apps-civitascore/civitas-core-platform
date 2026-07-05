@@ -187,7 +187,7 @@ public class FlowDeploymentPlanner {
   /** Parses each on-path mapping node's config, in flow order. */
   private List<MappingConfig> parseMappings(FlowPath path) throws FatalAdapterException {
     List<MappingConfig> configs = new ArrayList<>();
-    for (GraphNode node : path.mappings()) {
+    for (GraphNode node : path.transforms()) {
       Object rawConfig = node.data().get("mappingConfig");
       if (rawConfig == null) {
         // A wired mapping node must carry a config; a missing one is a corrupted payload that

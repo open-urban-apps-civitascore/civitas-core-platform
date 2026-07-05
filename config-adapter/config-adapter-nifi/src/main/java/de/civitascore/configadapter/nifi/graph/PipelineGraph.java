@@ -18,16 +18,14 @@ import java.util.Set;
 /**
  * The parsed engine-neutral pipeline graph carried in {@code dataPipelines[].data} — the React-Flow
  * editor graph, the authoritative description of the pipeline's data flow. Construction enforces
- * only payload integrity (node ids, edge endpoints); the flow semantics — source/sink/mapping
- * extraction, positions, trigger binding — are derived by {@link FlowPath}.
+ * only payload integrity (node ids, edge endpoints); the flow semantics — source/sink/transform
+ * extraction, positions, trigger binding — are derived by {@link FlowPath} over the {@link
+ * NodeKind} vocabulary.
  *
  * @param nodes the graph nodes
  * @param edges the graph edges
  */
 public record PipelineGraph(List<GraphNode> nodes, List<GraphEdge> edges) {
-
-  /** The node kind that carries a {@code mappingConfig}. */
-  public static final String TYPE_MAPPING = "mapping";
 
   public PipelineGraph {
     nodes = List.copyOf(Objects.requireNonNull(nodes, "nodes"));

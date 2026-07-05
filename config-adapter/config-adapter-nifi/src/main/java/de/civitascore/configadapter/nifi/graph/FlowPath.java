@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.nifi.graph;
 
+import de.civitascore.configadapter.nifi.graph.NodeKind.Role;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphEdge;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import java.util.ArrayList;
@@ -20,38 +21,32 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * The linear data path derived from a {@link PipelineGraph}: exactly one datasource node, the
- * ordered mapping chain, exactly one datasink node, plus the (optional) cron trigger bound to the
- * source. Derivation walks the actual wiring — an edge between two functional nodes is data flow;
- * edges from/to the {@code start}/{@code end} control anchors carry no data; a {@code cron} edge is
- * a trigger binding, not data flow. Node existence on the canvas never decides anything, only
- * wiring does.
+ * The linear data path derived from a {@link PipelineGraph}: exactly one {@link Role#SOURCE} node,
+ * the ordered on-path {@link Role#TRANSFORM} nodes, exactly one {@link Role#SINK} node, plus the
+ * (optional) cron trigger bound to the source. Derivation dispatches on {@link NodeKind} roles,
+ * never on raw type strings, and walks the actual wiring — an edge between two functional nodes is
+ * data flow; edges from/to the {@link Role#CONTROL} anchors carry no data; a {@link Role#TRIGGER}
+ * edge is a trigger binding, not data flow. Node existence on the canvas never decides anything,
+ * only wiring does.
  *
  * <p>All structural constraints fail loud at derivation with node-anchored messages, mirroring the
  * editor's validation, so the saga/API path (which bypasses the editor) gets the same answer as the
  * user saw at edit time. The source/sink cardinality of exactly one each is a deliberate product
- * restriction, not a mechanical assumption — the walk itself handles any chain length.
+ * restriction, not a mechanical assumption — the walk itself handles any chain length, any
+ * transform kind, and any number of transform instances.
  *
- * @param source the single {@code dataSource} node
- * @param mappings the {@code mapping} nodes in flow order (possibly empty)
- * @param sink the single sink node ({@code frost} or {@code geoPersistence})
+ * @param source the single {@link Role#SOURCE} node
+ * @param transforms the on-path {@link Role#TRANSFORM} nodes in flow order (possibly empty)
+ * @param sink the single {@link Role#SINK} node
  * @param triggerCron the trimmed cron expression of the trigger wired to the source, or empty
  */
 public record FlowPath(
-    GraphNode source, List<GraphNode> mappings, GraphNode sink, Optional<String> triggerCron) {
+    GraphNode source, List<GraphNode> transforms, GraphNode sink, Optional<String> triggerCron) {
 
-  /** The node kind carrying a datasource {@code entityId}. */
-  public static final String TYPE_DATA_SOURCE = "dataSource";
-
-  /** The sink node kinds, each carrying a datasink {@code entityId}. */
-  public static final Set<String> SINK_TYPES = Set.of("frost", "geoPersistence");
-
-  private static final String TYPE_CRON = "cron";
-  private static final Set<String> CONTROL_TYPES = Set.of("start", "end");
   private static final String KEY_CRON_EXPRESSION = "cronExpression";
 
   public FlowPath {
-    mappings = List.copyOf(mappings);
+    transforms = List.copyOf(transforms);
   }
 
   /**
@@ -68,32 +63,34 @@ public record FlowPath(
       nodesById.put(node.id(), node);
     }
 
-    GraphNode source = requireExactlyOne(graph, TYPE_DATA_SOURCE::equals, "datasource");
-    GraphNode sink = requireExactlyOne(graph, SINK_TYPES::contains, "datasink");
+    GraphNode source = requireExactlyOne(graph, Role.SOURCE, "datasource");
+    GraphNode sink = requireExactlyOne(graph, Role.SINK, "datasink");
     rejectUnknownNodesInFlow(graph, nodesById);
 
     Map<String, List<GraphNode>> dataOut = dataEdges(graph, nodesById);
     requireTerminalPositions(graph, nodesById, source, sink, dataOut);
 
-    List<GraphNode> mappings = walk(source, sink, dataOut);
-    requireAllMappingsOnPath(graph, mappings);
+    List<GraphNode> transforms = walk(source, sink, dataOut);
+    requireAllTransformsOnPath(graph, transforms);
 
-    return new FlowPath(source, mappings, sink, triggerCron(graph, source));
+    return new FlowPath(source, transforms, sink, triggerCron(graph, source));
   }
 
   // ─── Cardinality ────────────────────────────────────────────────────────────
 
-  private static GraphNode requireExactlyOne(
-      PipelineGraph graph, java.util.function.Predicate<String> typeMatch, String role) {
-    List<GraphNode> matches =
-        graph.nodes().stream().filter(n -> n.type() != null && typeMatch.test(n.type())).toList();
+  private static GraphNode requireExactlyOne(PipelineGraph graph, Role role, String label) {
+    List<GraphNode> matches = graph.nodes().stream().filter(n -> hasRole(n, role)).toList();
     if (matches.isEmpty()) {
       throw new IllegalStateException(
-          "pipeline graph has no " + role + " node; exactly one wired " + role + " is required");
+          "pipeline graph has no " + label + " node; exactly one wired " + label + " is required");
     }
     if (matches.size() > 1) {
       throw new IllegalStateException(
-          "pipeline graph has " + matches.size() + " " + role + " nodes; exactly one is supported");
+          "pipeline graph has "
+              + matches.size()
+              + " "
+              + label
+              + " nodes; exactly one is supported");
     }
     return matches.get(0);
   }
@@ -108,9 +105,7 @@ public record FlowPath(
       PipelineGraph graph, Map<String, GraphNode> nodesById) {
     for (GraphEdge edge : graph.edges()) {
       for (GraphNode node : List.of(nodesById.get(edge.source()), nodesById.get(edge.target()))) {
-        if (!isFunctional(node)
-            && !CONTROL_TYPES.contains(node.type())
-            && !TYPE_CRON.equals(node.type())) {
+        if (NodeKind.roleOf(node).isEmpty()) {
           throw new IllegalStateException(
               "pipeline graph wires unsupported node type '"
                   + node.type()
@@ -124,11 +119,15 @@ public record FlowPath(
 
   // ─── Data-flow topology ─────────────────────────────────────────────────────
 
+  private static boolean hasRole(GraphNode node, Role role) {
+    return NodeKind.roleOf(node).filter(role::equals).isPresent();
+  }
+
+  /** Whether the node carries data: it emits, transforms, or consumes the flow. */
   private static boolean isFunctional(GraphNode node) {
-    String type = node.type();
-    return TYPE_DATA_SOURCE.equals(type)
-        || PipelineGraph.TYPE_MAPPING.equals(type)
-        || (type != null && SINK_TYPES.contains(type));
+    return NodeKind.roleOf(node)
+        .filter(r -> r == Role.SOURCE || r == Role.TRANSFORM || r == Role.SINK)
+        .isPresent();
   }
 
   /** Adjacency of the data edges only — edges whose both endpoints are functional nodes. */
@@ -162,10 +161,10 @@ public record FlowPath(
     }
   }
 
-  /** Walks the single data path source → mappings → sink and returns the mappings in order. */
+  /** Walks the single data path source → transforms → sink and returns the transforms in order. */
   private static List<GraphNode> walk(
       GraphNode source, GraphNode sink, Map<String, List<GraphNode>> dataOut) {
-    List<GraphNode> mappings = new ArrayList<>();
+    List<GraphNode> transforms = new ArrayList<>();
     Set<String> visited = new HashSet<>();
     visited.add(source.id());
     GraphNode current = source;
@@ -188,51 +187,53 @@ public record FlowPath(
         throw new IllegalStateException(
             "pipeline graph contains a cycle at " + step.type() + " node '" + step.id() + "'");
       }
-      // The cardinality and position checks already ruled out every functional kind except
-      // mapping and the sink itself, so no other kind can appear here.
-      if (PipelineGraph.TYPE_MAPPING.equals(step.type())) {
-        mappings.add(step);
+      if (hasRole(step, Role.TRANSFORM)) {
+        transforms.add(step);
       }
       current = step;
     }
-    return mappings;
+    return transforms;
   }
 
   /**
-   * Every mapping node must lie on the walked path — a mapping off the path would silently not be
-   * applied. The message distinguishes an unwired mapping from one wired into a side component,
+   * Every transform node must lie on the walked path — a transform off the path would silently not
+   * be applied. The message distinguishes an unwired node from one wired into a side component,
    * matching the pre-derivation checks these replace.
    */
-  private static void requireAllMappingsOnPath(PipelineGraph graph, List<GraphNode> onPath) {
+  private static void requireAllTransformsOnPath(PipelineGraph graph, List<GraphNode> onPath) {
     Set<String> pathIds = new HashSet<>();
-    for (GraphNode mapping : onPath) {
-      pathIds.add(mapping.id());
+    for (GraphNode transform : onPath) {
+      pathIds.add(transform.id());
     }
     for (GraphNode node : graph.nodes()) {
-      if (!PipelineGraph.TYPE_MAPPING.equals(node.type()) || pathIds.contains(node.id())) {
+      if (!hasRole(node, Role.TRANSFORM) || pathIds.contains(node.id())) {
         continue;
       }
       if (!isWired(graph, node.id())) {
         throw new IllegalStateException(
-            "the mapping node is not wired into the flow (it needs both an incoming and an"
+            "the "
+                + node.type()
+                + " node is not wired into the flow (it needs both an incoming and an"
                 + " outgoing edge)");
       }
       throw new IllegalStateException(
-          "the mapping node is in a separate component from the pipeline's source/sink nodes");
+          "the "
+              + node.type()
+              + " node is in a separate component from the pipeline's source/sink nodes");
     }
   }
 
   // ─── Trigger binding ────────────────────────────────────────────────────────
 
   /**
-   * Resolves the cron trigger: every cron node must be wired, must feed the datasource node (a
+   * Resolves the cron trigger: every trigger node must be wired, must feed the datasource node (a
    * trigger schedules the source's entry processor — feeding anything else is meaningless), and the
    * source's trigger port holds at most one schedule.
    */
   private static Optional<String> triggerCron(PipelineGraph graph, GraphNode source) {
     List<GraphNode> scheduling = new ArrayList<>();
     for (GraphNode cron : graph.nodes()) {
-      if (!TYPE_CRON.equals(cron.type())) {
+      if (!hasRole(cron, Role.TRIGGER)) {
         continue;
       }
       requireCronFeedsSource(graph, cron, source);
@@ -259,7 +260,7 @@ public record FlowPath(
   /** A cron must be wired and every outgoing edge must feed the datasource node. */
   private static void requireCronFeedsSource(
       PipelineGraph graph, GraphNode cron, GraphNode source) {
-    // A detached cron must not silently schedule the source; reject it like the mapping check.
+    // A detached cron must not silently schedule the source; reject it like the transform check.
     if (!isWired(graph, cron.id())) {
       throw new IllegalStateException(
           "the cron node is not wired into the flow (it needs both an incoming and an outgoing"

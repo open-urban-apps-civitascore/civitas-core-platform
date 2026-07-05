@@ -66,7 +66,7 @@ class FlowPathTest {
 
     assertEquals("src", path.source().id());
     assertEquals("sink", path.sink().id());
-    assertTrue(path.mappings().isEmpty());
+    assertTrue(path.transforms().isEmpty());
     assertEquals(Optional.empty(), path.triggerCron());
   }
 
@@ -85,7 +85,7 @@ class FlowPathTest {
 
     FlowPath path = FlowPath.derive(graph);
 
-    assertEquals(List.of("m1", "m2"), path.mappings().stream().map(GraphNode::id).toList());
+    assertEquals(List.of("m1", "m2"), path.transforms().stream().map(GraphNode::id).toList());
   }
 
   @Test
