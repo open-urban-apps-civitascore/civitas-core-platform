@@ -362,13 +362,8 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       BuildContext ctx, Processor upstream, Processor errorSink, FrostLeg leg)
       throws FatalAdapterException {
     String disc = leg.disc();
-    String splitPath = leg.splitPath();
-    List<Map.Entry<String, String>> refProps = leg.refProps();
-    String getUrl = leg.getUrl();
-    String routeRelationship = leg.routeRelationship();
-    String routeCondition = leg.routeCondition();
     Processor split = ctx.loadProcessor(Fragment.SPLIT_JSON, "split", disc + "Split");
-    setProp(split, "JsonPath Expression", splitPath);
+    setProp(split, "JsonPath Expression", leg.splitPath());
 
     Processor extractBody =
         ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Body");
@@ -376,20 +371,20 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     setProp(extractBody, "frost.body", "$");
 
     Processor extractRef = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Ref");
-    for (Map.Entry<String, String> ref : refProps) {
+    for (Map.Entry<String, String> ref : leg.refProps()) {
       setProp(extractRef, ref.getKey(), ref.getValue());
     }
 
     Processor get = ctx.loadProcessor(Fragment.INVOKE_HTTP, "Response", disc + "Get");
     setProp(get, "HTTP Method", "GET");
-    setProp(get, "HTTP URL", getUrl);
+    setProp(get, "HTTP URL", leg.getUrl());
 
     Processor extractId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Id");
     setProp(extractId, "frost.id", "$.value[0]['@iot.id']");
 
     Processor route =
-        ctx.loadProcessor(Fragment.ROUTE_ON_ATTRIBUTE, routeRelationship, disc + "Route");
-    setProp(route, routeRelationship, routeCondition);
+        ctx.loadProcessor(Fragment.ROUTE_ON_ATTRIBUTE, leg.routeRelationship(), disc + "Route");
+    setProp(route, leg.routeRelationship(), leg.routeCondition());
 
     for (Processor p : List.of(split, extractBody, extractRef, get, extractId, route)) {
       ctx.addProcessor(p);
