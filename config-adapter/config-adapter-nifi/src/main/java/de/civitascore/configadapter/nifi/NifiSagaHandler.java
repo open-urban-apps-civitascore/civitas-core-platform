@@ -465,6 +465,12 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       throw new FatalAdapterException(
           AdapterErrorCode.INVALID_PAYLOAD, key + " must be a list of strings");
     }
+    return requireStringItems(key, list);
+  }
+
+  /** Every item as a string; a non-string item is a corrupt payload (INVALID_PAYLOAD). */
+  private static List<String> requireStringItems(String key, List<?> list)
+      throws FatalAdapterException {
     List<String> values = new ArrayList<>(list.size());
     for (Object item : list) {
       if (!(item instanceof String text)) {
@@ -532,18 +538,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     // Validate every element up front: an unchecked (List<String>) cast defers the
     // ClassCastException to the consuming loop, which for DELETE would throw partway through after
     // some pipelines are already gone. Fail cleanly with INVALID_PAYLOAD before any side effect.
-    List<String> result = new ArrayList<>(list.size());
-    for (Object item : list) {
-      if (!(item instanceof String s)) {
-        throw new FatalAdapterException(
-            AdapterErrorCode.INVALID_PAYLOAD,
-            key
-                + " must contain only strings, got: "
-                + (item == null ? "null" : item.getClass().getSimpleName()));
-      }
-      result.add(s);
-    }
-    return result;
+    return requireStringItems(key, list);
   }
 
   private static String requireString(Map<String, Object> map, String field)

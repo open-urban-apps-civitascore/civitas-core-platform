@@ -23,6 +23,11 @@ import java.util.List;
 public record StageResult(List<Processor> chain, List<Processor> failureSources) {
   public StageResult {
     chain = List.copyOf(chain);
+    if (chain.isEmpty()) {
+      // enforce the documented invariant here instead of failing later with a bare
+      // NoSuchElementException from exit()
+      throw new IllegalArgumentException("a stage must contribute at least one processor");
+    }
     failureSources = List.copyOf(failureSources);
   }
 

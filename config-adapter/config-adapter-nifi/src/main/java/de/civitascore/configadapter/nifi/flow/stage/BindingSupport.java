@@ -24,10 +24,13 @@ public final class BindingSupport {
 
   /** A scalar or list value as trimmed, non-blank strings (empty for null/all-blank). */
   public static List<String> trimmedNonBlank(Object value) {
+    if (value == null) {
+      return List.of();
+    }
     List<String> raw =
         value instanceof List<?> list
             ? list.stream().map(String::valueOf).toList()
-            : value == null ? List.of() : List.of(String.valueOf(value));
+            : List.of(String.valueOf(value));
     return raw.stream().map(String::trim).filter(s -> !s.isEmpty()).toList();
   }
 

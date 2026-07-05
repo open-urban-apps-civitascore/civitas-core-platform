@@ -26,6 +26,7 @@ import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -394,7 +395,7 @@ class NifiFlowBuilderTest {
   }
 
   private List<String> updateRecordIds(JsonNode flow) {
-    List<String> ids = new java.util.ArrayList<>();
+    List<String> ids = new ArrayList<>();
     for (JsonNode c : flow.get("flowContents").get("processors")) {
       if (c.path("type").asText().endsWith("UpdateRecord")) {
         ids.add(c.get("identifier").asText());
@@ -445,7 +446,7 @@ class NifiFlowBuilderTest {
                 "PostGISConnectionPool",
                 Map.of("Database Connection URL", "jdbc:postgresql://db:5432/x")),
             null,
-            new FrostEnvelopePlan("{}", java.util.List.of()));
+            new FrostEnvelopePlan("{}", List.of()));
     FatalAdapterException ex = assertThrows(FatalAdapterException.class, () -> builder.build(spec));
     assertTrue(ex.getMessage().contains("POSTGIS sink cannot consume a pre-region plan"));
   }

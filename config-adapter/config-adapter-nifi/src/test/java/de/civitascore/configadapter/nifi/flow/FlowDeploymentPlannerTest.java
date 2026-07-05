@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.crypto.CredentialEncryptor;
 import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
@@ -75,9 +76,7 @@ class FlowDeploymentPlannerTest {
                             new PipelineDeploymentRequest(
                                 "p-sql-" + field, graphWithMapping(), source, postgisSinkWithPk())),
                 "must reject unsupported field: " + field);
-        assertEquals(
-            de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-            ex.getErrorCode());
+        assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
       }
     }
   }
@@ -96,9 +95,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-sql-cursor", graphWithMapping(), source, postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -116,9 +113,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-sql-q", graphWithMapping(), source, postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -138,9 +133,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-sql-el", graphWithMapping(), source, postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -267,9 +260,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-sql-mtls", graphWithMapping(), source, postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -306,9 +297,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-sql-sf", graphWithMapping(), source, postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -319,8 +308,7 @@ class FlowDeploymentPlannerTest {
     SqlSourceProbe failing =
         (url, user, pw) -> {
           throw new FatalAdapterException(
-              de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-              "unreachable: " + url);
+              AdapterErrorCode.NIFI_TEMPLATE_ERROR, "unreachable: " + url);
         };
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       FlowDeploymentPlanner probing = planner(resolver, failing);
@@ -331,9 +319,7 @@ class FlowDeploymentPlannerTest {
                   probing.plan(
                       new PipelineDeploymentRequest(
                           "p-probe", graphWithMapping(), sqlSource(null), postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -397,9 +383,7 @@ class FlowDeploymentPlannerTest {
                                 graphWithMapping(),
                                 sqlSourceWith("postgres", "events", List.of("*"), where),
                                 postgisSinkWithPk())));
-        assertEquals(
-            de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-            ex.getErrorCode());
+        assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
       }
     }
   }
@@ -420,9 +404,7 @@ class FlowDeploymentPlannerTest {
                               graphWithMapping(),
                               mqttSource(null),
                               new FrostSinkSpec("1"))));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_MAPPING_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
       assertTrue(ex.getMessage().contains("unsupported FROST mapping target path"));
     }
   }
@@ -443,9 +425,7 @@ class FlowDeploymentPlannerTest {
                               NifiTestFixtures.graphWithIncompleteFrostMapping(),
                               mqttSource(null),
                               new FrostSinkSpec("1"))));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_MAPPING_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
       assertTrue(
           ex.getMessage()
               .contains(
@@ -470,9 +450,7 @@ class FlowDeploymentPlannerTest {
                               graphWithoutMapping(),
                               sqlSource(null),
                               new FrostSinkSpec("1"))));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
       assertTrue(
           ex.getMessage()
               .contains(
@@ -572,9 +550,7 @@ class FlowDeploymentPlannerTest {
                               graphWithMapping(),
                               sqlSourceWith("mysql", "events", List.of("*"), null),
                               postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -593,9 +569,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-sql-nodsn", graphWithMapping(), source, postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -613,9 +587,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-sql-plainpw", graphWithMapping(), source, postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -633,9 +605,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-mqtt-plainpw", graphWithMapping(), source, postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -654,9 +624,7 @@ class FlowDeploymentPlannerTest {
                               graphWithMapping(),
                               sqlSourceWith("postgres", null, List.of("*"), null),
                               postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -738,8 +706,7 @@ class FlowDeploymentPlannerTest {
                 noDbPlanner.plan(
                     new PipelineDeploymentRequest(
                         "p-nodb", graphWithMapping(), mqttSource(null), postgisSink())));
-    assertEquals(
-        de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
+    assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }
 
   @Test
@@ -789,8 +756,7 @@ class FlowDeploymentPlannerTest {
                         graphWithoutMapping(),
                         mqttSource(null),
                         new FrostSinkSpec("1"))));
-    assertEquals(
-        de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
+    assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }
 
   // Note: rejection of a POSTGIS sink without a table name happens at SinkSpec construction
@@ -856,9 +822,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-real", graph, mqttSource(null), postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
       assertTrue(
           ex.getMessage().contains("pipeline graph has 2 datasink nodes; exactly one is"),
           ex.getMessage());
@@ -924,9 +888,7 @@ class FlowDeploymentPlannerTest {
                               graphWithCron("0 0 6 * * ? 2026"),
                               sqlSource(null),
                               postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -946,9 +908,7 @@ class FlowDeploymentPlannerTest {
                         .plan(
                             new PipelineDeploymentRequest(
                                 "p-sql-nopk", graph, sqlSource(null), postgisSink())));
-        assertEquals(
-            de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-            ex.getErrorCode());
+        assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
       }
     }
   }
@@ -968,9 +928,7 @@ class FlowDeploymentPlannerTest {
                               graphWithCron("0 0 * * *"),
                               sqlSource(null),
                               postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -990,9 +948,7 @@ class FlowDeploymentPlannerTest {
                               graphWithCron("0 0 6 * * ?"),
                               mqttSource(null),
                               postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -1023,9 +979,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-2map", graph, mqttSource(null), postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
       assertTrue(
           ex.getMessage().contains("not wired into the flow"),
           "the error names the unwired-mapping condition");
@@ -1046,9 +1000,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-2topic", graphWithMapping(), source, postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -1067,9 +1019,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-tls", graphWithMapping(), source, postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -1141,9 +1091,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-nocfg", graph, mqttSource(null), postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -1157,9 +1105,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               pipelineId, graphWithMapping(), source, postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -1193,9 +1139,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p1", graphWithMapping(), source, postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -1219,9 +1163,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-corrupt", ghostEdgeGraph, sqlSourceBasic(), postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 }
