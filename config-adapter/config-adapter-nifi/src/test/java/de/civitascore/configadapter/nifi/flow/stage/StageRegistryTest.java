@@ -16,13 +16,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.dataset.Datasource;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
+import de.civitascore.configadapter.nifi.flow.PostgisSinkSpec;
+import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
 import de.civitascore.configadapter.nifi.graph.NodeKind;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -36,7 +38,7 @@ class StageRegistryTest {
       }
 
       @Override
-      public Compilation compile(List<GraphNode> ownNodes, SinkStage sink) {
+      public Compilation compile(List<GraphNode> ownNodes, SinkStage<?> sink) {
         throw new UnsupportedOperationException();
       }
     };
@@ -69,11 +71,21 @@ class StageRegistryTest {
     };
   }
 
-  private static SinkStage sinkStage(SinkType type) {
-    return new SinkStage() {
+  private static SinkStage<PostgisSinkSpec> sinkStage(SinkType type) {
+    return new SinkStage<>() {
       @Override
       public SinkType type() {
         return type;
+      }
+
+      @Override
+      public Class<PostgisSinkSpec> specType() {
+        return PostgisSinkSpec.class;
+      }
+
+      @Override
+      public PostgisSinkSpec parseSpec(Map<String, Object> datasink, SinkResolutionContext ctx) {
+        throw new UnsupportedOperationException();
       }
 
       @Override
@@ -87,7 +99,7 @@ class StageRegistryTest {
       }
 
       @Override
-      public void bind(PipelineDeploymentRequest request, PlanContext out) {}
+      public void bind(PostgisSinkSpec spec, PlanContext out) {}
 
       @Override
       public void build(
@@ -104,7 +116,7 @@ class StageRegistryTest {
   @Test
   void resolvesStagesByType() throws Exception {
     SourceStage mqtt = sourceStage(SourceType.MQTT);
-    SinkStage postgis = sinkStage(SinkType.POSTGIS);
+    SinkStage<PostgisSinkSpec> postgis = sinkStage(SinkType.POSTGIS);
     TransformNodeType mapping = transformNodeType(NodeKind.MAPPING);
     StageRegistry registry = new StageRegistry(List.of(mqtt), List.of(postgis), List.of(mapping));
 

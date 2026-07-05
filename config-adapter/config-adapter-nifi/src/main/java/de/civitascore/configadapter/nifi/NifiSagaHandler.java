@@ -18,16 +18,14 @@ import de.civitascore.configadapter.exception.AdapterException;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
-import de.civitascore.configadapter.model.dataset.DataStructureSchema;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner;
-import de.civitascore.configadapter.nifi.flow.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.JdbcSqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
-import de.civitascore.configadapter.nifi.flow.PostgisSinkSpec;
+import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.flow.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.stage.FrostSinkStage;
@@ -103,6 +101,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   private final GraphParser graphParser = new GraphParser();
   private boolean tlsInsecure = true;
   private CredentialResolver credentialResolver;
+  private StageRegistry stages;
   private FlowDeploymentPlanner planner;
   private NifiRestClient nifiClient;
 
@@ -142,7 +141,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
             getProperty("postgis.user", null),
             getProperty("postgis.password", null));
 
-    StageRegistry stages =
+    this.stages =
         new StageRegistry(
             List.of(
                 new MqttSourceStage(credentialResolver),
@@ -385,8 +384,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /** Resolves the pipeline's own datasink — same id-based catalog lookup as the source. */
-  @SuppressWarnings("unchecked")
-  private static SinkSpec resolveSink(
+  private SinkSpec resolveSink(
       GraphNode sinkNode,
       List<String> dataSinkIds,
       List<Map<String, Object>> datasinks,
@@ -415,35 +413,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
                     new FatalAdapterException(
                         AdapterErrorCode.NIFI_TEMPLATE_ERROR,
                         "unsupported sink type: " + sink.get("type")));
-    return switch (type) {
-      case POSTGIS -> {
-        String tableName = null;
-        if (sink.get("configuration") instanceof Map<?, ?> config) {
-          tableName = asString(((Map<String, Object>) config).get("tableName"));
-        }
-        yield new PostgisSinkSpec(tableName, resolvePrimaryKey(sink));
-      }
-      case FROST -> {
-        // A FROST flow must be scoped to the dataset's project — unscoped it would post to the
-        // server root, invisible to the project-scoped named API. The id is a saga-wide variable
-        // from the FROST create/update-project step, so its absence means a mis-ordered or
-        // hand-crafted saga.
-        if (projectId == null || projectId.isBlank()) {
-          throw new FatalAdapterException(
-              AdapterErrorCode.INVALID_PAYLOAD,
-              "FROST sink requires the saga's '"
-                  + FIELD_PROJECT_ID
-                  + "' (result of the FROST create-project step)");
-        }
-        try {
-          yield new FrostSinkSpec(projectId);
-        } catch (IllegalArgumentException e) {
-          // e.g. a non-numeric projectId; keep the raw detail internal and publish only the safe
-          // external message for the error code.
-          throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, e, e.getMessage());
-        }
-      }
-    };
+    return stages.sink(type).parseSpec(sink, new SinkResolutionContext(projectId));
   }
 
   /** The graph node's configured entity id — an unconfigured node cannot be resolved. */
@@ -469,27 +439,6 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       }
     }
     return List.copyOf(values);
-  }
-
-  /**
-   * The sink's primary-key columns via the shared {@link DataStructureSchema#resolvePrimaryKey}
-   * "explicit wins, else marker" rule, so the PutDatabaseRecord UPSERT {@code Update Keys} are
-   * identical to the PostGIS table's PRIMARY KEY (single source of truth, no divergence).
-   */
-  @SuppressWarnings("unchecked")
-  private static List<String> resolvePrimaryKey(Map<String, Object> sink)
-      throws FatalAdapterException {
-    Object explicit =
-        sink.get("configuration") instanceof Map<?, ?> config
-            ? ((Map<String, Object>) config).get("primaryKey")
-            : null;
-    Map<String, Object> schema =
-        sink.get("dataStructure") instanceof Map<?, ?> ds ? (Map<String, Object>) ds : null;
-    try {
-      return DataStructureSchema.resolvePrimaryKey(explicit, schema);
-    } catch (IllegalArgumentException e) {
-      throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, e, e.getMessage());
-    }
   }
 
   private static String processGroupName(String pipelineId) {

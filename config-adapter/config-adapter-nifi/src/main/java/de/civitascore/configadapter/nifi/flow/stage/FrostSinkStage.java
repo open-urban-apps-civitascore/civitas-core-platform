@@ -15,7 +15,7 @@ import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.setProp;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.flow.FrostSinkSpec;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
+import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
@@ -31,7 +31,7 @@ import java.util.Set;
  * MappingSupport#ENVELOPE}): any source works — the mapped record's flat fields are rebuilt into
  * the envelope by a generated ReplaceText template before the legs.
  */
-public final class FrostSinkStage implements SinkStage {
+public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
   /**
    * Sink-property key carrying the FROST SensorThings base URL into the find-or-create sub-flow
@@ -94,8 +94,33 @@ public final class FrostSinkStage implements SinkStage {
   }
 
   @Override
-  public void bind(PipelineDeploymentRequest request, PlanContext out)
+  public Class<FrostSinkSpec> specType() {
+    return FrostSinkSpec.class;
+  }
+
+  @Override
+  public FrostSinkSpec parseSpec(Map<String, Object> datasink, SinkResolutionContext ctx)
       throws FatalAdapterException {
+    // A FROST flow must be scoped to the dataset's project — unscoped it would post to the
+    // server root, invisible to the project-scoped named API. The id is a saga-wide variable
+    // from the FROST create/update-project step, so its absence means a mis-ordered or
+    // hand-crafted saga.
+    if (ctx.frostProjectId() == null || ctx.frostProjectId().isBlank()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD,
+          "FROST sink requires the saga's 'projectId' (result of the FROST create-project step)");
+    }
+    try {
+      return new FrostSinkSpec(ctx.frostProjectId());
+    } catch (IllegalArgumentException e) {
+      // e.g. a non-numeric projectId; keep the raw detail internal and publish only the safe
+      // external message for the error code.
+      throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, e, e.getMessage());
+    }
+  }
+
+  @Override
+  public void bind(FrostSinkSpec spec, PlanContext out) throws FatalAdapterException {
     if (frostBaseUrl == null || frostBaseUrl.isBlank()) {
       // A localhost fallback would deploy a flow that silently posts observations into the void.
       throw new FatalAdapterException(
@@ -107,7 +132,7 @@ public final class FrostSinkStage implements SinkStage {
     out.putSinkProperty(FROST_BASE_URL, frostBaseUrl);
     // The saga's project id scopes those URLs to the dataset's FROST project; the spec
     // guarantees it is present and numeric.
-    out.putSinkProperty(FROST_PROJECT_ID, ((FrostSinkSpec) request.sink()).projectId());
+    out.putSinkProperty(FROST_PROJECT_ID, spec.projectId());
   }
 
   /**

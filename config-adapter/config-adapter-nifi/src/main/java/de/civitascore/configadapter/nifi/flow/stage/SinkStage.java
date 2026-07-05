@@ -10,21 +10,41 @@
 package de.civitascore.configadapter.nifi.flow.stage;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
+import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
+import de.civitascore.configadapter.nifi.flow.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
- * A self-describing pipeline sink. One implementation per {@link SinkType}, owning both halves of
- * its lifecycle: plan-time binding (validation, property maps) and build-time wiring of the entire
- * tail region — terminal processor or sub-graph, the shared error sink, and all failure routing.
+ * A self-describing pipeline sink. One implementation per {@link SinkType}, owning its whole
+ * lifecycle: parsing its catalog entry into the typed spec, plan-time binding (validation, property
+ * maps), and build-time wiring of the entire tail region — terminal processor or sub-graph, the
+ * shared error sink, and all failure routing.
+ *
+ * @param <S> the sink's typed specification
  */
-public interface SinkStage {
+public interface SinkStage<S extends SinkSpec> {
 
   /** The registry key. */
   SinkType type();
+
+  /**
+   * The spec variant this stage parses and binds — the checked-cast anchor at wildcard call sites.
+   */
+  Class<S> specType();
+
+  /**
+   * Resolution half: parses this sink's raw catalog entry (the trigger payload's {@code
+   * datasinks[]} element) into the typed spec, enforcing the sink's own payload invariants.
+   *
+   * @param datasink the raw catalog entry
+   * @param ctx saga-level values not carried by the entry itself
+   * @throws FatalAdapterException if the entry or the saga context is invalid for this sink
+   */
+  S parseSpec(Map<String, Object> datasink, SinkResolutionContext ctx) throws FatalAdapterException;
 
   /**
    * The payload forms this sink can consume — drives the compatibility check and the convert and
@@ -64,12 +84,12 @@ public interface SinkStage {
   }
 
   /**
-   * Plan-time half: validates the sink spec and fills the property maps. Secrets go only into
+   * Plan-time half: validates the typed spec and fills the property maps. Secrets go only into
    * {@link PlanContext#putSensitive}, never into snapshot-bound properties.
    *
    * @throws FatalAdapterException if the sink spec is invalid or unsafe to deploy
    */
-  void bind(PipelineDeploymentRequest request, PlanContext out) throws FatalAdapterException;
+  void bind(S spec, PlanContext out) throws FatalAdapterException;
 
   /** Build-time half, phase A: registers sink-side controller services (before processors). */
   default void registerControllerServices(BuildContext ctx) throws FatalAdapterException {}

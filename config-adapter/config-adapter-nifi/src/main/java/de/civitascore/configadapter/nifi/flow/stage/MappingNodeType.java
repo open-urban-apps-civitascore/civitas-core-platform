@@ -59,7 +59,7 @@ public final class MappingNodeType implements TransformNodeType {
   }
 
   @Override
-  public Compilation compile(List<GraphNode> ownNodes, SinkStage sink)
+  public Compilation compile(List<GraphNode> ownNodes, SinkStage<?> sink)
       throws FatalAdapterException {
     List<MappingConfig> mappingConfigs = parse(ownNodes);
     if (sink.mappingSupport() == MappingSupport.NONE) {

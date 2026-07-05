@@ -157,7 +157,7 @@ public class NifiFlowBuilder {
     BuildContext ctx =
         new BuildContext(mapper, pgId, spec, processors, controllerServices, connections);
     SourceStage sourceStage = registry.source(spec.sourceType());
-    SinkStage sinkStage = registry.sink(spec.sinkType());
+    SinkStage<?> sinkStage = registry.sink(spec.sinkType());
     requireCompatibleSource(sourceStage, sinkStage, spec.mappingPresent());
 
     // Controller services first — processors reference them by id.
@@ -205,7 +205,8 @@ public class NifiFlowBuilder {
    * then the sink DB pool for a PostGIS sink. The order is part of the byte-stable snapshot
    * contract.
    */
-  private void addControllerServices(BuildContext ctx, SourceStage sourceStage, SinkStage sinkStage)
+  private void addControllerServices(
+      BuildContext ctx, SourceStage sourceStage, SinkStage<?> sinkStage)
       throws FatalAdapterException {
     ctx.addControllerService(Fragment.JSON_TREE_READER, READER);
     ctx.addControllerService(Fragment.JSON_RECORD_SET_WRITER, WRITER);
@@ -215,7 +216,7 @@ public class NifiFlowBuilder {
 
   /** Rejects a source whose emitted payload form the sink can neither consume nor convert. */
   private static void requireCompatibleSource(
-      SourceStage source, SinkStage sink, boolean mappingPresent) throws FatalAdapterException {
+      SourceStage source, SinkStage<?> sink, boolean mappingPresent) throws FatalAdapterException {
     PayloadForm offered = source.output();
     Set<PayloadForm> accepted = sink.acceptedInputs(mappingPresent);
     boolean convertible =
@@ -236,8 +237,8 @@ public class NifiFlowBuilder {
    * MappingSupport#ENVELOPE} sink is exactly the mapped case, whose sink-owned pre-region rebuilds
    * the mapped records into its envelope.
    */
-  private List<TransformStage> transformsFor(SourceStage source, SinkStage sink, FlowBuildSpec spec)
-      throws FatalAdapterException {
+  private List<TransformStage> transformsFor(
+      SourceStage source, SinkStage<?> sink, FlowBuildSpec spec) throws FatalAdapterException {
     boolean mapped = spec.mappingPresent();
     // The builder is reachable directly (golden tests), not only through the planner: a compiled
     // mapping heading into an envelope-mode sink without an envelope rebuild plan would silently

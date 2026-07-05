@@ -36,7 +36,7 @@ public interface TransformNodeType {
    * @return the compilation; its units align 1:1 with {@code ownNodes}
    * @throws FatalAdapterException if a node payload is missing or invalid
    */
-  Compilation compile(List<GraphNode> ownNodes, SinkStage sink) throws FatalAdapterException;
+  Compilation compile(List<GraphNode> ownNodes, SinkStage<?> sink) throws FatalAdapterException;
 
   /**
    * The compiled units of one kind, aligned 1:1 with the nodes passed to {@link #compile}.

@@ -28,19 +28,19 @@ import java.util.Map;
 public final class StageRegistry {
 
   private final Map<SourceType, SourceStage> sources = new EnumMap<>(SourceType.class);
-  private final Map<SinkType, SinkStage> sinks = new EnumMap<>(SinkType.class);
+  private final Map<SinkType, SinkStage<?>> sinks = new EnumMap<>(SinkType.class);
   private final Map<NodeKind, TransformNodeType> transformNodeTypes = new EnumMap<>(NodeKind.class);
 
   public StageRegistry(
       List<SourceStage> sourceStages,
-      List<SinkStage> sinkStages,
+      List<? extends SinkStage<?>> sinkStages,
       List<TransformNodeType> transformKinds) {
     for (SourceStage stage : sourceStages) {
       if (sources.putIfAbsent(stage.type(), stage) != null) {
         throw new IllegalArgumentException("duplicate source stage for " + stage.type());
       }
     }
-    for (SinkStage stage : sinkStages) {
+    for (SinkStage<?> stage : sinkStages) {
       if (sinks.putIfAbsent(stage.type(), stage) != null) {
         throw new IllegalArgumentException("duplicate sink stage for " + stage.type());
       }
@@ -73,8 +73,8 @@ public final class StageRegistry {
     return stage;
   }
 
-  public SinkStage sink(SinkType type) throws FatalAdapterException {
-    SinkStage stage = sinks.get(type);
+  public SinkStage<?> sink(SinkType type) throws FatalAdapterException {
+    SinkStage<?> stage = sinks.get(type);
     if (stage == null) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR, "no sink stage registered for type: " + type);

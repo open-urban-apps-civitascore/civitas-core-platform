@@ -13,9 +13,10 @@ import static de.civitascore.configadapter.nifi.flow.stage.BindingSupport.putIfP
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
+import de.civitascore.configadapter.model.dataset.DataStructureSchema;
 import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
 import de.civitascore.configadapter.nifi.flow.PostgisSinkSpec;
+import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import java.util.LinkedHashMap;
@@ -28,7 +29,7 @@ import java.util.Set;
  * pool. Consumes records, so convert and record mapping run in front of it; geometry values arrive
  * as WKT the server parses on insert.
  */
-public final class PostgisSinkStage implements SinkStage {
+public final class PostgisSinkStage implements SinkStage<PostgisSinkSpec> {
 
   /** Friendly name the REST client matches for the post-upload sensitive-property push. */
   private static final String DBCP = "PostGISConnectionPool";
@@ -58,9 +59,48 @@ public final class PostgisSinkStage implements SinkStage {
   }
 
   @Override
-  public void bind(PipelineDeploymentRequest request, PlanContext out)
+  public Class<PostgisSinkSpec> specType() {
+    return PostgisSinkSpec.class;
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public PostgisSinkSpec parseSpec(Map<String, Object> datasink, SinkResolutionContext ctx)
       throws FatalAdapterException {
-    PostgisSinkSpec sink = (PostgisSinkSpec) request.sink();
+    String tableName = null;
+    if (datasink.get("configuration") instanceof Map<?, ?> config) {
+      tableName = asString(((Map<String, Object>) config).get("tableName"));
+    }
+    return new PostgisSinkSpec(tableName, resolvePrimaryKey(datasink));
+  }
+
+  /**
+   * The sink's primary-key columns via the shared {@link DataStructureSchema#resolvePrimaryKey}
+   * "explicit wins, else marker" rule, so the PutDatabaseRecord UPSERT {@code Update Keys} are
+   * identical to the PostGIS table's PRIMARY KEY (single source of truth, no divergence).
+   */
+  @SuppressWarnings("unchecked")
+  private static List<String> resolvePrimaryKey(Map<String, Object> datasink)
+      throws FatalAdapterException {
+    Object explicit =
+        datasink.get("configuration") instanceof Map<?, ?> config
+            ? ((Map<String, Object>) config).get("primaryKey")
+            : null;
+    Map<String, Object> schema =
+        datasink.get("dataStructure") instanceof Map<?, ?> ds ? (Map<String, Object>) ds : null;
+    try {
+      return DataStructureSchema.resolvePrimaryKey(explicit, schema);
+    } catch (IllegalArgumentException e) {
+      throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, e, e.getMessage());
+    }
+  }
+
+  private static String asString(Object value) {
+    return value instanceof String text ? text : null;
+  }
+
+  @Override
+  public void bind(PostgisSinkSpec sink, PlanContext out) throws FatalAdapterException {
     // PostgisSinkSpec guarantees a non-blank tableName (the invalid state is rejected at
     // construction), so PutDatabaseRecord always has a target here.
     out.putSinkProperty("Table Name", sink.tableName());

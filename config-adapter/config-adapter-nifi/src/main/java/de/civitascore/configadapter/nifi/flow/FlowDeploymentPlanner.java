@@ -79,7 +79,7 @@ public class FlowDeploymentPlanner {
     }
     Optional<String> sourceCron = validatedTriggerCron(path);
     SinkSpec sink = request.sink();
-    SinkStage sinkStage = registry.sink(sink.type());
+    SinkStage<?> sinkStage = registry.sink(sink.type());
     Compilation chain = compileTransforms(path, sinkStage);
 
     Datasource source = request.source();
@@ -113,7 +113,7 @@ public class FlowDeploymentPlanner {
 
     PlanContext out = new PlanContext();
     sourceStage.bind(source, out);
-    sinkStage.bind(request, out);
+    bindSink(sinkStage, sink, out);
 
     String processGroupName = "pipeline-" + request.pipelineId();
     String snapshot =
@@ -159,6 +159,15 @@ public class FlowDeploymentPlanner {
       ordered.add(unitsByKind.get(kindOf(node)).next());
     }
     return new Compilation(ordered, staEnvelope);
+  }
+
+  /**
+   * Binds the sink through its typed spec. The checked cast is safe by construction: the spec was
+   * parsed by the same stage the registry resolves for its type.
+   */
+  private static <S extends SinkSpec> void bindSink(
+      SinkStage<S> stage, SinkSpec spec, PlanContext out) throws FatalAdapterException {
+    stage.bind(stage.specType().cast(spec), out);
   }
 
   /** The kind of an on-path transform node; the derivation already rejected unknown kinds. */
