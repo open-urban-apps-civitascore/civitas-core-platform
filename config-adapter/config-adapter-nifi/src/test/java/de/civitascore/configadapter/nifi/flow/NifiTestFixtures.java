@@ -15,7 +15,6 @@ import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.FrostSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.MappingNodeType;
 import de.civitascore.configadapter.nifi.flow.stage.MqttSourceStage;
@@ -373,12 +372,12 @@ public final class NifiTestFixtures {
   }
 
   static SinkSpec postgisSink() {
-    return new SinkSpec(SinkType.POSTGIS, "sensor_observations");
+    return new PostgisSinkSpec("sensor_observations");
   }
 
   /** A PostGIS sink with a primary key — required for a cron-scheduled (re-reading) SQL source. */
   static SinkSpec postgisSinkWithPk() {
-    return new SinkSpec(SinkType.POSTGIS, "sensor_observations", List.of("id"));
+    return new PostgisSinkSpec("sensor_observations", List.of("id"));
   }
 
   /** Wraps one node's compiled properties as the spec's mapping-unit list (empty stays empty). */

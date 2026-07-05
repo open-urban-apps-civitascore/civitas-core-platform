@@ -22,11 +22,13 @@ import de.civitascore.configadapter.model.dataset.DataStructureSchema;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner;
+import de.civitascore.configadapter.nifi.flow.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.JdbcSqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
+import de.civitascore.configadapter.nifi.flow.PostgisSinkSpec;
+import de.civitascore.configadapter.nifi.flow.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.stage.FrostSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.MappingNodeType;
@@ -331,24 +333,13 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     Datasource source =
         resolveSource(path.source(), stringList(pipeline.get(FIELD_DATA_SOURCE_IDS)), datasources);
     SinkSpec sink =
-        resolveSink(path.sink(), stringList(pipeline.get(FIELD_DATA_SINK_IDS)), datasinks);
-    // A FROST flow must be scoped to the dataset's project — unscoped it would post to the server
-    // root, invisible to the project-scoped named API. The id is a saga-wide variable from the
-    // FROST create/update-project step, so its absence means a mis-ordered or hand-crafted saga.
-    if (sink.type() == SinkType.FROST && (projectId == null || projectId.isBlank())) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.INVALID_PAYLOAD,
-          "FROST sink requires the saga's '"
-              + FIELD_PROJECT_ID
-              + "' (result of the FROST create-project step)");
-    }
+        resolveSink(
+            path.sink(), stringList(pipeline.get(FIELD_DATA_SINK_IDS)), datasinks, projectId);
     PipelineDeploymentRequest request;
     try {
-      request =
-          new PipelineDeploymentRequest(
-              id, graphData, source, sink, sink.type() == SinkType.FROST ? projectId : null);
+      request = new PipelineDeploymentRequest(id, graphData, source, sink);
     } catch (IllegalArgumentException e) {
-      // e.g. a non-numeric projectId; keep the raw detail internal and publish only the safe
+      // e.g. a blank pipeline id; keep the raw detail internal and publish only the safe
       // external message for the error code.
       throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, e, e.getMessage());
     }
@@ -396,7 +387,10 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   /** Resolves the pipeline's own datasink — same id-based catalog lookup as the source. */
   @SuppressWarnings("unchecked")
   private static SinkSpec resolveSink(
-      GraphNode sinkNode, List<String> dataSinkIds, List<Map<String, Object>> datasinks)
+      GraphNode sinkNode,
+      List<String> dataSinkIds,
+      List<Map<String, Object>> datasinks,
+      String projectId)
       throws FatalAdapterException {
     String entityId = entityId(sinkNode, "datasink");
     Map<String, Object> sink =
@@ -421,14 +415,35 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
                     new FatalAdapterException(
                         AdapterErrorCode.NIFI_TEMPLATE_ERROR,
                         "unsupported sink type: " + sink.get("type")));
-    String tableName = null;
-    if (sink.get("configuration") instanceof Map<?, ?> config) {
-      tableName = asString(((Map<String, Object>) config).get("tableName"));
-    }
-    // The primary key only drives the PostGIS PutDatabaseRecord UPSERT; deriving it for other sink
-    // types would be unused and (per SinkSpec's invariant) rejected, so only POSTGIS gets one.
-    List<String> primaryKey = type == SinkType.POSTGIS ? resolvePrimaryKey(sink) : List.of();
-    return new SinkSpec(type, tableName, primaryKey);
+    return switch (type) {
+      case POSTGIS -> {
+        String tableName = null;
+        if (sink.get("configuration") instanceof Map<?, ?> config) {
+          tableName = asString(((Map<String, Object>) config).get("tableName"));
+        }
+        yield new PostgisSinkSpec(tableName, resolvePrimaryKey(sink));
+      }
+      case FROST -> {
+        // A FROST flow must be scoped to the dataset's project — unscoped it would post to the
+        // server root, invisible to the project-scoped named API. The id is a saga-wide variable
+        // from the FROST create/update-project step, so its absence means a mis-ordered or
+        // hand-crafted saga.
+        if (projectId == null || projectId.isBlank()) {
+          throw new FatalAdapterException(
+              AdapterErrorCode.INVALID_PAYLOAD,
+              "FROST sink requires the saga's '"
+                  + FIELD_PROJECT_ID
+                  + "' (result of the FROST create-project step)");
+        }
+        try {
+          yield new FrostSinkSpec(projectId);
+        } catch (IllegalArgumentException e) {
+          // e.g. a non-numeric projectId; keep the raw detail internal and publish only the safe
+          // external message for the error code.
+          throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, e, e.getMessage());
+        }
+      }
+    };
   }
 
   /** The graph node's configured entity id — an unconfigured node cannot be resolved. */

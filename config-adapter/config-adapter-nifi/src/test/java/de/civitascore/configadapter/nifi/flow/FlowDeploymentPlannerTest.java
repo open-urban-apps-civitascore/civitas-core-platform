@@ -32,7 +32,6 @@ import de.civitascore.configadapter.crypto.CredentialEncryptor;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -166,7 +165,7 @@ class FlowDeploymentPlannerTest {
     // source updates instead of duplicating rows. NiFi needs the key columns explicitly (Update
     // Keys); it does not derive them from the table's PRIMARY KEY.
     Datasource source = sqlSourceBasic();
-    SinkSpec sink = new SinkSpec(SinkType.POSTGIS, "sensor_observations", List.of("id"));
+    SinkSpec sink = new PostgisSinkSpec("sensor_observations", List.of("id"));
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       DeploymentPlan plan =
           planner(resolver)
@@ -186,7 +185,7 @@ class FlowDeploymentPlannerTest {
     // a multi-column PK must join ALL key columns into Update Keys, not just the first — otherwise
     // the UPSERT ON CONFLICT target would not match the composite PRIMARY KEY
     Datasource source = sqlSourceBasic();
-    SinkSpec sink = new SinkSpec(SinkType.POSTGIS, "sensor_observations", List.of("tenant", "id"));
+    SinkSpec sink = new PostgisSinkSpec("sensor_observations", List.of("tenant", "id"));
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       String snapshot =
           planner(resolver)
@@ -417,8 +416,7 @@ class FlowDeploymentPlannerTest {
                               "p-frost-map",
                               graphWithMapping(),
                               mqttSource(null),
-                              new SinkSpec(SinkType.FROST, null),
-                              "1")));
+                              new FrostSinkSpec("1"))));
       assertEquals(
           de.civitascore.configadapter.model.AdapterErrorCode.NIFI_MAPPING_ERROR,
           ex.getErrorCode());
@@ -441,8 +439,7 @@ class FlowDeploymentPlannerTest {
                               "p-frost-incomplete",
                               NifiTestFixtures.graphWithIncompleteFrostMapping(),
                               mqttSource(null),
-                              new SinkSpec(SinkType.FROST, null),
-                              "1")));
+                              new FrostSinkSpec("1"))));
       assertEquals(
           de.civitascore.configadapter.model.AdapterErrorCode.NIFI_MAPPING_ERROR,
           ex.getErrorCode());
@@ -470,8 +467,7 @@ class FlowDeploymentPlannerTest {
                               "p-sql-frost-nomap",
                               graphWithoutMapping(),
                               sqlSource(null),
-                              new SinkSpec(SinkType.FROST, null),
-                              "1")));
+                              new FrostSinkSpec("1"))));
       assertEquals(
           de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           ex.getErrorCode());
@@ -495,8 +491,7 @@ class FlowDeploymentPlannerTest {
                       "p-mqtt-frost-map",
                       NifiTestFixtures.graphWithFrostMapping(),
                       mqttSource(null),
-                      new SinkSpec(SinkType.FROST, null),
-                      "7"))
+                      new FrostSinkSpec("7")))
               .snapshotJson();
       processorOfType(snapshot, "ConvertRecord");
       assertEquals(
@@ -525,8 +520,7 @@ class FlowDeploymentPlannerTest {
                       "p-sql-frost-map",
                       NifiTestFixtures.graphWithFrostMapping(),
                       sqlSource(null),
-                      new SinkSpec(SinkType.FROST, null),
-                      "7"))
+                      new FrostSinkSpec("7")))
               .snapshotJson();
       processorOfType(snapshot, "QueryDatabaseTableRecord");
       assertFalse(snapshot.contains("ConvertRecord"), "SQL records need no convert step");
@@ -550,8 +544,7 @@ class FlowDeploymentPlannerTest {
                       "p-frost-scoped",
                       graphWithoutMapping(),
                       mqttSource(null),
-                      new SinkSpec(SinkType.FROST, null),
-                      "7"));
+                      new FrostSinkSpec("7")));
       String snapshot = plan.snapshotJson();
       assertTrue(
           snapshot.contains("/Projects(7)/Things"),
@@ -773,8 +766,7 @@ class FlowDeploymentPlannerTest {
                         "p-nofrost",
                         graphWithoutMapping(),
                         mqttSource(null),
-                        new SinkSpec(SinkType.FROST, null),
-                        "1")));
+                        new FrostSinkSpec("1"))));
     assertEquals(
         de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }

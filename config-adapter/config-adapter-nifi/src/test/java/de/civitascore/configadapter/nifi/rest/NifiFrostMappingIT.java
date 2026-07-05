@@ -24,10 +24,9 @@ import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner;
+import de.civitascore.configadapter.nifi.flow.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
-import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import java.io.File;
 import java.net.URI;
@@ -465,11 +464,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
       DeploymentPlan plan =
           planner.plan(
               new PipelineDeploymentRequest(
-                  pipelineId,
-                  graph,
-                  source,
-                  new SinkSpec(SinkType.FROST, null),
-                  String.valueOf(projectId)));
+                  pipelineId, graph, source, new FrostSinkSpec(String.valueOf(projectId))));
       client.deployFlow(plan);
     }
   }

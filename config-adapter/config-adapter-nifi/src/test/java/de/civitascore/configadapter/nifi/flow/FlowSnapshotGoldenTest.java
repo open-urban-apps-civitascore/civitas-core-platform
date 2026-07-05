@@ -29,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.civitascore.configadapter.crypto.CredentialEncryptor;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
@@ -170,8 +169,7 @@ class FlowSnapshotGoldenTest {
                       "golden-frost",
                       graphWithoutMapping(),
                       mqttSource(null),
-                      new SinkSpec(SinkType.FROST, null),
-                      "7"));
+                      new FrostSinkSpec("7")));
       verify("planner-mqtt-frost", plan.snapshotJson());
       assertEquals(Map.of(), plan.sensitivePropsByComponent());
     }
@@ -187,8 +185,7 @@ class FlowSnapshotGoldenTest {
                       "golden-frost-map",
                       NifiTestFixtures.graphWithFrostMapping(),
                       mqttSource(null),
-                      new SinkSpec(SinkType.FROST, null),
-                      "7"));
+                      new FrostSinkSpec("7")));
       verify("planner-mqtt-frost-mapping", plan.snapshotJson());
       assertEquals(Map.of(), plan.sensitivePropsByComponent());
     }
@@ -205,8 +202,7 @@ class FlowSnapshotGoldenTest {
                       "golden-sql-frost-map",
                       NifiTestFixtures.graphWithFrostMapping(),
                       sqlSource(enc(key)),
-                      new SinkSpec(SinkType.FROST, null),
-                      "7"));
+                      new FrostSinkSpec("7")));
       verify("planner-sql-frost-mapping", plan.snapshotJson());
       assertEquals(
           Map.of("SourceConnectionPool", Map.of("Password", SECRET)),
@@ -244,8 +240,7 @@ class FlowSnapshotGoldenTest {
                       "golden-frost-chained",
                       NifiTestFixtures.graphWithChainedFrostMappings(),
                       mqttSource(null),
-                      new SinkSpec(SinkType.FROST, null),
-                      "7"));
+                      new FrostSinkSpec("7")));
       verify("planner-mqtt-frost-chained", plan.snapshotJson());
     }
   }

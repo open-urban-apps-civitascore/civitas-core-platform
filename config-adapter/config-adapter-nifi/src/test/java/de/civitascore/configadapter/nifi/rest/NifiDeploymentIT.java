@@ -19,11 +19,12 @@ import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner;
+import de.civitascore.configadapter.nifi.flow.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
-import de.civitascore.configadapter.nifi.flow.SinkType;
+import de.civitascore.configadapter.nifi.flow.PostgisSinkSpec;
+import de.civitascore.configadapter.nifi.flow.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import java.time.Duration;
 import java.util.List;
@@ -64,7 +65,7 @@ class NifiDeploymentIT extends AbstractNifiIT {
     source.handleUnknownProperty("urls", List.of("tcp://localhost:1883"));
     source.handleUnknownProperty("topics", List.of("sensors/+/temp"));
 
-    SinkSpec sink = new SinkSpec(SinkType.POSTGIS, "sensor_observations");
+    SinkSpec sink = new PostgisSinkSpec("sensor_observations");
 
     Map<String, Object> graph =
         map(
@@ -166,8 +167,7 @@ class NifiDeploymentIT extends AbstractNifiIT {
             "http://localhost:8080/FROST-Server/v1.1");
     DeploymentPlan plan =
         planner.plan(
-            new PipelineDeploymentRequest(
-                "frost-it", graph, source, new SinkSpec(SinkType.FROST, null), "1"));
+            new PipelineDeploymentRequest("frost-it", graph, source, new FrostSinkSpec("1")));
 
     // A FROST/HTTP sink has no DBCP/JDBC-driver dependency, so the FULL deploy lifecycle
     // (upload → enable controller services → start) must succeed on real NiFi — this is exactly

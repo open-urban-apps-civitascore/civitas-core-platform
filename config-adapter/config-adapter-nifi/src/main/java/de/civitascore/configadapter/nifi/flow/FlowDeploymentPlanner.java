@@ -13,7 +13,6 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
 import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
@@ -103,8 +102,8 @@ public class FlowDeploymentPlanner {
     // (from x-core-primaryKey on the target, or an explicit configuration.primaryKey); this also
     // surfaces the case where a marker exists but the schema is too ambiguous to resolve one.
     if (sourceType == SourceType.SQL
-        && sink.type() == SinkType.POSTGIS
-        && sink.primaryKeyColumns().isEmpty()) {
+        && sink instanceof PostgisSinkSpec postgis
+        && postgis.primaryKeyColumns().isEmpty()) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           "a SQL source writing to PostGIS requires a primary key on the target data structure (mark"

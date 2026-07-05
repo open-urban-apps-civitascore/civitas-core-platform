@@ -14,8 +14,8 @@ import static de.civitascore.configadapter.nifi.flow.stage.BindingSupport.putIfP
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
+import de.civitascore.configadapter.nifi.flow.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import java.util.LinkedHashMap;
@@ -60,8 +60,8 @@ public final class PostgisSinkStage implements SinkStage {
   @Override
   public void bind(PipelineDeploymentRequest request, PlanContext out)
       throws FatalAdapterException {
-    SinkSpec sink = request.sink();
-    // SinkSpec guarantees a non-blank tableName for POSTGIS (the invalid state is rejected at
+    PostgisSinkSpec sink = (PostgisSinkSpec) request.sink();
+    // PostgisSinkSpec guarantees a non-blank tableName (the invalid state is rejected at
     // construction), so PutDatabaseRecord always has a target here.
     out.putSinkProperty("Table Name", sink.tableName());
     // With a primary key (the data structure's x-core-primaryKey marker), write UPSERT keyed on

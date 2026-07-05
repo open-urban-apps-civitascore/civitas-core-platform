@@ -15,9 +15,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.civitascore.configadapter.model.dataset.Datasource;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -26,74 +26,50 @@ class PipelineDeploymentRequestTest {
   @Test
   void postgisSinkWithoutTableNameIsRejectedAtConstruction() {
     // The invalid state must be unrepresentable: PutDatabaseRecord without a table has no target.
-    assertThrows(IllegalArgumentException.class, () -> new SinkSpec(SinkType.POSTGIS, null));
-    assertThrows(IllegalArgumentException.class, () -> new SinkSpec(SinkType.POSTGIS, "  "));
+    assertThrows(IllegalArgumentException.class, () -> new PostgisSinkSpec(null));
+    assertThrows(IllegalArgumentException.class, () -> new PostgisSinkSpec("  "));
   }
 
   @Test
   void postgisSinkWithTableNameIsAccepted() {
-    assertEquals(
-        "sensor_observations", new SinkSpec(SinkType.POSTGIS, "sensor_observations").tableName());
+    assertEquals("sensor_observations", new PostgisSinkSpec("sensor_observations").tableName());
   }
 
   @Test
-  void frostSinkLegitimatelyCarriesNoTableName() {
-    SinkSpec sink = new SinkSpec(SinkType.FROST, null);
+  void frostSinkCarriesItsProjectId() {
+    FrostSinkSpec sink = new FrostSinkSpec("42");
     assertEquals(SinkType.FROST, sink.type());
+    assertEquals("42", sink.projectId());
   }
 
   @Test
   void frostSinkRequiresANumericProjectId() {
     // The id scopes the flow to the dataset's FROST project and is interpolated into processor
     // URLs/$filters — missing or non-numeric values must be unrepresentable.
-    SinkSpec frost = new SinkSpec(SinkType.FROST, null);
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> new PipelineDeploymentRequest("p", Map.of(), null, frost));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> new PipelineDeploymentRequest("p", Map.of(), null, frost, " "));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> new PipelineDeploymentRequest("p", Map.of(), null, frost, "1) or true"));
-    assertEquals(
-        "42", new PipelineDeploymentRequest("p", Map.of(), null, frost, "42").frostProjectId());
-  }
-
-  @Test
-  void projectIdOnNonFrostSinkIsRejected() {
-    SinkSpec postgis = new SinkSpec(SinkType.POSTGIS, "t");
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> new PipelineDeploymentRequest("p", Map.of(), null, postgis, "1"));
-    // the convenience constructor (no project id) stays valid for non-FROST sinks
-    assertEquals(
-        SinkType.POSTGIS,
-        new PipelineDeploymentRequest("p", Map.of(), null, postgis).sink().type());
-  }
-
-  @Test
-  void primaryKeyColumnsOnNonPostgisSinkAreRejected() {
-    // PK columns only drive the PostGIS UPSERT; carrying them on a FROST sink is a meaningless
-    // state
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> new SinkSpec(SinkType.FROST, null, java.util.List.of("id")));
+    assertThrows(IllegalArgumentException.class, () -> new FrostSinkSpec(null));
+    assertThrows(IllegalArgumentException.class, () -> new FrostSinkSpec(" "));
+    assertThrows(IllegalArgumentException.class, () -> new FrostSinkSpec("1) or true"));
   }
 
   @Test
   void primaryKeyColumnsAreTrimmedAndDeduplicated() {
     // names are joined verbatim into NiFi Update Keys → trim + de-duplicate (preserving order)
-    SinkSpec sink =
-        new SinkSpec(SinkType.POSTGIS, "t", java.util.List.of(" tenant ", "id", "tenant"));
-    assertEquals(java.util.List.of("tenant", "id"), sink.primaryKeyColumns());
+    PostgisSinkSpec sink = new PostgisSinkSpec("t", List.of(" tenant ", "id", "tenant"));
+    assertEquals(List.of("tenant", "id"), sink.primaryKeyColumns());
   }
 
   @Test
   void blankPrimaryKeyColumnIsRejected() {
     assertThrows(
+        IllegalArgumentException.class, () -> new PostgisSinkSpec("t", List.of("id", "  ")));
+  }
+
+  @Test
+  void blankPipelineIdIsRejected() {
+    assertThrows(
         IllegalArgumentException.class,
-        () -> new SinkSpec(SinkType.POSTGIS, "t", java.util.List.of("id", "  ")));
+        () ->
+            new PipelineDeploymentRequest(" ", Map.of(), new Datasource(), new FrostSinkSpec("1")));
   }
 
   @Test
@@ -102,8 +78,7 @@ class PipelineDeploymentRequestTest {
     mutable.put("nodes", new ArrayList<>());
 
     PipelineDeploymentRequest request =
-        new PipelineDeploymentRequest(
-            "p-1", mutable, new Datasource(), new SinkSpec(SinkType.FROST, null), "1");
+        new PipelineDeploymentRequest("p-1", mutable, new Datasource(), new FrostSinkSpec("1"));
 
     // mutating the caller's map after construction must not leak into the record
     mutable.put("edges", new ArrayList<>());
@@ -114,8 +89,7 @@ class PipelineDeploymentRequestTest {
   @Test
   void nullGraphDataBecomesEmptyMap() {
     PipelineDeploymentRequest request =
-        new PipelineDeploymentRequest(
-            "p-1", null, new Datasource(), new SinkSpec(SinkType.FROST, null), "1");
+        new PipelineDeploymentRequest("p-1", null, new Datasource(), new FrostSinkSpec("1"));
     assertTrue(request.graphData().isEmpty());
   }
 }

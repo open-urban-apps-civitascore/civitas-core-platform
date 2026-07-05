@@ -20,9 +20,8 @@ import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder;
 import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
-import de.civitascore.configadapter.nifi.flow.SinkType;
+import de.civitascore.configadapter.nifi.flow.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import java.io.File;
 import java.sql.Connection;
@@ -160,7 +159,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     DeploymentPlan plan =
         planner.plan(
             new PipelineDeploymentRequest(
-                "pg-data-it", graph, source, new SinkSpec(SinkType.POSTGIS, "observation")));
+                "pg-data-it", graph, source, new PostgisSinkSpec("observation")));
 
     client.deployFlow(plan);
 
@@ -221,7 +220,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     DeploymentPlan plan =
         planner.plan(
             new PipelineDeploymentRequest(
-                "pg-geo-it", graph, source, new SinkSpec(SinkType.POSTGIS, "geo_observation")));
+                "pg-geo-it", graph, source, new PostgisSinkSpec("geo_observation")));
 
     client.deployFlow(plan);
 
@@ -279,10 +278,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     DeploymentPlan plan =
         planner.plan(
             new PipelineDeploymentRequest(
-                "pg-geo25832-it",
-                graph,
-                source,
-                new SinkSpec(SinkType.POSTGIS, "geo_observation_25832")));
+                "pg-geo25832-it", graph, source, new PostgisSinkSpec("geo_observation_25832")));
 
     client.deployFlow(plan);
 

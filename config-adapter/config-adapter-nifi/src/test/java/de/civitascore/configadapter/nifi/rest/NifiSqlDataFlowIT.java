@@ -22,9 +22,9 @@ import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder;
 import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
-import de.civitascore.configadapter.nifi.flow.SinkType;
+import de.civitascore.configadapter.nifi.flow.PostgisSinkSpec;
+import de.civitascore.configadapter.nifi.flow.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import java.io.File;
 import java.sql.Connection;
@@ -138,11 +138,7 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
 
     Datasource source = sqlSource("sensor_input");
     // a cron-scheduled SQL source requires a sink primary key (dedup of re-read rows)
-    deploy(
-        "sql-typed-it",
-        graph,
-        source,
-        new SinkSpec(SinkType.POSTGIS, "observation", List.of("stationid")));
+    deploy("sql-typed-it", graph, source, new PostgisSinkSpec("observation", List.of("stationid")));
 
     // the row must arrive…
     await()
@@ -180,10 +176,7 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
 
     Datasource source = sqlSource("geo_input");
     deploy(
-        "sql-geo-it",
-        graph,
-        source,
-        new SinkSpec(SinkType.POSTGIS, "geo_observation", List.of("stationid")));
+        "sql-geo-it", graph, source, new PostgisSinkSpec("geo_observation", List.of("stationid")));
 
     await()
         .atMost(Duration.ofSeconds(90))
@@ -221,7 +214,7 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
         "sql-dedup-it",
         graph,
         source,
-        new SinkSpec(SinkType.POSTGIS, "dedup_observation", List.of("stationid")));
+        new PostgisSinkSpec("dedup_observation", List.of("stationid")));
 
     // the row lands…
     await()
@@ -267,7 +260,7 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
         "sql-mixedcase-it",
         graph,
         sqlSource("mixed_input"),
-        new SinkSpec(SinkType.POSTGIS, "mixedObservation", List.of("stationId")));
+        new PostgisSinkSpec("mixedObservation", List.of("stationId")));
 
     await()
         .atMost(Duration.ofSeconds(90))

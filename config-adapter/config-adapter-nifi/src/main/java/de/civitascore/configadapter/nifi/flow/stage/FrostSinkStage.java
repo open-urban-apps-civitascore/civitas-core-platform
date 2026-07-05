@@ -14,6 +14,7 @@ import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.setProp;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.nifi.flow.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
@@ -104,9 +105,9 @@ public final class FrostSinkStage implements SinkStage {
     // The base URL feeds the find-or-create sub-flow, which derives the per-stage URLs (/Things,
     // /Datastreams, /Observations) — not a single POST endpoint.
     out.putSinkProperty(FROST_BASE_URL, frostBaseUrl);
-    // The saga's project id scopes those URLs to the dataset's FROST project; the request record
-    // guarantees it is present and numeric for a FROST sink.
-    out.putSinkProperty(FROST_PROJECT_ID, request.frostProjectId());
+    // The saga's project id scopes those URLs to the dataset's FROST project; the spec
+    // guarantees it is present and numeric.
+    out.putSinkProperty(FROST_PROJECT_ID, ((FrostSinkSpec) request.sink()).projectId());
   }
 
   /**
