@@ -39,8 +39,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Builds a NiFi 2.x flow-snapshot JSON by orchestrating the registered stages along the fixed chain
- * source → [convert] → [mapping...] → sink. All type knowledge lives in the stages; the builder
+ * Builds a NiFi 2.x flow-snapshot JSON by orchestrating the registered stages along the chain
+ * source → [convert] → [transform...] → sink. All type knowledge lives in the stages; the builder
  * owns the chain order, the controller-service phase, and the snapshot envelope. Components are
  * minted exclusively from the curated fragment whitelist (never scripting), so a constrained graph
  * can never smuggle arbitrary processors in. The produced snapshot carries no secrets; sensitive
@@ -163,16 +163,14 @@ public class NifiFlowBuilder {
     // Controller services first — processors reference them by id.
     addControllerServices(ctx, sourceStage, sinkStage);
 
-    // Processor chain: source -> [convert] -> [mapping...] -> sink. A mapping may need more than
-    // one
-    // UpdateRecord because a single processor allows only one Replacement Value Strategy, so const
-    // (literal-value) fields and record-path fields land on separate processors. The convert step
-    // exists only to turn a raw (non-record) source payload into records — the MQTT source emits
-    // raw
-    // bytes on 'Message'; the SQL source (QueryDatabaseTableRecord) already emits records on
-    // 'success', so it is wired straight into the mapping/sink with no convert.
-    // Common prefix: source -> [convert] -> [mapping...]. The sink stage differs: PostGIS/MQTT is a
-    // single terminal processor (linear), FROST is a multi-stage find-or-create sub-flow.
+    // Processor chain: source -> [convert] -> [transform...] -> sink. A mapping may need more than
+    // one UpdateRecord because a single processor allows only one Replacement Value Strategy, so
+    // const (literal-value) fields and record-path fields land on separate processors. The convert
+    // step exists only to turn a raw (non-record) source payload into records — the MQTT source
+    // emits raw bytes on 'Message'; the SQL source (QueryDatabaseTableRecord) already emits records
+    // on 'success', so it is wired straight into the transform/sink with no convert.
+    // Common prefix: source -> [convert] -> [transform...]. The sink stage differs: PostGIS/MQTT is
+    // a single terminal processor (linear), FROST is a multi-stage find-or-create sub-flow.
     List<Processor> prefix = new ArrayList<>(sourceStage.build(ctx).chain());
     List<Processor> failureSources = new ArrayList<>();
     for (TransformStage transform : transformsFor(sourceStage, sinkStage, spec)) {

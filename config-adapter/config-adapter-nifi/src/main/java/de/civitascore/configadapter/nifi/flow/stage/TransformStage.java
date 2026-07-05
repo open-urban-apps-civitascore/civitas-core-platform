@@ -12,9 +12,11 @@ package de.civitascore.configadapter.nifi.flow.stage;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 
 /**
- * A chain segment between source and sink. Transforms are not registry-dispatched: whether a
- * convert or mapping step exists is a structural function of source capabilities, sink input shape,
- * and the compiled mapping — not of a node type.
+ * A chain segment between source and sink — the build half of one compiled transform unit, or a
+ * structurally inserted step. Node-carried transforms reach the chain through their {@link
+ * TransformNodeType}; the convert step is different: it is never user-modelled, its existence is a
+ * structural function of source output form and sink input shape (the coercion table), so the
+ * builder inserts it directly.
  */
 @FunctionalInterface
 public interface TransformStage {
