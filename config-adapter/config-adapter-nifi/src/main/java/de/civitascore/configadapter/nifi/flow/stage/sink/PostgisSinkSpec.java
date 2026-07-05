@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.nifi.flow.stage.sink;
 
 import de.civitascore.configadapter.nifi.flow.SinkType;
+import de.civitascore.configadapter.nifi.mapping.NifiExpressionLanguage;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,9 +32,14 @@ public record PostgisSinkSpec(String tableName, List<String> primaryKeyColumns)
     if (tableName == null || tableName.isBlank()) {
       throw new IllegalArgumentException("POSTGIS sink requires a non-blank tableName");
     }
-    // These names are joined verbatim into NiFi's "Update Keys", so normalize them here: trim,
-    // reject blank entries (a broken UPSERT config otherwise), and de-duplicate while preserving
-    // order.
+    // The table name lands in PutDatabaseRecord's EL-enabled "Table Name" property, so a tenant
+    // value of ${ENV_VAR} would expand against the NiFi process environment at write time. Escape
+    // it here, at the boundary where tenant text enters the spec, so the invariant holds for every
+    // sink path — the same escape the mapping values already get.
+    tableName = NifiExpressionLanguage.escape(tableName);
+    // These names are joined verbatim into NiFi's likewise EL-enabled "Update Keys", so normalize
+    // them here: trim, reject blank entries (a broken UPSERT config otherwise), de-duplicate while
+    // preserving order, and escape EL for the same reason as the table name.
     primaryKeyColumns = sanitizeKeyColumns(primaryKeyColumns);
   }
 
@@ -56,7 +62,7 @@ public record PostgisSinkSpec(String tableName, List<String> primaryKeyColumns)
       if (key == null || key.isBlank()) {
         throw new IllegalArgumentException("primaryKeyColumns must not contain blank entries");
       }
-      String trimmed = key.trim();
+      String trimmed = NifiExpressionLanguage.escape(key.trim());
       if (!sanitized.contains(trimmed)) {
         sanitized.add(trimmed);
       }

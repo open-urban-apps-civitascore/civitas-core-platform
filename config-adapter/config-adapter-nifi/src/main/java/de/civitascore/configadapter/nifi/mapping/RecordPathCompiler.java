@@ -102,12 +102,12 @@ public class RecordPathCompiler {
       // UpdateRecord processors.
       return new UpdateRecordProperty(
           destination,
-          escapeEl(String.valueOf(constant.value())),
+          NifiExpressionLanguage.escape(String.valueOf(constant.value())),
           ReplacementStrategy.LITERAL_VALUE);
     }
     return new UpdateRecordProperty(
         destination,
-        escapeEl(render(node, geometryEncoding)),
+        NifiExpressionLanguage.escape(render(node, geometryEncoding)),
         ReplacementStrategy.RECORD_PATH_VALUE);
   }
 
@@ -178,17 +178,6 @@ public class RecordPathCompiler {
               AdapterErrorCode.NIFI_MAPPING_ERROR,
               "geoPoint is not yet supported for GeoJSON (FROST) sinks");
     };
-  }
-
-  /**
-   * Escapes {@code $} to {@code $$} in a finished property value. UpdateRecord evaluates NiFi
-   * Expression Language in its dynamic property values (both strategies), so tenant text carrying
-   * {@code ${ENV_VAR}} would otherwise expand against the NiFi process environment and exfiltrate
-   * into the record. {@code $$} is EL's literal escape; RecordPath itself uses no {@code $}, so the
-   * only {@code $} in a compiled value is tenant-supplied.
-   */
-  private static String escapeEl(String value) {
-    return value.replace("$", "$$");
   }
 
   private static String literal(Object value) {
