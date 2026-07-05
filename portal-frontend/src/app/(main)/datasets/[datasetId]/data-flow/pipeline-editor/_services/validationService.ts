@@ -47,15 +47,16 @@ export const isValidNifiCron = (expression: string): boolean => {
   // Hours: 0-23
   const hoursPattern =
     /^(\*(\/([1-9]|1\d|2[0-3]))?|(\d|1\d|2[0-3])(-(\d|1\d|2[0-3])|\/([1-9]|1\d|2[0-3]))?)([,](\*(\/([1-9]|1\d|2[0-3]))?|(\d|1\d|2[0-3])(-(\d|1\d|2[0-3])|\/([1-9]|1\d|2[0-3]))?))*$/
-  // Day of month: 1-31 or ? or L or W
+  // Day of month: 1-31 or ? or L/LW; W only on a single day (5-10W is rejected by the parser)
   const dayOfMonthPattern =
-    /^(\*(\/([1-9]|[12]\d|3[01]))?|\?|L|([1-9]|[12]\d|3[01])(-([1-9]|[12]\d|3[01])|\/([1-9]|[12]\d|3[01]))?[WL]?)([,](\*(\/([1-9]|[12]\d|3[01]))?|([1-9]|[12]\d|3[01])(-([1-9]|[12]\d|3[01])|\/([1-9]|[12]\d|3[01]))?[WL]?))*$/
+    /^(\*(\/([1-9]|[12]\d|3[01]))?|\?|LW?|([1-9]|[12]\d|3[01])(W|-([1-9]|[12]\d|3[01])|\/([1-9]|[12]\d|3[01]))?)([,](\*(\/([1-9]|[12]\d|3[01]))?|LW?|([1-9]|[12]\d|3[01])(W|-([1-9]|[12]\d|3[01])|\/([1-9]|[12]\d|3[01]))?))*$/
   // Month: 1-12 or JAN-DEC
   const monthPattern =
     /^(\*(\/([1-9]|1[0-2]))?|([1-9]|1[0-2]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([-/]([1-9]|1[0-2]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC))?)([,](\*(\/([1-9]|1[0-2]))?|([1-9]|1[0-2]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([-/]([1-9]|1[0-2]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC))?))*$/i
-  // Day of week: 0-7 (Spring numbering: 0 and 7 = Sunday, 1 = Monday) or SUN-SAT or ? or L
+  // Day of week: 0-7 (Spring numbering: 0 and 7 = Sunday, 1 = Monday) or SUN-SAT or ? or L;
+  // L/#n only on a single day (MON-FRI#3 is rejected by the parser)
   const dayOfWeekPattern =
-    /^(\*(\/[1-7])?|\?|L|([0-7]|SUN|MON|TUE|WED|THU|FRI|SAT)(-([0-7]|SUN|MON|TUE|WED|THU|FRI|SAT)|\/[1-7])?(L|#[1-5])?)([,](\*(\/[1-7])?|([0-7]|SUN|MON|TUE|WED|THU|FRI|SAT)(-([0-7]|SUN|MON|TUE|WED|THU|FRI|SAT)|\/[1-7])?(L|#[1-5])?))*$/i
+    /^(\*(\/[1-7])?|\?|L|([0-7]|SUN|MON|TUE|WED|THU|FRI|SAT)(L|#[1-5]|-([0-7]|SUN|MON|TUE|WED|THU|FRI|SAT)|\/[1-7])?)([,](\*(\/[1-7])?|([0-7]|SUN|MON|TUE|WED|THU|FRI|SAT)(L|#[1-5]|-([0-7]|SUN|MON|TUE|WED|THU|FRI|SAT)|\/[1-7])?))*$/i
 
   return (
     secondsPattern.test(seconds) &&

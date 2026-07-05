@@ -77,6 +77,16 @@ describe('isValidNifiCron', () => {
     expect(isValidNifiCron('0 0 6 0 * ?')).toBe(false)
     expect(isValidNifiCron('0 0 6 * 0 ?')).toBe(false)
   })
+
+  it('restricts W, L and #n to single values (the parser rejects them on ranges)', () => {
+    expect(isValidNifiCron('0 0 6 15W * ?')).toBe(true)
+    expect(isValidNifiCron('0 0 6 LW * ?')).toBe(true)
+    expect(isValidNifiCron('0 0 6 ? * MON#3')).toBe(true)
+    expect(isValidNifiCron('0 0 6 ? * FRIL')).toBe(true)
+    expect(isValidNifiCron('0 0 6 5-10W * ?')).toBe(false)
+    expect(isValidNifiCron('0 0 6 ? * MON-FRI#3')).toBe(false)
+    expect(isValidNifiCron('0 0 6 ? * MON-FRIL')).toBe(false)
+  })
 })
 
 describe('validateMappingCoversRequiredTargetFields', () => {
