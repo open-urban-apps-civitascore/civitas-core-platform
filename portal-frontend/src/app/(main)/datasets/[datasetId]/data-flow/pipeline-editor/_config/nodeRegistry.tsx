@@ -14,6 +14,12 @@
  * default-data factory) is DERIVED from this array. Pipeline-wide concerns that are
  * not per-node (RedPandaConnect model building, structural validation) live in their
  * dedicated services (`modelBuilderService`, `validationService`).
+ *
+ * A node type's DATA-FLOW declaration (role, emitted/accepted payload forms, schedule
+ * port) lives in the React-free sibling `nodeFlow.ts` — the validation service consumes
+ * it, and this file's inspector panels import validation helpers, so keeping it here
+ * would create an import cycle. Its `Record<PipelineNodeType, …>` fails to compile when
+ * a type added here is missing there.
  */
 
 import type { LucideIcon } from 'lucide-react'
