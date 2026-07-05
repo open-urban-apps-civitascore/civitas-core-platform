@@ -42,7 +42,7 @@ tests {
 docs {
   **Saga step 4c of 20** — Prerequisites: DataSet created (step 4).
 
-  Creates the FROST DataSink the pipeline's `frost` graph node references. The deploy derives the pipeline's sink from the wired sink node in the graph — there is **no implicit FROST default** anymore, so a pipeline without a referenced FROST sink entity is rejected by the adapter.
+  Creates the FROST DataSink the pipeline's `frost` graph node references. The deploy derives the pipeline's sink from the wired sink node in the graph — there is **no implicit FROST default**, so a pipeline without a referenced FROST sink entity is rejected by the adapter.
 
   FROST sinks carry no configuration of their own — provisioning happens via the FROST adapter on dataset release.
 
