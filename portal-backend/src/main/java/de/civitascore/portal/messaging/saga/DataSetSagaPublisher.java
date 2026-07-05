@@ -398,6 +398,12 @@ public class DataSetSagaPublisher {
   }
 
   private DataPipeline toPipelineEntry(Pipeline pipeline, PipelineAction action) {
+    // The relation can be null on a pipeline without sources — buildDatasources treats that as
+    // valid, so the association list must not abort the publication either.
+    List<String> dataSourceIds =
+        pipeline.getDataSources() == null
+            ? List.of()
+            : pipeline.getDataSources().stream().map(ds -> ds.getId().toString()).sorted().toList();
     return new DataPipeline(
         pipeline.getId().toString(),
         String.valueOf(pipeline.getVersion()),
@@ -408,7 +414,7 @@ public class DataSetSagaPublisher {
         // engine specifics appear.
         pipeline.getModel(),
         // Sorted so the payload is deterministic — the entity relations are unordered sets.
-        pipeline.getDataSources().stream().map(ds -> ds.getId().toString()).sorted().toList(),
+        dataSourceIds,
         dataSinkRepository.findByPipelineId(pipeline.getId()).stream()
             .map(sink -> sink.getId().toString())
             .sorted()
