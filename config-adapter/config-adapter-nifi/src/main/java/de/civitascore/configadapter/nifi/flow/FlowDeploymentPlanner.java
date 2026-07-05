@@ -19,6 +19,8 @@ import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
 import de.civitascore.configadapter.nifi.flow.stage.TransformNodeType;
 import de.civitascore.configadapter.nifi.flow.stage.TransformNodeType.Compilation;
+import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
 import de.civitascore.configadapter.nifi.graph.FlowPath;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
 import de.civitascore.configadapter.nifi.graph.NodeKind;

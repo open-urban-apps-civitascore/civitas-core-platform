@@ -11,8 +11,8 @@ package de.civitascore.configadapter.nifi.flow.stage;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
-import de.civitascore.configadapter.nifi.flow.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.SinkType;
+import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import java.util.List;
 import java.util.Map;

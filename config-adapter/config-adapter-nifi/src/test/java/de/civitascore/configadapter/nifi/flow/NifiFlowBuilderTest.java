@@ -23,7 +23,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
-import de.civitascore.configadapter.nifi.flow.stage.FrostSinkStage;
+import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
 import java.util.List;

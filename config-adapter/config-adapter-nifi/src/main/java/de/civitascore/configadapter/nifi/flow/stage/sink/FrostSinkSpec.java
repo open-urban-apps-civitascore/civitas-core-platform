@@ -7,7 +7,9 @@
  * Copyright (c) 2012-2026 Civitas Connect e. V. and others.
  *
  */
-package de.civitascore.configadapter.nifi.flow;
+package de.civitascore.configadapter.nifi.flow.stage.sink;
+
+import de.civitascore.configadapter.nifi.flow.SinkType;
 
 /**
  * A FROST sink's resolved configuration.

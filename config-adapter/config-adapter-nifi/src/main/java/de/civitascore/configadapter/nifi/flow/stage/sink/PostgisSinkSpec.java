@@ -7,8 +7,9 @@
  * Copyright (c) 2012-2026 Civitas Connect e. V. and others.
  *
  */
-package de.civitascore.configadapter.nifi.flow;
+package de.civitascore.configadapter.nifi.flow.stage.sink;
 
+import de.civitascore.configadapter.nifi.flow.SinkType;
 import java.util.ArrayList;
 import java.util.List;
 

@@ -7,10 +7,15 @@
  * Copyright (c) 2012-2026 Civitas Connect e. V. and others.
  *
  */
-package de.civitascore.configadapter.nifi.flow.stage;
+package de.civitascore.configadapter.nifi.flow.stage.transform;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.nifi.flow.stage.BuildContext;
+import de.civitascore.configadapter.nifi.flow.stage.Fragment;
+import de.civitascore.configadapter.nifi.flow.stage.Processor;
+import de.civitascore.configadapter.nifi.flow.stage.StageResult;
+import de.civitascore.configadapter.nifi.flow.stage.TransformStage;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.ReplacementStrategy;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;

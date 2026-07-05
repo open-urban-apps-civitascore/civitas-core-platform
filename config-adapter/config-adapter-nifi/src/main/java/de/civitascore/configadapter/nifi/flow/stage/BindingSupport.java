@@ -13,17 +13,17 @@ import java.util.List;
 import java.util.Map;
 
 /** Shared value coercions for the plan-time binding halves of the stages. */
-final class BindingSupport {
+public final class BindingSupport {
 
   private BindingSupport() {}
 
   /** A value as a trimmed string, or {@code ""} for null. */
-  static String trimmedString(Object value) {
+  public static String trimmedString(Object value) {
     return value == null ? "" : String.valueOf(value).trim();
   }
 
   /** A scalar or list value as trimmed, non-blank strings (empty for null/all-blank). */
-  static List<String> trimmedNonBlank(Object value) {
+  public static List<String> trimmedNonBlank(Object value) {
     List<String> raw =
         value instanceof List<?> list
             ? list.stream().map(String::valueOf).toList()
@@ -31,13 +31,13 @@ final class BindingSupport {
     return raw.stream().map(String::trim).filter(s -> !s.isEmpty()).toList();
   }
 
-  static void putIfPresent(Map<String, String> target, String key, Object value) {
+  public static void putIfPresent(Map<String, String> target, String key, Object value) {
     if (value != null) {
       target.put(key, String.valueOf(value));
     }
   }
 
-  static boolean isEncrypted(Object value) {
+  public static boolean isEncrypted(Object value) {
     return value instanceof String text && text.startsWith("ENC(") && text.endsWith(")");
   }
 }

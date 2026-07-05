@@ -7,7 +7,7 @@
  * Copyright (c) 2012-2026 Civitas Connect e. V. and others.
  *
  */
-package de.civitascore.configadapter.nifi.flow.stage;
+package de.civitascore.configadapter.nifi.flow.stage.source;
 
 import static de.civitascore.configadapter.nifi.flow.stage.BindingSupport.isEncrypted;
 import static de.civitascore.configadapter.nifi.flow.stage.BindingSupport.putIfPresent;
@@ -20,6 +20,13 @@ import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.SourceType;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
+import de.civitascore.configadapter.nifi.flow.stage.BuildContext;
+import de.civitascore.configadapter.nifi.flow.stage.Fragment;
+import de.civitascore.configadapter.nifi.flow.stage.PayloadForm;
+import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
+import de.civitascore.configadapter.nifi.flow.stage.Processor;
+import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
+import de.civitascore.configadapter.nifi.flow.stage.StageResult;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;

@@ -7,7 +7,7 @@
  * Copyright (c) 2012-2026 Civitas Connect e. V. and others.
  *
  */
-package de.civitascore.configadapter.nifi.flow.stage;
+package de.civitascore.configadapter.nifi.flow.stage.sink;
 
 import static de.civitascore.configadapter.nifi.flow.stage.BindingSupport.putIfPresent;
 
@@ -15,9 +15,14 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.dataset.DataStructureSchema;
 import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
-import de.civitascore.configadapter.nifi.flow.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.flow.SinkType;
+import de.civitascore.configadapter.nifi.flow.stage.BuildContext;
+import de.civitascore.configadapter.nifi.flow.stage.Fragment;
+import de.civitascore.configadapter.nifi.flow.stage.PayloadForm;
+import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
+import de.civitascore.configadapter.nifi.flow.stage.Processor;
+import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import java.util.LinkedHashMap;
 import java.util.List;

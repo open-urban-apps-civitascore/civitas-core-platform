@@ -7,7 +7,9 @@
  * Copyright (c) 2012-2026 Civitas Connect e. V. and others.
  *
  */
-package de.civitascore.configadapter.nifi.flow;
+package de.civitascore.configadapter.nifi.flow.stage.sink;
+
+import de.civitascore.configadapter.nifi.flow.SinkType;
 
 /**
  * The resolved, typed sink configuration of one pipeline — one variant per {@link SinkType}, each

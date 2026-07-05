@@ -15,6 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.civitascore.configadapter.model.dataset.Datasource;
+import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

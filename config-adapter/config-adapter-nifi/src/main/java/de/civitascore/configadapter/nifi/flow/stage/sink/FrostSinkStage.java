@@ -7,16 +7,22 @@
  * Copyright (c) 2012-2026 Civitas Connect e. V. and others.
  *
  */
-package de.civitascore.configadapter.nifi.flow.stage;
+package de.civitascore.configadapter.nifi.flow.stage.sink;
 
 import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.removeAutoTerminated;
 import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.setProp;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
-import de.civitascore.configadapter.nifi.flow.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.flow.SinkType;
+import de.civitascore.configadapter.nifi.flow.stage.BuildContext;
+import de.civitascore.configadapter.nifi.flow.stage.Fragment;
+import de.civitascore.configadapter.nifi.flow.stage.MappingSupport;
+import de.civitascore.configadapter.nifi.flow.stage.PayloadForm;
+import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
+import de.civitascore.configadapter.nifi.flow.stage.Processor;
+import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
 import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import de.civitascore.configadapter.nifi.mapping.SinkPreRegionPlan;

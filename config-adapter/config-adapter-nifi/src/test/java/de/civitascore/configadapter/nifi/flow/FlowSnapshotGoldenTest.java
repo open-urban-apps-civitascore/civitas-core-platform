@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.civitascore.configadapter.crypto.CredentialEncryptor;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
+import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;

@@ -7,7 +7,7 @@
  * Copyright (c) 2012-2026 Civitas Connect e. V. and others.
  *
  */
-package de.civitascore.configadapter.nifi.flow.stage;
+package de.civitascore.configadapter.nifi.flow.stage.source;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.nifi.flow;
 
 import de.civitascore.configadapter.model.dataset.Datasource;
+import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;

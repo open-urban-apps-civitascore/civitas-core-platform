@@ -20,7 +20,7 @@ import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
 import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
-import de.civitascore.configadapter.nifi.flow.stage.FrostSinkStage;
+import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import jakarta.ws.rs.core.Response;
 import java.net.URI;
 import java.net.http.HttpClient;
