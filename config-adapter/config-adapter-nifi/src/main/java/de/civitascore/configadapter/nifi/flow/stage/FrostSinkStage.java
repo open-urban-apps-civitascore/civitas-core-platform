@@ -90,7 +90,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
   @Override
   public MappingSupport mappingSupport() {
     // Raw-JSON sink, but a mapping is accepted: the compiled flat fields are rebuilt into the
-    // envelope by the pre-region in build(...), driven by the plan's staEnvelope.
+    // envelope by the pre-region in build(...), driven by the compilation's sink pre-region plan.
     return MappingSupport.ENVELOPE;
   }
 
