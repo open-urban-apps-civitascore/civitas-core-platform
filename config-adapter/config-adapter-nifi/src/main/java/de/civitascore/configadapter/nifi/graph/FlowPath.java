@@ -62,7 +62,7 @@ public record FlowPath(
    * @throws IllegalStateException if the graph violates a structural constraint (cardinality,
    *     position, connectivity, trigger binding); the message names the offending node
    */
-  public static FlowPath of(PipelineGraph graph) {
+  public static FlowPath derive(PipelineGraph graph) {
     Map<String, GraphNode> nodesById = new HashMap<>();
     for (GraphNode node : graph.nodes()) {
       nodesById.put(node.id(), node);
@@ -78,7 +78,7 @@ public record FlowPath(
     List<GraphNode> mappings = walk(source, sink, dataOut);
     requireAllMappingsOnPath(graph, mappings);
 
-    return new FlowPath(source, mappings, sink, triggerCron(graph, nodesById, source));
+    return new FlowPath(source, mappings, sink, triggerCron(graph, source));
   }
 
   // ─── Cardinality ────────────────────────────────────────────────────────────
@@ -229,24 +229,13 @@ public record FlowPath(
    * trigger schedules the source's entry processor — feeding anything else is meaningless), and the
    * source's trigger port holds at most one schedule.
    */
-  private static Optional<String> triggerCron(
-      PipelineGraph graph, Map<String, GraphNode> nodesById, GraphNode source) {
+  private static Optional<String> triggerCron(PipelineGraph graph, GraphNode source) {
     List<GraphNode> scheduling = new ArrayList<>();
     for (GraphNode cron : graph.nodes()) {
       if (!TYPE_CRON.equals(cron.type())) {
         continue;
       }
-      // A detached cron must not silently schedule the source; reject it like the mapping check.
-      if (!isWired(graph, cron.id())) {
-        throw new IllegalStateException(
-            "the cron node is not wired into the flow (it needs both an incoming and an outgoing"
-                + " edge)");
-      }
-      for (GraphEdge edge : graph.edges()) {
-        if (edge.source().equals(cron.id()) && !edge.target().equals(source.id())) {
-          throw unsupportedPosition(cron);
-        }
-      }
+      requireCronFeedsSource(graph, cron, source);
       scheduling.add(cron);
     }
     if (scheduling.size() > 1) {
@@ -265,6 +254,22 @@ public record FlowPath(
       throw new IllegalStateException("cron node has no cronExpression");
     }
     return Optional.of(text.trim());
+  }
+
+  /** A cron must be wired and every outgoing edge must feed the datasource node. */
+  private static void requireCronFeedsSource(
+      PipelineGraph graph, GraphNode cron, GraphNode source) {
+    // A detached cron must not silently schedule the source; reject it like the mapping check.
+    if (!isWired(graph, cron.id())) {
+      throw new IllegalStateException(
+          "the cron node is not wired into the flow (it needs both an incoming and an outgoing"
+              + " edge)");
+    }
+    for (GraphEdge edge : graph.edges()) {
+      if (edge.source().equals(cron.id()) && !edge.target().equals(source.id())) {
+        throw unsupportedPosition(cron);
+      }
+    }
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────

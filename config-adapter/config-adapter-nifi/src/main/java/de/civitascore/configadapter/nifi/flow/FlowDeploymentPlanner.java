@@ -85,9 +85,10 @@ public class FlowDeploymentPlanner {
     FlowPath path;
     try {
       // parse() rejects a corrupt payload (missing/duplicate node id, edge to an unknown node);
-      // of() rejects an unbuildable topology — both fail loud so a malformed graph never deploys
+      // derive() rejects an unbuildable topology — both fail loud so a malformed graph never
+      // deploys
       // silently.
-      path = FlowPath.of(graphParser.parse(request.graphData()));
+      path = FlowPath.derive(graphParser.parse(request.graphData()));
     } catch (IllegalStateException e) {
       throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, e, e.getMessage());
     }
@@ -95,31 +96,7 @@ public class FlowDeploymentPlanner {
     Optional<String> sourceCron = validatedTriggerCron(path);
     SinkSpec sink = request.sink();
     SinkStage sinkStage = registry.sink(sink.type());
-    if (!mappingConfigs.isEmpty() && sinkStage.mappingSupport() == MappingSupport.NONE) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_TEMPLATE_ERROR, sinkStage.mappingRejectionMessage());
-    }
-    List<CompiledMapping> mappings = new ArrayList<>();
-    FrostEnvelopePlan staEnvelope = null;
-    if (!mappingConfigs.isEmpty() && sinkStage.mappingSupport() == MappingSupport.ENVELOPE) {
-      // Raw-JSON sink: intermediate mappings stay plain record transforms; the LAST mapping before
-      // the sink carries the STA target paths and compiles into flat intermediate fields plus the
-      // envelope rebuild plan the sink's build half turns into the split/capture/ReplaceText
-      // pre-region.
-      for (MappingConfig config : mappingConfigs.subList(0, mappingConfigs.size() - 1)) {
-        mappings.add(
-            new CompiledMapping(recordPathCompiler.compile(config, sinkStage.geometryEncoding())));
-      }
-      StaEnvelopeCompiler.EnvelopeCompilation compilation =
-          staEnvelopeCompiler.compile(mappingConfigs.get(mappingConfigs.size() - 1));
-      mappings.add(new CompiledMapping(compilation.flatProperties()));
-      staEnvelope = compilation.plan();
-    } else {
-      for (MappingConfig config : mappingConfigs) {
-        mappings.add(
-            new CompiledMapping(recordPathCompiler.compile(config, sinkStage.geometryEncoding())));
-      }
-    }
+    CompiledChain chain = compileChain(mappingConfigs, sinkStage);
 
     Datasource source = request.source();
     if (source == null) {
@@ -163,12 +140,48 @@ public class FlowDeploymentPlanner {
                 out.sourceProperties(),
                 sink.type(),
                 out.sinkProperties(),
-                mappings,
+                chain.mappings(),
                 out.controllerServiceProperties(),
                 sourceCron.orElse(null),
-                staEnvelope));
+                chain.staEnvelope()));
 
     return new DeploymentPlan(processGroupName, snapshot, Map.copyOf(out.sensitive()));
+  }
+
+  /** The compiled mapping chain plus the envelope rebuild plan (FROST sink only, else null). */
+  private record CompiledChain(List<CompiledMapping> mappings, FrostEnvelopePlan staEnvelope) {}
+
+  /**
+   * Compiles the mapping chain against the sink's declaration. For an envelope sink the
+   * intermediate mappings stay plain record transforms while the LAST mapping before the sink
+   * carries the STA target paths and compiles into flat intermediate fields plus the envelope
+   * rebuild plan the sink's build half turns into the split/capture/ReplaceText pre-region.
+   */
+  private CompiledChain compileChain(List<MappingConfig> mappingConfigs, SinkStage sinkStage)
+      throws FatalAdapterException {
+    if (mappingConfigs.isEmpty()) {
+      return new CompiledChain(List.of(), null);
+    }
+    if (sinkStage.mappingSupport() == MappingSupport.NONE) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR, sinkStage.mappingRejectionMessage());
+    }
+    List<CompiledMapping> mappings = new ArrayList<>();
+    if (sinkStage.mappingSupport() == MappingSupport.ENVELOPE) {
+      for (MappingConfig config : mappingConfigs.subList(0, mappingConfigs.size() - 1)) {
+        mappings.add(
+            new CompiledMapping(recordPathCompiler.compile(config, sinkStage.geometryEncoding())));
+      }
+      StaEnvelopeCompiler.EnvelopeCompilation compilation =
+          staEnvelopeCompiler.compile(mappingConfigs.get(mappingConfigs.size() - 1));
+      mappings.add(new CompiledMapping(compilation.flatProperties()));
+      return new CompiledChain(mappings, compilation.plan());
+    }
+    for (MappingConfig config : mappingConfigs) {
+      mappings.add(
+          new CompiledMapping(recordPathCompiler.compile(config, sinkStage.geometryEncoding())));
+    }
+    return new CompiledChain(mappings, null);
   }
 
   /** Parses each on-path mapping node's config, in flow order. */

@@ -327,7 +327,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     // deterministic function of the graph, so both see the same source/sink nodes.
     FlowPath path;
     try {
-      path = FlowPath.of(graphParser.parse(graphData));
+      path = FlowPath.derive(graphParser.parse(graphData));
     } catch (IllegalStateException e) {
       throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, e, e.getMessage());
     }

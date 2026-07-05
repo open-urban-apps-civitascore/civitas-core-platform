@@ -44,7 +44,7 @@ class FlowPathTest {
   }
 
   private static String derivationError(PipelineGraph graph) {
-    return assertThrows(IllegalStateException.class, () -> FlowPath.of(graph)).getMessage();
+    return assertThrows(IllegalStateException.class, () -> FlowPath.derive(graph)).getMessage();
   }
 
   // ─── Happy paths ────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ class FlowPathTest {
             edge("src", "sink"),
             edge("sink", "end"));
 
-    FlowPath path = FlowPath.of(graph);
+    FlowPath path = FlowPath.derive(graph);
 
     assertEquals("src", path.source().id());
     assertEquals("sink", path.sink().id());
@@ -83,7 +83,7 @@ class FlowPathTest {
             edge("m1", "m2"),
             edge("m2", "sink"));
 
-    FlowPath path = FlowPath.of(graph);
+    FlowPath path = FlowPath.derive(graph);
 
     assertEquals(List.of("m1", "m2"), path.mappings().stream().map(GraphNode::id).toList());
   }
@@ -101,7 +101,7 @@ class FlowPathTest {
             edge("c", "src"),
             edge("src", "sink"));
 
-    assertEquals(Optional.of("0 0 6 * * ?"), FlowPath.of(graph).triggerCron());
+    assertEquals(Optional.of("0 0 6 * * ?"), FlowPath.derive(graph).triggerCron());
   }
 
   @Test
@@ -111,7 +111,7 @@ class FlowPathTest {
             List.of(node("src", "dataSource"), node("sink", "frost"), node("note", "annotation")),
             edge("src", "sink"));
 
-    assertEquals("sink", FlowPath.of(graph).sink().id());
+    assertEquals("sink", FlowPath.derive(graph).sink().id());
   }
 
   // ─── Cardinality ────────────────────────────────────────────────────────────
