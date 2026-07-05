@@ -201,6 +201,33 @@ describe('validateFrostMappingCoversStaGroups', () => {
       )
     })
 
+    it('rejects a target path outside the STA catalog, naming it (the deploy compiler accepts exactly the catalog)', () => {
+      const UNKNOWN_KEY = 'validation.messages.frostMappingUnknownStaTarget'
+      const result = validatePipeline(
+        wiredToFrost(staMapping({ ...fullThingsFields, '$.things[].properties.custom': '$.x' })),
+      )
+      const errors = result.errors.filter(e => e.messageKey === UNKNOWN_KEY)
+      expect(errors).toHaveLength(1)
+      expect(errors[0].elementId).toBe('map-1')
+      expect(errors[0].messageParams?.path).toBe('$.things[].properties.custom')
+    })
+
+    it('accepts the optional catalog paths (phenomenonTime/resultTime)', () => {
+      const result = validatePipeline(
+        wiredToFrost(
+          staMapping({
+            ...fullThingsFields,
+            '$.observations[].result': '$.value',
+            '$.observations[].parameters.reference': '$.ref',
+            '$.observations[].parameters.name': '$.name',
+            '$.observations[].phenomenonTime': '$.time',
+            '$.observations[].resultTime': '$.time',
+          }),
+        ),
+      )
+      expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
+    })
+
     it('finds the FROST sink transitively downstream, not only via a direct edge', () => {
       const mapping = staMapping({})
       const between: TestNode = { id: 'geo-1', type: 'geoPersistence', data: { label: 'Geo', configured: true } }
@@ -457,6 +484,21 @@ describe('validateFlowShape', () => {
     expect(errors[0].elementId).toBe('map-1')
   })
 
+  it('suppresses mapping-off-path noise while the walk is aborted (the branch is the finding)', () => {
+    // map-1 is fully wired but the walk aborts at the branch; piling "not on path" onto it would
+    // blame a node the user cannot fix before resolving the branch
+    const pipeline = graph(
+      [sourceAt('src-1', 'SQL'), mappingAt('map-1'), geoAt('geo-1')],
+      [
+        { source: 'src-1', target: 'map-1' },
+        { source: 'src-1', target: 'geo-1' },
+        { source: 'map-1', target: 'geo-1' },
+      ],
+    )
+    expect(errorsFor(pipeline, 'flowBranches')).toHaveLength(1)
+    expect(errorsFor(pipeline, 'mappingNotOnPath')).toEqual([])
+  })
+
   it('accepts one schedule trigger on a pull source and anchors a second one at the additional cron node', () => {
     const single = graph(
       [startNode, sourceAt('src-1', 'SQL'), geoAt('geo-1'), cronAt('cron-1')],
@@ -528,6 +570,45 @@ describe('validateFlowShape', () => {
           warning.messageKey === 'validation.messages.cronSourceConnectorUnknown' && warning.elementId === 'cron-1',
       ),
     ).toBe(true)
+  })
+})
+
+describe('validateEdgeEndpoints', () => {
+  it('errors on an edge whose endpoint resolves to no node (dangling after a corrupt round-trip)', () => {
+    const pipeline = graph(
+      [sourceAt('src-1', 'MQTT'), frostAt('frost-1')],
+      [
+        { source: 'src-1', target: 'frost-1' },
+        { source: 'src-1', target: 'ghost' },
+      ],
+    )
+    const errors = errorsFor(pipeline, 'edgeEndpointMissing')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('edge-1')
+    expect(errors[0].type).toBe('edge')
+  })
+
+  it('accepts edges whose endpoints both resolve', () => {
+    const pipeline = graph([sourceAt('src-1', 'MQTT'), frostAt('frost-1')], [{ source: 'src-1', target: 'frost-1' }])
+    expect(errorsFor(pipeline, 'edgeEndpointMissing')).toEqual([])
+  })
+})
+
+describe('validateMappingDataShape', () => {
+  const CORRUPT_KEY = 'validation.messages.mappingDataCorrupt'
+
+  it('errors on a mapping-typed node whose data lost the mapping shape (corrupt round-trip)', () => {
+    // every mapping rule skips such a node, so without this rule it would validate clean and fail
+    // only at deploy
+    const corrupt: TestNode = { id: 'map-x', type: 'mapping', data: { label: 'Broken', configured: true } }
+    const errors = validatePipeline(pipelineWith([corrupt])).errors.filter(e => e.messageKey === CORRUPT_KEY)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('map-x')
+  })
+
+  it('accepts a mapping node carrying the mapping shape', () => {
+    const errors = validatePipeline(pipelineWith([mappingAt('map-1')])).errors.filter(e => e.messageKey === CORRUPT_KEY)
+    expect(errors).toEqual([])
   })
 })
 

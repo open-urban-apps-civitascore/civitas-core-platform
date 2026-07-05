@@ -7,7 +7,7 @@
  */
 
 import { isFormAccepted, NODE_FLOW_DECLARATIONS, type NodeFlowDeclaration } from '../_config/nodeFlow'
-import { STA_GROUPS } from '../_constants/staTargetCatalog'
+import { STA_ALLOWED_TARGET_PATHS, STA_GROUPS } from '../_constants/staTargetCatalog'
 import { isCronNodeData, isDataSourceNodeData, isGeoPersistenceNodeData, isMappingNodeData } from '../_types/nodes'
 import { type Pipeline, PIPELINE_NODE_TYPES, type PipelineNode } from '../_types/pipeline'
 
@@ -451,6 +451,21 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
         .filter(([, value]) => isNonEmptyMappingValue(value))
         .map(([key]) => key)
 
+      // The engine's envelope compiler accepts exactly the catalog paths and fails the deploy
+      // saga for anything else — surface that here instead of letting it pass edit-time.
+      assigned
+        .filter(path => !STA_ALLOWED_TARGET_PATHS.has(path))
+        .forEach(path => {
+          errors.push({
+            id: crypto.randomUUID(),
+            type: 'node',
+            elementId: node.id,
+            messageKey: 'validation.messages.frostMappingUnknownStaTarget',
+            messageParams: { label, path },
+            severity: 'error',
+          })
+        })
+
       const touchedGroups = STA_GROUPS.filter(group =>
         assigned.some(path => path === group.arrayPath || path.startsWith(group.pathPrefix)),
       )
@@ -526,7 +541,8 @@ const validateCronAndMappingWired: ValidationRule = {
  * The adapter derives the deployed chain by walking the graph's wiring against the node flow
  * declarations (`_config/nodeFlow.ts`) and rejects the same violations these two rules report —
  * anchored at the same nodes, so the user sees at edit time exactly what the deploy would say.
- * Node existence on the canvas never decides anything here, only wiring does.
+ * Node existence never silently changes the flow — a loose transform/trigger node fails loud
+ * rather than being ignored; only wiring contributes flow semantics.
  */
 
 const flowDeclOf = (node: PipelineNode): NodeFlowDeclaration | undefined =>
@@ -579,7 +595,8 @@ const dataFlowAdjacency = (
 
 /**
  * Whether a mapping node lies upstream of the given node (following edge direction backwards).
- * Wiring-based, never existence-based — the upstream twin of {@link hasFrostSinkDownstream}.
+ * Wiring-based, never existence-based — the upstream twin of the downstream walk in
+ * {@link lastMappingsBeforeFrostSinks}.
  */
 const hasMappingUpstream = (pipeline: Pick<Pipeline, 'nodes' | 'edges'>, nodeId: string): boolean => {
   const mappingIds = new Set(
@@ -819,6 +836,57 @@ const validateMappingChainStructure: ValidationRule = {
   },
 }
 
+/**
+ * Rule: every edge must resolve both endpoints to nodes. The adapter rejects an unknown edge
+ * endpoint at graph construction; a dangling edge here (possible only through a corrupt
+ * round-trip, the editor removes edges with their nodes) would otherwise count a node as "wired"
+ * in the wiredness rules and fail only at deploy.
+ */
+const validateEdgeEndpoints: ValidationRule = {
+  id: 'edge-endpoints',
+  name: 'Edge Endpoints',
+  description: 'Every edge must connect two existing nodes',
+  validate: (pipeline: Pipeline) => {
+    const errors: PipelineValidationError[] = []
+    const nodeIds = new Set(pipeline.nodes.map(node => node.id))
+
+    pipeline.edges.forEach(edge => {
+      if (nodeIds.has(edge.source) && nodeIds.has(edge.target)) return
+      errors.push({
+        id: crypto.randomUUID(),
+        type: 'edge',
+        elementId: edge.id,
+        messageKey: 'validation.messages.edgeEndpointMissing',
+        severity: 'error',
+      })
+    })
+
+    return { errors, warnings: [] }
+  },
+}
+
+/**
+ * Rule: a mapping-typed node whose data lost the mapping shape (no `mappingConfig`) is corrupt —
+ * graphs round-trip through the backend's opaque JSON, so the TS types cannot guarantee the shape
+ * at runtime. Every mapping rule skips such a node (its data cannot be interpreted), so without
+ * this rule it would validate clean and fail only at deploy.
+ */
+const validateMappingDataShape: ValidationRule = {
+  id: 'mapping-data-shape',
+  name: 'Mapping Data Shape',
+  description: 'A mapping node must carry mapping-shaped data',
+  validate: (pipeline: Pipeline) => {
+    const errors: PipelineValidationError[] = []
+
+    pipeline.nodes.forEach(node => {
+      if (node.type !== PIPELINE_NODE_TYPES.Mapping || isMappingNodeData(node.data)) return
+      errors.push(errorAt(node, 'validation.messages.mappingDataCorrupt', { label: nodeLabel(node) }))
+    })
+
+    return { errors, warnings: [] }
+  },
+}
+
 /** A mapping value counts as assigned only if it is a non-blank string or a (non-null) op node. */
 const isNonEmptyMappingValue = (value: unknown): boolean =>
   typeof value === 'string' ? value.trim() !== '' : value != null
@@ -905,6 +973,8 @@ export const VALIDATION_RULES: ValidationRule[] = [
   validateSqlSourceHasExplicitSchedule,
   validateFrostMappingCoversStaGroups,
   validateCronAndMappingWired,
+  validateEdgeEndpoints,
+  validateMappingDataShape,
   validateMappingCoversRequiredTargetFields,
 ]
 

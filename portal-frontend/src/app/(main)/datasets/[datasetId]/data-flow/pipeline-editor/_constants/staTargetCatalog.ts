@@ -14,18 +14,21 @@
  */
 export interface StaGroup {
   /** The group's array path (a mapping may not target it directly — element-wise only). */
-  arrayPath: string
+  readonly arrayPath: string
   /** The element prefix every field path of the group starts with. */
-  pathPrefix: string
+  readonly pathPrefix: string
   /** Paths that must all be assigned once any path of the group is assigned. */
-  requiredPaths: string[]
+  readonly requiredPaths: readonly string[]
+  /** Paths the engine accepts but does not demand. */
+  readonly optionalPaths: readonly string[]
 }
 
-export const STA_GROUPS: StaGroup[] = [
+export const STA_GROUPS: readonly StaGroup[] = [
   {
     arrayPath: '$.things',
     pathPrefix: '$.things[',
     requiredPaths: ['$.things[].name', '$.things[].description', '$.things[].properties.reference'],
+    optionalPaths: [],
   },
   {
     arrayPath: '$.observations',
@@ -35,5 +38,14 @@ export const STA_GROUPS: StaGroup[] = [
       '$.observations[].parameters.reference',
       '$.observations[].parameters.name',
     ],
+    optionalPaths: ['$.observations[].phenomenonTime', '$.observations[].resultTime'],
   },
 ]
+
+/**
+ * Every target path the engine's envelope compiler accepts — anything else fails the deploy saga,
+ * so validation rejects it at edit time.
+ */
+export const STA_ALLOWED_TARGET_PATHS: ReadonlySet<string> = new Set(
+  STA_GROUPS.flatMap(group => [...group.requiredPaths, ...group.optionalPaths]),
+)
