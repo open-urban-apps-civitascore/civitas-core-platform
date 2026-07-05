@@ -15,7 +15,6 @@ import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.flow.stage.MappingSupport;
 import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.TransformNodeType;
-import de.civitascore.configadapter.nifi.flow.stage.TransformNodeType.Compilation;
 import de.civitascore.configadapter.nifi.graph.NodeKind;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;

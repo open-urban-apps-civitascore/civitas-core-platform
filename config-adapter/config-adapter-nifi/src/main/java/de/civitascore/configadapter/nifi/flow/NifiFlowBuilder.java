@@ -245,8 +245,10 @@ public class NifiFlowBuilder {
     int mappingIndex = 0;
     for (CompiledTransform transform : spec.transforms()) {
       switch (transform) {
-        case CompiledMapping mapping ->
-            transforms.add(new RecordMappingStage(mapping, mappingIndex++));
+        case CompiledMapping mapping -> {
+          transforms.add(new RecordMappingStage(mapping, mappingIndex));
+          mappingIndex++;
+        }
       }
     }
     return transforms;

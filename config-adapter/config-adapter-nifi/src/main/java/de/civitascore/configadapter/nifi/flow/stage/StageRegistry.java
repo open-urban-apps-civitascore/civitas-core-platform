@@ -36,31 +36,37 @@ public final class StageRegistry {
       List<? extends SinkStage<?>> sinkStages,
       List<TransformNodeType> transformKinds) {
     for (SourceStage stage : sourceStages) {
-      if (sources.putIfAbsent(stage.type(), stage) != null) {
-        throw new IllegalArgumentException("duplicate source stage for " + stage.type());
-      }
+      register(sources, stage.type(), stage, "source stage");
     }
     for (SinkStage<?> stage : sinkStages) {
-      if (sinks.putIfAbsent(stage.type(), stage) != null) {
-        throw new IllegalArgumentException("duplicate sink stage for " + stage.type());
-      }
+      register(sinks, stage.type(), stage, "sink stage");
     }
-    // The transform vocabulary is checked at construction so a declared-but-unregistered kind
-    // kills the adapter start, never a deploy: NodeKind and this registry are two files, and only
-    // this fail-fast keeps them from drifting apart.
+    registerTransformKinds(transformKinds);
+  }
+
+  /**
+   * The transform vocabulary is checked at construction so a declared-but-unregistered kind kills
+   * the adapter start, never a deploy: NodeKind and this registry are two files, and only this
+   * fail-fast keeps them from drifting apart.
+   */
+  private void registerTransformKinds(List<TransformNodeType> transformKinds) {
     for (TransformNodeType kind : transformKinds) {
       if (kind.kind().role() != Role.TRANSFORM) {
         throw new IllegalArgumentException(
             "node kind " + kind.kind() + " does not have the TRANSFORM role");
       }
-      if (transformNodeTypes.putIfAbsent(kind.kind(), kind) != null) {
-        throw new IllegalArgumentException("duplicate transform node type for " + kind.kind());
-      }
+      register(transformNodeTypes, kind.kind(), kind, "transform node type");
     }
     for (NodeKind kind : NodeKind.values()) {
       if (kind.role() == Role.TRANSFORM && !transformNodeTypes.containsKey(kind)) {
         throw new IllegalArgumentException("no transform node type registered for " + kind);
       }
+    }
+  }
+
+  private static <K, V> void register(Map<K, V> target, K key, V value, String what) {
+    if (target.putIfAbsent(key, value) != null) {
+      throw new IllegalArgumentException("duplicate " + what + " for " + key);
     }
   }
 
