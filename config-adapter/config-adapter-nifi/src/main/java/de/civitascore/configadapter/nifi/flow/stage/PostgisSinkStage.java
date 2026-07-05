@@ -71,7 +71,13 @@ public final class PostgisSinkStage implements SinkStage<PostgisSinkSpec> {
     if (datasink.get("configuration") instanceof Map<?, ?> config) {
       tableName = asString(((Map<String, Object>) config).get("tableName"));
     }
-    return new PostgisSinkSpec(tableName, resolvePrimaryKey(datasink));
+    try {
+      return new PostgisSinkSpec(tableName, resolvePrimaryKey(datasink));
+    } catch (IllegalArgumentException e) {
+      // e.g. a missing tableName; keep the raw detail internal and publish only the safe external
+      // message for the error code.
+      throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, e, e.getMessage());
+    }
   }
 
   /**

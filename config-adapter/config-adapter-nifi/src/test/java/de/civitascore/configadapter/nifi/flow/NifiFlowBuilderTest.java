@@ -302,6 +302,24 @@ class NifiFlowBuilderTest {
   }
 
   @Test
+  void frostSinkWithoutBaseUrlIsRejected() {
+    // The build is reachable without the bind half; a missing base URL would deploy relative
+    // InvokeHTTP URLs that post observations into the void.
+    FlowBuildSpec spec =
+        new FlowBuildSpec(
+            "pipeline-frost-nobase",
+            SourceType.MQTT,
+            Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", "t"),
+            SinkType.FROST,
+            Map.of(FrostSinkStage.FROST_PROJECT_ID, "7"),
+            List.of(),
+            Map.of(),
+            null,
+            null);
+    assertThrows(FatalAdapterException.class, () -> builder.build(spec));
+  }
+
+  @Test
   void routesFrostSinkWriteFailuresToLogSink() throws Exception {
     JsonNode flow = build(frostSink());
 

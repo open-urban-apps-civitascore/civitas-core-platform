@@ -95,7 +95,16 @@ public final class MqttSourceStage implements SourceStage {
     putIfPresent(out.sourceProperties(), "Quality of Service", decrypted.get("qos"));
     bindSeconds(out, "Connection Timeout", decrypted.get("connect_timeout"));
     bindSeconds(out, "Keep Alive", decrypted.get("keepalive"));
-    if (isEncrypted(original.get("password"))) {
+    // A password, if present, must be encrypted: a plaintext secret must never be written into
+    // the (logged, non-secret) flow snapshot, and silently dropping it would deploy a flow that
+    // connects to the broker unauthenticated.
+    Object password = original.get("password");
+    if (password != null && !String.valueOf(password).isBlank() && !isEncrypted(password)) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "MQTT source password must be encrypted (plaintext secrets are not accepted)");
+    }
+    if (isEncrypted(password)) {
       out.putSensitive(MQTT_PROCESSOR, "Password", String.valueOf(decrypted.get("password")));
     }
   }

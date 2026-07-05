@@ -330,10 +330,16 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, e, e.getMessage());
     }
     Datasource source =
-        resolveSource(path.source(), stringList(pipeline.get(FIELD_DATA_SOURCE_IDS)), datasources);
+        resolveSource(
+            path.source(),
+            stringList(FIELD_DATA_SOURCE_IDS, pipeline.get(FIELD_DATA_SOURCE_IDS)),
+            datasources);
     SinkSpec sink =
         resolveSink(
-            path.sink(), stringList(pipeline.get(FIELD_DATA_SINK_IDS)), datasinks, projectId);
+            path.sink(),
+            stringList(FIELD_DATA_SINK_IDS, pipeline.get(FIELD_DATA_SINK_IDS)),
+            datasinks,
+            projectId);
     PipelineDeploymentRequest request;
     try {
       request = new PipelineDeploymentRequest(id, graphData, source, sink);
@@ -362,6 +368,16 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       GraphNode sourceNode, List<String> dataSourceIds, List<Datasource> datasources)
       throws FatalAdapterException {
     String entityId = entityId(sourceNode, "datasource");
+    if (dataSourceIds.isEmpty()) {
+      // Distinct from the id-mismatch below: an empty list means the trigger carries no
+      // per-pipeline association at all — it predates the dataSourceIds contract or the
+      // datasource was never associated with the pipeline. Naming an id mismatch here would
+      // send an operator hunting a divergence that does not exist.
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "pipeline carries no dataSourceIds: the trigger predates per-pipeline associations or"
+              + " the datasource is not associated with the pipeline; re-publish the dataset");
+    }
     if (!dataSourceIds.contains(entityId)) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
@@ -391,6 +407,14 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       String projectId)
       throws FatalAdapterException {
     String entityId = entityId(sinkNode, "datasink");
+    if (dataSinkIds.isEmpty()) {
+      // Same distinction as resolveSource: no association at all is a different defect than a
+      // diverging id.
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "pipeline carries no dataSinkIds: the trigger predates per-pipeline associations or"
+              + " the datasink is not associated with the pipeline; re-publish the dataset");
+    }
     Map<String, Object> sink =
         dataSinkIds.contains(entityId)
             ? datasinks.stream()
@@ -427,16 +451,30 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
         role + " node '" + node.id() + "' carries no entityId; the node is not configured");
   }
 
-  /** The payload member as a list of its non-null string items (absent/other yields empty). */
-  private static List<String> stringList(Object raw) {
-    if (!(raw instanceof List<?> list)) {
+  /**
+   * The payload member as a list of strings (absent yields empty). A present-but-non-list value or
+   * a non-string item is a corrupt payload: coercing it to empty would fail the deploy later with a
+   * misleading "not part of the trigger payload" id-association error instead of naming the actual
+   * field defect.
+   */
+  private static List<String> stringList(String key, Object raw) throws FatalAdapterException {
+    if (raw == null) {
       return List.of();
     }
-    List<String> values = new ArrayList<>();
+    if (!(raw instanceof List<?> list)) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD, key + " must be a list of strings");
+    }
+    List<String> values = new ArrayList<>(list.size());
     for (Object item : list) {
-      if (item instanceof String text) {
-        values.add(text);
+      if (!(item instanceof String text)) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.INVALID_PAYLOAD,
+            key
+                + " must contain only strings, got: "
+                + (item == null ? "null" : item.getClass().getSimpleName()));
       }
+      values.add(text);
     }
     return List.copyOf(values);
   }
@@ -489,7 +527,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       throws FatalAdapterException {
     Object value = command.payload().getOrDefault(key, List.of());
     if (!(value instanceof List<?> list)) {
-      return List.of();
+      throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, key + " must be a list");
     }
     // Validate every element up front: an unchecked (List<String>) cast defers the
     // ClassCastException to the consuming loop, which for DELETE would throw partway through after

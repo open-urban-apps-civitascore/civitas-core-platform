@@ -83,10 +83,16 @@ public class FlowDeploymentPlanner {
 
     Datasource source = request.source();
     if (source == null) {
-      throw template("<no source>");
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR, "pipeline has no resolved datasource");
     }
     SourceType sourceType =
-        SourceType.fromRaw(source.getType()).orElseThrow(() -> template(source.getType()));
+        SourceType.fromRaw(source.getType())
+            .orElseThrow(
+                () ->
+                    new FatalAdapterException(
+                        AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+                        "unsupported source type: " + source.getType()));
     SourceStage sourceStage = registry.source(sourceType);
 
     if (sourceCron.isPresent() && !sourceStage.acceptsSchedule()) {
@@ -199,9 +205,5 @@ public class FlowDeploymentPlanner {
       return false;
     }
     return expression.trim().split("\\s+").length == 6;
-  }
-
-  private static FatalAdapterException template(String combination) {
-    return new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, combination);
   }
 }

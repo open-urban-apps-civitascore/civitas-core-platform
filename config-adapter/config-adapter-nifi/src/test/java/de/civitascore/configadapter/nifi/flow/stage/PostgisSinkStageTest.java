@@ -11,10 +11,30 @@ package de.civitascore.configadapter.nifi.flow.stage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class PostgisSinkStageTest {
+
+  @Test
+  void parseSpecRejectsAMissingTableNameAsInvalidPayload() {
+    // The construction-time IllegalArgumentException must be wrapped like the FROST stage does:
+    // unwrapped it bypasses the saga handler's safe-external-message discipline.
+    PostgisSinkStage stage = new PostgisSinkStage(null);
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                stage.parseSpec(
+                    Map.of("id", "sk-1", "type", "POSTGIS", "configuration", Map.of()),
+                    new SinkResolutionContext(null)));
+    assertEquals(AdapterErrorCode.INVALID_PAYLOAD, ex.getErrorCode());
+  }
 
   @Test
   void withStringtypeUnspecifiedCoversAllBranches() {

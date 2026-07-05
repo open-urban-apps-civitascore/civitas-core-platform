@@ -165,11 +165,17 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       ctx.addConnection(failureSource, errorSink, "failure");
     }
 
-    String base = ctx.spec().sinkProperties().getOrDefault(FROST_BASE_URL, "");
+    String base = ctx.spec().sinkProperties().get(FROST_BASE_URL);
     String projectId = ctx.spec().sinkProperties().get(FROST_PROJECT_ID);
-    // Every FROST flow is project-scoped: an unscoped flow would write to the server root,
-    // invisible to the dataset's named API and open to cross-dataset reference collisions — so a
-    // missing project id fails the build instead of degrading silently.
+    // The build is reachable without the bind half (golden tests, hand-composed specs), so its
+    // guarantees are re-checked here: a missing base URL would deploy relative InvokeHTTP URLs
+    // that post observations into the void, and an unscoped flow would write to the server root,
+    // invisible to the dataset's named API and open to cross-dataset reference collisions.
+    if (base == null || base.isBlank()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "FROST sink requires the '" + FROST_BASE_URL + "' sink property");
+    }
     if (projectId == null || projectId.isBlank()) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,

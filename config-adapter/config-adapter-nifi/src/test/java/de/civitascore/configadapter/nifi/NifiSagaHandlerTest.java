@@ -533,6 +533,56 @@ class NifiSagaHandlerTest {
   }
 
   @Test
+  void nonListDataSourceIdsFailsTheStep() throws Exception {
+    // A present-but-non-list dataSourceIds is a corrupt payload; coercing it to empty would fail
+    // later with a misleading id-association error instead of naming the field defect.
+    Map<String, Object> payload =
+        map(
+            """
+            { "type": "EXECUTE_STEP", "sagaId": "s", "stepId": "d", "adapter": "nifi",
+              "operation": "DEPLOY_PIPELINES",
+              "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
+              "datasinks": [ { "id": "sk-1", "type": "POSTGIS", "configuration": { "tableName": "obs" } } ],
+              "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
+                "dataSourceIds": "ds-1", "dataSinkIds": ["sk-1"],
+                "data": { "nodes": [
+                    { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } },
+                    { "id": "sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } } ],
+                  "edges": [ { "id": "e1", "source": "src", "target": "sink" } ] } } ] }
+            """);
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals("STEP_FAILED", result.type());
+    verify(restClient, times(0)).deployFlow(any());
+  }
+
+  @Test
+  void triggerWithoutPipelineAssociationsFailsTheStep() throws Exception {
+    // A trigger that carries no dataSourceIds at all (it predates per-pipeline associations, or
+    // the datasource was never associated) must fail the deploy; the internal detail names that
+    // condition instead of misreporting an id mismatch.
+    Map<String, Object> payload =
+        map(
+            """
+            { "type": "EXECUTE_STEP", "sagaId": "s", "stepId": "d", "adapter": "nifi",
+              "operation": "DEPLOY_PIPELINES",
+              "datasources": [ { "id": "ds-1", "type": "MQTT", "urls": ["tcp://m:1883"], "topics": ["t/+"] } ],
+              "datasinks": [ { "id": "sk-1", "type": "POSTGIS", "configuration": { "tableName": "obs" } } ],
+              "dataPipelines": [ { "id": "p-1", "version": "1", "action": "ADD",
+                "data": { "nodes": [
+                    { "id": "src", "type": "dataSource", "data": { "entityId": "ds-1" } },
+                    { "id": "sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } } ],
+                  "edges": [ { "id": "e1", "source": "src", "target": "sink" } ] } } ] }
+            """);
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals("STEP_FAILED", result.type());
+    verify(restClient, times(0)).deployFlow(any());
+  }
+
+  @Test
   void adapterNameIsNifi() {
     assertEquals("nifi", handler.adapter());
   }

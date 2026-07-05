@@ -617,6 +617,26 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
+  void mqttSourcePlaintextPasswordIsRejected() throws Exception {
+    // same rule as the SQL source: a non-ENC(...) password must never enter the snapshot, and
+    // silently dropping it would deploy a flow that connects to the broker unauthenticated
+    Datasource source = mqttSource("plaintext-secret");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-mqtt-plainpw", graphWithMapping(), source, postgisSink())));
+      assertEquals(
+          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          ex.getErrorCode());
+    }
+  }
+
+  @Test
   void sqlSourceWithoutTableIsRejected() throws Exception {
     // QueryDatabaseTableRecord cannot run without a table — reject rather than deploy a broken flow
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
