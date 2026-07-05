@@ -24,9 +24,9 @@ import com.tngtech.archunit.lang.ArchRule;
 class ArchitectureTest {
 
   /**
-   * Scripting engines are arbitrary-code vectors and stay banned. Jolt is not scripting and the
-   * team has cleared it in principle, but nothing uses it yet — it stays in this rule so
-   * introducing it is a conscious, reviewed decision rather than a drive-by dependency.
+   * Scripting engines are arbitrary-code vectors and stay banned. Jolt is not scripting and would
+   * be acceptable in principle, but nothing uses it yet — it stays in this rule so introducing it
+   * is a conscious, reviewed decision rather than a drive-by dependency.
    */
   @ArchTest
   static final ArchRule noScriptingOrJolt =
