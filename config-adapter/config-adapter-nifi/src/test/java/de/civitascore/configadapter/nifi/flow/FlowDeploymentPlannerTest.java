@@ -403,7 +403,7 @@ class FlowDeploymentPlannerTest {
 
   @Test
   void frostMappingOutsideTheStaCatalogIsRejected() throws Exception {
-    // FROST accepts a mapping now, but only onto the closed STA target catalog — free target paths
+    // FROST accepts a mapping only onto the closed STA target catalog — free target paths
     // (here the PostGIS-shaped graphWithMapping) can never become envelope JSON keys
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       FatalAdapterException ex =
@@ -454,8 +454,7 @@ class FlowDeploymentPlannerTest {
   @Test
   void sqlToFrostWithoutMappingIsRejected() throws Exception {
     // Without a mapping the find-or-create consumes the source's envelope as-is; a SQL source emits
-    // plain records, so the combination stays rejected — with the hint that a mapping now unlocks
-    // it
+    // plain records, so the combination is rejected — with the hint that a mapping unlocks it
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       FatalAdapterException ex =
           assertThrows(
@@ -771,13 +770,13 @@ class FlowDeploymentPlannerTest {
         de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }
 
-  // Note: rejection of a POSTGIS sink without a table name now happens at SinkSpec construction
+  // Note: rejection of a POSTGIS sink without a table name happens at SinkSpec construction
   // (the type rejects the invalid state) — see PipelineDeploymentRequestTest.
 
   @Test
   void mixedConstAndCopyMappingIsAccepted() throws Exception {
     // A const is rendered as a RecordPath literal, so it shares one UpdateRecord with a copy — the
-    // combination is valid (previously rejected as a "mixed strategy").
+    // combination is valid, not a "mixed strategy" conflict.
     Map<String, Object> graph =
         map(
             """
@@ -975,17 +974,21 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
-  void multipleMappingNodesAreRejected() throws Exception {
-    // the adapter builds a single transform; two mapping nodes are ambiguous and must fail loudly
+  void unwiredMappingsAlongsideAValidPathAreRejected() throws Exception {
+    // chained mappings on the path are supported (see the chained golden snapshots); a mapping
+    // that exists on the canvas but is not wired into the path would silently not be applied —
+    // the derivation rejects it with the unwired-node message
     Map<String, Object> graph =
         map(
             """
             { "nodes": [
+                { "id": "n-src", "type": "dataSource", "data": { "entityId": "a1" } },
+                { "id": "n-sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } },
                 { "id": "n-map1", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.a": "$.b" } } } },
                 { "id": "n-map2", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.c": "$.d" } } } } ],
-              "edges": [] }
+              "edges": [ { "id": "e1", "source": "n-src", "target": "n-sink" } ] }
             """);
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       FatalAdapterException ex =
@@ -999,6 +1002,9 @@ class FlowDeploymentPlannerTest {
       assertEquals(
           de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           ex.getErrorCode());
+      assertTrue(
+          ex.getMessage().contains("not wired into the flow"),
+          "the error names the unwired-mapping condition");
     }
   }
 
@@ -1147,10 +1153,6 @@ class FlowDeploymentPlannerTest {
       assertTrue(snapshot.contains("concat('POINT(', /lon, ' ', /lat, ')')"));
     }
   }
-
-  // Note: a FROST sink with a geoPoint (or any) mapping is now rejected wholesale by
-  // frostSinkWithMappingIsRejected — a FROST sink consumes the raw STA envelope and has no mapping
-  // stage — so the former geoPoint-specific FROST rejection test is subsumed by it.
 
   @Test
   void unsupportedSourceSinkCombinationIsRejected() throws Exception {

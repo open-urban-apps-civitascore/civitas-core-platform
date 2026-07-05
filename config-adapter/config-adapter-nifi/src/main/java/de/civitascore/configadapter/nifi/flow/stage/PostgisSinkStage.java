@@ -105,8 +105,7 @@ public final class PostgisSinkStage implements SinkStage<PostgisSinkSpec> {
     // construction), so PutDatabaseRecord always has a target here.
     out.putSinkProperty("Table Name", sink.tableName());
     // With a primary key (the data structure's x-core-primaryKey marker), write UPSERT keyed on
-    // it so a cron-recurring source that re-reads rows updates instead of duplicating them.
-    // NiFi
+    // it so a cron-recurring source that re-reads rows updates instead of duplicating them. NiFi
     // does not derive the conflict key from the table PK — it must be given via Update Keys.
     // The PutDatabaseRecord fragment quotes identifiers and does NOT translate field names: the
     // PostGIS table is created with quoted (case-preserving) identifiers, so an UPSERT of a

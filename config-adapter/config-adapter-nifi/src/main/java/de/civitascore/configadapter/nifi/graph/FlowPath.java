@@ -26,8 +26,9 @@ import java.util.Set;
  * (optional) cron trigger bound to the source. Derivation dispatches on {@link NodeKind} roles,
  * never on raw type strings, and walks the actual wiring — an edge between two functional nodes is
  * data flow; edges from/to the {@link Role#CONTROL} anchors carry no data; a {@link Role#TRIGGER}
- * edge is a trigger binding, not data flow. Node existence on the canvas never decides anything,
- * only wiring does.
+ * edge is a trigger binding, not data flow. Node existence never silently changes the derived path
+ * — a loose transform/trigger node fails loud rather than being ignored; only wiring contributes
+ * flow semantics.
  *
  * <p>All structural constraints fail loud at derivation with node-anchored messages, mirroring the
  * editor's validation, so the saga/API path (which bypasses the editor) gets the same answer as the

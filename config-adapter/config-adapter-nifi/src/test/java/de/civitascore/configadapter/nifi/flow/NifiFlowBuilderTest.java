@@ -369,8 +369,8 @@ class NifiFlowBuilderTest {
 
     assertEquals(1, singleIds.size());
     assertEquals(2, chainedIds.size());
-    // The first chain position keeps the pre-chain discriminator, so existing single-mapping
-    // flows map back to the same NiFi component across the upgrade (redeploy idempotency).
+    // The first chain position omits the index, so single-mapping flows already deployed to a
+    // live NiFi map back to the same component on redeploy (redeploy idempotency).
     assertEquals(singleIds.get(0), chainedIds.get(0));
     assertFalse(chainedIds.get(0).equals(chainedIds.get(1)));
   }

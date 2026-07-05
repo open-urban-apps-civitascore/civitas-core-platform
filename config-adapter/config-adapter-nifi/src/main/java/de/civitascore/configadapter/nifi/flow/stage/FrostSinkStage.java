@@ -146,7 +146,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
    *   <li><b>Observations</b> ({@code $.observations}): look up the Datastream by {@code
    *       properties/reference} + {@code name}; if found, merge its {@code @iot.id} into the
    *       observation and POST {@code /Observations}; if not found, route to the error sink (the
-   *       Datastream must exist — like the prior engine, the pipeline does not create it).
+   *       Datastream must exist — the pipeline does not create it).
    * </ul>
    *
    * <p>Each leg captures the body into an attribute before the lookup GET (which overwrites the

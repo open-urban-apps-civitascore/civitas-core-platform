@@ -38,9 +38,9 @@ public final class RecordMappingStage implements TransformStage {
    * @param mapping the node's compiled unit
    * @param chainIndex the node's position in the mapping chain; part of the deterministic
    *     processor-id seed for every chain position after the first, so a redeploy maps each
-   *     UpdateRecord back to the same NiFi component. The first position stays discriminated by
-   *     strategy alone — the pre-chain id scheme — so existing single-mapping flows keep their
-   *     component ids across the upgrade.
+   *     UpdateRecord back to the same NiFi component. The first position deliberately omits the
+   *     index (discriminated by strategy alone), so the ids of single-mapping flows already
+   *     deployed to a live NiFi stay stable across redeploys.
    */
   public RecordMappingStage(CompiledMapping mapping, int chainIndex) {
     this.mapping = mapping;

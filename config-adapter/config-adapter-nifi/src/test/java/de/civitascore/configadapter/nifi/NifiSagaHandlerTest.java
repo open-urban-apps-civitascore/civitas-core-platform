@@ -47,7 +47,7 @@ class NifiSagaHandlerTest {
     when(config.getProperty(any(), any()))
         .thenAnswer(invocation -> invocation.getArgument(1)); // return defaults
     when(config.getProperty("nifi.master-key", null)).thenReturn(MASTER_KEY_HEX);
-    // platform sink connections the planner now requires (FROST base URL / PostGIS DB URL)
+    // platform sink connections the planner requires (FROST base URL / PostGIS DB URL)
     when(config.getProperty("nifi.frost.url", null))
         .thenReturn("http://frost:8080/FROST-Server/v1.1");
     when(config.getProperty("nifi.postgis.url", null))
@@ -415,8 +415,7 @@ class NifiSagaHandlerTest {
   @Test
   void unreferencedDatasinkInCatalogIsInert() throws Exception {
     // A datasink of the dataset that no pipeline references must not affect the deploy — the
-    // catalog is dataset-wide, the association is per pipeline. (Previously any second entry
-    // failed every pipeline with a dataset-wide cardinality error.)
+    // catalog is dataset-wide, the association is per pipeline.
     when(restClient.deployFlow(any())).thenReturn("pg-1");
     Map<String, Object> payload =
         map(
@@ -446,8 +445,7 @@ class NifiSagaHandlerTest {
   @Test
   void pipelinesResolveTheirOwnSources() throws Exception {
     // Two pipelines with different datasources deploy independently — the per-pipeline
-    // association picks each one's source from the catalog. (Previously the dataset-wide
-    // exactly-one check failed every pipeline of such a dataset.)
+    // association picks each one's source from the catalog.
     when(restClient.deployFlow(any())).thenReturn("pg-1", "pg-2");
     Map<String, Object> payload =
         map(
@@ -487,8 +485,8 @@ class NifiSagaHandlerTest {
 
   @Test
   void pipelineWithoutSinkNodeFailsTheStep() throws Exception {
-    // The graph is authoritative and there is no implicit platform-FROST default any more: a
-    // pipeline without a wired sink node cannot deploy.
+    // The graph is authoritative: a pipeline without a wired sink node cannot deploy — there is
+    // no implicit platform-FROST default.
     Map<String, Object> payload =
         map(
             """

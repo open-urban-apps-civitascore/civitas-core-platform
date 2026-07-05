@@ -143,8 +143,8 @@ class NifiDeploymentIT extends AbstractNifiIT {
     source.handleUnknownProperty("urls", List.of("tcp://localhost:1883"));
     source.handleUnknownProperty("topics", List.of("sensors/+/temp"));
 
-    // FROST consumes the raw SensorThings envelope from the source (find-or-create); no mapping
-    // node — the planner rejects a FROST sink with a mapping (see frostSinkWithMappingIsRejected).
+    // Passthrough mode: without a mapping node, FROST consumes the raw SensorThings envelope
+    // from the source (find-or-create); the mapped mode is covered by NifiFrostMappingIT.
     Map<String, Object> graph =
         map(
             """

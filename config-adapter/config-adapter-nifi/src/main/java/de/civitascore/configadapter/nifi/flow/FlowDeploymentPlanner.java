@@ -71,8 +71,7 @@ public class FlowDeploymentPlanner {
     try {
       // parse() rejects a corrupt payload (missing/duplicate node id, edge to an unknown node);
       // derive() rejects an unbuildable topology — both fail loud so a malformed graph never
-      // deploys
-      // silently.
+      // deploys silently.
       path = FlowPath.derive(graphParser.parse(request.graphData()));
     } catch (IllegalStateException e) {
       throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, e, e.getMessage());
@@ -187,11 +186,13 @@ public class FlowDeploymentPlanner {
   /**
    * Whether {@code expression} is a NiFi cron — exactly 6 whitespace-separated fields ({@code sec
    * min hour day-of-month month day-of-week}). NiFi 2.x replaced Quartz with Spring's cron parser,
-   * which dropped Quartz's optional 7th "year" field; a year-qualified expression passes a 7-field
-   * count here but is then rejected inside NiFi at deploy as an opaque saga failure. NiFi itself
-   * validates the field syntax; this only guards the field count so an obviously malformed value
-   * fails the plan early rather than the remote NiFi REST call. Mirrors the 6-field check in the
-   * editor's {@code validationService.isValidQuartzCron}. Package-private for unit testing.
+   * which dropped Quartz's optional 7th "year" field — so the check requires exactly 6 fields, not
+   * Quartz's 6-or-7: a year-qualified expression would otherwise pass here and then fail inside
+   * NiFi at deploy as an opaque saga failure. NiFi itself validates the field syntax; this only
+   * guards the field count so an obviously malformed value fails the plan early rather than the
+   * remote NiFi REST call. Mirrors the 6-field check in the editor's {@code
+   * validationService.isValidNifiCron}, which additionally bounds the field values. Package-private
+   * for unit testing.
    */
   static boolean isValidNifiCron(String expression) {
     if (expression == null || expression.isBlank()) {

@@ -42,7 +42,12 @@ import java.util.stream.Collectors;
  */
 public class StaEnvelopeCompiler {
 
-  /** Flat keys must be valid as RecordPath/Avro field, JsonPath segment, attribute and EL ref. */
+  /**
+   * Flat keys must be valid as RecordPath/Avro field, JsonPath segment, attribute and EL ref. The
+   * leaf part exists for readability only — the index prefix guarantees uniqueness — so it is
+   * capped to keep the generated attribute names short in the NiFi UI; the exact bound is
+   * arbitrary.
+   */
   private static final int MAX_LEAF_LENGTH = 40;
 
   private final RecordPathCompiler recordPathCompiler;

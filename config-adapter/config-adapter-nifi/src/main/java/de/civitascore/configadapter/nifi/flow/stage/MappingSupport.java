@@ -13,7 +13,7 @@ package de.civitascore.configadapter.nifi.flow.stage;
  * How a sink supports a record mapping in front of it. A boolean cannot distinguish "accepts a
  * mapping" from "accepts a mapping but needs the flat-compiled fields rebuilt into its raw-JSON
  * envelope", so the third operating mode is explicit instead of encoded in {@link
- * SinkStage#input()} special cases.
+ * SinkStage#acceptedInputs} special cases.
  */
 public enum MappingSupport {
   /** No mapping may run in front of this sink; the planner rejects the combination. */

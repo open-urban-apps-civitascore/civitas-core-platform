@@ -163,9 +163,9 @@ public class NifiFlowBuilder {
     // const (literal-value) fields and record-path fields land on separate processors. The convert
     // step exists only to turn a raw (non-record) source payload into records — the MQTT source
     // emits raw bytes on 'Message'; the SQL source (QueryDatabaseTableRecord) already emits records
-    // on 'success', so it is wired straight into the transform/sink with no convert.
-    // Common prefix: source -> [convert] -> [transform...]. The sink stage differs: PostGIS/MQTT is
-    // a single terminal processor (linear), FROST is a multi-stage find-or-create sub-flow.
+    // on 'success', so it is wired straight into the transform/sink with no convert. The sink stage
+    // differs: PostGIS is a single terminal processor (PutDatabaseRecord), FROST is a multi-stage
+    // find-or-create sub-flow.
     List<Processor> prefix = new ArrayList<>(sourceStage.build(ctx).chain());
     List<Processor> failureSources = new ArrayList<>();
     for (TransformStage transform : transformsFor(sourceStage, sinkStage, spec)) {
