@@ -9,12 +9,9 @@
  */
 package de.civitascore.configadapter.nifi.flow.stage;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import de.civitascore.configadapter.exception.FatalAdapterException;
-import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.flow.SinkType;
@@ -23,6 +20,7 @@ import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.graph.NodeKind;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -99,6 +97,11 @@ class StageRegistryTest {
       }
 
       @Override
+      public MappingSupport mappingSupport() {
+        return MappingSupport.RECORD_PATH;
+      }
+
+      @Override
       public void bind(PostgisSinkSpec spec, PlanContext out) {}
 
       @Override
@@ -113,12 +116,24 @@ class StageRegistryTest {
     return List.of(transformNodeType(NodeKind.MAPPING));
   }
 
+  private static List<SourceStage> allSources() {
+    return Arrays.stream(SourceType.values()).map(StageRegistryTest::sourceStage).toList();
+  }
+
+  private static List<SinkStage<PostgisSinkSpec>> allSinks() {
+    return Arrays.stream(SinkType.values()).map(StageRegistryTest::sinkStage).toList();
+  }
+
   @Test
   void resolvesStagesByType() throws Exception {
     SourceStage mqtt = sourceStage(SourceType.MQTT);
     SinkStage<PostgisSinkSpec> postgis = sinkStage(SinkType.POSTGIS);
     TransformNodeType mapping = transformNodeType(NodeKind.MAPPING);
-    StageRegistry registry = new StageRegistry(List.of(mqtt), List.of(postgis), List.of(mapping));
+    StageRegistry registry =
+        new StageRegistry(
+            List.of(mqtt, sourceStage(SourceType.SQL)),
+            List.of(postgis, sinkStage(SinkType.FROST)),
+            List.of(mapping));
 
     assertSame(mqtt, registry.source(SourceType.MQTT));
     assertSame(postgis, registry.sink(SinkType.POSTGIS));
@@ -126,15 +141,17 @@ class StageRegistryTest {
   }
 
   @Test
-  void unknownTypesFailWithTemplateError() {
-    StageRegistry registry = new StageRegistry(List.of(), List.of(), allTransformKinds());
+  void uncoveredSourceTypeIsRejectedAtConstruction() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new StageRegistry(List.of(), allSinks(), allTransformKinds()));
+  }
 
-    FatalAdapterException sourceMiss =
-        assertThrows(FatalAdapterException.class, () -> registry.source(SourceType.SQL));
-    assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, sourceMiss.getErrorCode());
-    FatalAdapterException sinkMiss =
-        assertThrows(FatalAdapterException.class, () -> registry.sink(SinkType.FROST));
-    assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, sinkMiss.getErrorCode());
+  @Test
+  void uncoveredSinkTypeIsRejectedAtConstruction() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new StageRegistry(allSources(), List.of(), allTransformKinds()));
   }
 
   @Test

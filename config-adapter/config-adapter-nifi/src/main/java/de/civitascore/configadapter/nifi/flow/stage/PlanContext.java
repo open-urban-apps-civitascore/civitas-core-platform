@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.nifi.flow.stage;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -49,18 +50,18 @@ public final class PlanContext {
   }
 
   public Map<String, String> sourceProperties() {
-    return sourceProperties;
+    return Collections.unmodifiableMap(sourceProperties);
   }
 
   public Map<String, String> sinkProperties() {
-    return sinkProperties;
+    return Collections.unmodifiableMap(sinkProperties);
   }
 
   public Map<String, Map<String, String>> controllerServiceProperties() {
-    return controllerServiceProperties;
+    return Collections.unmodifiableMap(controllerServiceProperties);
   }
 
   public Map<String, Map<String, String>> sensitive() {
-    return sensitive;
+    return Collections.unmodifiableMap(sensitive);
   }
 }

@@ -18,6 +18,7 @@ import de.civitascore.configadapter.nifi.graph.NodeKind.Role;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 /**
  * The closed set of deployable stages and transform node kinds, hand-wired at adapter
@@ -42,6 +43,19 @@ public final class StageRegistry {
       register(sinks, stage.type(), stage, "sink stage");
     }
     registerTransformKinds(transformKinds);
+    // Every declared type must have a stage: a miss kills the adapter start, never a deploy. The
+    // type enums and this registry are separate files, and only this fail-fast keeps them aligned.
+    requireComplete(SourceType.values(), sources::containsKey, "source stage");
+    requireComplete(SinkType.values(), sinks::containsKey, "sink stage");
+  }
+
+  private static <T extends Enum<T>> void requireComplete(
+      T[] declaredTypes, Predicate<T> registered, String what) {
+    for (T type : declaredTypes) {
+      if (!registered.test(type)) {
+        throw new IllegalArgumentException("no " + what + " registered for " + type);
+      }
+    }
   }
 
   /**

@@ -137,8 +137,8 @@ public final class SqlSourceStage implements SourceStage {
     }
     String jdbcUrl = postgresDsnToJdbcUrl(dsn);
     Map<String, String> pool = new LinkedHashMap<>();
-    putIfPresent(pool, "Database Connection URL", jdbcUrl);
-    putIfPresent(pool, "Database User", decrypted.get("user"));
+    putIfPresent(pool::put, "Database Connection URL", jdbcUrl);
+    putIfPresent(pool::put, "Database User", decrypted.get("user"));
     pool.put("Database Driver Class Name", "org.postgresql.Driver");
     pool.put("Database Driver Locations", "/opt/nifi/drivers/postgresql.jar");
     // The Redpanda conn_max_* fields (idle/lifetime/open) are intentionally NOT mapped: the

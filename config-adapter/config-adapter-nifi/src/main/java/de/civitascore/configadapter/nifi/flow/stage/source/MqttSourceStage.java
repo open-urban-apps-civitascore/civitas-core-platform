@@ -97,9 +97,9 @@ public final class MqttSourceStage implements SourceStage {
     }
     out.putSourceProperty("Broker URI", String.join(",", brokers));
     out.putSourceProperty("Topic Filter", topics.get(0));
-    putIfPresent(out.sourceProperties(), "Username", decrypted.get("user"));
-    putIfPresent(out.sourceProperties(), "Client ID", decrypted.get("client_id"));
-    putIfPresent(out.sourceProperties(), "Quality of Service", decrypted.get("qos"));
+    putIfPresent(out::putSourceProperty, "Username", decrypted.get("user"));
+    putIfPresent(out::putSourceProperty, "Client ID", decrypted.get("client_id"));
+    putIfPresent(out::putSourceProperty, "Quality of Service", decrypted.get("qos"));
     bindSeconds(out, "Connection Timeout", decrypted.get("connect_timeout"));
     bindSeconds(out, "Keep Alive", decrypted.get("keepalive"));
     // A password, if present, must be encrypted: a plaintext secret must never be written into

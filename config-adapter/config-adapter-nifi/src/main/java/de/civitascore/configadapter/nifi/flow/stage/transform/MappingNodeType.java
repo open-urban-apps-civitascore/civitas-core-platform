@@ -23,6 +23,7 @@ import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import de.civitascore.configadapter.nifi.mapping.StaEnvelopeCompiler;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -71,7 +72,9 @@ public final class MappingNodeType implements TransformNodeType {
     }
     List<CompiledTransform> units = new ArrayList<>();
     if (sink.mappingSupport() == MappingSupport.ENVELOPE) {
-      for (MappingConfig config : mappingConfigs.subList(0, mappingConfigs.size() - 1)) {
+      List<MappingConfig> intermediate = mappingConfigs.subList(0, mappingConfigs.size() - 1);
+      for (MappingConfig config : intermediate) {
+        rejectStaTargets(config);
         units.add(new CompiledMapping(recordPathCompiler.compile(config, sink.geometryEncoding())));
       }
       StaEnvelopeCompiler.EnvelopeCompilation compilation =
@@ -83,6 +86,23 @@ public final class MappingNodeType implements TransformNodeType {
       units.add(new CompiledMapping(recordPathCompiler.compile(config, sink.geometryEncoding())));
     }
     return new Compilation(units, null);
+  }
+
+  /**
+   * Only the last mapping before an envelope sink may carry STA target paths — it alone compiles
+   * into the envelope. An earlier mapping targeting a catalog path would silently be treated as a
+   * plain record field named after the STA path, so reject it instead of building a wrong flow.
+   */
+  private void rejectStaTargets(MappingConfig config) throws FatalAdapterException {
+    for (String path : config.fields().keySet()) {
+      if (StaTargetCatalog.byPath(path).isPresent()) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+            "only the final mapping before a FROST sink may target STA paths; '"
+                + path
+                + "' appears in an earlier mapping");
+      }
+    }
   }
 
   /** Parses each node's config, in flow order. */

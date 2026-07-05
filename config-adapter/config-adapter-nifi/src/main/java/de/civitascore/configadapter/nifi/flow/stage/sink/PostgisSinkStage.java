@@ -19,6 +19,7 @@ import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.stage.BuildContext;
 import de.civitascore.configadapter.nifi.flow.stage.Fragment;
+import de.civitascore.configadapter.nifi.flow.stage.MappingSupport;
 import de.civitascore.configadapter.nifi.flow.stage.PayloadForm;
 import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
@@ -61,6 +62,11 @@ public final class PostgisSinkStage implements SinkStage<PostgisSinkSpec> {
   @Override
   public GeometryEncoding geometryEncoding() {
     return GeometryEncoding.WKT;
+  }
+
+  @Override
+  public MappingSupport mappingSupport() {
+    return MappingSupport.RECORD_PATH;
   }
 
   @Override
@@ -193,8 +199,8 @@ public final class PostgisSinkStage implements SinkStage<PostgisSinkSpec> {
     // Intentionally applied to every PostGIS sink (not only geoPoint flows): unspecified is benign
     // for non-geometry columns and is what lets a geoPoint WKT bind into a geometry column.
     putIfPresent(
-        dbcp, "Database Connection URL", withStringtypeUnspecified(platformSink.postgisUrl()));
-    putIfPresent(dbcp, "Database User", platformSink.postgisUser());
+        dbcp::put, "Database Connection URL", withStringtypeUnspecified(platformSink.postgisUrl()));
+    putIfPresent(dbcp::put, "Database User", platformSink.postgisUser());
     dbcp.forEach((key, value) -> out.putControllerServiceProperty(DBCP, key, value));
     if (platformSink.postgisPassword() != null) {
       out.putSensitive(DBCP, "Password", platformSink.postgisPassword());

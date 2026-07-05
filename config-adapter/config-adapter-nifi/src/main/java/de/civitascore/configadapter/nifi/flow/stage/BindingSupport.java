@@ -10,7 +10,7 @@
 package de.civitascore.configadapter.nifi.flow.stage;
 
 import java.util.List;
-import java.util.Map;
+import java.util.function.BiConsumer;
 
 /** Shared value coercions for the plan-time binding halves of the stages. */
 public final class BindingSupport {
@@ -34,9 +34,9 @@ public final class BindingSupport {
     return raw.stream().map(String::trim).filter(s -> !s.isEmpty()).toList();
   }
 
-  public static void putIfPresent(Map<String, String> target, String key, Object value) {
+  public static void putIfPresent(BiConsumer<String, String> target, String key, Object value) {
     if (value != null) {
-      target.put(key, String.valueOf(value));
+      target.accept(key, String.valueOf(value));
     }
   }
 

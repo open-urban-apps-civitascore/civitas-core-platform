@@ -68,12 +68,12 @@ public interface SinkStage<S extends SinkSpec> {
   /** The geometry encoding the mapping compiler must emit for this sink's target format. */
   GeometryEncoding geometryEncoding();
 
-  /** How a record mapping may run in front of this sink. */
-  default MappingSupport mappingSupport() {
-    return acceptedInputs(false).contains(PayloadForm.RECORDS)
-        ? MappingSupport.RECORD_PATH
-        : MappingSupport.NONE;
-  }
+  /**
+   * How a record mapping may run in front of this sink. Declared explicitly rather than derived
+   * from {@link #acceptedInputs}: the derivation cannot express {@link MappingSupport#ENVELOPE}, so
+   * a default would silently misclassify an envelope sink as {@code RECORD_PATH}.
+   */
+  MappingSupport mappingSupport();
 
   /**
    * The rejection message when the graph carries a mapping but {@link #mappingSupport} is {@link
