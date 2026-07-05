@@ -398,12 +398,14 @@ public class DataSetSagaPublisher {
   }
 
   private DataPipeline toPipelineEntry(Pipeline pipeline, PipelineAction action) {
-    // The relation can be null on a pipeline without sources — buildDatasources treats that as
-    // valid, so the association list must not abort the publication either.
+    // The relation is a @Builder.Default set and Hibernate never loads it as null (empty for a
+    // pipeline without sources), so null can only mean a corrupted entity reached the publisher —
+    // fail loud rather than publish a silently empty association.
+    if (pipeline.getDataSources() == null) {
+      throw invariant("pipeline %s has a null dataSources relation", pipeline.getId());
+    }
     List<String> dataSourceIds =
-        pipeline.getDataSources() == null
-            ? List.of()
-            : pipeline.getDataSources().stream().map(ds -> ds.getId().toString()).sorted().toList();
+        pipeline.getDataSources().stream().map(ds -> ds.getId().toString()).sorted().toList();
     return new DataPipeline(
         pipeline.getId().toString(),
         String.valueOf(pipeline.getVersion()),

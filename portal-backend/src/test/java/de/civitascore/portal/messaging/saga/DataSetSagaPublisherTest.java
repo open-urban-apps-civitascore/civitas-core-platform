@@ -791,12 +791,9 @@ class DataSetSagaPublisherTest {
     }
 
     @Test
-    @DisplayName("a pipeline with a null dataSources relation publishes an empty id list")
-    void nullDataSourcesRelationPublishesEmptyIdList() {
-      // buildDatasources() already treats a null relation as valid; the association list must not
-      // abort the publication either
+    @DisplayName("a pipeline with no sources publishes an empty id list")
+    void emptyDataSourcesRelationPublishesEmptyIdList() {
       Pipeline pipeline = pipeline(UUID.randomUUID());
-      pipeline.setDataSources(null);
 
       DataSet dataSet = new DataSet();
       dataSet.setId(UUID.randomUUID());
@@ -809,6 +806,22 @@ class DataSetSagaPublisherTest {
 
       var entry = new JsonMapper().readTree(jsonCaptor.getValue()).get("dataPipelines").get(0);
       assertThat(entry.get("dataSourceIds").size()).isZero();
+    }
+
+    @Test
+    @DisplayName("a null dataSources relation is an invariant violation, not a silent empty list")
+    void nullDataSourcesRelationFailsLoud() {
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      pipeline.setDataSources(null);
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setPipelines(Set.of(pipeline));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(IllegalStateException.class);
     }
   }
 
