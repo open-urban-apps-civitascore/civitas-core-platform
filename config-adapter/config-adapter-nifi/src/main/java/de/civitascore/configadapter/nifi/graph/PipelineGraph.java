@@ -9,7 +9,9 @@
  */
 package de.civitascore.configadapter.nifi.graph;
 
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -45,7 +47,9 @@ public record PipelineGraph(List<GraphNode> nodes, List<GraphEdge> edges) {
    */
   public record GraphNode(String id, String type, Map<String, Object> data) {
     public GraphNode {
-      data = data == null ? Map.of() : data;
+      // Not Map.copyOf: a JSON node payload may carry null values. The unmodifiable copy keeps
+      // the record's value semantics real instead of aliasing the parser's mutable map.
+      data = data == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(data));
     }
   }
 

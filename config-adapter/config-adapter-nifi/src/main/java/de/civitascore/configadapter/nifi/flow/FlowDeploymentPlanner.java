@@ -143,7 +143,7 @@ public class FlowDeploymentPlanner {
    * one kind produces a sink pre-region plan — today the mapping kind's STA envelope for a mapped
    * FROST sink.
    */
-  private Compilation compileTransforms(FlowPath path, SinkStage sinkStage)
+  private Compilation compileTransforms(FlowPath path, SinkStage<?> sinkStage)
       throws FatalAdapterException {
     Map<NodeKind, List<GraphNode>> byKind = new LinkedHashMap<>();
     for (GraphNode node : path.transforms()) {
@@ -154,8 +154,25 @@ public class FlowDeploymentPlanner {
     for (Map.Entry<NodeKind, List<GraphNode>> entry : byKind.entrySet()) {
       TransformNodeType nodeType = registry.transformNodeType(entry.getKey());
       Compilation compilation = nodeType.compile(entry.getValue(), sinkStage);
+      // The reassembly below consumes exactly one unit per node; a miscounting kind would
+      // otherwise drop surplus units silently or exhaust the iterator with a bare
+      // NoSuchElementException.
+      if (compilation.units().size() != entry.getValue().size()) {
+        throw new IllegalStateException(
+            "transform kind "
+                + entry.getKey()
+                + " compiled "
+                + compilation.units().size()
+                + " units for "
+                + entry.getValue().size()
+                + " nodes");
+      }
       unitsByKind.put(entry.getKey(), compilation.units().iterator());
       if (compilation.sinkPreRegion() != null) {
+        if (sinkPreRegion != null) {
+          throw new IllegalStateException(
+              "more than one transform kind produced a sink pre-region plan");
+        }
         sinkPreRegion = compilation.sinkPreRegion();
       }
     }
