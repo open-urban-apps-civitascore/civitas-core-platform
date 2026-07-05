@@ -23,6 +23,7 @@ import de.civitascore.configadapter.nifi.flow.stage.SqlSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
+import de.civitascore.configadapter.nifi.mapping.CompiledTransform;
 import de.civitascore.configadapter.nifi.mapping.ConversionOp;
 import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
@@ -384,7 +385,7 @@ public final class NifiTestFixtures {
   }
 
   /** Wraps one node's compiled properties as the spec's mapping-unit list (empty stays empty). */
-  static List<CompiledMapping> compiled(List<UpdateRecordProperty> properties) {
+  static List<CompiledTransform> compiled(List<UpdateRecordProperty> properties) {
     return properties.isEmpty() ? List.of() : List.of(new CompiledMapping(properties));
   }
 

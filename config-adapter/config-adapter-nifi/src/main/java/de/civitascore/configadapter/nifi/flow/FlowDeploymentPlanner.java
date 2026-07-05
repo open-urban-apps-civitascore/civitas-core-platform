@@ -24,6 +24,7 @@ import de.civitascore.configadapter.nifi.graph.FlowPath;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
+import de.civitascore.configadapter.nifi.mapping.CompiledTransform;
 import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
 import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
@@ -140,7 +141,7 @@ public class FlowDeploymentPlanner {
                 out.sourceProperties(),
                 sink.type(),
                 out.sinkProperties(),
-                chain.mappings(),
+                chain.transforms(),
                 out.controllerServiceProperties(),
                 sourceCron.orElse(null),
                 chain.staEnvelope()));
@@ -148,8 +149,8 @@ public class FlowDeploymentPlanner {
     return new DeploymentPlan(processGroupName, snapshot, Map.copyOf(out.sensitive()));
   }
 
-  /** The compiled mapping chain plus the envelope rebuild plan (FROST sink only, else null). */
-  private record CompiledChain(List<CompiledMapping> mappings, FrostEnvelopePlan staEnvelope) {}
+  /** The compiled transform chain plus the envelope rebuild plan (FROST sink only, else null). */
+  private record CompiledChain(List<CompiledTransform> transforms, FrostEnvelopePlan staEnvelope) {}
 
   /**
    * Compiles the mapping chain against the sink's declaration. For an envelope sink the
@@ -166,7 +167,7 @@ public class FlowDeploymentPlanner {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR, sinkStage.mappingRejectionMessage());
     }
-    List<CompiledMapping> mappings = new ArrayList<>();
+    List<CompiledTransform> mappings = new ArrayList<>();
     if (sinkStage.mappingSupport() == MappingSupport.ENVELOPE) {
       for (MappingConfig config : mappingConfigs.subList(0, mappingConfigs.size() - 1)) {
         mappings.add(

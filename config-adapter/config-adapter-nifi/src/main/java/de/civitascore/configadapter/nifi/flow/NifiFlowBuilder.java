@@ -28,6 +28,7 @@ import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
 import de.civitascore.configadapter.nifi.flow.stage.StageResult;
 import de.civitascore.configadapter.nifi.flow.stage.TransformStage;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
+import de.civitascore.configadapter.nifi.mapping.CompiledTransform;
 import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -66,8 +67,8 @@ public class NifiFlowBuilder {
    *     Filter)
    * @param sinkType the datasink type
    * @param sinkProperties non-sensitive sink processor properties (e.g. Table Name)
-   * @param mappings the compiled mapping units in flow order, one per mapping node (empty if the
-   *     graph has no mapping node)
+   * @param transforms the compiled on-path transform units in flow order, one per transform node
+   *     (empty if the graph has no transform node)
    * @param controllerServiceProperties non-sensitive controller-service properties, keyed by
    *     friendly name
    * @param sourceCron the cron (Quartz) schedule for the source processor, or {@code null} to keep
@@ -81,7 +82,7 @@ public class NifiFlowBuilder {
       Map<String, String> sourceProperties,
       SinkType sinkType,
       Map<String, String> sinkProperties,
-      List<CompiledMapping> mappings,
+      List<CompiledTransform> transforms,
       Map<String, Map<String, String>> controllerServiceProperties,
       String sourceCron,
       FrostEnvelopePlan staEnvelope) {
@@ -91,17 +92,27 @@ public class NifiFlowBuilder {
       Objects.requireNonNull(sinkType, "sinkType");
       sourceProperties = Map.copyOf(Objects.requireNonNull(sourceProperties, "sourceProperties"));
       sinkProperties = Map.copyOf(Objects.requireNonNull(sinkProperties, "sinkProperties"));
-      mappings = List.copyOf(Objects.requireNonNull(mappings, "mappings"));
+      transforms = List.copyOf(Objects.requireNonNull(transforms, "transforms"));
       controllerServiceProperties =
           Map.copyOf(
               Objects.requireNonNull(controllerServiceProperties, "controllerServiceProperties"));
       // sourceCron is intentionally nullable — most flows keep the fragment's built-in schedule.
       // The envelope plan exists exactly for a mapped FROST sink; any other carrier is a mis-wired
       // spec (same discipline as frostProjectId on PipelineDeploymentRequest).
-      if (staEnvelope != null && (sinkType != SinkType.FROST || mappings.isEmpty())) {
+      if (staEnvelope != null
+          && (sinkType != SinkType.FROST
+              || transforms.stream().noneMatch(CompiledMapping.class::isInstance))) {
         throw new IllegalArgumentException(
             "staEnvelope is only valid for a FROST sink with a record mapping");
       }
+    }
+
+    /**
+     * Whether a record mapping is part of the chain — the signal the sink declarations key their
+     * accepted input forms on ({@code acceptedInputs(mappingPresent)}).
+     */
+    public boolean mappingPresent() {
+      return transforms.stream().anyMatch(CompiledMapping.class::isInstance);
     }
   }
 
@@ -147,7 +158,7 @@ public class NifiFlowBuilder {
         new BuildContext(mapper, pgId, spec, processors, controllerServices, connections);
     SourceStage sourceStage = registry.source(spec.sourceType());
     SinkStage sinkStage = registry.sink(spec.sinkType());
-    requireCompatibleSource(sourceStage, sinkStage, !spec.mappings().isEmpty());
+    requireCompatibleSource(sourceStage, sinkStage, spec.mappingPresent());
 
     // Controller services first — processors reference them by id.
     addControllerServices(ctx, sourceStage, sinkStage);
@@ -229,7 +240,7 @@ public class NifiFlowBuilder {
    */
   private List<TransformStage> transformsFor(SourceStage source, SinkStage sink, FlowBuildSpec spec)
       throws FatalAdapterException {
-    boolean mapped = !spec.mappings().isEmpty();
+    boolean mapped = spec.mappingPresent();
     // The builder is reachable directly (golden tests), not only through the planner: a compiled
     // mapping heading into an envelope-mode sink without an envelope rebuild plan would silently
     // vanish inside the envelope — fail the build instead.
@@ -243,8 +254,14 @@ public class NifiFlowBuilder {
     if (recordChain && source.output() != PayloadForm.RECORDS) {
       transforms.add(new ConvertRecordStage());
     }
-    for (int i = 0; i < spec.mappings().size(); i++) {
-      transforms.add(new RecordMappingStage(spec.mappings().get(i), i));
+    // Each kind counts its own chain positions (see CompiledTransform) — the exhaustive switch
+    // makes a new transform kind a compile error here rather than a silently dropped unit.
+    int mappingIndex = 0;
+    for (CompiledTransform transform : spec.transforms()) {
+      switch (transform) {
+        case CompiledMapping mapping ->
+            transforms.add(new RecordMappingStage(mapping, mappingIndex++));
+      }
     }
     return transforms;
   }

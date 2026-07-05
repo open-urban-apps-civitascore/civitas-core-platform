@@ -19,7 +19,7 @@ import java.util.List;
  *
  * @param properties the node's {@code UpdateRecord} properties, in mapping order
  */
-public record CompiledMapping(List<UpdateRecordProperty> properties) {
+public record CompiledMapping(List<UpdateRecordProperty> properties) implements CompiledTransform {
   public CompiledMapping {
     properties = List.copyOf(properties);
   }
