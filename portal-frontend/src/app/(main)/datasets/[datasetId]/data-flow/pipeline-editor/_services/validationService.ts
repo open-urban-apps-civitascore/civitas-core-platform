@@ -382,6 +382,39 @@ const validateSqlSourceHasExplicitSchedule: ValidationRule = {
   },
 }
 
+const nodeLabel = (node: PipelineNode): string => node.data.label || node.type
+
+const errorAt = (
+  node: PipelineNode,
+  messageKey: string,
+  messageParams?: Record<string, string | number>,
+): PipelineValidationError => ({
+  id: crypto.randomUUID(),
+  type: 'node',
+  elementId: node.id,
+  messageKey,
+  messageParams,
+  severity: 'error',
+})
+
+const structureError = (messageKey: string): PipelineValidationError => ({
+  id: crypto.randomUUID(),
+  type: 'structure',
+  messageKey,
+  severity: 'error',
+})
+
+const mappingNodeIds = (nodes: Pipeline['nodes']): Set<string> =>
+  new Set(nodes.filter(node => node.type === PIPELINE_NODE_TYPES.Mapping).map(node => node.id))
+
+const incomingAdjacency = (edges: Pipeline['edges']): Map<string, string[]> => {
+  const incoming = new Map<string, string[]>()
+  edges.forEach(edge => {
+    incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source])
+  })
+  return incoming
+}
+
 /**
  * The mappings that directly feed a FROST sink — the last mapping of each chain, found by walking
  * the wiring backwards from every FROST node and stopping at the first mapping per path. In a
@@ -392,14 +425,8 @@ const validateSqlSourceHasExplicitSchedule: ValidationRule = {
  */
 const lastMappingsBeforeFrostSinks = (pipeline: Pick<Pipeline, 'nodes' | 'edges'>): Set<string> => {
   const result = new Set<string>()
-  const mappingIds = new Set(
-    pipeline.nodes.filter(node => node.type === PIPELINE_NODE_TYPES.Mapping).map(node => node.id),
-  )
-
-  const incoming = new Map<string, string[]>()
-  pipeline.edges.forEach(edge => {
-    incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source])
-  })
+  const mappingIds = mappingNodeIds(pipeline.nodes)
+  const incoming = incomingAdjacency(pipeline.edges)
 
   const queue = pipeline.nodes.filter(node => node.type === PIPELINE_NODE_TYPES.Frost).map(node => node.id)
   const visited = new Set(queue)
@@ -451,42 +478,27 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
       assigned
         .filter(path => !STA_ALLOWED_TARGET_PATHS.has(path))
         .forEach(path => {
-          errors.push({
-            id: crypto.randomUUID(),
-            type: 'node',
-            elementId: node.id,
-            messageKey: 'validation.messages.frostMappingUnknownStaTarget',
-            messageParams: { label, path },
-            severity: 'error',
-          })
+          errors.push(errorAt(node, 'validation.messages.frostMappingUnknownStaTarget', { label, path }))
         })
 
       const touchedGroups = STA_GROUPS.filter(group =>
         assigned.some(path => path === group.arrayPath || path.startsWith(group.pathPrefix)),
       )
       if (touchedGroups.length === 0) {
-        errors.push({
-          id: crypto.randomUUID(),
-          type: 'node',
-          elementId: node.id,
-          messageKey: 'validation.messages.frostMappingNoStaElement',
-          messageParams: { label },
-          severity: 'error',
-        })
+        errors.push(errorAt(node, 'validation.messages.frostMappingNoStaElement', { label }))
         return
       }
 
       touchedGroups.forEach(group => {
         const missing = group.requiredPaths.filter(path => !assigned.includes(path))
         if (missing.length === 0) return
-        errors.push({
-          id: crypto.randomUUID(),
-          type: 'node',
-          elementId: node.id,
-          messageKey: 'validation.messages.frostMappingGroupIncomplete',
-          messageParams: { label, group: group.arrayPath, fields: missing.join(', ') },
-          severity: 'error',
-        })
+        errors.push(
+          errorAt(node, 'validation.messages.frostMappingGroupIncomplete', {
+            label,
+            group: group.arrayPath,
+            fields: missing.join(', '),
+          }),
+        )
       })
     })
 
@@ -514,14 +526,7 @@ const validateCronAndMappingWired: ValidationRule = {
     pipeline.nodes.forEach(node => {
       if (node.type !== PIPELINE_NODE_TYPES.Cron && node.type !== PIPELINE_NODE_TYPES.Mapping) return
       if (withIncoming.has(node.id) && withOutgoing.has(node.id)) return
-      errors.push({
-        id: crypto.randomUUID(),
-        type: 'node',
-        elementId: node.id,
-        messageKey: 'validation.messages.nodeNotWired',
-        messageParams: { label: node.data.label || node.type },
-        severity: 'error',
-      })
+      errors.push(errorAt(node, 'validation.messages.nodeNotWired', { label: nodeLabel(node) }))
     })
 
     return { errors, warnings: [] }
@@ -549,28 +554,6 @@ const isFunctionalNode = (node: PipelineNode): boolean => {
   return role === 'source' || role === 'transform' || role === 'sink'
 }
 
-const nodeLabel = (node: PipelineNode): string => node.data.label || node.type
-
-const errorAt = (
-  node: PipelineNode,
-  messageKey: string,
-  messageParams?: Record<string, string | number>,
-): PipelineValidationError => ({
-  id: crypto.randomUUID(),
-  type: 'node',
-  elementId: node.id,
-  messageKey,
-  messageParams,
-  severity: 'error',
-})
-
-const structureError = (messageKey: string): PipelineValidationError => ({
-  id: crypto.randomUUID(),
-  type: 'structure',
-  messageKey,
-  severity: 'error',
-})
-
 /** Adjacency of the data edges only — edges whose both endpoints are functional nodes. */
 const dataFlowAdjacency = (
   pipeline: Pipeline,
@@ -594,15 +577,9 @@ const dataFlowAdjacency = (
  * {@link lastMappingsBeforeFrostSinks}.
  */
 const hasMappingUpstream = (pipeline: Pick<Pipeline, 'nodes' | 'edges'>, nodeId: string): boolean => {
-  const mappingIds = new Set(
-    pipeline.nodes.filter(node => node.type === PIPELINE_NODE_TYPES.Mapping).map(node => node.id),
-  )
+  const mappingIds = mappingNodeIds(pipeline.nodes)
   if (mappingIds.size === 0) return false
-
-  const incoming = new Map<string, string[]>()
-  pipeline.edges.forEach(edge => {
-    incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source])
-  })
+  const incoming = incomingAdjacency(pipeline.edges)
 
   const queue = [nodeId]
   const visited = new Set(queue)
