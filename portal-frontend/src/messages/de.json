@@ -1243,7 +1243,19 @@
         "frostMappingGroupIncomplete": "{label} bildet {group} ab, aber es fehlen Pflichtfelder: {fields}",
         "nodeNotWired": "{label} muss mit einer eingehenden und einer ausgehenden Kante verbunden sein",
         "mappingRequiredFieldsMissing": "{label} weist nicht alle Pflicht-Zielfelder zu: {fields}",
-        "mappingNotSaved": "{label} hat kein gespeichertes Feld-Mapping — bitte den Mapping-Editor öffnen und speichern"
+        "mappingNotSaved": "{label} hat kein gespeichertes Feld-Mapping — bitte den Mapping-Editor öffnen und speichern",
+        "sourceNodeRequired": "Pipeline hat keinen Datenquellen-Knoten; genau eine verdrahtete Datenquelle ist erforderlich",
+        "sinkNodeRequired": "Pipeline hat keinen Datensenken-Knoten (Sensor- oder Geodaten-Speicher); genau eine verdrahtete Datensenke ist erforderlich",
+        "multipleSourceNodes": "{label} ist ein zusätzlicher Datenquellen-Knoten; eine Pipeline unterstützt genau einen",
+        "multipleSinkNodes": "{label} ist ein zusätzlicher Datensenken-Knoten; eine Pipeline unterstützt genau einen",
+        "nodeUnsupportedPosition": "{label} ist an einer nicht unterstützten Position verdrahtet",
+        "unknownNodeInFlow": "{label} hat einen nicht unterstützten Knotentyp und kann nicht in den Datenfluss verdrahtet werden",
+        "flowBranches": "Der Datenfluss verzweigt bei {label}; ein linearer Fluss von Quelle zu Senke ist erforderlich",
+        "flowCycle": "Der Datenfluss enthält einen Zyklus bei {label}",
+        "noDataPath": "Es gibt keinen Datenfluss-Pfad von der Datenquelle zur Datensenke",
+        "mappingNotOnPath": "{label} liegt nicht auf dem Datenfluss-Pfad zwischen Datenquelle und Datensenke",
+        "cronTriggerCapacity": "{label} ist ein zusätzlicher Zeitplan-Trigger an der Datenquelle; der Trigger-Port fasst höchstens einen",
+        "edgeFormIncompatible": "{label} kann {form} von {upstreamLabel} nicht verarbeiten; akzeptiert wird: {accepted}"
       }
     },
     "toolbar": {

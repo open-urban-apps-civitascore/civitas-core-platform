@@ -1256,7 +1256,19 @@
         "frostMappingGroupIncomplete": "{label} maps {group} but misses required fields: {fields}",
         "nodeNotWired": "{label} must be connected with both an incoming and an outgoing edge",
         "mappingRequiredFieldsMissing": "{label} does not map all required target fields: {fields}",
-        "mappingNotSaved": "{label} has no saved field mapping — open the mapping editor and save it"
+        "mappingNotSaved": "{label} has no saved field mapping — open the mapping editor and save it",
+        "sourceNodeRequired": "Pipeline has no data source node; exactly one wired data source is required",
+        "sinkNodeRequired": "Pipeline has no data sink node (sensor or geospatial data storage); exactly one wired data sink is required",
+        "multipleSourceNodes": "{label} is an additional data source node; a pipeline supports exactly one",
+        "multipleSinkNodes": "{label} is an additional data sink node; a pipeline supports exactly one",
+        "nodeUnsupportedPosition": "{label} is wired in an unsupported position",
+        "unknownNodeInFlow": "{label} has an unsupported node type and cannot be wired into the data flow",
+        "flowBranches": "The data flow branches at {label}; a linear source-to-sink flow is required",
+        "flowCycle": "The data flow contains a cycle at {label}",
+        "noDataPath": "There is no data path from the data source to the data sink",
+        "mappingNotOnPath": "{label} is not on the data path between the data source and the data sink",
+        "cronTriggerCapacity": "{label} is an additional schedule trigger on the data source; its trigger port holds at most one",
+        "edgeFormIncompatible": "{label} cannot consume {form} from {upstreamLabel}; it accepts: {accepted}"
       }
     },
     "toolbar": {

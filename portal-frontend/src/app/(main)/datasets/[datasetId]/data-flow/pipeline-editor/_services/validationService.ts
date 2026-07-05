@@ -6,9 +6,10 @@
  *
  */
 
+import { isFormAccepted, NODE_FLOW_DECLARATIONS, type NodeFlowDeclaration } from '../_config/nodeFlow'
 import { STA_GROUPS } from '../_constants/staTargetCatalog'
 import { isCronNodeData, isDataSourceNodeData, isGeoPersistenceNodeData, isMappingNodeData } from '../_types/nodes'
-import { type Pipeline, PIPELINE_NODE_TYPES } from '../_types/pipeline'
+import { type Pipeline, PIPELINE_NODE_TYPES, type PipelineNode } from '../_types/pipeline'
 
 // ============================================================================
 // NiFi Cron Validation
@@ -591,6 +592,266 @@ const validateCronAndMappingWired: ValidationRule = {
   },
 }
 
+// ============================================================================
+// Graph-driven flow rules (mirror of the adapter's FlowPath derivation)
+// ============================================================================
+
+/**
+ * The adapter derives the deployed chain by walking the graph's wiring against the node flow
+ * declarations (`_config/nodeFlow.ts`) and rejects the same violations these two rules report —
+ * anchored at the same nodes, so the user sees at edit time exactly what the deploy would say.
+ * Node existence on the canvas never decides anything here, only wiring does.
+ */
+
+const flowDeclOf = (node: PipelineNode): NodeFlowDeclaration | undefined =>
+  (NODE_FLOW_DECLARATIONS as Partial<Record<string, NodeFlowDeclaration>>)[node.type]
+
+/** Whether the node carries data (source/transform/sink) — edges between such nodes are data flow. */
+const isFunctionalNode = (node: PipelineNode): boolean => {
+  const role = flowDeclOf(node)?.role
+  return role === 'source' || role === 'transform' || role === 'sink'
+}
+
+const nodeLabel = (node: PipelineNode): string => node.data.label || node.type
+
+const errorAt = (
+  node: PipelineNode,
+  messageKey: string,
+  messageParams?: Record<string, string | number>,
+): PipelineValidationError => ({
+  id: crypto.randomUUID(),
+  type: 'node',
+  elementId: node.id,
+  messageKey,
+  messageParams,
+  severity: 'error',
+})
+
+const structureError = (messageKey: string): PipelineValidationError => ({
+  id: crypto.randomUUID(),
+  type: 'structure',
+  messageKey,
+  severity: 'error',
+})
+
+/** Adjacency of the data edges only — edges whose both endpoints are functional nodes. */
+const dataFlowAdjacency = (
+  pipeline: Pipeline,
+  nodesById: Map<string, PipelineNode>,
+): { dataOut: Map<string, PipelineNode[]>; dataIn: Map<string, PipelineNode[]> } => {
+  const dataOut = new Map<string, PipelineNode[]>()
+  const dataIn = new Map<string, PipelineNode[]>()
+  pipeline.edges.forEach(edge => {
+    const from = nodesById.get(edge.source)
+    const to = nodesById.get(edge.target)
+    if (!from || !to || !isFunctionalNode(from) || !isFunctionalNode(to)) return
+    dataOut.set(from.id, [...(dataOut.get(from.id) ?? []), to])
+    dataIn.set(to.id, [...(dataIn.get(to.id) ?? []), from])
+  })
+  return { dataOut, dataIn }
+}
+
+/**
+ * Whether a mapping node lies upstream of the given node (following edge direction backwards).
+ * Wiring-based, never existence-based — the upstream twin of {@link hasFrostSinkDownstream}.
+ */
+const hasMappingUpstream = (pipeline: Pick<Pipeline, 'nodes' | 'edges'>, nodeId: string): boolean => {
+  const mappingIds = new Set(
+    pipeline.nodes.filter(node => node.type === PIPELINE_NODE_TYPES.Mapping).map(node => node.id),
+  )
+  if (mappingIds.size === 0) return false
+
+  const incoming = new Map<string, string[]>()
+  pipeline.edges.forEach(edge => {
+    incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source])
+  })
+
+  const queue = [nodeId]
+  const visited = new Set(queue)
+  while (queue.length > 0) {
+    for (const previous of incoming.get(queue.shift()!) ?? []) {
+      if (mappingIds.has(previous)) return true
+      if (!visited.has(previous)) {
+        visited.add(previous)
+        queue.push(previous)
+      }
+    }
+  }
+  return false
+}
+
+/**
+ * Rule: every data edge must deliver a payload form its downstream node accepts, where a consumer
+ * of RECORDS also accepts the coercible forms (the engine inserts the convert structurally). The
+ * error hangs on the downstream node — the consumer states what it cannot digest.
+ */
+const validateEdgeCompatibility: ValidationRule = {
+  id: 'edge-form-compatibility',
+  name: 'Edge Payload-Form Compatibility',
+  description: 'Every data edge must deliver a payload form its downstream node accepts',
+  validate: (pipeline: Pipeline) => {
+    const errors: PipelineValidationError[] = []
+    const nodesById = new Map(pipeline.nodes.map(node => [node.id, node]))
+
+    pipeline.edges.forEach(edge => {
+      const upstream = nodesById.get(edge.source)
+      const downstream = nodesById.get(edge.target)
+      if (!upstream || !downstream || !isFunctionalNode(upstream) || !isFunctionalNode(downstream)) return
+
+      const acceptedInputs = flowDeclOf(downstream)?.acceptedInputs
+      if (!acceptedInputs) return
+      const offered = flowDeclOf(upstream)?.output?.(upstream.data)
+      // an undeterminable form (unknown source connector) cannot be verified either way
+      if (offered === undefined) return
+
+      const hasMappedUpstream = hasMappingUpstream(pipeline, downstream.id)
+      const accepted = acceptedInputs({ mappedUpstream: hasMappedUpstream })
+      if (isFormAccepted(offered, accepted)) return
+
+      // The only conflict reachable today is a records source feeding an unmapped FROST sink —
+      // keep the adapter's actionable wording for it instead of the generic form message.
+      errors.push(
+        downstream.type === PIPELINE_NODE_TYPES.Frost && !hasMappedUpstream
+          ? errorAt(downstream, 'validation.messages.sqlSourceToFrost')
+          : errorAt(downstream, 'validation.messages.edgeFormIncompatible', {
+              label: nodeLabel(downstream),
+              upstreamLabel: nodeLabel(upstream),
+              form: offered,
+              accepted: accepted.join(', '),
+            }),
+      )
+    })
+
+    return { errors, warnings: [] }
+  },
+}
+
+/**
+ * Rule: the graph must describe one linear data flow — exactly one source and one sink (a
+ * deliberate product restriction; mappings and future node kinds are unbounded), source first and
+ * sink terminal, no branching/cycles/dead ends, every mapping on the path, unknown node kinds not
+ * wired into the flow, and cron triggers feeding only the source, whose trigger port holds at most
+ * one schedule.
+ */
+const validateFlowShape: ValidationRule = {
+  id: 'flow-shape',
+  name: 'Flow Shape',
+  description: 'The graph must describe one linear source-to-sink data flow with a valid trigger binding',
+  validate: (pipeline: Pipeline) => {
+    const errors: PipelineValidationError[] = []
+    const warnings: PipelineValidationWarning[] = []
+    const nodesById = new Map(pipeline.nodes.map(node => [node.id, node]))
+
+    // A wired node of an unknown kind would silently deploy a different flow than modelled.
+    // A loose one is left to the orphan rule.
+    const flaggedUnknown = new Set<string>()
+    pipeline.edges.forEach(edge => {
+      for (const node of [nodesById.get(edge.source), nodesById.get(edge.target)]) {
+        if (!node || flowDeclOf(node) || flaggedUnknown.has(node.id)) continue
+        flaggedUnknown.add(node.id)
+        errors.push(errorAt(node, 'validation.messages.unknownNodeInFlow', { label: nodeLabel(node) }))
+      }
+    })
+
+    const sources = pipeline.nodes.filter(node => flowDeclOf(node)?.role === 'source')
+    const sinks = pipeline.nodes.filter(node => flowDeclOf(node)?.role === 'sink')
+    if (sources.length === 0) errors.push(structureError('validation.messages.sourceNodeRequired'))
+    if (sinks.length === 0) errors.push(structureError('validation.messages.sinkNodeRequired'))
+    sources.slice(1).forEach(node => {
+      errors.push(errorAt(node, 'validation.messages.multipleSourceNodes', { label: nodeLabel(node) }))
+    })
+    sinks.slice(1).forEach(node => {
+      errors.push(errorAt(node, 'validation.messages.multipleSinkNodes', { label: nodeLabel(node) }))
+    })
+    // Without the 1/1 anchor pair the path is undefined; the cardinality errors are the finding.
+    if (sources.length !== 1 || sinks.length !== 1) return { errors, warnings }
+    const source = sources[0]
+    const sink = sinks[0]
+
+    const { dataOut, dataIn } = dataFlowAdjacency(pipeline, nodesById)
+    if ((dataIn.get(source.id) ?? []).length > 0) {
+      errors.push(errorAt(source, 'validation.messages.nodeUnsupportedPosition', { label: nodeLabel(source) }))
+    }
+    if ((dataOut.get(sink.id) ?? []).length > 0) {
+      errors.push(errorAt(sink, 'validation.messages.nodeUnsupportedPosition', { label: nodeLabel(sink) }))
+    }
+
+    // Walk the single data path source → … → sink.
+    const onPath = new Set([source.id])
+    let isWalkComplete = false
+    let current = source
+    for (;;) {
+      if (current.id === sink.id) {
+        isWalkComplete = true
+        break
+      }
+      const next = dataOut.get(current.id) ?? []
+      if (next.length === 0) {
+        errors.push(structureError('validation.messages.noDataPath'))
+        break
+      }
+      if (next.length > 1) {
+        errors.push(errorAt(current, 'validation.messages.flowBranches', { label: nodeLabel(current) }))
+        break
+      }
+      const step = next[0]
+      if (onPath.has(step.id)) {
+        errors.push(errorAt(step, 'validation.messages.flowCycle', { label: nodeLabel(step) }))
+        break
+      }
+      onPath.add(step.id)
+      current = step
+    }
+
+    const withIncoming = new Set(pipeline.edges.map(edge => edge.target))
+    const withOutgoing = new Set(pipeline.edges.map(edge => edge.source))
+    const isWired = (nodeId: string) => withIncoming.has(nodeId) && withOutgoing.has(nodeId)
+
+    // A wired mapping off the walked path would silently not be applied. Half-wired mappings are
+    // validateCronAndMappingWired's finding; an aborted walk leaves no defined path to check against.
+    if (isWalkComplete) {
+      pipeline.nodes.forEach(node => {
+        if (node.type !== PIPELINE_NODE_TYPES.Mapping || onPath.has(node.id) || !isWired(node.id)) return
+        errors.push(errorAt(node, 'validation.messages.mappingNotOnPath', { label: nodeLabel(node) }))
+      })
+    }
+
+    // Trigger binding: a cron schedules the source's entry processor — feeding anything else is
+    // meaningless, and the source's trigger port holds at most one schedule.
+    const schedulingCrons: PipelineNode[] = []
+    for (const cron of pipeline.nodes.filter(node => node.type === PIPELINE_NODE_TYPES.Cron)) {
+      const outgoing = pipeline.edges.filter(edge => edge.source === cron.id)
+      if (outgoing.some(edge => edge.target !== source.id)) {
+        errors.push(errorAt(cron, 'validation.messages.nodeUnsupportedPosition', { label: nodeLabel(cron) }))
+        continue
+      }
+      // a cron without an outgoing edge is validateCronAndMappingWired's finding
+      if (outgoing.length > 0) schedulingCrons.push(cron)
+    }
+    schedulingCrons.slice(1).forEach(cron => {
+      errors.push(errorAt(cron, 'validation.messages.cronTriggerCapacity', { label: nodeLabel(cron) }))
+    })
+    if (schedulingCrons.length > 0) {
+      const canSchedule = flowDeclOf(source)?.acceptsSchedule?.(source.data)
+      schedulingCrons.forEach(cron => {
+        if (canSchedule === false) {
+          errors.push(errorAt(cron, 'validation.messages.cronMqttIncompatible'))
+        } else if (canSchedule === undefined) {
+          warnings.push({
+            id: crypto.randomUUID(),
+            type: 'node',
+            elementId: cron.id,
+            messageKey: 'validation.messages.cronSourceConnectorUnknown',
+            severity: 'warning',
+          })
+        }
+      })
+    }
+
+    return { errors, warnings }
+  },
+}
+
 /** A mapping value counts as assigned only if it is a non-blank string or a (non-null) op node. */
 const isNonEmptyMappingValue = (value: unknown): boolean =>
   typeof value === 'string' ? value.trim() !== '' : value != null
@@ -671,6 +932,8 @@ export const VALIDATION_RULES: ValidationRule[] = [
   validateCronExpression,
   validateOrphanNodes,
   validateUniqueGeoPersistenceTableNames,
+  validateFlowShape,
+  validateEdgeCompatibility,
   validateCronRequiresNonMqttSource,
   validateSqlSourceHasExplicitSchedule,
   validateSqlSourceNotToFrost,

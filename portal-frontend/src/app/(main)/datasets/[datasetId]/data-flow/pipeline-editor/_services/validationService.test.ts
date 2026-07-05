@@ -276,6 +276,329 @@ describe('sink/source combination rules mirror the deploy engine', () => {
   })
 })
 
+// ============================================================================
+// Graph-driven flow rules (mirror of the adapter's FlowPath derivation)
+// ============================================================================
+
+const graph = (nodes: TestNode[], edges: { source: string; target: string }[]): Pipeline => ({
+  ...pipelineWith(nodes),
+  edges: edges.map((edge, index) => ({ ...edge, id: `edge-${index}` })) as Pipeline['edges'],
+})
+
+const startNode: TestNode = { id: 'start-1', type: 'start', data: { label: 'Start', configured: true } }
+const endNode: TestNode = { id: 'end-1', type: 'end', data: { label: 'End', configured: true } }
+
+const sourceAt = (id: string, connector?: string): TestNode => ({
+  id,
+  type: 'dataSource',
+  data: {
+    label: id,
+    configured: true,
+    entityType: 'datasource',
+    entityMetadata: connector === undefined ? {} : { connector },
+  },
+})
+
+const frostAt = (id: string): TestNode => ({
+  id,
+  type: 'frost',
+  data: { label: id, configured: true, entityType: 'frost' },
+})
+
+const geoAt = (id: string): TestNode => ({
+  id,
+  type: 'geoPersistence',
+  data: { label: id, configured: true, entityType: 'persistence', tableName: id },
+})
+
+const mappingAt = (id: string): TestNode => ({
+  id,
+  type: 'mapping',
+  data: { label: id, configured: true, mappingConfig: { fields: {}, positions: {} }, targetRequiredFields: [] },
+})
+
+const cronAt = (id: string): TestNode => ({
+  id,
+  type: 'cron',
+  data: { label: id, configured: true, cronExpression: '0 0 6 * * ?' },
+})
+
+const errorsFor = (pipeline: Pipeline, key: string) =>
+  validatePipeline(pipeline).errors.filter(error => error.messageKey === `validation.messages.${key}`)
+
+describe('validateFlowShape', () => {
+  it('accepts a linear source → sink flow', () => {
+    const pipeline = graph(
+      [startNode, endNode, sourceAt('src-1', 'MQTT'), frostAt('frost-1')],
+      [
+        { source: 'start-1', target: 'src-1' },
+        { source: 'src-1', target: 'frost-1' },
+        { source: 'frost-1', target: 'end-1' },
+      ],
+    )
+    expect(validatePipeline(pipeline).errors).toEqual([])
+  })
+
+  it('requires a data source node (structure error)', () => {
+    const pipeline = graph([startNode, endNode, frostAt('frost-1')], [{ source: 'start-1', target: 'frost-1' }])
+    const errors = errorsFor(pipeline, 'sourceNodeRequired')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].type).toBe('structure')
+  })
+
+  it('requires a data sink node (structure error) — there is no implicit FROST default', () => {
+    const pipeline = graph(
+      [startNode, endNode, sourceAt('src-1', 'MQTT')],
+      [
+        { source: 'start-1', target: 'src-1' },
+        { source: 'src-1', target: 'end-1' },
+      ],
+    )
+    const errors = errorsFor(pipeline, 'sinkNodeRequired')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].type).toBe('structure')
+  })
+
+  it('anchors the error for a second data source at the additional node', () => {
+    const pipeline = graph(
+      [sourceAt('src-1', 'SQL'), sourceAt('src-2', 'SQL'), geoAt('geo-1')],
+      [{ source: 'src-1', target: 'geo-1' }],
+    )
+    const errors = errorsFor(pipeline, 'multipleSourceNodes')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('src-2')
+  })
+
+  it('anchors the error for a second data sink at the additional node (frost + geoPersistence count together)', () => {
+    const pipeline = graph(
+      [sourceAt('src-1', 'MQTT'), frostAt('frost-1'), geoAt('geo-1')],
+      [{ source: 'src-1', target: 'frost-1' }],
+    )
+    const errors = errorsFor(pipeline, 'multipleSinkNodes')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('geo-1')
+  })
+
+  it('rejects a source with an incoming data edge (unsupported position)', () => {
+    const pipeline = graph(
+      [sourceAt('src-1', 'SQL'), mappingAt('map-1'), geoAt('geo-1')],
+      [
+        { source: 'map-1', target: 'src-1' },
+        { source: 'src-1', target: 'geo-1' },
+      ],
+    )
+    const errors = errorsFor(pipeline, 'nodeUnsupportedPosition')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('src-1')
+  })
+
+  it('rejects a sink with an outgoing data edge (unsupported position)', () => {
+    const pipeline = graph(
+      [sourceAt('src-1', 'SQL'), mappingAt('map-1'), geoAt('geo-1')],
+      [
+        { source: 'src-1', target: 'geo-1' },
+        { source: 'geo-1', target: 'map-1' },
+      ],
+    )
+    const errors = errorsFor(pipeline, 'nodeUnsupportedPosition')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('geo-1')
+  })
+
+  it('rejects a branching data flow at the branching node', () => {
+    const pipeline = graph(
+      [sourceAt('src-1', 'SQL'), mappingAt('map-1'), geoAt('geo-1')],
+      [
+        { source: 'src-1', target: 'map-1' },
+        { source: 'src-1', target: 'geo-1' },
+        { source: 'map-1', target: 'geo-1' },
+      ],
+    )
+    const errors = errorsFor(pipeline, 'flowBranches')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('src-1')
+  })
+
+  it('rejects a cycle at the revisited node', () => {
+    const pipeline = graph(
+      [sourceAt('src-1', 'SQL'), mappingAt('map-1'), mappingAt('map-2'), geoAt('geo-1')],
+      [
+        { source: 'src-1', target: 'map-1' },
+        { source: 'map-1', target: 'map-2' },
+        { source: 'map-2', target: 'map-1' },
+      ],
+    )
+    const errors = errorsFor(pipeline, 'flowCycle')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('map-1')
+  })
+
+  it('reports a dead end before the sink as a missing data path (structure error)', () => {
+    const pipeline = graph(
+      [sourceAt('src-1', 'SQL'), mappingAt('map-1'), geoAt('geo-1')],
+      [{ source: 'src-1', target: 'map-1' }],
+    )
+    const errors = errorsFor(pipeline, 'noDataPath')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].type).toBe('structure')
+  })
+
+  it('rejects an unknown node kind wired into the flow, but tolerates a loose one', () => {
+    const unknown: TestNode = { id: 'x-1', type: 'weird', data: { label: 'Weird', configured: true } }
+    const wired = graph(
+      [sourceAt('src-1', 'MQTT'), frostAt('frost-1'), unknown],
+      [
+        { source: 'src-1', target: 'frost-1' },
+        { source: 'src-1', target: 'x-1' },
+      ],
+    )
+    const errors = errorsFor(wired, 'unknownNodeInFlow')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('x-1')
+
+    const loose = graph(
+      [sourceAt('src-1', 'MQTT'), frostAt('frost-1'), unknown],
+      [{ source: 'src-1', target: 'frost-1' }],
+    )
+    expect(errorsFor(loose, 'unknownNodeInFlow')).toEqual([])
+  })
+
+  it('rejects a fully wired mapping that is not on the source-to-sink path', () => {
+    const pipeline = graph(
+      [startNode, endNode, sourceAt('src-1', 'MQTT'), frostAt('frost-1'), mappingAt('map-1')],
+      [
+        { source: 'start-1', target: 'src-1' },
+        { source: 'src-1', target: 'frost-1' },
+        { source: 'frost-1', target: 'end-1' },
+        { source: 'start-1', target: 'map-1' },
+        { source: 'map-1', target: 'end-1' },
+      ],
+    )
+    const errors = errorsFor(pipeline, 'mappingNotOnPath')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('map-1')
+  })
+
+  it('accepts one schedule trigger on a pull source and anchors a second one at the additional cron node', () => {
+    const single = graph(
+      [startNode, sourceAt('src-1', 'SQL'), geoAt('geo-1'), cronAt('cron-1')],
+      [
+        { source: 'start-1', target: 'cron-1' },
+        { source: 'cron-1', target: 'src-1' },
+        { source: 'src-1', target: 'geo-1' },
+      ],
+    )
+    expect(errorsFor(single, 'cronTriggerCapacity')).toEqual([])
+
+    const double = graph(
+      [startNode, sourceAt('src-1', 'SQL'), geoAt('geo-1'), cronAt('cron-1'), cronAt('cron-2')],
+      [
+        { source: 'start-1', target: 'cron-1' },
+        { source: 'start-1', target: 'cron-2' },
+        { source: 'cron-1', target: 'src-1' },
+        { source: 'cron-2', target: 'src-1' },
+        { source: 'src-1', target: 'geo-1' },
+      ],
+    )
+    const errors = errorsFor(double, 'cronTriggerCapacity')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('cron-2')
+  })
+
+  it('rejects a cron feeding anything but the source (unsupported position)', () => {
+    const pipeline = graph(
+      [startNode, sourceAt('src-1', 'SQL'), mappingAt('map-1'), geoAt('geo-1'), cronAt('cron-1')],
+      [
+        { source: 'start-1', target: 'cron-1' },
+        { source: 'cron-1', target: 'map-1' },
+        { source: 'src-1', target: 'map-1' },
+        { source: 'map-1', target: 'geo-1' },
+      ],
+    )
+    const errors = errorsFor(pipeline, 'nodeUnsupportedPosition')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('cron-1')
+  })
+
+  it('anchors the cron-on-push-source error at the cron node', () => {
+    const pipeline = graph(
+      [startNode, sourceAt('src-1', 'MQTT'), frostAt('frost-1'), cronAt('cron-1')],
+      [
+        { source: 'start-1', target: 'cron-1' },
+        { source: 'cron-1', target: 'src-1' },
+        { source: 'src-1', target: 'frost-1' },
+      ],
+    )
+    const errors = errorsFor(pipeline, 'cronMqttIncompatible').filter(error => error.elementId === 'cron-1')
+    expect(errors).toHaveLength(1)
+  })
+
+  it('warns at the cron node when the wired source connector cannot be verified', () => {
+    const pipeline = graph(
+      [startNode, sourceAt('src-1'), geoAt('geo-1'), cronAt('cron-1')],
+      [
+        { source: 'start-1', target: 'cron-1' },
+        { source: 'cron-1', target: 'src-1' },
+        { source: 'src-1', target: 'geo-1' },
+      ],
+    )
+    const result = validatePipeline(pipeline)
+    expect(errorsFor(pipeline, 'cronMqttIncompatible')).toEqual([])
+    expect(
+      result.warnings.some(
+        warning =>
+          warning.messageKey === 'validation.messages.cronSourceConnectorUnknown' && warning.elementId === 'cron-1',
+      ),
+    ).toBe(true)
+  })
+})
+
+describe('validateEdgeCompatibility', () => {
+  it('rejects a records source feeding an unmapped FROST sink, anchored at the sink', () => {
+    const pipeline = graph([sourceAt('src-1', 'SQL'), frostAt('frost-1')], [{ source: 'src-1', target: 'frost-1' }])
+    const errors = errorsFor(pipeline, 'sqlSourceToFrost').filter(error => error.elementId === 'frost-1')
+    expect(errors).toHaveLength(1)
+  })
+
+  it('accepts a records source feeding a FROST sink through a wired mapping', () => {
+    const pipeline = graph(
+      [sourceAt('src-1', 'SQL'), mappingAt('map-1'), frostAt('frost-1')],
+      [
+        { source: 'src-1', target: 'map-1' },
+        { source: 'map-1', target: 'frost-1' },
+      ],
+    )
+    expect(errorsFor(pipeline, 'sqlSourceToFrost')).toEqual([])
+    expect(errorsFor(pipeline, 'edgeFormIncompatible')).toEqual([])
+  })
+
+  it('judges mapped-upstream by wiring, not by a mapping existing elsewhere on the canvas', () => {
+    const pipeline = graph(
+      [sourceAt('src-1', 'SQL'), mappingAt('map-1'), frostAt('frost-1')],
+      [{ source: 'src-1', target: 'frost-1' }],
+    )
+    const errors = errorsFor(pipeline, 'sqlSourceToFrost').filter(error => error.elementId === 'frost-1')
+    expect(errors).toHaveLength(1)
+  })
+
+  it('accepts an envelope source feeding an unmapped FROST sink (passthrough)', () => {
+    const pipeline = graph([sourceAt('src-1', 'MQTT'), frostAt('frost-1')], [{ source: 'src-1', target: 'frost-1' }])
+    expect(errorsFor(pipeline, 'sqlSourceToFrost')).toEqual([])
+    expect(errorsFor(pipeline, 'edgeFormIncompatible')).toEqual([])
+  })
+
+  it('coerces an envelope source into a records sink (the engine inserts the convert)', () => {
+    const pipeline = graph([sourceAt('src-1', 'MQTT'), geoAt('geo-1')], [{ source: 'src-1', target: 'geo-1' }])
+    expect(errorsFor(pipeline, 'edgeFormIncompatible')).toEqual([])
+  })
+
+  it('skips the check when the source form cannot be determined (unknown connector)', () => {
+    const pipeline = graph([sourceAt('src-1'), frostAt('frost-1')], [{ source: 'src-1', target: 'frost-1' }])
+    expect(errorsFor(pipeline, 'sqlSourceToFrost')).toEqual([])
+    expect(errorsFor(pipeline, 'edgeFormIncompatible')).toEqual([])
+  })
+})
+
 describe('validateCronAndMappingWired', () => {
   const NOT_WIRED_KEY = 'validation.messages.nodeNotWired'
 
