@@ -10,4 +10,18 @@
 package de.civitascore.configadapter.nifi.flow;
 
 /** Platform-managed sink connection (not a tenant credential). */
-public record PlatformSinkConfig(String postgisUrl, String postgisUser, String postgisPassword) {}
+public record PlatformSinkConfig(String postgisUrl, String postgisUser, String postgisPassword) {
+
+  /**
+   * Masks the password: the record's generated toString would print it verbatim, so any incidental
+   * logging or string concatenation of this object would leak the platform credential.
+   */
+  @Override
+  public String toString() {
+    return "PlatformSinkConfig[postgisUrl="
+        + postgisUrl
+        + ", postgisUser="
+        + postgisUser
+        + ", postgisPassword=***]";
+  }
+}
