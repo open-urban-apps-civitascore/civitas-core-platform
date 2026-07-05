@@ -59,6 +59,24 @@ describe('isValidNifiCron', () => {
     expect(isValidNifiCron('0 0/15 9-17 ? * MON-FRI')).toBe(true)
     expect(isValidNifiCron('0 0 6 1,15 JAN,JUL ?')).toBe(true)
   })
+
+  it('bounds range ends like the base values', () => {
+    expect(isValidNifiCron('0 0 6-99 * * ?')).toBe(false) // hours range end >23
+    expect(isValidNifiCron('0 0-75 6 * * ?')).toBe(false) // minutes range end >59
+    expect(isValidNifiCron('0 0 6 1-40 * ?')).toBe(false) // day-of-month range end >31
+    expect(isValidNifiCron('0 0 6 * * 1-9')).toBe(false) // day-of-week range end >7
+  })
+
+  it('bounds steps like the base values', () => {
+    expect(isValidNifiCron('0 0/999 6 * * ?')).toBe(false) // minutes step >59
+    expect(isValidNifiCron('0 0 */24 * * ?')).toBe(false) // hours step >23
+    expect(isValidNifiCron('0 0/0 6 * * ?')).toBe(false) // zero step
+  })
+
+  it('rejects 0 for the 1-based day-of-month and month fields', () => {
+    expect(isValidNifiCron('0 0 6 0 * ?')).toBe(false)
+    expect(isValidNifiCron('0 0 6 * 0 ?')).toBe(false)
+  })
 })
 
 describe('validateMappingCoversRequiredTargetFields', () => {

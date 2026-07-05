@@ -24,7 +24,10 @@ import { type Pipeline, PIPELINE_NODE_TYPES, type PipelineNode } from '../_types
  * This matches the adapter's field-count check (FlowDeploymentPlanner.isValidNifiCron) and keeps the
  * editor from accepting a schedule NiFi then rejects or runs on the wrong weekday.
  *
- * Supports: wildcards (*), ranges (-), steps (/), lists (,), and ? for day-of-month/day-of-week.
+ * Supports: wildcards (*), ranges (-), steps (/), lists (,), ? for day-of-month/day-of-week,
+ * L/W qualifiers, and #n (nth weekday). Range ends and steps are bounded like the base values:
+ * the adapter deliberately checks only the field count, so this is the sole guard keeping an
+ * out-of-range value (e.g. hours 6-99) from failing only inside NiFi as an opaque saga error.
  */
 export const isValidNifiCron = (expression: string): boolean => {
   const trimmed = expression.trim()
@@ -36,20 +39,23 @@ export const isValidNifiCron = (expression: string): boolean => {
   const [seconds, minutes, hours, dayOfMonth, month, dayOfWeek] = fields
 
   // Seconds: 0-59, supports *, */N, ranges, steps, lists
-  const secondsPattern = /^(\*(\/\d+)?|(\d|[0-5]\d)([-/]\d+)?)([,](\*(\/\d+)?|(\d|[0-5]\d)([-/]\d+)?))*$/
+  const secondsPattern =
+    /^(\*(\/([1-9]|[1-5]\d))?|(\d|[0-5]\d)(-(\d|[0-5]\d)|\/([1-9]|[1-5]\d))?)([,](\*(\/([1-9]|[1-5]\d))?|(\d|[0-5]\d)(-(\d|[0-5]\d)|\/([1-9]|[1-5]\d))?))*$/
   // Minutes: 0-59
-  const minutesPattern = /^(\*(\/\d+)?|(\d|[0-5]\d)([-/]\d+)?)([,](\*(\/\d+)?|(\d|[0-5]\d)([-/]\d+)?))*$/
+  const minutesPattern =
+    /^(\*(\/([1-9]|[1-5]\d))?|(\d|[0-5]\d)(-(\d|[0-5]\d)|\/([1-9]|[1-5]\d))?)([,](\*(\/([1-9]|[1-5]\d))?|(\d|[0-5]\d)(-(\d|[0-5]\d)|\/([1-9]|[1-5]\d))?))*$/
   // Hours: 0-23
-  const hoursPattern = /^(\*(\/\d+)?|(\d|1\d|2[0-3])([-/]\d+)?)([,](\*(\/\d+)?|(\d|1\d|2[0-3])([-/]\d+)?))*$/
+  const hoursPattern =
+    /^(\*(\/([1-9]|1\d|2[0-3]))?|(\d|1\d|2[0-3])(-(\d|1\d|2[0-3])|\/([1-9]|1\d|2[0-3]))?)([,](\*(\/([1-9]|1\d|2[0-3]))?|(\d|1\d|2[0-3])(-(\d|1\d|2[0-3])|\/([1-9]|1\d|2[0-3]))?))*$/
   // Day of month: 1-31 or ? or L or W
   const dayOfMonthPattern =
-    /^(\*(\/\d+)?|\?|L|(\d|[12]\d|3[01])([-/]\d+)?[WL]?)([,](\*(\/\d+)?|(\d|[12]\d|3[01])([-/]\d+)?[WL]?))*$/
+    /^(\*(\/([1-9]|[12]\d|3[01]))?|\?|L|([1-9]|[12]\d|3[01])(-([1-9]|[12]\d|3[01])|\/([1-9]|[12]\d|3[01]))?[WL]?)([,](\*(\/([1-9]|[12]\d|3[01]))?|([1-9]|[12]\d|3[01])(-([1-9]|[12]\d|3[01])|\/([1-9]|[12]\d|3[01]))?[WL]?))*$/
   // Month: 1-12 or JAN-DEC
   const monthPattern =
-    /^(\*(\/\d+)?|(\d|1[0-2]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([-/](\d|1[0-2]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC))?)([,](\*(\/\d+)?|(\d|1[0-2]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([-/](\d|1[0-2]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC))?))*$/i
+    /^(\*(\/([1-9]|1[0-2]))?|([1-9]|1[0-2]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([-/]([1-9]|1[0-2]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC))?)([,](\*(\/([1-9]|1[0-2]))?|([1-9]|1[0-2]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([-/]([1-9]|1[0-2]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC))?))*$/i
   // Day of week: 0-7 (Spring numbering: 0 and 7 = Sunday, 1 = Monday) or SUN-SAT or ? or L
   const dayOfWeekPattern =
-    /^(\*(\/\d+)?|\?|L|([0-7]|SUN|MON|TUE|WED|THU|FRI|SAT)([-/]([0-7]|SUN|MON|TUE|WED|THU|FRI|SAT))?[L#]?(\d)?)([,](\*(\/\d+)?|([0-7]|SUN|MON|TUE|WED|THU|FRI|SAT)([-/]([0-7]|SUN|MON|TUE|WED|THU|FRI|SAT))?[L#]?(\d)?))*$/i
+    /^(\*(\/[1-7])?|\?|L|([0-7]|SUN|MON|TUE|WED|THU|FRI|SAT)(-([0-7]|SUN|MON|TUE|WED|THU|FRI|SAT)|\/[1-7])?(L|#[1-5])?)([,](\*(\/[1-7])?|([0-7]|SUN|MON|TUE|WED|THU|FRI|SAT)(-([0-7]|SUN|MON|TUE|WED|THU|FRI|SAT)|\/[1-7])?(L|#[1-5])?))*$/i
 
   return (
     secondsPattern.test(seconds) &&
