@@ -167,7 +167,7 @@ describe('RoleDetails', () => {
     it('redirects to default tab when subTabValue is empty', () => {
       mockSubTabValue = ''
       render(<RoleDetails roleId="role-1" />)
-      expect(mockSetSubTabValueParam).toHaveBeenCalledWith('basicInformation')
+      expect(mockSetSubTabValueParam).toHaveBeenCalledWith('basicInformation', true)
     })
 
     it('renders PermissionsTab when subTabValue is permissions', () => {
