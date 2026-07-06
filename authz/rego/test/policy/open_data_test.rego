@@ -12,7 +12,7 @@ import data.civitas.authz
 import data.civitas.authz.open_data
 import data.test.helpers.mock_http
 
-# Injected as the FROST host guard (no bundle default; supplied at runtime via FROST_API_HOST).
+# Injected as the host guard (no bundle default; supplied at runtime via API_HOST).
 frost_api_host := "api.localhost"
 
 # =============================================================================

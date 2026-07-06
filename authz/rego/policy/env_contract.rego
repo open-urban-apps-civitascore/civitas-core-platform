@@ -6,7 +6,7 @@ package civitas.authz.env_contract
 import rego.v1
 
 # Runtime env vars the bundle requires.
-required_env := {"FROST_API_HOST"}
+required_env := {"API_HOST"}
 
 # Required env vars that are unset or empty at runtime.
 missing_env contains key if {

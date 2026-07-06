@@ -190,13 +190,13 @@ test_path_pattern_unconfigured_api_host_rejected if {
 }
 
 # =============================================================================
-# API HOST RESOLUTION TESTS (FROST_API_HOST env override)
+# API HOST RESOLUTION TESTS (API_HOST env override)
 # =============================================================================
 
-# The FROST_API_HOST environment variable is the canonical override and MUST
+# The API_HOST environment variable is the canonical override and MUST
 # take precedence over the (dev-only) backend data `api_host` value.
 test_api_host_from_env_takes_precedence if {
-	result := frost_server.api_host with opa.runtime as {"env": {"FROST_API_HOST": "api.env.test"}}
+	result := frost_server.api_host with opa.runtime as {"env": {"API_HOST": "api.env.test"}}
 		with data.backends.frost_server.api_host as "api.data.test"
 	result == "api.env.test"
 }
@@ -204,21 +204,21 @@ test_api_host_from_env_takes_precedence if {
 # A request on the env-configured host must match, even when the data value differs.
 test_path_pattern_matches_env_host if {
 	result := frost_server.path_pattern with input as frost_request_host("GET", "/v1/datasets/abc-123", "api.env.test")
-		with opa.runtime as {"env": {"FROST_API_HOST": "api.env.test"}}
+		with opa.runtime as {"env": {"API_HOST": "api.env.test"}}
 		with data.backends.frost_server.api_host as "api.data.test"
 	result == "/v1/datasets/{id}"
 }
 
 # The env host is normalised (case-insensitive, port-stripped) like everything else.
 test_api_host_from_env_normalised if {
-	result := frost_server.api_host with opa.runtime as {"env": {"FROST_API_HOST": "Api.Env.Test:9080"}}
+	result := frost_server.api_host with opa.runtime as {"env": {"API_HOST": "Api.Env.Test:9080"}}
 		with data.backends.frost_server.api_host as ""
 	result == "api.env.test"
 }
 
-# When FROST_API_HOST is empty, fall back to the backend data value.
+# When API_HOST is empty, fall back to the backend data value.
 test_api_host_falls_back_to_data_when_env_empty if {
-	result := frost_server.api_host with opa.runtime as {"env": {"FROST_API_HOST": ""}}
+	result := frost_server.api_host with opa.runtime as {"env": {"API_HOST": ""}}
 		with data.backends.frost_server.api_host as "api.data.test"
 	result == "api.data.test"
 }

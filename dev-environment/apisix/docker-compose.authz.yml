@@ -39,7 +39,7 @@ services:
     container_name: civitas-opa
     restart: always
     environment:
-      FROST_API_HOST: ${FROST_API_HOST:-api.localhost}
+      API_HOST: ${API_HOST:-api.localhost}
     command:
       - "run"
       - "--server"
