@@ -105,6 +105,9 @@ class DatasetCreateCodedTest {
     stubFrostSuccess();
     stubApisixSuccess();
     stubPipelineFailure("Pipeline deployment failed");
+    when(pipelineHandler.handle(
+            argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
+        .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "deploy-pipelines"));
     when(apisixHandler.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "create-route"));
     when(frostHandler.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
@@ -114,6 +117,15 @@ class DatasetCreateCodedTest {
     executeAllJobs();
 
     assertProcessFinished(instance.getId());
+
+    // The failed deploy step is itself compensated, tearing down the sibling pipelines it already
+    // deployed, before the upstream APISIX/FROST rollback runs.
+    ArgumentCaptor<SagaCommandMessage> pipelineCaptor =
+        ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(pipelineHandler, times(2)).handle(pipelineCaptor.capture());
+    assertTrue(
+        pipelineCaptor.getAllValues().stream()
+            .anyMatch(c -> "DELETE_PIPELINES".equals(c.operation())));
 
     ArgumentCaptor<SagaCommandMessage> apisixCaptor =
         ArgumentCaptor.forClass(SagaCommandMessage.class);

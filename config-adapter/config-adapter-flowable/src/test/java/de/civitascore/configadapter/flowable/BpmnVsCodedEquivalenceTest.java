@@ -95,6 +95,69 @@ class BpmnVsCodedEquivalenceTest {
     }
   }
 
+  @ParameterizedTest(name = "{0}: Pipeline failure compensates the deployed pipelines")
+  @MethodSource("approaches")
+  void datasetCreatePipelineFailureCompensatesPipelines(String approach, boolean useBpmn) {
+    SagaCommandHandler frost = FlowableTestSupport.mockHandler("frost");
+    SagaCommandHandler apisix = FlowableTestSupport.mockHandler("apisix");
+    SagaCommandHandler pipeline = FlowableTestSupport.mockHandler("nifi");
+
+    when(frost.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+        .thenReturn(
+            SagaCommandResult.success(
+                "s",
+                "create-project",
+                Map.of("projectId", "p1", "baseUrl", "http://frost"),
+                Map.of("projectId", "p1")));
+    when(apisix.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+        .thenReturn(
+            SagaCommandResult.success(
+                "s", "create-route", Map.of("routeId", "r1"), Map.of("routeId", "r1")));
+    when(pipeline.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+        .thenReturn(SagaCommandResult.failure("s", "deploy-pipelines", "Pipeline 2 failed"));
+    when(pipeline.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
+        .thenReturn(SagaCommandResult.compensationSuccess("s", "deploy-pipelines"));
+    when(apisix.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
+        .thenReturn(SagaCommandResult.compensationSuccess("s", "create-route"));
+    when(frost.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
+        .thenReturn(SagaCommandResult.compensationSuccess("s", "create-project"));
+
+    SagaHandlerRegistry reg = FlowableTestSupport.registry(frost, apisix, pipeline);
+    ProcessEngine engine = createEngine(useBpmn, reg);
+
+    try {
+      ProcessInstance instance =
+          engine
+              .getRuntimeService()
+              .startProcessInstanceByKey("dataset-create", createVariables(true));
+      FlowableTestSupport.executeAllJobs(engine);
+
+      FlowableTestSupport.assertProcessFinished(engine.getHistoryService(), instance.getId());
+
+      // The deploy step is compensated (DELETE_PIPELINES) before the upstream APISIX/FROST rollback
+      // — BPMN and coded must agree on this. No compensate-pipelines step means the deployed
+      // pipelines leak (issue #1842).
+      ArgumentCaptor<SagaCommandMessage> pipelineCmd =
+          ArgumentCaptor.forClass(SagaCommandMessage.class);
+      verify(pipeline, times(2)).handle(pipelineCmd.capture());
+      assertEquals(
+          List.of("DEPLOY_PIPELINES", "DELETE_PIPELINES"),
+          pipelineCmd.getAllValues().stream().map(SagaCommandMessage::operation).toList());
+
+      ArgumentCaptor<SagaCommandMessage> apisixCmd =
+          ArgumentCaptor.forClass(SagaCommandMessage.class);
+      verify(apisix, times(2)).handle(apisixCmd.capture());
+      assertEquals("DELETE_ROUTE", apisixCmd.getAllValues().get(1).operation());
+
+      ArgumentCaptor<SagaCommandMessage> frostCmd =
+          ArgumentCaptor.forClass(SagaCommandMessage.class);
+      verify(frost, times(2)).handle(frostCmd.capture());
+      assertEquals("DELETE_PROJECT", frostCmd.getAllValues().get(1).operation());
+    } finally {
+      engine.close();
+    }
+  }
+
   @ParameterizedTest(name = "{0}: Dataset Create skip pipeline")
   @MethodSource("approaches")
   void datasetCreateSkipPipeline(String approach, boolean useBpmn) {
