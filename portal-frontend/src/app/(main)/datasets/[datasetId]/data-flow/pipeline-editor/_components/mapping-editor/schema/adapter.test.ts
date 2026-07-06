@@ -83,7 +83,7 @@ describe('umlDiagramToSchemaTree', () => {
     expect(nested?.children?.map(c => c.path)).toEqual(['$.properties.reference', '$.properties.source'])
   })
 
-  it('roots at the aggregation container (diamond/target) and nests the part', () => {
+  it('ignores an out-of-scope aggregation edge: the part is not nested', () => {
     const diagram = {
       nodes: [classNode('whole-id', 'Whole', [{ name: 'label' }]), classNode('part-id', 'Part', [{ name: 'value' }])],
       edges: [edge('aggregation', 'part-id', 'whole-id', { sourceRole: 'parts' })],
@@ -92,12 +92,11 @@ describe('umlDiagramToSchemaTree', () => {
     const tree = umlDiagramToSchemaTree(diagram, 'whole')
 
     expect(tree.name).toBe('Whole')
-    const nested = tree.fields.find(f => f.name === 'parts')
-    expect(nested?.type).toBe('object')
-    expect(nested?.children?.map(c => c.name)).toEqual(['value'])
+    expect(tree.fields.find(f => f.name === 'parts')).toBeUndefined()
+    expect(tree.fields.map(f => f.name)).toEqual(['label'])
   })
 
-  it('keeps the drawn direction for association (source is root, target nested)', () => {
+  it('ignores an out-of-scope association edge: the target is not nested', () => {
     const diagram = {
       nodes: [
         classNode('order-id', 'Order', [{ name: 'orderNo' }]),
@@ -109,9 +108,8 @@ describe('umlDiagramToSchemaTree', () => {
     const tree = umlDiagramToSchemaTree(diagram, 'order')
 
     expect(tree.name).toBe('Order')
-    const nested = tree.fields.find(f => f.name === 'customer')
-    expect(nested?.type).toBe('object')
-    expect(nested?.children?.map(c => c.name)).toEqual(['email'])
+    expect(tree.fields.find(f => f.name === 'customer')).toBeUndefined()
+    expect(tree.fields.map(f => f.name)).toEqual(['orderNo'])
   })
 
   it('reads the part multiplicity from the source end for composition (* -> array)', () => {
@@ -124,14 +122,13 @@ describe('umlDiagramToSchemaTree', () => {
     expect(nested?.type).toBe('array')
   })
 
-  it('reads the multiplicity from the target end for association (* -> array)', () => {
+  it('ignores an out-of-scope association edge regardless of its multiplicity', () => {
     const diagram = {
       nodes: [classNode('order-id', 'Order', [{ name: 'orderNo' }]), classNode('item-id', 'Item', [{ name: 'sku' }])],
       edges: [edge('association', 'order-id', 'item-id', { targetRole: 'items', targetMultiplicity: '*' })],
     } as unknown as UMLDiagram
 
-    const nested = umlDiagramToSchemaTree(diagram, 'order').fields.find(f => f.name === 'items')
-    expect(nested?.type).toBe('array')
+    expect(umlDiagramToSchemaTree(diagram, 'order').fields.find(f => f.name === 'items')).toBeUndefined()
   })
 
   it('never roots on an embedded part even when fallbackName matches it', () => {
@@ -171,15 +168,17 @@ describe('umlDiagramToSchemaTree', () => {
     expect(tree.fields.map(f => f.path)).toEqual(['$.name', '$.breed'])
   })
 
-  it('handles realization the same way as inheritance', () => {
+  it('ignores realization rather than inlining it like inheritance', () => {
     const diagram = {
       nodes: [classNode('iface', 'IFace', [{ name: 'y' }]), classNode('impl', 'Impl', [{ name: 'x' }])],
       edges: [inhEdge('impl', 'iface', 'realization')],
     } as unknown as UMLDiagram
 
+    // The realization edge is dropped, so Impl is not embedded and inherits nothing; the
+    // name-matching IFace stays the root with only its own attribute.
     const tree = umlDiagramToSchemaTree(diagram, 'iface')
-    expect(tree.name).toBe('Impl')
-    expect(tree.fields.map(f => f.name)).toEqual(['y', 'x'])
+    expect(tree.name).toBe('IFace')
+    expect(tree.fields.map(f => f.name)).toEqual(['y'])
   })
 
   it('inlines multi-level inheritance (A → B → C) top-down', () => {
