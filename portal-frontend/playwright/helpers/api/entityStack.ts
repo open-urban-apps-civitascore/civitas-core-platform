@@ -61,7 +61,6 @@ export const createAvailableEntityStack = async (
   const version = await adminApi.createDatastructureVersion(datastructure.id, {
     version: '1.0.0',
     description: 'E2E version',
-    modelAtlasUri: modelUri,
     modelName,
     model: buildUmlModel(modelName, modelUri),
   })
@@ -135,7 +134,6 @@ export const createDraftDatastructureWithAvailableVersion = async (
   const version = await adminApi.createDatastructureVersion(datastructure.id, {
     version: '1.0.0',
     description: 'E2E version',
-    modelAtlasUri: modelUri,
     modelName,
     model: buildUmlModel(modelName, modelUri),
   })

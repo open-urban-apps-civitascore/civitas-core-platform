@@ -290,15 +290,6 @@ services:
       retries: 10
       start_period: 30s
 
-  model-atlas:
-    image: eclipsefennec/model.atlas:snapshot
-    environment:
-      APICURIO_HOST: apicurio-registry
-      APICURIO_PORT: 8080
-    depends_on:
-      apicurio-registry:
-        condition: service_healthy
-
   # ── Data Pipelines ──────────────────────────────────────
 
   nifi:
@@ -460,7 +451,6 @@ services:
       APP_URL: http://portal-backend:8089
       SERVER_PORT: 8089
       SPRING_PROFILES_ACTIVE: local,postgres,init
-      MODEL_ATLAS_BASE_URL: http://model-atlas:8080
       SPRING_KAFKA_PRODUCER_PROPERTIES_COMPRESSION_TYPE: lz4
     depends_on:
       postgres-portal:
@@ -469,8 +459,6 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
-      model-atlas:
-        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8089/v1/actuator/health"]
       interval: 15s

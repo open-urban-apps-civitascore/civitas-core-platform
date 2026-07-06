@@ -205,7 +205,9 @@ class DataStructureControllerIntegrationTest
               b.version("1.0.0")
                   .description("Version 1 Description")
                   .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
-                  .model(Map.<String, Object>of("$id", "http://modelatlas.example.com/models/1"))
+                  .model(
+                      Map.<String, Object>of(
+                          "$id", "urn:core:platform:civitas:element:common:GeoPoint:1.0.0"))
                   .modelName("Test Model v1")
                   .styles(Map.of("color", "blue", "size", "large")));
 
@@ -215,7 +217,10 @@ class DataStructureControllerIntegrationTest
               b.version("2.0.0")
                   .description("Version 2 Description")
                   .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
-                  .model(Map.<String, Object>of("$id", "http://modelatlas.example.com/models/2"))
+                  .model(
+                      Map.<String, Object>of(
+                          "$id",
+                          "urn:core:platform:civitas:datastructure:common:WeatherModel:1.0.0"))
                   .modelName("Test Model v2")
                   .styles(Map.of("color", "red", "size", "medium")));
 
@@ -369,7 +374,8 @@ class DataStructureControllerIntegrationTest
                   .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
                   .model(
                       Map.<String, Object>of(
-                          "$id", "http://modelatlas.example.com/models/released"))
+                          "$id",
+                          "urn:core:platform:civitas:datastructure:common:WeatherModel:1.0.0"))
                   .modelName("Released Model"));
 
       // Release via API
@@ -449,7 +455,8 @@ class DataStructureControllerIntegrationTest
                   .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
                   .model(
                       Map.<String, Object>of(
-                          "$id", "http://modelatlas.example.com/models/released"))
+                          "$id",
+                          "urn:core:platform:civitas:datastructure:common:WeatherModel:1.0.0"))
                   .modelName("Released Model"));
     }
 
@@ -494,7 +501,9 @@ class DataStructureControllerIntegrationTest
               b.version("1.0.0")
                   .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
                   .model(
-                      Map.<String, Object>of("$id", "http://modelatlas.example.com/models/draft"))
+                      Map.<String, Object>of(
+                          "$id",
+                          "urn:core:platform:civitas:datastructure:common:WeatherModel:1.0.0"))
                   .modelName("Draft Model"));
 
       ResponseEntity<DataStructureOutputDTO> response =
@@ -589,7 +598,8 @@ class DataStructureControllerIntegrationTest
                   .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
                   .model(
                       Map.<String, Object>of(
-                          "$id", "http://modelatlas.example.com/models/released"))
+                          "$id",
+                          "urn:core:platform:civitas:datastructure:common:WeatherModel:1.0.0"))
                   .modelName("Released Model"));
     }
 
@@ -690,7 +700,8 @@ class DataStructureControllerIntegrationTest
                   .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
                   .model(
                       Map.<String, Object>of(
-                          "$id", "http://modelatlas.example.com/models/released"))
+                          "$id",
+                          "urn:core:platform:civitas:datastructure:common:WeatherModel:1.0.0"))
                   .modelName("Released Model"));
     }
 
@@ -969,7 +980,8 @@ class DataStructureControllerIntegrationTest
                       .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
                       .model(
                           Map.<String, Object>of(
-                              "$id", "http://modelatlas.example.com/models/inuse"))
+                              "$id",
+                              "urn:core:platform:civitas:datastructure:common:WeatherModel:1.0.0"))
                       .modelName("InUse Model"));
 
       portalData.dataSource(
