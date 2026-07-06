@@ -215,18 +215,6 @@ describe('DatasetOverview', () => {
         expect(getStatusOption('AVAILABLE')).toHaveAttribute('aria-disabled', 'true')
       })
 
-      it('when there are namedApis but no assignments', async () => {
-        renderComponent({
-          dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
-          groupCount: 0,
-          roleCount: 0,
-        })
-        clickEditButton()
-        await openStatusDropdown()
-        expect(getStatusOption('READY')).toHaveAttribute('aria-disabled', 'true')
-        expect(getStatusOption('AVAILABLE')).toHaveAttribute('aria-disabled', 'true')
-      })
-
       it('when form name is too short', async () => {
         renderComponent({
           dataset: makeDraftDataset({
@@ -283,6 +271,18 @@ describe('DatasetOverview', () => {
         expect(getStatusOption('AVAILABLE')).not.toHaveAttribute('aria-disabled', 'true')
       })
 
+      it('when distribution present and form valid but no assignments (assignments not required)', async () => {
+        renderComponent({
+          dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
+          groupCount: 0,
+          roleCount: 0,
+        })
+        clickEditButton()
+        await openStatusDropdown()
+        expect(getStatusOption('READY')).not.toHaveAttribute('aria-disabled', 'true')
+        expect(getStatusOption('AVAILABLE')).not.toHaveAttribute('aria-disabled', 'true')
+      })
+
       it('becomes enabled when description is filled in edit mode', async () => {
         renderComponent({
           dataset: makeDraftDataset({
@@ -309,7 +309,7 @@ describe('DatasetOverview', () => {
 
     describe('auto-reverts status to DRAFT and shows toast when canStage becomes false', () => {
       it.each([{ dataSetStatus: 'READY' as const }, { dataSetStatus: 'AVAILABLE' as const }])(
-        'reverts from $dataSetStatus to DRAFT when assignments drop to 0',
+        'keeps $dataSetStatus when assignments drop to 0 (assignments not required)',
         async ({ dataSetStatus }) => {
           const { rerender } = renderComponent({
             dataset: makeDraftDataset({
@@ -336,8 +336,8 @@ describe('DatasetOverview', () => {
             )
           })
 
-          expect(screen.getByTestId('statusDropdown')).toHaveTextContent('DRAFT')
-          expect(toast.info).toHaveBeenCalledWith('info.switchMode')
+          expect(screen.getByTestId('statusDropdown')).toHaveTextContent(dataSetStatus)
+          expect(toast.info).not.toHaveBeenCalled()
         },
       )
 
