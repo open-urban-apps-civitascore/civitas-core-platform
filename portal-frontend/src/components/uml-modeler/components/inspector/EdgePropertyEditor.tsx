@@ -6,7 +6,7 @@ import { MULTIPLICITY_VALUES } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
 import type { UMLEdge } from '../../types/diagram'
-import type { UMLRelationshipType } from '../../types/uml'
+import { SUPPORTED_RELATIONSHIP_TYPES, type UMLRelationshipType } from '../../types/uml'
 
 interface EdgePropertyEditorProps {
   edge: UMLEdge
@@ -80,14 +80,25 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
     [edge.id, updateEdge],
   )
 
-  const relationshipTypes: { value: UMLRelationshipType; label: string }[] = [
-    { value: 'association', label: 'Association' },
-    { value: 'aggregation', label: 'Aggregation' },
-    { value: 'composition', label: 'Composition' },
-    { value: 'inheritance', label: 'Inheritance' },
-    { value: 'realization', label: 'Realization' },
-    { value: 'dependency', label: 'Dependency' },
-  ]
+  const RELATIONSHIP_TYPE_LABELS: Record<UMLRelationshipType, string> = {
+    association: 'Association',
+    aggregation: 'Aggregation',
+    composition: 'Composition',
+    inheritance: 'Inheritance',
+    realization: 'Realization',
+    dependency: 'Dependency',
+  }
+
+  const relationshipTypes: { value: UMLRelationshipType; label: string }[] = SUPPORTED_RELATIONSHIP_TYPES.map(
+    value => ({
+      value,
+      label: RELATIONSHIP_TYPE_LABELS[value],
+    }),
+  )
+
+  // Legacy models may carry an out-of-scope type. Surface it as a disabled current
+  // value so the select isn't silently blank, but force the user to pick a supported one.
+  const isCurrentTypeUnsupported = !relationshipTypes.some(t => t.value === relationship.type)
 
   return (
     <div className="space-y-4">
@@ -100,12 +111,22 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           disabled={isReadOnly}
         >
+          {isCurrentTypeUnsupported && (
+            <option value={relationship.type} disabled>
+              {RELATIONSHIP_TYPE_LABELS[relationship.type] ?? relationship.type} (unsupported)
+            </option>
+          )}
           {relationshipTypes.map(type => (
             <option key={type.value} value={type.value}>
               {type.label}
             </option>
           ))}
         </select>
+        {isCurrentTypeUnsupported && (
+          <p className="mt-1 text-xs text-red-600">
+            This relationship type is not supported. Change it to a supported type before saving.
+          </p>
+        )}
       </div>
 
       {/* Relationship Name */}

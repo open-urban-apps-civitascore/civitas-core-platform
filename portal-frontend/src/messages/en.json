@@ -1379,11 +1379,13 @@
     },
     "save": {
       "success": "Model saved successfully",
-      "error": "Failed to save model. Please try again."
+      "error": "Failed to save model. Please try again.",
+      "unsupportedRelationships": "Model contains unsupported relationship types. Only Inheritance and Composition are supported — change or remove the others before saving."
     },
     "export": {
       "success": "Diagram exported successfully",
-      "error": "Failed to export diagram. Please try again."
+      "error": "Failed to export diagram. Please try again.",
+      "unsupportedRelationships": "Diagram contains unsupported relationship types. Only Inheritance and Composition are supported — change or remove the others before exporting."
     }
   },
   "datapools": {

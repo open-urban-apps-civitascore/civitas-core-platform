@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality } from '../constants/umlTypes'
 import type { UMLDiagram } from '../types/diagram'
-import { canMultiplicityBePrimaryKey, exportToJsonSchema, sanitizeName } from './jsonSchemaExportService'
+import {
+  canMultiplicityBePrimaryKey,
+  exportToJsonSchema,
+  sanitizeName,
+  UnsupportedRelationshipError,
+} from './jsonSchemaExportService'
 
 const baseDiagram = (overrides?: Partial<UMLDiagram>): UMLDiagram => ({
   id: 'diagram-1',
@@ -582,70 +587,31 @@ describe('exportToJsonSchema', () => {
     },
   }
 
-  it('embeds the source part into the target container for aggregation', () => {
-    const diagram = baseDiagram({
-      nodes: [...baseDiagram().nodes, readingNode],
-      edges: [
-        {
-          id: 'edge-1',
-          type: 'aggregation',
-          source: 'node-2',
-          target: 'node-1',
-          data: {
-            relationship: {
-              id: 'rel-1',
-              type: 'aggregation',
-              source: 'elem-2',
-              target: 'elem-1',
-              sourceRole: 'readings',
-            },
-            label: '',
-            isSelected: false,
-            isDirty: false,
-          },
-        },
-      ],
-    })
-
-    const schema = exportToJsonSchema(diagram)
-    const properties = classDef(schema, 'TrafficSensor').properties as Record<string, Record<string, unknown>>
-    expect(properties.readings).toEqual({ $ref: '#/$defs/Reading' })
-    expect((schema.$defs as Record<string, Record<string, unknown>>).Reading).toMatchObject({ title: 'Reading' })
-    expect(schema.title).toBe('TrafficSensor')
+  const outOfScopeEdge = (type: 'association' | 'aggregation' | 'dependency') => ({
+    id: 'edge-1',
+    type,
+    source: 'node-1',
+    target: 'node-2',
+    data: {
+      relationship: { id: 'rel-1', type, source: 'elem-1', target: 'elem-2' },
+      label: '',
+      isSelected: false,
+      isDirty: false,
+    },
   })
 
-  it('keeps the drawn direction for association (source references target)', () => {
-    const diagram = baseDiagram({
-      nodes: [...baseDiagram().nodes, readingNode],
-      edges: [
-        {
-          id: 'edge-1',
-          type: 'association',
-          source: 'node-1',
-          target: 'node-2',
-          data: {
-            relationship: {
-              id: 'rel-1',
-              type: 'association',
-              source: 'elem-1',
-              target: 'elem-2',
-              targetRole: 'reading',
-            },
-            label: '',
-            isSelected: false,
-            isDirty: false,
-          },
-        },
-      ],
-    })
+  it.each(['association', 'aggregation', 'dependency'] as const)(
+    'rejects out-of-scope relationship type %s instead of silently mapping it',
+    type => {
+      const diagram = baseDiagram({
+        nodes: [...baseDiagram().nodes, readingNode],
+        edges: [outOfScopeEdge(type)],
+      })
 
-    const schema = exportToJsonSchema(diagram)
-    const properties = classDef(schema, 'TrafficSensor').properties as Record<string, Record<string, unknown>>
-    // Direction not flipped: source stays the root class and references the target.
-    expect(properties.reading).toEqual({ $ref: '#/$defs/Reading' })
-    expect((schema.$defs as Record<string, Record<string, unknown>>).Reading).toMatchObject({ title: 'Reading' })
-    expect(schema.title).toBe('TrafficSensor')
-  })
+      expect(() => exportToJsonSchema(diagram)).toThrow(UnsupportedRelationshipError)
+      expect(() => exportToJsonSchema(diagram)).toThrow(new RegExp(type))
+    },
+  )
 
   const cls = (id: string, name: string, attrs: { id: string; name: string; type?: string }[]) => ({
     id: `node-${id}`,
@@ -698,7 +664,7 @@ describe('exportToJsonSchema', () => {
     expect((schema.$defs as Record<string, unknown>).Animal).toBeDefined()
   })
 
-  it('handles realization like inheritance', () => {
+  it('rejects realization as out of scope rather than mapping it like inheritance', () => {
     const diagram = baseDiagram({
       name: 'IFace',
       nodes: [
@@ -708,13 +674,8 @@ describe('exportToJsonSchema', () => {
       edges: [inhEdge('1', 'impl', 'iface', 'realization')],
     } as Partial<UMLDiagram>)
 
-    const schema = exportToJsonSchema(diagram)
-    expect(schema.title).toBe('IFace')
-    expect(schema.properties).toEqual({ impl: { $ref: '#/$defs/Impl' } })
-    expect(classDef(schema, 'Impl').allOf).toEqual([
-      { $ref: '#/$defs/IFace' },
-      expect.objectContaining({ title: 'Impl' }),
-    ])
+    expect(() => exportToJsonSchema(diagram)).toThrow(UnsupportedRelationshipError)
+    expect(() => exportToJsonSchema(diagram)).toThrow(/realization/)
   })
 
   it('roots on the leaf for multi-level inheritance', () => {

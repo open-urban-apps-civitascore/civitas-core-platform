@@ -24,31 +24,33 @@ const createTestDiagram = (overrides?: Partial<UMLDiagram>): UMLDiagram => ({
     },
     {
       id: 'node-2',
-      type: 'interface',
+      type: 'class',
       position: { x: 400, y: 100 },
       data: {
         element: {
           id: 'elem-2',
-          name: 'MyInterface',
-          type: 'interface',
+          name: 'MyPart',
+          type: 'class',
+          attributes: [],
           operations: [],
         },
-        label: 'MyInterface',
+        label: 'MyPart',
       },
     },
   ],
   edges: [
+    // Composition with MyClass as the container (edge target) — MyClass stays the root.
     {
       id: 'edge-1',
-      type: 'realization',
-      source: 'node-1',
-      target: 'node-2',
+      type: 'composition',
+      source: 'node-2',
+      target: 'node-1',
       data: {
         relationship: {
           id: 'rel-1',
-          type: 'realization',
-          source: 'elem-1',
-          target: 'elem-2',
+          type: 'composition',
+          source: 'elem-2',
+          target: 'elem-1',
         },
         label: '',
         isSelected: false,

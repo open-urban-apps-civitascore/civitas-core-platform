@@ -3,8 +3,13 @@
  *
  * Converts UML diagram data to a JSON Schema (draft 2020-12) document.
  *
- * Conventional UML -> JSON Schema mapping:
- * - Each UML class/interface/abstractClass becomes an object schema.
+ * Only the relationship types the platform supports end-to-end reach this
+ * stage: a diagram carrying any other type is rejected up front (see
+ * {@link assertSupportedRelationships}), so export never has to invent a
+ * mapping for an out-of-scope relation.
+ *
+ * UML -> JSON Schema mapping:
+ * - Each UML class becomes an object schema.
  * - Each attribute becomes a `properties` entry.
  * - Primitive UML types map to JSON Schema `type`/`format`.
  * - Geometry types map to a GeoJSON-style `$ref`.
@@ -13,20 +18,20 @@
  *   are added to the class's `required` array.
  * - Enumerations map to the `enum` keyword.
  * - Inheritance maps to `allOf: [{ $ref }, { ...own }]`.
- * - Associations/aggregation/composition map to a `$ref` property (an array
- *   `$ref` for many multiplicities).
+ * - Composition maps to a `$ref` property on the container (an array `$ref`
+ *   for many multiplicities).
  *
  * Root: the document root is the data structure itself, titled after the
  * diagram. Every class is emitted under `$defs`; the root class (the one not
- * contained by any other via composition, aggregation, inheritance, or
- * realization) is referenced from the document root via a `$ref` property, so
- * the structure's name — not an arbitrary class — is always the top level. An
- * enumeration-only diagram keeps its `enum` at the document root instead.
+ * contained by any other via composition or inheritance) is referenced from
+ * the document root via a `$ref` property, so the structure's name — not an
+ * arbitrary class — is always the top level. An enumeration-only diagram keeps
+ * its `enum` at the document root instead.
  */
 
 import type { UMLDiagram } from '../types/diagram'
 import type { UMLAttribute, UMLElement, UMLEnumeration, UMLRelationship, UMLType } from '../types/uml'
-import { hasAttributes } from '../types/uml'
+import { hasAttributes, isSupportedRelationshipType, SUPPORTED_RELATIONSHIP_TYPES } from '../types/uml'
 import {
   classifyStructuralEdge,
   collectContainedIds,
@@ -253,9 +258,49 @@ const buildClassSchema = (
 }
 
 /**
+ * Thrown when a diagram carries relationships outside the supported release scope.
+ * Lets callers distinguish an out-of-scope model from a generic export failure.
+ */
+export class UnsupportedRelationshipError extends Error {
+  readonly unsupportedTypes: readonly string[]
+
+  constructor(unsupportedTypes: readonly string[]) {
+    const allowed = [...SUPPORTED_RELATIONSHIP_TYPES].join(', ')
+    super(
+      `Model contains unsupported relationship type(s): ${[...unsupportedTypes].join(', ')}. Only ${allowed} are supported — change or remove these relationships before saving.`,
+    )
+    this.name = 'UnsupportedRelationshipError'
+    this.unsupportedTypes = unsupportedTypes
+  }
+}
+
+/**
+ * Rejects a diagram carrying relationships outside the supported release scope.
+ * Guards both save and schema export against out-of-scope semantics that the
+ * downstream pipeline (config-adapter, PostGIS derivation) is not tested for —
+ * including legacy edges in models drawn before the scope was enforced. Throws
+ * with a message naming the offending types; returns normally when the diagram
+ * is clean.
+ */
+export const assertSupportedRelationships = (diagram: UMLDiagram): void => {
+  const unsupported = new Set<string>()
+  for (const edge of diagram.edges ?? []) {
+    const type = edge.data?.relationship?.type
+    if (type && !isSupportedRelationshipType(type)) unsupported.add(type)
+  }
+  if (unsupported.size > 0) {
+    throw new UnsupportedRelationshipError([...unsupported].sort())
+  }
+}
+
+/**
  * Main export function - converts a UMLDiagram into a JSON Schema document.
+ * Throws if the diagram carries relationships outside the supported scope
+ * (see {@link assertSupportedRelationships}).
  */
 export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): JsonSchemaObject => {
+  assertSupportedRelationships(diagram)
+
   const elements = (diagram.nodes ?? []).map(node => node.data?.element).filter((e): e is UMLElement => !!e)
 
   // Map every class element id to a stable `$defs` key.

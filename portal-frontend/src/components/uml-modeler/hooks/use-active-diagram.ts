@@ -5,14 +5,15 @@ import { createContext, useContext } from 'react'
 
 import { createEmptyDiagram, getDiagramStats } from '../services/diagramService'
 import type { DiagramAction, NodeCreationContext, UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
-import type { UMLElement, UMLRelationship } from '../types/uml'
+import type { UMLElement, UMLRelationship, UMLRelationshipType } from '../types/uml'
 
 interface ActiveDiagramContextValue {
   // Current active diagram
   diagram: UMLDiagram
   stats: ReturnType<typeof getDiagramStats>
   isDirty: boolean
-  activeRelationshipType: string
+  // null = no relationship tool selected (neutral). Connections cannot be drawn until a tool is picked.
+  activeRelationshipType: UMLRelationshipType | null
 
   // Selected elements
   selectedNode: UMLNode | undefined
@@ -34,7 +35,7 @@ interface ActiveDiagramContextValue {
   selectEdge: (edgeId: string, isMultiSelect?: boolean) => void
 
   // Relationship type setting
-  setActiveRelationshipType: (type: string) => void
+  setActiveRelationshipType: (type: UMLRelationshipType | null) => void
 
   // Selection operations
   clearSelection: () => void
@@ -63,7 +64,7 @@ export const useActiveDiagram = (): ActiveDiagramContextValue => {
       diagram: emptyDiagram,
       stats: getDiagramStats(emptyDiagram),
       isDirty: false,
-      activeRelationshipType: 'association',
+      activeRelationshipType: null,
       selectedNode: undefined,
       selectedEdge: undefined,
       dispatch: () => {},

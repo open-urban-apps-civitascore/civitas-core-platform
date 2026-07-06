@@ -126,6 +126,17 @@ export type UMLRelationshipType =
   | 'realization'
   | 'dependency'
 
+// Relationship types the platform officially supports end-to-end (schema generation,
+// config-adapter pipeline, PostGIS derivation). Every other type is out of scope and
+// must not reach a saved model — palette, inspector and save-time validation all key off this.
+export const SUPPORTED_RELATIONSHIP_TYPES = [
+  'inheritance',
+  'composition',
+] as const satisfies readonly UMLRelationshipType[]
+
+export const isSupportedRelationshipType = (type: UMLRelationshipType): boolean =>
+  (SUPPORTED_RELATIONSHIP_TYPES as readonly UMLRelationshipType[]).includes(type)
+
 export interface UMLRelationship {
   id: string
   type: UMLRelationshipType
