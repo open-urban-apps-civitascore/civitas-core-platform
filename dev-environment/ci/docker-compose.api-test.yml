@@ -113,8 +113,8 @@ services:
         - |
           exec 3<>/dev/tcp/127.0.0.1/8080 || exit 1
           printf 'GET /realms/civitas-core/.well-known/openid-configuration HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3
-          read -r status <&3
-          case "$status" in *" 200"*) exit 0 ;; *) exit 1 ;; esac
+          read -r line <&3
+          case "$$line" in *" 200"*) exit 0 ;; *) exit 1 ;; esac
       interval: 10s
       timeout: 5s
       retries: 30

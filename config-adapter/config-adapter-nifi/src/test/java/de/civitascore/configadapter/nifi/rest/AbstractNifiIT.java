@@ -118,9 +118,22 @@ abstract class AbstractNifiIT {
     }
   }
 
-  /** Generates a self-signed PKCS12 keystore + matching truststore for NiFi's HTTPS connector. */
+  /**
+   * Generates a self-signed PKCS12 keystore + matching truststore for NiFi's HTTPS connector. The
+   * cert's SAN must include the host the client connects to, or NiFi 2.x rejects the TLS handshake
+   * with HTTP 400 "Invalid SNI". The client uses {@link #dockerHost} (localhost locally, {@code
+   * docker} in GitLab DinD, or an IP), so that host is resolved here and added to the SAN.
+   */
   private static Path generateKeystores() {
     try {
+      dockerHost = DockerClientFactory.instance().dockerHostIpAddress();
+      String san = "SAN=dns:localhost,dns:host.docker.internal,ip:127.0.0.1";
+      if (!dockerHost.equals("localhost") && !dockerHost.equals("127.0.0.1")) {
+        san +=
+            dockerHost.matches("\\d{1,3}(\\.\\d{1,3}){3}")
+                ? ",ip:" + dockerHost
+                : ",dns:" + dockerHost;
+      }
       Path dir = Files.createTempDirectory("nifi-oidc-certs");
       Path keystore = dir.resolve("keystore.p12");
       Path truststore = dir.resolve("truststore.p12");
@@ -148,7 +161,7 @@ abstract class AbstractNifiIT {
           "-keypass",
           KEYSTORE_PASSWORD,
           "-ext",
-          "SAN=dns:localhost,dns:host.docker.internal");
+          san);
       runKeytool(
           keytool,
           "-exportcert",
