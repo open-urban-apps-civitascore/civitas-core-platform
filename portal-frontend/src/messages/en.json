@@ -740,6 +740,7 @@
     "values": {
       "ASSIGNMENT": "Assignment",
       "DATASET": "Dataset",
+      "DATASET_DASHBOARD": "Dataset Dashboard",
       "DATASET_PAYLOAD": "Dataset Payload",
       "DATASOURCE": "Data source",
       "DATASTRUCTURE": "Data structure",
