@@ -147,9 +147,8 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const canSetAvailable = useMemo(() => {
     const hasDistribution = !!dataset.pipelines?.length || !!dataset.namedApis?.length
-    const hasAssignments = groupCount > 0 && roleCount > 0
-    return DatasetFormAvailableSchema.safeParse(formValues).success && hasDistribution && hasAssignments
-  }, [formValues, dataset.pipelines, dataset.namedApis, groupCount, roleCount])
+    return DatasetFormAvailableSchema.safeParse(formValues).success && hasDistribution
+  }, [formValues, dataset.pipelines, dataset.namedApis])
 
   // Auto-revert status to draft when required fields become invalid
   const revalidateDraftMode = () => {
