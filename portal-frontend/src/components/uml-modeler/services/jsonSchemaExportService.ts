@@ -3,10 +3,10 @@
  *
  * Converts UML diagram data to a JSON Schema (draft 2020-12) document.
  *
- * Only the relationship types the platform supports end-to-end reach this
- * stage: a diagram carrying any other type is rejected up front (see
- * {@link assertSupportedRelationships}), so export never has to invent a
- * mapping for an out-of-scope relation.
+ * Only relationship types in the supported release scope contribute to the
+ * schema; any other type (including legacy edges in older models) carries no
+ * semantics and is silently ignored rather than invented a mapping for. The
+ * scope is deliberately small and grows over time — see umlContainment.
  *
  * UML -> JSON Schema mapping:
  * - Each UML class becomes an object schema.
@@ -31,7 +31,7 @@
 
 import type { UMLDiagram } from '../types/diagram'
 import type { UMLAttribute, UMLElement, UMLEnumeration, UMLRelationship, UMLType } from '../types/uml'
-import { hasAttributes, isSupportedRelationshipType, SUPPORTED_RELATIONSHIP_TYPES } from '../types/uml'
+import { hasAttributes } from '../types/uml'
 import {
   classifyStructuralEdge,
   collectContainedIds,
@@ -258,49 +258,13 @@ const buildClassSchema = (
 }
 
 /**
- * Thrown when a diagram carries relationships outside the supported release scope.
- * Lets callers distinguish an out-of-scope model from a generic export failure.
- */
-export class UnsupportedRelationshipError extends Error {
-  readonly unsupportedTypes: readonly string[]
-
-  constructor(unsupportedTypes: readonly string[]) {
-    const allowed = [...SUPPORTED_RELATIONSHIP_TYPES].join(', ')
-    super(
-      `Model contains unsupported relationship type(s): ${[...unsupportedTypes].join(', ')}. Only ${allowed} are supported — change or remove these relationships before saving.`,
-    )
-    this.name = 'UnsupportedRelationshipError'
-    this.unsupportedTypes = unsupportedTypes
-  }
-}
-
-/**
- * Rejects a diagram carrying relationships outside the supported release scope.
- * Guards both save and schema export against out-of-scope semantics that the
- * downstream pipeline (config-adapter, PostGIS derivation) is not tested for —
- * including legacy edges in models drawn before the scope was enforced. Throws
- * with a message naming the offending types; returns normally when the diagram
- * is clean.
- */
-export const assertSupportedRelationships = (diagram: UMLDiagram): void => {
-  const unsupported = new Set<string>()
-  for (const edge of diagram.edges ?? []) {
-    const type = edge.data?.relationship?.type
-    if (type && !isSupportedRelationshipType(type)) unsupported.add(type)
-  }
-  if (unsupported.size > 0) {
-    throw new UnsupportedRelationshipError([...unsupported].sort())
-  }
-}
-
-/**
  * Main export function - converts a UMLDiagram into a JSON Schema document.
- * Throws if the diagram carries relationships outside the supported scope
- * (see {@link assertSupportedRelationships}).
+ * Relationships outside the supported scope carry no semantics and are ignored
+ * (see {@link classifyStructuralEdge} / {@link collectParentIds}), so a legacy
+ * model with out-of-scope edges still exports — those edges just contribute
+ * nothing to the schema.
  */
 export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): JsonSchemaObject => {
-  assertSupportedRelationships(diagram)
-
   const elements = (diagram.nodes ?? []).map(node => node.data?.element).filter((e): e is UMLElement => !!e)
 
   // Map every class element id to a stable `$defs` key.

@@ -96,8 +96,8 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
     }),
   )
 
-  // Legacy models may carry an out-of-scope type. Surface it as a disabled current
-  // value so the select isn't silently blank, but force the user to pick a supported one.
+  // Legacy models may carry an out-of-scope type. Surface it as a disabled current value so the
+  // select isn't silently blank, and hint that it is ignored — it stays valid but has no effect.
   const isCurrentTypeUnsupported = !relationshipTypes.some(t => t.value === relationship.type)
 
   return (
@@ -123,8 +123,9 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
           ))}
         </select>
         {isCurrentTypeUnsupported && (
-          <p className="mt-1 text-xs text-red-600">
-            This relationship type is not supported. Change it to a supported type before saving.
+          <p className="mt-1 text-xs text-amber-600">
+            This relationship type is no longer supported and is ignored on export. Pick a supported type to give it
+            effect.
           </p>
         )}
       </div>

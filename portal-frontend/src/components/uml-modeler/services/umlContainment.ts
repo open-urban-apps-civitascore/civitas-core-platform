@@ -2,36 +2,29 @@
  * Shared UML containment semantics: the single source of containment direction and root-selection
  * rules consumed by the mapping-editor schema adapter and the JSON-Schema export service.
  *
+ * Only relationship types in the supported release scope carry semantics here; every other type is
+ * silently ignored (no containment, no parent), so a legacy model with out-of-scope edges still
+ * maps — those edges simply contribute nothing. The scope is deliberately small and grows over
+ * time: widening it means adding the type both to SUPPORTED_RELATIONSHIP_TYPES and to the set below.
+ *
  * Direction rules:
- * - composition/aggregation: the diamond (= the container) is drawn at the edge target, so the
- *   target contains the source.
- * - association: no diamond; keeps its drawn direction (source → target), and the source is not
- *   embedded (it stays a possible document root).
- * - inheritance/realization: the parent sits at the edge target and is embedded into the subclass
- *   (the subclass is the concrete root).
+ * - composition: the diamond (= the container) is drawn at the edge target, so the target contains
+ *   the source.
+ * - inheritance: the parent sits at the edge target and is embedded into the subclass (the subclass
+ *   is the concrete root).
  */
 
 import type { UMLDiagram } from '../types/diagram'
 import type { UMLElement, UMLRelationship, UMLRelationshipType } from '../types/uml'
 
-/** Relationship types that express a structural part-of containment. */
-export const STRUCTURAL_RELATIONS: ReadonlySet<UMLRelationshipType> = new Set<UMLRelationshipType>([
-  'association',
-  'aggregation',
-  'composition',
-])
+/** Structural part-of containments in scope. Its container sits at the edge target (diamond end). */
+export const STRUCTURAL_RELATIONS: ReadonlySet<UMLRelationshipType> = new Set<UMLRelationshipType>(['composition'])
 
 /** Structural relations whose container sits at the edge target (the diamond end). */
-export const CONTAINER_AT_TARGET: ReadonlySet<UMLRelationshipType> = new Set<UMLRelationshipType>([
-  'aggregation',
-  'composition',
-])
+export const CONTAINER_AT_TARGET: ReadonlySet<UMLRelationshipType> = new Set<UMLRelationshipType>(['composition'])
 
 /** Relationship types where the edge target is the parent embedded into the subclass. */
-export const INHERITANCE_RELATIONS: ReadonlySet<UMLRelationshipType> = new Set<UMLRelationshipType>([
-  'inheritance',
-  'realization',
-])
+export const INHERITANCE_RELATIONS: ReadonlySet<UMLRelationshipType> = new Set<UMLRelationshipType>(['inheritance'])
 
 /** A structural edge normalised into container/part orientation. */
 export interface Containment {
@@ -70,8 +63,9 @@ export const parseMultiplicity = (multiplicity?: string): { lower: number; upper
 export const isManyMultiplicity = (multiplicity?: string): boolean => parseMultiplicity(multiplicity).upper > 1
 
 /**
- * Normalises one relationship into container/part orientation. Returns `null` for non-structural
- * edges (inheritance/realization/dependency), which carry no part-of containment.
+ * Normalises one relationship into container/part orientation. Returns `null` for edges that carry
+ * no part-of containment — inheritance as well as any out-of-scope type (association, aggregation,
+ * realization, dependency), which are ignored rather than mapped.
  */
 export const classifyStructuralEdge = (rel: UMLRelationship): Containment | null => {
   if (!STRUCTURAL_RELATIONS.has(rel.type)) return null

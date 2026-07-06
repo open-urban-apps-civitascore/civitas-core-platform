@@ -26,7 +26,7 @@ const diagram = (edges: ReturnType<typeof edge>[]): UMLDiagram => ({ edges }) as
 const element = (id: string, name: string, type: UMLElement['type'] = 'class') => ({ id, name, type }) as UMLElement
 
 describe('classifyStructuralEdge', () => {
-  it('orients composition/aggregation with the container at the target', () => {
+  it('orients composition with the container at the target', () => {
     const c = classifyStructuralEdge(
       relationship({
         type: 'composition',
@@ -39,21 +39,8 @@ describe('classifyStructuralEdge', () => {
     expect(c).toEqual({ containerId: 'whole', partId: 'part', role: 'parts', multiplicity: '*', isMany: true })
   })
 
-  it('keeps association in its drawn direction', () => {
-    const c = classifyStructuralEdge(
-      relationship({
-        type: 'association',
-        source: 'order',
-        target: 'item',
-        targetRole: 'items',
-        targetMultiplicity: '1',
-      }),
-    )
-    expect(c).toMatchObject({ containerId: 'order', partId: 'item', role: 'items', isMany: false })
-  })
-
-  it('returns null for inheritance, realization and dependency edges', () => {
-    for (const type of ['inheritance', 'realization', 'dependency'] as const) {
+  it('returns null for every out-of-scope and non-structural type', () => {
+    for (const type of ['association', 'aggregation', 'inheritance', 'realization', 'dependency'] as const) {
       expect(classifyStructuralEdge(relationship({ type, source: 'a', target: 'b' }))).toBeNull()
     }
   })
@@ -82,11 +69,13 @@ describe('parseMultiplicity / isManyMultiplicity', () => {
 })
 
 describe('collectContainedIds', () => {
-  it('embeds composition/aggregation parts and inheritance/realization parents, not associations', () => {
+  it('embeds composition parts and inheritance parents; ignores out-of-scope types', () => {
     const d = diagram([
       edge(relationship({ type: 'composition', source: 'part', target: 'whole' })),
       edge(relationship({ type: 'inheritance', source: 'sub', target: 'parent' })),
+      // Out-of-scope: neither embeds anything.
       edge(relationship({ type: 'association', source: 'order', target: 'item' })),
+      edge(relationship({ type: 'aggregation', source: 'wheel', target: 'car' })),
     ])
     const contained = collectContainedIds(d)
     expect([...contained].sort()).toEqual(['parent', 'part'])
@@ -94,13 +83,13 @@ describe('collectContainedIds', () => {
 })
 
 describe('collectParentIds', () => {
-  it('returns inheritance/realization parents of one element in edge order', () => {
+  it('returns inheritance parents in edge order; ignores realization', () => {
     const d = diagram([
       edge(relationship({ type: 'inheritance', source: 'sub', target: 'a' })),
       edge(relationship({ type: 'realization', source: 'sub', target: 'b' })),
       edge(relationship({ type: 'inheritance', source: 'other', target: 'c' })),
     ])
-    expect(collectParentIds(d, 'sub')).toEqual(['a', 'b'])
+    expect(collectParentIds(d, 'sub')).toEqual(['a'])
     expect(collectParentIds(d, 'other')).toEqual(['c'])
   })
 })

@@ -127,15 +127,13 @@ export type UMLRelationshipType =
   | 'dependency'
 
 // Relationship types the platform officially supports end-to-end (schema generation,
-// config-adapter pipeline, PostGIS derivation). Every other type is out of scope and
-// must not reach a saved model — palette, inspector and save-time validation all key off this.
+// config-adapter pipeline, PostGIS derivation). The set is deliberately small and grows over time;
+// the palette and edge inspector only let users draw or pick from it. Out-of-scope types are not
+// rejected — legacy models keep them — but they carry no semantics and are ignored on export.
 export const SUPPORTED_RELATIONSHIP_TYPES = [
   'inheritance',
   'composition',
 ] as const satisfies readonly UMLRelationshipType[]
-
-export const isSupportedRelationshipType = (type: UMLRelationshipType): boolean =>
-  (SUPPORTED_RELATIONSHIP_TYPES as readonly UMLRelationshipType[]).includes(type)
 
 export interface UMLRelationship {
   id: string

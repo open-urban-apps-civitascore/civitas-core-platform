@@ -2,12 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality } from '../constants/umlTypes'
 import type { UMLDiagram } from '../types/diagram'
-import {
-  canMultiplicityBePrimaryKey,
-  exportToJsonSchema,
-  sanitizeName,
-  UnsupportedRelationshipError,
-} from './jsonSchemaExportService'
+import { canMultiplicityBePrimaryKey, exportToJsonSchema, sanitizeName } from './jsonSchemaExportService'
 
 const baseDiagram = (overrides?: Partial<UMLDiagram>): UMLDiagram => ({
   id: 'diagram-1',
@@ -601,15 +596,21 @@ describe('exportToJsonSchema', () => {
   })
 
   it.each(['association', 'aggregation', 'dependency'] as const)(
-    'rejects out-of-scope relationship type %s instead of silently mapping it',
+    'ignores out-of-scope relationship type %s: the edge contributes no property and export still succeeds',
     type => {
       const diagram = baseDiagram({
         nodes: [...baseDiagram().nodes, readingNode],
         edges: [outOfScopeEdge(type)],
       })
 
-      expect(() => exportToJsonSchema(diagram)).toThrow(UnsupportedRelationshipError)
-      expect(() => exportToJsonSchema(diagram)).toThrow(new RegExp(type))
+      const schema = exportToJsonSchema(diagram)
+      // The out-of-scope edge is dropped, so TrafficSensor gains no reference to Reading; both
+      // classes are still emitted under $defs.
+      const properties = classDef(schema, 'TrafficSensor').properties as Record<string, unknown>
+      expect(Object.keys(properties)).not.toContain('reading')
+      const defs = schema.$defs as Record<string, Record<string, unknown>>
+      expect(defs.TrafficSensor).toBeDefined()
+      expect(defs.Reading).toBeDefined()
     },
   )
 
@@ -664,7 +665,7 @@ describe('exportToJsonSchema', () => {
     expect((schema.$defs as Record<string, unknown>).Animal).toBeDefined()
   })
 
-  it('rejects realization as out of scope rather than mapping it like inheritance', () => {
+  it('ignores realization rather than mapping it like inheritance', () => {
     const diagram = baseDiagram({
       name: 'IFace',
       nodes: [
@@ -674,8 +675,12 @@ describe('exportToJsonSchema', () => {
       edges: [inhEdge('1', 'impl', 'iface', 'realization')],
     } as Partial<UMLDiagram>)
 
-    expect(() => exportToJsonSchema(diagram)).toThrow(UnsupportedRelationshipError)
-    expect(() => exportToJsonSchema(diagram)).toThrow(/realization/)
+    const schema = exportToJsonSchema(diagram)
+    // The realization edge is dropped: Impl gets no allOf parent, so both classes remain plain
+    // object schemas and export still succeeds.
+    expect(classDef(schema, 'Impl').allOf).toBeUndefined()
+    expect(classDef(schema, 'Impl').type).toBe('object')
+    expect((schema.$defs as Record<string, unknown>).IFace).toBeDefined()
   })
 
   it('roots on the leaf for multi-level inheritance', () => {

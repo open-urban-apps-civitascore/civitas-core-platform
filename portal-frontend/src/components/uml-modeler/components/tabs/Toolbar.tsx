@@ -10,7 +10,7 @@ import { BasicDropdownMenu } from '@/components/dropdown-menu/BasicDropdownMenu'
 import { Button } from '@/components/ui/button'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
-import { downloadJsonSchema, UnsupportedRelationshipError } from '../../services/jsonSchemaExportService'
+import { downloadJsonSchema } from '../../services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '../../services/modelUploadService'
 
 interface ToolbarProps {
@@ -36,15 +36,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const handleSave = useCallback(() => {
     if (isSaving) return
 
-    let payload
-    try {
-      payload = {
-        ...buildUMLModelPayload(diagram),
-        name: sessionName || diagram.name,
-      }
-    } catch (error) {
-      toast.error(error instanceof UnsupportedRelationshipError ? t('save.unsupportedRelationships') : t('save.error'))
-      return
+    const payload = {
+      ...buildUMLModelPayload(diagram),
+      name: sessionName || diagram.name,
     }
 
     createModel.mutate(payload, {
@@ -62,10 +56,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     try {
       downloadJsonSchema(diagram)
       toast.success(t('export.success'))
-    } catch (error) {
-      toast.error(
-        error instanceof UnsupportedRelationshipError ? t('export.unsupportedRelationships') : t('export.error'),
-      )
+    } catch {
+      toast.error(t('export.error'))
     }
   }, [diagram, t])
 
