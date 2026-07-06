@@ -293,7 +293,8 @@ public final class SqlSourceStage implements SourceStage {
    * tenant-supplied {@code table}/{@code columns}/{@code where} carrying {@code
    * ${NIFI_SECURITY_USER_OIDC_CLIENT_SECRET}} would have NiFi's own OIDC client secret expanded and
    * sent in the SQL to the tenant's source DB — an environment-variable exfiltration path. {@code
-   * $$} is EL's own literal escape for a {@code $}, so it is not a reference and is allowed through.
+   * $$} is EL's own literal escape for a {@code $}, so it is not a reference and is allowed
+   * through.
    */
   private static void rejectExpressionLanguage(String field, String value)
       throws FatalAdapterException {

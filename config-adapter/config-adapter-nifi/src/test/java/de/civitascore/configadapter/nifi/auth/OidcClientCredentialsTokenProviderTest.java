@@ -146,7 +146,8 @@ class OidcClientCredentialsTokenProviderTest {
   @Test
   void serverErrorIsRetryable() {
     server.stubFor(
-        post(urlEqualTo(TOKEN_PATH)).willReturn(aResponse().withStatus(503).withBody("overloaded")));
+        post(urlEqualTo(TOKEN_PATH))
+            .willReturn(aResponse().withStatus(503).withBody("overloaded")));
 
     assertThrows(RetryableAdapterException.class, () -> provider(null).getToken());
   }
@@ -190,7 +191,8 @@ class OidcClientCredentialsTokenProviderTest {
 
   @Test
   void requestTimeoutIsRetryable() {
-    // 408 Request Timeout (e.g. from a proxy in front of Keycloak) is transient, not a config error.
+    // 408 Request Timeout (e.g. from a proxy in front of Keycloak) is transient, not a config
+    // error.
     server.stubFor(post(urlEqualTo(TOKEN_PATH)).willReturn(aResponse().withStatus(408)));
 
     assertThrows(RetryableAdapterException.class, () -> provider(null).getToken());
@@ -198,7 +200,8 @@ class OidcClientCredentialsTokenProviderTest {
 
   @Test
   void emptyOkBodyIsFatal() {
-    // A 200 with no body must surface as a fatal auth error, not an uncategorised NullPointerException.
+    // A 200 with no body must surface as a fatal auth error, not an uncategorised
+    // NullPointerException.
     server.stubFor(post(urlEqualTo(TOKEN_PATH)).willReturn(aResponse().withStatus(200)));
 
     assertThrows(FatalAdapterException.class, () -> provider(null).getToken());

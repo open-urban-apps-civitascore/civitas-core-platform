@@ -207,7 +207,8 @@ class NifiRestClientTest {
     server.stubFor(
         get(urlEqualTo("/nifi-api/flow/process-groups/root"))
             .willReturn(json("{ \"processGroupFlow\": { \"id\": \"root-1\" } }")));
-    // An existing policy that grants another user AND an admin group is returned; the client PUTs it
+    // An existing policy that grants another user AND an admin group is returned; the client PUTs
+    // it
     // back including its own user while preserving both the other user and the group.
     server.stubFor(
         get(urlMatching("/nifi-api/policies/(read|write)/(data/)?process-groups/root-1"))
@@ -408,7 +409,8 @@ class NifiRestClientTest {
     String rootId = client.getRootProcessGroupId(); // 401 → re-auth → retry → 200
 
     assertEquals("root-1", rootId);
-    // token refreshed exactly once, in response to the 401 (the initial token came from authenticate)
+    // token refreshed exactly once, in response to the 401 (the initial token came from
+    // authenticate)
     assertEquals(1, tokenProvider.getCount);
     assertEquals(1, tokenProvider.refreshCount);
   }

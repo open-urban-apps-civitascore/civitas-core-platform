@@ -56,7 +56,8 @@ abstract class AbstractNifiIT {
   private static final String REALM = "nifi-test";
   protected static final String OIDC_CLIENT_ID = "nifi";
   protected static final String OIDC_CLIENT_SECRET = "nifi-test-secret";
-  // NiFi maps a bearer (client-credentials) token to its 'sub' claim — the service account's Keycloak
+  // NiFi maps a bearer (client-credentials) token to its 'sub' claim — the service account's
+  // Keycloak
   // user id, pinned in nifi-test-realm.json so it is a known value here. This is NiFi's initial
   // admin; the config-adapter then self-provisions its own root-canvas policies on first deploy.
   protected static final String OIDC_ADMIN_IDENTITY = "a11ce55a-0000-4000-8000-000000000001";
@@ -126,17 +127,54 @@ abstract class AbstractNifiIT {
       Path cert = dir.resolve("nifi.crt");
       String keytool = System.getProperty("java.home") + "/bin/keytool";
       runKeytool(
-          keytool, "-genkeypair", "-alias", "nifi", "-keyalg", "RSA", "-keysize", "2048",
-          "-validity", "3650", "-dname", "CN=nifi", "-storetype", "PKCS12",
-          "-keystore", keystore.toString(), "-storepass", KEYSTORE_PASSWORD,
-          "-keypass", KEYSTORE_PASSWORD, "-ext", "SAN=dns:localhost,dns:host.docker.internal");
+          keytool,
+          "-genkeypair",
+          "-alias",
+          "nifi",
+          "-keyalg",
+          "RSA",
+          "-keysize",
+          "2048",
+          "-validity",
+          "3650",
+          "-dname",
+          "CN=nifi",
+          "-storetype",
+          "PKCS12",
+          "-keystore",
+          keystore.toString(),
+          "-storepass",
+          KEYSTORE_PASSWORD,
+          "-keypass",
+          KEYSTORE_PASSWORD,
+          "-ext",
+          "SAN=dns:localhost,dns:host.docker.internal");
       runKeytool(
-          keytool, "-exportcert", "-alias", "nifi", "-keystore", keystore.toString(),
-          "-storepass", KEYSTORE_PASSWORD, "-rfc", "-file", cert.toString());
+          keytool,
+          "-exportcert",
+          "-alias",
+          "nifi",
+          "-keystore",
+          keystore.toString(),
+          "-storepass",
+          KEYSTORE_PASSWORD,
+          "-rfc",
+          "-file",
+          cert.toString());
       runKeytool(
-          keytool, "-importcert", "-alias", "nifi", "-keystore", truststore.toString(),
-          "-storetype", "PKCS12", "-storepass", KEYSTORE_PASSWORD, "-noprompt",
-          "-file", cert.toString());
+          keytool,
+          "-importcert",
+          "-alias",
+          "nifi",
+          "-keystore",
+          truststore.toString(),
+          "-storetype",
+          "PKCS12",
+          "-storepass",
+          KEYSTORE_PASSWORD,
+          "-noprompt",
+          "-file",
+          cert.toString());
       return dir;
     } catch (Exception e) {
       throw new IllegalStateException("failed to generate NiFi OIDC keystores", e);
@@ -169,8 +207,8 @@ abstract class AbstractNifiIT {
 
   /**
    * Whether these ITs can run: a Docker daemon is available AND the shared Keycloak + keystores
-   * started. ITs {@code assumeTrue} on this so a missing daemon or an occupied fixed port skips them
-   * cleanly rather than erroring.
+   * started. ITs {@code assumeTrue} on this so a missing daemon or an occupied fixed port skips
+   * them cleanly rather than erroring.
    */
   protected static boolean dockerAvailable() {
     return DockerClientFactory.instance().isDockerAvailable() && infraReady;
@@ -250,7 +288,12 @@ abstract class AbstractNifiIT {
     // not reachable back from the host). Keycloak's pinned KC_HOSTNAME still stamps the issuer as
     // host.docker.internal:PORT, so NiFi accepts the token regardless.
     String tokenUri =
-        "http://" + dockerHost + ":" + KEYCLOAK_PORT + "/realms/" + REALM
+        "http://"
+            + dockerHost
+            + ":"
+            + KEYCLOAK_PORT
+            + "/realms/"
+            + REALM
             + "/protocol/openid-connect/token";
     client =
         new NifiRestClient(

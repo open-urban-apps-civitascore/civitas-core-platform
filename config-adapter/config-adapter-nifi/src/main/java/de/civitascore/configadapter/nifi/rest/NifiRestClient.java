@@ -64,10 +64,11 @@ public class NifiRestClient implements AutoCloseable {
 
   /**
    * The bearer token most recently obtained from {@link #tokenProvider}, refreshed in place on a
-   * 401. This single shared field is safe for the single-instance/concurrent-deploy contract because
-   * every token is a valid credential for the same OIDC service-account identity: a concurrent
-   * refresh can at worst replace it with another equally-valid token (a fresh JWT, not necessarily
-   * byte-identical). {@code volatile} guarantees visibility of that replacement across threads.
+   * 401. This single shared field is safe for the single-instance/concurrent-deploy contract
+   * because every token is a valid credential for the same OIDC service-account identity: a
+   * concurrent refresh can at worst replace it with another equally-valid token (a fresh JWT, not
+   * necessarily byte-identical). {@code volatile} guarantees visibility of that replacement across
+   * threads.
    */
   private volatile String token;
 
@@ -178,9 +179,9 @@ public class NifiRestClient implements AutoCloseable {
    * OIDC-secured NiFi always has. NiFi's initial-admin seeding grants the config-adapter service
    * account the global policies (/flow, /controller, /policies, /tenants) but NOT read/write on the
    * root canvas, so the very first read returns 403. On that 403 we grant the missing root policies
-   * — using the global rights the account already holds — and return the id resolved while doing so.
-   * On a NiFi that already has the policies (persistent state, later deploys) the first read succeeds
-   * and nothing is provisioned.
+   * — using the global rights the account already holds — and return the id resolved while doing
+   * so. On a NiFi that already has the policies (persistent state, later deploys) the first read
+   * succeeds and nothing is provisioned.
    */
   String getRootProcessGroupId() throws FatalAdapterException, RetryableAdapterException {
     try (Response response =
@@ -199,10 +200,10 @@ public class NifiRestClient implements AutoCloseable {
 
   /**
    * Grants the authenticated service account read+write on the root process group and its data, and
-   * returns the root process-group id. Mirrors the one-time canvas grant an operator would otherwise
-   * perform by hand. Idempotent: re-running against a NiFi that already has the policies re-adds an
-   * already-present user. {@code synchronized} so concurrent deploys hitting the initial 403
-   * provision once, not in a race. A failure to provision (e.g. the account lacks the global
+   * returns the root process-group id. Mirrors the one-time canvas grant an operator would
+   * otherwise perform by hand. Idempotent: re-running against a NiFi that already has the policies
+   * re-adds an already-present user. {@code synchronized} so concurrent deploys hitting the initial
+   * 403 provision once, not in a race. A failure to provision (e.g. the account lacks the global
    * /policies right) propagates from {@link #grantUserPolicy}.
    */
   private synchronized String ensureRootAccess()
@@ -239,9 +240,10 @@ public class NifiRestClient implements AutoCloseable {
             + "' has no NiFi user — is INITIAL_ADMIN_IDENTITY set to this service account?");
   }
 
-  /** The root process-group id, read via the /flow endpoint (needs only the global /flow policy). */
-  private String flowRootProcessGroupId()
-      throws FatalAdapterException, RetryableAdapterException {
+  /**
+   * The root process-group id, read via the /flow endpoint (needs only the global /flow policy).
+   */
+  private String flowRootProcessGroupId() throws FatalAdapterException, RetryableAdapterException {
     JsonNode body = getJson(API + "/flow/process-groups/root", "root process group (flow)");
     return requireId(
         body.path("processGroupFlow").path("id").asText(), "root process group (flow)");
