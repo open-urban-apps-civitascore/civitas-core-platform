@@ -75,6 +75,8 @@ public enum AdapterErrorCode {
   NIFI_TEMPLATE_ERROR(
       3603, false, "No curated NiFi template for %s", "Unsupported pipeline combination"),
   NIFI_MAPPING_ERROR(3604, false, "NiFi mapping compile error: %s", "Pipeline mapping invalid"),
+  NIFI_AUTH_ERROR(
+      3605, false, "NiFi OIDC authentication error: %s", "Pipeline authentication failed"),
 
   // 9xxx: Unknown/unexpected errors
   UNKNOWN_ERROR(9001, false, "Unexpected error: %s", "Internal error"),

@@ -20,6 +20,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.put;
 import static com.github.tomakehurst.wiremock.client.WireMock.putRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -29,6 +30,7 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
+import de.civitascore.configadapter.nifi.auth.NifiTokenProvider;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
@@ -41,6 +43,7 @@ class NifiRestClientTest {
 
   private WireMockServer server;
   private Client httpClient;
+  private FakeTokenProvider tokenProvider;
   private NifiRestClient client;
 
   @BeforeEach
@@ -48,7 +51,8 @@ class NifiRestClientTest {
     server = new WireMockServer(WireMockConfiguration.options().dynamicPort());
     server.start();
     httpClient = ClientBuilder.newClient();
-    client = new NifiRestClient(server.baseUrl(), "admin", "pw", httpClient);
+    tokenProvider = new FakeTokenProvider();
+    client = new NifiRestClient(server.baseUrl(), tokenProvider, httpClient);
   }
 
   @AfterEach
@@ -57,10 +61,26 @@ class NifiRestClientTest {
     server.stop();
   }
 
-  private void stubAuth() {
-    server.stubFor(
-        post(urlEqualTo("/nifi-api/access/token"))
-            .willReturn(aResponse().withStatus(201).withBody("jwt-token")));
+  /**
+   * Stands in for the OIDC token provider: hands out a constant bearer token and counts how often
+   * the client asks for one and refreshes it (so the 401-replay path can be asserted without an
+   * HTTP token endpoint).
+   */
+  private static final class FakeTokenProvider implements NifiTokenProvider {
+    private int getCount;
+    private int refreshCount;
+
+    @Override
+    public String getToken() {
+      getCount++;
+      return "jwt-token";
+    }
+
+    @Override
+    public String refreshToken() {
+      refreshCount++;
+      return "jwt-token";
+    }
   }
 
   /** A single VALID, Running processor so the post-start processor health check passes. */
@@ -77,7 +97,6 @@ class NifiRestClientTest {
 
   @Test
   void deployFlowRunsFullSequenceAndPushesSecretPostUpload() throws Exception {
-    stubAuth();
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
             .willReturn(json("{ \"id\": \"root-1\" }")));
@@ -120,8 +139,101 @@ class NifiRestClientTest {
   }
 
   @Test
+  void provisionsRootPoliciesOnForbiddenThenRetries() throws Exception {
+    // First root read is denied (fresh OIDC NiFi: the service account has global policies but not
+    // the root canvas). The client must grant itself the four root policies, then re-read and
+    // succeed.
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .inScenario("provision")
+            .whenScenarioStateIs("Started")
+            .willReturn(aResponse().withStatus(403).withBody("No applicable policies"))
+            .willSetStateTo("granted"));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .inScenario("provision")
+            .whenScenarioStateIs("granted")
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/current-user"))
+            .willReturn(json("{ \"identity\": \"svc-account\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/tenants/users"))
+            .willReturn(
+                json(
+                    "{ \"users\": [ { \"id\": \"user-1\", \"component\": { \"identity\":"
+                        + " \"svc-account\" } } ] }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/root"))
+            .willReturn(json("{ \"processGroupFlow\": { \"id\": \"root-1\" } }")));
+    // No policy exists yet for any of the four resource/action pairs → 404 → create.
+    server.stubFor(
+        get(urlMatching("/nifi-api/policies/(read|write)/(data/)?process-groups/root-1"))
+            .willReturn(aResponse().withStatus(404)));
+    server.stubFor(post(urlEqualTo("/nifi-api/policies")).willReturn(json("{ \"id\": \"pol\" }")));
+
+    assertEquals("root-1", client.getRootProcessGroupId());
+
+    // exactly the four root policies were created, each granting the resolved NiFi user id
+    server.verify(4, postRequestedFor(urlEqualTo("/nifi-api/policies")));
+    server.verify(
+        postRequestedFor(urlEqualTo("/nifi-api/policies")).withRequestBody(containing("user-1")));
+  }
+
+  @Test
+  void addsUserToAnExistingRootPolicyInsteadOfCreatingIt() throws Exception {
+    // A NiFi that already carries the root policies (persistent state) must not error: the client
+    // updates the existing policy to include its user rather than POSTing a duplicate.
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .inScenario("provision")
+            .whenScenarioStateIs("Started")
+            .willReturn(aResponse().withStatus(403))
+            .willSetStateTo("granted"));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .inScenario("provision")
+            .whenScenarioStateIs("granted")
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/current-user"))
+            .willReturn(json("{ \"identity\": \"svc-account\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/tenants/users"))
+            .willReturn(
+                json(
+                    "{ \"users\": [ { \"id\": \"user-1\", \"component\": { \"identity\":"
+                        + " \"svc-account\" } } ] }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/root"))
+            .willReturn(json("{ \"processGroupFlow\": { \"id\": \"root-1\" } }")));
+    // An existing policy that grants another user AND an admin group is returned; the client PUTs it
+    // back including its own user while preserving both the other user and the group.
+    server.stubFor(
+        get(urlMatching("/nifi-api/policies/(read|write)/(data/)?process-groups/root-1"))
+            .willReturn(
+                json(
+                    "{ \"id\": \"pol-1\", \"revision\": { \"version\": 5 }, \"component\": { \"id\":"
+                        + " \"pol-1\", \"resource\": \"/process-groups/root-1\", \"action\":"
+                        + " \"read\", \"users\": [ { \"id\": \"other\" } ], \"userGroups\": [ {"
+                        + " \"id\": \"admin-group\" } ] } }")));
+    server.stubFor(put(urlMatching("/nifi-api/policies/pol-1")).willReturn(json("{}")));
+
+    assertEquals("root-1", client.getRootProcessGroupId());
+
+    // no new policy created; the existing one is updated to include the client's user while KEEPING
+    // the other user and the admin group, echoing the optimistic-lock revision
+    server.verify(0, postRequestedFor(urlEqualTo("/nifi-api/policies")));
+    server.verify(
+        putRequestedFor(urlEqualTo("/nifi-api/policies/pol-1"))
+            .withRequestBody(containing("user-1"))
+            .withRequestBody(containing("other"))
+            .withRequestBody(containing("admin-group"))
+            .withRequestBody(containing("\"version\":5")));
+  }
+
+  @Test
   void serverErrorIsRetryable() {
-    stubAuth();
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
             .willReturn(aResponse().withStatus(503).withBody("overloaded")));
@@ -136,7 +248,6 @@ class NifiRestClientTest {
 
   @Test
   void clientErrorIsFatal() {
-    stubAuth();
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
             .willReturn(aResponse().withStatus(400).withBody("bad request")));
@@ -153,7 +264,6 @@ class NifiRestClientTest {
   void conflictIsRetryable() {
     // 409 is a transient optimistic-lock/component-starting condition, not a permanent failure —
     // it must be retryable so a redelivery can complete the deploy rather than rolling it back.
-    stubAuth();
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
             .willReturn(aResponse().withStatus(409).withBody("revision conflict")));
@@ -168,7 +278,6 @@ class NifiRestClientTest {
 
   @Test
   void tooManyRequestsIsRetryable() {
-    stubAuth();
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
             .willReturn(aResponse().withStatus(429).withBody("slow down")));
@@ -185,7 +294,6 @@ class NifiRestClientTest {
   void invalidControllerServiceFailsFatallyInsteadOfPollingForever() {
     // A controller service whose configuration is INVALID will never reach ENABLED. The enable-wait
     // must fail FATALLY (naming the service) rather than time out as retryable and loop forever.
-    stubAuth();
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
             .willReturn(json("{ \"id\": \"root-1\" }")));
@@ -222,7 +330,6 @@ class NifiRestClientTest {
   void missingRevisionVersionIsFatal() {
     // A matching group whose revision.version field is ABSENT must not be silently coerced to 0
     // (which would be sent as a stale optimistic-lock version) — surface the malformed response.
-    stubAuth();
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
             .willReturn(json("{ \"id\": \"root-1\" }")));
@@ -238,7 +345,6 @@ class NifiRestClientTest {
 
   @Test
   void uploadReturningNoIdIsFatal() {
-    stubAuth();
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
             .willReturn(json("{ \"id\": \"root-1\" }")));
@@ -259,7 +365,6 @@ class NifiRestClientTest {
 
   @Test
   void transientErrorTearingDownExistingGroupStaysRetryable() {
-    stubAuth();
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
             .willReturn(json("{ \"id\": \"root-1\" }")));
@@ -286,7 +391,6 @@ class NifiRestClientTest {
 
   @Test
   void reauthenticatesAndRetriesOnceOn401() throws Exception {
-    stubAuth(); // token endpoint always issues a token
     // first GET is rejected (expired token), then succeeds after re-authentication
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
@@ -304,13 +408,13 @@ class NifiRestClientTest {
     String rootId = client.getRootProcessGroupId(); // 401 → re-auth → retry → 200
 
     assertEquals("root-1", rootId);
-    // token endpoint hit twice: the initial authenticate() + the re-auth triggered by the 401
-    server.verify(2, postRequestedFor(urlEqualTo("/nifi-api/access/token")));
+    // token refreshed exactly once, in response to the 401 (the initial token came from authenticate)
+    assertEquals(1, tokenProvider.getCount);
+    assertEquals(1, tokenProvider.refreshCount);
   }
 
   @Test
   void persistent401AfterReauthIsRetryable() throws Exception {
-    stubAuth(); // token endpoint always issues a token
     // every call to root is rejected, even after re-authentication (e.g. NiFi restarting)
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root")).willReturn(aResponse().withStatus(401)));
@@ -318,13 +422,12 @@ class NifiRestClientTest {
     client.authenticate();
     // first 401 → re-auth → still 401 → must surface as retryable (transient), not fatal
     assertThrows(RetryableAdapterException.class, client::getRootProcessGroupId);
-    // re-authentication was attempted: initial authenticate() + the one triggered by the 401
-    server.verify(2, postRequestedFor(urlEqualTo("/nifi-api/access/token")));
+    // a token refresh was attempted in response to the 401
+    assertEquals(1, tokenProvider.refreshCount);
   }
 
   @Test
   void uploadResendsSnapshotBodyAfterReauthOn401() throws Exception {
-    stubAuth();
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
             .willReturn(json("{ \"id\": \"root-1\" }")));
@@ -370,7 +473,6 @@ class NifiRestClientTest {
 
   @Test
   void patchesOnlyTheNameMatchedControllerService() throws Exception {
-    stubAuth();
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
             .willReturn(json("{ \"id\": \"root-1\" }")));
@@ -421,7 +523,6 @@ class NifiRestClientTest {
     // A ConsumeMQTT *processor* carries a sensitive Password — it is NOT a controller service, so
     // the post-upload secret push must also patch processors, else authenticated MQTT sources
     // deploy without a password.
-    stubAuth();
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
             .willReturn(json("{ \"id\": \"root-1\" }")));
@@ -474,7 +575,6 @@ class NifiRestClientTest {
   void unmatchedSensitivePropertyFailsLoudlyInsteadOfDroppingTheSecret() throws Exception {
     // A secret whose target component exists in neither the controller services nor the processors
     // must fail the deploy, not silently vanish.
-    stubAuth();
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
             .willReturn(json("{ \"id\": \"root-1\" }")));
@@ -505,7 +605,6 @@ class NifiRestClientTest {
     // starting the group returns only an HTTP status; a processor left INVALID (e.g. a bad cron)
     // would otherwise make the saga report success while the flow never runs. The post-start check
     // must fail the deploy with the processor's validation state.
-    stubAuth();
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
             .willReturn(json("{ \"id\": \"root-1\" }")));
@@ -547,7 +646,6 @@ class NifiRestClientTest {
 
   @Test
   void deleteOfMissingProcessGroupIsIdempotent() throws Exception {
-    stubAuth();
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
             .willReturn(json("{ \"id\": \"root-1\" }")));
@@ -561,7 +659,6 @@ class NifiRestClientTest {
 
   @Test
   void deleteWaitsForProcessGroupToStopBeforeDeleting() throws Exception {
-    stubAuth();
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/root"))
             .willReturn(json("{ \"id\": \"root-1\" }")));

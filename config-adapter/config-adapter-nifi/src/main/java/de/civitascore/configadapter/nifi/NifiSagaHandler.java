@@ -19,6 +19,8 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.dataset.Datasource;
+import de.civitascore.configadapter.nifi.auth.NifiTokenProvider;
+import de.civitascore.configadapter.nifi.auth.OidcClientCredentialsTokenProvider;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner;
 import de.civitascore.configadapter.nifi.flow.JdbcSqlSourceProbe;
@@ -104,6 +106,8 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   private StageRegistry stages;
   private FlowDeploymentPlanner planner;
   private NifiRestClient nifiClient;
+  // Dedicated (cert-validating) client for the Keycloak token endpoint; see oidcTokenProvider().
+  private Client oidcClient;
 
   /** No-arg constructor for ServiceLoader discovery. Call {@link #initialize} before use. */
   public NifiSagaHandler() {
@@ -125,8 +129,6 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
               + " set it to false in non-dev environments");
     }
     String url = getProperty("url", "https://localhost:8443");
-    String username = getProperty("username", "admin");
-    String password = getProperty("password", "");
 
     byte[] stretchedKey = loadStretchedKey();
     if (stretchedKey.length == 0) {
@@ -156,9 +158,40 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     if (this.nifiClient == null) {
       Client jaxrs = client() != null ? client() : createClient();
       setClient(jaxrs);
-      this.nifiClient = new NifiRestClient(url, username, password, jaxrs);
+      this.nifiClient = new NifiRestClient(url, oidcTokenProvider(), jaxrs);
     }
     log.info("NifiSagaHandler initialized for: {}", Encode.forJava(url));
+  }
+
+  /**
+   * Builds the OIDC token provider the NiFi client authenticates with. NiFi 2.x validates these
+   * client-credentials tokens against the configured OpenID Connect provider (Keycloak), replacing
+   * the former single-user login.
+   *
+   * <p>It gets its OWN JAX-RS client, deliberately NOT the NiFi client: disabling TLS verification
+   * for a self-signed dev NiFi ({@code nifi.tls.insecure=true}) must never also disable it for the
+   * Keycloak token endpoint, or the client secret could be posted over an unverified connection.
+   */
+  private NifiTokenProvider oidcTokenProvider() {
+    String tokenUri =
+        getProperty(
+            "oidc.token-uri",
+            "http://localhost:8080/realms/civitas-core/protocol/openid-connect/token");
+    String clientId = getProperty("oidc.client-id", "nifi");
+    String clientSecret = getProperty("oidc.client-secret", "");
+    String scope = getProperty("oidc.scope", null);
+    if (clientSecret.isBlank()) {
+      log.warn(
+          "nifi.oidc.client-secret is not set — NiFi authentication will fail until"
+              + " NIFI_OIDC_CLIENT_SECRET is provided");
+    }
+    this.oidcClient =
+        ClientBuilder.newBuilder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .build();
+    return new OidcClientCredentialsTokenProvider(
+        tokenUri, clientId, clientSecret, scope, oidcClient);
   }
 
   private byte[] loadStretchedKey() {
@@ -581,6 +614,9 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   public void close() {
     if (credentialResolver != null) {
       credentialResolver.close();
+    }
+    if (oidcClient != null) {
+      oidcClient.close();
     }
     super.close();
   }

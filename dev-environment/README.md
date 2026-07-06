@@ -224,7 +224,7 @@ cd apisix    && docker compose up -d
 | FROST Server     | http://localhost:8085/FROST-Server/v1.1         | |
 | GeoServer Admin  | http://localhost:8082/geoserver/web             | admin / see geoserver/.env |
 | GeoServer OWS    | http://localhost:9080/geoserver/{workspace}/ows | via APISIX |
-| Apache NiFi      | https://localhost:8443/nifi                     | admin / see nifi/.env |
+| Apache NiFi      | https://localhost:8443/nifi                     | OIDC via Keycloak (no single-user login) |
 
 ---
 

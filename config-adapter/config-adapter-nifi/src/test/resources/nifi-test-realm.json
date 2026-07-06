@@ -1,0 +1,41 @@
+{
+  "realm": "nifi-test",
+  "enabled": true,
+  "sslRequired": "none",
+  "accessTokenLifespan": 300,
+  "users": [
+    {
+      "id": "a11ce55a-0000-4000-8000-000000000001",
+      "username": "service-account-nifi",
+      "enabled": true,
+      "serviceAccountClientId": "nifi"
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "nifi",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "secret": "nifi-test-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "fullScopeAllowed": true,
+      "protocolMappers": [
+        {
+          "name": "nifi-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "nifi",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ]
+}

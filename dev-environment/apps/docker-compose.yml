@@ -63,8 +63,10 @@ services:
       FROST_API_KEY_HEADER: X-API-Key
       FROST_TOPICS: de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
       NIFI_URL: https://civitas-nifi:8443
-      NIFI_USERNAME: admin
-      NIFI_PASSWORD: nifi-dev-password-1234567890
+      # config-adapter authenticates to NiFi via the OIDC client-credentials grant (Keycloak).
+      NIFI_OIDC_TOKEN_URI: http://civitas-keycloak:8080/realms/civitas-core/protocol/openid-connect/token
+      NIFI_OIDC_CLIENT_ID: nifi
+      NIFI_OIDC_CLIENT_SECRET: ${NIFI_OIDC_CLIENT_SECRET:-nifi-dev-secret}
       NIFI_TLS_INSECURE: "true"
       NIFI_FROST_URL: http://civitas-frost:8080/FROST-Server/v1.1
       # PostGIS sink connection (read by bindPlatformDbcp); points at the same DB GeoServer/PostGIS use

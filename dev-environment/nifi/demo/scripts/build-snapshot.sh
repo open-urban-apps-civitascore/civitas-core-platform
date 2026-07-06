@@ -12,13 +12,17 @@
 set -euo pipefail
 
 BASE="${NIFI_BASE:-https://localhost:8443}"
-USER="${NIFI_USER:-admin}"
-PASS="${NIFI_PASS:-nifi-dev-password-1234567890}"
+# NiFi is secured with OIDC; obtain a token from Keycloak via the client-credentials grant.
+KEYCLOAK_TOKEN_URL="${KEYCLOAK_TOKEN_URL:-http://localhost:8080/realms/civitas-core/protocol/openid-connect/token}"
+CLIENT_ID="${NIFI_CLIENT_ID:-nifi}"
+CLIENT_SECRET="${NIFI_CLIENT_SECRET:-nifi-dev-secret}"
 ROOT="${NIFI_ROOT_PG:-4651c93d-019e-1000-3a1c-6a2d5a2dfea0}"
 SNAPSHOT_OUT="${1:-/tmp/nifi-scaffold/snapshot.json}"
 CLIENT="build-flow-$$"
 
-TOKEN=$(curl -sk -X POST "$BASE/nifi-api/access/token" -d "username=$USER&password=$PASS")
+TOKEN=$(curl -s -X POST "$KEYCLOAK_TOKEN_URL" \
+  -d "grant_type=client_credentials" -d "client_id=$CLIENT_ID" -d "client_secret=$CLIENT_SECRET" \
+  | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
 H=(-H "Authorization: Bearer $TOKEN")
 
 # call URL METHOD BODY  → echoes body on success, exits if non-2xx

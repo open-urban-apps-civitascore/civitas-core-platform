@@ -252,7 +252,8 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         thing.path("description").asText(),
         "EL in a const value must stay literal (\\$ escaped as \\$\\$)");
     assertFalse(
-        thing.toString().contains(PASSWORD), "the NiFi admin password must never leak into FROST");
+        thing.toString().contains(OIDC_CLIENT_SECRET),
+        "the NiFi OIDC client secret must never leak into FROST");
 
     JsonNode observation = observations(dsMapId).get(0);
     assertTrue(observation.path("result").isNumber(), "toFloat result must serialize unquoted");

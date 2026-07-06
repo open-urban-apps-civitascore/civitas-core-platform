@@ -12,23 +12,25 @@ package de.civitascore.configadapter.nifi.rest;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.nifi.auth.NifiTokenProvider;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.client.Invocation;
 import jakarta.ws.rs.client.WebTarget;
-import jakarta.ws.rs.core.Form;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -56,18 +58,16 @@ public class NifiRestClient implements AutoCloseable {
   private static final long POLL_INTERVAL_MS = 1000L;
 
   private final String baseUrl;
-  private final String username;
-  private final String password;
+  private final NifiTokenProvider tokenProvider;
   private final Client client;
   private final ObjectMapper mapper = new ObjectMapper();
 
   /**
-   * The bearer token, refreshed in place on a 401. This single shared field is safe for the
-   * single-instance/concurrent-deploy contract ONLY because every deploy authenticates with the
-   * same configured credential: a concurrent refresh can at worst replace the token with an
-   * equivalent one. {@code volatile} guarantees visibility of that replacement across threads. If
-   * per-tenant or rotating credentials are ever introduced, this must become a guarded/atomic
-   * refresh.
+   * The bearer token most recently obtained from {@link #tokenProvider}, refreshed in place on a
+   * 401. This single shared field is safe for the single-instance/concurrent-deploy contract because
+   * every token is a valid credential for the same OIDC service-account identity: a concurrent
+   * refresh can at worst replace it with another equally-valid token (a fresh JWT, not necessarily
+   * byte-identical). {@code volatile} guarantees visibility of that replacement across threads.
    */
   private volatile String token;
 
@@ -75,14 +75,12 @@ public class NifiRestClient implements AutoCloseable {
    * Creates a client.
    *
    * @param baseUrl the NiFi base URL (e.g. {@code https://nifi:8443})
-   * @param username the single-user username
-   * @param password the single-user password
+   * @param tokenProvider supplies (and refreshes) the OIDC bearer token sent to NiFi
    * @param client the JAX-RS client to use
    */
-  public NifiRestClient(String baseUrl, String username, String password, Client client) {
+  public NifiRestClient(String baseUrl, NifiTokenProvider tokenProvider, Client client) {
     this.baseUrl = baseUrl;
-    this.username = username;
-    this.password = password;
+    this.tokenProvider = tokenProvider;
     this.client = client;
   }
 
@@ -171,20 +169,168 @@ public class NifiRestClient implements AutoCloseable {
   // ─── Individual steps ──────────────────────────────────────────────────────
 
   String authenticate() throws FatalAdapterException, RetryableAdapterException {
-    Form form = new Form().param("username", username).param("password", password);
+    this.token = tokenProvider.getToken();
+    return token;
+  }
+
+  /**
+   * Returns the root process-group id, self-healing the one authorization gap that a fresh
+   * OIDC-secured NiFi always has. NiFi's initial-admin seeding grants the config-adapter service
+   * account the global policies (/flow, /controller, /policies, /tenants) but NOT read/write on the
+   * root canvas, so the very first read returns 403. On that 403 we grant the missing root policies
+   * — using the global rights the account already holds — and return the id resolved while doing so.
+   * On a NiFi that already has the policies (persistent state, later deploys) the first read succeeds
+   * and nothing is provisioned.
+   */
+  String getRootProcessGroupId() throws FatalAdapterException, RetryableAdapterException {
     try (Response response =
-        target(API + "/access/token").request(MediaType.TEXT_PLAIN).post(Entity.form(form))) {
-      check(response, "authenticate");
-      this.token = response.readEntity(String.class);
-      return token;
+        sendAuthorized(() -> authorized(target(API + "/process-groups/root")).get())) {
+      if (response.getStatus() != 403) {
+        check(response, "root process group");
+        return requireId(
+            readTree(response, "root process group").path("id").asText(), "root process group");
+      }
     } catch (ProcessingException e) {
-      throw network("authenticate", e);
+      throw network("root process group", e);
+    }
+    LOG.info("NiFi denied root process-group access (403) — provisioning service-account policies");
+    return ensureRootAccess();
+  }
+
+  /**
+   * Grants the authenticated service account read+write on the root process group and its data, and
+   * returns the root process-group id. Mirrors the one-time canvas grant an operator would otherwise
+   * perform by hand. Idempotent: re-running against a NiFi that already has the policies re-adds an
+   * already-present user. {@code synchronized} so concurrent deploys hitting the initial 403
+   * provision once, not in a race. A failure to provision (e.g. the account lacks the global
+   * /policies right) propagates from {@link #grantUserPolicy}.
+   */
+  private synchronized String ensureRootAccess()
+      throws FatalAdapterException, RetryableAdapterException {
+    String userId = currentUserId();
+    String rootId = flowRootProcessGroupId();
+    for (String resource : List.of("/process-groups/" + rootId, "/data/process-groups/" + rootId)) {
+      for (String action : List.of("read", "write")) {
+        LOG.debug("Granting {} on {} to the config-adapter service account", action, resource);
+        grantUserPolicy(userId, resource, action);
+      }
+    }
+    LOG.info("Ensured NiFi root process-group access for the config-adapter service account");
+    return rootId;
+  }
+
+  /** Resolves the NiFi user id of the currently-authenticated identity. */
+  private String currentUserId() throws FatalAdapterException, RetryableAdapterException {
+    String identity = getJson(API + "/flow/current-user", "current user").path("identity").asText();
+    if (identity.isBlank()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_AUTH_ERROR,
+          "NiFi returned no identity for the current token — check the OIDC token's claims");
+    }
+    for (JsonNode user : getJson(API + "/tenants/users", "list users").path("users")) {
+      if (identity.equals(user.path("component").path("identity").asText())) {
+        return requireId(user.path("id").asText(), "current user");
+      }
+    }
+    throw new FatalAdapterException(
+        AdapterErrorCode.NIFI_AUTH_ERROR,
+        "authenticated identity '"
+            + identity
+            + "' has no NiFi user — is INITIAL_ADMIN_IDENTITY set to this service account?");
+  }
+
+  /** The root process-group id, read via the /flow endpoint (needs only the global /flow policy). */
+  private String flowRootProcessGroupId()
+      throws FatalAdapterException, RetryableAdapterException {
+    JsonNode body = getJson(API + "/flow/process-groups/root", "root process group (flow)");
+    return requireId(
+        body.path("processGroupFlow").path("id").asText(), "root process group (flow)");
+  }
+
+  /** Ensures the given user has an access policy for {@code action} on {@code resource}. */
+  private void grantUserPolicy(String userId, String resource, String action)
+      throws FatalAdapterException, RetryableAdapterException {
+    Optional<JsonNode> existing = getPolicy(action, resource);
+    if (existing.isPresent()) {
+      addUserToPolicy(existing.get(), userId);
+    } else {
+      createPolicyWithUser(resource, action, userId);
     }
   }
 
-  String getRootProcessGroupId() throws FatalAdapterException, RetryableAdapterException {
-    JsonNode body = getJson(API + "/process-groups/root", "root process group");
-    return requireId(body.path("id").asText(), "root process group");
+  /** Returns the access policy for {@code action}/{@code resource}, or empty if none exists yet. */
+  private Optional<JsonNode> getPolicy(String action, String resource)
+      throws FatalAdapterException, RetryableAdapterException {
+    try (Response response =
+        sendAuthorized(() -> authorized(target(API + "/policies/" + action + resource)).get())) {
+      if (response.getStatus() == 404) {
+        return Optional.empty();
+      }
+      check(response, "read access policy");
+      return Optional.of(readTree(response, "read access policy"));
+    } catch (ProcessingException e) {
+      throw network("read access policy", e);
+    }
+  }
+
+  /**
+   * Adds the user to an existing policy (no-op if already present). PUT replaces the whole policy
+   * component, so BOTH the existing users AND user groups are carried over verbatim — otherwise
+   * adding the service-account user would silently drop an admin group already granted on the root
+   * canvas.
+   */
+  private void addUserToPolicy(JsonNode policy, String userId)
+      throws FatalAdapterException, RetryableAdapterException {
+    JsonNode component = policy.path("component");
+    ArrayNode users = mapper.createArrayNode();
+    boolean present = false;
+    for (JsonNode user : component.path("users")) {
+      String id = user.path("id").asText();
+      users.add(mapper.createObjectNode().put("id", id));
+      present |= userId.equals(id);
+    }
+    if (present) {
+      return;
+    }
+    users.add(mapper.createObjectNode().put("id", userId));
+    String policyId = requireId(policy.path("id").asText(), "access policy");
+    ObjectNode body = mapper.createObjectNode();
+    ObjectNode revision = body.putObject("revision");
+    revision.put("version", requireRevisionVersion(policy, "access policy"));
+    revision.put("clientId", CLIENT_ID);
+    ObjectNode newComponent = body.putObject("component");
+    newComponent.put("id", policyId);
+    newComponent.put("resource", component.path("resource").asText());
+    newComponent.put("action", component.path("action").asText());
+    newComponent.set("users", users);
+    // Preserve any group grants unchanged — we only add a user, never touch groups.
+    JsonNode userGroups = component.path("userGroups");
+    if (userGroups.isArray()) {
+      newComponent.set("userGroups", userGroups.deepCopy());
+    }
+    put(API + "/policies/" + policyId, body, "add user to access policy");
+  }
+
+  /** Creates a new access policy granting the given user {@code action} on {@code resource}. */
+  private void createPolicyWithUser(String resource, String action, String userId)
+      throws FatalAdapterException, RetryableAdapterException {
+    ObjectNode body = mapper.createObjectNode();
+    ObjectNode revision = body.putObject("revision");
+    revision.put("version", 0);
+    revision.put("clientId", CLIENT_ID);
+    ObjectNode component = body.putObject("component");
+    component.put("resource", resource);
+    component.put("action", action);
+    component.putArray("users").add(mapper.createObjectNode().put("id", userId));
+    try (Response response =
+        sendAuthorized(
+            () ->
+                authorized(target(API + "/policies"))
+                    .post(Entity.entity(body.toString(), MediaType.APPLICATION_JSON)))) {
+      check(response, "create access policy");
+    } catch (ProcessingException e) {
+      throw network("create access policy", e);
+    }
   }
 
   Optional<ProcessGroupRef> findProcessGroupByName(String rootId, String name)
@@ -638,9 +784,21 @@ public class NifiRestClient implements AutoCloseable {
       throws FatalAdapterException, RetryableAdapterException {
     try (Response response = sendAuthorized(() -> authorized(target(path)).get())) {
       check(response, description);
-      return mapper.readTree(response.readEntity(String.class));
+      return readTree(response, description);
     } catch (ProcessingException e) {
       throw network(description, e);
+    }
+  }
+
+  /**
+   * Parses a JSON response body, mapping malformed JSON to a fatal error. An empty body yields an
+   * empty object (not {@code null}), so callers' {@code path(...)} chains degrade to a clean
+   * "returned no id" error instead of a {@link NullPointerException}.
+   */
+  private JsonNode readTree(Response response, String description) throws FatalAdapterException {
+    try {
+      JsonNode node = mapper.readTree(response.readEntity(String.class));
+      return node == null ? mapper.createObjectNode() : node;
     } catch (JsonProcessingException e) {
       throw new FatalAdapterException(AdapterErrorCode.NIFI_FLOW_ERROR, e, description);
     }
@@ -661,24 +819,29 @@ public class NifiRestClient implements AutoCloseable {
 
   /**
    * Executes an authorized request and, if NiFi answers 401 (the bearer token expired mid-saga),
-   * re-authenticates once and replays it — the replayed request rebuilds the {@code Authorization}
-   * header from the refreshed {@link #token}.
+   * refreshes the token once and replays it — the replayed request rebuilds the {@code
+   * Authorization} header from the refreshed {@link #token}.
    */
   private Response sendAuthorized(Supplier<Response> request)
       throws FatalAdapterException, RetryableAdapterException {
     Response response = request.get();
     if (response.getStatus() == 401) {
       response.close();
-      LOG.info("NiFi returned 401 — re-authenticating and retrying once");
-      authenticate();
+      LOG.info("NiFi returned 401 — refreshing token and retrying once");
+      this.token = tokenProvider.refreshToken();
       response = request.get();
       if (response.getStatus() == 401) {
         response.close();
-        // Re-authentication did not clear the 401 (e.g. NiFi restarting, credentials momentarily
-        // rejected). That is a transient condition — surface it as retryable so the saga layer can
-        // back off and redeliver, rather than letting check() map the 4xx to a fatal DLQ error.
+        // A freshly-refreshed Keycloak token is still rejected. This is transient while NiFi's OIDC
+        // filter is still initialising at boot (kept retryable so a redelivery succeeds), but if it
+        // persists it is an OIDC misconfiguration NiFi cannot accept — NIFI_SECURITY_USER_OIDC
+        // audience/issuer not matching the token, or a revoked client. The message names that so a
+        // looping deploy is diagnosable rather than an opaque "HTTP 401".
         throw new RetryableAdapterException(
-            AdapterErrorCode.NIFI_ERROR, "re-authentication did not clear HTTP 401");
+            AdapterErrorCode.NIFI_ERROR,
+            "NiFi rejected a freshly-refreshed OIDC token (HTTP 401) — transient during NiFi's OIDC"
+                + " startup; if persistent, check NiFi's oidc audience/issuer match the Keycloak"
+                + " token and the client is not revoked");
       }
     }
     return response;
@@ -699,11 +862,11 @@ public class NifiRestClient implements AutoCloseable {
       return;
     }
     String body = safeBody(response);
-    // 5xx is transient; so are 409 (a component still starting, or a concurrent edit that moved the
-    // optimistic-lock revision) and 429 (rate limited). These are retryable — a permanent
-    // FatalAdapterException here would abort and roll back a deploy that a redelivery could
-    // complete.
-    if (status >= 500 || status == 409 || status == 429) {
+    // 5xx is transient; so are 408 (request timeout), 409 (a component still starting, or a
+    // concurrent edit that moved the optimistic-lock revision) and 429 (rate limited). These are
+    // retryable — a permanent FatalAdapterException here would abort and roll back a deploy that a
+    // redelivery could complete.
+    if (status >= 500 || status == 408 || status == 409 || status == 429) {
       throw new RetryableAdapterException(
           AdapterErrorCode.NIFI_ERROR, description + ": HTTP " + status + " — " + body);
     }

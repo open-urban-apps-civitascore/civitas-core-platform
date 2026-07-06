@@ -291,10 +291,9 @@ public final class SqlSourceStage implements SourceStage {
    * Rejects a NiFi Expression Language reference ({@code ${...}}) in a value bound verbatim into a
    * QueryDatabaseTableRecord property. Those properties evaluate EL in the environment scope, so a
    * tenant-supplied {@code table}/{@code columns}/{@code where} carrying {@code
-   * ${SINGLE_USER_CREDENTIALS_PASSWORD}} would have the config-adapter's own NiFi admin password
-   * expanded and sent in the SQL to the tenant's source DB — an environment-variable exfiltration
-   * path. {@code $$} is EL's own literal escape for a {@code $}, so it is not a reference and is
-   * allowed through.
+   * ${NIFI_SECURITY_USER_OIDC_CLIENT_SECRET}} would have NiFi's own OIDC client secret expanded and
+   * sent in the SQL to the tenant's source DB — an environment-variable exfiltration path. {@code
+   * $$} is EL's own literal escape for a {@code $}, so it is not a reference and is allowed through.
    */
   private static void rejectExpressionLanguage(String field, String value)
       throws FatalAdapterException {

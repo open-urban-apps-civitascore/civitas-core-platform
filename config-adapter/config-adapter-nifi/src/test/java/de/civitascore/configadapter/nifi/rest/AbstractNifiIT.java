@@ -13,36 +13,147 @@ import static org.awaitility.Awaitility.await;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.civitascore.configadapter.nifi.auth.OidcClientCredentialsTokenProvider;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.FixedHostPortGenericContainer;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.utility.MountableFile;
 
 /**
  * Shared Testcontainers scaffolding for the real-NiFi integration tests: brings up an Apache NiFi
- * 2.9.0 single-user container, a trust-all JAX-RS {@link Client} and a {@link NifiRestClient}
- * authenticated against it. Subclasses provide their own {@code @BeforeAll}/{@code @AfterAll} —
- * they start any IT-specific containers first, then call {@link #startNifi(int, Network)} (so NiFi
- * can join a shared network the sibling containers already sit on), and mirror the teardown with
- * {@link #stopNifi()}.
+ * 2.9.0 container secured with OpenID Connect, a trust-all JAX-RS {@link Client} and a {@link
+ * NifiRestClient} that authenticates via the OIDC client-credentials grant. A single Keycloak
+ * container (started once per JVM) issues the tokens; NiFi validates them against that same
+ * provider. Subclasses provide their own {@code @BeforeAll}/{@code @AfterAll} — they start any
+ * IT-specific containers first, then call {@link #startNifi(int, Network)} (so NiFi can join a
+ * shared network the sibling containers already sit on), and mirror the teardown with {@link
+ * #stopNifi()}.
+ *
+ * <p>Keycloak is reached through {@code host.docker.internal} from BOTH the test JVM (via the fixed
+ * published port) and the NiFi container (via the host gateway), so the token issuer string is
+ * identical on both sides — a mismatch there would make NiFi reject every token.
  *
  * <p>Deliberately a plain JUnit 5 + Testcontainers base with no Spring annotations — these ITs run
  * a real NiFi via failsafe, not a Spring context.
  */
 abstract class AbstractNifiIT {
 
-  protected static final String USER = "admin";
-  protected static final String PASSWORD = "ctsNiFiTestPassword123";
+  private static final String REALM = "nifi-test";
+  protected static final String OIDC_CLIENT_ID = "nifi";
+  protected static final String OIDC_CLIENT_SECRET = "nifi-test-secret";
+  // NiFi maps a bearer (client-credentials) token to its 'sub' claim — the service account's Keycloak
+  // user id, pinned in nifi-test-realm.json so it is a known value here. This is NiFi's initial
+  // admin; the config-adapter then self-provisions its own root-canvas policies on first deploy.
+  protected static final String OIDC_ADMIN_IDENTITY = "a11ce55a-0000-4000-8000-000000000001";
+  // Fixed so the issuer URL is known before NiFi starts and is byte-for-byte identical on host and
+  // container side (see class javadoc). host.docker.internal resolves on the host and, with the
+  // host-gateway extra host, inside the NiFi container.
+  private static final int KEYCLOAK_PORT = 8098;
+  // The token issuer, pinned via Keycloak's KC_HOSTNAME so it is identical no matter which host the
+  // token is fetched from. NiFi (in a container) reaches Keycloak here via the host gateway.
+  private static final String ISSUER_HOST = "host.docker.internal:" + KEYCLOAK_PORT;
+  private static final String DISCOVERY_URL =
+      "http://" + ISSUER_HOST + "/realms/" + REALM + "/.well-known/openid-configuration";
+
+  // secure.sh (AUTH=oidc) requires an explicit TLS keystore/truststore — unlike single-user mode it
+  // does not auto-generate one. A throwaway self-signed pair is generated once per JVM and copied
+  // into each NiFi container. The client trusts all certs, so the cert's identity is irrelevant.
+  private static final String KEYSTORE_PASSWORD = "changeit";
+  private static Path certsDir;
+
+  @SuppressWarnings("resource")
+  private static final GenericContainer<?> KEYCLOAK;
+
+  /** Whether the shared Keycloak + keystores came up; ITs {@code assumeTrue} on this to skip. */
+  private static boolean infraReady;
+
+  static {
+    KEYCLOAK =
+        new FixedHostPortGenericContainer<>("quay.io/keycloak/keycloak:26.0")
+            .withFixedExposedPort(KEYCLOAK_PORT, 8080)
+            .withExposedPorts(8080)
+            .withEnv("KEYCLOAK_ADMIN", "admin")
+            .withEnv("KEYCLOAK_ADMIN_PASSWORD", "admin")
+            .withEnv("KC_HTTP_ENABLED", "true")
+            .withEnv("KC_HOSTNAME_STRICT", "false")
+            // Pin the issuer to the exact host:port both sides use, regardless of request host.
+            .withEnv("KC_HOSTNAME", "http://" + ISSUER_HOST)
+            .withCopyToContainer(
+                MountableFile.forClasspathResource("nifi-test-realm.json"),
+                "/opt/keycloak/data/import/nifi-test-realm.json")
+            .withCommand("start-dev", "--import-realm")
+            .waitingFor(
+                Wait.forHttp("/realms/" + REALM + "/.well-known/openid-configuration")
+                    .forPort(8080)
+                    .forStatusCode(200)
+                    .withStartupTimeout(Duration.ofMinutes(3)));
+    if (DockerClientFactory.instance().isDockerAvailable()) {
+      try {
+        KEYCLOAK.start();
+        Runtime.getRuntime().addShutdownHook(new Thread(KEYCLOAK::stop));
+        certsDir = generateKeystores();
+        infraReady = true;
+      } catch (RuntimeException e) {
+        // e.g. the fixed Keycloak port (8098) is already in use. Fail soft so these ITs skip
+        // cleanly via assumeTrue(dockerAvailable()) instead of aborting class initialization with
+        // an ExceptionInInitializerError that fails every test in the class.
+        infraReady = false;
+      }
+    }
+  }
+
+  /** Generates a self-signed PKCS12 keystore + matching truststore for NiFi's HTTPS connector. */
+  private static Path generateKeystores() {
+    try {
+      Path dir = Files.createTempDirectory("nifi-oidc-certs");
+      Path keystore = dir.resolve("keystore.p12");
+      Path truststore = dir.resolve("truststore.p12");
+      Path cert = dir.resolve("nifi.crt");
+      String keytool = System.getProperty("java.home") + "/bin/keytool";
+      runKeytool(
+          keytool, "-genkeypair", "-alias", "nifi", "-keyalg", "RSA", "-keysize", "2048",
+          "-validity", "3650", "-dname", "CN=nifi", "-storetype", "PKCS12",
+          "-keystore", keystore.toString(), "-storepass", KEYSTORE_PASSWORD,
+          "-keypass", KEYSTORE_PASSWORD, "-ext", "SAN=dns:localhost,dns:host.docker.internal");
+      runKeytool(
+          keytool, "-exportcert", "-alias", "nifi", "-keystore", keystore.toString(),
+          "-storepass", KEYSTORE_PASSWORD, "-rfc", "-file", cert.toString());
+      runKeytool(
+          keytool, "-importcert", "-alias", "nifi", "-keystore", truststore.toString(),
+          "-storetype", "PKCS12", "-storepass", KEYSTORE_PASSWORD, "-noprompt",
+          "-file", cert.toString());
+      return dir;
+    } catch (Exception e) {
+      throw new IllegalStateException("failed to generate NiFi OIDC keystores", e);
+    }
+  }
+
+  private static void runKeytool(String... cmd) throws Exception {
+    Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
+    if (!process.waitFor(60, TimeUnit.SECONDS)) {
+      process.destroyForcibly();
+      throw new IllegalStateException("keytool timed out");
+    }
+    if (process.exitValue() != 0) {
+      throw new IllegalStateException(
+          "keytool failed: " + new String(process.getInputStream().readAllBytes()));
+    }
+  }
 
   protected static FixedHostPortGenericContainer<?> nifi;
   protected static Client httpClient;
@@ -56,9 +167,13 @@ abstract class AbstractNifiIT {
 
   protected final ObjectMapper mapper = new ObjectMapper();
 
-  /** Whether a Docker daemon is available; ITs {@code assumeTrue} on this to skip without it. */
+  /**
+   * Whether these ITs can run: a Docker daemon is available AND the shared Keycloak + keystores
+   * started. ITs {@code assumeTrue} on this so a missing daemon or an occupied fixed port skips them
+   * cleanly rather than erroring.
+   */
   protected static boolean dockerAvailable() {
-    return DockerClientFactory.instance().isDockerAvailable();
+    return DockerClientFactory.instance().isDockerAvailable() && infraReady;
   }
 
   /** Starts a standalone NiFi (no shared network, no extra container customization). */
@@ -90,10 +205,34 @@ abstract class AbstractNifiIT {
     nifi =
         new FixedHostPortGenericContainer<>("apache/nifi:2.9.0")
             .withFixedExposedPort(hostPort, 8443)
-            .withEnv("SINGLE_USER_CREDENTIALS_USERNAME", USER)
-            .withEnv("SINGLE_USER_CREDENTIALS_PASSWORD", PASSWORD)
+            // Secure NiFi with OpenID Connect against the shared Keycloak; the config-adapter
+            // authenticates as the 'nifi' service account (client-credentials grant).
+            .withEnv("AUTH", "oidc")
             .withEnv("NIFI_WEB_HTTPS_PORT", "8443")
             .withEnv("NIFI_WEB_PROXY_HOST", dockerHost + ":" + hostPort + ",localhost:" + hostPort)
+            .withEnv("NIFI_SECURITY_USER_OIDC_DISCOVERY_URL", DISCOVERY_URL)
+            .withEnv("NIFI_SECURITY_USER_OIDC_CLIENT_ID", OIDC_CLIENT_ID)
+            .withEnv("NIFI_SECURITY_USER_OIDC_CLIENT_SECRET", OIDC_CLIENT_SECRET)
+            // NiFi identifies a bearer token by its 'sub' claim, so the initial admin must be the
+            // service account's Keycloak user id, not its username (claim.identifying.user only
+            // affects the unused browser-login flow).
+            .withEnv("INITIAL_ADMIN_IDENTITY", OIDC_ADMIN_IDENTITY)
+            // Let NiFi resolve host.docker.internal (Keycloak's issuer host) via the host gateway.
+            .withExtraHost("host.docker.internal", "host-gateway")
+            // AUTH=oidc requires an explicit keystore/truststore (no auto-generation).
+            .withCopyFileToContainer(
+                MountableFile.forHostPath(certsDir.resolve("keystore.p12")),
+                "/opt/certs/keystore.p12")
+            .withCopyFileToContainer(
+                MountableFile.forHostPath(certsDir.resolve("truststore.p12")),
+                "/opt/certs/truststore.p12")
+            .withEnv("KEYSTORE_PATH", "/opt/certs/keystore.p12")
+            .withEnv("KEYSTORE_TYPE", "PKCS12")
+            .withEnv("KEYSTORE_PASSWORD", KEYSTORE_PASSWORD)
+            .withEnv("KEY_PASSWORD", KEYSTORE_PASSWORD)
+            .withEnv("TRUSTSTORE_PATH", "/opt/certs/truststore.p12")
+            .withEnv("TRUSTSTORE_TYPE", "PKCS12")
+            .withEnv("TRUSTSTORE_PASSWORD", KEYSTORE_PASSWORD)
             .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(5)));
     if (network != null) {
       nifi.withNetwork(network);
@@ -106,10 +245,22 @@ abstract class AbstractNifiIT {
             .sslContext(trustAll())
             .hostnameVerifier((host, session) -> true)
             .build();
+    // The config-adapter runs on the host, so it fetches tokens from Keycloak's published port on
+    // the Docker host — NOT via host.docker.internal (that gateway address is for containers and is
+    // not reachable back from the host). Keycloak's pinned KC_HOSTNAME still stamps the issuer as
+    // host.docker.internal:PORT, so NiFi accepts the token regardless.
+    String tokenUri =
+        "http://" + dockerHost + ":" + KEYCLOAK_PORT + "/realms/" + REALM
+            + "/protocol/openid-connect/token";
     client =
-        new NifiRestClient("https://" + dockerHost + ":" + hostPort, USER, PASSWORD, httpClient);
+        new NifiRestClient(
+            "https://" + dockerHost + ":" + hostPort,
+            new OidcClientCredentialsTokenProvider(
+                tokenUri, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, null, httpClient),
+            httpClient);
 
-    // NiFi keeps initialising after the port opens; poll the REST API until it authenticates.
+    // NiFi keeps initialising after the port opens; poll the REST API (with a real, token-backed
+    // request) until it both accepts the OIDC token and has materialised the root process group.
     await()
         .atMost(Duration.ofMinutes(3))
         .pollInterval(Duration.ofSeconds(5))
@@ -117,6 +268,7 @@ abstract class AbstractNifiIT {
         .until(
             () -> {
               client.authenticate();
+              client.getRootProcessGroupId();
               return true;
             });
   }

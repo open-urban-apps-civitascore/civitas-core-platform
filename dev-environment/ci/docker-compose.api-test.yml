@@ -104,7 +104,17 @@ services:
         aliases:
           - civitas-keycloak
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      # Not just a TCP probe: require the civitas-core realm's discovery endpoint to return 200, so
+      # 'depends_on: service_healthy' means the realm import has finished. Otherwise NiFi (which
+      # fetches OIDC discovery at boot) can start against a not-yet-imported realm and 404. Uses only
+      # shell builtins (/dev/tcp, read, case) — the Keycloak image has no curl/wget.
+      test:
+        - "CMD-SHELL"
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/8080 || exit 1
+          printf 'GET /realms/civitas-core/.well-known/openid-configuration HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3
+          read -r status <&3
+          case "$status" in *" 200"*) exit 0 ;; *) exit 1 ;; esac
       interval: 10s
       timeout: 5s
       retries: 30
@@ -308,25 +318,55 @@ services:
           && curl -fsSL -o /opt/nifi/drivers/postgresql.jar \
                https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar \
           && chown -R nifi:nifi /opt/nifi/drivers
+        # AUTH=oidc needs an explicit keystore/truststore (single-user's auto-generation is gone).
+        # Bake a throwaway self-signed pair; the config-adapter trusts all certs (NIFI_TLS_INSECURE).
+        RUN mkdir -p /opt/nifi/certs \
+          && keytool -genkeypair -alias nifi -keyalg RSA -keysize 2048 -validity 3650 \
+               -dname CN=nifi -storetype PKCS12 -keystore /opt/nifi/certs/keystore.p12 \
+               -storepass changeit -keypass changeit -ext SAN=dns:nifi,dns:localhost \
+          && keytool -exportcert -alias nifi -keystore /opt/nifi/certs/keystore.p12 \
+               -storepass changeit -rfc -file /opt/nifi/certs/nifi.crt \
+          && keytool -importcert -alias nifi -keystore /opt/nifi/certs/truststore.p12 \
+               -storetype PKCS12 -storepass changeit -noprompt -file /opt/nifi/certs/nifi.crt \
+          && chown -R nifi:nifi /opt/nifi/certs
         USER nifi
     env_file:
      - ../nifi/.env.example
+    depends_on:
+      keycloak:
+        condition: service_healthy
     environment:
+      AUTH: "oidc"
       NIFI_WEB_HTTPS_PORT: "8443"
       NIFI_WEB_PROXY_HOST: "nifi:8443"
+      NIFI_SECURITY_USER_OIDC_DISCOVERY_URL: "http://keycloak:8080/realms/civitas-core/.well-known/openid-configuration"
+      NIFI_SECURITY_USER_OIDC_CLIENT_ID: "nifi"
+      NIFI_SECURITY_USER_OIDC_CLIENT_SECRET: "${NIFI_OIDC_CLIENT_SECRET:-nifi-dev-secret}"
+      # NiFi identifies a bearer token by its 'sub' claim (the service account's pinned Keycloak user
+      # id), so the initial admin is that id; the config-adapter self-provisions root policies later.
+      INITIAL_ADMIN_IDENTITY: "a11ce55a-0000-4000-8000-000000001838"
+      KEYSTORE_PATH: "/opt/nifi/certs/keystore.p12"
+      KEYSTORE_TYPE: "PKCS12"
+      KEYSTORE_PASSWORD: "changeit"
+      KEY_PASSWORD: "changeit"
+      TRUSTSTORE_PATH: "/opt/nifi/certs/truststore.p12"
+      TRUSTSTORE_TYPE: "PKCS12"
+      TRUSTSTORE_PASSWORD: "changeit"
       NIFI_JVM_HEAP_INIT: "512m"
       NIFI_JVM_HEAP_MAX: "1g"
     healthcheck:
       test:
         - "CMD-SHELL"
         - |
-          TOKEN=$$(curl -k -sf -H 'Host: nifi:8443' -X POST \
-            --data-urlencode "username=$$SINGLE_USER_CREDENTIALS_USERNAME" \
-            --data-urlencode "password=$$SINGLE_USER_CREDENTIALS_PASSWORD" \
-            https://$$HOSTNAME:8443/nifi-api/access/token) \
+          TOKEN=$$(curl -sf -X POST \
+            -d "grant_type=client_credentials" \
+            -d "client_id=nifi" \
+            -d "client_secret=$$NIFI_SECURITY_USER_OIDC_CLIENT_SECRET" \
+            http://keycloak:8080/realms/civitas-core/protocol/openid-connect/token \
+            | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p') \
           && curl -k -sf -o /dev/null -H 'Host: nifi:8443' \
             -H "Authorization: Bearer $$TOKEN" \
-            https://$$HOSTNAME:8443/nifi-api/system-diagnostics
+            https://$$HOSTNAME:8443/nifi-api/flow/current-user
       interval: 30s
       timeout: 15s
       retries: 10
@@ -514,8 +554,10 @@ services:
       FROST_API_KEY_HEADER: X-API-Key
       FROST_TOPICS: de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
       NIFI_URL: https://nifi:8443
-      NIFI_USERNAME: admin
-      NIFI_PASSWORD: nifi-dev-password-1234567890
+      # config-adapter authenticates to NiFi via the OIDC client-credentials grant (Keycloak).
+      NIFI_OIDC_TOKEN_URI: http://keycloak:8080/realms/civitas-core/protocol/openid-connect/token
+      NIFI_OIDC_CLIENT_ID: nifi
+      NIFI_OIDC_CLIENT_SECRET: ${NIFI_OIDC_CLIENT_SECRET:-nifi-dev-secret}
       NIFI_TLS_INSECURE: "true"
       # Master key for decrypting datasource credentials (e.g. a SQL source DB password). Must match
       # the portal-backend key (application-local.yaml, loaded via SPRING_PROFILES_ACTIVE=local).
