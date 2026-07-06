@@ -614,6 +614,78 @@ describe('exportToJsonSchema', () => {
     },
   )
 
+  it('maps a supported composition while ignoring an out-of-scope association in the same diagram', () => {
+    // Realistic legacy shape: TrafficSensor composes Reading (in scope) and also has a stray
+    // association to a third class (out of scope). The composition maps; the association is dropped.
+    const strayNode = {
+      id: 'node-3',
+      type: 'class' as const,
+      position: { x: 400, y: 0 },
+      data: {
+        element: {
+          id: 'elem-3',
+          name: 'Owner',
+          type: 'class' as const,
+          attributes: [{ id: 'a1', name: 'orgName', type: 'String', visibility: 'public' as const }],
+          operations: [],
+        },
+        label: 'Owner',
+      },
+    }
+    const diagram = baseDiagram({
+      nodes: [...baseDiagram().nodes, readingNode, strayNode],
+      edges: [
+        // Composition: Reading (part/source) into TrafficSensor (container/target).
+        {
+          id: 'edge-comp',
+          type: 'composition',
+          source: 'node-2',
+          target: 'node-1',
+          data: {
+            relationship: {
+              id: 'rel-comp',
+              type: 'composition',
+              source: 'elem-2',
+              target: 'elem-1',
+              sourceRole: 'reading',
+            },
+            label: '',
+            isSelected: false,
+            isDirty: false,
+          },
+        },
+        // Out-of-scope association from TrafficSensor to Owner.
+        {
+          id: 'edge-assoc',
+          type: 'association',
+          source: 'node-1',
+          target: 'node-3',
+          data: {
+            relationship: {
+              id: 'rel-assoc',
+              type: 'association',
+              source: 'elem-1',
+              target: 'elem-3',
+              targetRole: 'owner',
+            },
+            label: '',
+            isSelected: false,
+            isDirty: false,
+          },
+        },
+      ],
+    })
+
+    const schema = exportToJsonSchema(diagram)
+    const properties = classDef(schema, 'TrafficSensor').properties as Record<string, unknown>
+    expect(properties.reading).toEqual({ $ref: '#/$defs/Reading' })
+    expect(Object.keys(properties)).not.toContain('owner')
+    // All three classes still emitted; only the association contributes nothing.
+    const defs = schema.$defs as Record<string, Record<string, unknown>>
+    expect(defs.Reading).toBeDefined()
+    expect(defs.Owner).toBeDefined()
+  })
+
   const cls = (id: string, name: string, attrs: { id: string; name: string; type?: string }[]) => ({
     id: `node-${id}`,
     type: 'class' as const,

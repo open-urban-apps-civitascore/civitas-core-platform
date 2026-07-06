@@ -107,7 +107,7 @@ export const useUMLDiagramCore = (initialDiagram?: UMLDiagram): UseUMLDiagramCor
         // Create basic relationship data
         const relationshipData = {
           id: crypto.randomUUID(),
-          type: edgeType as UMLRelationshipType,
+          type: edgeType,
           source: connection.source!,
           target: connection.target!,
         }
@@ -121,7 +121,7 @@ export const useUMLDiagramCore = (initialDiagram?: UMLDiagram): UseUMLDiagramCor
 
         const newEdge: UMLEdge = {
           id: crypto.randomUUID(),
-          type: edgeType as UMLRelationshipType,
+          type: edgeType,
           source: connection.source!,
           target: connection.target!,
           data: edgeData,

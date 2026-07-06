@@ -5,8 +5,8 @@
  *
  * Only relationship types in the supported release scope contribute to the
  * schema; any other type (including legacy edges in older models) carries no
- * semantics and is silently ignored rather than invented a mapping for. The
- * scope is deliberately small and grows over time — see umlContainment.
+ * semantics and is silently ignored — no mapping is invented for it. The scope
+ * is deliberately small and grows over time — see umlContainment.
  *
  * UML -> JSON Schema mapping:
  * - Each UML class becomes an object schema.

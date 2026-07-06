@@ -82,7 +82,7 @@ export const classifyStructuralEdge = (rel: UMLRelationship): Containment | null
 
 /**
  * Ids of every element that is embedded and therefore cannot be the document root: the part side of
- * a composition/aggregation, and the parent (target) of an inheritance/realization edge.
+ * a composition, and the parent (target) of an inheritance edge.
  */
 export const collectContainedIds = (diagram: UMLDiagram): Set<string> => {
   const containedIds = new Set<string>()
@@ -98,7 +98,7 @@ export const collectContainedIds = (diagram: UMLDiagram): Set<string> => {
   return containedIds
 }
 
-/** Inheritance/realization parents of one element, in edge declaration order. */
+/** Inheritance parents of one element, in edge declaration order. */
 export const collectParentIds = (diagram: UMLDiagram, elementId: string): string[] => {
   const parents: string[] = []
   for (const edge of diagram.edges ?? []) {
