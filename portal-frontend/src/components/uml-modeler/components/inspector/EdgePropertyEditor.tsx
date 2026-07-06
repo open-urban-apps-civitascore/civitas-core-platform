@@ -2,21 +2,15 @@
 
 import { ChangeEvent, useCallback } from 'react'
 
+import { RELATIONSHIP_PALETTE_ITEMS } from '../../constants/paletteItems'
 import { MULTIPLICITY_VALUES } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
 import type { UMLEdge } from '../../types/diagram'
-import { SUPPORTED_RELATIONSHIP_TYPES, type UMLRelationshipType } from '../../types/uml'
+import type { UMLRelationshipType } from '../../types/uml'
 
-const RELATIONSHIP_TYPE_LABELS: Record<(typeof SUPPORTED_RELATIONSHIP_TYPES)[number], string> = {
-  inheritance: 'Inheritance',
-  composition: 'Composition',
-}
-
-const RELATIONSHIP_TYPE_OPTIONS = SUPPORTED_RELATIONSHIP_TYPES.map(value => ({
-  value,
-  label: RELATIONSHIP_TYPE_LABELS[value],
-}))
+// Same supported scope the palette offers, so retyping an edge can never leave it.
+const RELATIONSHIP_TYPE_OPTIONS = RELATIONSHIP_PALETTE_ITEMS.map(item => ({ value: item.type, label: item.label }))
 
 interface EdgePropertyEditorProps {
   edge: UMLEdge

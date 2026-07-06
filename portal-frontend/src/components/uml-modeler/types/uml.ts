@@ -117,7 +117,10 @@ export interface UMLEnumeration extends BaseUMLElement {
 
 export type UMLElement = UMLClass | UMLInterface | UMLAbstractClass | UMLEnumeration
 
-// Relationship types
+// Relationship types. The full historical vocabulary; the supported subset a user may actually draw
+// or pick is defined once as RELATIONSHIP_PALETTE_ITEMS / SUPPORTED_RELATIONSHIP_TYPES in
+// constants/paletteItems.ts. Out-of-scope types are not rejected — legacy models keep them — but
+// carry no semantics and are ignored on export.
 export type UMLRelationshipType =
   | 'association'
   | 'aggregation'
@@ -125,15 +128,6 @@ export type UMLRelationshipType =
   | 'inheritance'
   | 'realization'
   | 'dependency'
-
-// Relationship types the platform officially supports end-to-end (schema generation,
-// config-adapter pipeline, PostGIS derivation). The set is deliberately small and grows over time;
-// the palette and edge inspector only let users draw or pick from it. Out-of-scope types are not
-// rejected — legacy models keep them — but they carry no semantics and are ignored on export.
-export const SUPPORTED_RELATIONSHIP_TYPES = [
-  'inheritance',
-  'composition',
-] as const satisfies readonly UMLRelationshipType[]
 
 export interface UMLRelationship {
   id: string

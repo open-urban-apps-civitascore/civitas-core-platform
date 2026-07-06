@@ -4,8 +4,9 @@
  *
  * Only relationship types in the supported release scope carry semantics here; every other type is
  * silently ignored (no containment, no parent), so a legacy model with out-of-scope edges still
- * maps — those edges simply contribute nothing. The scope is deliberately small and grows over
- * time: widening it means adding the type both to SUPPORTED_RELATIONSHIP_TYPES and to the set below.
+ * maps — those edges simply contribute nothing. The scope itself is defined once by the palette
+ * (constants/paletteItems.ts); widening it means adding the type there AND registering its
+ * containment category in the set below.
  *
  * Direction rules:
  * - composition: the diamond (= the container) is drawn at the edge target, so the target contains
