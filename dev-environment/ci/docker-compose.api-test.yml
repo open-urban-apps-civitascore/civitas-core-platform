@@ -220,6 +220,8 @@ services:
         COPY --from=prep /staging/helpers /helpers
         COPY --from=prep /staging/providers /providers
         COPY --from=prep /staging/data /data
+    environment:
+      API_HOST: ${API_HOST:-api.localhost}
     command:
       - "run"
       - "--server"

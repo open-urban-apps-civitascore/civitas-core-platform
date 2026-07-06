@@ -61,11 +61,37 @@ host_without_port(raw) := lower(split(raw, ":")[0]) if {
 	not startswith(raw, "[")
 }
 
+# Configured API host, resolved from (priority order):
+#   1. API_HOST env var (opa.runtime().env) — production source. This is the
+#      platform-wide public API host, shared by FROST, GeoServer and any other
+#      backend served on the same gateway virtual host.
+#   2. data.backends.frost_server.api_host — test-only fallback (not shipped in
+#      the bundle; injected via `with data...` in tests).
+# Empty when neither is set → fail closed.
+
+default raw_api_host := ""
+
+raw_api_host := host if {
+	host := opa.runtime().env.API_HOST
+	host != ""
+}
+
+raw_api_host := data.backends.frost_server.api_host if {
+	not env_api_host_set
+	data.backends.frost_server.api_host
+}
+
+# True when API_HOST is present and non-empty in the runtime environment.
+env_api_host_set if {
+	host := opa.runtime().env.API_HOST
+	host != ""
+}
+
 # Configured API host (normalised). Empty if unconfigured → fail-closed.
 default api_host := ""
 
-api_host := host_without_port(data.backends.frost_server.api_host) if {
-	data.backends.frost_server.api_host
+api_host := host_without_port(raw_api_host) if {
+	raw_api_host != ""
 }
 
 # Incoming request's Host header (normalised, empty if missing).
