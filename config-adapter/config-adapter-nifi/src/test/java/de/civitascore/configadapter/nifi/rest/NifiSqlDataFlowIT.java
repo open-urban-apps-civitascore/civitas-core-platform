@@ -19,14 +19,13 @@ import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner;
-import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner.PlatformSinkConfig;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder;
+import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
-import de.civitascore.configadapter.nifi.flow.SinkType;
-import de.civitascore.configadapter.nifi.graph.GraphParser;
-import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
-import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
+import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
+import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
+import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -123,23 +122,23 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
                 { "id": "c", "type": "cron", "data": { "cronExpression": "%s" } },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.stationid": "$.stationid", "$.temperature": "$.temperature" } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "c" },
-                { "id": "e2", "source": "c", "target": "m" },
-                { "id": "e3", "source": "m", "target": "e" } ] }
+                { "id": "e2", "source": "c", "target": "src" },
+                { "id": "e3", "source": "src", "target": "m" },
+                { "id": "e4", "source": "m", "target": "k" },
+                { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND));
 
     Datasource source = sqlSource("sensor_input");
     // a cron-scheduled SQL source requires a sink primary key (dedup of re-read rows)
-    deploy(
-        "sql-typed-it",
-        graph,
-        source,
-        new SinkSpec(SinkType.POSTGIS, "observation", List.of("stationid")));
+    deploy("sql-typed-it", graph, source, new PostgisSinkSpec("observation", List.of("stationid")));
 
     // the row must arrive…
     await()
@@ -160,23 +159,24 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
                 { "id": "c", "type": "cron", "data": { "cronExpression": "%s" } },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.stationid": "$.stationid",
                                 "$.geom": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" } } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "c" },
-                { "id": "e2", "source": "c", "target": "m" },
-                { "id": "e3", "source": "m", "target": "e" } ] }
+                { "id": "e2", "source": "c", "target": "src" },
+                { "id": "e3", "source": "src", "target": "m" },
+                { "id": "e4", "source": "m", "target": "k" },
+                { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND));
 
     Datasource source = sqlSource("geo_input");
     deploy(
-        "sql-geo-it",
-        graph,
-        source,
-        new SinkSpec(SinkType.POSTGIS, "geo_observation", List.of("stationid")));
+        "sql-geo-it", graph, source, new PostgisSinkSpec("geo_observation", List.of("stationid")));
 
     await()
         .atMost(Duration.ofSeconds(90))
@@ -195,13 +195,17 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
                 { "id": "c", "type": "cron", "data": { "cronExpression": "%s" } },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.stationid": "$.stationid", "$.temperature": "$.temperature" } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "c" },
-                { "id": "e2", "source": "c", "target": "m" },
-                { "id": "e3", "source": "m", "target": "e" } ] }
+                { "id": "e2", "source": "c", "target": "src" },
+                { "id": "e3", "source": "src", "target": "m" },
+                { "id": "e4", "source": "m", "target": "k" },
+                { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND));
 
@@ -210,7 +214,7 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
         "sql-dedup-it",
         graph,
         source,
-        new SinkSpec(SinkType.POSTGIS, "dedup_observation", List.of("stationid")));
+        new PostgisSinkSpec("dedup_observation", List.of("stationid")));
 
     // the row lands…
     await()
@@ -238,13 +242,17 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
                 { "id": "c", "type": "cron", "data": { "cronExpression": "%s" } },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.stationId": "$.stationId", "$.tempValue": "$.tempValue" } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "c" },
-                { "id": "e2", "source": "c", "target": "m" },
-                { "id": "e3", "source": "m", "target": "e" } ] }
+                { "id": "e2", "source": "c", "target": "src" },
+                { "id": "e3", "source": "src", "target": "m" },
+                { "id": "e4", "source": "m", "target": "k" },
+                { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND));
 
@@ -252,7 +260,7 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
         "sql-mixedcase-it",
         graph,
         sqlSource("mixed_input"),
-        new SinkSpec(SinkType.POSTGIS, "mixedObservation", List.of("stationId")));
+        new PostgisSinkSpec("mixedObservation", List.of("stationId")));
 
     await()
         .atMost(Duration.ofSeconds(90))
@@ -275,12 +283,9 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
     byte[] key = CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
     try (CredentialResolver resolver = new CredentialResolver(key)) {
       FlowDeploymentPlanner planner =
-          new FlowDeploymentPlanner(
-              new GraphParser(),
-              new MappingConfigParser(),
-              new RecordPathCompiler(),
-              new NifiFlowBuilder(),
+          NifiTestFixtures.planner(
               resolver,
+              SqlSourceProbe.NO_OP,
               new PlatformSinkConfig("jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
               null);
       DeploymentPlan plan =

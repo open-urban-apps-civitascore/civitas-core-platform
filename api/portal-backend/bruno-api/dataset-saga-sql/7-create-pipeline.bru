@@ -25,7 +25,9 @@ body:json {
       "nodePositions": {
         "33333333-3333-4000-8000-000000000001": { "x": 360, "y": -40 },
         "33333333-3333-4000-8000-000000000004": { "x": 360, "y": 30 },
+        "33333333-3333-4000-8000-000000000005": { "x": 140, "y": 100 },
         "33333333-3333-4000-8000-000000000002": { "x": 320, "y": 100 },
+        "33333333-3333-4000-8000-000000000006": { "x": 520, "y": 100 },
         "33333333-3333-4000-8000-000000000003": { "x": 740, "y": 80 }
       },
       "nodes": [
@@ -41,6 +43,13 @@ body:json {
           "type": "cron",
           "position": { "x": 360, "y": 30 },
           "data": { "nodeType": "cron", "label": "CRON", "configured": true, "cronExpression": "0 0 6 * * ?" },
+          "measured": { "width": 160, "height": 48 }
+        },
+        {
+          "id": "33333333-3333-4000-8000-000000000005",
+          "type": "dataSource",
+          "position": { "x": 140, "y": 100 },
+          "data": { "label": "SQL Source", "configured": true, "entityType": "datasource", "entityId": "{{sqlDataSourceId}}", "entityMetadata": { "connector": "SQL" } },
           "measured": { "width": 160, "height": 48 }
         },
         {
@@ -72,6 +81,13 @@ body:json {
           "dragging": false
         },
         {
+          "id": "33333333-3333-4000-8000-000000000006",
+          "type": "geoPersistence",
+          "position": { "x": 520, "y": 100 },
+          "data": { "label": "Geospatial Data Storage", "configured": true, "entityType": "persistence", "entityId": "{{sqlDataSinkId}}", "tableName": "saga_sql_observations", "dataStructureVersionId": "{{sqlTargetDataStructureId}}/{{sqlTargetVersionId}}", "dataStructureName": "GeoSensorTarget" },
+          "measured": { "width": 160, "height": 48 }
+        },
+        {
           "id": "33333333-3333-4000-8000-000000000003",
           "type": "end",
           "position": { "x": 740, "y": 80 },
@@ -81,8 +97,10 @@ body:json {
       ],
       "edges": [
         { "id": "33333333-3333-4000-8000-0000000000e1", "source": "33333333-3333-4000-8000-000000000001", "target": "33333333-3333-4000-8000-000000000004", "type": "smoothstep", "data": { "label": "" } },
-        { "id": "33333333-3333-4000-8000-0000000000e3", "source": "33333333-3333-4000-8000-000000000004", "target": "33333333-3333-4000-8000-000000000002", "type": "smoothstep", "data": { "label": "" } },
-        { "id": "33333333-3333-4000-8000-0000000000e2", "source": "33333333-3333-4000-8000-000000000002", "target": "33333333-3333-4000-8000-000000000003", "type": "smoothstep", "data": { "label": "" } }
+        { "id": "33333333-3333-4000-8000-0000000000e3", "source": "33333333-3333-4000-8000-000000000004", "target": "33333333-3333-4000-8000-000000000005", "type": "smoothstep", "data": { "label": "" } },
+        { "id": "33333333-3333-4000-8000-0000000000e4", "source": "33333333-3333-4000-8000-000000000005", "target": "33333333-3333-4000-8000-000000000002", "type": "smoothstep", "data": { "label": "" } },
+        { "id": "33333333-3333-4000-8000-0000000000e5", "source": "33333333-3333-4000-8000-000000000002", "target": "33333333-3333-4000-8000-000000000006", "type": "smoothstep", "data": { "label": "" } },
+        { "id": "33333333-3333-4000-8000-0000000000e2", "source": "33333333-3333-4000-8000-000000000006", "target": "33333333-3333-4000-8000-000000000003", "type": "smoothstep", "data": { "label": "" } }
       ]
     }
   }
@@ -106,7 +124,7 @@ tests {
 docs {
   **SQL saga step 7** — Prerequisites: DataSource AVAILABLE (step 4a), DataSet created (step 5), POSTGIS DataSink created (step 6).
 
-  Creates the pipeline attached to the dataset, modelled as a CORE intermediate-representation graph. It consumes from the SQL datasource (`sqlDataSourceId`) and declares the POSTGIS sink (`sqlDataSinkId`) in `dataSinkIds`.
+  Creates the pipeline attached to the dataset, modelled as a CORE intermediate-representation graph. The graph is the mandatory linear data flow `start → cron → dataSource → mapping → geoPersistence → end` (the cron trigger is wired in front of the pull source): the wired SQL source node (`entityId` = `sqlDataSourceId`) feeds the mapping, which feeds the wired POSTGIS sink node (`entityId` = `sqlDataSinkId`). The adapter derives source and sink per pipeline from the graph's `entityId`s, which must also appear in `dataSourceIds`/`dataSinkIds`; a graph without a wired source or sink node is rejected at deploy.
 
   The mapping node carries an inline `mappingConfig` whose `fields` use the **geoPoint** op:
   `"$.geo": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" }`.

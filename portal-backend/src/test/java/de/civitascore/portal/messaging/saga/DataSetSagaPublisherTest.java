@@ -727,6 +727,105 @@ class DataSetSagaPublisherTest {
   }
 
   @Nested
+  @DisplayName("toPipelineEntry() per-pipeline source/sink association")
+  class PipelineAssociationTests {
+
+    @Test
+    @DisplayName("pipeline entries carry their own sorted dataSourceIds and dataSinkIds")
+    void pipelineEntriesCarrySourceAndSinkIds() {
+      DataSource dsA =
+          dataSource(UUID.fromString("aaaaaaaa-0000-4000-8000-000000000001"), ConnectorType.MQTT);
+      DataSource dsB =
+          dataSource(UUID.fromString("bbbbbbbb-0000-4000-8000-000000000002"), ConnectorType.MQTT);
+      Pipeline pipeline = pipeline(UUID.randomUUID(), dsB, dsA);
+
+      DataSink sinkA =
+          postgisSink(UUID.fromString("aaaaaaaa-0000-4000-8000-000000000003"), "table_a");
+      DataSink sinkB =
+          postgisSink(UUID.fromString("bbbbbbbb-0000-4000-8000-000000000004"), "table_b");
+      when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sinkB, sinkA));
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setPipelines(Set.of(pipeline));
+
+      ArgumentCaptor<String> jsonCaptor = stubKafkaSend();
+      publisher.publishCreateRequested(dataSet);
+
+      var entry = new JsonMapper().readTree(jsonCaptor.getValue()).get("dataPipelines").get(0);
+      var sourceIds = entry.get("dataSourceIds");
+      var sinkIds = entry.get("dataSinkIds");
+      assertThat(sourceIds).isNotNull();
+      assertThat(sinkIds).isNotNull();
+      assertThat(sourceIds.size()).isEqualTo(2);
+      assertThat(sinkIds.size()).isEqualTo(2);
+      assertThat(sourceIds.get(0).asString()).isEqualTo(dsA.getId().toString());
+      assertThat(sourceIds.get(1).asString()).isEqualTo(dsB.getId().toString());
+      assertThat(sinkIds.get(0).asString()).isEqualTo(sinkA.getId().toString());
+      assertThat(sinkIds.get(1).asString()).isEqualTo(sinkB.getId().toString());
+    }
+
+    @Test
+    @DisplayName("DELETE entries carry empty id lists")
+    void deleteEntriesCarryEmptyIdLists() {
+      Pipeline removed = pipeline(UUID.randomUUID());
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setProjectId("proj-1");
+      dataSet.setServiceId("svc-1");
+      dataSet.setPipelineIds(List.of());
+      dataSet.setPipelines(Set.of());
+
+      ArgumentCaptor<String> jsonCaptor = stubKafkaSend();
+      publisher.publishUpdateRequested(dataSet, Set.of(removed));
+
+      var entry = new JsonMapper().readTree(jsonCaptor.getValue()).get("dataPipelines").get(0);
+      assertThat(entry.get("action").asString()).isEqualTo("DELETE");
+      assertThat(entry.get("dataSourceIds").size()).isZero();
+      assertThat(entry.get("dataSinkIds").size()).isZero();
+    }
+
+    @Test
+    @DisplayName("a pipeline with no sources publishes an empty id list")
+    void emptyDataSourcesRelationPublishesEmptyIdList() {
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setPipelines(Set.of(pipeline));
+
+      ArgumentCaptor<String> jsonCaptor = stubKafkaSend();
+      publisher.publishCreateRequested(dataSet);
+
+      var entry = new JsonMapper().readTree(jsonCaptor.getValue()).get("dataPipelines").get(0);
+      assertThat(entry.get("dataSourceIds").size()).isZero();
+    }
+
+    @Test
+    @DisplayName("a null dataSources relation is an invariant violation, not a silent empty list")
+    void nullDataSourcesRelationFailsLoud() {
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      pipeline.setDataSources(null);
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setPipelines(Set.of(pipeline));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(IllegalStateException.class);
+    }
+  }
+
+  @Nested
   @DisplayName("namedApis serialization in saga triggers (#1311)")
   class NamedApisSerializationTests {
 

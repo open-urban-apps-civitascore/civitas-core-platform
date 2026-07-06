@@ -135,6 +135,28 @@ class DatasetSerializationTest {
   }
 
   @Test
+  void absentSourceAndSinkIdsDeserializeAsEmptyLists() {
+    // Triggers published before the per-pipeline association existed omit the fields; the record
+    // normalizes them so consumers never see null.
+    DataPipeline pipeline = dataset.datapipelines().getFirst();
+    assertEquals(List.of(), pipeline.dataSourceIds());
+    assertEquals(List.of(), pipeline.dataSinkIds());
+  }
+
+  @Test
+  void shouldDeserializeSourceAndSinkIds() throws Exception {
+    DataPipeline pipeline =
+        objectMapper.readValue(
+            """
+            {"id":"p1","version":"1","action":"ADD","data":{},
+             "dataSourceIds":["src-1"],"dataSinkIds":["sink-1","sink-2"]}
+            """,
+            DataPipeline.class);
+    assertEquals(List.of("src-1"), pipeline.dataSourceIds());
+    assertEquals(List.of("sink-1", "sink-2"), pipeline.dataSinkIds());
+  }
+
+  @Test
   void shouldDeserializeNamedApis() {
     assertNotNull(dataset.namedApis());
     assertEquals(2, dataset.namedApis().size());

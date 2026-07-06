@@ -9,135 +9,42 @@
  */
 package de.civitascore.configadapter.nifi.flow;
 
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.graphWithCron;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.graphWithGeoPoint;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.graphWithMapping;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.graphWithoutMapping;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.map;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.mqttSource;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.planner;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.postgisSink;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.postgisSinkWithPk;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.sqlSource;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.sqlSourceBasic;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.sqlSourceWith;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.stretchedKey;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.crypto.CredentialEncryptor;
-import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
-import de.civitascore.configadapter.nifi.graph.GraphParser;
-import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
-import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
+import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class FlowDeploymentPlannerTest {
 
-  private static final String MASTER_KEY_HEX =
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
   private static final String SECRET = "sup3r-s3cret-mqtt-pw";
 
   private final ObjectMapper mapper = new ObjectMapper();
-
-  private byte[] stretchedKey() throws Exception {
-    return CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
-  }
-
-  private FlowDeploymentPlanner planner(CredentialResolver resolver) {
-    return new FlowDeploymentPlanner(
-        new GraphParser(),
-        new MappingConfigParser(),
-        new RecordPathCompiler(),
-        new NifiFlowBuilder(),
-        resolver,
-        new FlowDeploymentPlanner.PlatformSinkConfig(
-            "jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
-        "http://frost:8080/FROST-Server/v1.1");
-  }
-
-  private Map<String, Object> map(String json) throws Exception {
-    return mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
-  }
-
-  private Map<String, Object> graphWithMapping() throws Exception {
-    return map(
-        """
-        {
-          "nodes": [
-            { "id": "n-start", "type": "start", "data": {} },
-            { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                "fields": {
-                  "$.station_id": "$.station_id",
-                  "$.temperature": "$.temperature",
-                  "$.observed_at": { "op": "toDate", "input": "$.ts", "pattern": "yyyy-MM-dd" }
-                } } } },
-            { "id": "n-end", "type": "end", "data": {} }
-          ],
-          "edges": [
-            { "id": "e1", "source": "n-start", "target": "n-map" },
-            { "id": "e2", "source": "n-map", "target": "n-end" }
-          ]
-        }
-        """);
-  }
-
-  private Map<String, Object> graphWithGeoPoint() throws Exception {
-    return map(
-        """
-        {
-          "nodes": [
-            { "id": "n-start", "type": "start", "data": {} },
-            { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                "fields": {
-                  "$.location": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" }
-                } } } },
-            { "id": "n-end", "type": "end", "data": {} }
-          ],
-          "edges": [
-            { "id": "e1", "source": "n-start", "target": "n-map" },
-            { "id": "e2", "source": "n-map", "target": "n-end" }
-          ]
-        }
-        """);
-  }
-
-  /**
-   * A graph with no mapping node (source feeds the sink directly) — e.g. a FROST find-or-create.
-   */
-  private Map<String, Object> graphWithoutMapping() throws Exception {
-    return map(
-        """
-        {
-          "nodes": [
-            { "id": "n-start", "type": "start", "data": {} },
-            { "id": "n-end", "type": "end", "data": {} }
-          ],
-          "edges": [ { "id": "e1", "source": "n-start", "target": "n-end" } ]
-        }
-        """);
-  }
-
-  private Datasource mqttSource(String encryptedPassword) {
-    Datasource source = new Datasource();
-    source.setId("a1");
-    source.setType("MQTT");
-    // the portal connector shape: urls/topics are lists, user/client_id/qos scalars
-    source.handleUnknownProperty("urls", List.of("tcp://mosquitto:1883"));
-    source.handleUnknownProperty("topics", List.of("sensors/+/temp"));
-    source.handleUnknownProperty("user", "mqttuser");
-    source.handleUnknownProperty("client_id", "civitas-it");
-    source.handleUnknownProperty("qos", 1);
-    source.handleUnknownProperty("password", encryptedPassword);
-    return source;
-  }
-
-  private SinkSpec postgisSink() {
-    return new SinkSpec(SinkType.POSTGIS, "sensor_observations");
-  }
-
-  /** A PostGIS sink with a primary key — required for a cron-scheduled (re-reading) SQL source. */
-  private SinkSpec postgisSinkWithPk() {
-    return new SinkSpec(SinkType.POSTGIS, "sensor_observations", List.of("id"));
-  }
 
   /** The first processor of the given type in a flow snapshot. */
   private com.fasterxml.jackson.databind.JsonNode processorOfType(
@@ -149,55 +56,6 @@ class FlowDeploymentPlannerTest {
       }
     }
     throw new AssertionError("no processor of type " + typeSuffix);
-  }
-
-  private Datasource sqlSource(String encryptedPassword) {
-    Datasource source = new Datasource();
-    source.setId("s1");
-    source.setType("SQL");
-    // the portal SQL connector shape (see datasources/contract)
-    source.handleUnknownProperty("driver", "postgres");
-    source.handleUnknownProperty("dsn", "postgres://reader@srcdb:5432/in");
-    source.handleUnknownProperty("user", "reader");
-    source.handleUnknownProperty("table", "events");
-    source.handleUnknownProperty("columns", List.of("*"));
-    source.handleUnknownProperty("password", encryptedPassword);
-    return source;
-  }
-
-  /** A SQL datasource with explicit connector fields (any may be null to omit it). */
-  private Datasource sqlSourceWith(String driver, String table, Object columns, String where) {
-    Datasource source = new Datasource();
-    source.setId("s2");
-    source.setType("SQL");
-    source.handleUnknownProperty("dsn", "postgres://reader@srcdb:5432/in");
-    source.handleUnknownProperty("user", "reader");
-    if (driver != null) {
-      source.handleUnknownProperty("driver", driver);
-    }
-    if (table != null) {
-      source.handleUnknownProperty("table", table);
-    }
-    if (columns != null) {
-      source.handleUnknownProperty("columns", columns);
-    }
-    if (where != null) {
-      source.handleUnknownProperty("where", where);
-    }
-    return source;
-  }
-
-  /** A basic, valid SQL datasource (postgres) for negative/WHERE tests. */
-  private Datasource sqlSourceBasic() {
-    Datasource source = new Datasource();
-    source.setId("s3");
-    source.setType("SQL");
-    source.handleUnknownProperty("driver", "postgres");
-    source.handleUnknownProperty("dsn", "postgres://reader@srcdb:5432/in");
-    source.handleUnknownProperty("user", "reader");
-    source.handleUnknownProperty("table", "events");
-    source.handleUnknownProperty("columns", List.of("*"));
-    return source;
   }
 
   @Test
@@ -218,9 +76,7 @@ class FlowDeploymentPlannerTest {
                             new PipelineDeploymentRequest(
                                 "p-sql-" + field, graphWithMapping(), source, postgisSinkWithPk())),
                 "must reject unsupported field: " + field);
-        assertEquals(
-            de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-            ex.getErrorCode());
+        assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
       }
     }
   }
@@ -239,9 +95,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-sql-cursor", graphWithMapping(), source, postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -259,9 +113,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-sql-q", graphWithMapping(), source, postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -281,9 +133,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-sql-el", graphWithMapping(), source, postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -311,7 +161,7 @@ class FlowDeploymentPlannerTest {
     // source updates instead of duplicating rows. NiFi needs the key columns explicitly (Update
     // Keys); it does not derive them from the table's PRIMARY KEY.
     Datasource source = sqlSourceBasic();
-    SinkSpec sink = new SinkSpec(SinkType.POSTGIS, "sensor_observations", List.of("id"));
+    SinkSpec sink = new PostgisSinkSpec("sensor_observations", List.of("id"));
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       DeploymentPlan plan =
           planner(resolver)
@@ -331,7 +181,7 @@ class FlowDeploymentPlannerTest {
     // a multi-column PK must join ALL key columns into Update Keys, not just the first — otherwise
     // the UPSERT ON CONFLICT target would not match the composite PRIMARY KEY
     Datasource source = sqlSourceBasic();
-    SinkSpec sink = new SinkSpec(SinkType.POSTGIS, "sensor_observations", List.of("tenant", "id"));
+    SinkSpec sink = new PostgisSinkSpec("sensor_observations", List.of("tenant", "id"));
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       String snapshot =
           planner(resolver)
@@ -410,9 +260,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-sql-mtls", graphWithMapping(), source, postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -449,9 +297,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-sql-sf", graphWithMapping(), source, postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -459,24 +305,13 @@ class FlowDeploymentPlannerTest {
   void sqlSourceConnectionProbeFailureFailsLoud() throws Exception {
     // #3: an unreachable / mis-credentialed source must fail the plan loudly, not deploy a flow
     // that silently produces no data
-    FlowDeploymentPlanner.SqlSourceProbe failing =
+    SqlSourceProbe failing =
         (url, user, pw) -> {
           throw new FatalAdapterException(
-              de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-              "unreachable: " + url);
+              AdapterErrorCode.NIFI_TEMPLATE_ERROR, "unreachable: " + url);
         };
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
-      FlowDeploymentPlanner probing =
-          new FlowDeploymentPlanner(
-              new GraphParser(),
-              new MappingConfigParser(),
-              new RecordPathCompiler(),
-              new NifiFlowBuilder(),
-              resolver,
-              new FlowDeploymentPlanner.PlatformSinkConfig(
-                  "jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
-              "http://frost:8080/FROST-Server/v1.1",
-              failing);
+      FlowDeploymentPlanner probing = planner(resolver, failing);
       FatalAdapterException ex =
           assertThrows(
               FatalAdapterException.class,
@@ -484,9 +319,7 @@ class FlowDeploymentPlannerTest {
                   probing.plan(
                       new PipelineDeploymentRequest(
                           "p-probe", graphWithMapping(), sqlSource(null), postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -550,17 +383,15 @@ class FlowDeploymentPlannerTest {
                                 graphWithMapping(),
                                 sqlSourceWith("postgres", "events", List.of("*"), where),
                                 postgisSinkWithPk())));
-        assertEquals(
-            de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-            ex.getErrorCode());
+        assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
       }
     }
   }
 
   @Test
-  void frostSinkWithMappingIsRejected() throws Exception {
-    // a FROST sink consumes the raw SensorThings envelope; a configured record mapping would be
-    // silently ignored by the builder — reject rather than deploy a no-op transformation
+  void frostMappingOutsideTheStaCatalogIsRejected() throws Exception {
+    // FROST accepts a mapping only onto the closed STA target catalog — free target paths
+    // (here the PostGIS-shaped graphWithMapping) can never become envelope JSON keys
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       FatalAdapterException ex =
           assertThrows(
@@ -572,11 +403,111 @@ class FlowDeploymentPlannerTest {
                               "p-frost-map",
                               graphWithMapping(),
                               mqttSource(null),
-                              new SinkSpec(SinkType.FROST, null),
-                              "1")));
+                              new FrostSinkSpec("1"))));
+      assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+      assertTrue(ex.getMessage().contains("unsupported FROST mapping target path"));
+    }
+  }
+
+  @Test
+  void frostMappingMissingLookupKeysIsRejected() throws Exception {
+    // A mapped group must cover its required lookup keys — otherwise the flow deploys and routes
+    // every message to the error sink, invisible to the tenant. Fail the plan instead.
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-frost-incomplete",
+                              NifiTestFixtures.graphWithIncompleteFrostMapping(),
+                              mqttSource(null),
+                              new FrostSinkSpec("1"))));
+      assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+      assertTrue(
+          ex.getMessage()
+              .contains(
+                  "a FROST mapping targeting $.things[] must also map: $.things[].description,"
+                      + " $.things[].properties.reference"));
+    }
+  }
+
+  @Test
+  void sqlToFrostWithoutMappingIsRejected() throws Exception {
+    // Without a mapping the find-or-create consumes the source's envelope as-is; a SQL source emits
+    // plain records, so the combination is rejected — with the hint that a mapping unlocks it
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-sql-frost-nomap",
+                              graphWithoutMapping(),
+                              sqlSource(null),
+                              new FrostSinkSpec("1"))));
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
+      assertTrue(
+          ex.getMessage()
+              .contains(
+                  "FROST sink without a record mapping requires a source that emits the"
+                      + " SensorThings envelope (MQTT)"));
+    }
+  }
+
+  @Test
+  void mqttToFrostWithMappingIsPlanned() throws Exception {
+    // MQTT delivers raw bytes, so the mapped FROST flow needs the record chain (ConvertRecord +
+    // UpdateRecord) before the envelope rebuild region.
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-mqtt-frost-map",
+                      NifiTestFixtures.graphWithFrostMapping(),
+                      mqttSource(null),
+                      new FrostSinkSpec("7")))
+              .snapshotJson();
+      processorOfType(snapshot, "ConvertRecord");
       assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+          "$[*]",
+          processorOfType(snapshot, "SplitJson")
+              .path("properties")
+              .path("JsonPath Expression")
+              .asText(),
+          "the record-writer array is split before the legs");
+      assertTrue(snapshot.contains("/sta_0_name"), "flat mapping fields are bound");
+      assertTrue(
+          snapshot.contains("${sta_2_reference:escapeJson()}"),
+          "the envelope template references the captured attributes");
+    }
+  }
+
+  @Test
+  void sqlToFrostWithMappingIsPlanned() throws Exception {
+    // A SQL source already emits records (no convert), needs no primary key for FROST (the PK
+    // guard is PostGIS-specific), and is accepted because the mapping rebuilds the envelope.
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-sql-frost-map",
+                      NifiTestFixtures.graphWithFrostMapping(),
+                      sqlSource(null),
+                      new FrostSinkSpec("7")))
+              .snapshotJson();
+      processorOfType(snapshot, "QueryDatabaseTableRecord");
+      assertFalse(snapshot.contains("ConvertRecord"), "SQL records need no convert step");
+      // quotes inside the bound template are JSON-escaped in the snapshot, so match a quote-free
+      // placeholder instead of the raw template bytes
+      assertTrue(
+          snapshot.contains("${sta_2_reference:escapeJson()}"), "envelope template is bound");
     }
   }
 
@@ -593,8 +524,7 @@ class FlowDeploymentPlannerTest {
                       "p-frost-scoped",
                       graphWithoutMapping(),
                       mqttSource(null),
-                      new SinkSpec(SinkType.FROST, null),
-                      "7"));
+                      new FrostSinkSpec("7")));
       String snapshot = plan.snapshotJson();
       assertTrue(
           snapshot.contains("/Projects(7)/Things"),
@@ -620,9 +550,7 @@ class FlowDeploymentPlannerTest {
                               graphWithMapping(),
                               sqlSourceWith("mysql", "events", List.of("*"), null),
                               postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -641,9 +569,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-sql-nodsn", graphWithMapping(), source, postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -661,9 +587,25 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-sql-plainpw", graphWithMapping(), source, postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
+    }
+  }
+
+  @Test
+  void mqttSourcePlaintextPasswordIsRejected() throws Exception {
+    // same rule as the SQL source: a non-ENC(...) password must never enter the snapshot, and
+    // silently dropping it would deploy a flow that connects to the broker unauthenticated
+    Datasource source = mqttSource("plaintext-secret");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-mqtt-plainpw", graphWithMapping(), source, postgisSink())));
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -682,32 +624,8 @@ class FlowDeploymentPlannerTest {
                               graphWithMapping(),
                               sqlSourceWith("postgres", null, List.of("*"), null),
                               postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
-  }
-
-  /** A start → cron → mapping → end graph (cron wired into the functional component). */
-  private Map<String, Object> graphWithCron(String cronExpression) throws Exception {
-    return map(
-        """
-        {
-          "nodes": [
-            { "id": "n-start", "type": "start", "data": {} },
-            { "id": "n-cron", "type": "cron", "data": { "cronExpression": "%s" } },
-            { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                "fields": { "$.a": "$.b" } } } },
-            { "id": "n-end", "type": "end", "data": {} }
-          ],
-          "edges": [
-            { "id": "e1", "source": "n-start", "target": "n-cron" },
-            { "id": "e2", "source": "n-cron", "target": "n-map" },
-            { "id": "e3", "source": "n-map", "target": "n-end" }
-          ]
-        }
-        """
-            .formatted(cronExpression));
   }
 
   @Test
@@ -760,23 +678,12 @@ class FlowDeploymentPlannerTest {
     source.handleUnknownProperty("password", enc);
 
     String[] probedPassword = {null};
-    FlowDeploymentPlanner.SqlSourceProbe capturingProbe =
-        (jdbcUrl, user, password) -> probedPassword[0] = password;
+    SqlSourceProbe capturingProbe = (jdbcUrl, user, password) -> probedPassword[0] = password;
 
     try (CredentialResolver resolver = new CredentialResolver(key)) {
-      FlowDeploymentPlanner planner =
-          new FlowDeploymentPlanner(
-              new GraphParser(),
-              new MappingConfigParser(),
-              new RecordPathCompiler(),
-              new NifiFlowBuilder(),
-              resolver,
-              new FlowDeploymentPlanner.PlatformSinkConfig(
-                  "jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
-              "http://frost:8080/FROST-Server/v1.1",
-              capturingProbe);
+      FlowDeploymentPlanner probing = planner(resolver, capturingProbe);
 
-      planner.plan(
+      probing.plan(
           new PipelineDeploymentRequest(
               "p-sql-probe", graphWithMapping(), source, postgisSinkWithPk()));
     }
@@ -787,12 +694,9 @@ class FlowDeploymentPlannerTest {
   @Test
   void postgisSinkWithoutPlatformConnectionIsRejected() throws Exception {
     FlowDeploymentPlanner noDbPlanner =
-        new FlowDeploymentPlanner(
-            new GraphParser(),
-            new MappingConfigParser(),
-            new RecordPathCompiler(),
-            new NifiFlowBuilder(),
+        NifiTestFixtures.planner(
             new CredentialResolver(stretchedKey()),
+            SqlSourceProbe.NO_OP,
             null,
             "http://frost:8080/FROST-Server/v1.1");
     FatalAdapterException ex =
@@ -802,8 +706,7 @@ class FlowDeploymentPlannerTest {
                 noDbPlanner.plan(
                     new PipelineDeploymentRequest(
                         "p-nodb", graphWithMapping(), mqttSource(null), postgisSink())));
-    assertEquals(
-        de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
+    assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }
 
   @Test
@@ -815,13 +718,13 @@ class FlowDeploymentPlannerTest {
         map(
             """
             { "nodes": [
-                { "id": "n-start", "type": "start", "data": {} },
+                { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.count": { "op": "toInt", "input": "$.n" } } } } },
-                { "id": "n-end", "type": "end", "data": {} } ],
+                { "id": "n-sink", "type": "geoPersistence", "data": { "entityId": "sink-1" } } ],
               "edges": [
-                { "id": "e1", "source": "n-start", "target": "n-map" },
-                { "id": "e2", "source": "n-map", "target": "n-end" } ] }
+                { "id": "e1", "source": "n-src", "target": "n-map" },
+                { "id": "e2", "source": "n-map", "target": "n-sink" } ] }
             """);
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       DeploymentPlan plan =
@@ -838,14 +741,10 @@ class FlowDeploymentPlannerTest {
     // A null FROST base URL must fail fast — otherwise the flow would deploy and silently POST
     // observations to a bogus/empty URL.
     FlowDeploymentPlanner noFrostPlanner =
-        new FlowDeploymentPlanner(
-            new GraphParser(),
-            new MappingConfigParser(),
-            new RecordPathCompiler(),
-            new NifiFlowBuilder(),
+        NifiTestFixtures.planner(
             new CredentialResolver(stretchedKey()),
-            new FlowDeploymentPlanner.PlatformSinkConfig(
-                "jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
+            SqlSourceProbe.NO_OP,
+            new PlatformSinkConfig("jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
             null);
     FatalAdapterException ex =
         assertThrows(
@@ -856,33 +755,31 @@ class FlowDeploymentPlannerTest {
                         "p-nofrost",
                         graphWithoutMapping(),
                         mqttSource(null),
-                        new SinkSpec(SinkType.FROST, null),
-                        "1")));
-    assertEquals(
-        de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
+                        new FrostSinkSpec("1"))));
+    assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }
 
-  // Note: rejection of a POSTGIS sink without a table name now happens at SinkSpec construction
+  // Note: rejection of a POSTGIS sink without a table name happens at SinkSpec construction
   // (the type rejects the invalid state) — see PipelineDeploymentRequestTest.
 
   @Test
   void mixedConstAndCopyMappingIsAccepted() throws Exception {
     // A const is rendered as a RecordPath literal, so it shares one UpdateRecord with a copy — the
-    // combination is valid (previously rejected as a "mixed strategy").
+    // combination is valid, not a "mixed strategy" conflict.
     Map<String, Object> graph =
         map(
             """
             { "nodes": [
-                { "id": "n-start", "type": "start", "data": {} },
+                { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
                     "fields": {
                       "$.station_id": "$.station_id",
                       "$.unit": { "op": "const", "value": "celsius" }
                     } } } },
-                { "id": "n-end", "type": "end", "data": {} } ],
+                { "id": "n-sink", "type": "geoPersistence", "data": { "entityId": "sink-1" } } ],
               "edges": [
-                { "id": "e1", "source": "n-start", "target": "n-map" },
-                { "id": "e2", "source": "n-map", "target": "n-end" } ] }
+                { "id": "e1", "source": "n-src", "target": "n-map" },
+                { "id": "e2", "source": "n-map", "target": "n-sink" } ] }
             """);
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       DeploymentPlan plan =
@@ -898,10 +795,10 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
-  void toleratesRealFrontendNodeTypes() throws Exception {
-    // the editor emits source/sink nodes (dataSource, frost, geoPersistence) alongside the mapping
-    // —
-    // the adapter must tolerate them and still build, not reject the graph
+  void unbuildableGraphTopologyIsRejectedAsTemplateError() throws Exception {
+    // The graph is the authoritative data-flow description: a second sink node wired into the
+    // flow is rejected at plan time (FlowPath), surfaced as a template error with the
+    // node-anchored message the editor mirrors.
     Map<String, Object> graph =
         map(
             """
@@ -917,11 +814,18 @@ class FlowDeploymentPlannerTest {
                 { "id": "e3", "source": "n-frost", "target": "n-geo" } ] }
             """);
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
-      DeploymentPlan plan =
-          planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest("p-real", graph, mqttSource(null), postgisSink()));
-      assertTrue(plan.snapshotJson().contains("/a")); // the mapping was still found and compiled
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(
+                          new PipelineDeploymentRequest(
+                              "p-real", graph, mqttSource(null), postgisSink())));
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
+      assertTrue(
+          ex.getMessage().contains("pipeline graph has 2 datasink nodes; exactly one is"),
+          ex.getMessage());
     }
   }
 
@@ -984,9 +888,7 @@ class FlowDeploymentPlannerTest {
                               graphWithCron("0 0 6 * * ? 2026"),
                               sqlSource(null),
                               postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -1006,9 +908,7 @@ class FlowDeploymentPlannerTest {
                         .plan(
                             new PipelineDeploymentRequest(
                                 "p-sql-nopk", graph, sqlSource(null), postgisSink())));
-        assertEquals(
-            de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-            ex.getErrorCode());
+        assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
       }
     }
   }
@@ -1028,9 +928,7 @@ class FlowDeploymentPlannerTest {
                               graphWithCron("0 0 * * *"),
                               sqlSource(null),
                               postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -1050,24 +948,27 @@ class FlowDeploymentPlannerTest {
                               graphWithCron("0 0 6 * * ?"),
                               mqttSource(null),
                               postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
   @Test
-  void multipleMappingNodesAreRejected() throws Exception {
-    // the adapter builds a single transform; two mapping nodes are ambiguous and must fail loudly
+  void unwiredMappingsAlongsideAValidPathAreRejected() throws Exception {
+    // chained mappings on the path are supported (NifiFlowBuilderTest pins the chained ids); a
+    // mapping
+    // that exists on the canvas but is not wired into the path would silently not be applied —
+    // the derivation rejects it with the unwired-node message
     Map<String, Object> graph =
         map(
             """
             { "nodes": [
+                { "id": "n-src", "type": "dataSource", "data": { "entityId": "a1" } },
+                { "id": "n-sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } },
                 { "id": "n-map1", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.a": "$.b" } } } },
                 { "id": "n-map2", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.c": "$.d" } } } } ],
-              "edges": [] }
+              "edges": [ { "id": "e1", "source": "n-src", "target": "n-sink" } ] }
             """);
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       FatalAdapterException ex =
@@ -1078,9 +979,10 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-2map", graph, mqttSource(null), postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
+      assertTrue(
+          ex.getMessage().contains("not wired into the flow"),
+          "the error names the unwired-mapping condition");
     }
   }
 
@@ -1098,9 +1000,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-2topic", graphWithMapping(), source, postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -1119,9 +1019,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-tls", graphWithMapping(), source, postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -1193,9 +1091,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-nocfg", graph, mqttSource(null), postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -1209,9 +1105,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               pipelineId, graphWithMapping(), source, postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -1230,39 +1124,6 @@ class FlowDeploymentPlannerTest {
     }
   }
 
-  // Note: a FROST sink with a geoPoint (or any) mapping is now rejected wholesale by
-  // frostSinkWithMappingIsRejected — a FROST sink consumes the raw STA envelope and has no mapping
-  // stage — so the former geoPoint-specific FROST rejection test is subsumed by it.
-
-  @Test
-  void withStringtypeUnspecifiedCoversAllBranches() {
-    // no query string → append with '?'
-    assertEquals(
-        "jdbc:postgresql://db:5432/civitas?stringtype=unspecified",
-        FlowDeploymentPlanner.withStringtypeUnspecified("jdbc:postgresql://db:5432/civitas"));
-    // existing query string → append with '&'
-    assertEquals(
-        "jdbc:postgresql://db:5432/civitas?ssl=true&stringtype=unspecified",
-        FlowDeploymentPlanner.withStringtypeUnspecified(
-            "jdbc:postgresql://db:5432/civitas?ssl=true"));
-    // already present → unchanged (idempotent, no double-append)
-    String already = "jdbc:postgresql://db:5432/civitas?stringtype=unspecified";
-    assertEquals(already, FlowDeploymentPlanner.withStringtypeUnspecified(already));
-    // null / blank pass through untouched
-    assertNull(FlowDeploymentPlanner.withStringtypeUnspecified(null));
-    assertEquals("", FlowDeploymentPlanner.withStringtypeUnspecified(""));
-  }
-
-  @Test
-  void dsnToJdbcUrlStripsUserinfoWithoutTruncatingAnAtInAQueryParam() {
-    // the userinfo separator is only the '@' inside the authority; an '@' inside a query-parameter
-    // value must survive, not truncate the URL
-    assertEquals(
-        "jdbc:postgresql://host:5432/db?applicationname=x@y",
-        FlowDeploymentPlanner.postgresDsnToJdbcUrl(
-            "postgres://u:p@host:5432/db?applicationname=x@y"));
-  }
-
   @Test
   void unsupportedSourceSinkCombinationIsRejected() throws Exception {
     Datasource source = new Datasource();
@@ -1278,9 +1139,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p1", graphWithMapping(), source, postgisSink())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 
@@ -1304,9 +1163,7 @@ class FlowDeploymentPlannerTest {
                       .plan(
                           new PipelineDeploymentRequest(
                               "p-corrupt", ghostEdgeGraph, sqlSourceBasic(), postgisSinkWithPk())));
-      assertEquals(
-          de.civitascore.configadapter.model.AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          ex.getErrorCode());
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
 }

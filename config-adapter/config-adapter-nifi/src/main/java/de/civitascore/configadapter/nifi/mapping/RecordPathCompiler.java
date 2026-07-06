@@ -88,7 +88,12 @@ public class RecordPathCompiler {
     return List.copyOf(properties);
   }
 
-  private UpdateRecordProperty compileField(
+  /**
+   * Compiles a single field rule against an explicit destination — the flat-compilation entry point
+   * for {@link StaEnvelopeCompiler}, which redirects each rule into an intermediate root-level
+   * field instead of the mapping's own target path.
+   */
+  UpdateRecordProperty compileField(
       String destination, ValueNode node, GeometryEncoding geometryEncoding)
       throws FatalAdapterException {
     if (node instanceof ConstNode constant) {
@@ -96,10 +101,14 @@ public class RecordPathCompiler {
       // the literal-value strategy. The builder groups properties by strategy into separate
       // UpdateRecord processors.
       return new UpdateRecordProperty(
-          destination, String.valueOf(constant.value()), ReplacementStrategy.LITERAL_VALUE);
+          destination,
+          NifiExpressionLanguage.escape(String.valueOf(constant.value())),
+          ReplacementStrategy.LITERAL_VALUE);
     }
     return new UpdateRecordProperty(
-        destination, render(node, geometryEncoding), ReplacementStrategy.RECORD_PATH_VALUE);
+        destination,
+        NifiExpressionLanguage.escape(render(node, geometryEncoding)),
+        ReplacementStrategy.RECORD_PATH_VALUE);
   }
 
   private String render(ValueNode node, GeometryEncoding geometryEncoding)

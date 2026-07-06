@@ -80,6 +80,33 @@ class RecordPathCompilerTest {
   }
 
   @Test
+  void escapesExpressionLanguageInConstValues() throws Exception {
+    // UpdateRecord evaluates EL in dynamic property values: an unescaped ${…} const would expand
+    // against the NiFi process environment and exfiltrate it into the record. $$ is EL's literal
+    // escape.
+    var props =
+        byPath(
+            compile(
+                "{ \"$.note\": { \"op\": \"const\","
+                    + " \"value\": \"${SINGLE_USER_CREDENTIALS_PASSWORD}\" } }"));
+
+    UpdateRecordProperty p = props.get("/note");
+    assertEquals("$${SINGLE_USER_CREDENTIALS_PASSWORD}", p.value());
+    assertEquals(ReplacementStrategy.LITERAL_VALUE, p.strategy());
+  }
+
+  @Test
+  void escapesExpressionLanguageInConcatSeparators() throws Exception {
+    var props =
+        byPath(
+            compile(
+                "{ \"$.k\": { \"op\": \"concat\", \"separator\": \"${HOSTNAME}\","
+                    + " \"inputs\": [ \"$.a\", \"$.b\" ] } }"));
+
+    assertEquals("concat(/a, '$${HOSTNAME}', /b)", props.get("/k").value());
+  }
+
+  @Test
   void concatBecomesRecordPathFunction() throws Exception {
     var props =
         byPath(

@@ -1,0 +1,40 @@
+meta {
+  name: 0h. Find Existing Saga DataSink
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{sagaDataSetId}}
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const match = res.body.content.find(s => s.dataSinkType === 'FROST');
+    if (match) {
+      bru.setVar('sagaDataSinkId', match.id);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded or no dataset yet", function() {
+    const status = res.getStatus();
+    // 200=found, 400/404=dataset doesn't exist yet (first run)
+    expect(status === 200 || status === 400 || status === 404).to.be.true;
+  });
+}
+
+docs {
+  **Purpose:** Idempotency guard — checks whether the FROST DataSink for the existing dataset already exists. If found, `sagaDataSinkId` is populated so step 4c can be skipped (a repeated POST would create a duplicate sink) and cleanup step 12b targets the correct record.
+
+  **Expected Response:** 200 OK with paginated list, or 400/404 if the dataset does not exist yet (first run).
+
+  **Post-condition:** If a FROST sink is found, saves `sagaDataSinkId` from `body.content[].id`.
+}

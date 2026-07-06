@@ -16,8 +16,10 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
+import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.SourceType;
+import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import jakarta.ws.rs.core.Response;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -195,7 +197,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
   @Test
   void findOrCreateCreatesThingExactlyOnceAcrossRepeatedMessages() throws Exception {
     String snapshot =
-        new NifiFlowBuilder()
+        NifiTestFixtures.flowBuilder()
             .build(
                 new FlowBuildSpec(
                     "pipeline-frost-it",
@@ -203,12 +205,13 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                     Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", TOPIC),
                     SinkType.FROST,
                     Map.of(
-                        NifiFlowBuilder.FROST_BASE_URL,
+                        FrostSinkStage.FROST_BASE_URL,
                         "http://frost:8080" + FROST_PATH,
-                        NifiFlowBuilder.FROST_PROJECT_ID,
+                        FrostSinkStage.FROST_PROJECT_ID,
                         String.valueOf(projectId)),
                     List.of(),
                     Map.of(),
+                    null,
                     null));
     client.deployFlow(new DeploymentPlan("pipeline-frost-it", snapshot, Map.of()));
 
@@ -250,7 +253,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
         "FROST must resolve the Datastream by reference+name");
 
     String snapshot =
-        new NifiFlowBuilder()
+        NifiTestFixtures.flowBuilder()
             .build(
                 new FlowBuildSpec(
                     "pipeline-frost-obs-it",
@@ -258,12 +261,13 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                     Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", OBS_TOPIC),
                     SinkType.FROST,
                     Map.of(
-                        NifiFlowBuilder.FROST_BASE_URL,
+                        FrostSinkStage.FROST_BASE_URL,
                         "http://frost:8080" + FROST_PATH,
-                        NifiFlowBuilder.FROST_PROJECT_ID,
+                        FrostSinkStage.FROST_PROJECT_ID,
                         String.valueOf(projectId)),
                     List.of(),
                     Map.of(),
+                    null,
                     null));
     client.deployFlow(new DeploymentPlan("pipeline-frost-obs-it", snapshot, Map.of()));
 
@@ -302,7 +306,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
         "precondition: the referenced Datastream must not exist");
 
     String snapshot =
-        new NifiFlowBuilder()
+        NifiTestFixtures.flowBuilder()
             .build(
                 new FlowBuildSpec(
                     "pipeline-frost-nods-it",
@@ -310,12 +314,13 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
                     Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", NO_DS_TOPIC),
                     SinkType.FROST,
                     Map.of(
-                        NifiFlowBuilder.FROST_BASE_URL,
+                        FrostSinkStage.FROST_BASE_URL,
                         "http://frost:8080" + FROST_PATH,
-                        NifiFlowBuilder.FROST_PROJECT_ID,
+                        FrostSinkStage.FROST_PROJECT_ID,
                         String.valueOf(projectId)),
                     List.of(),
                     Map.of(),
+                    null,
                     null));
     client.deployFlow(new DeploymentPlan("pipeline-frost-nods-it", snapshot, Map.of()));
 

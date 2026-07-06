@@ -17,14 +17,12 @@ import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner;
-import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner.PlatformSinkConfig;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder;
+import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
-import de.civitascore.configadapter.nifi.flow.SinkType;
-import de.civitascore.configadapter.nifi.graph.GraphParser;
-import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
-import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
+import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
+import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
+import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -133,13 +131,17 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
             """
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.stationid": "$.stationid", "$.count": "$.count",
                                 "$.meta": "$.meta" } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
-                { "id": "e1", "source": "s", "target": "m" },
-                { "id": "e2", "source": "m", "target": "e" } ] }
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
             """);
 
     Datasource source = new Datasource();
@@ -149,18 +151,15 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     source.handleUnknownProperty("topics", List.of(TOPIC));
 
     FlowDeploymentPlanner planner =
-        new FlowDeploymentPlanner(
-            new GraphParser(),
-            new MappingConfigParser(),
-            new RecordPathCompiler(),
-            new NifiFlowBuilder(),
+        NifiTestFixtures.planner(
             new CredentialResolver(new byte[0]),
+            SqlSourceProbe.NO_OP,
             new PlatformSinkConfig("jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
             null);
     DeploymentPlan plan =
         planner.plan(
             new PipelineDeploymentRequest(
-                "pg-data-it", graph, source, new SinkSpec(SinkType.POSTGIS, "observation")));
+                "pg-data-it", graph, source, new PostgisSinkSpec("observation")));
 
     client.deployFlow(plan);
 
@@ -193,13 +192,17 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
             """
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.stationid": "$.stationid",
                                 "$.geom": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" } } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
-                { "id": "e1", "source": "s", "target": "m" },
-                { "id": "e2", "source": "m", "target": "e" } ] }
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
             """);
 
     Datasource source = new Datasource();
@@ -209,18 +212,15 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     source.handleUnknownProperty("topics", List.of(GEO_TOPIC));
 
     FlowDeploymentPlanner planner =
-        new FlowDeploymentPlanner(
-            new GraphParser(),
-            new MappingConfigParser(),
-            new RecordPathCompiler(),
-            new NifiFlowBuilder(),
+        NifiTestFixtures.planner(
             new CredentialResolver(new byte[0]),
+            SqlSourceProbe.NO_OP,
             new PlatformSinkConfig("jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
             null);
     DeploymentPlan plan =
         planner.plan(
             new PipelineDeploymentRequest(
-                "pg-geo-it", graph, source, new SinkSpec(SinkType.POSTGIS, "geo_observation")));
+                "pg-geo-it", graph, source, new PostgisSinkSpec("geo_observation")));
 
     client.deployFlow(plan);
 
@@ -250,13 +250,17 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
             """
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping", "data": { "mappingConfig": {
                     "fields": { "$.stationid": "$.stationid",
                                 "$.geom": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" } } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
-                { "id": "e1", "source": "s", "target": "m" },
-                { "id": "e2", "source": "m", "target": "e" } ] }
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
             """);
 
     Datasource source = new Datasource();
@@ -266,21 +270,15 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     source.handleUnknownProperty("topics", List.of(GEO_25832_TOPIC));
 
     FlowDeploymentPlanner planner =
-        new FlowDeploymentPlanner(
-            new GraphParser(),
-            new MappingConfigParser(),
-            new RecordPathCompiler(),
-            new NifiFlowBuilder(),
+        NifiTestFixtures.planner(
             new CredentialResolver(new byte[0]),
+            SqlSourceProbe.NO_OP,
             new PlatformSinkConfig("jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
             null);
     DeploymentPlan plan =
         planner.plan(
             new PipelineDeploymentRequest(
-                "pg-geo25832-it",
-                graph,
-                source,
-                new SinkSpec(SinkType.POSTGIS, "geo_observation_25832")));
+                "pg-geo25832-it", graph, source, new PostgisSinkSpec("geo_observation_25832")));
 
     client.deployFlow(plan);
 

@@ -19,14 +19,13 @@ import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner;
-import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner.PlatformSinkConfig;
-import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder;
+import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
-import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest.SinkSpec;
-import de.civitascore.configadapter.nifi.flow.SinkType;
-import de.civitascore.configadapter.nifi.graph.GraphParser;
-import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
-import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
+import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
+import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
+import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -66,30 +65,31 @@ class NifiDeploymentIT extends AbstractNifiIT {
     source.handleUnknownProperty("urls", List.of("tcp://localhost:1883"));
     source.handleUnknownProperty("topics", List.of("sensors/+/temp"));
 
-    SinkSpec sink = new SinkSpec(SinkType.POSTGIS, "sensor_observations");
+    SinkSpec sink = new PostgisSinkSpec("sensor_observations");
 
     Map<String, Object> graph =
         map(
             """
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
                 { "id": "m", "type": "mapping",
                   "data": { "mappingConfig": { "fields": {
                     "$.station_id": "$.station_id",
                     "$.temperature": "$.temperature" } } } },
+                { "id": "k", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
               "edges": [
-                { "id": "e1", "source": "s", "target": "m" },
-                { "id": "e2", "source": "m", "target": "e" } ] }
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
             """);
 
     FlowDeploymentPlanner planner =
-        new FlowDeploymentPlanner(
-            new GraphParser(),
-            new MappingConfigParser(),
-            new RecordPathCompiler(),
-            new NifiFlowBuilder(),
+        NifiTestFixtures.planner(
             new CredentialResolver(new byte[0]),
+            SqlSourceProbe.NO_OP,
             new PlatformSinkConfig(
                 "jdbc:postgresql://localhost:5432/civitas", "nifi", "nifi-db-secret"),
             "http://localhost:8080/FROST-Server/v1.1");
@@ -143,30 +143,31 @@ class NifiDeploymentIT extends AbstractNifiIT {
     source.handleUnknownProperty("urls", List.of("tcp://localhost:1883"));
     source.handleUnknownProperty("topics", List.of("sensors/+/temp"));
 
-    // FROST consumes the raw SensorThings envelope from the source (find-or-create); no mapping
-    // node — the planner rejects a FROST sink with a mapping (see frostSinkWithMappingIsRejected).
+    // Passthrough mode: without a mapping node, FROST consumes the raw SensorThings envelope
+    // from the source (find-or-create); the mapped mode is covered by NifiFrostMappingIT.
     Map<String, Object> graph =
         map(
             """
             { "nodes": [
                 { "id": "s", "type": "start", "data": {} },
+                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
+                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
                 { "id": "e", "type": "end", "data": {} } ],
-              "edges": [ { "id": "e1", "source": "s", "target": "e" } ] }
+              "edges": [
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "k" },
+                { "id": "e3", "source": "k", "target": "e" } ] }
             """);
 
     FlowDeploymentPlanner planner =
-        new FlowDeploymentPlanner(
-            new GraphParser(),
-            new MappingConfigParser(),
-            new RecordPathCompiler(),
-            new NifiFlowBuilder(),
+        NifiTestFixtures.planner(
             new CredentialResolver(new byte[0]),
+            SqlSourceProbe.NO_OP,
             null,
             "http://localhost:8080/FROST-Server/v1.1");
     DeploymentPlan plan =
         planner.plan(
-            new PipelineDeploymentRequest(
-                "frost-it", graph, source, new SinkSpec(SinkType.FROST, null), "1"));
+            new PipelineDeploymentRequest("frost-it", graph, source, new FrostSinkSpec("1")));
 
     // A FROST/HTTP sink has no DBCP/JDBC-driver dependency, so the FULL deploy lifecycle
     // (upload → enable controller services → start) must succeed on real NiFi — this is exactly

@@ -9,6 +9,11 @@
  */
 package de.civitascore.configadapter.nifi.flow;
 
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.compiled;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.frostSink;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.mapping;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.mqttToPostgis;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.sqlToPostgis;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -18,8 +23,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
-import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
-import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
+import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
+import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
+import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -27,75 +34,10 @@ import org.junit.jupiter.api.Test;
 class NifiFlowBuilderTest {
 
   private final ObjectMapper mapper = new ObjectMapper();
-  private final NifiFlowBuilder builder = new NifiFlowBuilder();
-
-  private List<UpdateRecordProperty> mapping() {
-    return List.of(
-        new UpdateRecordProperty(
-            "/title", "/name", RecordPathCompiler.ReplacementStrategy.RECORD_PATH_VALUE));
-  }
+  private final NifiFlowBuilder builder = NifiTestFixtures.flowBuilder();
 
   private JsonNode build(FlowBuildSpec spec) throws Exception {
     return mapper.readTree(builder.build(spec));
-  }
-
-  private FlowBuildSpec mqttToPostgis(List<UpdateRecordProperty> mapping) {
-    return new FlowBuildSpec(
-        "pipeline-abc",
-        SourceType.MQTT,
-        Map.of("Broker URI", "tcp://mosquitto:1883", "Topic Filter", "sensors/+/temp"),
-        SinkType.POSTGIS,
-        Map.of("Table Name", "sensor_observations"),
-        mapping,
-        Map.of(
-            "PostGISConnectionPool",
-            Map.of("Database Connection URL", "jdbc:postgresql://db:5432/x", "Database User", "u")),
-        null);
-  }
-
-  /**
-   * A SQL-source → PostGIS-sink flow. Mirrors the {@code datasources/contract} SQL config shape
-   * ({@code table}/{@code columns}/{@code where}): the source pulls records from a table over a
-   * dedicated source-side connection pool, the sink writes them to PostGIS over its own pool.
-   */
-  private FlowBuildSpec sqlToPostgis() {
-    return sqlToPostgis(null);
-  }
-
-  private FlowBuildSpec sqlToPostgis(String sourceCron) {
-    return new FlowBuildSpec(
-        "pipeline-sql",
-        SourceType.SQL,
-        Map.of("Table Name", "events", "Columns to Return", "*"),
-        SinkType.POSTGIS,
-        Map.of("Table Name", "sensor_observations"),
-        mapping(),
-        Map.of(
-            "SourceConnectionPool",
-            Map.of(
-                "Database Connection URL", "jdbc:postgresql://src:5432/in",
-                "Database User", "reader"),
-            "PostGISConnectionPool",
-            Map.of("Database Connection URL", "jdbc:postgresql://db:5432/x", "Database User", "u")),
-        sourceCron);
-  }
-
-  private FlowBuildSpec frostSink() {
-    return new FlowBuildSpec(
-        "pipeline-frost",
-        SourceType.MQTT,
-        Map.of("Broker URI", "tcp://mosquitto:1883", "Topic Filter", "sensors/+/temp"),
-        SinkType.FROST,
-        Map.of(
-            NifiFlowBuilder.FROST_BASE_URL,
-            "http://frost:8080/FROST-Server/v1.1",
-            NifiFlowBuilder.FROST_PROJECT_ID,
-            "7"),
-        // FROST: the source delivers the STA envelope; no record mapping (find-or-create works on
-        // the raw JSON).
-        List.of(),
-        Map.of(),
-        null);
   }
 
   /** Whether any processor of the given type has a property whose value contains the substring. */
@@ -313,12 +255,13 @@ class NifiFlowBuilderTest {
                 unscoped.sourceProperties(),
                 SinkType.FROST,
                 Map.of(
-                    NifiFlowBuilder.FROST_BASE_URL,
+                    FrostSinkStage.FROST_BASE_URL,
                     "http://frost:8080/FROST-Server/v1.1",
-                    NifiFlowBuilder.FROST_PROJECT_ID,
+                    FrostSinkStage.FROST_PROJECT_ID,
                     "7"),
                 List.of(),
                 Map.of(),
+                null,
                 null));
 
     assertTrue(
@@ -351,9 +294,28 @@ class NifiFlowBuilderTest {
             SourceType.MQTT,
             Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", "t"),
             SinkType.FROST,
-            Map.of(NifiFlowBuilder.FROST_BASE_URL, "http://frost:8080/FROST-Server/v1.1"),
+            Map.of(FrostSinkStage.FROST_BASE_URL, "http://frost:8080/FROST-Server/v1.1"),
             List.of(),
             Map.of(),
+            null,
+            null);
+    assertThrows(FatalAdapterException.class, () -> builder.build(spec));
+  }
+
+  @Test
+  void frostSinkWithoutBaseUrlIsRejected() {
+    // The build is reachable without the bind half; a missing base URL would deploy relative
+    // InvokeHTTP URLs that post observations into the void.
+    FlowBuildSpec spec =
+        new FlowBuildSpec(
+            "pipeline-frost-nobase",
+            SourceType.MQTT,
+            Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", "t"),
+            SinkType.FROST,
+            Map.of(FrostSinkStage.FROST_PROJECT_ID, "7"),
+            List.of(),
+            Map.of(),
+            null,
             null);
     assertThrows(FatalAdapterException.class, () -> builder.build(spec));
   }
@@ -407,12 +369,46 @@ class NifiFlowBuilderTest {
   }
 
   @Test
-  void frostSinkDefensivelyDropsRecordMapping() throws Exception {
-    // Defensive low-level behavior: a record-based UpdateRecord cannot run in the raw-JSON
-    // find-or-create path, so the builder builds none even if mapping properties are passed. In
-    // production this combination never reaches the builder — FlowDeploymentPlanner rejects a FROST
-    // sink with a configured mapping (see frostSinkWithMappingIsRejected) — so the mapping is never
-    // silently honored end-to-end.
+  void chainedMappingsMaterializePerNodeWithStableFirstIds() throws Exception {
+    FlowBuildSpec single = mqttToPostgis(mapping());
+    FlowBuildSpec chained =
+        new FlowBuildSpec(
+            single.processGroupName(),
+            single.sourceType(),
+            single.sourceProperties(),
+            single.sinkType(),
+            single.sinkProperties(),
+            List.of(new CompiledMapping(mapping()), new CompiledMapping(mapping())),
+            single.controllerServiceProperties(),
+            null,
+            null);
+
+    List<String> singleIds = updateRecordIds(build(single));
+    List<String> chainedIds = updateRecordIds(build(chained));
+
+    assertEquals(1, singleIds.size());
+    assertEquals(2, chainedIds.size());
+    // The first chain position omits the index, so single-mapping flows already deployed to a
+    // live NiFi map back to the same component on redeploy (redeploy idempotency).
+    assertEquals(singleIds.get(0), chainedIds.get(0));
+    assertFalse(chainedIds.get(0).equals(chainedIds.get(1)));
+  }
+
+  private List<String> updateRecordIds(JsonNode flow) {
+    List<String> ids = new ArrayList<>();
+    for (JsonNode c : flow.get("flowContents").get("processors")) {
+      if (c.path("type").asText().endsWith("UpdateRecord")) {
+        ids.add(c.get("identifier").asText());
+      }
+    }
+    return ids;
+  }
+
+  @Test
+  void frostSinkWithMappingButNoEnvelopePlanIsRejected() {
+    // The builder is reachable directly (not only through the planner): a compiled mapping heading
+    // into the raw-JSON find-or-create without an envelope rebuild would silently vanish inside
+    // the envelope — the build must fail instead of dropping the transformation.
     FlowBuildSpec spec =
         new FlowBuildSpec(
             "pipeline-frost-map",
@@ -420,19 +416,39 @@ class NifiFlowBuilderTest {
             Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", "t"),
             SinkType.FROST,
             Map.of(
-                NifiFlowBuilder.FROST_BASE_URL,
+                FrostSinkStage.FROST_BASE_URL,
                 "http://frost:8080/x",
-                NifiFlowBuilder.FROST_PROJECT_ID,
+                FrostSinkStage.FROST_PROJECT_ID,
                 "7"),
-            mapping(),
+            compiled(mapping()),
             Map.of(),
+            null,
             null);
-    JsonNode flow = build(spec);
-    for (JsonNode processor : flow.get("flowContents").get("processors")) {
-      assertFalse(
-          processor.path("type").asText().endsWith("UpdateRecord"),
-          "FROST find-or-create must not build a record-mapping processor");
-    }
+    FatalAdapterException ex = assertThrows(FatalAdapterException.class, () -> builder.build(spec));
+    assertTrue(
+        ex.getMessage()
+            .contains("a record mapping was compiled for a raw-JSON sink but no envelope plan"));
+  }
+
+  @Test
+  void postgisSinkRejectsAPreRegionPlan() {
+    // The pre-region slot is sink-neutral; a sink that cannot consume the variant must fail the
+    // build instead of silently dropping the compiled transform output.
+    FlowBuildSpec spec =
+        new FlowBuildSpec(
+            "pipeline-postgis-preregion",
+            SourceType.MQTT,
+            Map.of("Broker URI", "tcp://mqtt:1883", "Topic Filter", "t"),
+            SinkType.POSTGIS,
+            Map.of("Table Name", "t"),
+            compiled(mapping()),
+            Map.of(
+                "PostGISConnectionPool",
+                Map.of("Database Connection URL", "jdbc:postgresql://db:5432/x")),
+            null,
+            new FrostEnvelopePlan("{}", List.of()));
+    FatalAdapterException ex = assertThrows(FatalAdapterException.class, () -> builder.build(spec));
+    assertTrue(ex.getMessage().contains("POSTGIS sink cannot consume a pre-region plan"));
   }
 
   @Test
@@ -469,14 +485,15 @@ class NifiFlowBuilderTest {
             Map.of("Table Name", "events"),
             SinkType.FROST,
             Map.of(
-                NifiFlowBuilder.FROST_BASE_URL,
+                FrostSinkStage.FROST_BASE_URL,
                 "http://frost:8080",
-                NifiFlowBuilder.FROST_PROJECT_ID,
+                FrostSinkStage.FROST_PROJECT_ID,
                 "7"),
             List.of(),
             Map.of(
                 "SourceConnectionPool",
                 Map.of("Database Connection URL", "jdbc:postgresql://s/in")),
+            null,
             null);
     assertThrows(FatalAdapterException.class, () -> builder.build(spec));
   }
@@ -612,6 +629,73 @@ class NifiFlowBuilderTest {
         "0 15 10 * * ?",
         source.get("schedulingPeriod").asText(),
         "explicit cron node overrides the fragment's default schedule");
+  }
+
+  @Test
+  void buildsFrostEnvelopeRegionForMappedFlow() throws Exception {
+    // A mapped FROST flow rebuilds the record into the STA envelope before the legs: the record
+    // chain (Convert + UpdateRecord) runs, then split $[*] → capture (flat keys) → ReplaceText
+    // (generated template) feeds both find-or-create legs.
+    JsonNode flow = build(NifiTestFixtures.frostSinkWithMapping());
+
+    // throws if absent: the MQTT payload must be converted to records for the mapping
+    component(flow, "processors", "ConvertRecord");
+    JsonNode update = component(flow, "processors", "UpdateRecord");
+    assertEquals(
+        "/station",
+        update.get("properties").get("/sta_0_name").asText(),
+        "mapping writes the flat intermediate fields");
+
+    JsonNode split = componentByProperty(flow, "SplitJson", "JsonPath Expression", "$[*]");
+    assertTrue(split != null, "record-writer array must be split into single records");
+    JsonNode capture = componentByProperty(flow, "EvaluateJsonPath", "sta_0_name", "$.sta_0_name");
+    assertTrue(capture != null, "flat fields must be captured into attributes");
+    assertTrue(
+        hasProcessor(flow, "ReplaceText", "Replacement Value", "\"things\":[{\"name\":"),
+        "content must be replaced with the generated envelope template");
+
+    // the envelope rebuild feeds BOTH legs — their splits consume from the ReplaceText
+    JsonNode thingSplit = componentByProperty(flow, "SplitJson", "JsonPath Expression", "$.things");
+    JsonNode obsSplit =
+        componentByProperty(flow, "SplitJson", "JsonPath Expression", "$.observations");
+    JsonNode envelope = null;
+    for (JsonNode c : flow.get("flowContents").get("processors")) {
+      if (c.path("type").asText().endsWith("ReplaceText")
+          && c.path("properties").path("Replacement Value").asText().startsWith("{\"things\"")) {
+        envelope = c;
+      }
+    }
+    assertTrue(envelope != null, "envelope ReplaceText must exist");
+    assertTrue(
+        hasConnection(
+            flow,
+            envelope.get("identifier").asText(),
+            thingSplit.get("identifier").asText(),
+            "success"),
+        "Thing leg consumes the rebuilt envelope");
+    assertTrue(
+        hasConnection(
+            flow,
+            envelope.get("identifier").asText(),
+            obsSplit.get("identifier").asText(),
+            "success"),
+        "Observation leg consumes the rebuilt envelope");
+  }
+
+  @Test
+  void routesFrostEnvelopeRegionFailuresToLogSink() throws Exception {
+    // No silent drop in the rebuild region: staRecordSplit/staCapture/staEnvelope route 'failure'
+    // to the error sink.
+    JsonNode flow = build(NifiTestFixtures.frostSinkWithMapping());
+    String logId = component(flow, "processors", "LogMessage").get("identifier").asText();
+    JsonNode split = componentByProperty(flow, "SplitJson", "JsonPath Expression", "$[*]");
+    JsonNode capture = componentByProperty(flow, "EvaluateJsonPath", "sta_0_name", "$.sta_0_name");
+    for (JsonNode processor : List.of(split, capture)) {
+      assertFalse(autoTerminates(processor, "failure"), "must not auto-terminate failure");
+      assertTrue(
+          hasConnection(flow, processor.get("identifier").asText(), logId, "failure"),
+          "envelope-region failure must route to the log sink");
+    }
   }
 
   @Test

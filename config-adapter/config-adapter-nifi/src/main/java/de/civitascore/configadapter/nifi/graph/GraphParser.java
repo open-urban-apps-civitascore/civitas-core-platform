@@ -19,8 +19,9 @@ import java.util.Map;
 public class GraphParser {
 
   /**
-   * Parses a pipeline graph. A {@code null} or empty map yields an empty graph rather than failing,
-   * so provide-style or malformed entries are handled gracefully by the caller.
+   * Parses a pipeline graph. A {@code null} or empty map yields an empty graph rather than failing
+   * here — the {@link FlowPath} derivation rejects it with its own message (an empty graph names no
+   * datasource), which is more actionable than a parse error.
    *
    * @param data the raw graph map ({@code viewport}/{@code nodes}/{@code edges})
    * @return the parsed graph
@@ -35,17 +36,14 @@ public class GraphParser {
   @SuppressWarnings("unchecked")
   private List<GraphNode> parseNodes(Object raw) {
     List<GraphNode> nodes = new ArrayList<>();
-    if (raw instanceof List<?> list) {
-      for (Object item : list) {
-        if (item instanceof Map<?, ?> node) {
-          Map<String, Object> typed = (Map<String, Object>) node;
-          nodes.add(
-              new GraphNode(
-                  asString(typed.get("id")),
-                  asString(typed.get("type")),
-                  nodeData(typed.get("data"))));
-        }
+    for (Object item : listEntries(raw, "nodes")) {
+      if (!(item instanceof Map<?, ?> node)) {
+        throw malformedEntry("nodes", item);
       }
+      Map<String, Object> typed = (Map<String, Object>) node;
+      nodes.add(
+          new GraphNode(
+              asString(typed.get("id")), asString(typed.get("type")), nodeData(typed.get("data"))));
     }
     return List.copyOf(nodes);
   }
@@ -53,19 +51,41 @@ public class GraphParser {
   @SuppressWarnings("unchecked")
   private List<GraphEdge> parseEdges(Object raw) {
     List<GraphEdge> edges = new ArrayList<>();
-    if (raw instanceof List<?> list) {
-      for (Object item : list) {
-        if (item instanceof Map<?, ?> edge) {
-          Map<String, Object> typed = (Map<String, Object>) edge;
-          edges.add(
-              new GraphEdge(
-                  asString(typed.get("id")),
-                  asString(typed.get("source")),
-                  asString(typed.get("target"))));
-        }
+    for (Object item : listEntries(raw, "edges")) {
+      if (!(item instanceof Map<?, ?> edge)) {
+        throw malformedEntry("edges", item);
       }
+      Map<String, Object> typed = (Map<String, Object>) edge;
+      edges.add(
+          new GraphEdge(
+              asString(typed.get("id")),
+              asString(typed.get("source")),
+              asString(typed.get("target"))));
     }
     return List.copyOf(edges);
+  }
+
+  /**
+   * An absent member is a valid (empty) graph half, but a present-but-non-list value or a non-map
+   * entry is a corrupt payload: skipping it would let the derivation misreport the defect as a
+   * modelling problem ("no datasink node") instead of naming the corrupt field.
+   */
+  private static List<?> listEntries(Object raw, String member) {
+    if (raw == null) {
+      return List.of();
+    }
+    if (!(raw instanceof List<?> list)) {
+      throw new IllegalStateException("pipeline graph '" + member + "' must be a list");
+    }
+    return list;
+  }
+
+  private static IllegalStateException malformedEntry(String member, Object item) {
+    return new IllegalStateException(
+        "pipeline graph '"
+            + member
+            + "' must contain only objects, got: "
+            + (item == null ? "null" : item.getClass().getSimpleName()));
   }
 
   @SuppressWarnings("unchecked")

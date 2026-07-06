@@ -24,7 +24,9 @@ body:json {
       "viewport": { "x": 0, "y": 0, "zoom": 1 },
       "nodePositions": {
         "33333333-3333-4000-8000-000000000001": { "x": 360, "y": -40 },
+        "33333333-3333-4000-8000-000000000005": { "x": 140, "y": 100 },
         "33333333-3333-4000-8000-000000000002": { "x": 320, "y": 100 },
+        "33333333-3333-4000-8000-000000000006": { "x": 520, "y": 100 },
         "33333333-3333-4000-8000-000000000003": { "x": 740, "y": 80 }
       },
       "nodes": [
@@ -34,6 +36,13 @@ body:json {
           "position": { "x": 360, "y": -40 },
           "data": { "nodeType": "start", "label": "Start", "configured": true, "description": "Entry point of the pipeline. Execution begins here." },
           "measured": { "width": 32, "height": 32 }
+        },
+        {
+          "id": "33333333-3333-4000-8000-000000000005",
+          "type": "dataSource",
+          "position": { "x": 140, "y": 100 },
+          "data": { "label": "MQTT Source", "configured": true, "entityType": "datasource", "entityId": "{{pgDataSourceId}}", "entityMetadata": { "connector": "MQTT" } },
+          "measured": { "width": 160, "height": 48 }
         },
         {
           "id": "33333333-3333-4000-8000-000000000002",
@@ -64,6 +73,13 @@ body:json {
           "dragging": false
         },
         {
+          "id": "33333333-3333-4000-8000-000000000006",
+          "type": "geoPersistence",
+          "position": { "x": 520, "y": 100 },
+          "data": { "label": "Geospatial Data Storage", "configured": true, "entityType": "persistence", "entityId": "{{pgDataSinkId}}", "tableName": "saga_geo_observations", "dataStructureVersionId": "{{pgTargetDataStructureId}}/{{pgTargetVersionId}}", "dataStructureName": "GeoSensorTarget" },
+          "measured": { "width": 160, "height": 48 }
+        },
+        {
           "id": "33333333-3333-4000-8000-000000000003",
           "type": "end",
           "position": { "x": 740, "y": 80 },
@@ -72,8 +88,10 @@ body:json {
         }
       ],
       "edges": [
-        { "id": "33333333-3333-4000-8000-0000000000e1", "source": "33333333-3333-4000-8000-000000000001", "target": "33333333-3333-4000-8000-000000000002", "type": "smoothstep", "data": { "label": "" } },
-        { "id": "33333333-3333-4000-8000-0000000000e2", "source": "33333333-3333-4000-8000-000000000002", "target": "33333333-3333-4000-8000-000000000003", "type": "smoothstep", "data": { "label": "" } }
+        { "id": "33333333-3333-4000-8000-0000000000e1", "source": "33333333-3333-4000-8000-000000000001", "target": "33333333-3333-4000-8000-000000000005", "type": "smoothstep", "data": { "label": "" } },
+        { "id": "33333333-3333-4000-8000-0000000000e3", "source": "33333333-3333-4000-8000-000000000005", "target": "33333333-3333-4000-8000-000000000002", "type": "smoothstep", "data": { "label": "" } },
+        { "id": "33333333-3333-4000-8000-0000000000e4", "source": "33333333-3333-4000-8000-000000000002", "target": "33333333-3333-4000-8000-000000000006", "type": "smoothstep", "data": { "label": "" } },
+        { "id": "33333333-3333-4000-8000-0000000000e2", "source": "33333333-3333-4000-8000-000000000006", "target": "33333333-3333-4000-8000-000000000003", "type": "smoothstep", "data": { "label": "" } }
       ]
     }
   }
@@ -97,7 +115,7 @@ tests {
 docs {
   **PostGIS saga step 7** — Prerequisites: DataSource AVAILABLE (step 4a), DataSet created (step 5), POSTGIS DataSink created (step 6).
 
-  Creates the pipeline attached to the dataset, modelled as a CORE intermediate-representation graph. It consumes from the MQTT datasource (`pgDataSourceId`) and declares the POSTGIS sink (`pgDataSinkId`) in `dataSinkIds`.
+  Creates the pipeline attached to the dataset, modelled as a CORE intermediate-representation graph. The graph is the mandatory linear data flow `start → dataSource → mapping → geoPersistence → end`: the wired MQTT source node (`entityId` = `pgDataSourceId`) feeds the mapping, which feeds the wired POSTGIS sink node (`entityId` = `pgDataSinkId`). The adapter derives source and sink per pipeline from the graph's `entityId`s, which must also appear in `dataSourceIds`/`dataSinkIds`; a graph without a wired source or sink node is rejected at deploy.
 
   The mapping node carries an inline `mappingConfig` whose `fields` use the **geoPoint** op:
   `"$.geo": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" }`.
