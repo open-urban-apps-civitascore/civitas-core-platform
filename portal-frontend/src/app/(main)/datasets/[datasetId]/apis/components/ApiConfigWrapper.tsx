@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { FormEvent } from 'react'
 
+import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
@@ -83,19 +84,17 @@ export const ApiConfigWrapper = (props: ApiConfigWrapperProps) => {
       </Button>
     </div>
   ) : (
-    <div className="flex items-center gap-2 px-[var(--layout-padding)]">
-      <Button data-testid="cancelButton" type="button" variant="secondary" onClick={onExit} disabled={isLoading}>
-        {tCommon('actions.exit')}
-      </Button>
-      <Button
-        data-testid="confirmButton"
-        type="submit"
-        form="api-config-form"
-        disabled={!hasUnsavedChanges || !isFormValid || isLoading}
-      >
-        {tCommon('actions.submit')}
-      </Button>
-    </div>
+    <ActionButtons
+      hasCard={false}
+      wrapperClassname="px-[var(--layout-padding)]"
+      confirmButtonType="submit"
+      formId="api-config-form"
+      onCancelClick={onExit}
+      isCancelButtonDisabled={isLoading}
+      isConfirmButtonDisabled={!hasUnsavedChanges || !isFormValid || isLoading}
+      cancelButtonTitle={tCommon('actions.exit')}
+      confirmButtonTitle={tCommon('actions.submit')}
+    />
   )
 
   return (
