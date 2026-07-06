@@ -111,7 +111,7 @@ export const useDatasourceForm = (
   const hasStatusChanged = dataSourceStatus !== datasource.dataSourceStatus
 
   // Zod v4 discriminatedUnion safeParse can throw on stale keys
-  const canSetAvailable = useMemo(() => {
+  const canStage = useMemo(() => {
     try {
       return DatasourceFormAvailableSchema.safeParse(formValues).success
     } catch {
@@ -136,12 +136,12 @@ export const useDatasourceForm = (
 
   // Revert to draft when required fields become empty
   useEffect(() => {
-    if (dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
+    if (dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE && !canStage) {
       form.setValue('dataSourceStatus', DATASOURCE_STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSetAvailable, dataSourceStatus, form])
+  }, [canStage, dataSourceStatus, form])
 
   const completedTabs = useMemo((): DatasourceTab[] => {
     const completed: DatasourceTab[] = []
@@ -281,7 +281,7 @@ export const useDatasourceForm = (
     hasStatusChanged,
     handleStatusChange,
     isDraftMode,
-    canSetAvailable,
+    canStage,
     completedTabs,
     submitDatasource,
     resetToInitialState,

@@ -202,7 +202,7 @@ describe('DatasetOverview', () => {
   })
 
   describe('Status availability and auto-revert', () => {
-    describe('READY and AVAILABLE are disabled when canSetAvailable is false', () => {
+    describe('READY and AVAILABLE are disabled when canStage is false', () => {
       it('when no pipelines are present', async () => {
         renderComponent({
           dataset: makeDraftDataset({ pipelines: [] }),
@@ -258,7 +258,7 @@ describe('DatasetOverview', () => {
       })
     })
 
-    describe('READY and AVAILABLE are enabled when canSetAvailable is true', () => {
+    describe('READY and AVAILABLE are enabled when canStage is true', () => {
       it('when pipelines present, assignments set, and form passes strict schema', async () => {
         renderComponent({
           dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
@@ -307,7 +307,7 @@ describe('DatasetOverview', () => {
       })
     })
 
-    describe('auto-reverts status to DRAFT and shows toast when canSetAvailable becomes false', () => {
+    describe('auto-reverts status to DRAFT and shows toast when canStage becomes false', () => {
       it.each([{ dataSetStatus: 'READY' as const }, { dataSetStatus: 'AVAILABLE' as const }])(
         'reverts from $dataSetStatus to DRAFT when assignments drop to 0',
         async ({ dataSetStatus }) => {

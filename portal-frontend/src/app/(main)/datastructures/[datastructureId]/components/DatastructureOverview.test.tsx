@@ -50,7 +50,7 @@ const mockForm = {
 vi.mock('../hooks/useDatastructure', () => ({
   useDatastructure: () => ({
     areAssignmentsDirty: false,
-    canSetAvailable: false,
+    canStage: false,
     canSetDraft: true,
     completedTabs: [],
     form: mockForm,

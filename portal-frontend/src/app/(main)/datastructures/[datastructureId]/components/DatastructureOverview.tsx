@@ -95,7 +95,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
 
   const {
     areAssignmentsDirty,
-    canSetAvailable,
+    canStage,
     completedTabs,
     form: datastructureForm,
     handleStatusChange,
@@ -186,7 +186,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
             status={datastructureStatus}
             onStatusChange={handleStatusChange}
             statusOptions={Object.values(DATASTRUCTURE_STATUS_TYPES)}
-            canSetAvailable={canSetAvailable}
+            canStage={canStage}
             canRelease={canRelease}
             statusHint={statusHint}
             confirmButtonType="button"
