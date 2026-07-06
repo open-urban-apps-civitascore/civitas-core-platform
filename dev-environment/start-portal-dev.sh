@@ -466,7 +466,6 @@ echo "  - APISIX + etcd"
 echo "  - OPA + AuthZ Repository"
 echo "  - FROST Server"
 echo "  - Apache NiFi"
-echo "  - Model Atlas + Apicurio Registry"
 echo
 
 cd "$SCRIPT_DIR/postgres"
@@ -622,10 +621,6 @@ else
     echo "           Dataset pipeline deployment will not work."
 fi
 
-cd "$SCRIPT_DIR/modelatlas"
-$DOCKER_COMPOSE up -d
-echo "  Model Atlas + Apicurio Registry started"
-
 cd "$SCRIPT_DIR"
 
 echo
@@ -674,19 +669,6 @@ wait_for_service "Keycloak" "http://localhost:8080/realms/master" 60
 wait_for_service "Kafka UI" "http://localhost:8090" 30
 wait_for_service "OPA" "http://localhost:8181/health" 30
 wait_for_service "AuthZ Repository" "http://localhost:8091/actuator/health" 60
-# Model Atlas has no health endpoint — check that it responds (any HTTP status)
-MA_READY=false
-for i in $(seq 1 30); do
-    if curl -s -o /dev/null "http://localhost:8086/" 2>/dev/null; then
-        echo "  Model Atlas is ready"
-        MA_READY=true
-        break
-    fi
-    sleep 2
-done
-if [ "$MA_READY" = false ]; then
-    echo "  WARNING: Model Atlas may not be ready yet (timeout)"
-fi
 
 # macOS: disable Keycloak https requirement on master realm on macos
 if [ "$OS_TYPE" = "Darwin" ]; then
@@ -899,7 +881,6 @@ cd "$BACKEND_DIR"
 export SPRING_DATASOURCE_USERNAME=admin
 export SPRING_DATASOURCE_PASSWORD=admin
 export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable&gssEncMode=disable"
-export MODEL_ATLAS_BASE_URL=http://localhost:8086
 mvn clean spring-boot:run -Dspring-boot.run.profiles=local,init,postgres -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION
 exec bash
 SCRIPT_EOF
@@ -983,7 +964,6 @@ if [ "$backend_option" = "3" ]; then
     echo "  SPRING_DATASOURCE_USERNAME=admin"
     echo "  SPRING_DATASOURCE_PASSWORD=admin"
     echo "  SPRING_DATASOURCE_URL=\"jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable&gssEncMode=disable\""
-    echo "  MODEL_ATLAS_BASE_URL=http://localhost:8086"
     echo
 fi
 
@@ -1198,7 +1178,6 @@ echo "  APISIX Admin API: http://localhost:9180"
 echo "  Apache NiFi:      https://localhost:8443/nifi (${SINGLE_USER_CREDENTIALS_USERNAME:-admin} / ${SINGLE_USER_CREDENTIALS_PASSWORD:-see nifi/.env})"
 echo "  OPA:              http://localhost:8181"
 echo "  AuthZ Repository: http://localhost:8091"
-echo "  Model Atlas:      http://localhost:8086"
 echo "  Apicurio Registry UI: http://localhost:8888"
 echo
 echo "======================================================"
@@ -1235,5 +1214,4 @@ echo "  cd dev-environment/apisix && docker compose down"
 echo "  cd dev-environment/frost && docker compose down"
 echo "  cd dev-environment/geoserver && docker compose down"
 echo "  cd dev-environment/nifi && docker compose down"
-echo "  cd dev-environment/modelatlas && docker compose down"
 echo

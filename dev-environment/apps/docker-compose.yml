@@ -120,7 +120,6 @@ services:
       KEYCLOAK_ISSUER_URI: ${KC_HOSTNAME:-http://localhost:8080}
       KEYCLOAK_REALM: civitas-core
       KEYCLOAK_TARGET_REALM: civitas-core
-      MODEL_ATLAS_BASE_URL: http://model-atlas:8080
       APP_URL: http://localhost:8089
       SERVER_PORT: 8089
       SPRING_PROFILES_ACTIVE: local,postgres,init
