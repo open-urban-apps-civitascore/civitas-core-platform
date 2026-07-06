@@ -740,7 +740,7 @@
       "id": "0a91ce55-bbbb-4ccc-8ddd-000000001838",
       "clientId": "nifi",
       "name": "Apache NiFi service account (#1838)",
-      "description": "Confidential service-account client the config-adapter uses to authenticate to NiFi via the OIDC client-credentials grant. NiFi validates the issued access token against this realm and maps its 'sub' claim (this client's service-account user id, pinned in the realm 'users') to the NiFi user identity used as INITIAL_ADMIN_IDENTITY.",
+      "description": "Confidential service-account client (#1838) the config-adapter uses to authenticate to NiFi via the OIDC client-credentials grant. NiFi maps the token 'sub' claim (this client's service-account user id) to INITIAL_ADMIN_IDENTITY.",
       "rootUrl": "",
       "adminUrl": "",
       "baseUrl": "",
