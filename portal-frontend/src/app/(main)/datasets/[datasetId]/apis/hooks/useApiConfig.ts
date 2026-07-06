@@ -73,6 +73,7 @@ export const useApiConfig = <TFormData extends FormData>({
 
   const isDirty = form.formState.isDirty
   const dirtyFields = form.formState.dirtyFields
+  const isValid = form.formState.isValid
 
   const updateMode = useCallback(
     (isEditing: boolean) => {
@@ -92,6 +93,10 @@ export const useApiConfig = <TFormData extends FormData>({
   const handleSaveBaseInfo = async (data: TFormData) => {
     if (!isCreate && !hasDirtyField(dirtyFields.baseInfo)) return
     const newApi = buildPayloadData(data)
+    const redirectUrl = `/datasets/${dataset.id}/apis/${newApi.slug}`
+
+    setUrlPreviewSlug(newApi.slug)
+
     if (isCreate) {
       await createNamedApi.mutateAsync({
         datasetId: dataset.id,
@@ -99,7 +104,7 @@ export const useApiConfig = <TFormData extends FormData>({
         existingApis: otherNamedApis,
       })
       toast.success(t('messages.createSuccess'))
-      router.push(`/datasets/${dataset.id}/apis/${newApi.slug}?mode=edit`)
+      router.push(`${redirectUrl}?mode=edit`)
     } else {
       const otherInputs: NamedApiPayload[] = otherNamedApis.map(a => ({
         name: a.name,
@@ -113,6 +118,9 @@ export const useApiConfig = <TFormData extends FormData>({
       form.reset(data)
       router.refresh()
       updateMode(false)
+      if (newApi.slug !== initialSlug) {
+        router.push(redirectUrl)
+      }
     }
   }
 
@@ -209,18 +217,15 @@ export const useApiConfig = <TFormData extends FormData>({
     return isSaved
   }
 
-  const handleSlugBlur = (_event: FocusEvent<HTMLInputElement>) => {
-    setUrlPreviewSlug((form.getValues as (name: 'slug') => string)('slug'))
-  }
-
   const handleExit = () => {
-    if (isDirty) {
+    if (isDirty && isValid) {
       setIsExitModalOpen(true)
       return
     }
     if (isCreate) {
       router.push(`/datasets/${dataset.id}`)
     } else {
+      form.reset(initialFormData)
       updateMode(false)
     }
   }
@@ -246,6 +251,10 @@ export const useApiConfig = <TFormData extends FormData>({
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     void handleSave()
+  }
+
+  const handleSlugBlur = (_event: FocusEvent<HTMLInputElement>) => {
+    setUrlPreviewSlug(form.getValues('baseInfo.slug' as Path<TFormData>) as string)
   }
 
   useRegisterUnsavedChanges(isDirty, handleSave)

@@ -102,6 +102,7 @@ const mockHasPermission = (permissions: PermissionName[]) => {
     hasPermission: (permission: string) => permissions.includes(permission as PermissionName),
     hasAnyPermission: (...perms: string[]) => perms.some(p => permissions.includes(p as PermissionName)),
     hasScopedPermission: () => false,
+    hasPermissionInScope: () => false,
   })
 }
 
