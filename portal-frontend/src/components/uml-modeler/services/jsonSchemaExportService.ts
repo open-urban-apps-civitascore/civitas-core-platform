@@ -71,7 +71,7 @@ const GEOMETRY_TYPES = new Set([
 /**
  * GeoJSON reference base for geometry types.
  */
-const GEOJSON_REF_BASE = 'https://geojson.org/schema'
+export const GEOJSON_REF_BASE = 'https://geojson.org/schema'
 
 /** Lower-cases the first character, leaving the rest untouched. */
 const lowerFirst = (value: string): string => value.charAt(0).toLowerCase() + value.slice(1)
