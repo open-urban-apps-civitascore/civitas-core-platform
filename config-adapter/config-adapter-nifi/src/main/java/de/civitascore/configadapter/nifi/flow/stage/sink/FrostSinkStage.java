@@ -14,6 +14,7 @@ import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.setProp;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.model.dataset.DataStructureSchema;
 import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.stage.BuildContext;
@@ -23,7 +24,8 @@ import de.civitascore.configadapter.nifi.flow.stage.PayloadForm;
 import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
 import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
-import de.civitascore.configadapter.nifi.mapping.FrostEnvelopePlan;
+import de.civitascore.configadapter.nifi.mapping.FrostEntityPlan;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaKeys;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import de.civitascore.configadapter.nifi.mapping.SinkPreRegionPlan;
 import java.util.List;
@@ -118,12 +120,49 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
           "FROST sink requires the saga's 'projectId' (result of the FROST create-project step)");
     }
     try {
-      return new FrostSinkSpec(ctx.frostProjectId());
+      return new FrostSinkSpec(ctx.frostProjectId(), resolveStaKeys(datasink));
     } catch (IllegalArgumentException e) {
       // e.g. a non-numeric projectId; keep the raw detail internal and publish only the safe
       // external message for the error code.
       throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, e, e.getMessage());
     }
+  }
+
+  /**
+   * The match keys of the sink's Thing-shaped target structure ({@code datasinks[].dataStructure},
+   * the mapping's target the portal embeds at publish time): per entity class the {@code
+   * x-core-primaryKey} attributes, falling back to a declared {@code reference} attribute. Null
+   * when the datasink carries no structure — a passthrough flow needs none; a mapped flow is
+   * rejected later by the compiler, which alone knows a mapping is present.
+   */
+  @SuppressWarnings("unchecked")
+  private static StaKeys resolveStaKeys(Map<String, Object> datasink) {
+    if (!(datasink.get("dataStructure") instanceof Map<?, ?> ds)) {
+      return null;
+    }
+    Map<String, Object> schema = (Map<String, Object>) ds;
+    return new StaKeys(entityKeys(schema, List.of()), entityKeys(schema, List.of("Datastreams")));
+  }
+
+  private static List<String> entityKeys(Map<String, Object> schema, List<String> path) {
+    List<String> marked;
+    try {
+      marked = DataStructureSchema.primaryKeyColumnsAt(schema, path);
+    } catch (IllegalArgumentException absent) {
+      // No class at this path (e.g. a Thing-only structure without Datastreams) — the compiler
+      // rejects a mapping that touches the entity anyway.
+      return List.of();
+    }
+    if (!marked.isEmpty()) {
+      return marked;
+    }
+    // Fallback for structures without a {id} marker: a declared 'reference' attribute keeps the
+    // pre-marker convention working; neither → empty, rejected by the compiler once touched.
+    return DataStructureSchema.resolveDefinitionAt(schema, path)
+            .properties()
+            .containsKey("reference")
+        ? List.of("reference")
+        : List.of();
   }
 
   @Override
@@ -191,61 +230,215 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     // Things live inside the dataset's FROST project so they are reachable through the
     // project-scoped named API; Observations stay at the root — their scope flows through the
     // resolved Datastream (whose lookup is project-filtered below).
-    String thingBase = base + "/Projects(" + projectId + ")";
-    Processor upstream = buildEnvelopeRegion(ctx, upstreamTail, errorSink);
-    buildThingLeg(ctx, thingBase, upstream, errorSink);
-    buildObservationLeg(ctx, base, projectId, upstream, errorSink);
-  }
-
-  /**
-   * The envelope-rebuild pre-region for a mapped flow: split the record-writer array into single
-   * records ({@code $[*]} — the JsonRecordSetWriter always writes an array, and a SQL source
-   * delivers many records per FlowFile; this is also what enforces 1 record = 1 STA element),
-   * capture the flat mapped fields into FlowFile attributes, and ReplaceText the content with the
-   * generated envelope template so the unchanged find-or-create legs consume their usual shape. A
-   * passthrough flow (no mapping) returns {@code upstreamTail} untouched — that path stays
-   * byte-identical.
-   */
-  private Processor buildEnvelopeRegion(
-      BuildContext ctx, Processor upstreamTail, Processor errorSink) throws FatalAdapterException {
     SinkPreRegionPlan handoff = ctx.spec().sinkPreRegion();
     if (handoff == null) {
       // The build is reachable directly with a hand-composed spec, not only through the
-      // planner: a compiled
-      // mapping without an envelope rebuild plan would silently vanish inside the envelope — fail
-      // the build instead.
+      // planner: a compiled mapping without an entity plan would silently deploy an
+      // untransformed passthrough — fail the build instead.
       if (ctx.spec().mappingPresent()) {
         throw new FatalAdapterException(
             AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-            "a record mapping was compiled for a raw-JSON sink but no envelope plan was built");
+            "a record mapping was compiled for a raw-JSON sink but no entity plan was built");
       }
-      return upstreamTail;
+      // Passthrough: the source delivers the STA envelope itself; this path stays byte-identical.
+      String thingBase = base + "/Projects(" + projectId + ")";
+      buildThingLeg(ctx, thingBase, upstreamTail, errorSink);
+      buildObservationLeg(ctx, base, projectId, upstreamTail, errorSink);
+      return;
     }
-    if (!(handoff instanceof FrostEnvelopePlan plan)) {
+    if (!(handoff instanceof FrostEntityPlan plan)) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
           "FROST sink cannot consume the pre-region plan " + handoff.getClass().getSimpleName());
     }
+    buildMappedChain(ctx, plan, base, projectId, upstreamTail, errorSink);
+  }
+
+  /**
+   * The mapped flow: one linear find-or-create chain per record. The pre-region splits the
+   * record-writer array into single records ({@code $[*]} — the JsonRecordSetWriter always writes
+   * an array, and a SQL source delivers many records per FlowFile; this is also what enforces 1
+   * record = 1 Thing) and captures the flat mapped fields into FlowFile attributes; every later
+   * stage is attribute-driven, so no body capture/restore is needed. The stages run strictly in
+   * sequence — Thing before Datastream before Observation — because each entity's create needs its
+   * parent's {@code @iot.id}; parallel legs would race a brand-new Thing against its first
+   * observation.
+   *
+   * <p>Each entity stage is find-or-create: GET by the plan's match-key filter, route on the
+   * extracted {@code @iot.id}. A miss on a creatable entity POSTs the plan's body template and
+   * re-GETs the id (no response parsing — creation is rare, one extra GET is cheap and both paths
+   * end in the same attribute); a miss on a lookup-only entity routes to the error sink, matching
+   * the passthrough legs' semantics.
+   */
+  private void buildMappedChain(
+      BuildContext ctx,
+      FrostEntityPlan plan,
+      String base,
+      String projectId,
+      Processor upstreamTail,
+      Processor errorSink)
+      throws FatalAdapterException {
     Processor split = ctx.loadProcessor(Fragment.SPLIT_JSON, "split", "staRecordSplit");
     setProp(split, "JsonPath Expression", "$[*]");
     Processor capture = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", "staCapture");
     for (String key : plan.flatKeys()) {
       setProp(capture, key, "$." + key);
     }
-    Processor envelope = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "staEnvelope");
-    setProp(envelope, "Replacement Value", plan.template());
-
     ctx.addProcessor(split);
     ctx.addProcessor(capture);
-    ctx.addProcessor(envelope);
     ctx.addChainConnection(upstreamTail, split);
     ctx.addChainConnection(split, capture);
-    ctx.addChainConnection(capture, envelope);
-    // A record that fails to split, capture or rebuild must be logged, never dropped silently.
+    // A record that fails to split or capture must be logged, never dropped silently.
     ctx.routeFailure(split, errorSink);
     ctx.routeFailure(capture, errorSink);
-    ctx.routeFailure(envelope, errorSink);
-    return envelope;
+
+    String thingBase = base + "/Projects(" + projectId + ")";
+    List<Tail> tails =
+        buildEntityStage(
+            ctx,
+            "thing",
+            thingBase + "/Things?$filter=" + filterExpression(plan.thingFilter(), null),
+            FrostEntityPlan.THING_ID_ATTRIBUTE,
+            plan.thingBody(),
+            thingBase + "/Things",
+            List.of(new Tail(capture, "matched")),
+            errorSink);
+
+    if (!plan.datastreamFilter().isEmpty()) {
+      // The Datastream lookup filters on Thing/Projects/id: Datastreams are not project-scoped
+      // themselves, so a match-key collision with another dataset must not resolve across
+      // datasets.
+      tails =
+          buildEntityStage(
+              ctx,
+              "ds",
+              base + "/Datastreams?$filter=" + filterExpression(plan.datastreamFilter(), projectId),
+              FrostEntityPlan.DS_ID_ATTRIBUTE,
+              plan.datastreamBody(),
+              base + "/Datastreams",
+              tails,
+              errorSink);
+    }
+
+    if (plan.observationBody() != null) {
+      Processor renderBody = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", "obsBody");
+      setProp(renderBody, "Replacement Value", plan.observationBody());
+      Processor post = ctx.loadProcessor(Fragment.INVOKE_HTTP, null, "obsPost");
+      setProp(post, "HTTP Method", "POST");
+      setProp(post, "HTTP URL", base + "/Observations");
+      setProp(post, "Request Content-Type", "application/json");
+      ctx.addProcessor(renderBody);
+      ctx.addProcessor(post);
+      connect(ctx, tails, renderBody);
+      ctx.addChainConnection(renderBody, post);
+      ctx.routeFailure(renderBody, errorSink);
+      routeHttpFailures(ctx, post, errorSink);
+    }
+    // Without an observation body the chain ends after the last entity stage; the tails'
+    // relationships stay auto-terminated — the metadata is ensured, nothing more to write.
+  }
+
+  /**
+   * One find-or-create stage. Returns the tails both outcomes converge on: the found route (the id
+   * attribute set by the lookup) and — for a creatable entity — the re-GET's extraction (the id of
+   * the just-created entity).
+   */
+  private List<Tail> buildEntityStage(
+      BuildContext ctx,
+      String disc,
+      String lookupUrl,
+      String idAttribute,
+      String body,
+      String postUrl,
+      List<Tail> upstream,
+      Processor errorSink)
+      throws FatalAdapterException {
+    Processor get = ctx.loadProcessor(Fragment.INVOKE_HTTP, "Response", disc + "Get");
+    setProp(get, "HTTP Method", "GET");
+    setProp(get, "HTTP URL", lookupUrl);
+    Processor extractId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "Id");
+    setProp(extractId, idAttribute, "$.value[0]['@iot.id']");
+    Processor route = ctx.loadProcessor(Fragment.ROUTE_ON_ATTRIBUTE, "new", disc + "Route");
+    setProp(route, "new", "${" + idAttribute + ":isEmpty()}");
+
+    for (Processor p : List.of(get, extractId, route)) {
+      ctx.addProcessor(p);
+    }
+    connect(ctx, upstream, get);
+    removeAutoTerminated(get, "Response");
+    ctx.addChainConnection(get, extractId);
+    ctx.addChainConnection(extractId, route);
+    routeHttpFailures(ctx, get, errorSink);
+    ctx.routeFailure(extractId, errorSink);
+
+    if (body == null) {
+      // Lookup-only: the entity must pre-exist; a miss is a data error, not a create.
+      ctx.addConnection(route, errorSink, "new");
+      return List.of(new Tail(route, "unmatched"));
+    }
+
+    Processor renderBody = ctx.loadProcessor(Fragment.REPLACE_TEXT, "success", disc + "Body");
+    setProp(renderBody, "Replacement Value", body);
+    Processor post = ctx.loadProcessor(Fragment.INVOKE_HTTP, "Response", disc + "Post");
+    setProp(post, "HTTP Method", "POST");
+    setProp(post, "HTTP URL", postUrl);
+    setProp(post, "Request Content-Type", "application/json");
+    Processor reGet = ctx.loadProcessor(Fragment.INVOKE_HTTP, "Response", disc + "ReGet");
+    setProp(reGet, "HTTP Method", "GET");
+    setProp(reGet, "HTTP URL", lookupUrl);
+    Processor reId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "ReId");
+    setProp(reId, idAttribute, "$.value[0]['@iot.id']");
+
+    for (Processor p : List.of(renderBody, post, reGet, reId)) {
+      ctx.addProcessor(p);
+    }
+    ctx.addConnection(route, renderBody, "new");
+    ctx.addChainConnection(renderBody, post);
+    removeAutoTerminated(post, "Response");
+    ctx.addChainConnection(post, reGet);
+    removeAutoTerminated(reGet, "Response");
+    ctx.addChainConnection(reGet, reId);
+    ctx.routeFailure(renderBody, errorSink);
+    routeHttpFailures(ctx, post, errorSink);
+    routeHttpFailures(ctx, reGet, errorSink);
+    ctx.routeFailure(reId, errorSink);
+
+    return List.of(new Tail(reId, "matched"), new Tail(route, "unmatched"));
+  }
+
+  /** A stage outcome: the processor and the relationship the next stage consumes. */
+  private record Tail(Processor processor, String relationship) {}
+
+  private void connect(BuildContext ctx, List<Tail> tails, Processor next) {
+    for (Tail tail : tails) {
+      if ("unmatched".equals(tail.relationship())) {
+        removeAutoTerminated(tail.processor(), "unmatched");
+      }
+      ctx.addConnection(tail.processor(), next, tail.relationship());
+    }
+  }
+
+  /**
+   * The OData {@code $filter} expression of a stage's lookup, URL-encoded like the passthrough
+   * legs': match-key terms conjoined with {@code and}, values escaped against quote breakout and
+   * URL-encoded at flow time. {@code projectId} appends the Thing/Projects scope term when given.
+   */
+  private String filterExpression(List<FrostEntityPlan.FilterTerm> terms, String projectId) {
+    StringBuilder filter = new StringBuilder();
+    for (FrostEntityPlan.FilterTerm term : terms) {
+      if (filter.length() > 0) {
+        filter.append("%20and%20");
+      }
+      filter
+          .append(term.frostPath())
+          .append("%20eq%20'${")
+          .append(term.flatKey())
+          .append(":replaceAll(\"'\",\"''\"):urlEncode()}'");
+    }
+    if (projectId != null) {
+      filter.append("%20and%20Thing/Projects/id%20eq%20").append(projectId);
+    }
+    return filter.toString();
   }
 
   /** Things leg: find by reference, POST only when absent (idempotent create). */

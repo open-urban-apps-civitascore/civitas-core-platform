@@ -15,25 +15,25 @@ import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.flow.stage.MappingSupport;
 import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.TransformNodeType;
+import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
 import de.civitascore.configadapter.nifi.graph.NodeKind;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.CompiledTransform;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler;
 import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
-import de.civitascore.configadapter.nifi.mapping.StaEnvelopeCompiler;
-import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * The mapping node kind: parses each node's {@code mappingConfig} and compiles the chain to
- * RecordPath (directly for a records sink, or via the STA envelope compiler for a mapped FROST
- * sink). For an envelope sink the intermediate mappings stay plain record transforms while the LAST
- * mapping before the sink carries the STA target paths and compiles into flat intermediate fields
- * plus the envelope rebuild plan the sink's build half turns into the split/capture/ReplaceText
- * pre-region.
+ * RecordPath (directly for a records sink, or via the FROST mapping compiler for a mapped FROST
+ * sink). For a FROST sink the intermediate mappings stay plain record transforms while the LAST
+ * mapping targets the sink's Thing-shaped structure and compiles into flat intermediate fields plus
+ * the entity plan the sink's build half turns into its find-or-create chain.
  */
 public final class MappingNodeType implements TransformNodeType {
 
@@ -42,7 +42,7 @@ public final class MappingNodeType implements TransformNodeType {
   private final ObjectMapper mapper = new ObjectMapper();
   private final MappingConfigParser mappingConfigParser;
   private final RecordPathCompiler recordPathCompiler;
-  private final StaEnvelopeCompiler staEnvelopeCompiler;
+  private final FrostMappingCompiler frostMappingCompiler;
 
   /**
    * Creates the mapping kind.
@@ -54,7 +54,7 @@ public final class MappingNodeType implements TransformNodeType {
       MappingConfigParser mappingConfigParser, RecordPathCompiler recordPathCompiler) {
     this.mappingConfigParser = mappingConfigParser;
     this.recordPathCompiler = recordPathCompiler;
-    this.staEnvelopeCompiler = new StaEnvelopeCompiler(recordPathCompiler);
+    this.frostMappingCompiler = new FrostMappingCompiler(recordPathCompiler);
   }
 
   @Override
@@ -63,7 +63,7 @@ public final class MappingNodeType implements TransformNodeType {
   }
 
   @Override
-  public Compilation compile(List<GraphNode> ownNodes, SinkStage<?> sink)
+  public Compilation compile(List<GraphNode> ownNodes, SinkStage<?> sink, SinkSpec sinkSpec)
       throws FatalAdapterException {
     List<MappingConfig> mappingConfigs = parse(ownNodes);
     if (sink.mappingSupport() == MappingSupport.NONE) {
@@ -72,13 +72,21 @@ public final class MappingNodeType implements TransformNodeType {
     }
     List<CompiledTransform> units = new ArrayList<>();
     if (sink.mappingSupport() == MappingSupport.ENVELOPE) {
+      // The last mapping targets the sink's Thing-shaped structure; the ones before it are
+      // ordinary record transformations between structures.
+      if (!(sinkSpec instanceof FrostSinkSpec frost) || frost.staKeys() == null) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+            "a mapped FROST pipeline requires the mapping's target data structure on the FROST"
+                + " datasink; re-publish the dataset");
+      }
       List<MappingConfig> intermediate = mappingConfigs.subList(0, mappingConfigs.size() - 1);
       for (MappingConfig config : intermediate) {
-        rejectStaTargets(config);
         units.add(new CompiledMapping(recordPathCompiler.compile(config, sink.geometryEncoding())));
       }
-      StaEnvelopeCompiler.EnvelopeCompilation compilation =
-          staEnvelopeCompiler.compile(mappingConfigs.get(mappingConfigs.size() - 1));
+      FrostMappingCompiler.FrostCompilation compilation =
+          frostMappingCompiler.compile(
+              mappingConfigs.get(mappingConfigs.size() - 1), frost.staKeys());
       units.add(new CompiledMapping(compilation.flatProperties()));
       return new Compilation(units, compilation.plan());
     }
@@ -86,23 +94,6 @@ public final class MappingNodeType implements TransformNodeType {
       units.add(new CompiledMapping(recordPathCompiler.compile(config, sink.geometryEncoding())));
     }
     return new Compilation(units, null);
-  }
-
-  /**
-   * Only the last mapping before an envelope sink may carry STA target paths — it alone compiles
-   * into the envelope. An earlier mapping targeting a catalog path would silently be treated as a
-   * plain record field named after the STA path, so reject it instead of building a wrong flow.
-   */
-  private void rejectStaTargets(MappingConfig config) throws FatalAdapterException {
-    for (String path : config.fields().keySet()) {
-      if (StaTargetCatalog.byPath(path).isPresent()) {
-        throw new FatalAdapterException(
-            AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-            "only the final mapping before a FROST sink may target STA paths; '"
-                + path
-                + "' appears in an earlier mapping");
-      }
-    }
   }
 
   /** Parses each node's config, in flow order. */

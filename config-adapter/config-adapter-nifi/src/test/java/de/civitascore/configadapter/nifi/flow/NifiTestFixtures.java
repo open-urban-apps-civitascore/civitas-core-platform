@@ -27,11 +27,12 @@ import de.civitascore.configadapter.nifi.graph.GraphParser;
 import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.CompiledTransform;
 import de.civitascore.configadapter.nifi.mapping.ConversionOp;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaKeys;
 import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
-import de.civitascore.configadapter.nifi.mapping.StaEnvelopeCompiler;
 import de.civitascore.configadapter.nifi.mapping.ValueNode;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -148,8 +149,8 @@ public final class NifiTestFixtures {
   }
 
   /**
-   * A mapping node targeting the STA envelope catalog paths (things + observations, mixed
-   * strategies via the const).
+   * A mapping node targeting the record-anchored FROST catalog paths (creatable Thing, lookup-only
+   * Datastream, observations, mixed strategies via the const).
    */
   static Map<String, Object> graphWithFrostMapping() throws Exception {
     return map(
@@ -160,13 +161,12 @@ public final class NifiTestFixtures {
             { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
             { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
                 "fields": {
-                  "$.things[].name": "$.station",
-                  "$.things[].description": { "op": "const", "value": "imported station" },
-                  "$.things[].properties.reference": "$.ref",
-                  "$.observations[].result": { "op": "toFloat", "input": "$.temp" },
-                  "$.observations[].phenomenonTime": "$.ts",
-                  "$.observations[].parameters.reference": "$.ref",
-                  "$.observations[].parameters.name": "$.dsName"
+                  "$.name": "$.station",
+                  "$.description": { "op": "const", "value": "imported station" },
+                  "$.reference": "$.ref",
+                  "$.Datastreams[].reference": "$.ref",
+                  "$.Datastreams[].Observations[].result": { "op": "toFloat", "input": "$.temp" },
+                  "$.Datastreams[].Observations[].phenomenonTime": "$.ts"
                 } } } },
             { "id": "n-sink", "type": "frost", "data": { "entityId": "sink-1" } },
             { "id": "n-end", "type": "end", "data": {} }
@@ -181,7 +181,7 @@ public final class NifiTestFixtures {
         """);
   }
 
-  /** A mapping node targeting only {@code $.things[].name} — misses the required lookup key. */
+  /** A mapping node targeting only {@code $.name} — misses the Thing match key. */
   static Map<String, Object> graphWithIncompleteFrostMapping() throws Exception {
     return map(
         """
@@ -190,7 +190,7 @@ public final class NifiTestFixtures {
             { "id": "n-start", "type": "start", "data": {} },
             { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
             { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                "fields": { "$.things[].name": "$.station" } } } },
+                "fields": { "$.name": "$.station" } } } },
             { "id": "n-sink", "type": "frost", "data": { "entityId": "sink-1" } },
             { "id": "n-end", "type": "end", "data": {} }
           ],
@@ -451,25 +451,28 @@ public final class NifiTestFixtures {
         null);
   }
 
+  /** The Thing/Datastream match keys of the mapped-FROST fixtures. */
+  static final StaKeys STA_KEYS = new StaKeys(List.of("reference"), List.of("reference"));
+
   /**
    * A mapped MQTT→FROST flow: the compiled flat mapping (mixed strategies via the const) plus the
-   * envelope rebuild plan, both produced by the real {@link StaEnvelopeCompiler} so the tests pin
-   * the actual compiler output.
+   * entity plan, both produced by the real {@link FrostMappingCompiler} so the tests pin the actual
+   * compiler output. Lookup-only datastream (no create set) with an observation — the
+   * pre-existing-datastream shape.
    */
   static FlowBuildSpec frostSinkWithMapping() throws Exception {
     Map<String, ValueNode> fields = new LinkedHashMap<>();
-    fields.put("$.things[].name", new ValueNode.CopyNode("$.station"));
-    fields.put("$.things[].description", new ValueNode.ConstNode("imported station", null));
-    fields.put("$.things[].properties.reference", new ValueNode.CopyNode("$.ref"));
+    fields.put("$.name", new ValueNode.CopyNode("$.station"));
+    fields.put("$.description", new ValueNode.ConstNode("imported station", null));
+    fields.put("$.reference", new ValueNode.CopyNode("$.ref"));
     fields.put(
-        "$.observations[].result",
+        "$.Datastreams[].Observations[].result",
         new ValueNode.ConvertNode(ConversionOp.TO_FLOAT, new ValueNode.CopyNode("$.temp"), null));
-    fields.put("$.observations[].phenomenonTime", new ValueNode.CopyNode("$.ts"));
-    fields.put("$.observations[].parameters.reference", new ValueNode.CopyNode("$.ref"));
-    fields.put("$.observations[].parameters.name", new ValueNode.CopyNode("$.dsName"));
-    StaEnvelopeCompiler.EnvelopeCompilation compilation =
-        new StaEnvelopeCompiler(new RecordPathCompiler())
-            .compile(new MappingConfig(null, null, fields));
+    fields.put("$.Datastreams[].Observations[].phenomenonTime", new ValueNode.CopyNode("$.ts"));
+    fields.put("$.Datastreams[].reference", new ValueNode.CopyNode("$.ref"));
+    FrostMappingCompiler.FrostCompilation compilation =
+        new FrostMappingCompiler(new RecordPathCompiler())
+            .compile(new MappingConfig(null, null, fields), STA_KEYS);
     return new FlowBuildSpec(
         "pipeline-frost-mapping",
         SourceType.MQTT,

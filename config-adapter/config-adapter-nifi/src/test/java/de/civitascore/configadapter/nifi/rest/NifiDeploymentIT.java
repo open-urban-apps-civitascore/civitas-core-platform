@@ -167,7 +167,7 @@ class NifiDeploymentIT extends AbstractNifiIT {
             "http://localhost:8080/FROST-Server/v1.1");
     DeploymentPlan plan =
         planner.plan(
-            new PipelineDeploymentRequest("frost-it", graph, source, new FrostSinkSpec("1")));
+            new PipelineDeploymentRequest("frost-it", graph, source, new FrostSinkSpec("1", null)));
 
     // A FROST/HTTP sink has no DBCP/JDBC-driver dependency, so the FULL deploy lifecycle
     // (upload → enable controller services → start) must succeed on real NiFi — this is exactly

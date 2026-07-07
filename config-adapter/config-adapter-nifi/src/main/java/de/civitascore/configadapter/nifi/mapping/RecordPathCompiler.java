@@ -10,7 +10,6 @@
 package de.civitascore.configadapter.nifi.mapping;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
-import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConcatNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConstNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConvertNode;
@@ -153,8 +152,8 @@ public class RecordPathCompiler {
   /**
    * Renders a {@code geoPoint} per encoding. {@code WKT} (PostGIS): {@code POINT(lon lat)} via
    * {@code concat}, with no {@code SRID=} prefix — the geometry column stamps its own SRID (a fixed
-   * one would clash with a non-4326 column). {@code GEOJSON} (FROST): rejected — RecordPath has no
-   * object constructor, so a GeoJSON object cannot be built (deferred to a dedicated FROST path).
+   * one would clash with a non-4326 column). {@code GEOJSON} (FROST): a GeoJSON Point built as a
+   * string via {@code concat} — the FROST entity template embeds it verbatim.
    */
   private String renderGeoPoint(GeoPointNode geoPoint, GeometryEncoding geometryEncoding)
       throws FatalAdapterException {
@@ -174,9 +173,20 @@ public class RecordPathCompiler {
               + quote(")")
               + ")";
       case GEOJSON ->
-          throw new FatalAdapterException(
-              AdapterErrorCode.NIFI_MAPPING_ERROR,
-              "geoPoint is not yet supported for GeoJSON (FROST) sinks");
+          // RecordPath has no object constructor, so the GeoJSON Point is built as a string —
+          // the FROST body template embeds the flat field verbatim (RAW_JSON), turning it back
+          // into a JSON object.
+          "concat("
+              + quote("{\"type\":\"Point\",\"coordinates\":[")
+              + ", "
+              + lon
+              + ", "
+              + quote(",")
+              + ", "
+              + lat
+              + ", "
+              + quote("]}")
+              + ")";
     };
   }
 

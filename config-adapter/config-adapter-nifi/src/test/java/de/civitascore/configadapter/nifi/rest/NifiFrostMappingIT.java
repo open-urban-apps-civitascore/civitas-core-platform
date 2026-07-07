@@ -28,6 +28,7 @@ import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaKeys;
 import java.io.File;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -374,17 +375,21 @@ class NifiFrostMappingIT extends AbstractNifiIT {
 
   // ─── Deployment ─────────────────────────────────────────────────────────────
 
-  /** The STA mapping every pipeline of this IT uses (things + observations, const injection). */
+  /**
+   * The record-anchored mapping every pipeline of this IT uses (Thing + lookup-only Datastream +
+   * observations, const injection). The datastreams are pre-created with a {@code
+   * properties.reference} equal to the record's {@code ref}, so the lookup-only stage resolves
+   * them.
+   */
   private static String mappingFields() {
     return """
         {
-          "$.things[].name": "$.station",
-          "$.things[].description": { "op": "const", "value": "%s" },
-          "$.things[].properties.reference": "$.ref",
-          "$.observations[].result": { "op": "toFloat", "input": "$.temp" },
-          "$.observations[].phenomenonTime": "$.ts",
-          "$.observations[].parameters.reference": "$.ref",
-          "$.observations[].parameters.name": "$.dsname"
+          "$.name": "$.station",
+          "$.description": { "op": "const", "value": "%s" },
+          "$.reference": "$.ref",
+          "$.Datastreams[].reference": "$.ref",
+          "$.Datastreams[].Observations[].result": { "op": "toFloat", "input": "$.temp" },
+          "$.Datastreams[].Observations[].phenomenonTime": "$.ts"
         }
         """
         .formatted(INJECTION_DESCRIPTION);
@@ -468,7 +473,12 @@ class NifiFrostMappingIT extends AbstractNifiIT {
       DeploymentPlan plan =
           planner.plan(
               new PipelineDeploymentRequest(
-                  pipelineId, graph, source, new FrostSinkSpec(String.valueOf(projectId))));
+                  pipelineId,
+                  graph,
+                  source,
+                  new FrostSinkSpec(
+                      String.valueOf(projectId),
+                      new StaKeys(List.of("reference"), List.of("reference")))));
       client.deployFlow(plan);
     }
   }

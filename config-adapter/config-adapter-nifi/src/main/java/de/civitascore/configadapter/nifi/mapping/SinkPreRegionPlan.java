@@ -16,4 +16,4 @@ package de.civitascore.configadapter.nifi.mapping;
  * that it received the variant it can consume, and rejects any other — the builder and the build
  * spec carry the plan without knowing any sink's specifics.
  */
-public sealed interface SinkPreRegionPlan permits FrostEnvelopePlan {}
+public sealed interface SinkPreRegionPlan permits FrostEntityPlan {}

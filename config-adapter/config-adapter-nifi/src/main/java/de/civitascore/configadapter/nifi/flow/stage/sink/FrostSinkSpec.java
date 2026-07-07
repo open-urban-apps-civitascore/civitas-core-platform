@@ -10,14 +10,19 @@
 package de.civitascore.configadapter.nifi.flow.stage.sink;
 
 import de.civitascore.configadapter.nifi.flow.SinkType;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaKeys;
 
 /**
  * A FROST sink's resolved configuration.
  *
  * @param projectId the dataset's FROST project id (from the saga's create-project step); scopes the
  *     find-or-create flow to the dataset's project
+ * @param staKeys the match keys of the mapping's Thing-shaped target structure (from {@code
+ *     x-core-primaryKey}, fallback {@code reference}), or {@code null} when the datasink carries no
+ *     target structure — valid for a passthrough flow (the source delivers the STA envelope
+ *     itself), rejected when a mapping is compiled against this sink
  */
-public record FrostSinkSpec(String projectId) implements SinkSpec {
+public record FrostSinkSpec(String projectId, StaKeys staKeys) implements SinkSpec {
 
   public FrostSinkSpec {
     // The project id is interpolated into NiFi processor URLs and $filter expressions, so it must

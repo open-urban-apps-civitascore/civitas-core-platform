@@ -10,11 +10,8 @@
 package de.civitascore.configadapter.nifi.mapping;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.civitascore.configadapter.exception.FatalAdapterException;
-import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.ReplacementStrategy;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import java.util.List;
@@ -206,17 +203,18 @@ class RecordPathCompilerTest {
   }
 
   @Test
-  void geoPointForFrostIsRejectedUntilGeoJsonSupported() {
-    // FROST needs a GeoJSON object, which RecordPath cannot construct — reject rather than emit a
-    // double-encoded JSON string.
-    FatalAdapterException ex =
-        assertThrows(
-            FatalAdapterException.class,
-            () ->
-                compile(
-                    "{ \"$.geo\": { \"op\": \"geoPoint\", \"lon\": \"$.lon\", \"lat\": \"$.lat\" } }",
-                    GeometryEncoding.GEOJSON));
-    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+  void geoPointForFrostRendersAGeoJsonPointString() throws Exception {
+    // RecordPath has no object constructor, so the GeoJSON Point is concatenated as a string; the
+    // FROST body template embeds the flat field verbatim, turning it back into a JSON object.
+    var props =
+        byPath(
+            compile(
+                "{ \"$.geo\": { \"op\": \"geoPoint\", \"lon\": \"$.lon\", \"lat\": \"$.lat\" } }",
+                GeometryEncoding.GEOJSON));
+
+    assertEquals(
+        "concat('{\"type\":\"Point\",\"coordinates\":[', /lon, ',', /lat, ']}')",
+        props.get("/geo").value());
   }
 
   @Test

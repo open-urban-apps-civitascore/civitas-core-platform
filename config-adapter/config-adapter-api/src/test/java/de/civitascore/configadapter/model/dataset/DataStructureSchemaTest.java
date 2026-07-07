@@ -71,6 +71,59 @@ class DataStructureSchemaTest {
     assertTrue(DataStructureSchema.primaryKeyColumns(null).isEmpty());
   }
 
+  /**
+   * A Thing-shaped wrapper schema: root wraps Thing, whose {@code Datastreams} array items carry
+   * their own {@code {id}} marker — the shape the FROST sink resolves per entity class.
+   */
+  private static Map<String, Object> thingShapedSchema() {
+    return json(
+        """
+        { "title": "SensorThingsDataModel",
+          "properties": { "thing": { "$ref": "#/$defs/Thing" } },
+          "$defs": {
+            "Thing": {
+              "properties": {
+                "reference": { "type": "string", "x-core-primaryKey": true },
+                "name": { "type": "string" },
+                "Datastreams": { "type": "array", "items": { "$ref": "#/$defs/Datastream" } } } },
+            "Datastream": {
+              "properties": {
+                "dsRef": { "type": "string", "x-core-primaryKey": true },
+                "name": { "type": "string" } } } } }
+        """);
+  }
+
+  @Test
+  void resolvesPrimaryKeyOfANestedClassThroughAnArrayProperty() {
+    assertEquals(
+        List.of("reference"),
+        DataStructureSchema.primaryKeyColumnsAt(thingShapedSchema(), List.of()));
+    assertEquals(
+        List.of("dsRef"),
+        DataStructureSchema.primaryKeyColumnsAt(thingShapedSchema(), List.of("Datastreams")));
+  }
+
+  @Test
+  void nestedResolutionIsStrictAboutUnknownSegments() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> DataStructureSchema.primaryKeyColumnsAt(thingShapedSchema(), List.of("Locations")));
+  }
+
+  @Test
+  void nestedResolutionRejectsAnExternalRefTarget() {
+    Map<String, Object> schema =
+        json(
+            """
+            { "properties": {
+                "geom": { "$ref": "https://geojson.org/schema/Point.json" },
+                "id": { "type": "string" } } }
+            """);
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> DataStructureSchema.resolveDefinitionAt(schema, List.of("geom")));
+  }
+
   @Test
   void resolvesMarkerInTitleMatchedDefinition() {
     assertEquals(

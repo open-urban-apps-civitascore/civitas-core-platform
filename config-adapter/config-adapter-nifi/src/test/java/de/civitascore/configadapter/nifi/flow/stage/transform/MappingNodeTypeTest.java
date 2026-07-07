@@ -14,8 +14,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaKeys;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import java.util.List;
@@ -33,16 +35,33 @@ class MappingNodeTypeTest {
   }
 
   @Test
-  void staTargetsInAnEarlierMappingBeforeAnEnvelopeSinkAreRejected() {
-    // Only the final mapping compiles into the STA envelope; a catalog path in an earlier mapping
-    // would otherwise be treated as a plain record field named after the STA path.
-    GraphNode first = mappingNode("m1", Map.of("$.things[].name", "$.stationName"));
-    GraphNode last = mappingNode("m2", Map.of("$.value", "$.raw"));
+  void mappedFrostSinkWithoutTargetStructureIsRejected() {
+    // The FROST compiler derives match keys from the mapping's target structure — a datasink
+    // without it cannot deploy a mapped flow, only a passthrough.
+    GraphNode mapping = mappingNode("m1", Map.of("$.reference", "$.ref"));
 
     FatalAdapterException ex =
         assertThrows(
             FatalAdapterException.class,
-            () -> mappingNodeType.compile(List.of(first, last), envelopeSink));
+            () ->
+                mappingNodeType.compile(
+                    List.of(mapping), envelopeSink, new FrostSinkSpec("1", null)));
     assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
+  }
+
+  @Test
+  void mappingChainBeforeAFrostSinkCompilesIntermediatesAsRecordTransforms() throws Exception {
+    // Earlier mappings of a chain are ordinary record transformations; only the last one compiles
+    // against the FROST catalog.
+    GraphNode first = mappingNode("m1", Map.of("$.stationName", "$.raw"));
+    GraphNode last = mappingNode("m2", Map.of("$.reference", "$.stationName"));
+
+    var compilation =
+        mappingNodeType.compile(
+            List.of(first, last),
+            envelopeSink,
+            new FrostSinkSpec("1", new StaKeys(List.of("reference"), List.of())));
+
+    assertEquals(2, compilation.units().size());
   }
 }
