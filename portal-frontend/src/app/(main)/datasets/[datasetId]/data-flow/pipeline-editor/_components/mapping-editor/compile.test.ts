@@ -138,7 +138,6 @@ describe('mapping editor compile', () => {
   })
 
   it('round-trips: compile → decompile → compile is stable', () => {
-
     const compiled = compileCanvas(nodes, edges)
     const config: MappingConfig = {
       $schema: 'https://civitasconnect.digital/core/mapping/v1',

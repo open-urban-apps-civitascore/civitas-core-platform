@@ -157,7 +157,6 @@ export const decompileConfig = (
     return endpoint
   }
 
-
   for (const [targetPath, vn] of Object.entries(config.fields)) {
     const rootType = isOpNode(vn) && vn.op !== 'copy' ? vn.op : null
     const rootDerived = rootType ? `${targetPath}#${rootType}` : targetPath
