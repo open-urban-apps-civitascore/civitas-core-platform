@@ -103,7 +103,42 @@ describe('mapping editor compile', () => {
     })
   })
 
+  it('does not wire an unconnected conversion input to the source node', () => {
+    const config: MappingConfig = {
+      $schema: 'https://civitasconnect.digital/core/mapping/v1',
+      source: 'urn:core:datastructure:a:b',
+      target: 'urn:core:datastructure:c:d',
+      fields: { '$.title': { op: 'toString', input: '' } },
+      positions: {},
+    }
+    const built = decompileConfig(config, sourceTree, targetTree)
+    expect(built.edges.some(e => e.source === SOURCE_NODE_ID)).toBe(false)
+    expect(built.edges).toHaveLength(1)
+    expect(built.edges[0]).toMatchObject({ target: TARGET_NODE_ID, targetHandle: '$.title' })
+  })
+
+  it('restores a single shared node when one transform feeds multiple target ports', () => {
+    const config: MappingConfig = {
+      $schema: 'https://civitasconnect.digital/core/mapping/v1',
+      source: 'urn:core:datastructure:a:b',
+      target: 'urn:core:datastructure:c:d',
+      fields: {
+        '$.title': { op: 'const', value: 'x', valueType: 'String' },
+        '$.fullCode': { op: 'const', value: 'x', valueType: 'String' },
+      },
+      positions: {},
+    }
+    const built = decompileConfig(config, sourceTree, targetTree)
+    const transformNodes = built.nodes.filter(n => n.type === 'transform')
+    expect(transformNodes).toHaveLength(1)
+    const targetEdges = built.edges.filter(e => e.target === TARGET_NODE_ID)
+    expect(targetEdges).toHaveLength(2)
+    expect(targetEdges.every(e => e.source === transformNodes[0].id)).toBe(true)
+    expect(targetEdges.map(e => e.targetHandle).sort()).toEqual(['$.fullCode', '$.title'])
+  })
+
   it('round-trips: compile → decompile → compile is stable', () => {
+
     const compiled = compileCanvas(nodes, edges)
     const config: MappingConfig = {
       $schema: 'https://civitasconnect.digital/core/mapping/v1',

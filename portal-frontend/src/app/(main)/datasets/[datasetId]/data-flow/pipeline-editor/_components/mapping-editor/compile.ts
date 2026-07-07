@@ -107,6 +107,11 @@ export const decompileConfig = (
     })
   }
 
+  // The config stores one value tree per target field, so a transform node feeding
+  // multiple target ports appears as identical trees. Cache materialized op nodes by
+  // their canonical shape to restore a single shared node with multiple outgoing edges.
+  const nodeCache = new Map<string, { nodeId: string; handleId: string; isArray: boolean }>()
+
   const materialize = (vn: ValueNode, derivedId: string): { nodeId: string; handleId: string; isArray: boolean } => {
     if (typeof vn === 'string') {
       return { nodeId: SOURCE_NODE_ID, handleId: vn, isArray: sourceFields.get(vn)?.portType === 'array' }
@@ -119,7 +124,12 @@ export const decompileConfig = (
       }
     }
 
+    const cacheKey = JSON.stringify(vn)
+    const cached = nodeCache.get(cacheKey)
+    if (cached) return cached
+
     const def = mappingRegistry.byType[vn.op]
+
     const childVns = def?.opInputs(vn) ?? []
     // concat keeps a spare trailing port so users can add inputs without replacing wires
     const inputs = vn.op === 'concat' ? concatInputPorts(childVns.length + 1) : (def?.inputs ?? [])
@@ -134,14 +144,19 @@ export const decompileConfig = (
     })
 
     childVns.forEach((child, i) => {
+      // Empty-string input means the port was left unconnected; don't materialize
+      if (child === '') return
       const childType = isOpNode(child) && child.op !== 'copy' ? child.op : null
       const childDerived = childType ? `${derivedId}.${i}#${childType}` : `${derivedId}.${i}`
       const endpoint = materialize(child, childDerived)
       addEdge(endpoint.nodeId, endpoint.handleId, derivedId, inputs[i]?.id ?? 'in', endpoint.isArray)
     })
 
-    return { nodeId: derivedId, handleId: outputs[0]?.id ?? 'out', isArray: outputs[0]?.type === 'array' }
+    const endpoint = { nodeId: derivedId, handleId: outputs[0]?.id ?? 'out', isArray: outputs[0]?.type === 'array' }
+    nodeCache.set(cacheKey, endpoint)
+    return endpoint
   }
+
 
   for (const [targetPath, vn] of Object.entries(config.fields)) {
     const rootType = isOpNode(vn) && vn.op !== 'copy' ? vn.op : null
