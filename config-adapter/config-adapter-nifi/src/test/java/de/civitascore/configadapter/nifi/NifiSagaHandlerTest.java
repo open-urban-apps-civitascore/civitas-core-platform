@@ -9,6 +9,12 @@
  */
 package de.civitascore.configadapter.nifi;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.containing;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -21,6 +27,8 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
@@ -111,6 +119,58 @@ class NifiSagaHandlerTest {
     assertEquals(List.of("pg-99"), result.resultData().get("nifiProcessGroupIds"));
 
     verify(restClient, times(1)).deployFlow(any(DeploymentPlan.class));
+  }
+
+  @Test
+  void initializeWiresOidcTokenProviderFromNifiOidcProperties() throws Exception {
+    // Pins the nifi.oidc.* property-key contract. doInitialize() builds the real token provider from
+    // these keys and no other test exercises it (the rest inject the client), so a typo in a key or
+    // default would pass the whole suite and only fail at deploy. Point token-uri + nifi.url at
+    // WireMock, run a real deploy, and assert the token endpoint got the configured credentials.
+    WireMockServer server = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+    server.start();
+    try {
+      server.stubFor(
+          post(urlEqualTo("/realms/civitas-core/protocol/openid-connect/token"))
+              .willReturn(
+                  aResponse()
+                      .withStatus(200)
+                      .withHeader("Content-Type", "application/json")
+                      .withBody("{\"access_token\":\"tok\",\"expires_in\":300}")));
+      // NiFi's first call fails fatally — we only need the preceding token fetch to have happened.
+      server.stubFor(
+          get(urlEqualTo("/nifi-api/process-groups/root"))
+              .willReturn(aResponse().withStatus(400)));
+
+      AdapterConfig config = mock(AdapterConfig.class);
+      when(config.getProperty(any(), any())).thenAnswer(inv -> inv.getArgument(1));
+      when(config.getProperty("nifi.master-key", null)).thenReturn(MASTER_KEY_HEX);
+      when(config.getProperty("nifi.frost.url", null))
+          .thenReturn("http://frost:8080/FROST-Server/v1.1");
+      when(config.getProperty("nifi.postgis.url", null))
+          .thenReturn("jdbc:postgresql://db:5432/civitas");
+      when(config.getProperty(eq("nifi.url"), any())).thenReturn(server.baseUrl());
+      when(config.getProperty(eq("nifi.oidc.token-uri"), any()))
+          .thenReturn(server.baseUrl() + "/realms/civitas-core/protocol/openid-connect/token");
+      when(config.getProperty(eq("nifi.oidc.client-id"), any())).thenReturn("nifi-test-id");
+      when(config.getProperty(eq("nifi.oidc.client-secret"), any())).thenReturn("nifi-test-secret");
+
+      NifiSagaHandler realHandler = new NifiSagaHandler();
+      try {
+        realHandler.initialize(config); // no setTestNifiClient → real client + token provider
+        realHandler.handle(deployCommand()); // deploy → authenticate() → token fetch, then NiFi 400
+
+        server.verify(
+            postRequestedFor(urlEqualTo("/realms/civitas-core/protocol/openid-connect/token"))
+                .withRequestBody(containing("grant_type=client_credentials"))
+                .withRequestBody(containing("client_id=nifi-test-id"))
+                .withRequestBody(containing("client_secret=nifi-test-secret")));
+      } finally {
+        realHandler.close();
+      }
+    } finally {
+      server.stop();
+    }
   }
 
   /**

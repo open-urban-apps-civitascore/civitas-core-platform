@@ -112,8 +112,13 @@ abstract class AbstractNifiIT {
       } catch (RuntimeException e) {
         // e.g. the fixed Keycloak port (8098) is already in use. Fail soft so these ITs skip
         // cleanly via assumeTrue(dockerAvailable()) instead of aborting class initialization with
-        // an ExceptionInInitializerError that fails every test in the class.
+        // an ExceptionInInitializerError that fails every test in the class. But do NOT swallow it
+        // silently — log loudly so a skipped run is diagnosable (not mistaken for "Docker absent").
         infraReady = false;
+        System.err.println(
+            "NiFi IT infrastructure (Keycloak/keystore) failed to start — all NiFi ITs in this JVM"
+                + " will be SKIPPED. Cause:");
+        e.printStackTrace();
       }
     }
   }

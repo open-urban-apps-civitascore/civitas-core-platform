@@ -13,6 +13,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.delete;
 import static com.github.tomakehurst.wiremock.client.WireMock.deleteRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
@@ -62,9 +63,10 @@ class NifiRestClientTest {
   }
 
   /**
-   * Stands in for the OIDC token provider: hands out a constant bearer token and counts how often
-   * the client asks for one and refreshes it (so the 401-replay path can be asserted without an
-   * HTTP token endpoint).
+   * Stands in for the OIDC token provider: hands out a bearer token and counts how often the client
+   * asks for one and refreshes it (so the 401-replay path can be asserted without an HTTP token
+   * endpoint). {@code refreshToken()} returns a DIFFERENT value than {@code getToken()} so a test
+   * can prove the post-401 retry is actually sent with the refreshed token, not the stale one.
    */
   private static final class FakeTokenProvider implements NifiTokenProvider {
     private int getCount;
@@ -79,7 +81,7 @@ class NifiRestClientTest {
     @Override
     public String refreshToken() {
       refreshCount++;
-      return "jwt-token";
+      return "jwt-token-2";
     }
   }
 
@@ -413,6 +415,14 @@ class NifiRestClientTest {
     // authenticate)
     assertEquals(1, tokenProvider.getCount);
     assertEquals(1, tokenProvider.refreshCount);
+    // the FIRST attempt carried the initial token; the RETRY must carry the REFRESHED token, not a
+    // replay of the stale one — this is the whole point of the 401 path
+    server.verify(
+        getRequestedFor(urlEqualTo("/nifi-api/process-groups/root"))
+            .withHeader("Authorization", equalTo("Bearer jwt-token")));
+    server.verify(
+        getRequestedFor(urlEqualTo("/nifi-api/process-groups/root"))
+            .withHeader("Authorization", equalTo("Bearer jwt-token-2")));
   }
 
   @Test
