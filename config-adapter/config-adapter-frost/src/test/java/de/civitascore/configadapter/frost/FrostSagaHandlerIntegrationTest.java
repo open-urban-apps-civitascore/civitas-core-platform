@@ -286,7 +286,46 @@ class FrostSagaHandlerIntegrationTest extends AbstractFrostIntegrationTest {
     }
   }
 
+  /**
+   * The Thing cascade does not cover Sensors and ObservedProperties — ids handed over as
+   * provisioned entities must be deleted by identity, after the Things.
+   */
+  @Test
+  void deleteProjectRemovesProvisionedEntitiesByIdentity() throws Exception {
+    String projectId = createProject("Provisioned-" + UUID.randomUUID());
+    String thingId = createThingWithDatastreamAndObservations(projectId, "provisioned-thing");
+    String datastreamId = collectIds("Things(" + thingId + ")/Datastreams").getFirst();
+    String sensorId = singleId("Datastreams(" + datastreamId + ")/Sensor");
+    String observedPropertyId = singleId("Datastreams(" + datastreamId + ")/ObservedProperty");
+
+    SagaCommandResult result =
+        handler.handle(
+            deleteProjectCommand(
+                "EXECUTE_STEP",
+                projectId,
+                Map.of(
+                    "provisionedEntities",
+                    Map.of(
+                        "Sensors",
+                        List.of(sensorId),
+                        "ObservedProperties",
+                        List.of(observedPropertyId)))));
+
+    assertEquals("STEP_COMPLETED", result.type(), () -> "DELETE_PROJECT failed: " + result.error());
+    assertRootEntityStatus(404, "Projects(" + projectId + ")");
+    assertRootEntityStatus(404, "Things(" + thingId + ")");
+    assertRootEntityStatus(404, "Sensors(" + sensorId + ")");
+    assertRootEntityStatus(404, "ObservedProperties(" + observedPropertyId + ")");
+  }
+
   private SagaCommandMessage deleteProjectCommand(String type, String projectId) {
+    return deleteProjectCommand(type, projectId, Map.of());
+  }
+
+  private SagaCommandMessage deleteProjectCommand(
+      String type, String projectId, Map<String, Object> extraPayload) {
+    Map<String, Object> payload = new HashMap<>(extraPayload);
+    payload.put("projectId", projectId);
     return new SagaCommandMessage(
         type,
         UUID.randomUUID().toString(),
@@ -294,7 +333,20 @@ class FrostSagaHandlerIntegrationTest extends AbstractFrostIntegrationTest {
         "delete-frost-project",
         "frost",
         "DELETE_PROJECT",
-        Map.of("projectId", projectId));
+        payload);
+  }
+
+  private String singleId(String entityPath) throws Exception {
+    try (Response response =
+        httpClient
+            .target(frostBaseUrl)
+            .path(entityPath)
+            .queryParam("$select", "@iot.id")
+            .request(MediaType.APPLICATION_JSON)
+            .get()) {
+      assertEquals(200, response.getStatus(), "Failed to read " + entityPath);
+      return objectMapper.readTree(response.readEntity(String.class)).get("@iot.id").asText();
+    }
   }
 
   private String createProject(String name) {

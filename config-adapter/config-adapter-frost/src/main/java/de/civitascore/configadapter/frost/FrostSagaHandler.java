@@ -17,7 +17,6 @@ import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,8 +43,6 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
 
   private static final String ADAPTER_NAME = "frost";
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/v1.1";
-  // Page size for Thing enumeration and chunk size for batched deletes: one page → one batch.
-  private static final int THING_BATCH_SIZE = 100;
   private static final String KEY_PROJECT_ID = "projectId";
   private static final String KEY_NAME = "name";
   private static final String KEY_DESCRIPTION = "description";
@@ -299,7 +296,10 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     String projectId = requireString(command, KEY_PROJECT_ID);
     boolean compensating = "COMPENSATE_STEP".equals(command.type());
 
-    deleteProjectThings(projectId, compensating, command.sagaId());
+    FrostProjectCleanup cleanup =
+        new FrostProjectCleanup(client(), authStrategy, serverUrl, command.sagaId());
+    cleanup.deleteProjectThings(projectId, compensating);
+    cleanup.deleteProvisionedEntities(provisionedEntities(command));
 
     try (Response response =
         authStrategy
@@ -337,139 +337,21 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Deletes the project's Things before the project itself: FROST does not cascade project
-   * deletion, but deleting a Thing cascades to its Datastreams and Observations. Not covered:
-   * Sensors, ObservedProperties, FeaturesOfInterest, Locations.
-   *
-   * <p>Re-run safe: already-deleted Things (404) are skipped; a 404 on the enumeration skips the
-   * cleanup on compensation only — a forward delete must fail instead of silently stranding the
-   * Things at server root.
+   * Optional payload map of provisioned FROST entity ids per entity set (payload key {@code
+   * "provisionedEntities"}), filled by the portal once Datastream provisioning exists. Absent or
+   * malformed → empty (nothing to delete).
    */
-  private void deleteProjectThings(String projectId, boolean compensating, String sagaId) {
-    // Collect all ids before deleting (deleting while paging shifts pages). Explicit $skip paging
-    // instead of @iot.nextLink: FROST renders that link from its serviceRootUrl, which is not
-    // necessarily reachable from this adapter. Stable because nothing writes during this step.
-    List<String> thingIds = new ArrayList<>();
-    int skip = 0;
-    while (true) {
-      try (Response response =
-          authStrategy
-              .apply(
-                  client()
-                      .target(serverUrl)
-                      .path(projectPath(projectId) + "/Things")
-                      .queryParam("$select", "@iot.id")
-                      .queryParam("$orderby", "id asc")
-                      .queryParam("$top", String.valueOf(THING_BATCH_SIZE))
-                      .queryParam("$skip", String.valueOf(skip))
-                      .request(MediaType.APPLICATION_JSON))
-              .get()) {
-        if (compensating && response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
-          log.info(
-              "DELETE_PROJECT compensation: project {} not found while listing its Things —"
-                  + " skipping Thing cleanup. saga={}",
-              Encode.forJava(projectId),
-              Encode.forJava(sagaId));
-          return;
-        }
-        checkResponse(response, "GET project Things for DELETE_PROJECT");
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> page = response.readEntity(Map.class);
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> things =
-            (List<Map<String, Object>>) page.getOrDefault("value", List.of());
-        for (Map<String, Object> thing : things) {
-          thingIds.add(String.valueOf(thing.get("@iot.id")));
-        }
-        if (things.isEmpty() || page.get("@iot.nextLink") == null) {
-          break;
-        }
-        skip += things.size();
+  private static Map<String, List<String>> provisionedEntities(SagaCommandMessage command) {
+    if (!(command.payload().get("provisionedEntities") instanceof Map<?, ?> raw)) {
+      return Map.of();
+    }
+    Map<String, List<String>> result = new HashMap<>();
+    for (Map.Entry<?, ?> entry : raw.entrySet()) {
+      if (entry.getValue() instanceof List<?> ids) {
+        result.put(String.valueOf(entry.getKey()), ids.stream().map(String::valueOf).toList());
       }
     }
-
-    int deletedCount = 0;
-    for (int from = 0; from < thingIds.size(); from += THING_BATCH_SIZE) {
-      List<String> chunk =
-          thingIds.subList(from, Math.min(from + THING_BATCH_SIZE, thingIds.size()));
-      deletedCount += deleteThingsBatch(chunk, sagaId);
-    }
-
-    log.info(
-        "FROST project Things deleted (cascading to their Datastreams and Observations):"
-            + " projectId={}, thingsDeleted={}, saga={}",
-        Encode.forJava(projectId),
-        deletedCount,
-        Encode.forJava(sagaId));
-  }
-
-  /**
-   * Deletes one chunk of Things in a single JSON batch request. Sub-requests execute independently:
-   * 404 means already gone (skip), any other failure fails the step. Every Thing needs a confirmed
-   * outcome — a truncated batch response fails rather than leaving Things behind.
-   *
-   * @return the number of Things actually deleted
-   */
-  private int deleteThingsBatch(List<String> thingIds, String sagaId) {
-    List<Map<String, Object>> requests = new ArrayList<>();
-    for (int i = 0; i < thingIds.size(); i++) {
-      requests.add(
-          Map.of(
-              "id",
-              String.valueOf(i),
-              "method",
-              "delete",
-              "url",
-              "Things(" + thingIds.get(i) + ")"));
-    }
-
-    try (Response response =
-        authStrategy
-            .apply(client().target(serverUrl).path("$batch").request(MediaType.APPLICATION_JSON))
-            .post(Entity.json(Map.of("requests", requests)))) {
-      checkResponse(response, "batch DELETE Things for DELETE_PROJECT");
-
-      @SuppressWarnings("unchecked")
-      Map<String, Object> body = response.readEntity(Map.class);
-      @SuppressWarnings("unchecked")
-      List<Map<String, Object>> subResponses =
-          (List<Map<String, Object>>) body.getOrDefault("responses", List.of());
-      if (subResponses.size() != thingIds.size()) {
-        throw new SagaApiException(
-            "batch DELETE Things for DELETE_PROJECT returned "
-                + subResponses.size()
-                + " sub-responses for "
-                + thingIds.size()
-                + " requests",
-            502);
-      }
-
-      int deleted = 0;
-      for (Map<String, Object> subResponse : subResponses) {
-        int status = ((Number) subResponse.get("status")).intValue();
-        String thingId = thingIds.get(Integer.parseInt(String.valueOf(subResponse.get("id"))));
-        if (status == Response.Status.NOT_FOUND.getStatusCode()) {
-          log.debug(
-              "DELETE_PROJECT: Thing {} already absent (404) — continuing. saga={}",
-              Encode.forJava(thingId),
-              Encode.forJava(sagaId));
-          continue;
-        }
-        if (status < 200 || status >= 300) {
-          throw new SagaApiException(
-              "DELETE Thing "
-                  + thingId
-                  + " for DELETE_PROJECT failed: HTTP "
-                  + status
-                  + " — "
-                  + subResponse.get("body"),
-              status);
-        }
-        deleted++;
-      }
-      return deleted;
-    }
+    return result;
   }
 
   private SagaCommandResult handleRestoreProject(SagaCommandMessage command) {

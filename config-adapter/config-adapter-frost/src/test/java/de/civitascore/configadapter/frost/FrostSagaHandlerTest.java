@@ -642,6 +642,74 @@ class FrostSagaHandlerTest {
     }
 
     @Test
+    @DisplayName("deletes provisioned entities by identity after the Things, before the project")
+    void shouldDeleteProvisionedEntitiesAfterThings() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response singleThingsPage = thingsPage(null, 7);
+        when(mockBuilder.get()).thenReturn(singleThingsPage);
+        Response thingsBatch = batchResponse(200);
+        Response datastreamsBatch = batchResponse(200);
+        Response sensorsBatch = batchResponse(200);
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> batchCaptor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.post(batchCaptor.capture()))
+            .thenReturn(thingsBatch, datastreamsBatch, sensorsBatch);
+        Response deleteResponse = mock(Response.class);
+        when(deleteResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(deleteResponse);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "DELETE_PROJECT",
+                    Map.of(
+                        "projectId",
+                        "42",
+                        "provisionedEntities",
+                        Map.of("Sensors", List.of("5"), "Datastreams", List.of("3")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // Datastreams before Sensors: a Sensor delete cascades into still-linked Datastreams.
+        assertEquals(List.of("Things(7)"), batchRequestUrls(batchCaptor.getAllValues().get(0)));
+        assertEquals(
+            List.of("Datastreams(3)"), batchRequestUrls(batchCaptor.getAllValues().get(1)));
+        assertEquals(List.of("Sensors(5)"), batchRequestUrls(batchCaptor.getAllValues().get(2)));
+        ArgumentCaptor<String> paths = ArgumentCaptor.forClass(String.class);
+        verify(mockTarget, times(5)).path(paths.capture());
+        assertEquals(
+            List.of("Projects(42)/Things", "$batch", "$batch", "$batch", "Projects(42)"),
+            paths.getAllValues());
+      }
+    }
+
+    @Test
+    @DisplayName("ignores unknown provisioned entity sets instead of building delete requests")
+    void shouldIgnoreUnknownProvisionedEntitySets() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response emptyThingsPage = thingsPage(null);
+        when(mockBuilder.get()).thenReturn(emptyThingsPage);
+        Response deleteResponse = mock(Response.class);
+        when(deleteResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(deleteResponse);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "DELETE_PROJECT",
+                    Map.of(
+                        "projectId",
+                        "42",
+                        "provisionedEntities",
+                        Map.of("Projects", List.of("9")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        verify(mockBuilder, never()).post(any(Entity.class));
+      }
+    }
+
+    @Test
     @DisplayName("fails the step when the batch response omits sub-responses")
     void shouldFailStepWhenBatchResponseIncomplete() {
       try (FrostSagaHandler handler = createHandler()) {
