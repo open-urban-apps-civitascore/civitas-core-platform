@@ -55,13 +55,12 @@ describe('datastructure-model contract fixtures', () => {
     const tree = modelToSchemaTree(multiRoot as Record<string, unknown>, 'fallback')
 
     expect(tree.name).toBe('MultiRoot')
-    const root = tree.fields[0]
-    expect(root).toMatchObject({ path: '$', name: 'MultiRoot', type: 'object' })
-    expect(root.children?.map(f => f.path)).toEqual(['$.building', '$.street'])
-    expect(root.children?.[0].children).toEqual([
+    // The record is the document root itself, so the root properties sit directly in the tree.
+    expect(tree.fields.map(f => f.path)).toEqual(['$.building', '$.street'])
+    expect(tree.fields[0].children).toEqual([
       { path: '$.building.floors', name: 'floors', type: 'int', portType: 'scalar', required: true },
     ])
-    expect(root.children?.[1].children).toEqual([
+    expect(tree.fields[1].children).toEqual([
       { path: '$.street.name', name: 'name', type: 'str', portType: 'scalar' },
     ])
   })
@@ -70,8 +69,7 @@ describe('datastructure-model contract fixtures', () => {
     const tree = modelToSchemaTree(legacyFlatRoot as Record<string, unknown>, 'fallback')
 
     expect(tree.name).toBe('Legacy')
-    expect(tree.fields[0]).toMatchObject({ path: '$', name: 'Legacy', required: true })
-    expect(tree.fields[0].children).toEqual([
+    expect(tree.fields).toEqual([
       { path: '$.attribut', name: 'attribut', type: 'str', portType: 'scalar', required: true },
     ])
   })

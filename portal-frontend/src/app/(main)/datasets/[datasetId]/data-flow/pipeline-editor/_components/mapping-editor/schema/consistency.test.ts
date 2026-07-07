@@ -216,11 +216,10 @@ describe('model-walker consistency (modelToSchemaTree vs adapter)', () => {
     const adapterTree = umlDiagramToSchemaTree(multiRoot, multiRoot.name)
     const modelTree = modelToSchemaTree(exportToJsonSchema(multiRoot), multiRoot.name)
 
-    expect(modelTree.fields[0].name).toBe('TrafficSensor')
-    const modelRoots = (modelTree.fields[0].children ?? []).map(f => f.path)
-    const adapterRoots = adapterTree.fields.map(f => f.path)
-    expect(modelRoots).toEqual(adapterRoots)
-    expect(leafPaths(modelTree.fields[0].children).sort()).toEqual(leafPaths(adapterTree.fields).sort())
+    expect(modelTree.name).toBe('TrafficSensor')
+    // Multi-root trees agree structurally: root properties directly, no wrapping record node.
+    expect(modelTree.fields.map(f => f.path)).toEqual(adapterTree.fields.map(f => f.path))
+    expect(leafPaths(modelTree.fields).sort()).toEqual(leafPaths(adapterTree.fields).sort())
   })
 
   it('agrees on colliding multi-root names: adapter paths match the exported property names', () => {
@@ -234,9 +233,7 @@ describe('model-walker consistency (modelToSchemaTree vs adapter)', () => {
     const adapterPaths = umlDiagramToSchemaTree(colliding, colliding.name).fields.map(f => f.path)
     expect(adapterPaths).toEqual(exportedPaths)
     expect(new Set(exportedPaths).size).toBe(2)
-    const modelPaths = (
-      modelToSchemaTree(schema as Record<string, unknown>, colliding.name).fields[0].children ?? []
-    ).map(f => f.path)
+    const modelPaths = modelToSchemaTree(schema as Record<string, unknown>, colliding.name).fields.map(f => f.path)
     expect(modelPaths).toEqual(exportedPaths)
   })
 })

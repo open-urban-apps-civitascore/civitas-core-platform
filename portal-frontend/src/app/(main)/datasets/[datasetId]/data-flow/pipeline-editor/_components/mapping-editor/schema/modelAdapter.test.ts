@@ -142,7 +142,7 @@ describe('modelToSchemaTree', () => {
     expect(tree.fields[0].children?.map(f => f.name)).toEqual(['current'])
   })
 
-  it('renders a multi-root document as one object node per root property', () => {
+  it('renders a multi-root document as one object node per root property, without a record node', () => {
     const tree = modelToSchemaTree(
       {
         title: 'TrafficSensor',
@@ -156,13 +156,12 @@ describe('modelToSchemaTree', () => {
       'fallback',
     )
     expect(tree.name).toBe('TrafficSensor')
-    const root = tree.fields[0]
-    expect(root).toMatchObject({ path: '$', name: 'TrafficSensor', type: 'object' })
-    expect(root.children?.map(f => ({ name: f.name, path: f.path, type: f.type }))).toEqual([
+    // The record is the document root itself — a `$` node would only repeat the tree name.
+    expect(tree.fields.map(f => ({ name: f.name, path: f.path, type: f.type }))).toEqual([
       { name: 'building', path: '$.building', type: 'object' },
       { name: 'street', path: '$.street', type: 'object' },
     ])
-    expect(root.children?.[0].children?.map(f => f.path)).toEqual(['$.building.floors'])
+    expect(tree.fields[0].children?.map(f => f.path)).toEqual(['$.building.floors'])
   })
 
   it('treats an enum $ref property as a scalar leaf', () => {
@@ -251,8 +250,7 @@ describe('modelToSchemaTree', () => {
       'fallback',
     )
     expect(tree.name).toBe('Legacy')
-    expect(tree.fields[0]).toMatchObject({ path: '$', name: 'Legacy' })
-    expect(tree.fields[0].children?.map(f => f.path)).toEqual(['$.attribut'])
+    expect(tree.fields.map(f => f.path)).toEqual(['$.attribut'])
   })
 
   it('rejects a dangling allOf parent instead of silently truncating the tree', () => {
@@ -309,8 +307,8 @@ describe('modelToSchemaTree', () => {
       },
       'fallback',
     )
-    expect(tree.fields[0]).toMatchObject({ path: '$', name: 'S' })
-    expect(tree.fields[0].children?.map(f => f.path)).toEqual(['$.thing'])
+    expect(tree.fields.map(f => f.path)).toEqual(['$.thing'])
+    expect(tree.fields[0].children?.map(f => f.path)).toEqual(['$.thing.a'])
   })
 
   it('terminates on mutually recursive $refs (A → B → A)', () => {

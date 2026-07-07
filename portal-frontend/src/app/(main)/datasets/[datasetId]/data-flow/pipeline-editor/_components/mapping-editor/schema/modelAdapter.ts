@@ -13,7 +13,8 @@ import { field, GEOMETRY } from '../_types'
  * unresolvable parent is rejected. Non-local `$ref`s on ordinary properties render as opaque
  * object leaves — the engine's JSONB-column reading of the same spec. The runtime records are
  * entity-shaped (the wrapper never appears in the data), so all field paths stay anchored at the
- * class: the resolved root class is the tree's single `$` node, the data structure's name (the
+ * record: a resolved root class becomes the tree's single `$` node, while a document-root record
+ * (multi-root, legacy flat) exposes its properties directly; the data structure's name (the
  * schema `title`) is the tree name.
  */
 
@@ -169,12 +170,13 @@ const wrappedRootName = (root: SchemaNode, defs: Record<string, SchemaNode>): st
 }
 
 interface RootResolution {
-  className: string
+  /** The resolved root class, or null when the record is the document root itself. */
+  className: string | null
   definition: ResolvedDefinition
 }
 
 /** Mirrors `DataStructureSchema.resolveDefinition`'s precedence: wrapper → root itself → named definition. */
-const resolveRoot = (root: SchemaNode, defs: Record<string, SchemaNode>, fallbackName: string): RootResolution => {
+const resolveRoot = (root: SchemaNode, defs: Record<string, SchemaNode>): RootResolution => {
   const wrapperName = wrappedRootName(root, defs)
   if (wrapperName) {
     return { className: wrapperName, definition: mergeDefinition(defs[wrapperName], defs) }
@@ -183,7 +185,7 @@ const resolveRoot = (root: SchemaNode, defs: Record<string, SchemaNode>, fallbac
   if (Object.keys(propertiesOf(root)).length > 0 || Array.isArray(root.allOf)) {
     const merged = mergeDefinition(root, defs)
     if (Object.keys(merged.properties).length > 0) {
-      return { className: asString(root.title) ?? fallbackName, definition: merged }
+      return { className: null, definition: merged }
     }
   }
 
@@ -305,11 +307,14 @@ const hasRequiredDescendant = (fields: FieldNode[]): boolean =>
   fields.some(node => node.required || (node.children ? hasRequiredDescendant(node.children) : false))
 
 /**
- * Converts a DataStructure version's JSON-Schema `model` into the editor's field tree: the tree is
- * named after the data structure (schema `title`), its single `$` node is the resolved root class
- * (a normal mappable object port representing the whole record), and the class's fields nest
- * beneath it. Throws {@link ModelResolutionError} on structurally broken models — callers fall
- * back to the diagram-based tree.
+ * Converts a DataStructure version's JSON-Schema `model` into the editor's field tree, named after
+ * the data structure (schema `title`). When the resolution yields a root class (wrapper or named
+ * definition), that class is the tree's single `$` node — a normal mappable object port
+ * representing the whole record — with the class's fields nested beneath it. When the record is
+ * the document root itself (several root properties, legacy flat root), the properties sit
+ * directly in the tree: a `$` node would just repeat the tree name without adding a level that
+ * exists in the data. Throws {@link ModelResolutionError} on structurally broken models — callers
+ * fall back to the diagram-based tree.
  */
 export const modelToSchemaTree = (model: Record<string, unknown>, fallbackName: string): SchemaTree => {
   const root = model as SchemaNode
@@ -318,9 +323,12 @@ export const modelToSchemaTree = (model: Record<string, unknown>, fallbackName: 
   if ('enum' in root) return { name, fields: [] }
 
   const defs = definitionsOf(root)
-  const { className, definition } = resolveRoot(root, defs, fallbackName)
-  const children = buildFields(definition, defs, '$', new Set([className]))
+  const { className, definition } = resolveRoot(root, defs)
+  if (className === null) {
+    return { name, fields: buildFields(definition, defs, '$', new Set()) }
+  }
 
+  const children = buildFields(definition, defs, '$', new Set([className]))
   // The record node is marked required only when it has required descendants: requiredFieldPaths
   // treats a required container without required children as itself mandatory, which would demand
   // a whole-record mapping for structures made of optional fields.
