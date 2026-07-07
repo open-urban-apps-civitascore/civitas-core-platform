@@ -263,7 +263,6 @@ public class PortalTestDataFactory {
   /** A minimal, well-formed JSON Schema document suitable for a data structure version's model. */
   public Map<String, Object> dataStructureVersionModel(String title) {
     Map<String, Object> schema = new HashMap<>();
-    schema.put("$id", "urn:core:datastructure:" + title);
     schema.put("title", title);
     schema.put("type", "object");
     return schema;

@@ -1,5 +1,6 @@
 package de.civitascore.portal.service;
 
+import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
@@ -235,8 +236,35 @@ public class DataStructureVersionService
           "model", id, "DataStructureVersion must contain a model before releasing");
     }
 
+    validateModelId(version);
+
     version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
     return dataStructureVersionRepository.save(version);
+  }
+
+  /**
+   * Validates the model's {@code $id} — the DataStructure's stable identity and JSON-Schema {@code
+   * $ref} target — is a well-formed CORE URN whose disambiguator was in fact derived from this
+   * version's DataStructure id. A malformed or foreign {@code $id} would be shipped verbatim to the
+   * config-adapter and break {@code $ref} resolution downstream, so it is rejected before release.
+   * The {@code $id} is optional: a model authored without a UML diagram carries none.
+   */
+  private void validateModelId(DataStructureVersion version) {
+    Object modelId = version.getModel().get("$id");
+    if (modelId == null) {
+      return;
+    }
+    UUID dataStructureId = version.getDataStructure().getId();
+    if (!CoreUrn.matchesId(modelId.toString(), dataStructureId)) {
+      throw new InvalidInputException(
+          "model.$id",
+          version.getId(),
+          "DataStructure model $id must be a CORE URN whose disambiguator is derived from the"
+              + " DataStructure id "
+              + dataStructureId
+              + ": "
+              + modelId);
+    }
   }
 
   /**

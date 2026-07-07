@@ -28,6 +28,11 @@ import org.junit.jupiter.api.Test;
 
 class MappingConfigParserTest {
 
+  private static final String SOURCE_URN =
+      "urn:core:platform:civitas:datastructure:common:Source:2dmtus8w40:1.0.0";
+  private static final String TARGET_URN =
+      "urn:core:platform:civitas:datastructure:common:Target:abcdefghij:1.0.0";
+
   private final ObjectMapper mapper = new ObjectMapper();
   private final MappingConfigParser parser = new MappingConfigParser();
 
@@ -43,15 +48,37 @@ class MappingConfigParserTest {
             """
             {
               "$schema": "https://civitasconnect.digital/core/mapping/v1",
-              "source": "urn:core:datastructure:src:v1",
-              "target": "urn:core:datastructure:tgt:v1",
+              "source": "%s",
+              "target": "%s",
               "fields": { "$.a": "$.b" }
             }
-            """);
+            """
+                .formatted(SOURCE_URN, TARGET_URN));
 
-    assertEquals("urn:core:datastructure:src:v1", mc.source());
-    assertEquals("urn:core:datastructure:tgt:v1", mc.target());
+    assertEquals(SOURCE_URN, mc.source());
+    assertEquals(TARGET_URN, mc.target());
     assertEquals(1, mc.fields().size());
+  }
+
+  @Test
+  void acceptsAbsentSourceAndTarget() throws Exception {
+    MappingConfig mc = parse("{ \"fields\": { \"$.a\": \"$.b\" } }");
+
+    assertEquals(null, mc.source());
+    assertEquals(null, mc.target());
+  }
+
+  @Test
+  void rejectsMalformedSourceUrn() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                parse(
+                    """
+                    { "source": "not-a-core-urn", "fields": { "$.a": "$.b" } }
+                    """));
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
   }
 
   @Test

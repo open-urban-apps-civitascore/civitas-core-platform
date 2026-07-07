@@ -12,6 +12,7 @@ package de.civitascore.configadapter.nifi.mapping;
 import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConcatNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConstNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConvertNode;
@@ -45,8 +46,8 @@ public class MappingConfigParser {
     if (root == null || !root.isObject()) {
       throw reject("mappingConfig must be a JSON object");
     }
-    String source = optionalText(root, "source");
-    String target = optionalText(root, "target");
+    String source = requireCoreUrnOrNull(optionalText(root, "source"), "source");
+    String target = requireCoreUrnOrNull(optionalText(root, "target"), "target");
 
     Map<String, ValueNode> fields = new LinkedHashMap<>();
     JsonNode fieldsNode = root.get("fields");
@@ -191,6 +192,18 @@ public class MappingConfigParser {
   private static String optionalText(JsonNode node, String field) {
     JsonNode value = node.get(field);
     return value != null && value.isTextual() ? value.asText() : null;
+  }
+
+  /**
+   * Rejects a present-but-malformed CORE URN at this trust boundary; a null (absent) URN passes
+   * through, since {@code source}/{@code target} are optional metadata.
+   */
+  private static String requireCoreUrnOrNull(String urn, String field)
+      throws FatalAdapterException {
+    if (urn != null && !CoreUrn.isValid(urn)) {
+      throw reject(field + " is not a valid CORE URN: " + urn);
+    }
+    return urn;
   }
 
   private static FatalAdapterException reject(String detail) {

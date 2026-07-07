@@ -516,4 +516,77 @@ class DataStructureVersionServiceTest {
           .findAllByDataStructureIdAndVersion(dataStructureId, "1.0.0");
     }
   }
+
+  @Nested
+  @DisplayName("Release model $id validation")
+  class ReleaseModelIdTests {
+
+    private static final UUID DATA_STRUCTURE_ID =
+        UUID.fromString("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+    // disambiguator 2dmtus8w40 is CoreUrn.disambiguatorFor(DATA_STRUCTURE_ID)
+    private static final String VALID_URN =
+        "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0.0";
+
+    private DataStructureVersion draftVersionWithModel(Map<String, Object> model) {
+      DataStructure ds = new DataStructure();
+      ds.setId(DATA_STRUCTURE_ID);
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(UUID.randomUUID());
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      version.setDataStructure(ds);
+      version.setModel(model);
+      when(dataStructureVersionRepository.findById(version.getId()))
+          .thenReturn(Optional.of(version));
+      return version;
+    }
+
+    @Test
+    @DisplayName("releases when the model carries no $id")
+    void releasesWithoutModelId() {
+      DataStructureVersion version = draftVersionWithModel(new HashMap<>(Map.of("type", "object")));
+      when(dataStructureVersionRepository.save(version)).thenReturn(version);
+
+      dataStructureVersionService.release(version.getId());
+
+      assertThat(version.getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName("releases when the $id disambiguator is derived from the DataStructure id")
+    void releasesWithMatchingModelId() {
+      DataStructureVersion version = draftVersionWithModel(new HashMap<>(Map.of("$id", VALID_URN)));
+      when(dataStructureVersionRepository.save(version)).thenReturn(version);
+
+      dataStructureVersionService.release(version.getId());
+
+      assertThat(version.getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName("rejects a malformed $id")
+    void rejectsMalformedModelId() {
+      DataStructureVersion version =
+          draftVersionWithModel(new HashMap<>(Map.of("$id", "not-a-core-urn")));
+
+      assertThatThrownBy(() -> dataStructureVersionService.release(version.getId()))
+          .isInstanceOf(InvalidInputException.class);
+    }
+
+    @Test
+    @DisplayName("rejects an $id whose disambiguator belongs to another DataStructure")
+    void rejectsForeignDisambiguator() {
+      DataStructureVersion version =
+          draftVersionWithModel(
+              new HashMap<>(
+                  Map.of(
+                      "$id",
+                      "urn:core:platform:civitas:datastructure:common:WeatherModel:0000000001:1.0.0")));
+
+      assertThatThrownBy(() -> dataStructureVersionService.release(version.getId()))
+          .isInstanceOf(InvalidInputException.class);
+    }
+  }
 }

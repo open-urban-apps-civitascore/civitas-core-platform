@@ -74,7 +74,7 @@ vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
 }))
 
 const mockDatastructure: Datastructure = {
-  id: 'ds-1',
+  id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
   name: 'Test Datastructure',
   description: 'Test Description',
   dataStructureStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
