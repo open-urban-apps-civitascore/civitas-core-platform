@@ -1,0 +1,19 @@
+{
+  "$id": "urn:core:tenant:civitas:datastructure:contract:BrokenMissingParent:0000000000:1.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BrokenMissingParent",
+  "type": "object",
+  "properties": {
+    "dog": { "$ref": "#/$defs/Dog" }
+  },
+  "$defs": {
+    "Dog": {
+      "allOf": [{ "$ref": "#/$defs/Gone" }],
+      "type": "object",
+      "title": "Dog",
+      "properties": {
+        "breed": { "type": "string" }
+      }
+    }
+  }
+}
