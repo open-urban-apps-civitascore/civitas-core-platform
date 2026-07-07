@@ -276,7 +276,7 @@
       "completion": {
         "title": "Creation Progress",
         "accessManagement": {
-          "title": "Access Management",
+          "title": "Access",
           "button": {
             "readOnly": "View Groups and Roles",
             "editable": "Edit Groups and Roles"
@@ -299,7 +299,6 @@
           "apis": {
             "title": "APIs",
             "empty": "No API available yet",
-            "noDescription": "No description provided",
             "addButton": "Add API",
             "sensorThings": "SensorThings API",
             "sensorThingsSubtitle": "Time Series Data",
@@ -764,7 +763,8 @@
       "GROUP": "Group",
       "PERMISSION": "Permission",
       "ROLE": "Role",
-      "USER": "User"
+      "USER": "User",
+      "DATASET_DASHBOARD": "Dataset Dashboard"
     }
   },
   "roles": {

@@ -275,7 +275,7 @@
       "completion": {
         "title": "Erstellungsfortschritt",
         "accessManagement": {
-          "title": "Zugriffsberechtigungen",
+          "title": "Zugriff",
           "button": {
             "readOnly": "Gruppen und Rollen ansehen",
             "editable": "Gruppen und Rollen bearbeiten"
@@ -298,7 +298,6 @@
           "apis": {
             "title": "APIs",
             "empty": "Noch keine API vorhanden",
-            "noDescription": "Keine Beschreibung vorhanden",
             "addButton": "API hinzufügen",
             "sensorThings": "SensorThings API",
             "sensorThingsSubtitle": "Zeitreihendaten",
@@ -757,7 +756,8 @@
       "GROUP": "Gruppe",
       "PERMISSION": "Berechtigung",
       "ROLE": "Rolle",
-      "USER": "Benutzer"
+      "USER": "Benutzer",
+      "DATASET_DASHBOARD": "Datensatz-Dashboard"
     }
   },
   "roles": {
