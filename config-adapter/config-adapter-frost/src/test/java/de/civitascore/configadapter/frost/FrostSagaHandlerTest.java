@@ -710,6 +710,120 @@ class FrostSagaHandlerTest {
     }
 
     @Test
+    @DisplayName("fails the step when the batch response repeats a sub-response id")
+    void shouldFailStepOnDuplicateBatchSubResponseId() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response singleThingsPage = thingsPage(null, 7, 8);
+        when(mockBuilder.get()).thenReturn(singleThingsPage);
+        Response batch = mock(Response.class);
+        when(batch.getStatus()).thenReturn(200);
+        when(batch.readEntity(Map.class))
+            .thenReturn(
+                Map.of(
+                    "responses",
+                    List.of(Map.of("id", "0", "status", 200), Map.of("id", "0", "status", 200))));
+        when(mockBuilder.post(any(Entity.class))).thenReturn(batch);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "42")));
+
+        // A duplicate id with a matching size leaves one Thing's outcome unconfirmed — it must
+        // not slip through into the project delete.
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+        verify(mockBuilder, never()).delete();
+      }
+    }
+
+    @Test
+    @DisplayName("fails the step when the batch response carries a malformed sub-response id")
+    void shouldFailStepOnMalformedBatchSubResponseId() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response singleThingsPage = thingsPage(null, 7);
+        when(mockBuilder.get()).thenReturn(singleThingsPage);
+        Response batch = mock(Response.class);
+        when(batch.getStatus()).thenReturn(200);
+        when(batch.readEntity(Map.class))
+            .thenReturn(Map.of("responses", List.of(Map.of("id", "x", "status", 200))));
+        when(mockBuilder.post(any(Entity.class))).thenReturn(batch);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "42")));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+        verify(mockBuilder, never()).delete();
+      }
+    }
+
+    @Test
+    @DisplayName("fails the step before any deletion when provisionedEntities has a non-scalar id")
+    void shouldFailStepOnNonScalarProvisionedId() {
+      try (FrostSagaHandler handler = createHandler()) {
+        // An object instead of a scalar id (e.g. a serialized entity) is a broken producer —
+        // silently skipping it would silently retain the entity in FROST.
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "DELETE_PROJECT",
+                    Map.of(
+                        "projectId",
+                        "42",
+                        "provisionedEntities",
+                        Map.of("Sensors", List.of(Map.of("@iot.id", "5"))))));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+        // Validation must run before any deletion side effect.
+        verify(mockBuilder, never()).get();
+        verify(mockBuilder, never()).post(any(Entity.class));
+        verify(mockBuilder, never()).delete();
+      }
+    }
+
+    @Test
+    @DisplayName("fails the step before any deletion when a provisionedEntities value is no list")
+    void shouldFailStepOnNonListProvisionedValue() {
+      try (FrostSagaHandler handler = createHandler()) {
+        // "Datastreams": "5,7" — a string instead of a list is a broken producer; silently
+        // dropping it would silently retain the entities in FROST.
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "DELETE_PROJECT",
+                    Map.of(
+                        "projectId", "42", "provisionedEntities", Map.of("Datastreams", "5,7"))));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+        verify(mockBuilder, never()).get();
+        verify(mockBuilder, never()).delete();
+      }
+    }
+
+    @Test
+    @DisplayName("fails the step before any deletion when provisionedEntities itself is no map")
+    void shouldFailStepOnNonMapProvisionedEntities() {
+      try (FrostSagaHandler handler = createHandler()) {
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "DELETE_PROJECT",
+                    Map.of("projectId", "42", "provisionedEntities", "Sensors")));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+        verify(mockBuilder, never()).get();
+        verify(mockBuilder, never()).delete();
+      }
+    }
+
+    @Test
     @DisplayName("fails the step when the batch response omits sub-responses")
     void shouldFailStepWhenBatchResponseIncomplete() {
       try (FrostSagaHandler handler = createHandler()) {

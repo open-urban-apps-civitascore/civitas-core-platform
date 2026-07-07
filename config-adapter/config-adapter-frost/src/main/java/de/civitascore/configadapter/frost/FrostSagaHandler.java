@@ -298,8 +298,11 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
 
     FrostProjectCleanup cleanup =
         new FrostProjectCleanup(client(), authStrategy, serverUrl, command.sagaId());
+    // Parse (and thereby validate) the provisioned ids before anything is deleted — a malformed
+    // payload must fail the step up front, not after the Things are already gone.
+    Map<String, List<String>> provisionedEntities = provisionedEntities(command);
     cleanup.deleteProjectThings(projectId, compensating);
-    cleanup.deleteProvisionedEntities(provisionedEntities(command));
+    cleanup.deleteProvisionedEntities(provisionedEntities);
 
     try (Response response =
         authStrategy
@@ -342,16 +345,49 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
    * malformed → empty (nothing to delete).
    */
   private static Map<String, List<String>> provisionedEntities(SagaCommandMessage command) {
-    if (!(command.payload().get("provisionedEntities") instanceof Map<?, ?> raw)) {
+    Object raw = command.payload().get("provisionedEntities");
+    // Absent key = payload predates (or doesn't use) the contract — nothing to delete. A PRESENT
+    // key with the wrong shape is a broken producer and must fail loudly, like a malformed id.
+    if (raw == null) {
       return Map.of();
     }
+    if (!(raw instanceof Map<?, ?> bySet)) {
+      throw new IllegalArgumentException(
+          "DELETE_PROJECT payload field 'provisionedEntities' is not a map: "
+              + raw.getClass().getSimpleName());
+    }
     Map<String, List<String>> result = new HashMap<>();
-    for (Map.Entry<?, ?> entry : raw.entrySet()) {
-      if (entry.getValue() instanceof List<?> ids) {
-        result.put(String.valueOf(entry.getKey()), ids.stream().map(String::valueOf).toList());
+    for (Map.Entry<?, ?> entry : bySet.entrySet()) {
+      if (!(entry.getValue() instanceof List<?> ids)) {
+        throw new IllegalArgumentException(
+            "DELETE_PROJECT payload field 'provisionedEntities."
+                + entry.getKey()
+                + "' is not a list");
       }
+      result.put(
+          String.valueOf(entry.getKey()),
+          ids.stream().map(rawId -> scalarId(entry.getKey(), rawId)).toList());
     }
     return result;
+  }
+
+  /**
+   * A provisioned entity id must be a non-blank scalar. Anything else (null, object, blank) is a
+   * broken producer — failing loudly beats silently skipping the id, which would silently retain
+   * the entity in FROST.
+   */
+  private static String scalarId(Object entitySet, Object rawId) {
+    if (rawId instanceof Number number) {
+      return String.valueOf(number);
+    }
+    if (rawId instanceof String id && !id.isBlank()) {
+      return id;
+    }
+    throw new IllegalArgumentException(
+        "DELETE_PROJECT payload field 'provisionedEntities."
+            + entitySet
+            + "' contains a non-scalar or blank id: "
+            + rawId);
   }
 
   private SagaCommandResult handleRestoreProject(SagaCommandMessage command) {

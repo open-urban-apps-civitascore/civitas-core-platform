@@ -29,7 +29,10 @@ import org.slf4j.LoggerFactory;
 final class FrostProjectCleanup {
 
   /**
-   * Deletion order: Datastreams first, so a Sensor delete cannot cascade into a live Datastream.
+   * Deletion order: listed Datastreams before Sensors, because a Sensor delete cascades to its
+   * remaining Datastreams. This protects only Datastreams in the list — ids are assumed to be
+   * provisioned per dataset, so a listed Sensor sharing an unlisted live Datastream is not
+   * expected.
    */
   static final List<String> PROVISIONABLE_ENTITY_SETS =
       List.of("Datastreams", "Sensors", "ObservedProperties", "FeaturesOfInterest", "Locations");
@@ -176,7 +179,7 @@ final class FrostProjectCleanup {
         authStrategy
             .apply(client.target(serverUrl).path("$batch").request(MediaType.APPLICATION_JSON))
             .post(Entity.json(Map.of("requests", requests)))) {
-      checkResponse(response, "batch DELETE " + entitySet + " for DELETE_PROJECT");
+      checkResponse(response, batchOperation(entitySet));
 
       @SuppressWarnings("unchecked")
       Map<String, Object> body = response.readEntity(Map.class);
@@ -185,9 +188,8 @@ final class FrostProjectCleanup {
           (List<Map<String, Object>>) body.getOrDefault("responses", List.of());
       if (subResponses.size() != entityIds.size()) {
         throw new SagaApiException(
-            "batch DELETE "
-                + entitySet
-                + " for DELETE_PROJECT returned "
+            batchOperation(entitySet)
+                + " returned "
                 + subResponses.size()
                 + " sub-responses for "
                 + entityIds.size()
@@ -196,34 +198,79 @@ final class FrostProjectCleanup {
       }
 
       int deleted = 0;
+      boolean[] confirmed = new boolean[entityIds.size()];
       for (Map<String, Object> subResponse : subResponses) {
-        int status = ((Number) subResponse.get("status")).intValue();
-        String entityPath =
-            entitySet
-                + "("
-                + entityIds.get(Integer.parseInt(String.valueOf(subResponse.get("id"))))
-                + ")";
-        if (status == Response.Status.NOT_FOUND.getStatusCode()) {
-          log.debug(
-              "DELETE_PROJECT: {} already absent (404) — continuing. saga={}",
-              Encode.forJava(entityPath),
-              Encode.forJava(sagaId));
-          continue;
-        }
-        if (status < 200 || status >= 300) {
-          throw new SagaApiException(
-              "DELETE "
-                  + entityPath
-                  + " for DELETE_PROJECT failed: HTTP "
-                  + status
-                  + " — "
-                  + subResponse.get("body"),
-              status);
-        }
-        deleted++;
+        deleted += confirmSubResponse(entitySet, entityIds, confirmed, subResponse);
       }
       return deleted;
     }
+  }
+
+  /**
+   * Confirms one entity's outcome from its batch sub-response: 404 counts as already gone, any
+   * other failure fails the step.
+   *
+   * @return 1 if the entity was deleted, 0 if it was already absent
+   */
+  private int confirmSubResponse(
+      String entitySet,
+      List<String> entityIds,
+      boolean[] confirmed,
+      Map<String, Object> subResponse) {
+    int requestIndex = requestIndex(subResponse.get("id"), confirmed, entitySet);
+    if (!(subResponse.get("status") instanceof Number statusNumber)) {
+      throw new SagaApiException(
+          batchOperation(entitySet) + " returned no status for sub-response id " + requestIndex,
+          502);
+    }
+    int status = statusNumber.intValue();
+    String entityPath = entitySet + "(" + entityIds.get(requestIndex) + ")";
+    if (status == Response.Status.NOT_FOUND.getStatusCode()) {
+      log.debug(
+          "DELETE_PROJECT: {} already absent (404) — continuing. saga={}",
+          Encode.forJava(entityPath),
+          Encode.forJava(sagaId));
+      return 0;
+    }
+    if (status < 200 || status >= 300) {
+      throw new SagaApiException(
+          "DELETE "
+              + entityPath
+              + " for DELETE_PROJECT failed: HTTP "
+              + status
+              + " — "
+              + subResponse.get("body"),
+          status);
+    }
+    return 1;
+  }
+
+  /**
+   * Resolves a batch sub-response id back to its request index and marks it confirmed. Sub-response
+   * ids echo the request indexes; a malformed, out-of-range or duplicate id means some entity's
+   * outcome is unconfirmed — together with the size check, exactly-once confirmation guarantees
+   * full coverage.
+   */
+  private int requestIndex(Object rawId, boolean[] confirmed, String entitySet) {
+    String idText = String.valueOf(rawId);
+    // Request ids are the indexes 0..99 we generated — anything non-numeric is malformed.
+    if (!idText.matches("\\d{1,3}")) {
+      throw new SagaApiException(
+          batchOperation(entitySet) + " returned a malformed sub-response id: " + idText, 502);
+    }
+    int index = Integer.parseInt(idText);
+    if (index >= confirmed.length || confirmed[index]) {
+      throw new SagaApiException(
+          batchOperation(entitySet) + " returned an unknown or duplicate sub-response id: " + index,
+          502);
+    }
+    confirmed[index] = true;
+    return index;
+  }
+
+  /** Operation label for error messages, e.g. {@code batch DELETE Things for DELETE_PROJECT}. */
+  private static String batchOperation(String entitySet) {
+    return "batch DELETE " + entitySet + " for DELETE_PROJECT";
   }
 
   private void checkResponse(Response response, String operationDesc) {
