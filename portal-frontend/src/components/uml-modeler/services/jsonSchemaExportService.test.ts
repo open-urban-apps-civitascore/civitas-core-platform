@@ -427,7 +427,7 @@ describe('exportToJsonSchema', () => {
     expect(schema.title).toBe('Status')
   })
 
-  it('keeps a single-root layout when the diagram has multiple unconnected classes', () => {
+  it('references every unconnected class from the document root', () => {
     const diagram = baseDiagram({
       nodes: [
         {
@@ -466,11 +466,14 @@ describe('exportToJsonSchema', () => {
 
     const schema = exportToJsonSchema(diagram)
 
-    // The document root is the data structure (diagram name). Only the selected root class is a
+    // The document root is the data structure (diagram name). Each unconnected tree's top is a
     // $ref property of it; every class — root and non-root — is emitted under $defs.
     expect(schema.type).toBe('object')
     expect(schema.title).toBe('TrafficSensor')
-    expect(schema.properties).toEqual({ building: { $ref: '#/$defs/Building' } })
+    expect(schema.properties).toEqual({
+      building: { $ref: '#/$defs/Building' },
+      street: { $ref: '#/$defs/Street' },
+    })
     const defs = schema.$defs as Record<string, Record<string, unknown>>
     expect(defs.Building).toBeDefined()
     expect(defs.Street).toBeDefined()
@@ -802,7 +805,7 @@ describe('exportToJsonSchema', () => {
     ])
   })
 
-  it('references the diagram-name-matching class as the root class (case-insensitive)', () => {
+  it('does not collapse a multi-root diagram onto a diagram-name-matching class', () => {
     const diagram = baseDiagram({
       name: 'beta',
       nodes: [
@@ -813,9 +816,10 @@ describe('exportToJsonSchema', () => {
     } as Partial<UMLDiagram>)
 
     const schema = exportToJsonSchema(diagram)
-    // Document title is the diagram name; the name-matching class Beta is picked as the root class.
+    // Document title is the diagram name; both unconnected classes stay root properties — a name
+    // match must not silently drop the other tree.
     expect(schema.title).toBe('beta')
-    expect(schema.properties).toEqual({ beta: { $ref: '#/$defs/Beta' } })
+    expect(schema.properties).toEqual({ alpha: { $ref: '#/$defs/Alpha' }, beta: { $ref: '#/$defs/Beta' } })
   })
 })
 

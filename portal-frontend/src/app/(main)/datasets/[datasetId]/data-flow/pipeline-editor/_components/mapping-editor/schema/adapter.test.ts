@@ -143,13 +143,20 @@ describe('umlDiagramToSchemaTree', () => {
     expect(umlDiagramToSchemaTree(diagram, 'properties').name).toBe('Thing')
   })
 
-  it('prefers a name-matching element among structural roots', () => {
+  it('exposes every unconnected class as its own root object node', () => {
     const diagram = {
       nodes: [classNode('a', 'Alpha', [{ name: 'a1' }]), classNode('b', 'Beta', [{ name: 'b1' }])],
       edges: [],
     } as unknown as UMLDiagram
 
-    expect(umlDiagramToSchemaTree(diagram, 'beta').name).toBe('Beta')
+    const tree = umlDiagramToSchemaTree(diagram, 'MyStructure')
+    expect(tree.name).toBe('MyStructure')
+    expect(tree.fields.map(f => ({ name: f.name, path: f.path, type: f.type }))).toEqual([
+      { name: 'alpha', path: '$.alpha', type: 'object' },
+      { name: 'beta', path: '$.beta', type: 'object' },
+    ])
+    expect(tree.fields[0].children?.map(f => f.path)).toEqual(['$.alpha.a1'])
+    expect(tree.fields[1].children?.map(f => f.path)).toEqual(['$.beta.b1'])
   })
 
   it('returns an empty tree for a null diagram', () => {
@@ -272,17 +279,22 @@ describe('umlDiagramToSchemaTree', () => {
     expect(tree.fields.find(f => f.name === 'engine')?.children?.map(c => c.name)).toEqual(['power'])
   })
 
-  it('terminates on a cyclic inheritance and emits each attribute once', () => {
+  it('terminates on a cyclic inheritance and emits each attribute once per root', () => {
+    // A cyclic inheritance leaves no derivable top, so every class counts as a root; each root's
+    // subtree still inlines the cycle's attributes exactly once.
     const diagram = {
       nodes: [classNode('a', 'A', [{ name: 'a1' }]), classNode('b', 'B', [{ name: 'b1' }])],
       edges: [inhEdge('a', 'b'), inhEdge('b', 'a')],
     } as unknown as UMLDiagram
 
     const tree = umlDiagramToSchemaTree(diagram, 'a')
-    const names = tree.fields.map(f => f.name)
-    expect(new Set(names).size).toBe(names.length)
-    expect(names).toContain('a1')
-    expect(names).toContain('b1')
+    expect(tree.fields.map(f => f.name)).toEqual(['a', 'b'])
+    for (const root of tree.fields) {
+      const names = root.children?.map(c => c.name) ?? []
+      expect(new Set(names).size).toBe(names.length)
+      expect(names).toContain('a1')
+      expect(names).toContain('b1')
+    }
   })
 
   it('never roots on the inheritance parent even when fallbackName matches it', () => {
@@ -294,13 +306,15 @@ describe('umlDiagramToSchemaTree', () => {
     expect(umlDiagramToSchemaTree(diagram, 'animal').name).toBe('Dog')
   })
 
-  it('prefers the diagram name over the fallbackName when both could match a root', () => {
+  it('does not collapse a multi-root diagram onto a name-matching class', () => {
     const diagram = {
       name: 'Beta',
       nodes: [classNode('a', 'Alpha', [{ name: 'a1' }]), classNode('b', 'Beta', [{ name: 'b1' }])],
       edges: [],
     } as unknown as UMLDiagram
 
-    expect(umlDiagramToSchemaTree(diagram, 'alpha').name).toBe('Beta')
+    const tree = umlDiagramToSchemaTree(diagram, 'alpha')
+    expect(tree.name).toBe('alpha')
+    expect(tree.fields.map(f => f.name)).toEqual(['alpha', 'beta'])
   })
 })

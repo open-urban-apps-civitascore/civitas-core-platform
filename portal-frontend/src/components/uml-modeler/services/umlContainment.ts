@@ -9,10 +9,12 @@
  * containment category in the set below.
  *
  * Direction rules:
- * - composition: the diamond (= the container) is drawn at the edge target, so the target contains
- *   the source.
- * - inheritance: the parent sits at the edge target and is embedded into the subclass (the subclass
- *   is the concrete root).
+ * - composition/aggregation: the diamond (= the container) is drawn at the edge target, so the
+ *   target contains the source.
+ * - association: no diamond; keeps its drawn direction (source → target). The target becomes a
+ *   property of the source and is therefore embedded; the source stays a possible document root.
+ * - inheritance/realization: the parent sits at the edge target and is embedded into the subclass
+ *   (the subclass is the concrete root).
  */
 
 import type { UMLDiagram } from '../types/diagram'
@@ -81,19 +83,22 @@ export const classifyStructuralEdge = (rel: UMLRelationship): Containment | null
 }
 
 /**
- * Ids of every element that is embedded and therefore cannot be the document root: the part side of
- * a composition, and the parent (target) of an inheritance edge.
+ * Ids of every element that is embedded and therefore not a document root: the part side of any
+ * structural edge (composition/aggregation part, association target — both end up as a property of
+ * their container), and the parent (target) of an inheritance/realization edge. An embedded
+ * element is reachable from a root, so surfacing it as its own root would duplicate it.
  */
 export const collectContainedIds = (diagram: UMLDiagram): Set<string> => {
   const containedIds = new Set<string>()
   for (const edge of diagram.edges ?? []) {
     const rel = edge.data?.relationship
     if (!rel) continue
-    if (CONTAINER_AT_TARGET.has(rel.type)) {
-      containedIds.add(rel.source)
-    } else if (INHERITANCE_RELATIONS.has(rel.type)) {
+    if (INHERITANCE_RELATIONS.has(rel.type)) {
       containedIds.add(rel.target)
+      continue
     }
+    const containment = classifyStructuralEdge(rel)
+    if (containment) containedIds.add(containment.partId)
   }
   return containedIds
 }
@@ -111,30 +116,16 @@ export const collectParentIds = (diagram: UMLDiagram, elementId: string): string
 }
 
 /**
- * Picks the hierarchy root: a non-embedded, non-enumeration element. When several candidates remain
- * the choice is name-anchored case-insensitively (preferred name first, then the secondary name).
- * `pool[0]` is an order-dependent last resort that is only reached for a fully embedded (e.g. cyclic)
- * or multi-root diagram, where no single correct root exists.
+ * The hierarchy roots: every non-embedded, non-enumeration element, in node order. A diagram may
+ * legitimately hold several unconnected trees — each of their tops is a root, and the document
+ * root (the data structure itself) references all of them, so nothing depends on which class was
+ * inserted first. A fully embedded (e.g. cyclic) diagram has no derivable top, so every class
+ * counts; an enumeration-only diagram falls back to the enumerations themselves.
  */
-export const selectRootElement = (
-  elements: UMLElement[],
-  containedIds: Set<string>,
-  preferredName: string | undefined,
-  secondaryName?: string,
-): UMLElement | undefined => {
-  if (elements.length === 0) return undefined
-
+export const selectRootElements = (elements: UMLElement[], containedIds: Set<string>): UMLElement[] => {
   const nonEnum = elements.filter(e => e.type !== 'enumeration')
   const candidates = nonEnum.filter(e => !containedIds.has(e.id))
-  let pool = elements
-  if (candidates.length > 0) pool = candidates
-  else if (nonEnum.length > 0) pool = nonEnum
-
-  const preferred = (preferredName ?? '').toLowerCase()
-  const secondary = (secondaryName ?? '').toLowerCase()
-  return (
-    pool.find(e => e.name.toLowerCase() === preferred) ??
-    (secondary ? pool.find(e => e.name.toLowerCase() === secondary) : undefined) ??
-    pool[0]
-  )
+  if (candidates.length > 0) return candidates
+  if (nonEnum.length > 0) return nonEnum
+  return elements
 }

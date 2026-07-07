@@ -1,11 +1,11 @@
 import type { PortType } from '@/components/node-editor/types'
-import { isAttributeRequired } from '@/components/uml-modeler/services/jsonSchemaExportService'
+import { isAttributeRequired, sanitizeName } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import {
   classifyStructuralEdge,
   collectContainedIds,
   INHERITANCE_RELATIONS,
   isManyMultiplicity,
-  selectRootElement,
+  selectRootElements,
 } from '@/components/uml-modeler/services/umlContainment'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import type { UMLAttribute, UMLElement, UMLType } from '@/components/uml-modeler/types/uml'
@@ -185,12 +185,35 @@ const buildFields = (el: UMLElement, base: string, index: DiagramIndex, visited:
   return fields
 }
 
-/** Converts a datastructure version's `styles` (UML diagram) into the editor's field tree. */
+/**
+ * Converts a datastructure version's `styles` (UML diagram) into the editor's field tree. A
+ * single-root diagram anchors the class's fields directly at `$` (the runtime record is the class
+ * itself); a diagram with several unconnected trees mirrors the generated schema, whose document
+ * root holds one property per root class — each root becomes an object node at
+ * `$.<sanitized name>`.
+ */
 export const umlDiagramToSchemaTree = (diagram: UMLDiagram | null | undefined, fallbackName: string): SchemaTree => {
   if (!diagram) return { name: fallbackName, fields: [] }
   const index = indexDiagram(diagram)
   const elements = (diagram.nodes ?? []).map(n => n.data?.element).filter((e): e is UMLElement => !!e)
-  const root = selectRootElement(elements, collectContainedIds(diagram), diagram.name, fallbackName)
-  if (!root) return { name: fallbackName, fields: [] }
-  return { name: root.name || fallbackName, fields: buildFields(root, '$', index, new Set([root.id])) }
+  if (elements.length === 0) return { name: fallbackName, fields: [] }
+  const roots = selectRootElements(elements, collectContainedIds(diagram))
+
+  if (roots.length === 1) {
+    const root = roots[0]
+    return { name: root.name || fallbackName, fields: buildFields(root, '$', index, new Set([root.id])) }
+  }
+
+  const fields: FieldNode[] = roots.map(root => {
+    const name = sanitizeName(root.name) || root.id
+    const path = `$.${name}`
+    return {
+      path,
+      name,
+      type: 'object',
+      portType: 'object',
+      children: buildFields(root, path, index, new Set([root.id])),
+    }
+  })
+  return { name: fallbackName, fields }
 }

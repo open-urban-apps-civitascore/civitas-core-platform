@@ -22,11 +22,12 @@
  *   for many multiplicities).
  *
  * Root: the document root is the data structure itself, titled after the
- * diagram. Every class is emitted under `$defs`; the root class (the one not
- * contained by any other via composition or inheritance) is referenced from
- * the document root via a `$ref` property, so the structure's name — not an
- * arbitrary class — is always the top level. An enumeration-only diagram keeps
- * its `enum` at the document root instead.
+ * diagram. Every class is emitted under `$defs`; each root class (one not
+ * contained by any other via composition, aggregation, inheritance, or
+ * realization) is referenced from the document root via its own `$ref`
+ * property, so the structure's name — not an arbitrary class — is always the
+ * top level and a diagram may hold several unconnected trees. An
+ * enumeration-only diagram keeps its `enum` at the document root instead.
  */
 
 import type { UMLDiagram } from '../types/diagram'
@@ -37,7 +38,7 @@ import {
   collectContainedIds,
   collectParentIds,
   parseMultiplicity,
-  selectRootElement,
+  selectRootElements,
 } from './umlContainment'
 
 const JSON_SCHEMA_DIALECT = 'https://json-schema.org/draft/2020-12/schema'
@@ -285,7 +286,7 @@ export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): Json
   const sanitizedName = sanitizeName(diagram.name) || 'untitled'
   const id = modelUri || `${BASE_MODEL_URI}/${sanitizedName}`
 
-  const rootElement = selectRootElement(elements, collectContainedIds(diagram), diagram.name)
+  const rootElements = elements.length > 0 ? selectRootElements(elements, collectContainedIds(diagram)) : []
 
   const schema: JsonSchemaObject = {
     $id: id,
@@ -294,38 +295,46 @@ export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): Json
     type: 'object',
   }
 
-  if (!rootElement) {
+  if (rootElements.length === 0) {
     schema.properties = {}
     return schema
   }
 
-  if (rootElement.type !== 'enumeration') {
-    schema.properties = {
-      [sanitizeName(rootElement.name) || (classDefKeyById.get(rootElement.id) as string)]: {
-        $ref: `#/$defs/${classDefKeyById.get(rootElement.id)}`,
-      },
+  if (rootElements.length === 1 && rootElements[0].type === 'enumeration') {
+    const rootElement = rootElements[0]
+    const rootSchema = buildClassSchema(rootElement, diagram, classDefKeyById)
+    Object.assign(schema, rootSchema)
+    // buildClassSchema omits `type` for enumerations, so drop the pre-initialized `type: 'object'`.
+    delete schema.type
+    schema.$id = id
+    schema.$schema = JSON_SCHEMA_DIALECT
+    schema.title = rootElement.name || diagram.name
+
+    const defs = buildDefs(
+      elements.filter(e => e.id !== rootElement.id),
+      diagram,
+      classDefKeyById,
+    )
+    if (Object.keys(defs).length > 0) {
+      schema.$defs = defs
     }
-    schema.$defs = buildDefs(elements, diagram, classDefKeyById)
     return schema
   }
 
-  const rootSchema = buildClassSchema(rootElement, diagram, classDefKeyById)
-  Object.assign(schema, rootSchema)
-  // buildClassSchema omits `type` for enumerations, so drop the pre-initialized `type: 'object'`.
-  delete schema.type
-  schema.$id = id
-  schema.$schema = JSON_SCHEMA_DIALECT
-  schema.title = rootElement.name || diagram.name
-
-  const defs = buildDefs(
-    elements.filter(e => e.id !== rootElement.id),
-    diagram,
-    classDefKeyById,
-  )
-  if (Object.keys(defs).length > 0) {
-    schema.$defs = defs
+  // One property per root: a diagram may hold several unconnected trees, and the document root —
+  // the data structure itself — references each of their tops. Property names are derived from the
+  // (unique) `$defs` keys so two same-named roots cannot collapse into one property.
+  const properties: JsonSchemaObject = {}
+  const usedPropertyNames = new Set<string>()
+  for (const root of rootElements) {
+    const defKey = classDefKeyById.get(root.id) as string
+    let propertyName = sanitizeName(root.name) || sanitizeName(defKey) || defKey
+    if (usedPropertyNames.has(propertyName)) propertyName = sanitizeName(defKey) || defKey
+    usedPropertyNames.add(propertyName)
+    properties[propertyName] = { $ref: `#/$defs/${defKey}` }
   }
-
+  schema.properties = properties
+  schema.$defs = buildDefs(elements, diagram, classDefKeyById)
   return schema
 }
 

@@ -8,7 +8,7 @@ import {
   collectParentIds,
   isManyMultiplicity,
   parseMultiplicity,
-  selectRootElement,
+  selectRootElements,
 } from './umlContainment'
 
 const relationship = (over: Partial<UMLRelationship> & Pick<UMLRelationship, 'type' | 'source' | 'target'>) =>
@@ -69,16 +69,16 @@ describe('parseMultiplicity / isManyMultiplicity', () => {
 })
 
 describe('collectContainedIds', () => {
-  it('embeds composition parts and inheritance parents; ignores out-of-scope types', () => {
+  it('embeds the part side of every structural edge and inheritance/realization parents', () => {
     const d = diagram([
       edge(relationship({ type: 'composition', source: 'part', target: 'whole' })),
       edge(relationship({ type: 'inheritance', source: 'sub', target: 'parent' })),
-      // Out-of-scope: neither embeds anything.
+      // The association target becomes a property of the source, so it is embedded as well.
       edge(relationship({ type: 'association', source: 'order', target: 'item' })),
       edge(relationship({ type: 'aggregation', source: 'wheel', target: 'car' })),
     ])
     const contained = collectContainedIds(d)
-    expect([...contained].sort()).toEqual(['parent', 'part'])
+    expect([...contained].sort()).toEqual(['item', 'parent', 'part'])
   })
 })
 
@@ -94,16 +94,23 @@ describe('collectParentIds', () => {
   })
 })
 
-describe('selectRootElement', () => {
+describe('selectRootElements', () => {
   const els = [element('p', 'Parent'), element('s', 'Sub'), element('e', 'Status', 'enumeration')]
 
   it('excludes embedded and enumeration elements', () => {
-    expect(selectRootElement(els, new Set(['p']), undefined)?.name).toBe('Sub')
+    expect(selectRootElements(els, new Set(['p'])).map(e => e.name)).toEqual(['Sub'])
   })
 
-  it('prefers the primary name, then the secondary, then the first candidate', () => {
-    expect(selectRootElement(els, new Set(), 'sub')?.name).toBe('Sub')
-    expect(selectRootElement(els, new Set(), undefined, 'parent')?.name).toBe('Parent')
-    expect(selectRootElement(els, new Set(), undefined)?.name).toBe('Parent')
+  it('returns every unconnected class as a root, in node order', () => {
+    expect(selectRootElements(els, new Set()).map(e => e.name)).toEqual(['Parent', 'Sub'])
+  })
+
+  it('falls back to all classes for fully embedded (cyclic) diagrams', () => {
+    expect(selectRootElements(els, new Set(['p', 's'])).map(e => e.name)).toEqual(['Parent', 'Sub'])
+  })
+
+  it('falls back to the enumerations for an enumeration-only diagram', () => {
+    const enums = [element('e1', 'Status', 'enumeration'), element('e2', 'Kind', 'enumeration')]
+    expect(selectRootElements(enums, new Set()).map(e => e.name)).toEqual(['Status', 'Kind'])
   })
 })

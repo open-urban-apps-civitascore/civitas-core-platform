@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { exportToJsonSchema } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 
+import type { FieldNode } from '../_types'
 import { umlDiagramToSchemaTree } from './adapter'
+import { modelToSchemaTree } from './modelAdapter'
 
 const cls = (id: string, name: string, attrs: { id: string; name: string; type?: string }[]) => ({
   id: `node-${id}`,
@@ -173,5 +175,43 @@ describe('root-selection consistency (adapter vs generator)', () => {
     // single $ref property).
     const generatorFields = resolveTopLevelProperties(rootClass ? defs[rootClass] : undefined, defs)
     expect([...adapterFields].sort()).toEqual([...generatorFields].sort())
+  })
+})
+
+const leafPaths = (fields: FieldNode[] | undefined): string[] =>
+  (fields ?? []).flatMap(field => (field.children?.length ? leafPaths(field.children) : [field.path]))
+
+describe('model-walker consistency (modelToSchemaTree vs adapter)', () => {
+  // The model walker reads the generated schema; its `$` node is the resolved root class, so its
+  // subtree must expose exactly the leaf paths the diagram adapter derives directly — the paths are
+  // the mapping contract and must not depend on which representation the editor happens to read.
+  it.each(fixtures)('agrees on root class and leaf paths for $label', ({ diagram }) => {
+    const adapterTree = umlDiagramToSchemaTree(diagram, diagram.name)
+    const modelTree = modelToSchemaTree(exportToJsonSchema(diagram), diagram.name)
+
+    expect(modelTree.name).toBe(diagram.name)
+    expect(modelTree.fields).toHaveLength(1)
+    expect(modelTree.fields[0].path).toBe('$')
+    expect(modelTree.fields[0].name).toBe(adapterTree.name)
+    expect(leafPaths(modelTree.fields[0].children).sort()).toEqual(leafPaths(adapterTree.fields).sort())
+  })
+
+  it('agrees on a multi-root diagram: one object node per unconnected tree', () => {
+    const multiRoot = diagram(
+      'TrafficSensor',
+      [
+        cls('building', 'Building', [{ id: 'a1', name: 'floors' }]),
+        cls('street', 'Street', [{ id: 'a2', name: 'name' }]),
+      ],
+      [],
+    )
+    const adapterTree = umlDiagramToSchemaTree(multiRoot, multiRoot.name)
+    const modelTree = modelToSchemaTree(exportToJsonSchema(multiRoot), multiRoot.name)
+
+    expect(modelTree.fields[0].name).toBe('TrafficSensor')
+    const modelRoots = (modelTree.fields[0].children ?? []).map(f => f.path)
+    const adapterRoots = adapterTree.fields.map(f => f.path)
+    expect(modelRoots).toEqual(adapterRoots)
+    expect(leafPaths(modelTree.fields[0].children).sort()).toEqual(leafPaths(adapterTree.fields).sort())
   })
 })
