@@ -44,8 +44,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
 
   private static final String ADAPTER_NAME = "frost";
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/v1.1";
-  // Page size for Thing enumeration and chunk size for batched Thing deletes: one page of ids
-  // becomes at most one JSON batch request.
+  // Page size for Thing enumeration and chunk size for batched deletes: one page → one batch.
   private static final int THING_BATCH_SIZE = 100;
   private static final String KEY_PROJECT_ID = "projectId";
   private static final String KEY_NAME = "name";
@@ -300,7 +299,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     String projectId = requireString(command, KEY_PROJECT_ID);
     boolean compensating = "COMPENSATE_STEP".equals(command.type());
 
-    deleteProjectThings(projectId, command.sagaId());
+    deleteProjectThings(projectId, compensating, command.sagaId());
 
     try (Response response =
         authStrategy
@@ -338,26 +337,18 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Deletes all Things of a project before the project itself is deleted. FROST does not cascade
-   * project deletion — {@code DELETE /Projects(n)} removes only the project and its membership
-   * links, while the member Things, Datastreams and Observations survive at server root,
-   * unreachable through any project. Deleting a Thing, however, DOES cascade to its Datastreams and
-   * their Observations, so removing the project's Things first removes the project's sensor data
-   * with it. Not covered by that cascade: Sensors, ObservedProperties, FeaturesOfInterest and
-   * Locations shared across Things.
+   * Deletes the project's Things before the project itself: FROST does not cascade project
+   * deletion, but deleting a Thing cascades to its Datastreams and Observations. Not covered:
+   * Sensors, ObservedProperties, FeaturesOfInterest, Locations.
    *
-   * <p>Safe to re-run (compensation retries, partial earlier cleanup): a project that is already
-   * absent (enumeration 404) skips the cleanup entirely — the subsequent project delete remains the
-   * single place deciding idempotency semantics — and a Thing that is already gone (delete 404) is
-   * skipped.
+   * <p>Re-run safe: already-deleted Things (404) are skipped; a 404 on the enumeration skips the
+   * cleanup on compensation only — a forward delete must fail instead of silently stranding the
+   * Things at server root.
    */
-  private void deleteProjectThings(String projectId, String sagaId) {
-    // Collect all Thing ids fully BEFORE deleting: deleting while paging shifts the pages and
-    // would skip Things. Pages are requested with explicit $skip/$orderby instead of following
-    // @iot.nextLink verbatim — FROST renders that link from its configured serviceRootUrl, which
-    // is not necessarily reachable from this adapter (internal vs. public URL). $skip paging is
-    // stable here: the saga tears down the writing pipelines before this step, and no Thing is
-    // deleted until the enumeration is complete.
+  private void deleteProjectThings(String projectId, boolean compensating, String sagaId) {
+    // Collect all ids before deleting (deleting while paging shifts pages). Explicit $skip paging
+    // instead of @iot.nextLink: FROST renders that link from its serviceRootUrl, which is not
+    // necessarily reachable from this adapter. Stable because nothing writes during this step.
     List<String> thingIds = new ArrayList<>();
     int skip = 0;
     while (true) {
@@ -373,10 +364,10 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
                       .queryParam("$skip", String.valueOf(skip))
                       .request(MediaType.APPLICATION_JSON))
               .get()) {
-        if (response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
+        if (compensating && response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
           log.info(
-              "DELETE_PROJECT: project {} not found while listing its Things — skipping Thing"
-                  + " cleanup. saga={}",
+              "DELETE_PROJECT compensation: project {} not found while listing its Things —"
+                  + " skipping Thing cleanup. saga={}",
               Encode.forJava(projectId),
               Encode.forJava(sagaId));
           return;
@@ -414,12 +405,9 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Deletes one chunk of Things in a single JSON batch request — one round trip instead of one per
-   * Thing. The sub-requests execute independently on the server, so the outcome of each Thing is
-   * checked individually: a Thing that is already gone (sub-status 404) is skipped, any other
-   * failed sub-request fails the step. Every Thing must have a positively confirmed outcome — a
-   * batch response that omits sub-responses fails the step rather than silently leaving Things
-   * behind.
+   * Deletes one chunk of Things in a single JSON batch request. Sub-requests execute independently:
+   * 404 means already gone (skip), any other failure fails the step. Every Thing needs a confirmed
+   * outcome — a truncated batch response fails rather than leaving Things behind.
    *
    * @return the number of Things actually deleted
    */

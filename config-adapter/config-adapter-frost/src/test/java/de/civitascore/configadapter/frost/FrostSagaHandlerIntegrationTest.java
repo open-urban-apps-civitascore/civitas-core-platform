@@ -170,10 +170,8 @@ class FrostSagaHandlerIntegrationTest extends AbstractFrostIntegrationTest {
   }
 
   /**
-   * FROST does not cascade project deletion: {@code DELETE /Projects(n)} alone leaves the member
-   * Things, Datastreams and Observations at server root, unreachable through any project. The
-   * handler must therefore delete the project's Things first (which FROST cascades to their
-   * Datastreams and Observations) — and must not touch any other project's data while doing so.
+   * FROST does not cascade project deletion, so the handler must delete the project's Things first
+   * (that cascade covers Datastreams and Observations) — without touching other projects' data.
    */
   @Test
   void deleteProjectRemovesItsThingsDatastreamsAndObservationsButSparesOtherProjects()
@@ -221,9 +219,8 @@ class FrostSagaHandlerIntegrationTest extends AbstractFrostIntegrationTest {
   }
 
   /**
-   * A DELETE_PROJECT compensation must be re-runnable: a retry against a project that was already
-   * removed (or already emptied) must still succeed, otherwise a saga rollback could never complete
-   * after a partial earlier cleanup.
+   * A compensation retry against an already-removed project must still succeed — otherwise a saga
+   * rollback could never complete.
    */
   @Test
   void deleteProjectCompensationSucceedsWhenRerunAfterProjectAlreadyRemoved() throws Exception {
@@ -252,6 +249,43 @@ class FrostSagaHandlerIntegrationTest extends AbstractFrostIntegrationTest {
         () -> "Re-run DELETE_PROJECT compensation failed: " + second.error());
   }
 
+  /**
+   * A project with more Things than one enumeration page must be emptied completely — a paging
+   * error would loop forever or leave Things behind.
+   */
+  @Test
+  void deleteProjectRemovesAllThingsAcrossMultiplePages() throws Exception {
+    String projectId = createProject("Paged-" + UUID.randomUUID());
+    int thingCount = 101;
+    for (int i = 0; i < thingCount; i++) {
+      createPlainThing(projectId, "paged-thing-" + i);
+    }
+    int rootThingsBefore = countRootThings();
+
+    SagaCommandResult result = handler.handle(deleteProjectCommand("EXECUTE_STEP", projectId));
+
+    assertEquals("STEP_COMPLETED", result.type(), () -> "DELETE_PROJECT failed: " + result.error());
+    assertRootEntityStatus(404, "Projects(" + projectId + ")");
+    assertEquals(
+        rootThingsBefore - thingCount,
+        countRootThings(),
+        "every Thing of every enumeration page must be deleted at server root");
+  }
+
+  private int countRootThings() throws Exception {
+    try (Response response =
+        httpClient
+            .target(frostBaseUrl)
+            .path("Things")
+            .queryParam("$count", "true")
+            .queryParam("$top", "0")
+            .request(MediaType.APPLICATION_JSON)
+            .get()) {
+      assertEquals(200, response.getStatus(), "Failed to count Things");
+      return objectMapper.readTree(response.readEntity(String.class)).get("@iot.count").asInt();
+    }
+  }
+
   private SagaCommandMessage deleteProjectCommand(String type, String projectId) {
     return new SagaCommandMessage(
         type,
@@ -274,9 +308,8 @@ class FrostSagaHandlerIntegrationTest extends AbstractFrostIntegrationTest {
   }
 
   /**
-   * Seeds a Thing in the given project carrying a deep-inserted Datastream (with Sensor and
-   * ObservedProperty) and two Observations. The Location is required so FROST can auto-generate the
-   * FeatureOfInterest for the Observations.
+   * Seeds a Thing with a deep-inserted Datastream and two Observations; the Location lets FROST
+   * auto-generate the FeatureOfInterest.
    */
   private String createThingWithDatastreamAndObservations(String projectId, String name) {
     Map<String, Object> thing =

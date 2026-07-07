@@ -46,6 +46,7 @@ import org.mockito.ArgumentCaptor;
 class FrostSagaHandlerTest {
 
   private WebTarget mockTarget;
+  private WebTarget mockPathTarget;
   private Invocation.Builder mockBuilder;
 
   @Test
@@ -516,8 +517,7 @@ class FrostSagaHandlerTest {
                 createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "42")));
 
         assertEquals("STEP_COMPLETED", result.type());
-        // FROST does not cascade project deletion, so the project delete must come last —
-        // otherwise the membership links are gone and the Things are stranded at server root.
+        // Project delete last — once it is gone, its Things can no longer be enumerated.
         ArgumentCaptor<String> paths = ArgumentCaptor.forClass(String.class);
         verify(mockTarget, times(3)).path(paths.capture());
         assertEquals(
@@ -554,6 +554,10 @@ class FrostSagaHandlerTest {
         assertEquals(
             List.of("Things(7)", "Things(8)", "Things(9)"),
             batchRequestUrls(batchCaptor.getValue()));
+        // A stuck $skip would refetch page 1 forever (the nextLink keeps the loop alive).
+        ArgumentCaptor<Object> skips = ArgumentCaptor.forClass(Object.class);
+        verify(mockPathTarget, times(2)).queryParam(eq("$skip"), skips.capture());
+        assertEquals(List.of("0", "2"), skips.getAllValues());
       }
     }
 
@@ -588,6 +592,9 @@ class FrostSagaHandlerTest {
         verify(mockBuilder, times(2)).post(any(Entity.class));
         assertEquals(100, batchRequestUrls(batchCaptor.getAllValues().get(0)).size());
         assertEquals(50, batchRequestUrls(batchCaptor.getAllValues().get(1)).size());
+        ArgumentCaptor<Object> skips = ArgumentCaptor.forClass(Object.class);
+        verify(mockPathTarget, times(2)).queryParam(eq("$skip"), skips.capture());
+        assertEquals(List.of("0", "100"), skips.getAllValues());
       }
     }
 
@@ -627,8 +634,7 @@ class FrostSagaHandlerTest {
             handler.handle(
                 createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "42")));
 
-        // A genuine error must fail the step (no silent skip) — otherwise the project would be
-        // deleted while its Things stay behind, stranded at server root.
+        // A genuine error must fail the step — no silent skip that would strand Things.
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
         verify(mockBuilder, never()).delete();
@@ -648,8 +654,7 @@ class FrostSagaHandlerTest {
             handler.handle(
                 createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "42")));
 
-        // Every Thing needs a positively confirmed outcome — a truncated batch response must not
-        // let unconfirmed Things slip through into the project delete.
+        // A truncated batch response must not let unconfirmed Things slip through.
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
         verify(mockBuilder, never()).delete();
@@ -657,7 +662,7 @@ class FrostSagaHandlerTest {
     }
 
     @Test
-    @DisplayName("still fails a forward delete when the project is absent (404)")
+    @DisplayName("fails a forward delete already at a 404 Thing enumeration, before any delete")
     void shouldFailForwardDeleteWhenProjectAbsent() {
       try (FrostSagaHandler handler = createHandler()) {
         Response notFound = mock(Response.class);
@@ -670,10 +675,10 @@ class FrostSagaHandlerTest {
             handler.handle(
                 createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "999")));
 
-        // The Thing cleanup skips silently on 404, but a forward delete of a missing project is
-        // genuine drift and must stay visible.
+        // Only compensations may treat 404 as "already gone" — a forward delete must surface it.
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
+        verify(mockBuilder, never()).delete();
       }
     }
 
@@ -710,9 +715,7 @@ class FrostSagaHandlerTest {
             handler.handle(
                 createCommand("COMPENSATE_STEP", "DELETE_PROJECT", Map.of("projectId", "999")));
 
-        // Idempotent compensation: the project no longer existing IS the desired end state, so a
-        // retried/already-cleaned-up DELETE_PROJECT compensation must not fail the saga rollback.
-        // The Thing enumeration hits the 404 first and must fall through to this rule.
+        // "Already gone" is the compensation goal state; the enumeration 404 must fall through.
         assertEquals("COMPENSATION_COMPLETED", result.type());
       }
     }
@@ -737,10 +740,7 @@ class FrostSagaHandlerTest {
       }
     }
 
-    /**
-     * Mocked enumeration page of {@code Projects(n)/Things}: a {@code value} array with one {@code
-     * @iot.id} entry per given id, plus an {@code @iot.nextLink} when more pages follow.
-     */
+    /** Mocked enumeration page: one {@code @iot.id} entry per id, plus the nextLink if given. */
     private Response thingsPage(String nextLink, int... thingIds) {
       Response page = mock(Response.class);
       when(page.getStatus()).thenReturn(200);
@@ -1013,7 +1013,7 @@ class FrostSagaHandlerTest {
 
     Client mockClient = mock(Client.class);
     mockTarget = mock(WebTarget.class);
-    WebTarget mockPathTarget = mock(WebTarget.class);
+    mockPathTarget = mock(WebTarget.class);
     mockBuilder = mock(Invocation.Builder.class);
 
     when(mockClient.target(any(String.class))).thenReturn(mockTarget);
