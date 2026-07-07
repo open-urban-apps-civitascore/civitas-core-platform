@@ -17,6 +17,7 @@ import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +30,8 @@ import org.owasp.encoder.Encode;
  * <ul>
  *   <li>{@code CREATE_PROJECT} — POST /Projects
  *   <li>{@code UPDATE_PROJECT} — PATCH /Projects({projectId})
- *   <li>{@code DELETE_PROJECT} — DELETE /Projects({projectId})
+ *   <li>{@code DELETE_PROJECT} — DELETE all Things of the project (cascades to their Datastreams
+ *       and Observations), then DELETE /Projects({projectId})
  *   <li>{@code RESTORE_PROJECT} — PATCH /Projects({projectId}) with previous state (update
  *       compensation)
  * </ul>
@@ -37,6 +39,7 @@ import org.owasp.encoder.Encode;
  * <p>Compensation operations: {@code DELETE_PROJECT} to compensate a {@code CREATE_PROJECT}, {@code
  * RESTORE_PROJECT} to compensate an {@code UPDATE_PROJECT}.
  */
+@SuppressWarnings("PMD.TooManyMethods") // One method per saga operation plus focused helpers
 public class FrostSagaHandler extends AbstractSagaCommandHandler {
 
   private static final String ADAPTER_NAME = "frost";
@@ -294,6 +297,8 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     String projectId = requireString(command, KEY_PROJECT_ID);
     boolean compensating = "COMPENSATE_STEP".equals(command.type());
 
+    deleteProjectThings(projectId, command.sagaId());
+
     try (Response response =
         authStrategy
             .apply(
@@ -327,6 +332,97 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
           ? SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId())
           : SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
     }
+  }
+
+  /**
+   * Deletes all Things of a project before the project itself is deleted. FROST does not cascade
+   * project deletion — {@code DELETE /Projects(n)} removes only the project and its membership
+   * links, while the member Things, Datastreams and Observations survive at server root,
+   * unreachable through any project. Deleting a Thing, however, DOES cascade to its Datastreams and
+   * their Observations, so removing the project's Things first removes the project's sensor data
+   * with it. Not covered by that cascade: Sensors, ObservedProperties, FeaturesOfInterest and
+   * Locations shared across Things.
+   *
+   * <p>Safe to re-run (compensation retries, partial earlier cleanup): a project that is already
+   * absent (enumeration 404) skips the cleanup entirely — the subsequent project delete remains the
+   * single place deciding idempotency semantics — and a Thing that is already gone (delete 404) is
+   * skipped.
+   */
+  private void deleteProjectThings(String projectId, String sagaId) {
+    // Collect all Thing ids fully BEFORE deleting: deleting while paging shifts the pages and
+    // would skip Things. Pages are requested with explicit $skip/$orderby instead of following
+    // @iot.nextLink verbatim — FROST renders that link from its configured serviceRootUrl, which
+    // is not necessarily reachable from this adapter (internal vs. public URL). $skip paging is
+    // stable here: the saga tears down the writing pipelines before this step, and no Thing is
+    // deleted until the enumeration is complete.
+    List<String> thingIds = new ArrayList<>();
+    int skip = 0;
+    while (true) {
+      try (Response response =
+          authStrategy
+              .apply(
+                  client()
+                      .target(serverUrl)
+                      .path(projectPath(projectId) + "/Things")
+                      .queryParam("$select", "@iot.id")
+                      .queryParam("$orderby", "id asc")
+                      .queryParam("$top", "100")
+                      .queryParam("$skip", String.valueOf(skip))
+                      .request(MediaType.APPLICATION_JSON))
+              .get()) {
+        if (response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
+          log.info(
+              "DELETE_PROJECT: project {} not found while listing its Things — skipping Thing"
+                  + " cleanup. saga={}",
+              Encode.forJava(projectId),
+              Encode.forJava(sagaId));
+          return;
+        }
+        checkResponse(response, "GET project Things for DELETE_PROJECT");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> page = response.readEntity(Map.class);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> things =
+            (List<Map<String, Object>>) page.getOrDefault("value", List.of());
+        for (Map<String, Object> thing : things) {
+          thingIds.add(String.valueOf(thing.get("@iot.id")));
+        }
+        if (things.isEmpty() || page.get("@iot.nextLink") == null) {
+          break;
+        }
+        skip += things.size();
+      }
+    }
+
+    int deletedCount = 0;
+    for (String thingId : thingIds) {
+      try (Response response =
+          authStrategy
+              .apply(
+                  client()
+                      .target(serverUrl)
+                      .path("Things(" + thingId + ")")
+                      .request(MediaType.APPLICATION_JSON))
+              .delete()) {
+        if (response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
+          log.debug(
+              "DELETE_PROJECT: Thing {} already absent (404) — continuing. saga={}",
+              Encode.forJava(thingId),
+              Encode.forJava(sagaId));
+          continue;
+        }
+        checkResponse(response, "DELETE Thing for DELETE_PROJECT");
+        deletedCount++;
+      }
+    }
+
+    log.info(
+        "FROST project Things deleted (cascading to their Datastreams and Observations):"
+            + " projectId={}, thingsDeleted={}, saga={}",
+        Encode.forJava(projectId),
+        deletedCount,
+        Encode.forJava(sagaId));
   }
 
   private SagaCommandResult handleRestoreProject(SagaCommandMessage command) {

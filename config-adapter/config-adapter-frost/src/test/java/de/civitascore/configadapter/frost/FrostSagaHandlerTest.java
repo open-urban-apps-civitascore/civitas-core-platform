@@ -17,6 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
@@ -29,6 +31,7 @@ import jakarta.ws.rs.client.Invocation;
 import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +42,7 @@ import org.mockito.ArgumentCaptor;
 
 class FrostSagaHandlerTest {
 
+  private WebTarget mockTarget;
   private Invocation.Builder mockBuilder;
 
   @Test
@@ -474,6 +478,8 @@ class FrostSagaHandlerTest {
     @DisplayName("returns success on forward delete")
     void shouldDeleteProjectSuccessfully() {
       try (FrostSagaHandler handler = createHandler()) {
+        Response emptyThingsPage = thingsPage(null);
+        when(mockBuilder.get()).thenReturn(emptyThingsPage);
         Response mockResponse = mock(Response.class);
         when(mockResponse.getStatus()).thenReturn(200);
         when(mockBuilder.delete()).thenReturn(mockResponse);
@@ -489,9 +495,133 @@ class FrostSagaHandlerTest {
     }
 
     @Test
+    @DisplayName("deletes the project's Things before deleting the project itself")
+    void shouldDeleteThingsBeforeProject() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response singleThingsPage = thingsPage(null, 7, 8);
+        when(mockBuilder.get()).thenReturn(singleThingsPage);
+        Response deleteResponse = mock(Response.class);
+        when(deleteResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(deleteResponse);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "42")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        // FROST does not cascade project deletion, so the project delete must come last —
+        // otherwise the membership links are gone and the Things are stranded at server root.
+        ArgumentCaptor<String> paths = ArgumentCaptor.forClass(String.class);
+        verify(mockTarget, times(4)).path(paths.capture());
+        assertEquals(
+            List.of("Projects(42)/Things", "Things(7)", "Things(8)", "Projects(42)"),
+            paths.getAllValues());
+      }
+    }
+
+    @Test
+    @DisplayName("follows pagination and deletes the Things of every page")
+    void shouldDeleteThingsFromAllPages() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response firstPage = thingsPage("http://frost:8080/v1.1/Projects(42)/Things?$skip=2", 7, 8);
+        Response lastPage = thingsPage(null, 9);
+        when(mockBuilder.get()).thenReturn(firstPage, lastPage);
+        Response deleteResponse = mock(Response.class);
+        when(deleteResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(deleteResponse);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "42")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        ArgumentCaptor<String> paths = ArgumentCaptor.forClass(String.class);
+        verify(mockTarget, times(6)).path(paths.capture());
+        assertEquals(
+            List.of(
+                "Projects(42)/Things",
+                "Projects(42)/Things",
+                "Things(7)",
+                "Things(8)",
+                "Things(9)",
+                "Projects(42)"),
+            paths.getAllValues());
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "continues with the remaining Things and the project when one Thing is already gone")
+    void shouldContinueWhenSingleThingAlreadyAbsent() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response singleThingsPage = thingsPage(null, 7, 8);
+        when(mockBuilder.get()).thenReturn(singleThingsPage);
+        Response notFound = mock(Response.class);
+        when(notFound.getStatus()).thenReturn(404);
+        Response ok = mock(Response.class);
+        when(ok.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(notFound, ok, ok);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "42")));
+
+        // A Thing that is already gone is the goal state — the cleanup must not stop there.
+        assertEquals("STEP_COMPLETED", result.type());
+        verify(mockBuilder, times(3)).delete();
+      }
+    }
+
+    @Test
+    @DisplayName("fails the step when a Thing delete returns a genuine error (500)")
+    void shouldFailStepWhenThingDeleteFails() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response singleThingsPage = thingsPage(null, 7, 8);
+        when(mockBuilder.get()).thenReturn(singleThingsPage);
+        Response error = mock(Response.class);
+        when(error.getStatus()).thenReturn(500);
+        when(error.readEntity(String.class)).thenReturn("Internal Server Error");
+        when(mockBuilder.delete()).thenReturn(error);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "42")));
+
+        // A genuine error must fail the step (no silent skip) — otherwise the project would be
+        // deleted while its Things stay behind, stranded at server root.
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+        verify(mockBuilder, times(1)).delete();
+      }
+    }
+
+    @Test
+    @DisplayName("still fails a forward delete when the project is absent (404)")
+    void shouldFailForwardDeleteWhenProjectAbsent() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response notFound = mock(Response.class);
+        when(notFound.getStatus()).thenReturn(404);
+        when(notFound.readEntity(String.class)).thenReturn("Not Found");
+        when(mockBuilder.get()).thenReturn(notFound);
+        when(mockBuilder.delete()).thenReturn(notFound);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "999")));
+
+        // The Thing cleanup skips silently on 404, but a forward delete of a missing project is
+        // genuine drift and must stay visible.
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+      }
+    }
+
+    @Test
     @DisplayName("returns COMPENSATION_COMPLETED on compensate delete")
     void shouldReturnCompensationSuccessOnCompensateDelete() {
       try (FrostSagaHandler handler = createHandler()) {
+        Response emptyThingsPage = thingsPage(null);
+        when(mockBuilder.get()).thenReturn(emptyThingsPage);
         Response mockResponse = mock(Response.class);
         when(mockResponse.getStatus()).thenReturn(200);
         when(mockBuilder.delete()).thenReturn(mockResponse);
@@ -512,6 +642,7 @@ class FrostSagaHandlerTest {
         Response mockResponse = mock(Response.class);
         when(mockResponse.getStatus()).thenReturn(404);
         when(mockResponse.readEntity(String.class)).thenReturn("Not Found");
+        when(mockBuilder.get()).thenReturn(mockResponse);
         when(mockBuilder.delete()).thenReturn(mockResponse);
 
         SagaCommandResult result =
@@ -520,6 +651,7 @@ class FrostSagaHandlerTest {
 
         // Idempotent compensation: the project no longer existing IS the desired end state, so a
         // retried/already-cleaned-up DELETE_PROJECT compensation must not fail the saga rollback.
+        // The Thing enumeration hits the 404 first and must fall through to this rule.
         assertEquals("COMPENSATION_COMPLETED", result.type());
       }
     }
@@ -528,6 +660,8 @@ class FrostSagaHandlerTest {
     @DisplayName("returns COMPENSATION_FAILED on a genuine error (500) during compensation")
     void shouldReturnCompensationFailureOnGenuineError() {
       try (FrostSagaHandler handler = createHandler()) {
+        Response emptyThingsPage = thingsPage(null);
+        when(mockBuilder.get()).thenReturn(emptyThingsPage);
         Response mockResponse = mock(Response.class);
         when(mockResponse.getStatus()).thenReturn(500);
         when(mockResponse.readEntity(String.class)).thenReturn("Internal Server Error");
@@ -540,6 +674,26 @@ class FrostSagaHandlerTest {
         assertEquals("COMPENSATION_FAILED", result.type());
         assertNotNull(result.error());
       }
+    }
+
+    /**
+     * Mocked enumeration page of {@code Projects(n)/Things}: a {@code value} array with one {@code
+     * @iot.id} entry per given id, plus an {@code @iot.nextLink} when more pages follow.
+     */
+    private Response thingsPage(String nextLink, int... thingIds) {
+      Response page = mock(Response.class);
+      when(page.getStatus()).thenReturn(200);
+      List<Map<String, Object>> value = new ArrayList<>();
+      for (int thingId : thingIds) {
+        value.add(Map.of("@iot.id", thingId));
+      }
+      Map<String, Object> body = new HashMap<>();
+      body.put("value", value);
+      if (nextLink != null) {
+        body.put("@iot.nextLink", nextLink);
+      }
+      when(page.readEntity(Map.class)).thenReturn(body);
+      return page;
     }
   }
 
@@ -776,7 +930,7 @@ class FrostSagaHandlerTest {
     handler.initialize(mockConfig);
 
     Client mockClient = mock(Client.class);
-    WebTarget mockTarget = mock(WebTarget.class);
+    mockTarget = mock(WebTarget.class);
     WebTarget mockPathTarget = mock(WebTarget.class);
     mockBuilder = mock(Invocation.Builder.class);
 
