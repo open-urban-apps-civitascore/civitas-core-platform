@@ -76,11 +76,9 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
     FrostConfigurationOutput output = new FrostConfigurationOutput();
     Object dsvIdRaw = raw == null ? null : raw.get("dataStructureVersionId");
     if (dsvIdRaw != null) {
-      try {
-        output.setDataStructureVersionId(UUID.fromString(dsvIdRaw.toString()));
-      } catch (IllegalArgumentException ignored) {
-        // keep the id unset for malformed persisted config
-      }
+      // The write path validates the id, so a malformed persisted value is data corruption —
+      // surfacing it beats rendering a target-less sink that a re-save would silently strip.
+      output.setDataStructureVersionId(UUID.fromString(dsvIdRaw.toString()));
     }
     return output;
   }

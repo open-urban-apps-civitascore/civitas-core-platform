@@ -282,13 +282,14 @@ public class DataSetSagaPublisher {
     if (sink.getConfiguration() == null) {
       return null;
     }
-    UUID dsvId =
-        objectMapper
-            .convertValue(sink.getConfiguration(), PostgisConfiguration.class)
-            .getDataStructureVersionId();
-    if (dsvId == null) {
-      return null; // FROST passthrough sink — no data-structure version
+    // Read the shared key from the raw map: every sink type that references a structure names it
+    // 'dataStructureVersionId', and a typed detour through one sink's config class would couple
+    // the others to its shape.
+    Object dsvIdRaw = sink.getConfiguration().get("dataStructureVersionId");
+    if (dsvIdRaw == null) {
+      return null; // e.g. FROST passthrough sink — no data-structure version
     }
+    UUID dsvId = UUID.fromString(String.valueOf(dsvIdRaw));
     var version =
         dataStructureVersionRepository
             .findById(dsvId)

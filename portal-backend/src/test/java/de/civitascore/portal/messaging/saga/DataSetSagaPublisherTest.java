@@ -289,6 +289,40 @@ class DataSetSagaPublisherTest {
     }
 
     @Test
+    @DisplayName("FROST sink referencing its mapping target embeds the version's model")
+    void frostSinkWithReferenceEmbedsSchema() {
+      UUID dsvId = UUID.randomUUID();
+      UUID sinkId = UUID.randomUUID();
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      DataSink sink = new DataSink();
+      sink.setId(sinkId);
+      sink.setDataSinkType(DataSinkType.FROST);
+      sink.setConfiguration(Map.of("dataStructureVersionId", dsvId.toString()));
+      DataSet dataSet = datasetWithPipeline(pipeline);
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setModel(Map.of("title", "SensorThingsDataModel"));
+
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
+      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
+
+      ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
+      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
+          .thenReturn(
+              CompletableFuture.completedFuture(
+                  new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
+
+      publisher.publishCreateRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var ds = payload.get("datasinks").get(0);
+      assertThat(ds.get("type").asString()).isEqualTo("FROST");
+      assertThat(ds.get("dataStructure").get("title").asString())
+          .as("the mapping target's model rides on the FROST sink")
+          .isEqualTo("SensorThingsDataModel");
+    }
+
+    @Test
     @DisplayName("DELETE trigger carries datasinks so the saga can tear down the PostGIS sink")
     void deleteTriggerCarriesDatasinks() {
       UUID dsvId = UUID.randomUUID();
