@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -32,9 +33,11 @@ import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -495,11 +498,15 @@ class FrostSagaHandlerTest {
     }
 
     @Test
-    @DisplayName("deletes the project's Things before deleting the project itself")
+    @DisplayName("deletes the project's Things in one batch request before deleting the project")
     void shouldDeleteThingsBeforeProject() {
       try (FrostSagaHandler handler = createHandler()) {
         Response singleThingsPage = thingsPage(null, 7, 8);
         when(mockBuilder.get()).thenReturn(singleThingsPage);
+        Response batch = batchResponse(200, 200);
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> batchCaptor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.post(batchCaptor.capture())).thenReturn(batch);
         Response deleteResponse = mock(Response.class);
         when(deleteResponse.getStatus()).thenReturn(200);
         when(mockBuilder.delete()).thenReturn(deleteResponse);
@@ -512,10 +519,10 @@ class FrostSagaHandlerTest {
         // FROST does not cascade project deletion, so the project delete must come last —
         // otherwise the membership links are gone and the Things are stranded at server root.
         ArgumentCaptor<String> paths = ArgumentCaptor.forClass(String.class);
-        verify(mockTarget, times(4)).path(paths.capture());
+        verify(mockTarget, times(3)).path(paths.capture());
         assertEquals(
-            List.of("Projects(42)/Things", "Things(7)", "Things(8)", "Projects(42)"),
-            paths.getAllValues());
+            List.of("Projects(42)/Things", "$batch", "Projects(42)"), paths.getAllValues());
+        assertEquals(List.of("Things(7)", "Things(8)"), batchRequestUrls(batchCaptor.getValue()));
       }
     }
 
@@ -526,6 +533,10 @@ class FrostSagaHandlerTest {
         Response firstPage = thingsPage("http://frost:8080/v1.1/Projects(42)/Things?$skip=2", 7, 8);
         Response lastPage = thingsPage(null, 9);
         when(mockBuilder.get()).thenReturn(firstPage, lastPage);
+        Response batch = batchResponse(200, 200, 200);
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> batchCaptor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.post(batchCaptor.capture())).thenReturn(batch);
         Response deleteResponse = mock(Response.class);
         when(deleteResponse.getStatus()).thenReturn(200);
         when(mockBuilder.delete()).thenReturn(deleteResponse);
@@ -536,16 +547,47 @@ class FrostSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         ArgumentCaptor<String> paths = ArgumentCaptor.forClass(String.class);
-        verify(mockTarget, times(6)).path(paths.capture());
+        verify(mockTarget, times(4)).path(paths.capture());
         assertEquals(
-            List.of(
-                "Projects(42)/Things",
-                "Projects(42)/Things",
-                "Things(7)",
-                "Things(8)",
-                "Things(9)",
-                "Projects(42)"),
+            List.of("Projects(42)/Things", "Projects(42)/Things", "$batch", "Projects(42)"),
             paths.getAllValues());
+        assertEquals(
+            List.of("Things(7)", "Things(8)", "Things(9)"),
+            batchRequestUrls(batchCaptor.getValue()));
+      }
+    }
+
+    @Test
+    @DisplayName("splits the Thing deletes into multiple batch requests beyond the chunk size")
+    void shouldSplitThingDeletesIntoChunkedBatches() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response firstPage =
+            thingsPage(
+                "http://frost:8080/v1.1/Projects(42)/Things?$skip=100",
+                IntStream.range(0, 100).toArray());
+        Response lastPage = thingsPage(null, IntStream.range(100, 150).toArray());
+        when(mockBuilder.get()).thenReturn(firstPage, lastPage);
+        int[] fullChunk = new int[100];
+        Arrays.fill(fullChunk, 200);
+        int[] restChunk = new int[50];
+        Arrays.fill(restChunk, 200);
+        Response firstBatch = batchResponse(fullChunk);
+        Response secondBatch = batchResponse(restChunk);
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Entity> batchCaptor = ArgumentCaptor.forClass(Entity.class);
+        when(mockBuilder.post(batchCaptor.capture())).thenReturn(firstBatch, secondBatch);
+        Response deleteResponse = mock(Response.class);
+        when(deleteResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(deleteResponse);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "42")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        verify(mockBuilder, times(2)).post(any(Entity.class));
+        assertEquals(100, batchRequestUrls(batchCaptor.getAllValues().get(0)).size());
+        assertEquals(50, batchRequestUrls(batchCaptor.getAllValues().get(1)).size());
       }
     }
 
@@ -556,11 +598,11 @@ class FrostSagaHandlerTest {
       try (FrostSagaHandler handler = createHandler()) {
         Response singleThingsPage = thingsPage(null, 7, 8);
         when(mockBuilder.get()).thenReturn(singleThingsPage);
-        Response notFound = mock(Response.class);
-        when(notFound.getStatus()).thenReturn(404);
-        Response ok = mock(Response.class);
-        when(ok.getStatus()).thenReturn(200);
-        when(mockBuilder.delete()).thenReturn(notFound, ok, ok);
+        Response batch = batchResponse(404, 200);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(batch);
+        Response deleteResponse = mock(Response.class);
+        when(deleteResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.delete()).thenReturn(deleteResponse);
 
         SagaCommandResult result =
             handler.handle(
@@ -568,7 +610,7 @@ class FrostSagaHandlerTest {
 
         // A Thing that is already gone is the goal state — the cleanup must not stop there.
         assertEquals("STEP_COMPLETED", result.type());
-        verify(mockBuilder, times(3)).delete();
+        verify(mockBuilder, times(1)).delete();
       }
     }
 
@@ -578,10 +620,8 @@ class FrostSagaHandlerTest {
       try (FrostSagaHandler handler = createHandler()) {
         Response singleThingsPage = thingsPage(null, 7, 8);
         when(mockBuilder.get()).thenReturn(singleThingsPage);
-        Response error = mock(Response.class);
-        when(error.getStatus()).thenReturn(500);
-        when(error.readEntity(String.class)).thenReturn("Internal Server Error");
-        when(mockBuilder.delete()).thenReturn(error);
+        Response batch = batchResponse(500, 200);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(batch);
 
         SagaCommandResult result =
             handler.handle(
@@ -591,7 +631,28 @@ class FrostSagaHandlerTest {
         // deleted while its Things stay behind, stranded at server root.
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
-        verify(mockBuilder, times(1)).delete();
+        verify(mockBuilder, never()).delete();
+      }
+    }
+
+    @Test
+    @DisplayName("fails the step when the batch response omits sub-responses")
+    void shouldFailStepWhenBatchResponseIncomplete() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response singleThingsPage = thingsPage(null, 7, 8);
+        when(mockBuilder.get()).thenReturn(singleThingsPage);
+        Response batch = batchResponse(200);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(batch);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "DELETE_PROJECT", Map.of("projectId", "42")));
+
+        // Every Thing needs a positively confirmed outcome — a truncated batch response must not
+        // let unconfirmed Things slip through into the project delete.
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+        verify(mockBuilder, never()).delete();
       }
     }
 
@@ -694,6 +755,27 @@ class FrostSagaHandlerTest {
       }
       when(page.readEntity(Map.class)).thenReturn(body);
       return page;
+    }
+
+    /** Mocked JSON batch response: one sub-response per given status, ids "0", "1", … in order. */
+    private Response batchResponse(int... statuses) {
+      Response response = mock(Response.class);
+      when(response.getStatus()).thenReturn(200);
+      List<Map<String, Object>> subResponses = new ArrayList<>();
+      for (int i = 0; i < statuses.length; i++) {
+        subResponses.add(Map.of("id", String.valueOf(i), "status", statuses[i]));
+      }
+      when(response.readEntity(Map.class)).thenReturn(Map.of("responses", subResponses));
+      return response;
+    }
+
+    /** Extracts the sub-request urls from a captured JSON batch request entity, in order. */
+    private List<String> batchRequestUrls(Entity<?> entity) {
+      @SuppressWarnings("unchecked")
+      Map<String, Object> body = (Map<String, Object>) entity.getEntity();
+      @SuppressWarnings("unchecked")
+      List<Map<String, Object>> requests = (List<Map<String, Object>>) body.get("requests");
+      return requests.stream().map(request -> (String) request.get("url")).toList();
     }
   }
 

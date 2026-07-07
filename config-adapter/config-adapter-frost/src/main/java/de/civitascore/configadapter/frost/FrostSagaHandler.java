@@ -44,6 +44,9 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
 
   private static final String ADAPTER_NAME = "frost";
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/v1.1";
+  // Page size for Thing enumeration and chunk size for batched Thing deletes: one page of ids
+  // becomes at most one JSON batch request.
+  private static final int THING_BATCH_SIZE = 100;
   private static final String KEY_PROJECT_ID = "projectId";
   private static final String KEY_NAME = "name";
   private static final String KEY_DESCRIPTION = "description";
@@ -366,7 +369,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
                       .path(projectPath(projectId) + "/Things")
                       .queryParam("$select", "@iot.id")
                       .queryParam("$orderby", "id asc")
-                      .queryParam("$top", "100")
+                      .queryParam("$top", String.valueOf(THING_BATCH_SIZE))
                       .queryParam("$skip", String.valueOf(skip))
                       .request(MediaType.APPLICATION_JSON))
               .get()) {
@@ -396,25 +399,10 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     }
 
     int deletedCount = 0;
-    for (String thingId : thingIds) {
-      try (Response response =
-          authStrategy
-              .apply(
-                  client()
-                      .target(serverUrl)
-                      .path("Things(" + thingId + ")")
-                      .request(MediaType.APPLICATION_JSON))
-              .delete()) {
-        if (response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
-          log.debug(
-              "DELETE_PROJECT: Thing {} already absent (404) — continuing. saga={}",
-              Encode.forJava(thingId),
-              Encode.forJava(sagaId));
-          continue;
-        }
-        checkResponse(response, "DELETE Thing for DELETE_PROJECT");
-        deletedCount++;
-      }
+    for (int from = 0; from < thingIds.size(); from += THING_BATCH_SIZE) {
+      List<String> chunk =
+          thingIds.subList(from, Math.min(from + THING_BATCH_SIZE, thingIds.size()));
+      deletedCount += deleteThingsBatch(chunk, sagaId);
     }
 
     log.info(
@@ -423,6 +411,77 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
         Encode.forJava(projectId),
         deletedCount,
         Encode.forJava(sagaId));
+  }
+
+  /**
+   * Deletes one chunk of Things in a single JSON batch request — one round trip instead of one per
+   * Thing. The sub-requests execute independently on the server, so the outcome of each Thing is
+   * checked individually: a Thing that is already gone (sub-status 404) is skipped, any other
+   * failed sub-request fails the step. Every Thing must have a positively confirmed outcome — a
+   * batch response that omits sub-responses fails the step rather than silently leaving Things
+   * behind.
+   *
+   * @return the number of Things actually deleted
+   */
+  private int deleteThingsBatch(List<String> thingIds, String sagaId) {
+    List<Map<String, Object>> requests = new ArrayList<>();
+    for (int i = 0; i < thingIds.size(); i++) {
+      requests.add(
+          Map.of(
+              "id",
+              String.valueOf(i),
+              "method",
+              "delete",
+              "url",
+              "Things(" + thingIds.get(i) + ")"));
+    }
+
+    try (Response response =
+        authStrategy
+            .apply(client().target(serverUrl).path("$batch").request(MediaType.APPLICATION_JSON))
+            .post(Entity.json(Map.of("requests", requests)))) {
+      checkResponse(response, "batch DELETE Things for DELETE_PROJECT");
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> body = response.readEntity(Map.class);
+      @SuppressWarnings("unchecked")
+      List<Map<String, Object>> subResponses =
+          (List<Map<String, Object>>) body.getOrDefault("responses", List.of());
+      if (subResponses.size() != thingIds.size()) {
+        throw new SagaApiException(
+            "batch DELETE Things for DELETE_PROJECT returned "
+                + subResponses.size()
+                + " sub-responses for "
+                + thingIds.size()
+                + " requests",
+            502);
+      }
+
+      int deleted = 0;
+      for (Map<String, Object> subResponse : subResponses) {
+        int status = ((Number) subResponse.get("status")).intValue();
+        String thingId = thingIds.get(Integer.parseInt(String.valueOf(subResponse.get("id"))));
+        if (status == Response.Status.NOT_FOUND.getStatusCode()) {
+          log.debug(
+              "DELETE_PROJECT: Thing {} already absent (404) — continuing. saga={}",
+              Encode.forJava(thingId),
+              Encode.forJava(sagaId));
+          continue;
+        }
+        if (status < 200 || status >= 300) {
+          throw new SagaApiException(
+              "DELETE Thing "
+                  + thingId
+                  + " for DELETE_PROJECT failed: HTTP "
+                  + status
+                  + " — "
+                  + subResponse.get("body"),
+              status);
+        }
+        deleted++;
+      }
+      return deleted;
+    }
   }
 
   private SagaCommandResult handleRestoreProject(SagaCommandMessage command) {
