@@ -145,17 +145,16 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const formValues = useWatch({ control: form.control })
 
-  const canSetAvailable = useMemo(() => {
+  const canStage = useMemo(() => {
     const hasDistribution = !!dataset.pipelines?.length || !!dataset.namedApis?.length
-    const hasAssignments = groupCount > 0 && roleCount > 0
-    return DatasetFormAvailableSchema.safeParse(formValues).success && hasDistribution && hasAssignments
-  }, [formValues, dataset.pipelines, dataset.namedApis, groupCount, roleCount])
+    return DatasetFormAvailableSchema.safeParse(formValues).success && hasDistribution
+  }, [formValues, dataset.pipelines, dataset.namedApis])
 
   // Auto-revert status to draft when required fields become invalid
   const revalidateDraftMode = () => {
     const isReadyOrAvailable =
       dataSetStatus === DATASET_STATUS_TYPES.READY || dataSetStatus === DATASET_STATUS_TYPES.AVAILABLE
-    if (isReadyOrAvailable && !canSetAvailable) {
+    if (isReadyOrAvailable && !canStage) {
       setDataSetStatus(DATASET_STATUS_TYPES.DRAFT)
       toast.info(tCommon('info.switchMode'))
     }
@@ -173,7 +172,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   useEffect(() => {
     revalidateDraftMode()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSetAvailable, dataSetStatus])
+  }, [canStage, dataSetStatus])
 
   const getTransitionSteps = (
     oldStatus: DatasetStatusTypes,
@@ -397,7 +396,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       status={dataSetStatus}
       onStatusChange={handleStatusChange}
       statusOptions={Object.values(DATASET_STATUS_TYPES)}
-      canSetAvailable={canSetAvailable}
+      canStage={canStage}
       canRelease={canRelease}
       confirmButtonType="submit"
       formId="dataset-form"

@@ -54,7 +54,7 @@ interface UseDatastructureVersionProps {
   version: DatastructureVersion | null
   isCreateMode: boolean
   onCreateVersion?: (data: DatastructureVersion) => void
-  canSetAvailable?: boolean
+  canStage?: boolean
 }
 
 export const useDatastructureVersion = ({
@@ -62,7 +62,7 @@ export const useDatastructureVersion = ({
   version,
   isCreateMode,
   onCreateVersion,
-  canSetAvailable = true,
+  canStage = true,
 }: UseDatastructureVersionProps) => {
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
@@ -138,7 +138,7 @@ export const useDatastructureVersion = ({
   }
 
   const revalidateDraftMode = () => {
-    if (statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
+    if (statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canStage) {
       form.setValue('dataStructureVersionStatus', DATASTRUCTURE_STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
@@ -156,7 +156,7 @@ export const useDatastructureVersion = ({
   useEffect(() => {
     revalidateDraftMode()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSetAvailable, statusWatch])
+  }, [canStage, statusWatch])
 
   const handleStatusChange = (newStatus: DatastructureStatusType) => {
     form.setValue('dataStructureVersionStatus', newStatus, { shouldDirty: true })

@@ -13,7 +13,7 @@ import { Button } from '../ui/button'
 type PageEditControlsProps<T extends StatusTypes> = ActionButtonsProps & {
   status: T
   onStatusChange: (status: T) => void
-  canSetAvailable: boolean
+  canStage: boolean
   canSetDraft?: boolean
   canRelease?: boolean
   onEditClick: () => void
@@ -28,7 +28,7 @@ const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>
   const {
     status,
     onStatusChange,
-    canSetAvailable,
+    canStage,
     canSetDraft,
     canRelease,
     hasCard = true,
@@ -56,7 +56,7 @@ const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>
         status={status}
         statusOptions={statusOptions}
         onStatusChange={onStatusChange}
-        canSetAvailable={canSetAvailable}
+        canStage={canStage}
         canSetDraft={canSetDraft}
         canRelease={canRelease}
         isReadOnly={isReadOnly}

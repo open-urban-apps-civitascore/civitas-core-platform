@@ -79,7 +79,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
-  const [canSetAvailable, setCanSetAvailable] = useState(true)
+  const [canStage, setCanSetAvailable] = useState(true)
 
   const isInUse = version?.inUse || false
 
@@ -115,7 +115,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     datastructureId: datastructure.id,
     dataStructureName: datastructure.name,
     onCreateVersion: redirectAfterVersionCreation,
-    canSetAvailable,
+    canStage,
   })
 
   const formValues = useWatch({ control: form.control })
@@ -212,7 +212,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         statusOptions={Object.values(DATASTRUCTURE_STATUS_TYPES)}
         status={statusWatch}
         onStatusChange={handleStatusChange}
-        canSetAvailable={canSetAvailable}
+        canStage={canStage}
         canSetDraft={canSetDraft}
         canRelease={canRelease}
         statusHint={statusHint}

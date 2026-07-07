@@ -13,7 +13,7 @@ const defaultProps = {
   status: STATUS_TYPES.DRAFT,
   onStatusChange: vi.fn(),
   statusOptions: [STATUS_TYPES.DRAFT, STATUS_TYPES.AVAILABLE] as const,
-  canSetAvailable: true,
+  canStage: true,
   canRelease: true,
   isReadOnly: false,
 }
@@ -28,7 +28,7 @@ const openDropdown = async () => {
 
 describe('StatusDropdown', () => {
   it('enables Available option when canRelease is true', async () => {
-    render(<StatusDropdown {...defaultProps} canRelease={true} canSetAvailable={true} />)
+    render(<StatusDropdown {...defaultProps} canRelease={true} canStage={true} />)
 
     await openDropdown()
 
@@ -37,7 +37,7 @@ describe('StatusDropdown', () => {
   })
 
   it('disables Available option when canRelease is false', async () => {
-    render(<StatusDropdown {...defaultProps} canRelease={false} canSetAvailable={true} />)
+    render(<StatusDropdown {...defaultProps} canRelease={false} canStage={true} />)
 
     await openDropdown()
 
@@ -45,8 +45,8 @@ describe('StatusDropdown', () => {
     expect(availableOption).toHaveAttribute('data-disabled')
   })
 
-  it('disables Available option when canSetAvailable is false', async () => {
-    render(<StatusDropdown {...defaultProps} canRelease={true} canSetAvailable={false} />)
+  it('disables Available option when canStage is false', async () => {
+    render(<StatusDropdown {...defaultProps} canRelease={true} canStage={false} />)
 
     await openDropdown()
 

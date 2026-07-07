@@ -90,7 +90,7 @@ vi.mock('../hooks/useDatasourceForm', () => ({
     dataSourceStatus: 'DRAFT',
     hasStatusChanged: false,
     handleStatusChange: vi.fn(),
-    canSetAvailable: false,
+    canStage: false,
     completedTabs: [],
     submitDatasource: mockSubmitDatasource,
     resetToInitialState: vi.fn(),

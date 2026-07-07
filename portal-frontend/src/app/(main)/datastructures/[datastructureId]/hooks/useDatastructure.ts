@@ -84,7 +84,7 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
     [datastructure.dataStructureVersions],
   )
 
-  const canSetAvailable = useMemo(
+  const canStage = useMemo(
     () => DatastructureFormAvailableSchema.safeParse(formValues).success && hasAvailableVersion,
     [formValues, hasAvailableVersion],
   )
@@ -103,11 +103,11 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
   }, [form, isDraftMode])
 
   useEffect(() => {
-    if (datastructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
+    if (datastructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canStage) {
       form.setValue('dataStructureStatus', DATASTRUCTURE_STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
-  }, [canSetAvailable, form, datastructureStatus, tCommon])
+  }, [canStage, form, datastructureStatus, tCommon])
 
   const completedTabs = useMemo((): DatastructureTab[] => {
     const completed: DatastructureTab[] = []
@@ -229,7 +229,7 @@ export const useDatastructure = ({ datastructure, assignedGroups, initialAssignm
 
   return {
     areAssignmentsDirty,
-    canSetAvailable,
+    canStage,
     canSetDraft,
     completedTabs,
     form,

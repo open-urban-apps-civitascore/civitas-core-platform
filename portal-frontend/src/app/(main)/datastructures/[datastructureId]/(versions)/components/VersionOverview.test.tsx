@@ -424,7 +424,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
     })
   })
 
-  describe('canSetAvailable logic', () => {
+  describe('canStage logic', () => {
     it('disables AVAILABLE option when there is no datastructure defined', async () => {
       const user = userEvent.setup()
       renderComponent()
