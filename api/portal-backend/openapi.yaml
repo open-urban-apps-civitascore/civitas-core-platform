@@ -19,16 +19,8 @@ servers:
 security:
 - oauth2: []
 tags:
-- name: Users
-  description: User management endpoints
-- name: Data Structures
-  description: Data structure management endpoints
-- name: Pipelines
-  description: Pipeline management endpoints
 - name: Assignments
   description: Role assignment management endpoints
-- name: Data Structure Versions
-  description: Data structure version management endpoints
 - name: Groups
   description: Group management API
 - name: Roles
@@ -37,6 +29,22 @@ tags:
   description: Permission management endpoints
 - name: DataSets
   description: Dataset management endpoints
+- name: Styles
+  description: Style management endpoints
+- name: Users
+  description: User management endpoints
+- name: Data Structures
+  description: Data structure management endpoints
+- name: Pipelines
+  description: Pipeline management endpoints
+- name: DataSinks
+  description: DataSink management endpoints
+- name: Layers
+  description: Layer management endpoints
+- name: Data Structure Versions
+  description: Data structure version management endpoints
+- name: DataPools
+  description: Datapool management endpoints
 - name: DataSources
   description: Data source management endpoints
 paths:
@@ -1470,9 +1478,9 @@ paths:
       summary: Update metadata of a released data structure version
       description: "Updates a released data structure version (AVAILABLE status).\
         \ If the version is not in use by any DataSource, all fields including model,\
-        \ version, and styles can be updated. If the version is in\
-        \ use, only description and modelName can be changed. For DRAFT versions,\
-        \ use PUT /datastructures/{dataStructureId}/versions/{versionId} instead."
+        \ version, and styles can be updated. If the version is in use, only description\
+        \ and modelName can be changed. For DRAFT versions, use PUT /datastructures/{dataStructureId}/versions/{versionId}\
+        \ instead."
       operationId: updateDataStructureVersionReleasedMeta
       parameters:
       - name: dataStructureId
@@ -2682,6 +2690,352 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  /datasets/{dataSetId}/styles/{id}:
+    get:
+      tags:
+      - Styles
+      summary: Get Style by ID
+      operationId: getStyle
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      responses:
+        "200":
+          description: Style returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StyleOutputDTO"
+        "404":
+          description: Style not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      tags:
+      - Styles
+      summary: Replace a Style
+      operationId: updateStyle
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StyleInputDTO"
+        required: true
+      responses:
+        "200":
+          description: Style updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StyleOutputDTO"
+        "400":
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    type: urn:civitas:error:INVALID_INPUT
+                    title: Bad Request
+                    status: 400
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    type: urn:civitas:error:VALIDATION_FAILED
+                    title: Bad Request
+                    status: 400
+                    detail: Request body validation failed
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                    title: Bad Request
+                    status: 400
+                    detail: Failed to read request body
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+        "404":
+          description: Style not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+        "409":
+          description: Conflict (e.g. unique constraint violation)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      tags:
+      - Styles
+      summary: Delete a Style
+      operationId: deleteStyle
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      responses:
+        "204":
+          description: Style deleted successfully
+        "404":
+          description: Style not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+        "409":
+          description: Conflict (style still in use)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    patch:
+      tags:
+      - Styles
+      summary: Partially update a style
+      description: Applies a partial JSON update to an existing style. Only provided
+        fields are modified.
+      operationId: patch
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchStyleInputDTO"
+        required: true
+      responses:
+        "200":
+          description: Style patched successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StyleOutputDTO"
+        "400":
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    type: urn:civitas:error:INVALID_INPUT
+                    title: Bad Request
+                    status: 400
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    type: urn:civitas:error:VALIDATION_FAILED
+                    title: Bad Request
+                    status: 400
+                    detail: Request body validation failed
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                    title: Bad Request
+                    status: 400
+                    detail: Failed to read request body
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+        "404":
+          description: Style not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+        "409":
+          description: Conflict (e.g. unique constraint violation)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   /datasets/{dataSetId}/pipelines/{id}:
     get:
       tags:
@@ -3020,6 +3374,1060 @@ paths:
                     status: 409
                     detail: Referenced entity does not exist
                     instance: "/datasets/{dataSetId}/pipelines/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /datasets/{dataSetId}/layers/{id}:
+    get:
+      tags:
+      - Layers
+      summary: Get Layer by ID
+      operationId: getLayer
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      responses:
+        "200":
+          description: Layer returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LayerOutputDTO"
+        "404":
+          description: Layer not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      tags:
+      - Layers
+      summary: Replace a Layer
+      operationId: updateLayer
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LayerInputDTO"
+        required: true
+      responses:
+        "200":
+          description: Layer updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LayerOutputDTO"
+        "400":
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    type: urn:civitas:error:INVALID_INPUT
+                    title: Bad Request
+                    status: 400
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    type: urn:civitas:error:VALIDATION_FAILED
+                    title: Bad Request
+                    status: 400
+                    detail: Request body validation failed
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                    title: Bad Request
+                    status: 400
+                    detail: Failed to read request body
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+        "404":
+          description: Layer not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+        "409":
+          description: Conflict (e.g. unique constraint violation)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      tags:
+      - Layers
+      summary: Delete a Layer
+      operationId: deleteLayer
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      responses:
+        "204":
+          description: Layer deleted successfully
+        "404":
+          description: Layer not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+        "409":
+          description: Conflict (layer still in use)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    patch:
+      tags:
+      - Layers
+      summary: Partially update a layer
+      description: Applies a partial JSON update to an existing layer. Only provided
+        fields are modified.
+      operationId: patch_1
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchLayerInputDTO"
+        required: true
+      responses:
+        "200":
+          description: Layer patched successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LayerOutputDTO"
+        "400":
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    type: urn:civitas:error:INVALID_INPUT
+                    title: Bad Request
+                    status: 400
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    type: urn:civitas:error:VALIDATION_FAILED
+                    title: Bad Request
+                    status: 400
+                    detail: Request body validation failed
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                    title: Bad Request
+                    status: 400
+                    detail: Failed to read request body
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+        "404":
+          description: Layer not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+        "409":
+          description: Conflict (e.g. unique constraint violation)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /datasets/{dataSetId}/datasinks/{id}:
+    get:
+      tags:
+      - DataSinks
+      summary: Get DataSink by ID
+      operationId: getDataSink
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      responses:
+        "200":
+          description: Datasink returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataSinkOutputDTO"
+        "404":
+          description: Datasink not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      tags:
+      - DataSinks
+      summary: Replace a DataSink
+      operationId: updateDataSink
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataSinkInputDTO"
+        required: true
+      responses:
+        "200":
+          description: Datasink updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataSinkOutputDTO"
+        "400":
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    type: urn:civitas:error:INVALID_INPUT
+                    title: Bad Request
+                    status: 400
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    type: urn:civitas:error:VALIDATION_FAILED
+                    title: Bad Request
+                    status: 400
+                    detail: Request body validation failed
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                    title: Bad Request
+                    status: 400
+                    detail: Failed to read request body
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+        "404":
+          description: Datasink not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+        "409":
+          description: Conflict (e.g. unique constraint violation)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      tags:
+      - DataSinks
+      summary: Delete a DataSink
+      operationId: deleteDataSink
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      responses:
+        "204":
+          description: Datasink deleted successfully
+        "404":
+          description: Datasink not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+        "409":
+          description: Conflict (datasink still in use)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    patch:
+      tags:
+      - DataSinks
+      summary: Partially update a DataSink
+      operationId: patchDataSink
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchDataSinkInputDTO"
+        required: true
+      responses:
+        "200":
+          description: Datasink patched successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataSinkOutputDTO"
+        "400":
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    type: urn:civitas:error:INVALID_INPUT
+                    title: Bad Request
+                    status: 400
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    type: urn:civitas:error:VALIDATION_FAILED
+                    title: Bad Request
+                    status: 400
+                    detail: Request body validation failed
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                    title: Bad Request
+                    status: 400
+                    detail: Failed to read request body
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+        "404":
+          description: Datasink not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+        "409":
+          description: Conflict (e.g. unique constraint violation)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /datapools/{id}:
+    get:
+      tags:
+      - DataPools
+      summary: Get datapool by ID
+      description: Returns a single datapool identified by its UUID.
+      operationId: getDataPool
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Datapool returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataPoolOutputDTO"
+        "404":
+          description: Datapool not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datapools/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      tags:
+      - DataPools
+      summary: Replace a datapool
+      description: Fully replaces an existing datapool with the provided input.
+      operationId: updateDataPool
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataPoolInputDTO"
+        required: true
+      responses:
+        "200":
+          description: Datapool updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataPoolOutputDTO"
+        "400":
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    type: urn:civitas:error:INVALID_INPUT
+                    title: Bad Request
+                    status: 400
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datapools/{id}"
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    type: urn:civitas:error:VALIDATION_FAILED
+                    title: Bad Request
+                    status: 400
+                    detail: Request body validation failed
+                    instance: "/datapools/{id}"
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                    title: Bad Request
+                    status: 400
+                    detail: Failed to read request body
+                    instance: "/datapools/{id}"
+        "404":
+          description: Datapool not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datapools/{id}"
+        "409":
+          description: Conflict (e.g. unique constraint violation)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datapools/{id}"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datapools/{id}"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datapools/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      tags:
+      - DataPools
+      summary: Delete a datapool
+      description: Permanently deletes a datapool by its UUID. Fails with 409 Conflict
+        if any datasets are still assigned to it.
+      operationId: deleteDataPool
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Datapool deleted successfully
+        "404":
+          description: Datapool not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datapools/{id}"
+        "409":
+          description: Conflict — datasets are still assigned to this datapool
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datapools/{id}"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datapools/{id}"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datapools/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    patch:
+      tags:
+      - DataPools
+      summary: Partially update a datapool
+      description: Applies a partial JSON update to an existing datapool. Only provided
+        fields are modified.
+      operationId: patchDataPool
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchDataPoolInputDTO"
+        required: true
+      responses:
+        "200":
+          description: Datapool patched successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataPoolOutputDTO"
+        "400":
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    type: urn:civitas:error:INVALID_INPUT
+                    title: Bad Request
+                    status: 400
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datapools/{id}"
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    type: urn:civitas:error:VALIDATION_FAILED
+                    title: Bad Request
+                    status: 400
+                    detail: Request body validation failed
+                    instance: "/datapools/{id}"
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                    title: Bad Request
+                    status: 400
+                    detail: Failed to read request body
+                    instance: "/datapools/{id}"
+        "404":
+          description: Datapool not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datapools/{id}"
+        "409":
+          description: Conflict (e.g. unique constraint violation)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datapools/{id}"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datapools/{id}"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datapools/{id}"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /datapools/{id}/released/meta:
+    put:
+      tags:
+      - DataPools
+      summary: Update released metadata
+      description: Updates metadata of a released entity. Only works on entities that
+        are not in DRAFT status.
+      operationId: updateReleasedDataPoolMeta
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataPoolInputDTO"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataPoolOutputDTO"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -4117,7 +5525,7 @@ paths:
       - Data Structure Versions
       summary: Release a data structure version
       description: Releases a data structure version by setting status to AVAILABLE.
-        Requires a model (JSON Schema) to be present.
+        Requires a model (JSON schema) to be present.
       operationId: releaseDataStructureVersion
       parameters:
       - name: dataStructureId
@@ -4300,6 +5708,23 @@ paths:
           enum:
           - MQTT
           - SQL
+      - name: datapoolId
+        in: query
+        description: "Filter by DataPool scope. Returns DataSources with scope type\
+          \ ALL, or SPECIFIC DataSources that include this DataPool."
+        schema:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+      - name: datapoolScopeType
+        in: query
+        description: Filter by DataPool scope type (exact match).
+        schema:
+          type: string
+          enum:
+          - ALL
+          - NONE
+          - SPECIFIC
       responses:
         "200":
           description: Page of datasources returned successfully
@@ -4548,6 +5973,13 @@ paths:
         schema:
           type: string
           example: sensor
+      - name: datapoolIds
+        in: query
+        description: "Filter by datapool IDs (comma-separated UUIDs, IN-clause). Returns\
+          \ datasets assigned to any of the listed datapools."
+        schema:
+          type: string
+          example: "550e8400-e29b-41d4-a716-446655440000,3fa85f64-5717-4562-b3fc-2c963f66afa6"
       responses:
         "200":
           description: Page of datasets returned successfully
@@ -4783,6 +6215,189 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  /datasets/{dataSetId}/styles:
+    get:
+      tags:
+      - Styles
+      summary: List all Styles for a dataset
+      operationId: listStyles
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index (0..N)
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          default:
+          - "createdAt,DESC"
+          items:
+            type: string
+      - name: id
+        in: query
+        description: Filter by one or more IDs (comma-separated).
+        schema:
+          type: string
+          example: "1,2,3"
+        example: "1,2,3"
+      - name: createdAtFrom
+        in: query
+        description: Filter by creation date greater than or equal to this value (ISO
+          8601).
+        schema:
+          type: string
+          format: date-time
+          example: 2024-01-01T00:00:00Z
+      - name: createdAtTo
+        in: query
+        description: Filter by creation date less than or equal to this value (ISO
+          8601).
+        schema:
+          type: string
+          format: date-time
+          example: 2024-12-31T23:59:59Z
+      - name: modifiedAtFrom
+        in: query
+        description: Filter by modification date greater than or equal to this value
+          (ISO 8601).
+        schema:
+          type: string
+          format: date-time
+          example: 2024-01-01T00:00:00Z
+      - name: modifiedAtTo
+        in: query
+        description: Filter by modification date less than or equal to this value
+          (ISO 8601).
+        schema:
+          type: string
+          format: date-time
+          example: 2024-12-31T23:59:59Z
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      responses:
+        "200":
+          description: Page of styles returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageStyleOutputDTO"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      tags:
+      - Styles
+      summary: Create a new Style
+      operationId: createStyle
+      parameters:
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StyleInputDTO"
+        required: true
+      responses:
+        "201":
+          description: Style created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StyleOutputDTO"
+        "400":
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    type: urn:civitas:error:INVALID_INPUT
+                    title: Bad Request
+                    status: 400
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datasets/{dataSetId}/styles"
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    type: urn:civitas:error:VALIDATION_FAILED
+                    title: Bad Request
+                    status: 400
+                    detail: Request body validation failed
+                    instance: "/datasets/{dataSetId}/styles"
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                    title: Bad Request
+                    status: 400
+                    detail: Failed to read request body
+                    instance: "/datasets/{dataSetId}/styles"
+        "409":
+          description: Conflict (e.g. unique constraint violation)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datasets/{dataSetId}/styles"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datasets/{dataSetId}/styles"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datasets/{dataSetId}/styles"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   /datasets/{dataSetId}/pipelines:
     get:
       tags:
@@ -4984,6 +6599,620 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  /datasets/{dataSetId}/layers:
+    get:
+      tags:
+      - Layers
+      summary: List all Layers for a dataset
+      operationId: listLayers
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index (0..N)
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          default:
+          - "createdAt,DESC"
+          items:
+            type: string
+      - name: id
+        in: query
+        description: Filter by one or more IDs (comma-separated).
+        schema:
+          type: string
+          example: "1,2,3"
+        example: "1,2,3"
+      - name: createdAtFrom
+        in: query
+        description: Filter by creation date greater than or equal to this value (ISO
+          8601).
+        schema:
+          type: string
+          format: date-time
+          example: 2024-01-01T00:00:00Z
+      - name: createdAtTo
+        in: query
+        description: Filter by creation date less than or equal to this value (ISO
+          8601).
+        schema:
+          type: string
+          format: date-time
+          example: 2024-12-31T23:59:59Z
+      - name: modifiedAtFrom
+        in: query
+        description: Filter by modification date greater than or equal to this value
+          (ISO 8601).
+        schema:
+          type: string
+          format: date-time
+          example: 2024-01-01T00:00:00Z
+      - name: modifiedAtTo
+        in: query
+        description: Filter by modification date less than or equal to this value
+          (ISO 8601).
+        schema:
+          type: string
+          format: date-time
+          example: 2024-12-31T23:59:59Z
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      responses:
+        "200":
+          description: Page of layers returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageLayerOutputDTO"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      tags:
+      - Layers
+      summary: Create a new Layer
+      operationId: createLayer
+      parameters:
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LayerInputDTO"
+        required: true
+      responses:
+        "201":
+          description: Layer created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LayerOutputDTO"
+        "400":
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    type: urn:civitas:error:INVALID_INPUT
+                    title: Bad Request
+                    status: 400
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datasets/{dataSetId}/layers"
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    type: urn:civitas:error:VALIDATION_FAILED
+                    title: Bad Request
+                    status: 400
+                    detail: Request body validation failed
+                    instance: "/datasets/{dataSetId}/layers"
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                    title: Bad Request
+                    status: 400
+                    detail: Failed to read request body
+                    instance: "/datasets/{dataSetId}/layers"
+        "409":
+          description: Conflict (e.g. unique constraint violation)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datasets/{dataSetId}/layers"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datasets/{dataSetId}/layers"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datasets/{dataSetId}/layers"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /datasets/{dataSetId}/datasinks:
+    get:
+      tags:
+      - DataSinks
+      summary: List all DataSinks for a dataset
+      operationId: listDataSinks
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index (0..N)
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          default:
+          - "createdAt,DESC"
+          items:
+            type: string
+      - name: id
+        in: query
+        description: Filter by one or more IDs (comma-separated).
+        schema:
+          type: string
+          example: "1,2,3"
+        example: "1,2,3"
+      - name: createdAtFrom
+        in: query
+        description: Filter by creation date greater than or equal to this value (ISO
+          8601).
+        schema:
+          type: string
+          format: date-time
+          example: 2024-01-01T00:00:00Z
+      - name: createdAtTo
+        in: query
+        description: Filter by creation date less than or equal to this value (ISO
+          8601).
+        schema:
+          type: string
+          format: date-time
+          example: 2024-12-31T23:59:59Z
+      - name: modifiedAtFrom
+        in: query
+        description: Filter by modification date greater than or equal to this value
+          (ISO 8601).
+        schema:
+          type: string
+          format: date-time
+          example: 2024-01-01T00:00:00Z
+      - name: modifiedAtTo
+        in: query
+        description: Filter by modification date less than or equal to this value
+          (ISO 8601).
+        schema:
+          type: string
+          format: date-time
+          example: 2024-12-31T23:59:59Z
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      responses:
+        "200":
+          description: Page of datasinks returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageDataSinkOutputDTO"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      tags:
+      - DataSinks
+      summary: Create a new DataSink
+      operationId: createDataSink
+      parameters:
+      - name: dataSetId
+        in: path
+        required: true
+        schema:
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataSinkInputDTO"
+        required: true
+      responses:
+        "201":
+          description: Datasink created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataSinkOutputDTO"
+        "400":
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    type: urn:civitas:error:INVALID_INPUT
+                    title: Bad Request
+                    status: 400
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datasets/{dataSetId}/datasinks"
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    type: urn:civitas:error:VALIDATION_FAILED
+                    title: Bad Request
+                    status: 400
+                    detail: Request body validation failed
+                    instance: "/datasets/{dataSetId}/datasinks"
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                    title: Bad Request
+                    status: 400
+                    detail: Failed to read request body
+                    instance: "/datasets/{dataSetId}/datasinks"
+        "409":
+          description: Conflict (e.g. unique constraint violation)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: "/datasets/{dataSetId}/datasinks"
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datasets/{dataSetId}/datasinks"
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: "/datasets/{dataSetId}/datasinks"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /datapools:
+    get:
+      tags:
+      - DataPools
+      summary: List all datapools
+      description: "Returns a paginated, filterable list of datapools. Supports sorting\
+        \ and specification-based filtering."
+      operationId: listDataPools
+      parameters:
+      - name: page
+        in: query
+        description: Zero-based page index (0..N)
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          default:
+          - "createdAt,DESC"
+          items:
+            type: string
+      - name: id
+        in: query
+        description: Filter by one or more IDs (comma-separated).
+        schema:
+          type: string
+          example: "1,2,3"
+        example: "1,2,3"
+      - name: createdAtFrom
+        in: query
+        description: Filter by creation date greater than or equal to this value (ISO
+          8601).
+        schema:
+          type: string
+          format: date-time
+          example: 2024-01-01T00:00:00Z
+      - name: createdAtTo
+        in: query
+        description: Filter by creation date less than or equal to this value (ISO
+          8601).
+        schema:
+          type: string
+          format: date-time
+          example: 2024-12-31T23:59:59Z
+      - name: modifiedAtFrom
+        in: query
+        description: Filter by modification date greater than or equal to this value
+          (ISO 8601).
+        schema:
+          type: string
+          format: date-time
+          example: 2024-01-01T00:00:00Z
+      - name: modifiedAtTo
+        in: query
+        description: Filter by modification date less than or equal to this value
+          (ISO 8601).
+        schema:
+          type: string
+          format: date-time
+          example: 2024-12-31T23:59:59Z
+      - name: name
+        in: query
+        description: "Filter by name (partial match, case-insensitive)."
+        schema:
+          type: string
+          example: mobility
+      - name: description
+        in: query
+        description: "Filter by description (partial match, case-insensitive)."
+        schema:
+          type: string
+          example: governance
+      - name: q
+        in: query
+        description: "Search in name or description (partial match, case-insensitive)."
+        schema:
+          type: string
+          example: city
+      responses:
+        "200":
+          description: Page of datapools returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageDataPoolOutputDTO"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      tags:
+      - DataPools
+      summary: Create a new datapool
+      description: Creates a new datapool and returns it with a Location header pointing
+        to the new datapool URI.
+      operationId: createDataPool
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataPoolInputDTO"
+        required: true
+      responses:
+        "201":
+          description: Datapool created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataPoolOutputDTO"
+        "400":
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    type: urn:civitas:error:INVALID_INPUT
+                    title: Bad Request
+                    status: 400
+                    detail: "Validation failed: name must not be blank"
+                    instance: /datapools
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    type: urn:civitas:error:VALIDATION_FAILED
+                    title: Bad Request
+                    status: 400
+                    detail: Request body validation failed
+                    instance: /datapools
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                    title: Bad Request
+                    status: 400
+                    detail: Failed to read request body
+                    instance: /datapools
+        "409":
+          description: Conflict (e.g. unique constraint violation)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: A resource with this name already exists
+                    instance: /datapools
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                    title: Conflict
+                    status: 409
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: /datapools
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                    title: Conflict
+                    status: 409
+                    detail: Referenced entity does not exist
+                    instance: /datapools
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /datapools/{id}/unrelease:
+    post:
+      tags:
+      - DataPools
+      summary: Unrelease
+      description: Transitions the entity from AVAILABLE back to DRAFT status.
+      operationId: unreleaseDataPool
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataPoolOutputDTO"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /datapools/{id}/release:
+    post:
+      tags:
+      - DataPools
+      summary: Release
+      description: Transitions the entity from DRAFT to AVAILABLE status.
+      operationId: releaseDataPool
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataPoolOutputDTO"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   /assignments:
     get:
       tags:
@@ -5086,7 +7315,7 @@ paths:
       - name: scopeType
         in: query
         description: "Filter by scope type (exact match). One of: TENANT, DATASET,\
-          \ DATASOURCE, DATASTRUCTURE, DATASPACE, CATALOG."
+          \ DATASOURCE, DATASTRUCTURE, CATALOG, DATAPOOL."
         schema:
           type: string
           example: DATASET
@@ -5449,53 +7678,6 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  /datasets/{id}/apis:
-    get:
-      tags:
-      - DataSets
-      summary: List a dataset's published named APIs
-      description: Returns the named APIs of a PUBLISHED dataset (lifecycle status AVAILABLE),
-        including the server-built previewUrl. Per concept 1379 only active published APIs
-        are discoverable; a DRAFT/READY dataset returns an empty list. Respects the caller's
-        X-Allowed-Scope-Ids; unknown or out-of-scope datasets return 404.
-      operationId: getDataSetApis
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: Named APIs returned successfully
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/NamedApiOutputDTO"
-        "404":
-          description: Dataset not found or out of scope
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-              examples:
-                not_found:
-                  summary: not_found
-                  value:
-                    type: urn:civitas:error:NOT_FOUND
-                    title: Not Found
-                    status: 404
-                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
-                    instance: "/datasets/{id}/apis"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
   /datasets/{id}/assignments:
     get:
       tags:
@@ -5534,6 +7716,98 @@ paths:
                     status: 404
                     detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
                     instance: "/datasets/{id}/assignments"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /datasets/{id}/apis:
+    get:
+      tags:
+      - DataSets
+      summary: List a dataset's published named APIs
+      description: "Returns the named APIs of a PUBLISHED dataset (lifecycle status\
+        \ AVAILABLE), including the server-built previewUrl. Per concept #1379 only\
+        \ active published APIs are discoverable: a DRAFT/READY dataset returns an\
+        \ empty list. Respects the caller's X-Allowed-Scope-Ids; unknown or out-of-scope\
+        \ datasets return 404."
+      operationId: getDataSetApis
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Named APIs returned successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NamedApiOutputDTO"
+        "404":
+          description: Dataset not found or out of scope
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasets/{id}/apis"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /datapools/{id}/assignments:
+    get:
+      tags:
+      - DataPools
+      summary: Get assignments
+      description: Returns all role assignments scoped to this datapool.
+      operationId: getDataPoolAssignments
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Assignments returned successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AssignmentOutputDTO"
+        "404":
+          description: Datapool not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    type: urn:civitas:error:NOT_FOUND
+                    title: Not Found
+                    status: 404
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datapools/{id}/assignments"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -5652,6 +7926,17 @@ paths:
           $ref: "#/components/responses/InternalServerError"
 components:
   schemas:
+    DataPoolSummaryDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier (UUID)
+          example: 550e8400-e29b-41d4-a716-446655440000
+          readOnly: true
+        name:
+          type: string
     GroupSummaryDTO:
       type: object
       properties:
@@ -5714,6 +7999,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/GroupSummaryDTO"
+        datapools:
+          type: array
+          items:
+            $ref: "#/components/schemas/DataPoolSummaryDTO"
     UserInputDTO:
       type: object
       properties:
@@ -5865,6 +8154,10 @@ components:
           description: Number of users with this role (via group assignments)
           example: 12
           readOnly: true
+        datapools:
+          type: array
+          items:
+            $ref: "#/components/schemas/DataPoolSummaryDTO"
     GroupInputDTO:
       type: object
       properties:
@@ -5919,8 +8212,8 @@ components:
           - DATASTRUCTURE
           - DATASOURCE
           - DATASET
-          - DATASPACE
           - CATALOG
+          - DATAPOOL
           example: DATASET
         scope:
           $ref: "#/components/schemas/DataEntitySummaryDTO"
@@ -5975,6 +8268,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AssignmentOutputDTO"
+        datapools:
+          type: array
+          items:
+            $ref: "#/components/schemas/DataPoolSummaryDTO"
     RoleSummaryDTO:
       type: object
       properties:
@@ -6020,8 +8317,8 @@ components:
           - DATASTRUCTURE
           - DATASOURCE
           - DATASET
-          - DATASPACE
           - CATALOG
+          - DATAPOOL
         scopeId:
           type: string
           format: uuid
@@ -6258,8 +8555,32 @@ components:
           type: string
           format: uuid
           description: ID of the data structure version to associate
+        datapoolScope:
+          $ref: "#/components/schemas/DatapoolScopeInputDTO"
+          description: Datapool scope configuration. Defaults to ALL if omitted on
+            create.
       required:
       - name
+    DatapoolScopeInputDTO:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Scope type defining DataPool access
+          enum:
+          - ALL
+          - NONE
+          - SPECIFIC
+          example: SPECIFIC
+        datapoolIds:
+          type: array
+          description: List of DataPool IDs when type is SPECIFIC. Required and non-empty
+            for SPECIFIC type.
+          example:
+          - 550e8400-e29b-41d4-a716-446655440000
+          items:
+            type: string
+            format: uuid
     MqttConnectorConfiguration:
       type: object
       properties:
@@ -6437,6 +8758,29 @@ components:
           type: boolean
           description: Whether this data source is currently referenced by a pipeline
           readOnly: true
+        datapoolScope:
+          $ref: "#/components/schemas/DatapoolScopeOutputDTO"
+          description: Datapool scope configuration
+    DatapoolScopeOutputDTO:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Scope type defining DataPool access
+          enum:
+          - ALL
+          - NONE
+          - SPECIFIC
+          example: ALL
+        datapoolIds:
+          type: array
+          description: "List of DataPool IDs. Populated only when type is SPECIFIC,\
+            \ empty otherwise."
+          example:
+          - 550e8400-e29b-41d4-a716-446655440000
+          items:
+            type: string
+            format: uuid
     DataSetInputDTO:
       type: object
       properties:
@@ -6460,6 +8804,10 @@ components:
             one APISIX route after release.
           items:
             $ref: "#/components/schemas/NamedApiInputDTO"
+        datapoolId:
+          type: string
+          format: uuid
+          description: ID of the datapool this dataset belongs to.
       required:
       - name
     NamedApiInputDTO:
@@ -6467,9 +8815,10 @@ components:
       properties:
         name:
           type: string
-          description: Human-readable display label for this named API.
+          description: Human-readable display label for this named API. Max 255 characters.
           example: Traffic Sensor Readings
-          minLength: 1
+          maxLength: 255
+          minLength: 0
         slug:
           type: string
           description: "URL slug used as the path segment in the public route /v1/datasets/{datasetId}/{slug}.\
@@ -6491,8 +8840,11 @@ components:
           example: STA
         version:
           type: string
-          description: Optional standard version (e.g. "1.1" for STA). Free-form string.
+          description: "Optional standard version (e.g. \"1.1\" for STA). Free-form\
+            \ string, max 32 characters."
           example: "1.1"
+          maxLength: 32
+          minLength: 0
         description:
           type: string
           description: Optional free-form description of the named API surfaced in
@@ -6558,6 +8910,9 @@ components:
         openDataAccess:
           type: boolean
           description: Whether this dataset is publicly accessible
+        datapool:
+          $ref: "#/components/schemas/DataPoolSummaryDTO"
+          description: Datapool this dataset is assigned to
         createdBy:
           $ref: "#/components/schemas/UserSummaryDTO"
         publicUrl:
@@ -6604,8 +8959,11 @@ components:
           example: Live traffic counter readings from city sensors.
         previewUrl:
           type: string
-          description: "Predicted public URL once the dataset reaches AVAILABLE: {civitas.api.base-url}/v1/datasets/{datasetId}/{slug}.\
-            \ Server-populated; absent before the dataset is persisted."
+          description: "Predicted public URL once the dataset reaches AVAILABLE: {publicUrl}/{slug},\
+            \ where publicUrl is the base the saga provisioned the APISIX route under\
+            \ (APISIX_API_PUBLIC_URL). Falls back to {civitas.api.base-url}/v1/datasets/{datasetId}/{slug}\
+            \ for datasets provisioned before the saga set publicUrl. Server-populated;\
+            \ absent before the dataset is persisted."
           example: https://api.core.civitasconnect.digital/v1/datasets/b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a/traffic
           readOnly: true
     PipelineSummaryDTO:
@@ -6618,6 +8976,55 @@ components:
           type: string
         description:
           type: string
+    StyleInputDTO:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          pattern: "[A-Za-z0-9_-]+"
+        sldContent:
+          type: string
+          minLength: 1
+      required:
+      - name
+      - sldContent
+    StyleOutputDTO:
+      type: object
+      description: Style details
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier (UUID)
+          example: 550e8400-e29b-41d4-a716-446655440000
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the resource was created
+          example: 2025-06-15T10:30:00
+          readOnly: true
+        modifiedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the resource was last modified
+          example: 2025-06-15T14:22:00
+          readOnly: true
+        dataSetId:
+          type: string
+          format: uuid
+          description: ID of the dataset this style belongs to
+        name:
+          type: string
+          description: Unique name of the style within its dataset
+        sldContent:
+          type: string
+          description: SLD (Styled Layer Descriptor) XML content
+        inUse:
+          type: boolean
+          description: True if any Layer references this Style as its default or alternative
+            Style
     PipelineInputDTO:
       type: object
       properties:
@@ -6638,11 +9045,12 @@ components:
             type: string
             format: uuid
           uniqueItems: true
-        persistences:
+        dataSinkIds:
           type: array
           items:
-            type: integer
-            format: int64
+            type: string
+            format: uuid
+          uniqueItems: true
       required:
       - name
     PipelineOutputDTO:
@@ -6667,6 +9075,9 @@ components:
           description: Timestamp when the resource was last modified
           example: 2025-06-15T14:22:00
           readOnly: true
+        dataSetId:
+          type: string
+          format: uuid
         name:
           type: string
         description:
@@ -6674,14 +9085,287 @@ components:
         styles:
           type: object
           additionalProperties: {}
-        persistences:
+        dataSinkIds:
           type: array
           items:
-            type: integer
-            format: int64
+            type: string
+            format: uuid
         model:
           type: object
           additionalProperties: {}
+    LayerInputDTO:
+      type: object
+      properties:
+        dataSinkId:
+          type: string
+          format: uuid
+        layerName:
+          type: string
+          minLength: 1
+        title:
+          type: string
+        description:
+          type: string
+        keywords:
+          type: array
+          items:
+            type: string
+        attribute:
+          type: array
+          items:
+            type: string
+        geometryColumnRef:
+          type: string
+        cqlFilter:
+          type: string
+        defaultStyleId:
+          type: string
+          format: uuid
+        alternativeStyleIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        crs:
+          type: string
+        bboxAutoCalculate:
+          type: boolean
+        nativeBoundingBox:
+          type: object
+          additionalProperties: {}
+        latLonBoundingBox:
+          type: object
+          additionalProperties: {}
+      required:
+      - dataSinkId
+      - layerName
+    LayerOutputDTO:
+      type: object
+      description: Layer details
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier (UUID)
+          example: 550e8400-e29b-41d4-a716-446655440000
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the resource was created
+          example: 2025-06-15T10:30:00
+          readOnly: true
+        modifiedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the resource was last modified
+          example: 2025-06-15T14:22:00
+          readOnly: true
+        dataSetId:
+          type: string
+          format: uuid
+          description: ID of the dataset this layer belongs to
+        dataSinkId:
+          type: string
+          format: uuid
+          description: ID of the datasink this layer is derived from
+        layerName:
+          type: string
+          description: Unique name of the layer within its datasink
+        title:
+          type: string
+          description: Human-readable title
+        description:
+          type: string
+          description: Human-readable description
+        keywords:
+          type: array
+          description: Keywords associated with the layer
+          items:
+            type: string
+        attribute:
+          type: array
+          description: Attribute names exposed by the layer
+          items:
+            type: string
+        geometryColumnRef:
+          type: string
+          description: Name of the geometry column in the underlying data
+        cqlFilter:
+          type: string
+          description: CQL filter applied to the layer data
+        defaultStyleId:
+          type: string
+          format: uuid
+          description: ID of the default style for this layer
+        alternativeStyleIds:
+          type: array
+          description: IDs of alternative styles available for this layer
+          items:
+            type: string
+            format: uuid
+        crs:
+          type: string
+          description: Coordinate reference system (e.g. EPSG:4326)
+        bboxAutoCalculate:
+          type: boolean
+          description: "When true, the bounding box is computed automatically"
+        nativeBoundingBox:
+          type: object
+          additionalProperties: {}
+          description: Native bounding box of the layer data
+        latLonBoundingBox:
+          type: object
+          additionalProperties: {}
+          description: Bounding box in WGS84 lat/lon coordinates
+        geometryType:
+          type: string
+          description: Derived geometry type — null until provisioned
+          readOnly: true
+        nativeCRS:
+          type: string
+          description: Native CRS — null until provisioned
+          readOnly: true
+    DataSinkInputDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        dataSinkType:
+          type: string
+          enum:
+          - FROST
+          - POSTGIS
+        configuration:
+          type: object
+          additionalProperties: {}
+          oneOf:
+          - $ref: "#/components/schemas/PostgisConfiguration"
+          - $ref: "#/components/schemas/FrostConfiguration"
+      required:
+      - configuration
+      - dataSinkType
+    FrostConfiguration:
+      type: object
+      description: Configuration for a FROST data sink
+      properties:
+        dataStructureVersionId:
+          type: string
+          format: uuid
+          description: "ID of the DataStructureVersion of the mapping's Thing-shaped\
+            \ target structure; required when the pipeline maps into this sink, absent\
+            \ for passthrough"
+    PostgisConfiguration:
+      type: object
+      description: Configuration for a POSTGIS data sink
+      properties:
+        tableName:
+          type: string
+          description: Target table name in the PostGIS database
+          example: traffic_data
+        dataStructureVersionId:
+          type: string
+          format: uuid
+          description: ID of the DataStructureVersion that defines the table schema
+    DataSinkConfigurationOutput: {}
+    DataSinkOutputDTO:
+      type: object
+      description: DataSink details
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier (UUID)
+          example: 550e8400-e29b-41d4-a716-446655440000
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the resource was created
+          example: 2025-06-15T10:30:00
+          readOnly: true
+        modifiedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the resource was last modified
+          example: 2025-06-15T14:22:00
+          readOnly: true
+        dataSetId:
+          type: string
+          format: uuid
+        pipelineId:
+          type: string
+          format: uuid
+        dataSinkType:
+          type: string
+          enum:
+          - FROST
+          - POSTGIS
+        inUse:
+          type: boolean
+        configuration:
+          $ref: "#/components/schemas/DataSinkConfigurationOutput"
+          oneOf:
+          - $ref: "#/components/schemas/PostgisConfigurationOutput"
+          - $ref: "#/components/schemas/FrostConfigurationOutput"
+    DataPoolInputDTO:
+      type: object
+      properties:
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssignmentScopedInputDTO"
+          uniqueItems: true
+        name:
+          type: string
+          maxLength: 255
+          minLength: 3
+        description:
+          type: string
+          minLength: 1
+        contactPersonId:
+          type: string
+          format: uuid
+          description: ID of the user designated as the contact person for this datapool
+      required:
+      - description
+      - name
+    DataPoolOutputDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier (UUID)
+          example: 550e8400-e29b-41d4-a716-446655440000
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the resource was created
+          example: 2025-06-15T10:30:00
+          readOnly: true
+        modifiedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the resource was last modified
+          example: 2025-06-15T14:22:00
+          readOnly: true
+        name:
+          type: string
+          example: City Mobility DataPool
+        description:
+          type: string
+          example: Groups all mobility-related datasets under one governance boundary
+        contactPerson:
+          $ref: "#/components/schemas/UserSummaryDTO"
+          description: User designated as the contact person for this datapool
+        datasets:
+          type: array
+          description: UUIDs of datasets assigned to this datapool
+          items:
+            type: string
     AssignmentInputDTO:
       type: object
       properties:
@@ -6698,8 +9382,8 @@ components:
           - DATASTRUCTURE
           - DATASOURCE
           - DATASET
-          - DATASPACE
           - CATALOG
+          - DATAPOOL
         scopeId:
           type: string
           format: uuid
@@ -6729,13 +9413,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageableObject:
@@ -6777,8 +9461,8 @@ components:
           - DATASTRUCTURE
           - DATASOURCE
           - DATASET
-          - DATASPACE
           - CATALOG
+          - DATAPOOL
           example: DATASET
         scopeId:
           type: string
@@ -6849,13 +9533,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     Sort:
@@ -6929,13 +9613,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageDataStructureOutputDTO:
@@ -6961,13 +9645,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageDataSourceOutputDTO:
@@ -6993,13 +9677,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageDataSetOutputDTO:
@@ -7025,13 +9709,45 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+    PageStyleOutputDTO:
+      type: object
+      properties:
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/StyleOutputDTO"
+        number:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PagePipelineOutputDTO:
@@ -7057,13 +9773,109 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+    PageLayerOutputDTO:
+      type: object
+      properties:
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/LayerOutputDTO"
+        number:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+    PageDataSinkOutputDTO:
+      type: object
+      properties:
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/DataSinkOutputDTO"
+        number:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+    PageDataPoolOutputDTO:
+      type: object
+      properties:
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/DataPoolOutputDTO"
+        number:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageAssignmentOutputDTO:
@@ -7089,13 +9901,13 @@ components:
           $ref: "#/components/schemas/PageableObject"
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PatchUserInputDTO:
@@ -7250,6 +10062,10 @@ components:
           type: string
           format: uuid
           description: ID of the data structure version to associate
+        datapoolScope:
+          $ref: "#/components/schemas/DatapoolScopeInputDTO"
+          description: Datapool scope configuration. Defaults to ALL if omitted on
+            create.
     PatchDataSetInputDTO:
       description: Partial update — only provided fields are modified.
       properties:
@@ -7273,6 +10089,20 @@ components:
             one APISIX route after release.
           items:
             $ref: "#/components/schemas/NamedApiInputDTO"
+        datapoolId:
+          type: string
+          format: uuid
+          description: ID of the datapool this dataset belongs to.
+    PatchStyleInputDTO:
+      description: Partial update — only provided fields are modified.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          pattern: "[A-Za-z0-9_-]+"
+        sldContent:
+          type: string
+          minLength: 1
     PatchPipelineInputDTO:
       description: Partial update — only provided fields are modified.
       properties:
@@ -7293,11 +10123,91 @@ components:
             type: string
             format: uuid
           uniqueItems: true
-        persistences:
+        dataSinkIds:
           type: array
           items:
-            type: integer
-            format: int64
+            type: string
+            format: uuid
+          uniqueItems: true
+    PatchLayerInputDTO:
+      description: Partial update — only provided fields are modified.
+      properties:
+        dataSinkId:
+          type: string
+          format: uuid
+        layerName:
+          type: string
+          minLength: 1
+        title:
+          type: string
+        description:
+          type: string
+        keywords:
+          type: array
+          items:
+            type: string
+        attribute:
+          type: array
+          items:
+            type: string
+        geometryColumnRef:
+          type: string
+        cqlFilter:
+          type: string
+        defaultStyleId:
+          type: string
+          format: uuid
+        alternativeStyleIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        crs:
+          type: string
+        bboxAutoCalculate:
+          type: boolean
+        nativeBoundingBox:
+          type: object
+          additionalProperties: {}
+        latLonBoundingBox:
+          type: object
+          additionalProperties: {}
+    PatchDataSinkInputDTO:
+      description: Partial update — only provided fields are modified.
+      properties:
+        id:
+          type: string
+          format: uuid
+        dataSinkType:
+          type: string
+          enum:
+          - FROST
+          - POSTGIS
+        configuration:
+          type: object
+          additionalProperties: {}
+          oneOf:
+          - $ref: "#/components/schemas/PostgisConfiguration"
+          - $ref: "#/components/schemas/FrostConfiguration"
+    PatchDataPoolInputDTO:
+      description: Partial update — only provided fields are modified.
+      properties:
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssignmentScopedInputDTO"
+          uniqueItems: true
+        name:
+          type: string
+          maxLength: 255
+          minLength: 3
+        description:
+          type: string
+          minLength: 1
+        contactPersonId:
+          type: string
+          format: uuid
+          description: ID of the user designated as the contact person for this datapool
   responses:
     Unauthorized:
       description: Authentication required
