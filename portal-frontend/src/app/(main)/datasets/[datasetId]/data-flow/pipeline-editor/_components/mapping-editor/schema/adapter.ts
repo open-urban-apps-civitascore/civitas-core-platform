@@ -1,5 +1,8 @@
-import type { PortType } from '@/components/node-editor/types'
-import { isAttributeRequired, sanitizeName } from '@/components/uml-modeler/services/jsonSchemaExportService'
+import {
+  assignDefKeys,
+  assignRootPropertyNames,
+  isAttributeRequired,
+} from '@/components/uml-modeler/services/jsonSchemaExportService'
 import {
   classifyStructuralEdge,
   collectContainedIds,
@@ -12,6 +15,9 @@ import type { UMLAttribute, UMLElement, UMLType } from '@/components/uml-modeler
 import { hasAttributes } from '@/components/uml-modeler/types/uml'
 
 import type { FieldNode, FieldType, GeometryType, SchemaTree } from '../_types'
+import { field, GEOMETRY, portTypeFor } from '../_types'
+
+export { GEOMETRY }
 
 export const PRIMITIVE: Record<string, FieldType> = {
   String: 'str',
@@ -27,21 +33,8 @@ export const PRIMITIVE: Record<string, FieldType> = {
   Date: 'date',
 }
 
-export const GEOMETRY = new Set<GeometryType>([
-  'Point',
-  'LineString',
-  'Polygon',
-  'MultiPoint',
-  'MultiLineString',
-  'MultiPolygon',
-  'GeometryCollection',
-])
-
 /** Type guard: is the given UML type name one of the concrete geometry types? */
 const isGeometry = (type: string): type is GeometryType => (GEOMETRY as Set<string>).has(type)
-
-const portTypeFor = (type: FieldType): PortType =>
-  type === 'array' ? 'array' : type === 'object' ? 'object' : isGeometry(type) ? 'geometry' : 'scalar'
 
 const lowerFirst = (value: string): string => value.charAt(0).toLowerCase() + value.slice(1)
 
@@ -189,8 +182,10 @@ const buildFields = (el: UMLElement, base: string, index: DiagramIndex, visited:
  * Converts a datastructure version's `styles` (UML diagram) into the editor's field tree. A
  * single-root diagram anchors the class's fields directly at `$` (the runtime record is the class
  * itself); a diagram with several unconnected trees mirrors the generated schema, whose document
- * root holds one property per root class — each root becomes an object node at
- * `$.<sanitized name>`.
+ * root holds one property per root class — each root becomes a node at `$.<property name>`, named
+ * by the same collision-safe assignment the schema export uses, so the fallback tree's paths match
+ * the persisted model's properties. Enumeration roots are scalar values at runtime and render as
+ * string leaves.
  */
 export const umlDiagramToSchemaTree = (diagram: UMLDiagram | null | undefined, fallbackName: string): SchemaTree => {
   if (!diagram) return { name: fallbackName, fields: [] }
@@ -204,16 +199,12 @@ export const umlDiagramToSchemaTree = (diagram: UMLDiagram | null | undefined, f
     return { name: root.name || fallbackName, fields: buildFields(root, '$', index, new Set([root.id])) }
   }
 
+  const propertyNames = assignRootPropertyNames(roots, assignDefKeys(elements))
   const fields: FieldNode[] = roots.map(root => {
-    const name = sanitizeName(root.name) || root.id
+    const name = propertyNames.get(root.id) as string
     const path = `$.${name}`
-    return {
-      path,
-      name,
-      type: 'object',
-      portType: 'object',
-      children: buildFields(root, path, index, new Set([root.id])),
-    }
+    if (root.type === 'enumeration') return field(path, name, 'str', false)
+    return field(path, name, 'object', false, buildFields(root, path, index, new Set([root.id])))
   })
   return { name: fallbackName, fields }
 }

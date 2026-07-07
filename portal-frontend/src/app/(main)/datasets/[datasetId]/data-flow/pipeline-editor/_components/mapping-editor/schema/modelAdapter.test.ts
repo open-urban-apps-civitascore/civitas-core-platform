@@ -12,9 +12,15 @@ const wrapperModel = (defs: Record<string, unknown>, rootRef = 'Thing', title = 
 })
 
 describe('modelToSchemaTree', () => {
-  it('returns an empty tree for a missing model', () => {
-    expect(modelToSchemaTree(null, 'fallback')).toEqual({ name: 'fallback', fields: [] })
-    expect(modelToSchemaTree(undefined, 'fallback')).toEqual({ name: 'fallback', fields: [] })
+  it('rejects an empty model document', () => {
+    expect(() => modelToSchemaTree({}, 'fallback')).toThrow(/no resolvable definition/)
+  })
+
+  it('returns an empty tree for an enumeration-only model', () => {
+    expect(modelToSchemaTree({ title: 'Status', enum: ['ON', 'OFF'] }, 'fallback')).toEqual({
+      name: 'Status',
+      fields: [],
+    })
   })
 
   it('resolves a wrapper root: tree named after the structure, class as the mappable $ node', () => {
@@ -247,5 +253,137 @@ describe('modelToSchemaTree', () => {
     expect(tree.name).toBe('Legacy')
     expect(tree.fields[0]).toMatchObject({ path: '$', name: 'Legacy' })
     expect(tree.fields[0].children?.map(f => f.path)).toEqual(['$.attribut'])
+  })
+
+  it('rejects a dangling allOf parent instead of silently truncating the tree', () => {
+    expect(() =>
+      modelToSchemaTree(
+        wrapperModel({
+          Thing: { allOf: [{ $ref: '#/$defs/Gone' }], type: 'object', properties: { a: { type: 'string' } } },
+        }),
+        'fallback',
+      ),
+    ).toThrow(/Gone/)
+  })
+
+  it('rejects a local property $ref that resolves to no definition', () => {
+    expect(() =>
+      modelToSchemaTree(
+        wrapperModel({
+          Thing: { type: 'object', properties: { part: { $ref: '#/$defs/Gone' } } },
+        }),
+        'fallback',
+      ),
+    ).toThrow(/Gone/)
+  })
+
+  it('renders non-local property $refs as opaque object leaves (the engine reads them as JSONB)', () => {
+    const tree = modelToSchemaTree(
+      wrapperModel({
+        Thing: {
+          type: 'object',
+          properties: {
+            relative: { $ref: 'common.json#/$defs/Base' },
+            external: { $ref: 'https://example.org/other-schema.json' },
+          },
+        },
+      }),
+      'fallback',
+    )
+    expect(tree.fields[0].children).toEqual([
+      { path: '$.relative', name: 'relative', type: 'object', portType: 'object' },
+      { path: '$.external', name: 'external', type: 'object', portType: 'object' },
+    ])
+  })
+
+  it('does not treat a root with an empty allOf list as a wrapper', () => {
+    // Matches the backend: any allOf key on the root disqualifies wrapper unwrapping, so the
+    // record is the root itself and the single $ref property stays a nested object.
+    const tree = modelToSchemaTree(
+      {
+        title: 'S',
+        type: 'object',
+        allOf: [],
+        properties: { thing: { $ref: '#/$defs/Thing' } },
+        $defs: { Thing: { type: 'object', properties: { a: { type: 'string' } } } },
+      },
+      'fallback',
+    )
+    expect(tree.fields[0]).toMatchObject({ path: '$', name: 'S' })
+    expect(tree.fields[0].children?.map(f => f.path)).toEqual(['$.thing'])
+  })
+
+  it('terminates on mutually recursive $refs (A → B → A)', () => {
+    const tree = modelToSchemaTree(
+      wrapperModel(
+        {
+          A: { type: 'object', properties: { b: { $ref: '#/$defs/B' } } },
+          B: { type: 'object', properties: { a: { $ref: '#/$defs/A' } } },
+        },
+        'A',
+      ),
+      'fallback',
+    )
+    const b = tree.fields[0].children?.[0]
+    expect(b?.path).toBe('$.b')
+    // The cycle back to A is truncated instead of recursing forever.
+    expect(b?.children?.[0]).toMatchObject({ path: '$.b.a', type: 'object' })
+    expect(b?.children?.[0].children).toBeUndefined()
+  })
+
+  describe('named-definition fallback (root without own properties)', () => {
+    it('selects the single definition', () => {
+      const tree = modelToSchemaTree(
+        { title: 'X', type: 'object', $defs: { Only: { type: 'object', properties: { a: { type: 'string' } } } } },
+        'fallback',
+      )
+      expect(tree.fields[0]).toMatchObject({ path: '$', name: 'Only' })
+    })
+
+    it('selects the title-matching definition among several', () => {
+      const tree = modelToSchemaTree(
+        {
+          title: 'Second',
+          type: 'object',
+          $defs: {
+            First: { type: 'object', properties: { a: { type: 'string' } } },
+            Second: { type: 'object', properties: { b: { type: 'string' } } },
+          },
+        },
+        'fallback',
+      )
+      expect(tree.fields[0].children?.map(f => f.name)).toEqual(['b'])
+    })
+
+    it('selects the single properties-carrying definition, ignoring allOf-only ones', () => {
+      const tree = modelToSchemaTree(
+        {
+          title: 'X',
+          type: 'object',
+          $defs: {
+            Mixin: { allOf: [{ $ref: '#/$defs/Real' }] },
+            Real: { type: 'object', properties: { a: { type: 'string' } } },
+          },
+        },
+        'fallback',
+      )
+      expect(tree.fields[0]).toMatchObject({ path: '$', name: 'Real' })
+    })
+
+    it('rejects ambiguous definitions with no title match', () => {
+      expect(() =>
+        modelToSchemaTree(
+          {
+            title: 'X',
+            type: 'object',
+            $defs: {
+              A: { type: 'object', properties: { a: { type: 'string' } } },
+              B: { type: 'object', properties: { b: { type: 'string' } } },
+            },
+          },
+          'fallback',
+        ),
+      ).toThrow(/none matches the title/)
+    })
   })
 })

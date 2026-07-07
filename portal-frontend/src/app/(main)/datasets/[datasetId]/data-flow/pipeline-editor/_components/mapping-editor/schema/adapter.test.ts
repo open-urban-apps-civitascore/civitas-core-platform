@@ -317,4 +317,69 @@ describe('umlDiagramToSchemaTree', () => {
     expect(tree.name).toBe('alpha')
     expect(tree.fields.map(f => f.name)).toEqual(['alpha', 'beta'])
   })
+
+  it('dedupes same-named multi-root classes with the schema export naming', () => {
+    // 'Foo' and 'foo' both sanitize to 'foo'; without the shared collision handling the second
+    // root's subtree would silently vanish from the flattened path lookup.
+    const diagram = {
+      nodes: [classNode('a', 'Foo', [{ name: 'a1' }]), classNode('b', 'foo', [{ name: 'b1' }])],
+      edges: [],
+    } as unknown as UMLDiagram
+
+    const tree = umlDiagramToSchemaTree(diagram, 'MyStructure')
+    expect(tree.fields.map(f => f.path)).toEqual(['$.foo', '$.foo-2'])
+  })
+
+  it('renders enumeration roots as string leaves in a multi-root tree', () => {
+    const diagram = {
+      nodes: [
+        classNode('a', 'Alpha', [{ name: 'a1' }]),
+        {
+          id: 'node-e',
+          type: 'enumeration',
+          position: { x: 0, y: 0 },
+          data: {
+            element: { id: 'e', name: 'Status', type: 'enumeration', literals: [{ id: 'l1', name: 'ON' }] },
+            label: 'Status',
+          },
+        },
+      ],
+      edges: [],
+    } as unknown as UMLDiagram
+
+    // The enum is filtered from the root candidates while classes exist, so only Alpha roots; an
+    // enum-only diagram falls back to the enums as scalar leaves.
+    const tree = umlDiagramToSchemaTree(diagram, 'MyStructure')
+    expect(tree.name).toBe('Alpha')
+
+    const enumOnly = {
+      nodes: [
+        {
+          id: 'node-e1',
+          type: 'enumeration',
+          position: { x: 0, y: 0 },
+          data: {
+            element: { id: 'e1', name: 'Status', type: 'enumeration', literals: [{ id: 'l1', name: 'ON' }] },
+            label: 'Status',
+          },
+        },
+        {
+          id: 'node-e2',
+          type: 'enumeration',
+          position: { x: 0, y: 0 },
+          data: {
+            element: { id: 'e2', name: 'Kind', type: 'enumeration', literals: [{ id: 'l2', name: 'A' }] },
+            label: 'Kind',
+          },
+        },
+      ],
+      edges: [],
+    } as unknown as UMLDiagram
+
+    const enumTree = umlDiagramToSchemaTree(enumOnly, 'MyStructure')
+    expect(enumTree.fields.map(f => ({ path: f.path, type: f.type, portType: f.portType }))).toEqual([
+      { path: '$.status', type: 'str', portType: 'scalar' },
+      { path: '$.kind', type: 'str', portType: 'scalar' },
+    ])
+  })
 })

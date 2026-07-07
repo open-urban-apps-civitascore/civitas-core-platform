@@ -123,6 +123,14 @@ const fixtures: { label: string; diagram: UMLDiagram }[] = [
       ],
     ),
   },
+  {
+    label: 'association (target embedded, source is root)',
+    diagram: diagram(
+      'Order',
+      [cls('order', 'Order', [{ id: 'a1', name: 'orderNo' }]), cls('item', 'Item', [{ id: 'a2', name: 'sku' }])],
+      [rel('1', 'association', 'order', 'item', { targetRole: 'items', targetMultiplicity: '*' })],
+    ),
+  },
 ]
 
 type JsonSchema = {
@@ -213,5 +221,18 @@ describe('model-walker consistency (modelToSchemaTree vs adapter)', () => {
     const adapterRoots = adapterTree.fields.map(f => f.path)
     expect(modelRoots).toEqual(adapterRoots)
     expect(leafPaths(modelTree.fields[0].children).sort()).toEqual(leafPaths(adapterTree.fields).sort())
+  })
+
+  it('agrees on colliding multi-root names: adapter paths match the exported property names', () => {
+    const colliding = diagram(
+      'MyStructure',
+      [cls('a', 'Foo', [{ id: 'a1', name: 'a1' }]), cls('b', 'foo', [{ id: 'a2', name: 'b1' }])],
+      [],
+    )
+    const schema = exportToJsonSchema(colliding) as JsonSchema
+    const exportedPaths = Object.keys(schema.properties ?? {}).map(name => `$.${name}`)
+    const adapterPaths = umlDiagramToSchemaTree(colliding, colliding.name).fields.map(f => f.path)
+    expect(adapterPaths).toEqual(exportedPaths)
+    expect(new Set(exportedPaths).size).toBe(2)
   })
 })

@@ -1327,6 +1327,7 @@
     },
     "lines": "{count, plural, one {# line} other {# lines}}",
     "mappingEditor": {
+      "modelUnresolvable": "The stored schema of \"{name}\" could not be read. Showing the diagram structure instead — it may differ from the structure used at deploy time.",
       "toolbar": {
         "title": "Mapping",
         "status": "{mapped} mapped · {unmapped} unmapped"

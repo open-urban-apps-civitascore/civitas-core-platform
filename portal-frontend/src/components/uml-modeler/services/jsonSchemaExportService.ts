@@ -23,11 +23,11 @@
  *
  * Root: the document root is the data structure itself, titled after the
  * diagram. Every class is emitted under `$defs`; each root class (one not
- * contained by any other via composition, aggregation, inheritance, or
- * realization) is referenced from the document root via its own `$ref`
- * property, so the structure's name — not an arbitrary class — is always the
- * top level and a diagram may hold several unconnected trees. An
- * enumeration-only diagram keeps its `enum` at the document root instead.
+ * embedded by any structural or inheritance edge) is referenced from the
+ * document root via its own `$ref` property, so the structure's name — not an
+ * arbitrary class — is always the top level and a diagram may hold several
+ * unconnected trees. A diagram consisting of a single enumeration keeps its
+ * `enum` at the document root instead.
  */
 
 import type { UMLDiagram } from '../types/diagram'
@@ -258,6 +258,49 @@ const buildClassSchema = (
   return ownSchema
 }
 
+/** Maps every element id to a stable, unique `$defs` key (name-based, `_n`-suffixed on collision). */
+export const assignDefKeys = (elements: UMLElement[]): Map<string, string> => {
+  const defKeyById = new Map<string, string>()
+  const usedKeys = new Set<string>()
+  for (const element of elements) {
+    const key = element.name || 'Type'
+    let candidate = key
+    let suffix = 1
+    while (usedKeys.has(candidate)) {
+      candidate = `${key}_${suffix++}`
+    }
+    usedKeys.add(candidate)
+    defKeyById.set(element.id, candidate)
+  }
+  return defKeyById
+}
+
+/**
+ * One document-root property name per root element, keyed by element id. Primarily the sanitized
+ * class name; on a collision the (unique) `$defs` key disambiguates, numerically suffixed until
+ * free — sanitization is not injective over the unique keys (`Foo`/`foo` both sanitize to `foo`),
+ * and a root silently overwritten by a same-named sibling would vanish from the released schema.
+ * Shared with the mapping editor's diagram adapter so the persisted property names and the
+ * fallback tree's paths cannot diverge.
+ */
+export const assignRootPropertyNames = (roots: UMLElement[], defKeyById: Map<string, string>): Map<string, string> => {
+  const nameById = new Map<string, string>()
+  const used = new Set<string>()
+  for (const root of roots) {
+    const defKey = defKeyById.get(root.id) as string
+    const base = sanitizeName(defKey) || defKey
+    let candidate = sanitizeName(root.name) || base
+    if (used.has(candidate)) candidate = base
+    let suffix = 2
+    while (used.has(candidate)) {
+      candidate = `${base}-${suffix++}`
+    }
+    used.add(candidate)
+    nameById.set(root.id, candidate)
+  }
+  return nameById
+}
+
 /**
  * Main export function - converts a UMLDiagram into a JSON Schema document.
  * Relationships outside the supported scope carry no semantics and are ignored
@@ -268,20 +311,7 @@ const buildClassSchema = (
 export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): JsonSchemaObject => {
   const elements = (diagram.nodes ?? []).map(node => node.data?.element).filter((e): e is UMLElement => !!e)
 
-  // Map every class element id to a stable `$defs` key.
-  const classDefKeyById = new Map<string, string>()
-  const usedKeys = new Set<string>()
-  for (const element of elements) {
-    let key = element.name || 'Type'
-    let candidate = key
-    let suffix = 1
-    while (usedKeys.has(candidate)) {
-      candidate = `${key}_${suffix++}`
-    }
-    key = candidate
-    usedKeys.add(key)
-    classDefKeyById.set(element.id, key)
-  }
+  const classDefKeyById = assignDefKeys(elements)
 
   const sanitizedName = sanitizeName(diagram.name) || 'untitled'
   const id = modelUri || `${BASE_MODEL_URI}/${sanitizedName}`
@@ -322,16 +352,11 @@ export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): Json
   }
 
   // One property per root: a diagram may hold several unconnected trees, and the document root —
-  // the data structure itself — references each of their tops. Property names are derived from the
-  // (unique) `$defs` keys so two same-named roots cannot collapse into one property.
+  // the data structure itself — references each of their tops.
+  const propertyNames = assignRootPropertyNames(rootElements, classDefKeyById)
   const properties: JsonSchemaObject = {}
-  const usedPropertyNames = new Set<string>()
   for (const root of rootElements) {
-    const defKey = classDefKeyById.get(root.id) as string
-    let propertyName = sanitizeName(root.name) || sanitizeName(defKey) || defKey
-    if (usedPropertyNames.has(propertyName)) propertyName = sanitizeName(defKey) || defKey
-    usedPropertyNames.add(propertyName)
-    properties[propertyName] = { $ref: `#/$defs/${defKey}` }
+    properties[propertyNames.get(root.id) as string] = { $ref: `#/$defs/${classDefKeyById.get(root.id)}` }
   }
   schema.properties = properties
   schema.$defs = buildDefs(elements, diagram, classDefKeyById)

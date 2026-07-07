@@ -805,6 +805,63 @@ describe('exportToJsonSchema', () => {
     ])
   })
 
+  it('disambiguates root property names that sanitize identically', () => {
+    const diagram = baseDiagram({
+      name: 'S',
+      nodes: [
+        cls('a', 'Foo', [{ id: 'a1', name: 'a1' }]),
+        cls('b', 'foo', [{ id: 'a2', name: 'b1' }]),
+      ] as unknown as UMLDiagram['nodes'],
+      edges: [],
+    } as Partial<UMLDiagram>)
+
+    const schema = exportToJsonSchema(diagram)
+    // Both class names sanitize to 'foo'; the second root must not silently overwrite the first.
+    expect(schema.properties).toEqual({ foo: { $ref: '#/$defs/Foo' }, 'foo-2': { $ref: '#/$defs/foo' } })
+  })
+
+  it('references multiple enumerations as root properties instead of inlining one enum', () => {
+    const diagram = baseDiagram({
+      name: 'S',
+      nodes: [
+        {
+          id: 'node-e1',
+          type: 'enumeration',
+          position: { x: 0, y: 0 },
+          data: {
+            element: {
+              id: 'e1',
+              name: 'Status',
+              type: 'enumeration',
+              literals: [{ id: 'l1', name: 'ON' }],
+            },
+            label: 'Status',
+          },
+        },
+        {
+          id: 'node-e2',
+          type: 'enumeration',
+          position: { x: 0, y: 0 },
+          data: {
+            element: {
+              id: 'e2',
+              name: 'Kind',
+              type: 'enumeration',
+              literals: [{ id: 'l2', name: 'A' }],
+            },
+            label: 'Kind',
+          },
+        },
+      ] as unknown as UMLDiagram['nodes'],
+      edges: [],
+    } as Partial<UMLDiagram>)
+
+    const schema = exportToJsonSchema(diagram)
+    expect(schema.properties).toEqual({ status: { $ref: '#/$defs/Status' }, kind: { $ref: '#/$defs/Kind' } })
+    const defs = schema.$defs as Record<string, Record<string, unknown>>
+    expect(defs.Status.enum).toEqual(['ON'])
+  })
+
   it('does not collapse a multi-root diagram onto a diagram-name-matching class', () => {
     const diagram = baseDiagram({
       name: 'beta',

@@ -20,10 +20,9 @@ import type { PortType, TransformNodeData } from '@/components/node-editor/types
 import { buildRegistry } from '@/components/node-editor/types'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import type { DatastructureVersion } from '@/types/datastructures'
 import { buildDataStructureUrn } from '@/utils/urn'
 
-import type { MappingConfig, SchemaTree } from './_types'
+import type { MappingConfig } from './_types'
 import { ARRAY_EDGE_STYLE } from './_types'
 import {
   compileCanvas,
@@ -34,9 +33,8 @@ import {
 } from './compile'
 import { TransformInspector } from './inspector/TransformInspector'
 import { MegaNode } from './nodes/MegaNode'
-import { umlDiagramToSchemaTree } from './schema/adapter'
 import { flattenTree, objectFieldsCompatible, requiredFieldPaths } from './schema/fieldTree'
-import { modelToSchemaTree } from './schema/modelAdapter'
+import { versionToSchemaTree } from './schema/versionTree'
 import { computeStatus } from './status'
 import type { MappingTransformDef } from './transforms'
 import { concatInputPorts, LITERAL_DEFAULT_TYPE, literalOutputPort, mappingRegistry } from './transforms'
@@ -60,25 +58,6 @@ interface MappingEditorModalProps {
 
 const FULLSCREEN =
   'flex h-screen w-screen max-w-none flex-col overflow-hidden rounded-none border-0 p-0 gap-0 top-0 left-0 translate-x-0 translate-y-0 sm:max-w-none'
-
-/**
- * Prefers the persisted JSON-Schema model — the artifact the engine adapters interpret, rooted at
- * the data structure since #1797 — over the UML diagram. The diagram remains the fallback for
- * versions without a model (unsaved drafts) and for structurally broken models.
- */
-const versionToSchemaTree = (
-  version: Pick<DatastructureVersion, 'model' | 'styles'> | undefined,
-  fallbackName: string,
-): SchemaTree => {
-  if (version?.model) {
-    try {
-      return modelToSchemaTree(version.model, fallbackName)
-    } catch (error) {
-      console.warn('mapping editor: model unresolvable, falling back to the diagram-based tree', error)
-    }
-  }
-  return umlDiagramToSchemaTree(version?.styles ?? null, fallbackName)
-}
 
 export const MappingEditorModal = ({
   open,
@@ -126,16 +105,27 @@ export const MappingEditorModal = ({
     isEnabled: open,
   })
 
-  const sourceTree = useMemo(
+  const sourceResolution = useMemo(
     () => versionToSchemaTree(sourceQuery.data?.data, source.name ?? 'source'),
     [sourceQuery.data, source.name],
   )
-  const targetTree = useMemo(
+  const targetResolution = useMemo(
     () => versionToSchemaTree(targetQuery.data?.data, target.name ?? 'target'),
     [targetQuery.data, target.name],
   )
+  const sourceTree = sourceResolution.tree
+  const targetTree = targetResolution.tree
   const sourceFields = useMemo(() => flattenTree(sourceTree), [sourceTree])
   const targetFields = useMemo(() => flattenTree(targetTree), [targetTree])
+
+  // A tree silently derived from the diagram may diverge from the record shape the engine derives
+  // from the broken model — the user must know before drawing mappings against it.
+  useEffect(() => {
+    if (!open) return
+    for (const resolution of [sourceResolution, targetResolution]) {
+      if (resolution.isModelBroken) toast.warning(t('modelUnresolvable', { name: resolution.tree.name }))
+    }
+  }, [open, sourceResolution, targetResolution, t])
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])

@@ -1314,6 +1314,7 @@
     },
     "lines": "{count, plural, one {# Zeile} other {# Zeilen}}",
     "mappingEditor": {
+      "modelUnresolvable": "Das gespeicherte Schema von „{name}\" konnte nicht gelesen werden. Angezeigt wird die Diagrammstruktur — sie kann von der Struktur abweichen, die beim Deployment verwendet wird.",
       "toolbar": {
         "title": "Mapping",
         "status": "{mapped} zugeordnet · {unmapped} nicht zugeordnet"
