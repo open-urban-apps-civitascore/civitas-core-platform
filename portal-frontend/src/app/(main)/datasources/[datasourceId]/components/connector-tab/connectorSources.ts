@@ -98,7 +98,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       // string, not a secret. Credentials belong in the dedicated `user`/`password`
       // fields below, not embedded in the DSN — so it is not declared inputType: 'password'.
       key: 'dsn',
-      type: 'input',
+      type: 'textArea',
       label: { label: 'DSN', labelHint: null },
       placeholder: 'Driver-spezifischer Connection String',
       defaultValue: '',
