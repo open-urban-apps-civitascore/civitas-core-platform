@@ -15,8 +15,9 @@ import java.util.Objects;
 /**
  * The plan-time product of compiling a record mapping against a FROST sink: everything the sink's
  * linear find-or-create chain needs per entity, rendered from the flat capture attributes. A {@code
- * null} body means the entity is lookup-only (its miss routes to the error sink instead of a
- * create); an empty filter means the entity is not part of the mapping at all.
+ * null} Thing/Datastream body means the entity is lookup-only (its miss routes to the error sink
+ * instead of a create); a {@code null} observation body means the mapping writes no observations;
+ * an empty filter means the entity is not part of the mapping at all.
  *
  * <p>The body templates reference the chain's id attributes by the constants below — the compiler
  * renders the references, the sink build wires the processors that populate them.
@@ -50,12 +51,19 @@ public record FrostEntityPlan(
   /**
    * One conjunct of an entity's OData lookup filter: the FROST-side property path (from the closed
    * vocabulary plus a whitelisted key name, e.g. {@code properties/stationRef}) matched against the
-   * value of a flat capture attribute.
+   * value of a flat capture attribute. The path shape is enforced here because it is interpolated
+   * verbatim into a lookup URL — the identifier-per-segment form is the whitelist.
    */
   public record FilterTerm(String frostPath, String flatKey) {
+    private static final java.util.regex.Pattern SAFE_PATH =
+        java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(/[A-Za-z_][A-Za-z0-9_]*)*");
+
     public FilterTerm {
       Objects.requireNonNull(frostPath, "frostPath");
       Objects.requireNonNull(flatKey, "flatKey");
+      if (!SAFE_PATH.matcher(frostPath).matches()) {
+        throw new IllegalArgumentException("unsafe FROST filter path: " + frostPath);
+      }
     }
   }
 
@@ -69,5 +77,24 @@ public record FrostEntityPlan(
     if (observationBody != null && datastreamFilter.isEmpty()) {
       throw new IllegalArgumentException("an observation body requires a datastream to attach to");
     }
+    if (datastreamBody != null && datastreamFilter.isEmpty()) {
+      // The sink gates the whole datastream stage on the filter — a body without one would be
+      // silently dropped instead of deployed.
+      throw new IllegalArgumentException("a datastream body requires a datastream lookup filter");
+    }
+    for (FilterTerm term : concat(thingFilter, datastreamFilter)) {
+      if (!flatKeys.contains(term.flatKey())) {
+        // A term referencing an uncaptured attribute would compile to `eq ''` at flow time and
+        // match the wrong entities instead of failing.
+        throw new IllegalArgumentException(
+            "filter term references uncaptured flat key: " + term.flatKey());
+      }
+    }
+  }
+
+  private static List<FilterTerm> concat(List<FilterTerm> first, List<FilterTerm> second) {
+    List<FilterTerm> all = new java.util.ArrayList<>(first);
+    all.addAll(second);
+    return all;
   }
 }

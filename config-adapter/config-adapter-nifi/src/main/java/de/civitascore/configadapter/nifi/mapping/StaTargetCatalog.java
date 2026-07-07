@@ -193,16 +193,36 @@ public final class StaTargetCatalog {
    * @param path the target path exactly as the mapping editor emits it
    * @param entity the entity the path belongs to
    * @param type the JSON type of the serialized value
-   * @param kind whether the path belongs to the entity's create set
+   * @param kind how the path participates in the entity's rules (fixed catalog entries are {@code
+   *     CREATE} or {@code OPTIONAL}; {@code KEY} targets are synthesized from the schema)
    */
   public record StaTarget(String path, StaEntity entity, StaJsonType type, TargetKind kind) {
 
+    public StaTarget {
+      // A path outside its entity's prefix would silently render under the wrong body anchor.
+      if (!path.startsWith(prefixOf(entity))) {
+        throw new IllegalArgumentException(
+            "target path '" + path + "' does not start with the " + entity + " prefix");
+      }
+    }
+
     /** The path segments below the entity prefix (e.g. {@code unitOfMeasurement.name}). */
     public String relativePath() {
-      StaEntity anchor = entity;
-      // Observation paths nest under the datastream prefix; every other entity is its own anchor.
-      String prefix = "$".equals(anchor.pathPrefix()) ? "$." : anchor.pathPrefix() + ".";
-      return path.substring(prefix.length());
+      return path.substring(prefixOf(entity).length());
+    }
+
+    private static String prefixOf(StaEntity entity) {
+      return "$".equals(entity.pathPrefix()) ? "$." : entity.pathPrefix() + ".";
+    }
+  }
+
+  static {
+    // KEY targets exist only synthesized from a schema — a fixed KEY entry would claim a
+    // reviewable constant is tenant-derived.
+    for (StaTarget target : TARGETS) {
+      if (target.kind() == TargetKind.KEY) {
+        throw new IllegalStateException("the fixed catalog must not contain KEY targets");
+      }
     }
   }
 

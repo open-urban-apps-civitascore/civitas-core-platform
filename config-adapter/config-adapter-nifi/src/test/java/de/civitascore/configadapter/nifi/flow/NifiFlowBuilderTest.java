@@ -709,6 +709,73 @@ class NifiFlowBuilderTest {
   }
 
   @Test
+  void guardsEmptyMatchKeysIntoTheErrorSink() throws Exception {
+    // A record with an empty match-key value must never reach the lookup: the miss route would
+    // CREATE an entity with an empty key that every later bad record silently converges on.
+    JsonNode flow = build(NifiTestFixtures.frostSinkWithMapping());
+    String logId = component(flow, "processors", "LogMessage").get("identifier").asText();
+
+    JsonNode guard = null;
+    for (JsonNode c : flow.get("flowContents").get("processors")) {
+      if (c.path("type").asText().endsWith("RouteOnAttribute")
+          && c.path("properties").has("missing")) {
+        guard = c;
+      }
+    }
+    assertTrue(guard != null, "the mapped chain must contain the match-key guard");
+    assertEquals(
+        "${sta_2_reference:isEmpty():or(${sta_5_reference:isEmpty()})}",
+        guard.get("properties").get("missing").asText(),
+        "the guard must cover every match-key attribute of the plan");
+    assertTrue(
+        hasConnection(flow, guard.get("identifier").asText(), logId, "missing"),
+        "an empty match key must route to the error sink");
+    assertFalse(autoTerminates(guard, "unmatched"), "valid records must continue into the chain");
+  }
+
+  @Test
+  void thingOnlyMappedChainTerminatesWithAutoTerminatedTails() throws Exception {
+    // A metadata-only pipeline ends after the Thing stage. Its terminal relationships must be
+    // auto-terminated: NiFi treats a processor with an unconnected relationship as invalid and
+    // silently skips it on start — the queue in front would stall forever.
+    JsonNode flow = build(NifiTestFixtures.frostSinkWithThingOnlyMapping());
+
+    // Exactly one of the two id extractors is terminal (the re-GET's); its 'matched' must be
+    // auto-terminated while the mid-chain one stays connected.
+    int extractors = 0;
+    int terminalExtractors = 0;
+    JsonNode route = null;
+    for (JsonNode c : flow.get("flowContents").get("processors")) {
+      if (c.path("type").asText().endsWith("EvaluateJsonPath")
+          && c.path("properties").has("frost.thing.id")) {
+        extractors++;
+        if (autoTerminates(c, "matched")) {
+          terminalExtractors++;
+        }
+      }
+      if (c.path("type").asText().endsWith("RouteOnAttribute")
+          && c.path("properties").path("new").asText().contains("frost.thing.id")) {
+        route = c;
+      }
+    }
+    assertEquals(2, extractors, "lookup and re-GET extractors must exist");
+    assertEquals(
+        1,
+        terminalExtractors,
+        "the terminal re-GET extractor's matched relationship must be auto-terminated");
+    assertTrue(route != null, "the Thing route must exist");
+    assertTrue(
+        autoTerminates(route, "unmatched"),
+        "the found route must stay auto-terminated at the chain end");
+    // no observation stage in this flow
+    for (JsonNode c : flow.get("flowContents").get("processors")) {
+      assertFalse(
+          c.path("properties").path("HTTP URL").asText().endsWith("/Observations"),
+          "a thing-only mapping must not post observations");
+    }
+  }
+
+  @Test
   void routesFrostEnvelopeRegionFailuresToLogSink() throws Exception {
     // No silent drop in the rebuild region: staRecordSplit/staCapture/staEnvelope route 'failure'
     // to the error sink.

@@ -9,12 +9,14 @@
  */
 package de.civitascore.configadapter.nifi.flow.stage.sink;
 
+import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.addAutoTerminated;
 import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.removeAutoTerminated;
 import static de.civitascore.configadapter.nifi.flow.stage.BuildContext.setProp;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.dataset.DataStructureSchema;
+import de.civitascore.configadapter.model.dataset.DataStructureSchema.ResolvedDefinition;
 import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.flow.SinkType;
 import de.civitascore.configadapter.nifi.flow.stage.BuildContext;
@@ -28,17 +30,18 @@ import de.civitascore.configadapter.nifi.mapping.FrostEntityPlan;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaKeys;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import de.civitascore.configadapter.nifi.mapping.SinkPreRegionPlan;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * FROST SensorThings sink: a find-or-create sub-flow instead of a single terminal processor,
- * consuming the STA envelope ({@code $.things}/{@code $.observations}) in one of two modes.
- * <b>Passthrough</b> (no mapping): the source must deliver the envelope itself ({@link
- * PayloadForm#STA_ENVELOPE}, MQTT). <b>Envelope rebuild</b> (record mapping present, {@link
- * MappingSupport#ENVELOPE}): any source works — the mapped record's flat fields are rebuilt into
- * the envelope by a generated ReplaceText template before the legs.
+ * FROST SensorThings sink in one of two modes. <b>Passthrough</b> (no mapping): the source must
+ * deliver the STA envelope itself ({@link PayloadForm#STA_ENVELOPE}, MQTT), consumed by two
+ * find-or-create legs ({@code $.things}/{@code $.observations}). <b>Mapped</b> (record mapping
+ * present, {@link MappingSupport#ENVELOPE}): any source works — the compiled {@link
+ * FrostEntityPlan} drives one linear find-or-create chain per record (split → capture → Thing →
+ * Datastream → Observation).
  */
 public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
@@ -75,8 +78,9 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
   @Override
   public Set<PayloadForm> acceptedInputs(boolean mappedUpstream) {
-    // With a mapping, the envelope is rebuilt from the mapped record — any record-convertible
-    // source works (including SQL). Without one, the find-or-create consumes the source's envelope
+    // With a mapping, the entity bodies are rendered from the mapped record's flat fields — any
+    // record-convertible source works (including SQL). Without one, the find-or-create consumes the
+    // source's envelope
     // as-is ($.things/$.observations): a source emitting plain records would never match SplitJson
     // and the flow would silently produce nothing, so passthrough demands the envelope itself.
     return mappedUpstream ? Set.of(PayloadForm.RECORDS) : Set.of(PayloadForm.STA_ENVELOPE);
@@ -97,8 +101,8 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
   @Override
   public MappingSupport mappingSupport() {
-    // Raw-JSON sink, but a mapping is accepted: the compiled flat fields are rebuilt into the
-    // envelope by the pre-region in build(...), driven by the compilation's sink pre-region plan.
+    // Raw-JSON sink, but a mapping is accepted: the compilation's entity plan drives the mapped
+    // find-or-create chain in build(...).
     return MappingSupport.ENVELOPE;
   }
 
@@ -132,8 +136,11 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
    * The match keys of the sink's Thing-shaped target structure ({@code datasinks[].dataStructure},
    * the mapping's target the portal embeds at publish time): per entity class the {@code
    * x-core-primaryKey} attributes, falling back to a declared {@code reference} attribute. Null
-   * when the datasink carries no structure — a passthrough flow needs none; a mapped flow is
-   * rejected later by the compiler, which alone knows a mapping is present.
+   * when the datasink carries no structure — a passthrough flow needs none; the mapping compilation
+   * rejects a mapped flow without keys, since only it knows a mapping is present. A structurally
+   * broken schema (unresolvable root, mis-shaped {@code Datastreams} class) throws {@link
+   * IllegalArgumentException} instead of degrading to "no keys" — the caller turns it into a
+   * payload error; only a legitimately absent {@code Datastreams} property yields empty keys.
    */
   @SuppressWarnings("unchecked")
   private static StaKeys resolveStaKeys(Map<String, Object> datasink) {
@@ -141,18 +148,16 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       return null;
     }
     Map<String, Object> schema = (Map<String, Object>) ds;
-    return new StaKeys(entityKeys(schema, List.of()), entityKeys(schema, List.of("Datastreams")));
+    ResolvedDefinition thing = DataStructureSchema.resolveDefinitionAt(schema, List.of());
+    List<String> datastreamKeys =
+        thing.properties().containsKey("Datastreams")
+            ? entityKeys(schema, List.of("Datastreams"))
+            : List.of();
+    return new StaKeys(entityKeys(schema, List.of()), datastreamKeys);
   }
 
   private static List<String> entityKeys(Map<String, Object> schema, List<String> path) {
-    List<String> marked;
-    try {
-      marked = DataStructureSchema.primaryKeyColumnsAt(schema, path);
-    } catch (IllegalArgumentException absent) {
-      // No class at this path (e.g. a Thing-only structure without Datastreams) — the compiler
-      // rejects a mapping that touches the entity anyway.
-      return List.of();
-    }
+    List<String> marked = DataStructureSchema.primaryKeyColumnsAt(schema, path);
     if (!marked.isEmpty()) {
       return marked;
     }
@@ -182,8 +187,9 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
   }
 
   /**
-   * Builds the FROST find-or-create sub-flow, replacing a single {@code POST /Observations}. The
-   * STA envelope is processed in two independent legs cloned from the source:
+   * Builds the FROST sub-flow. A mapped flow (entity plan present) becomes the linear
+   * find-or-create chain of {@link #buildMappedChain}. A passthrough flow processes the source's
+   * STA envelope in two independent legs:
    *
    * <ul>
    *   <li><b>Things</b> ({@code $.things}): look up by {@code properties/reference}; POST only when
@@ -191,14 +197,14 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
    *   <li><b>Observations</b> ({@code $.observations}): look up the Datastream by {@code
    *       properties/reference} + {@code name}; if found, merge its {@code @iot.id} into the
    *       observation and POST {@code /Observations}; if not found, route to the error sink (the
-   *       Datastream must exist — the pipeline does not create it).
+   *       Datastream must exist — the passthrough flow does not create it).
    * </ul>
    *
-   * <p>Each leg captures the body into an attribute before the lookup GET (which overwrites the
-   * content) and restores it before the write. <b>Every</b> failure relationship — split/extract
-   * {@code failure}, the restore/inject {@code failure}, and the GET/POST {@code Failure/Retry/No
-   * Retry} — routes to the shared error (log) sink, so a malformed envelope, unparseable lookup
-   * response, or failed write is logged, never silently dropped.
+   * <p>Each passthrough leg captures the body into an attribute before the lookup GET (which
+   * overwrites the content) and restores it before the write. In both modes <b>every</b> failure
+   * relationship — split/extract {@code failure}, the restore/inject {@code failure}, and the
+   * GET/POST {@code Failure/Retry/No Retry} — routes to the shared error (log) sink, so a malformed
+   * payload, unparseable lookup response, or failed write is logged, never silently dropped.
    */
   @Override
   public void build(
@@ -240,7 +246,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
             AdapterErrorCode.NIFI_TEMPLATE_ERROR,
             "a record mapping was compiled for a raw-JSON sink but no entity plan was built");
       }
-      // Passthrough: the source delivers the STA envelope itself; this path stays byte-identical.
+      // Passthrough: the source delivers the STA envelope itself; the legs consume it unchanged.
       String thingBase = base + "/Projects(" + projectId + ")";
       buildThingLeg(ctx, thingBase, upstreamTail, errorSink);
       buildObservationLeg(ctx, base, projectId, upstreamTail, errorSink);
@@ -284,10 +290,21 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     for (String key : plan.flatKeys()) {
       setProp(capture, key, "$." + key);
     }
+    // A record whose match-key value is missing/empty must not enter the chain: the lookup
+    // filter would match nothing, the miss route would CREATE an entity with an empty key, and
+    // every later empty-keyed record would silently converge on that garbage entity. Guard once
+    // over all match keys and route offenders to the error sink.
+    Processor keyGuard = ctx.loadProcessor(Fragment.ROUTE_ON_ATTRIBUTE, "unmatched", "staKeyGuard");
+    setProp(keyGuard, "missing", emptyKeyCondition(plan));
+    removeAutoTerminated(keyGuard, "unmatched");
+
     ctx.addProcessor(split);
     ctx.addProcessor(capture);
+    ctx.addProcessor(keyGuard);
     ctx.addChainConnection(upstreamTail, split);
     ctx.addChainConnection(split, capture);
+    ctx.addChainConnection(capture, keyGuard);
+    ctx.addConnection(keyGuard, errorSink, "missing");
     // A record that fails to split or capture must be logged, never dropped silently.
     ctx.routeFailure(split, errorSink);
     ctx.routeFailure(capture, errorSink);
@@ -301,7 +318,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
             FrostEntityPlan.THING_ID_ATTRIBUTE,
             plan.thingBody(),
             thingBase + "/Things",
-            List.of(new Tail(capture, "matched")),
+            List.of(new Tail(keyGuard, "unmatched")),
             errorSink);
 
     if (!plan.datastreamFilter().isEmpty()) {
@@ -333,9 +350,30 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       ctx.addChainConnection(renderBody, post);
       ctx.routeFailure(renderBody, errorSink);
       routeHttpFailures(ctx, post, errorSink);
+      return;
     }
-    // Without an observation body the chain ends after the last entity stage; the tails'
-    // relationships stay auto-terminated — the metadata is ensured, nothing more to write.
+    // Without an observation the chain ends here — the metadata is ensured, nothing more to
+    // write. The tails must be auto-terminated explicitly: the re-GET extractor's 'matched' is
+    // not auto-terminated by its fragment, and an unconnected relationship leaves the processor
+    // invalid — NiFi silently skips invalid processors and the queue in front stalls forever.
+    for (Tail tail : tails) {
+      addAutoTerminated(tail.processor(), tail.relationship());
+    }
+  }
+
+  /**
+   * The RouteOnAttribute condition matching a record with at least one empty match-key attribute
+   * (EvaluateJsonPath represents a missing/null field as an empty attribute).
+   */
+  private String emptyKeyCondition(FrostEntityPlan plan) {
+    List<FrostEntityPlan.FilterTerm> terms = new ArrayList<>(plan.thingFilter());
+    terms.addAll(plan.datastreamFilter());
+    StringBuilder condition =
+        new StringBuilder("${").append(terms.get(0).flatKey()).append(":isEmpty()");
+    for (FrostEntityPlan.FilterTerm term : terms.subList(1, terms.size())) {
+      condition.append(":or(${").append(term.flatKey()).append(":isEmpty()})");
+    }
+    return condition.append('}').toString();
   }
 
   /**

@@ -11,8 +11,8 @@ package de.civitascore.configadapter.nifi.flow.stage;
 
 /**
  * How a sink supports a record mapping in front of it. A boolean cannot distinguish "accepts a
- * mapping" from "accepts a mapping but needs the flat-compiled fields rebuilt into its raw-JSON
- * envelope", so the third operating mode is explicit instead of encoded in {@link
+ * mapping" from "accepts a mapping but consumes the flat-compiled fields through its own sink-owned
+ * region", so the third operating mode is explicit instead of encoded in {@link
  * SinkStage#acceptedInputs} special cases.
  */
 public enum MappingSupport {
@@ -21,8 +21,8 @@ public enum MappingSupport {
   /** The compiled RecordPath mapping writes the sink's record shape directly (records sink). */
   RECORD_PATH,
   /**
-   * The mapping compiles to flat intermediate fields that are rebuilt into the sink's raw-JSON
-   * envelope by a sink-owned pre-region (template rebuild).
+   * The mapping compiles to flat intermediate fields a sink-owned region consumes through generated
+   * templates (the FROST entity plan).
    */
   ENVELOPE
 }

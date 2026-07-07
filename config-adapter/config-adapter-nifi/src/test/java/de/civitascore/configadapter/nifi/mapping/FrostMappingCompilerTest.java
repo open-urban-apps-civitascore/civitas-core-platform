@@ -246,6 +246,63 @@ class FrostMappingCompilerTest {
   }
 
   @Test
+  void compositeMatchKeysProduceOrderedFilterTermsAndProperties() throws Exception {
+    StaKeys composite = new StaKeys(List.of("tenant", "station"), List.of());
+    FrostCompilation compilation =
+        compiler.compile(
+            mapping(
+                "$.tenant", new CopyNode("$.t"),
+                "$.station", new CopyNode("$.s"),
+                "$.name", new CopyNode("$.n"),
+                "$.description", new CopyNode("$.d")),
+            composite);
+
+    assertEquals(
+        List.of(
+            new FilterTerm("properties/tenant", "sta_0_tenant"),
+            new FilterTerm("properties/station", "sta_1_station")),
+        compilation.plan().thingFilter());
+    assertTrue(
+        compilation
+            .plan()
+            .thingBody()
+            .contains(
+                "\"properties\":{\"tenant\":\"${sta_0_tenant:escapeJson()}\","
+                    + "\"station\":\"${sta_1_station:escapeJson()}\"}"));
+  }
+
+  @Test
+  void namesEveryMissingCompositeKey() {
+    StaKeys composite = new StaKeys(List.of("tenant", "station"), List.of());
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(mapping("$.name", new CopyNode("$.n")), composite));
+    assertTrue(ex.getMessage().contains("$.tenant, $.station"));
+  }
+
+  @Test
+  void rejectsAMatchKeyNamedLikeAStandardStaField() {
+    // 'name' as {id} would make $.name mean both the STA field and the properties-bag key.
+    StaKeys reserved = new StaKeys(List.of("name"), List.of());
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(mapping("$.name", new CopyNode("$.n")), reserved));
+    assertTrue(ex.getMessage().contains("collides with a standard SensorThings field"));
+  }
+
+  @Test
+  void rejectsAMatchKeyNamedLikeANestedStaContainer() {
+    StaKeys reserved = new StaKeys(List.of("reference"), List.of("Sensor"));
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(lookupOnlyWithObservationMapping(), reserved));
+    assertTrue(ex.getMessage().contains("collides with a standard SensorThings field"));
+  }
+
+  @Test
   void rejectsAnUnsafeKeyName() {
     StaKeys unsafe = new StaKeys(List.of("ref' or true"), List.of());
     FatalAdapterException ex =

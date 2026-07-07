@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.model.dataset;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -44,7 +45,14 @@ public final class DataStructureSchema {
   private DataStructureSchema() {}
 
   /** The merged {@code properties} (column name → spec) and unioned {@code required} of a table. */
-  public record ResolvedDefinition(Map<String, Object> properties, Set<String> required) {}
+  public record ResolvedDefinition(Map<String, Object> properties, Set<String> required) {
+    public ResolvedDefinition {
+      // Order-preserving unmodifiable views — declaration order drives column and key order, so
+      // Map.copyOf (unspecified iteration order) is not an option.
+      properties = Collections.unmodifiableMap(new LinkedHashMap<>(properties));
+      required = Collections.unmodifiableSet(new LinkedHashSet<>(required));
+    }
+  }
 
   /**
    * Resolves the table definition into merged properties/required, following {@code allOf}

@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -34,12 +35,14 @@ import java.util.stream.Collectors;
  *
  * <p>Validation is mandatory here, not left to the runtime error sink: the saga/API path bypasses
  * the editor's validation, and a mapping missing a match key would deploy a flow that routes every
- * message to the error sink — an invisible permanent failure instead of a clear plan error. Each
- * entity follows two rules: its <b>match key</b> paths (from {@code x-core-primaryKey}, fallback
- * {@code reference}) must be mapped once the entity is touched at all, and its fixed <b>create
- * set</b> is all-or-nothing — all present makes the entity creatable (miss → POST), none present
- * leaves it lookup-only (miss → error sink). Runtime <em>data</em> errors (empty key value,
- * malformed date) intentionally stay error-sink territory.
+ * message to the error sink — an invisible permanent failure instead of a clear plan error. Thing
+ * and Datastream follow two rules: the <b>match key</b> paths (from {@code x-core-primaryKey},
+ * fallback {@code reference}) must be mapped — the Thing's always, the Datastream's once any
+ * Datastream/Observation path is touched — and the fixed <b>create set</b> is all-or-nothing: all
+ * present makes the entity creatable (miss → POST), none present leaves it lookup-only (miss →
+ * error sink). Locations and Observations are create-only (Thing deep insert / append). Runtime
+ * <em>data</em> errors (a malformed date, a wrong type) stay error-sink territory; the deployed
+ * chain guards empty match-key values into the error sink before any lookup.
  *
  * <p>Everything emitted is byte-deterministic: template keys follow the catalog order, flat keys
  * and capture properties follow the mapping's insertion order — never map iteration of unspecified
@@ -69,8 +72,8 @@ public class FrostMappingCompiler {
    */
   public record StaKeys(List<String> thingKeys, List<String> datastreamKeys) {
     public StaKeys {
-      thingKeys = List.copyOf(thingKeys);
-      datastreamKeys = List.copyOf(datastreamKeys);
+      thingKeys = List.copyOf(Objects.requireNonNull(thingKeys, "thingKeys"));
+      datastreamKeys = List.copyOf(Objects.requireNonNull(datastreamKeys, "datastreamKeys"));
     }
   }
 
@@ -155,9 +158,11 @@ public class FrostMappingCompiler {
   private void validateKeyNames(StaKeys keys) throws FatalAdapterException {
     for (String key : keys.thingKeys()) {
       requireSafeKeyName(key, "Thing");
+      requireUnreservedKeyName(key, StaEntity.THING);
     }
     for (String key : keys.datastreamKeys()) {
       requireSafeKeyName(key, "Datastream");
+      requireUnreservedKeyName(key, StaEntity.DATASTREAM);
     }
     if (keys.thingKeys().isEmpty()) {
       throw reject(
@@ -171,6 +176,26 @@ public class FrostMappingCompiler {
       // The key name is tenant-modelled and ends up in $filter expressions and template keys —
       // anything outside the identifier whitelist is rejected, never escaped.
       throw reject("the " + entity + " match-key attribute '" + key + "' is not a safe identifier");
+    }
+  }
+
+  /**
+   * A match key named like a fixed catalog field ({@code name}, {@code Sensor}, …) would make one
+   * mapping path mean two things — the standard SensorThings field and the {@code properties}-bag
+   * key — so it is rejected rather than resolved by precedence.
+   */
+  private void requireUnreservedKeyName(String key, StaEntity entity) throws FatalAdapterException {
+    boolean reserved =
+        StaTargetCatalog.byPath(StaTargetCatalog.keyPath(entity, key)).isPresent()
+            || StaTargetCatalog.targetsOf(entity).stream()
+                .anyMatch(target -> target.relativePath().split("\\.")[0].equals(key));
+    if (reserved) {
+      throw reject(
+          "the match-key attribute '"
+              + key
+              + "' collides with a standard SensorThings field of "
+              + entity.name().toLowerCase(Locale.ROOT)
+              + "; rename the identifying attribute");
     }
   }
 
@@ -463,9 +488,9 @@ public class FrostMappingCompiler {
    * empty attribute, so non-string and optional placeholders fall back to a JSON {@code null} via
    * {@code isEmpty():ifElse(...)} — an unquoted empty value would be invalid JSON, and {@code null}
    * is the correct semantics (absent data is not an error). Required strings stay plain: an empty
-   * string is valid JSON and the mapping's data-quality responsibility; an empty lookup key runs
-   * controlled into {@code unmatched} → error sink. {@code RAW_JSON} embeds the flat value verbatim
-   * (a GeoJSON object rendered as a string by the record chain).
+   * string is valid JSON and the mapping's data-quality responsibility; an empty match-key value is
+   * caught by the chain's key guard before any lookup. {@code RAW_JSON} embeds the flat value
+   * verbatim (a GeoJSON object rendered as a string by the record chain).
    */
   private String placeholder(StaTarget target, String flatKey, ValueNode node) {
     if (target.type() == StaJsonType.RAW_JSON) {

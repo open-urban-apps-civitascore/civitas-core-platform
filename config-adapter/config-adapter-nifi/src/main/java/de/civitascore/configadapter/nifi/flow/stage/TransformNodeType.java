@@ -46,9 +46,9 @@ public interface TransformNodeType {
    * The compiled units of one kind, aligned 1:1 with the nodes passed to {@link #compile}.
    *
    * @param units the chain units, one per node, in flow order
-   * @param sinkPreRegion the handoff to the sink's build region, or {@code null}. Today: the STA
-   *     envelope rebuild plan a mapped FROST flow needs — compiled from the last mapping, so the
-   *     mapping kind produces it and the spec carries it to the sink, which validates it.
+   * @param sinkPreRegion the handoff to the sink's build region, or {@code null}. Today: the FROST
+   *     entity plan a mapped FROST flow needs — compiled from the last mapping, so the mapping kind
+   *     produces it and the spec carries it to the sink, which validates it.
    */
   record Compilation(List<CompiledTransform> units, SinkPreRegionPlan sinkPreRegion) {
     public Compilation {

@@ -460,6 +460,34 @@ public final class NifiTestFixtures {
    * compiler output. Lookup-only datastream (no create set) with an observation — the
    * pre-existing-datastream shape.
    */
+  /**
+   * A metadata-only mapped MQTT→FROST flow: a creatable Thing and nothing else — the chain must
+   * terminate cleanly after the Thing stage (no observation POST follows).
+   */
+  static FlowBuildSpec frostSinkWithThingOnlyMapping() throws Exception {
+    Map<String, ValueNode> fields = new LinkedHashMap<>();
+    fields.put("$.reference", new ValueNode.CopyNode("$.ref"));
+    fields.put("$.name", new ValueNode.CopyNode("$.station"));
+    fields.put("$.description", new ValueNode.ConstNode("registered station", null));
+    FrostMappingCompiler.FrostCompilation compilation =
+        new FrostMappingCompiler(new RecordPathCompiler())
+            .compile(new MappingConfig(null, null, fields), STA_KEYS);
+    return new FlowBuildSpec(
+        "pipeline-frost-thing-only",
+        SourceType.MQTT,
+        Map.of("Broker URI", "tcp://mosquitto:1883", "Topic Filter", "sensors/+/meta"),
+        SinkType.FROST,
+        Map.of(
+            FrostSinkStage.FROST_BASE_URL,
+            "http://frost:8080/FROST-Server/v1.1",
+            FrostSinkStage.FROST_PROJECT_ID,
+            "7"),
+        compiled(compilation.flatProperties()),
+        Map.of(),
+        null,
+        compilation.plan());
+  }
+
   static FlowBuildSpec frostSinkWithMapping() throws Exception {
     Map<String, ValueNode> fields = new LinkedHashMap<>();
     fields.put("$.name", new ValueNode.CopyNode("$.station"));
