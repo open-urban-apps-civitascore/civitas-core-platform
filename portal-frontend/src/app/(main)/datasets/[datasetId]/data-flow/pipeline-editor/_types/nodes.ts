@@ -1,4 +1,5 @@
 import { type MappingConfig } from '../_components/mapping-editor/_types'
+import type { StaMatchKeys } from '../_constants/staTargetCatalog'
 import { PIPELINE_NODE_TYPES } from './pipeline'
 
 // ============================================================================
@@ -161,6 +162,12 @@ export interface MappingNodeData extends BasePipelineNodeData {
    * re-fetching the target schema. {@code undefined} on legacy nodes saved before this existed.
    */
   targetRequiredFields?: string[]
+  /**
+   * Snapshot of the target structure's effective FROST match keys at mapping-save time (from the
+   * {@code x-core-primaryKey} marker, fallback {@code reference}). Only consumed when this mapping
+   * feeds a FROST sink; {@code undefined} on legacy nodes saved before this existed.
+   */
+  staMatchKeys?: StaMatchKeys
 }
 
 // ============================================================================

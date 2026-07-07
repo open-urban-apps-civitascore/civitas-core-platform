@@ -13,7 +13,7 @@
 import { DATASINK_TYPES, type DataSinkPayload } from '@/types/datasinks'
 
 import type { DataSourceNodeData } from '../_types/nodes'
-import { isDataSourceNodeData, isFrostNodeData, isGeoPersistenceNodeData } from '../_types/nodes'
+import { isDataSourceNodeData, isFrostNodeData, isGeoPersistenceNodeData, isMappingNodeData } from '../_types/nodes'
 import type { Pipeline, PipelinePayload, PipelineStylesPayload } from '../_types/pipeline'
 
 /**
@@ -97,6 +97,9 @@ export const buildDataSinkPayloads = (pipeline: Pipeline): DataSinkNodePayload[]
       ]
     }
     if (isFrostNodeData(node.data)) {
+      // The deploy engine derives the FROST match keys from the mapping's Thing-shaped target
+      // structure, so the sink references it; a passthrough pipeline (no mapping) sends none.
+      const targetVersionId = mappingTargetVersionBefore(pipeline, node.id)
       return [
         {
           nodeId: node.id,
@@ -104,13 +107,41 @@ export const buildDataSinkPayloads = (pipeline: Pipeline): DataSinkNodePayload[]
           payload: {
             id: node.data.entityId ?? null,
             dataSinkType: DATASINK_TYPES.FROST,
-            configuration: {} as Record<string, never>,
+            configuration: targetVersionId ? { dataStructureVersionId: targetVersionId } : {},
           },
         },
       ]
     }
     return []
   })
+}
+
+/**
+ * The target datastructure version of the last mapping feeding the given sink node, found by
+ * walking the wiring backwards and stopping at the first mapping per path — the same walk the
+ * validation uses to identify the STA-carrying mapping.
+ */
+const mappingTargetVersionBefore = (pipeline: Pipeline, sinkNodeId: string): string | null => {
+  const incoming = new Map<string, string[]>()
+  pipeline.edges.forEach(edge => {
+    incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source])
+  })
+  const nodesById = new Map(pipeline.nodes.map(node => [node.id, node]))
+
+  const queue = [sinkNodeId]
+  const visited = new Set(queue)
+  while (queue.length > 0) {
+    for (const previous of incoming.get(queue.shift() as string) ?? []) {
+      if (visited.has(previous)) continue
+      visited.add(previous)
+      const node = nodesById.get(previous)
+      if (node && isMappingNodeData(node.data)) {
+        return node.data.targetVersionId ?? null
+      }
+      queue.push(previous)
+    }
+  }
+  return null
 }
 
 /**

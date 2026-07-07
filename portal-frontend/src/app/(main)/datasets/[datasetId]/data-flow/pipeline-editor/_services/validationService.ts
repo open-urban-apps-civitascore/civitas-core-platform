@@ -7,7 +7,7 @@
  */
 
 import { isFormAccepted, NODE_FLOW_DECLARATIONS, type NodeFlowDeclaration } from '../_config/nodeFlow'
-import { STA_ALLOWED_TARGET_PATHS, STA_GROUPS } from '../_constants/staTargetCatalog'
+import { STA_ENTITIES, STA_FIXED_TARGET_PATHS, type StaEntity } from '../_constants/staTargetCatalog'
 import { isCronNodeData, isDataSourceNodeData, isGeoPersistenceNodeData, isMappingNodeData } from '../_types/nodes'
 import { type Pipeline, PIPELINE_NODE_TYPES, type PipelineNode } from '../_types/pipeline'
 
@@ -446,64 +446,145 @@ const lastMappingsBeforeFrostSinks = (pipeline: Pick<Pipeline, 'nodes' | 'edges'
 }
 
 /**
- * Rule: the last mapping before a FROST sink targets the STA-shaped datastructure, whose
- * required-ness is conditional per group — once a group ($.things[] / $.observations[]) is mapped
- * at all, its required paths (most importantly the find-or-create lookup keys) must all be
- * assigned, and at least one group must be mapped. The unconditional `targetRequiredFields`
- * snapshot cannot express this (it stays empty for STA targets), so this rule owns it — mirroring
- * the adapter's server-side StaEnvelopeCompiler validation, which compiles exactly this final
- * mapping and would otherwise fail the deploy saga. Earlier mappings of a chain are ordinary
- * record transformations covered by the required-target-fields rule.
+ * Rule: the last mapping before a FROST sink targets a Thing-shaped datastructure with
+ * record-anchored catalog paths. Mirrors the deploy engine's FrostMappingCompiler validation —
+ * which compiles exactly this final mapping and would otherwise fail the deploy saga: only catalog
+ * (or match-key) paths may be assigned, the Thing's match keys are always required, each entity's
+ * create set is all-or-nothing (all mapped = creatable, none = lookup-only), a Location needs a
+ * creatable Thing (it is created only via the Thing's deep insert), a touched Datastream needs its
+ * match keys, and a touched Observation needs `result`. The match keys are the target structure's
+ * `{id}`-marked attributes (fallback `reference`), snapshotted on the node at mapping-save time
+ * ({@code staMatchKeys}) — the unconditional `targetRequiredFields` snapshot cannot express this.
+ * Earlier mappings of a chain are ordinary record transformations covered by the
+ * required-target-fields rule.
  */
 const validateFrostMappingCoversStaGroups: ValidationRule = {
   id: 'frost-mapping-sta-group-coverage',
-  name: 'FROST Mapping Covers STA Groups',
-  description: 'The last mapping before a FROST sink must cover the required paths of every STA group it touches',
+  name: 'FROST Mapping Covers STA Entities',
+  description: 'The last mapping before a FROST sink must satisfy the FROST catalog rules',
   validate: (pipeline: Pipeline) => {
     const errors: PipelineValidationError[] = []
+    const warnings: PipelineValidationWarning[] = []
     const staMappingIds = lastMappingsBeforeFrostSinks(pipeline)
 
     pipeline.nodes.forEach(node => {
       if (!isMappingNodeData(node.data)) return
-      // a not-yet-configured/saved node is reported by other rules; avoid double errors
-      if (!node.data.configured || node.data.targetRequiredFields === undefined) return
+      // a not-yet-configured node is reported by validateNodeConfiguration; avoid a double error
+      if (!node.data.configured) return
       if (!staMappingIds.has(node.id)) return
       const label = node.data.label || node.type
 
-      const assigned = Object.entries(node.data.mappingConfig?.fields ?? {})
-        .filter(([, value]) => isNonEmptyMappingValue(value))
-        .map(([key]) => key)
-
-      // The engine's envelope compiler accepts exactly the catalog paths and fails the deploy
-      // saga for anything else — surface that here instead of letting it pass edit-time.
-      assigned
-        .filter(path => !STA_ALLOWED_TARGET_PATHS.has(path))
-        .forEach(path => {
-          errors.push(errorAt(node, 'validation.messages.frostMappingUnknownStaTarget', { label, path }))
-        })
-
-      const touchedGroups = STA_GROUPS.filter(group =>
-        assigned.some(path => path === group.arrayPath || path.startsWith(group.pathPrefix)),
-      )
-      if (touchedGroups.length === 0) {
-        errors.push(errorAt(node, 'validation.messages.frostMappingNoStaElement', { label }))
+      const keys = node.data.staMatchKeys
+      if (node.data.targetRequiredFields === undefined || keys === undefined) {
+        // Never actually saved (or saved before the match-key snapshot existed) — the generic
+        // required-fields rule deliberately skips FROST-final mappings, so this rule must report
+        // the unsaved state itself.
+        errors.push(errorAt(node, 'validation.messages.mappingNotSaved', { label }))
         return
       }
 
-      touchedGroups.forEach(group => {
-        const missing = group.requiredPaths.filter(path => !assigned.includes(path))
-        if (missing.length === 0) return
+      const assigned = new Set(
+        Object.entries(node.data.mappingConfig?.fields ?? {})
+          .filter(([, value]) => isNonEmptyMappingValue(value))
+          .map(([key]) => key),
+      )
+      const allowed = new Set([...STA_FIXED_TARGET_PATHS, ...keys.thing, ...keys.datastream])
+      const entity = (key: StaEntity['key']): StaEntity =>
+        STA_ENTITIES.find(candidate => candidate.key === key) as StaEntity
+
+      // The engine accepts exactly the catalog + match-key paths and fails the deploy saga for
+      // anything else — surface that here instead of letting it pass edit-time.
+      for (const path of assigned) {
+        if (!allowed.has(path)) {
+          errors.push(errorAt(node, 'validation.messages.frostMappingUnknownStaTarget', { label, path }))
+        }
+      }
+
+      const allAssigned = (paths: readonly string[]) => paths.every(path => assigned.has(path))
+      const anyAssigned = (paths: readonly string[]) => paths.some(path => assigned.has(path))
+      const missingOf = (paths: readonly string[]) => paths.filter(path => !assigned.has(path)).join(', ')
+
+      const requireCompleteCreateSet = (candidate: StaEntity) => {
+        if (anyAssigned(candidate.createPaths) && !allAssigned(candidate.createPaths)) {
+          errors.push(
+            errorAt(node, 'validation.messages.frostMappingCreateSetIncomplete', {
+              label,
+              entity: candidate.key,
+              fields: missingOf(candidate.createPaths),
+            }),
+          )
+        }
+      }
+
+      // Thing: the match keys are the find-or-create identity — always required.
+      if (keys.thing.length === 0) {
         errors.push(
-          errorAt(node, 'validation.messages.frostMappingGroupIncomplete', {
+          errorAt(node, 'validation.messages.frostMappingNoMatchKeyInStructure', {
             label,
-            group: group.arrayPath,
-            fields: missing.join(', '),
+            entity: 'thing',
           }),
         )
-      })
+      } else if (!allAssigned(keys.thing)) {
+        errors.push(
+          errorAt(node, 'validation.messages.frostMappingMissingMatchKeys', {
+            label,
+            entity: 'thing',
+            fields: missingOf(keys.thing),
+          }),
+        )
+      }
+      requireCompleteCreateSet(entity('thing'))
+
+      const isThingCreatable = allAssigned(entity('thing').createPaths)
+      if (anyAssigned([...entity('location').createPaths, ...entity('location').optionalPaths])) {
+        if (!isThingCreatable) {
+          errors.push(errorAt(node, 'validation.messages.frostMappingLocationNeedsCreatableThing', { label }))
+        }
+        requireCompleteCreateSet(entity('location'))
+      }
+
+      const isDatastreamTouched = [...assigned].some(path => path.startsWith('$.Datastreams['))
+      if (isDatastreamTouched) {
+        if (keys.datastream.length === 0) {
+          errors.push(
+            errorAt(node, 'validation.messages.frostMappingNoMatchKeyInStructure', {
+              label,
+              entity: 'datastream',
+            }),
+          )
+        } else if (!allAssigned(keys.datastream)) {
+          errors.push(
+            errorAt(node, 'validation.messages.frostMappingMissingMatchKeys', {
+              label,
+              entity: 'datastream',
+              fields: missingOf(keys.datastream),
+            }),
+          )
+        }
+        requireCompleteCreateSet(entity('datastream'))
+      }
+
+      const observation = entity('observation')
+      if (
+        anyAssigned([...observation.createPaths, ...observation.optionalPaths]) &&
+        !allAssigned(observation.createPaths)
+      ) {
+        errors.push(errorAt(node, 'validation.messages.frostMappingObservationNeedsResult', { label }))
+      }
+
+      if (keys.isFallback && keys.thing.length > 0) {
+        warnings.push({
+          id: crypto.randomUUID(),
+          type: 'node',
+          elementId: node.id,
+          messageKey: 'validation.messages.frostMappingFallbackMatchKey',
+          messageParams: { label },
+          severity: 'warning',
+        })
+      }
     })
 
-    return { errors, warnings: [] }
+    return { errors, warnings }
   },
 }
 
@@ -883,11 +964,16 @@ const validateMappingCoversRequiredTargetFields: ValidationRule = {
   description: 'A mapping must assign every required target field',
   validate: (pipeline: Pipeline) => {
     const errors: PipelineValidationError[] = []
+    const staMappingIds = lastMappingsBeforeFrostSinks(pipeline)
 
     pipeline.nodes.forEach(node => {
       if (!isMappingNodeData(node.data)) return
       // a not-yet-configured node is reported by validateNodeConfiguration; avoid a double error
       if (!node.data.configured) return
+      // The last mapping before a FROST sink follows the catalog's conditional requiredness
+      // (lookup-only vs creatable) — the unconditional snapshot would wrongly force the create
+      // fields of a lookup-only entity. validateFrostMappingCoversStaGroups owns that node.
+      if (staMappingIds.has(node.id)) return
       const required = node.data.targetRequiredFields
 
       if (required === undefined) {

@@ -23,6 +23,8 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { rootFailureMessage } from '@/components/uml-modeler/services/rootFailureMessage'
 import { buildDataStructureUrn } from '@/utils/urn'
 
+import type { StaMatchKeys } from '../../_constants/staTargetCatalog'
+import { deriveStaMatchKeys } from '../../_constants/staTargetCatalog'
 import type { MappingConfig } from './_types'
 import { ARRAY_EDGE_STYLE } from './_types'
 import {
@@ -54,7 +56,7 @@ interface MappingEditorModalProps {
   source: SchemaRef
   target: SchemaRef
   config: MappingConfig
-  onSave: (config: MappingConfig, targetRequiredFields: string[]) => void
+  onSave: (config: MappingConfig, targetRequiredFields: string[], staMatchKeys: StaMatchKeys) => void
 }
 
 const FULLSCREEN =
@@ -358,6 +360,7 @@ export const MappingEditorModal = ({
         positions,
       },
       requiredFieldPaths(targetTree),
+      deriveStaMatchKeys(targetTree),
     )
   }
 

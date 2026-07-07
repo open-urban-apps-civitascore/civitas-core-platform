@@ -36,7 +36,8 @@ export type PostgisDataSinkPayload = {
 export type FrostDataSinkPayload = {
   id: string | null
   dataSinkType: typeof DATASINK_TYPES.FROST
-  configuration: Record<string, never>
+  /** Empty for passthrough; a mapped pipeline references its final mapping's target structure. */
+  configuration: { dataStructureVersionId?: string }
 }
 
 export type DataSinkPayload = PostgisDataSinkPayload | FrostDataSinkPayload
