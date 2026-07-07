@@ -206,6 +206,17 @@ public class FrostMappingCompiler {
     if (mapping.fields().isEmpty()) {
       throw reject("a FROST mapping must map at least the Thing's match key");
     }
+    validateFieldEntries(mapping, targetsByPath);
+
+    requireKeys(mapping, keys.thingKeys(), StaEntity.THING);
+    requireCompleteCreateSet(mapping, StaEntity.THING);
+    validateLocation(mapping);
+    validateDatastream(mapping, keys);
+    validateObservation(mapping);
+  }
+
+  private void validateFieldEntries(MappingConfig mapping, Map<String, StaTarget> targetsByPath)
+      throws FatalAdapterException {
     for (Map.Entry<String, ValueNode> field : mapping.fields().entrySet()) {
       if (!targetsByPath.containsKey(field.getKey())) {
         throw reject(
@@ -222,37 +233,42 @@ public class FrostMappingCompiler {
             "a FROST mapping does not accept a null constant; omit the target field instead");
       }
     }
+  }
 
-    requireKeys(mapping, keys.thingKeys(), StaEntity.THING);
-    requireCompleteCreateSet(mapping, StaEntity.THING);
-
-    if (touches(mapping, StaEntity.LOCATION)) {
-      if (!hasCompleteCreateSet(mapping, StaEntity.THING)) {
-        throw reject(
-            "mapping a Location requires a creatable Thing (map "
-                + createSetOf(StaEntity.THING)
-                + ") — Locations are created only via the Thing's deep insert");
-      }
-      requireCompleteCreateSet(mapping, StaEntity.LOCATION);
+  private void validateLocation(MappingConfig mapping) throws FatalAdapterException {
+    if (!touches(mapping, StaEntity.LOCATION)) {
+      return;
     }
-
-    boolean datastreamTouched =
-        touches(mapping, StaEntity.DATASTREAM) || touches(mapping, StaEntity.OBSERVATION);
-    if (datastreamTouched) {
-      if (keys.datastreamKeys().isEmpty()) {
-        throw reject(
-            "the FROST target structure declares no match key on its Datastream class; mark the"
-                + " identifying attribute with the UML {id} flag or add a 'reference' attribute");
-      }
-      requireKeys(mapping, keys.datastreamKeys(), StaEntity.DATASTREAM);
-      requireCompleteCreateSet(mapping, StaEntity.DATASTREAM);
+    if (!hasCompleteCreateSet(mapping, StaEntity.THING)) {
+      throw reject(
+          "mapping a Location requires a creatable Thing (map "
+              + createSetOf(StaEntity.THING)
+              + ") — Locations are created only via the Thing's deep insert");
     }
+    requireCompleteCreateSet(mapping, StaEntity.LOCATION);
+  }
 
-    if (touches(mapping, StaEntity.OBSERVATION)) {
-      String resultPath = "$.Datastreams[].Observations[].result";
-      if (!mapping.fields().containsKey(resultPath)) {
-        throw reject("a mapped Observation must map " + resultPath);
-      }
+  private void validateDatastream(MappingConfig mapping, StaKeys keys)
+      throws FatalAdapterException {
+    if (!touches(mapping, StaEntity.DATASTREAM) && !touches(mapping, StaEntity.OBSERVATION)) {
+      return;
+    }
+    if (keys.datastreamKeys().isEmpty()) {
+      throw reject(
+          "the FROST target structure declares no match key on its Datastream class; mark the"
+              + " identifying attribute with the UML {id} flag or add a 'reference' attribute");
+    }
+    requireKeys(mapping, keys.datastreamKeys(), StaEntity.DATASTREAM);
+    requireCompleteCreateSet(mapping, StaEntity.DATASTREAM);
+  }
+
+  private void validateObservation(MappingConfig mapping) throws FatalAdapterException {
+    if (!touches(mapping, StaEntity.OBSERVATION)) {
+      return;
+    }
+    String resultPath = "$.Datastreams[].Observations[].result";
+    if (!mapping.fields().containsKey(resultPath)) {
+      throw reject("a mapped Observation must map " + resultPath);
     }
   }
 
