@@ -273,9 +273,10 @@ public class DataSetSagaPublisher {
 
   /**
    * Resolves the sink's referenced data-structure model (JSON Schema) persisted on the {@code
-   * DataStructureVersion}. {@code null} when no version is referenced (e.g. FROST); throws {@link
-   * InvalidInputException} if a referenced version is missing or carries no model, failing the
-   * publish. The id is already validated at sink save time.
+   * DataStructureVersion}: the table schema for PostGIS, the mapping's Thing-shaped target for a
+   * mapped FROST sink. {@code null} when no version is referenced (FROST passthrough); throws
+   * {@link InvalidInputException} if a referenced version is missing or carries no model, failing
+   * the publish. The id is already validated at sink save time.
    */
   private Map<String, Object> resolveDataStructure(DataSink sink) {
     if (sink.getConfiguration() == null) {
@@ -286,7 +287,7 @@ public class DataSetSagaPublisher {
             .convertValue(sink.getConfiguration(), PostgisConfiguration.class)
             .getDataStructureVersionId();
     if (dsvId == null) {
-      return null; // e.g. FROST sink — no data-structure version
+      return null; // FROST passthrough sink — no data-structure version
     }
     var version =
         dataStructureVersionRepository

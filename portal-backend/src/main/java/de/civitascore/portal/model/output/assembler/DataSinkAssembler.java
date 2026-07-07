@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component;
  * <p>{@link #enrichDto} resolves the type-specific configuration:
  *
  * <ul>
- *   <li>FROST — sets an empty {@link FrostConfigurationOutput}.
+ *   <li>FROST — sets a {@link FrostConfigurationOutput} with the referenced target structure.
  *   <li>POSTGIS — looks up the {@link de.civitascore.portal.model.entity.DataStructureVersion} and
  *       builds a {@link PostgisConfigurationOutput} with the nested summary.
  * </ul>
@@ -66,10 +66,23 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
   private DataSinkConfigurationOutput buildConfiguration(
       DataSinkType type, Map<String, Object> raw) {
     return switch (type) {
-      case FROST -> new FrostConfigurationOutput();
+      case FROST -> buildFrostConfiguration(raw);
       case POSTGIS -> buildPostgisConfiguration(raw);
       default -> null;
     };
+  }
+
+  private FrostConfigurationOutput buildFrostConfiguration(Map<String, Object> raw) {
+    FrostConfigurationOutput output = new FrostConfigurationOutput();
+    Object dsvIdRaw = raw == null ? null : raw.get("dataStructureVersionId");
+    if (dsvIdRaw != null) {
+      try {
+        output.setDataStructureVersionId(UUID.fromString(dsvIdRaw.toString()));
+      } catch (IllegalArgumentException ignored) {
+        // keep the id unset for malformed persisted config
+      }
+    }
+    return output;
   }
 
   private PostgisConfigurationOutput buildPostgisConfiguration(Map<String, Object> raw) {
