@@ -161,7 +161,8 @@ const wrappedRootName = (root: SchemaNode, defs: Record<string, SchemaNode>): st
   if (!property || Object.keys(property).length !== 1) return null
   const name = localDefName(asString(property.$ref))
   if (!name) return null
-  if (!defs[name] || Object.keys(defs[name]).length === 0) {
+  const target = defs[name]
+  if (!target || Object.keys(target).length === 0) {
     throw new ModelResolutionError(`Wrapper root references missing definition '${name}'`)
   }
   return name

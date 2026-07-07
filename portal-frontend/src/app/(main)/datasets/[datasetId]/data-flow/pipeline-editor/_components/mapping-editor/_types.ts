@@ -44,14 +44,12 @@ export interface FieldNode {
 }
 
 /** The port category is a pure function of the field type. */
-export const portTypeFor = (type: FieldType): PortType =>
-  type === 'array'
-    ? 'array'
-    : type === 'object'
-      ? 'object'
-      : (GEOMETRY as Set<string>).has(type)
-        ? 'geometry'
-        : 'scalar'
+export const portTypeFor = (type: FieldType): PortType => {
+  if (type === 'array') return 'array'
+  if (type === 'object') return 'object'
+  if ((GEOMETRY as Set<string>).has(type)) return 'geometry'
+  return 'scalar'
+}
 
 /**
  * The single {@link FieldNode} factory for every tree producer: derives `portType` from `type` and
