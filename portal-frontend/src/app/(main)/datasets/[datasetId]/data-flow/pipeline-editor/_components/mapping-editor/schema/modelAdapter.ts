@@ -1,5 +1,5 @@
 import type { FieldNode, FieldType, GeometryType, SchemaTree } from '../_types'
-import { field, GEOMETRY } from '../_types'
+import { field, isGeometryType } from '../_types'
 
 /**
  * Builds the mapping editor's field tree from a DataStructure version's persisted JSON-Schema
@@ -10,8 +10,9 @@ import { field, GEOMETRY } from '../_types'
  * bare local `$ref`) is resolved through to the referenced class, `$defs` shadows legacy
  * `definitions`, `allOf` branches and local `$ref` parents merge parents-first with own properties
  * overriding in place, and external (http/https) `$ref` parents are skipped while any other
- * unresolvable parent is rejected. Non-local `$ref`s on ordinary properties render as opaque
- * object leaves — the engine's JSONB-column reading of the same spec. The runtime records are
+ * unresolvable parent is rejected. GeoJSON geometry `$ref`s become typed geometry ports; other
+ * non-local `$ref`s on ordinary properties render as opaque object leaves — the engine's
+ * JSONB-column reading of the same spec. The runtime records are
  * entity-shaped (the wrapper never appears in the data), so all field paths stay anchored at the
  * record: a resolved root class becomes the tree's single `$` node, while a document-root record
  * (multi-root, legacy flat) exposes its properties directly; the data structure's name (the
@@ -147,8 +148,8 @@ const collectInto = (
 }
 
 /**
- * Wrapper-root detection matching `DataStructureSchema.wrappedRootDefinition`: no `allOf` key (an
- * empty list already disqualifies), exactly one property whose value is a bare `$ref` (no
+ * Wrapper-root detection matching `DataStructureSchema.wrappedRootDefinition`: no `allOf` array
+ * (even an empty one disqualifies), exactly one property whose value is a bare `$ref` (no
  * siblings) to a local definition. A wrapper whose target is missing is a broken schema and
  * rejected.
  */
@@ -224,7 +225,7 @@ const scalarTypeOf = (node: SchemaNode): FieldType => {
 
 const geometryTypeOf = (ref: string): GeometryType | null => {
   const match = GEOJSON_REF.exec(ref)
-  return match && (GEOMETRY as Set<string>).has(match[1]) ? (match[1] as GeometryType) : null
+  return match && isGeometryType(match[1]) ? match[1] : null
 }
 
 const buildFields = (
@@ -303,9 +304,6 @@ const childrenOf = (
   return buildFields(mergeDefinition(node, defs), defs, base, visited)
 }
 
-const hasRequiredDescendant = (fields: FieldNode[]): boolean =>
-  fields.some(node => node.required || (node.children ? hasRequiredDescendant(node.children) : false))
-
 /**
  * Converts a DataStructure version's JSON-Schema `model` into the editor's field tree, named after
  * the data structure (schema `title`). When the resolution yields a root class (wrapper or named
@@ -325,12 +323,16 @@ export const modelToSchemaTree = (model: Record<string, unknown>, fallbackName: 
   const defs = definitionsOf(root)
   const { className, definition } = resolveRoot(root, defs)
   if (className === null) {
+    // Root properties carry only the schema-declared requiredness (none for multi-root exports):
+    // a multi-root record may populate only some of its trees, so an unmapped root must not fail
+    // pipeline validation.
     return { name, fields: buildFields(definition, defs, '$', new Set()) }
   }
 
   const children = buildFields(definition, defs, '$', new Set([className]))
-  // The record node is marked required only when it has required descendants: requiredFieldPaths
-  // treats a required container without required children as itself mandatory, which would demand
-  // a whole-record mapping for structures made of optional fields.
-  return { name, fields: [field('$', className, 'object', hasRequiredDescendant(children), children)] }
+  // The record node is marked required only when a direct child is required: requiredFieldPaths
+  // recurses only into required containers, so a deeper required field under an optional container
+  // must not force a whole-record mapping, and a record of only optional fields demands nothing.
+  const hasRequiredChild = children.some(child => child.required)
+  return { name, fields: [field('$', className, 'object', hasRequiredChild, children)] }
 }

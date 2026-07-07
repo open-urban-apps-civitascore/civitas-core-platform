@@ -118,12 +118,17 @@ export const MappingEditorModal = ({
   const sourceFields = useMemo(() => flattenTree(sourceTree), [sourceTree])
   const targetFields = useMemo(() => flattenTree(targetTree), [targetTree])
 
-  // A tree silently derived from the diagram may diverge from the record shape the engine derives
-  // from the broken model — the user must know before drawing mappings against it.
+  // The diagram-derived fallback tree is not the artifact the engine reads, and a model this
+  // broken fails engine-side resolution too — the user must know before drawing mappings against
+  // it. The stable toast id absorbs re-renders (StrictMode, refetches) into one visible warning.
   useEffect(() => {
     if (!open) return
     for (const resolution of [sourceResolution, targetResolution]) {
-      if (resolution.isModelBroken) toast.warning(t('modelUnresolvable', { name: resolution.tree.name }))
+      if (resolution.isModelBroken) {
+        toast.warning(t('modelUnresolvable', { name: resolution.tree.name }), {
+          id: `model-broken-${resolution.tree.name}`,
+        })
+      }
     }
   }, [open, sourceResolution, targetResolution, t])
 

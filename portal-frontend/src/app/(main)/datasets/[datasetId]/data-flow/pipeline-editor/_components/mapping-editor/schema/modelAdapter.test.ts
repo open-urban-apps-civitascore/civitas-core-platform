@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { requiredFieldPaths } from './fieldTree'
 import { modelToSchemaTree } from './modelAdapter'
 
 const wrapperModel = (defs: Record<string, unknown>, rootRef = 'Thing', title = 'MyStructure') => ({
@@ -187,7 +188,7 @@ describe('modelToSchemaTree', () => {
     expect(child?.children).toBeUndefined()
   })
 
-  it('marks the record node required only when it has required descendants', () => {
+  it('marks the record node required only when a direct child is required', () => {
     const allOptional = modelToSchemaTree(
       wrapperModel({ Thing: { type: 'object', properties: { a: { type: 'string' } } } }),
       'fallback',
@@ -199,6 +200,52 @@ describe('modelToSchemaTree', () => {
       'fallback',
     )
     expect(withRequired.fields[0].required).toBe(true)
+  })
+
+  it('does not force a whole-record mapping for a required leaf under an optional container', () => {
+    // requiredFieldPaths recurses only into required containers; marking the record node required
+    // for a leaf it cannot reach would degenerate to demanding the whole record.
+    const tree = modelToSchemaTree(
+      wrapperModel({
+        Thing: { type: 'object', properties: { reading: { $ref: '#/$defs/Reading' } } },
+        Reading: { type: 'object', properties: { value: { type: 'number' } }, required: ['value'] },
+      }),
+      'fallback',
+    )
+    expect(tree.fields[0].required).toBeUndefined()
+    expect(requiredFieldPaths(tree)).toEqual([])
+  })
+
+  it('does not require multi-root trees: a record may populate only some roots', () => {
+    const tree = modelToSchemaTree(
+      {
+        title: 'MultiRoot',
+        type: 'object',
+        properties: { building: { $ref: '#/$defs/Building' }, street: { $ref: '#/$defs/Street' } },
+        $defs: {
+          Building: { type: 'object', properties: { floors: { type: 'integer' } }, required: ['floors'] },
+          Street: { type: 'object', properties: { name: { type: 'string' } } },
+        },
+      },
+      'fallback',
+    )
+    expect(tree.fields.map(f => f.required ?? false)).toEqual([false, false])
+    expect(requiredFieldPaths(tree)).toEqual([])
+  })
+
+  it('exposes a document root with a non-empty allOf as flat merged fields', () => {
+    const tree = modelToSchemaTree(
+      {
+        title: 'Merged',
+        type: 'object',
+        allOf: [{ $ref: '#/$defs/Base' }],
+        properties: { own: { type: 'string' } },
+        $defs: { Base: { type: 'object', properties: { inherited: { type: 'string' } } } },
+      },
+      'fallback',
+    )
+    expect(tree.name).toBe('Merged')
+    expect(tree.fields.map(f => f.path)).toEqual(['$.inherited', '$.own'])
   })
 
   it('rejects a wrapper whose $ref target is missing', () => {
@@ -295,8 +342,8 @@ describe('modelToSchemaTree', () => {
   })
 
   it('does not treat a root with an empty allOf list as a wrapper', () => {
-    // Matches the backend: any allOf key on the root disqualifies wrapper unwrapping, so the
-    // record is the root itself and the single $ref property stays a nested object.
+    // Matches the backend: an allOf array on the root — even empty — disqualifies wrapper
+    // unwrapping, so the record is the root itself and the single $ref property stays nested.
     const tree = modelToSchemaTree(
       {
         title: 'S',
@@ -350,6 +397,7 @@ describe('modelToSchemaTree', () => {
         },
         'fallback',
       )
+      expect(tree.fields[0]).toMatchObject({ path: '$', name: 'Second', type: 'object' })
       expect(tree.fields[0].children?.map(f => f.name)).toEqual(['b'])
     })
 

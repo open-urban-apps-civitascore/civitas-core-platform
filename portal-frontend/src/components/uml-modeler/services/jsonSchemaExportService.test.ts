@@ -871,7 +871,8 @@ describe('exportToJsonSchema', () => {
     } as Partial<UMLDiagram>)
 
     const schema = exportToJsonSchema(diagram)
-    // '/' and '~' in a def key would make '#/$defs/<key>' an invalid JSON Pointer.
+    // In a def key, '~' would make '#/$defs/<key>' an invalid JSON Pointer and '/' a valid one
+    // that resolves to the wrong, nested location.
     expect(schema.properties).toEqual({ 'road-segment-part': { $ref: '#/$defs/Road-Segment-Part' } })
     expect((schema.$defs as Record<string, unknown>)['Road-Segment-Part']).toBeDefined()
   })

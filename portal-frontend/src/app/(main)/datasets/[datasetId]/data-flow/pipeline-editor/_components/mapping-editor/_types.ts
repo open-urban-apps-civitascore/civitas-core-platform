@@ -22,7 +22,7 @@ export type GeometryType =
 
 export type FieldType = 'str' | 'int' | 'float' | 'bool' | 'date' | GeometryType | 'array' | 'object'
 
-export const GEOMETRY = new Set<GeometryType>([
+export const GEOMETRY: ReadonlySet<GeometryType> = new Set<GeometryType>([
   'Point',
   'LineString',
   'Polygon',
@@ -31,6 +31,9 @@ export const GEOMETRY = new Set<GeometryType>([
   'MultiPolygon',
   'GeometryCollection',
 ])
+
+/** Type guard: is the given type name one of the concrete geometry types? */
+export const isGeometryType = (value: string): value is GeometryType => (GEOMETRY as ReadonlySet<string>).has(value)
 
 export interface FieldNode {
   /** JSONPath, e.g. "$.klassen[].name" */
@@ -47,7 +50,7 @@ export interface FieldNode {
 export const portTypeFor = (type: FieldType): PortType => {
   if (type === 'array') return 'array'
   if (type === 'object') return 'object'
-  if ((GEOMETRY as Set<string>).has(type)) return 'geometry'
+  if (isGeometryType(type)) return 'geometry'
   return 'scalar'
 }
 

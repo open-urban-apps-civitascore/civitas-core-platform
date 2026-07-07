@@ -60,9 +60,7 @@ describe('datastructure-model contract fixtures', () => {
     expect(tree.fields[0].children).toEqual([
       { path: '$.building.floors', name: 'floors', type: 'int', portType: 'scalar', required: true },
     ])
-    expect(tree.fields[1].children).toEqual([
-      { path: '$.street.name', name: 'name', type: 'str', portType: 'scalar' },
-    ])
+    expect(tree.fields[1].children).toEqual([{ path: '$.street.name', name: 'name', type: 'str', portType: 'scalar' }])
   })
 
   it('legacy-flat-root: a root carrying its own properties is the record', () => {

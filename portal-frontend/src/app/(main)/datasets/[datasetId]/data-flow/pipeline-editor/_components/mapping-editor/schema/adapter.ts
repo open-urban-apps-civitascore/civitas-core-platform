@@ -14,8 +14,8 @@ import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import type { UMLAttribute, UMLElement, UMLType } from '@/components/uml-modeler/types/uml'
 import { hasAttributes } from '@/components/uml-modeler/types/uml'
 
-import type { FieldNode, FieldType, GeometryType, SchemaTree } from '../_types'
-import { field, GEOMETRY, portTypeFor } from '../_types'
+import type { FieldNode, FieldType, SchemaTree } from '../_types'
+import { field, GEOMETRY, isGeometryType, portTypeFor } from '../_types'
 
 export { GEOMETRY }
 
@@ -33,15 +33,12 @@ export const PRIMITIVE: Record<string, FieldType> = {
   Date: 'date',
 }
 
-/** Type guard: is the given UML type name one of the concrete geometry types? */
-const isGeometry = (type: string): type is GeometryType => (GEOMETRY as Set<string>).has(type)
-
 const lowerFirst = (value: string): string => value.charAt(0).toLowerCase() + value.slice(1)
 
 // Geometries map to their concrete type name (Point, Polygon, …) so Point vs Polygon
 // mismatches are caught by exact-type matching; other primitives map via PRIMITIVE.
 const scalarType = (type: UMLType): FieldType => {
-  if (typeof type === 'string') return isGeometry(type) ? type : (PRIMITIVE[type] ?? 'str')
+  if (typeof type === 'string') return isGeometryType(type) ? type : (PRIMITIVE[type] ?? 'str')
   return 'str'
 }
 
@@ -200,6 +197,8 @@ export const umlDiagramToSchemaTree = (diagram: UMLDiagram | null | undefined, f
   }
 
   const propertyNames = assignRootPropertyNames(roots, assignDefKeys(elements))
+  // Root nodes stay optional: a multi-root record may populate only some of its trees, so an
+  // unmapped root must not fail pipeline validation.
   const fields: FieldNode[] = roots.map(root => {
     const name = propertyNames.get(root.id) as string
     const path = `$.${name}`
