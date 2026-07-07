@@ -2,7 +2,24 @@
   "welcome": {
     "title": "Welcome to CIVITAS/CORE V2 Beta",
     "subtitle": "New here?",
-    "docsButton": "Documentation"
+    "docsButton": "Documentation",
+    "recommendedWorkflow": {
+      "title": "Recommended workflow",
+      "steps": {
+        "datastructure": {
+          "title": "Create a Data structure",
+          "subtitle": "Describes the Data"
+        },
+        "datasource": {
+          "title": "Create a Data source",
+          "subtitle": "Use the Data structure"
+        },
+        "pipeline": {
+          "title": "<b>Create a Dataset</b> and <b>configure a Pipeline</b>",
+          "subtitle": "Use the Data source to start the Dataflow"
+        }
+      }
+    }
   },
   "common": {
     "type-to-search": "Type to search",
