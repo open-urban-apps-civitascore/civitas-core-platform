@@ -2,6 +2,8 @@
 # All config-adapter jobs should extend this
 .only-config-adapter-changes:
   rules:
+    # Always run on the nightly scheduled pipeline so the full build/scan runs
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
     # Always run on main and develop branch
@@ -13,6 +15,7 @@
         - config-adapter/**/*
         - .gitlab-ci.yml
         - .gitlab/ci/config-adapter.yml
+
 
 # Setup version for config-adapter from pom.xml with branch-based suffixes
 # - main/tags: release version (e.g., 1.0.2)
@@ -61,8 +64,11 @@ generate-graph-config-adapter:
   needs:
     - job: setup-version-config-adapter
   rules:
+    # Always run on the nightly scheduled pipeline
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
+
     # Always run on main and develop branch
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "develop"
@@ -220,6 +226,13 @@ publish-config-adapter:
   stage: deploy-package
   rules:
     # Same conditions as .only-config-adapter-changes, but with per-rule needs:
+    # Nightly schedule: publish only after tests pass (same as main/develop)
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
+      needs:
+        - job: setup-version-config-adapter
+        - job: build-config-adapter
+          optional: true
+        - job: test-config-adapter
     # Tags/main/develop: publish only after tests pass
     - if: $CI_COMMIT_TAG
       needs:
@@ -227,6 +240,7 @@ publish-config-adapter:
         - job: build-config-adapter
           optional: true
         - job: test-config-adapter
+
     - if: $CI_COMMIT_BRANCH == "main"
       needs:
         - job: setup-version-config-adapter
@@ -336,7 +350,10 @@ deploy-config-adapter:
   stage: deploy
   needs:
     - job: setup-version-config-adapter
+    - job: setup-version
+      artifacts: true
     - job: container-scan-config-adapter
+
   services:
     - docker:27-dind
   variables:
@@ -353,6 +370,12 @@ deploy-config-adapter:
       if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
         docker buildx imagetools create $CI_REGISTRY_IMAGE/config-adapter:$CONFIG_ADAPTER_VERSION --tag $CI_REGISTRY_IMAGE/config-adapter:$CI_COMMIT_BRANCH
       fi
+    # Nightly build: additionally tag with <branch>-nightly-<YYYYMMDD>
+    - |
+      if [ "$IS_NIGHTLY" = "true" ] && [ -n "$NIGHTLY_IMAGE_TAG" ]; then
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/config-adapter:$CONFIG_ADAPTER_VERSION --tag $CI_REGISTRY_IMAGE/config-adapter:$NIGHTLY_IMAGE_TAG
+      fi
+
 
 sbom-config-adapter-image:
   extends: .only-config-adapter-changes
