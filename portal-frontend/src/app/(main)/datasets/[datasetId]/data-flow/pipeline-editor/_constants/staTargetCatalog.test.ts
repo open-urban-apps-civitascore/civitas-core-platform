@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 import type { SchemaTree } from '../_components/mapping-editor/_types'
 import { field } from '../_components/mapping-editor/_types'
-import { deriveStaMatchKeys, STA_ENTITIES, STA_FIXED_TARGET_PATHS } from './staTargetCatalog'
+import {
+  deriveStaMatchKeys,
+  isReservedStaKeyName,
+  isSafeStaKeyName,
+  STA_ENTITIES,
+  STA_FIXED_TARGET_PATHS,
+} from './staTargetCatalog'
 
 /**
  * Pins the STA catalog mirror against the adapter's `StaTargetCatalog` (config-adapter-nifi,
@@ -108,6 +114,16 @@ describe('deriveStaMatchKeys', () => {
     expect(keys.datastream).toEqual([])
   })
 
+  it('reports the fallback when only the datastream relies on it', () => {
+    const tree = thingTree([
+      { ...field('$.stationRef', 'stationRef', 'str', true), primaryKey: true },
+      field('$.Datastreams', 'Datastreams', 'array', false, [
+        field('$.Datastreams[].reference', 'reference', 'str', true),
+      ]),
+    ])
+    expect(deriveStaMatchKeys(tree).isFallback).toBe(true)
+  })
+
   it('reads document-root records (multi-root/legacy flat) directly', () => {
     const tree: SchemaTree = {
       name: 'Flat',
@@ -115,5 +131,22 @@ describe('deriveStaMatchKeys', () => {
     }
     expect(deriveStaMatchKeys(tree).thing).toEqual(['$.reference'])
     expect(deriveStaMatchKeys(tree).isFallback).toBe(false)
+  })
+})
+
+describe('key-name mirrors of the engine rules', () => {
+  it('whitelists identifiers and rejects everything else', () => {
+    expect(isSafeStaKeyName('stationRef_1')).toBe(true)
+    expect(isSafeStaKeyName('größe')).toBe(false)
+    expect(isSafeStaKeyName('1st')).toBe(false)
+    expect(isSafeStaKeyName("ref' or true")).toBe(false)
+  })
+
+  it('reserves the standard SensorThings field names per entity', () => {
+    expect(isReservedStaKeyName('thing', 'name')).toBe(true)
+    expect(isReservedStaKeyName('thing', 'observationType')).toBe(false)
+    expect(isReservedStaKeyName('datastream', 'Sensor')).toBe(true)
+    expect(isReservedStaKeyName('datastream', 'unitOfMeasurement')).toBe(true)
+    expect(isReservedStaKeyName('datastream', 'stationRef')).toBe(false)
   })
 })

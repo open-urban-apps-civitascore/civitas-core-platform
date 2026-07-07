@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { deriveStaMatchKeys } from '../../../_constants/staTargetCatalog'
 import { requiredFieldPaths } from './fieldTree'
 import { modelToSchemaTree } from './modelAdapter'
 
@@ -443,6 +444,48 @@ describe('modelToSchemaTree', () => {
           'fallback',
         ),
       ).toThrow(/none matches the title/)
+    })
+  })
+})
+
+describe('x-core-primaryKey marker', () => {
+  const thingModel = {
+    title: 'SensorThingsDataModel',
+    type: 'object',
+    properties: { thing: { $ref: '#/$defs/Thing' } },
+    $defs: {
+      Thing: {
+        type: 'object',
+        properties: {
+          stationRef: { type: 'string', 'x-core-primaryKey': true },
+          name: { type: 'string' },
+          tags: { type: 'array', items: { type: 'string' }, 'x-core-primaryKey': true },
+          Datastreams: { type: 'array', items: { $ref: '#/$defs/Datastream' } },
+        },
+      },
+      Datastream: {
+        type: 'object',
+        properties: { dsRef: { type: 'string', 'x-core-primaryKey': true } },
+      },
+    },
+  }
+
+  it('flags marked scalar fields and ignores the marker on non-scalars', () => {
+    const tree = modelToSchemaTree(thingModel, 'fallback')
+    const thing = tree.fields[0]
+    const byName = new Map((thing.children ?? []).map(child => [child.name, child]))
+    expect(byName.get('stationRef')?.primaryKey).toBe(true)
+    expect(byName.get('name')?.primaryKey).toBeUndefined()
+    // a marker on an array cannot back a find-or-create key — mirrors the engine's scalar rule
+    expect(byName.get('tags')?.primaryKey).toBeUndefined()
+  })
+
+  it('feeds deriveStaMatchKeys through the real adapter output (seam test)', () => {
+    const keys = deriveStaMatchKeys(modelToSchemaTree(thingModel, 'fallback'))
+    expect(keys).toEqual({
+      thing: ['$.stationRef'],
+      datastream: ['$.Datastreams[].dsRef'],
+      isFallback: false,
     })
   })
 })

@@ -70,6 +70,27 @@ export const STA_ENTITIES: readonly StaEntity[] = [
   },
 ]
 
+/**
+ * Mirror of the engine's identifier whitelist for schema-derived key names — they end up in
+ * OData $filter expressions and generated template keys, so anything else fails the deploy.
+ */
+export const isSafeStaKeyName = (keyName: string): boolean => /^[A-Za-z_][A-Za-z0-9_]*$/.test(keyName)
+
+/**
+ * Mirror of the engine's reserved-name rule: a match key named like a standard SensorThings
+ * field of its entity ({@link STA_ENTITIES} first path segment) would make one mapping path mean
+ * two things, so the deploy rejects it.
+ */
+export const isReservedStaKeyName = (entityKey: 'thing' | 'datastream', keyName: string): boolean => {
+  const entity = STA_ENTITIES.find(candidate => candidate.key === entityKey) as StaEntity
+  return entity.createPaths.some(path => firstSegment(path, entity.pathPrefix) === keyName)
+}
+
+const firstSegment = (path: string, pathPrefix: string): string => {
+  const prefix = pathPrefix === '$.' ? '$.' : `${pathPrefix}].`
+  return path.slice(prefix.length).split(/[.[]/)[0]
+}
+
 /** All fixed catalog paths (the schema-derived match-key paths come on top per structure). */
 export const STA_FIXED_TARGET_PATHS: ReadonlySet<string> = new Set(
   STA_ENTITIES.flatMap(entity => [...entity.createPaths, ...entity.optionalPaths]),
@@ -84,7 +105,7 @@ export interface StaMatchKeys {
   readonly thing: readonly string[]
   /** Record paths of the Datastream's match-key attributes; empty without a Datastreams class. */
   readonly datastream: readonly string[]
-  /** Whether the keys came from the `reference` fallback instead of an `{id}` marker. */
+  /** Whether any entity's keys came from the `reference` fallback instead of an `{id}` marker. */
   readonly isFallback: boolean
 }
 
@@ -99,12 +120,16 @@ export const deriveStaMatchKeys = (targetTree: SchemaTree): StaMatchKeys => {
 
   const thingMarked = keyPaths(record)
   const datastreamMarked = keyPaths(datastreams)
-  const isFallback = thingMarked.length === 0
+  const thing = thingMarked.length > 0 ? thingMarked : fallbackReference(record)
+  const datastream = datastreamMarked.length > 0 ? datastreamMarked : fallbackReference(datastreams)
 
   return {
-    thing: thingMarked.length > 0 ? thingMarked : fallbackReference(record),
-    datastream: datastreamMarked.length > 0 ? datastreamMarked : fallbackReference(datastreams),
-    isFallback,
+    thing,
+    datastream,
+    // Fallback on EITHER entity — the warning must fire whenever any find-or-create key is not
+    // an explicit {id} marker, not only the Thing's.
+    isFallback:
+      (thingMarked.length === 0 && thing.length > 0) || (datastreamMarked.length === 0 && datastream.length > 0),
   }
 }
 

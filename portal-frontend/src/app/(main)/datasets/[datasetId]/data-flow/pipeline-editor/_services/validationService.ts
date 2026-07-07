@@ -7,7 +7,13 @@
  */
 
 import { isFormAccepted, NODE_FLOW_DECLARATIONS, type NodeFlowDeclaration } from '../_config/nodeFlow'
-import { STA_ENTITIES, STA_FIXED_TARGET_PATHS, type StaEntity } from '../_constants/staTargetCatalog'
+import {
+  isReservedStaKeyName,
+  isSafeStaKeyName,
+  STA_ENTITIES,
+  STA_FIXED_TARGET_PATHS,
+  type StaEntity,
+} from '../_constants/staTargetCatalog'
 import { isCronNodeData, isDataSourceNodeData, isGeoPersistenceNodeData, isMappingNodeData } from '../_types/nodes'
 import { type Pipeline, PIPELINE_NODE_TYPES, type PipelineNode } from '../_types/pipeline'
 
@@ -515,6 +521,21 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
           )
         }
       }
+
+      // The engine whitelists key names (they reach $filter URLs and template keys) and rejects
+      // names shadowing standard SensorThings fields — surface both at edit time.
+      const checkKeyNames = (entityKey: 'thing' | 'datastream', keyPaths: readonly string[]) => {
+        for (const path of keyPaths) {
+          const keyName = path.split('.').pop() as string
+          if (!isSafeStaKeyName(keyName)) {
+            errors.push(errorAt(node, 'validation.messages.frostMappingUnsafeMatchKeyName', { label, keyName }))
+          } else if (isReservedStaKeyName(entityKey, keyName)) {
+            errors.push(errorAt(node, 'validation.messages.frostMappingReservedMatchKeyName', { label, keyName }))
+          }
+        }
+      }
+      checkKeyNames('thing', keys.thing)
+      checkKeyNames('datastream', keys.datastream)
 
       // Thing: the match keys are the find-or-create identity — always required.
       if (keys.thing.length === 0) {

@@ -117,9 +117,10 @@ export const buildDataSinkPayloads = (pipeline: Pipeline): DataSinkNodePayload[]
 }
 
 /**
- * The target datastructure version of the last mapping feeding the given sink node, found by
- * walking the wiring backwards and stopping at the first mapping per path — the same walk the
- * validation uses to identify the STA-carrying mapping.
+ * The target datastructure version of the last mapping feeding the given sink node: a backward
+ * walk stopping at the first mapping it reaches. The flow-shape validation only lets a single
+ * linear path deploy, so on a valid graph exactly one final mapping exists; on an invalid
+ * multi-branch canvas the pick is arbitrary but the deploy is blocked anyway.
  */
 const mappingTargetVersionBefore = (pipeline: Pipeline, sinkNodeId: string): string | null => {
   const incoming = new Map<string, string[]>()

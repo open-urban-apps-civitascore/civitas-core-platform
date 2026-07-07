@@ -1270,6 +1270,8 @@
         "frostMappingCreateSetIncomplete": "{label} bildet {entity} unvollständig ab; für das Anlegen fehlen: {fields} (oder alle Anlege-Felder weglassen für reinen Lookup)",
         "frostMappingLocationNeedsCreatableThing": "{label} bildet eine Location ab — das geht nur mit vollständig abgebildetem Thing (name, description), da Locations über dessen Deep-Insert entstehen",
         "frostMappingObservationNeedsResult": "{label} bildet eine Observation ohne $.Datastreams[].Observations[].result ab",
+        "frostMappingUnsafeMatchKeyName": "{label}: der Match-Schlüssel-Name \"{keyName}\" ist kein gültiger Bezeichner (erlaubt: Buchstaben, Ziffern, Unterstrich, nicht mit Ziffer beginnend) — benenne das Attribut um",
+        "frostMappingReservedMatchKeyName": "{label}: der Match-Schlüssel-Name \"{keyName}\" kollidiert mit einem SensorThings-Standardfeld — benenne das identifizierende Attribut um",
         "frostMappingFallbackMatchKey": "{label}: kein '{id}'-Attribut markiert — Match-Schlüssel fällt auf \"reference\" zurück",
         "nodeNotWired": "{label} muss mit einer eingehenden und einer ausgehenden Kante verbunden sein",
         "mappingRequiredFieldsMissing": "{label} weist nicht alle Pflicht-Zielfelder zu: {fields}",

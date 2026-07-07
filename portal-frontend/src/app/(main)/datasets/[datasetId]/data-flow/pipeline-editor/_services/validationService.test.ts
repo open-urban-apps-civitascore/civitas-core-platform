@@ -304,6 +304,42 @@ describe('validateFrostMappingCoversStaGroups', () => {
     expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
   })
 
+  it('exempts the FROST-final mapping from the unconditional required-fields rule', () => {
+    // A lookup-only mapping deliberately leaves required create fields (e.g. $.name) unmapped —
+    // the catalog's conditional requiredness owns this node, not the generic snapshot rule.
+    const REQUIRED_KEY = 'validation.messages.mappingRequiredFieldsMissing'
+    const node: TestNode = {
+      id: 'map-1',
+      type: 'mapping',
+      data: {
+        label: 'Mapping',
+        configured: true,
+        mappingConfig: { fields: { '$.reference': '$.ref' }, positions: {} },
+        targetRequiredFields: ['$.name'],
+        staMatchKeys: MATCH_KEYS,
+      },
+    }
+    expect(has(wiredToFrost(node), REQUIRED_KEY)).toBe(false)
+    // the same node NOT feeding a FROST sink stays subject to the rule
+    expect(has(pipelineWith([node]), REQUIRED_KEY)).toBe(true)
+  })
+
+  it('rejects an unsafe match-key name at edit time (mirrors the deploy whitelist)', () => {
+    const UNSAFE_KEY = 'validation.messages.frostMappingUnsafeMatchKeyName'
+    const umlaut = { ...MATCH_KEYS, thing: ['$.größe'] }
+    const result = validatePipeline(wiredToFrost(staMapping({ '$.größe': '$.ref' }, umlaut)))
+    const errors = result.errors.filter(e => e.messageKey === UNSAFE_KEY)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].messageParams?.keyName).toBe('größe')
+  })
+
+  it('rejects a match key shadowing a standard SensorThings field', () => {
+    const RESERVED_KEY = 'validation.messages.frostMappingReservedMatchKeyName'
+    const reserved = { ...MATCH_KEYS, thing: ['$.name'] }
+    const result = validatePipeline(wiredToFrost(staMapping({ '$.name': '$.n' }, reserved)))
+    expect(result.errors.some(e => e.messageKey === RESERVED_KEY)).toBe(true)
+  })
+
   it('warns when the match key came from the reference fallback', () => {
     const fallback = { ...MATCH_KEYS, isFallback: true }
     const result = validatePipeline(wiredToFrost(staMapping({ '$.reference': '$.ref' }, fallback)))
