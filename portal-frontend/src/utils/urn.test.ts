@@ -29,16 +29,28 @@ describe('toPascalCaseName', () => {
 
 describe('buildDataStructureUrn', () => {
   const id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+  const disambiguator = '2dmtus8w40'
 
-  it('builds the full CORE URN with fixed namespace segments', () => {
+  it('builds the full CORE URN with fixed namespace segments and a disambiguator segment', () => {
     expect(buildDataStructureUrn('Weather Model', id, '1.0.0')).toBe(
-      `urn:core:platform:civitas:datastructure:common:WeatherModel-${id}:1.0.0`,
+      `urn:core:platform:civitas:datastructure:common:WeatherModel:${disambiguator}:1.0.0`,
     )
   })
 
-  it('appends the datastructure id to the name for uniqueness', () => {
+  it('derives a 10-char base36 disambiguator that keeps equal names apart', () => {
     const urn = buildDataStructureUrn('Bürgerdienste', id, '2.1.0')
-    expect(urn).toBe(`urn:core:platform:civitas:datastructure:common:Buergerdienste-${id}:2.1.0`)
+    expect(urn).toBe(`urn:core:platform:civitas:datastructure:common:Buergerdienste:${disambiguator}:2.1.0`)
+  })
+
+  it('left-pads the disambiguator to a fixed length for low-valued ids', () => {
+    const urn = buildDataStructureUrn('Weather Model', '00000000-0000-0000-0000-000000000001', '1.0.0')
+    expect(urn).toBe('urn:core:platform:civitas:datastructure:common:WeatherModel:0000000001:1.0.0')
+  })
+
+  it('yields the same URN for the same DataStructure', () => {
+    expect(buildDataStructureUrn('Weather Model', id, '1.0.0')).toBe(
+      buildDataStructureUrn('Weather Model', id, '1.0.0'),
+    )
   })
 
   it('throws when the name normalizes to an empty segment', () => {
