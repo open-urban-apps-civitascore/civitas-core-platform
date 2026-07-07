@@ -123,7 +123,8 @@ class NifiSagaHandlerTest {
 
   @Test
   void initializeWiresOidcTokenProviderFromNifiOidcProperties() throws Exception {
-    // Pins the nifi.oidc.* property-key contract. doInitialize() builds the real token provider from
+    // Pins the nifi.oidc.* property-key contract. doInitialize() builds the real token provider
+    // from
     // these keys and no other test exercises it (the rest inject the client), so a typo in a key or
     // default would pass the whole suite and only fail at deploy. Point token-uri + nifi.url at
     // WireMock, run a real deploy, and assert the token endpoint got the configured credentials.
@@ -139,8 +140,7 @@ class NifiSagaHandlerTest {
                       .withBody("{\"access_token\":\"tok\",\"expires_in\":300}")));
       // NiFi's first call fails fatally — we only need the preceding token fetch to have happened.
       server.stubFor(
-          get(urlEqualTo("/nifi-api/process-groups/root"))
-              .willReturn(aResponse().withStatus(400)));
+          get(urlEqualTo("/nifi-api/process-groups/root")).willReturn(aResponse().withStatus(400)));
 
       AdapterConfig config = mock(AdapterConfig.class);
       when(config.getProperty(any(), any())).thenAnswer(inv -> inv.getArgument(1));
