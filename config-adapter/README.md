@@ -180,8 +180,11 @@ Apache NiFi adapter: transforms the engine-neutral pipeline graph into a curated
 ```properties
 # NiFi REST API base URL (default: https://localhost:8443)
 nifi.url=https://localhost:8443
-nifi.username=admin
-nifi.password=<single-user password>
+# NiFi is secured with OIDC; authenticate via the client-credentials grant (Keycloak).
+nifi.oidc.token-uri=http://localhost:8080/realms/civitas-core/protocol/openid-connect/token
+nifi.oidc.client-id=nifi
+nifi.oidc.client-secret=<client secret, via NIFI_OIDC_CLIENT_SECRET>
+# nifi.oidc.scope=<optional space-delimited scope>
 # Disable TLS verification for dev self-signed certs (set false in non-dev)
 nifi.tls.insecure=true
 # Platform sink endpoints the flow binds to

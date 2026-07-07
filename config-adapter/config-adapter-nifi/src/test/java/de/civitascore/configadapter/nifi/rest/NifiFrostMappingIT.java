@@ -90,10 +90,13 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static final String TOPIC = "civitas/it/frost-mapping";
 
   // EL/backreference-shaped tenant values: they must arrive in FROST byte-identically, never
-  // expanded against the NiFi environment (the env var IS set in the container) or interpreted as
-  // a regex backreference.
+  // expanded against the NiFi environment or interpreted as a regex backreference. Both referenced
+  // env vars ARE set in the container (HOSTNAME always; NIFI_SECURITY_USER_OIDC_CLIENT_SECRET holds
+  // exactly the secret the assertion below forbids from leaking), so an expansion bug would be
+  // caught here.
   private static final String INJECTION_NAME = "Station ${HOSTNAME} $1";
-  private static final String INJECTION_DESCRIPTION = "unit ${SINGLE_USER_CREDENTIALS_PASSWORD}";
+  private static final String INJECTION_DESCRIPTION =
+      "unit ${NIFI_SECURITY_USER_OIDC_CLIENT_SECRET}";
 
   private static final String REF_MAP = "REF-MAP-1";
   private static final String DS_MAP = "DS-MAP-1";
@@ -252,7 +255,8 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         thing.path("description").asText(),
         "EL in a const value must stay literal (\\$ escaped as \\$\\$)");
     assertFalse(
-        thing.toString().contains(PASSWORD), "the NiFi admin password must never leak into FROST");
+        thing.toString().contains(OIDC_CLIENT_SECRET),
+        "the NiFi OIDC client secret must never leak into FROST");
 
     JsonNode observation = observations(dsMapId).get(0);
     assertTrue(observation.path("result").isNumber(), "toFloat result must serialize unquoted");
