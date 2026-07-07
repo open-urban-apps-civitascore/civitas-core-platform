@@ -234,5 +234,9 @@ describe('model-walker consistency (modelToSchemaTree vs adapter)', () => {
     const adapterPaths = umlDiagramToSchemaTree(colliding, colliding.name).fields.map(f => f.path)
     expect(adapterPaths).toEqual(exportedPaths)
     expect(new Set(exportedPaths).size).toBe(2)
+    const modelPaths = (
+      modelToSchemaTree(schema as Record<string, unknown>, colliding.name).fields[0].children ?? []
+    ).map(f => f.path)
+    expect(modelPaths).toEqual(exportedPaths)
   })
 })

@@ -860,6 +860,20 @@ describe('exportToJsonSchema', () => {
     expect(schema.properties).toEqual({ status: { $ref: '#/$defs/Status' }, kind: { $ref: '#/$defs/Kind' } })
     const defs = schema.$defs as Record<string, Record<string, unknown>>
     expect(defs.Status.enum).toEqual(['ON'])
+    expect(defs.Kind.enum).toEqual(['A'])
+  })
+
+  it('keeps $defs keys free of JSON-Pointer-special characters', () => {
+    const diagram = baseDiagram({
+      name: 'S',
+      nodes: [cls('a', 'Road/Segment~Part', [{ id: 'a1', name: 'a1' }])] as unknown as UMLDiagram['nodes'],
+      edges: [],
+    } as Partial<UMLDiagram>)
+
+    const schema = exportToJsonSchema(diagram)
+    // '/' and '~' in a def key would make '#/$defs/<key>' an invalid JSON Pointer.
+    expect(schema.properties).toEqual({ 'road-segment-part': { $ref: '#/$defs/Road-Segment-Part' } })
+    expect((schema.$defs as Record<string, unknown>)['Road-Segment-Part']).toBeDefined()
   })
 
   it('does not collapse a multi-root diagram onto a diagram-name-matching class', () => {

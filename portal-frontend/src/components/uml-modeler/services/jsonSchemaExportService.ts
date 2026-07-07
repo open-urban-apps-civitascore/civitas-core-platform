@@ -258,12 +258,18 @@ const buildClassSchema = (
   return ownSchema
 }
 
-/** Maps every element id to a stable, unique `$defs` key (name-based, `_n`-suffixed on collision). */
+/**
+ * Maps every element id to a stable, unique `$defs` key (name-based, `_n`-suffixed on collision).
+ * The keys are embedded verbatim in `#/$defs/<key>` refs, which the platform resolvers match by
+ * prefix-stripping rather than JSON-Pointer evaluation — so instead of `~0`/`~1`-escaping the refs
+ * (which those resolvers would not unescape), pointer-special characters are kept out of the keys
+ * themselves, making every emitted ref a valid JSON Pointer for standard tooling too.
+ */
 export const assignDefKeys = (elements: UMLElement[]): Map<string, string> => {
   const defKeyById = new Map<string, string>()
   const usedKeys = new Set<string>()
   for (const element of elements) {
-    const key = element.name || 'Type'
+    const key = (element.name || 'Type').replace(/[~/]/g, '-')
     let candidate = key
     let suffix = 1
     while (usedKeys.has(candidate)) {
