@@ -89,12 +89,11 @@ public final class PostgisSinkStage implements SinkStage<PostgisSinkSpec> {
     if (schemaName == null || schemaName.isBlank()) {
       // No explicit schema: derive the dedicated per-DataSet schema from the trigger's datasetId
       // (the same WorkspaceNames rule PostGIS and GeoServer use), so PutDatabaseRecord writes into
-      // ds_<dataset> — the schema PostGIS created the table in — instead of the search_path default.
+      // ds_<dataset> — the schema PostGIS created the table in — instead of the search_path
+      // default.
       String datasetId = ctx.datasetId();
       schemaName =
-          datasetId == null || datasetId.isBlank()
-              ? null
-              : WorkspaceNames.fromDatasetId(datasetId);
+          datasetId == null || datasetId.isBlank() ? null : WorkspaceNames.fromDatasetId(datasetId);
     }
     try {
       return new PostgisSinkSpec(tableName, schemaName, resolvePrimaryKey(datasink));

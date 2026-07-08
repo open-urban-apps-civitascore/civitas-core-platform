@@ -570,9 +570,10 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   /**
    * The dedicated per-DataSet schema, derived from the trigger's {@code datasetId} via the shared
-   * {@link WorkspaceNames#fromDatasetId} rule — the same derivation the GeoServer workspace uses, so
-   * the sink table lands in the schema GeoServer reads from. Returns {@code null} when the payload
-   * carries no {@code datasetId} (e.g. a non-dataset caller), leaving the table unqualified.
+   * {@link WorkspaceNames#fromDatasetId} rule — the same derivation the GeoServer workspace uses,
+   * so the sink table lands in the schema GeoServer reads from. Returns {@code null} when the
+   * payload carries no {@code datasetId} (e.g. a non-dataset caller), leaving the table
+   * unqualified.
    */
   private static String datasetSchemaName(SagaCommandMessage command) {
     return command.payload().get("datasetId") instanceof String datasetId && !datasetId.isBlank()

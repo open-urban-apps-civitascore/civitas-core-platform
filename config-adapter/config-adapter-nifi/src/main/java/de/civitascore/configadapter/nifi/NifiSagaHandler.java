@@ -96,7 +96,8 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   // step's payload; scopes a FROST flow to the dataset's project.
   private static final String FIELD_PROJECT_ID = "projectId";
   // The dataset's technical id, carried by every trigger; used to derive the dedicated per-DataSet
-  // PostGIS schema a POSTGIS sink writes into (same WorkspaceNames rule as the GeoServer workspace).
+  // PostGIS schema a POSTGIS sink writes into (same WorkspaceNames rule as the GeoServer
+  // workspace).
   private static final String FIELD_DATASET_ID = "datasetId";
 
   private static final String ACTION_ADD = "ADD";
@@ -248,7 +249,8 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
 
       for (Map<String, Object> pipeline : extractMaps(command, FIELD_DATA_PIPELINES)) {
         String id = requireString(pipeline, FIELD_ID);
-        processGroupIds.add(deployPipeline(id, pipeline, datasources, datasinks, projectId, datasetId));
+        processGroupIds.add(
+            deployPipeline(id, pipeline, datasources, datasinks, projectId, datasetId));
         pipelineIds.add(id);
       }
 
@@ -270,7 +272,8 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       List<String> processedIds = new ArrayList<>();
 
       for (Map<String, Object> pipeline : extractMaps(command, FIELD_DATA_PIPELINES)) {
-        processedIds.add(applyPipelineAction(pipeline, datasources, datasinks, projectId, datasetId));
+        processedIds.add(
+            applyPipelineAction(pipeline, datasources, datasinks, projectId, datasetId));
       }
 
       Map<String, Object> data = Map.of(FIELD_PIPELINE_IDS, processedIds);
