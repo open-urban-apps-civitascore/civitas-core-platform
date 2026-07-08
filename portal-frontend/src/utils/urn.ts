@@ -76,7 +76,8 @@ const toDisambiguator = (datastructureId: string): string => {
  *   contain at least one alphanumeric character after normalization
  * @param datastructureId - the DataStructure id (UUID); source of the
  *   disambiguator that keeps equal names apart
- * @param version - the SemVer version string (e.g. `1.0.0`)
+ * @param version - the SemVer version string (e.g. `1.0.0`); the form schemas
+ *   enforce this shape (`VERSION_PATTERN`), the URN grammar rejects any other
  */
 export const buildDataStructureUrn = (name: string, datastructureId: string, version: string): string => {
   const normalizedName = toPascalCaseName(name)

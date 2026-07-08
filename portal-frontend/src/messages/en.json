@@ -1096,7 +1096,7 @@
     "versionInfo": {
       "title": "Version Information",
       "versionNumber": "Version Number",
-      "versionNumberPlaceholder": "e. g. 1.0",
+      "versionNumberPlaceholder": "e. g. 1.0.0",
       "description": "Version Description",
       "source": "Source"
     },
@@ -1112,7 +1112,8 @@
     },
     "errors": {
       "creationError": "An error occurred while creating the Data structure version.",
-      "versionAlreadyExists": "A version with the same version number already exists in this Data structure."
+      "versionAlreadyExists": "A version with the same version number already exists in this Data structure.",
+      "versionFormat": "The version number must follow the format X.Y.Z (e. g. 1.0.0)."
     }
   },
   "pipelineEditor": {
