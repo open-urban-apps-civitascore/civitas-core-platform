@@ -188,6 +188,42 @@ describe('mapping editor compile', () => {
     expect(fields['$.geometry_column']).toEqual({ op: 'geoPoint', lon: '$.longitude', lat: '' })
   })
 
+  it('drops an unconnected interior concat port instead of persisting an empty input', () => {
+    // in0 and in2 are wired, in1 is left empty — the compiled inputs must be compacted so the
+    // backend never receives a bare '' (which it rejects as a blank copy source path).
+    const concatDef = mappingRegistry.byType.concat
+
+    const cNodes: Node[] = [
+      {
+        id: SOURCE_NODE_ID,
+        type: 'mega',
+        position: { x: 0, y: 0 },
+        data: { role: 'source', fields: sourceTree.fields },
+      },
+      {
+        id: TARGET_NODE_ID,
+        type: 'mega',
+        position: { x: 700, y: 0 },
+        data: { role: 'target', fields: targetTree.fields },
+      },
+      {
+        id: 'c',
+        type: 'transform',
+        position: { x: 350, y: 100 },
+        data: { defType: 'concat', config: {}, inputs: concatInputPorts(3), outputs: concatDef.outputs },
+      },
+    ]
+
+    const cEdges: Edge[] = [
+      { id: 'e1', source: SOURCE_NODE_ID, sourceHandle: '$.name', target: 'c', targetHandle: 'in0' },
+      { id: 'e2', source: SOURCE_NODE_ID, sourceHandle: '$.suffix', target: 'c', targetHandle: 'in2' },
+      { id: 'e3', source: 'c', sourceHandle: 'out', target: TARGET_NODE_ID, targetHandle: '$.fullCode' },
+    ]
+
+    const { fields } = compileCanvas(cNodes, cEdges)
+    expect(fields['$.fullCode']).toEqual({ op: 'concat', inputs: ['$.name', '$.suffix'] })
+  })
+
   it('does not wire an unconnected conversion input to the source node', () => {
     const config: MappingConfig = {
       $schema: 'https://civitasconnect.digital/core/mapping/v1',

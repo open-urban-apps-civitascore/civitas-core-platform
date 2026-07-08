@@ -138,7 +138,8 @@ const concat: MappingTransformDef = {
   toValueNode: (inputs, cfg) => ({
     op: 'concat',
     ...(cfg.separator ? { separator: String(cfg.separator) } : {}),
-    inputs,
+    // concat is variadic: an unconnected port is simply absent, so drop empty slots.
+    inputs: inputs.filter(v => v !== ''),
   }),
   opInputs: op => (op.op === 'concat' ? op.inputs : []),
   opConfig: op => (op.op === 'concat' ? { separator: op.separator ?? '' } : {}),

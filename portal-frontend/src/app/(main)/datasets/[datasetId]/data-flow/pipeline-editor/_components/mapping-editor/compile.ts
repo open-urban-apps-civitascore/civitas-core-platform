@@ -53,8 +53,8 @@ export const compileCanvas = (nodes: Node[], edges: Edge[]): Pick<MappingConfig,
       const childDerived = childType ? `${derivedId}.${index}#${childType}` : `${derivedId}.${index}`
       inputs.push(resolve(edge.source, edge.sourceHandle ?? '', childDerived))
     })
-    // Drop trailing empty slots so variadic spares (e.g. concat's extra port) are not persisted.
-    while (inputs.length && inputs[inputs.length - 1] === '') inputs.pop()
+    // Each def's toValueNode decides how to treat empty slots: positional ops (geoPoint)
+    // keep them, variadic ops (concat) drop them.
     return def.toValueNode(inputs, data.config ?? {})
   }
 
