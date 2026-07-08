@@ -142,7 +142,7 @@ class PostgisSagaHandlerIT extends AbstractPostgisIT {
   }
 
   @Test
-  void provisionSinkCreatesObjectsThenDeprovisionRemovesTableAndRole() throws Exception {
+  void provisionSinkCreatesObjectsThenDeprovisionRemovesTableRoleAndSchema() throws Exception {
     Map<String, Object> trigger = postgisSinkTrigger();
 
     SagaCommandResult provisioned = handler.handle(execute("PROVISION_SINK", trigger));
@@ -161,7 +161,7 @@ class PostgisSagaHandlerIT extends AbstractPostgisIT {
     assertEquals("COMPENSATION_COMPLETED", deprovisioned.type());
     assertFalse(tableExists("sink_it", "observations"), "table should be dropped");
     assertFalse(roleExists("sink_it_geo"), "read role should be dropped");
-    assertTrue(schemaExists("sink_it"), "schema is intentionally left in place (may be shared)");
+    assertFalse(schemaExists("sink_it"), "the now-empty per-DataSet schema should be dropped");
   }
 
   private static Map<String, Object> postgisSinkTrigger() {
