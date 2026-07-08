@@ -245,8 +245,8 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
         toast.success(t('messages.updateSuccess'))
       }
 
+      form.reset(formData)
       router.refresh()
-      setIsReadOnly(true)
       return true
     } catch {
       toast.error(t('messages.transitionError'))
@@ -296,15 +296,17 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const handleSaveAndExit = () => {
     // Handle status-only change (form not dirty)
     if (hasOnlyStatusChanges) {
-      void handleSaveAndTransition(form.getValues() as DatasetFormDraft).then(() => {
+      void handleSaveAndTransition(form.getValues() as DatasetFormDraft).then(isSaved => {
         setIsExitModalOpen(false)
+        if (isSaved) setIsReadOnly(true)
       })
       return
     }
 
     void form.handleSubmit(data => {
-      void handleSaveAndTransition(data as DatasetFormDraft).then(() => {
+      void handleSaveAndTransition(data as DatasetFormDraft).then(isSaved => {
         setIsExitModalOpen(false)
+        if (isSaved) setIsReadOnly(true)
       })
     })()
   }
