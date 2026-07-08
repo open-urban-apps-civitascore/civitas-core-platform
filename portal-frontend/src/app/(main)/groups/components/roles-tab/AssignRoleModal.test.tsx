@@ -3,14 +3,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { JSX } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { Role } from '@/types/roles'
+import { type Role, ROLE_TYPES, type RoleType } from '@/types/roles'
 
 const mockRoles: Role[] = [
   {
     id: 'r1',
     name: 'System Admin',
     description: 'Administrates the system',
-    roleType: 'SYSTEM',
+    roleType: ROLE_TYPES.SYSTEM,
     permissions: [],
     readonly: true,
     modifiedBy: null,
@@ -23,7 +23,7 @@ const mockRoles: Role[] = [
     id: 'r2',
     name: 'Data Manager',
     description: 'Manages data',
-    roleType: 'DATA',
+    roleType: ROLE_TYPES.DATA,
     permissions: [],
     readonly: false,
     modifiedBy: null,
@@ -36,7 +36,7 @@ const mockRoles: Role[] = [
     id: 'r3',
     name: 'Data Lead',
     description: 'Data role',
-    roleType: 'DATA',
+    roleType: ROLE_TYPES.DATA,
     permissions: [],
     readonly: true,
     modifiedBy: null,
@@ -49,7 +49,7 @@ const mockRoles: Role[] = [
     id: 'r-assigned',
     name: 'Already Assigned',
     description: 'Already assigned role',
-    roleType: 'SYSTEM',
+    roleType: ROLE_TYPES.SYSTEM,
     permissions: [],
     readonly: true,
     modifiedBy: null,
@@ -103,7 +103,7 @@ const defaultProps = {
   onOpenChange: vi.fn(),
   groupId: 'g1',
   groupName: 'Test Group',
-  roleType: 'SYSTEM' as const,
+  roleType: ROLE_TYPES.SYSTEM as RoleType,
   assignedRoleIds: ['r-assigned'],
   onAssignRoles: vi.fn(),
 }
@@ -119,33 +119,33 @@ describe('AssignRoleModal', () => {
   }
 
   it('renders system role modal title and description', async () => {
-    await renderModal({ roleType: 'SYSTEM' })
+    await renderModal({ roleType: ROLE_TYPES.SYSTEM })
 
-    expect(screen.getByText('roles.assignSystemRole')).toBeInTheDocument()
-    expect(screen.getByText(/roles.assignSystemRoleDescription/)).toBeInTheDocument()
+    expect(await screen.findByText('roles.assignSystemRole')).toBeInTheDocument()
+    expect(await screen.findByText(/roles.assignSystemRoleDescription/)).toBeInTheDocument()
   })
 
   it('renders data role modal title and description', async () => {
-    await renderModal({ roleType: 'DATA' })
+    await renderModal({ roleType: ROLE_TYPES.DATA })
 
-    expect(screen.getByText('roles.assignDataRole')).toBeInTheDocument()
-    expect(screen.getByText(/roles.assignDataRoleDescription/)).toBeInTheDocument()
+    expect(await screen.findByText('roles.assignDataRole')).toBeInTheDocument()
+    expect(await screen.findByText(/roles.assignDataRoleDescription/)).toBeInTheDocument()
   })
 
   it('shows platform-wide warning banner for data role modal', async () => {
-    await renderModal({ roleType: 'DATA' })
+    await renderModal({ roleType: ROLE_TYPES.DATA })
 
     expect(screen.getByText('roles.dataRolePlatformWarning')).toBeInTheDocument()
   })
 
   it('does not show warning banner for system role modal', async () => {
-    await renderModal({ roleType: 'SYSTEM' })
+    await renderModal({ roleType: ROLE_TYPES.SYSTEM })
 
     expect(screen.queryByText('roles.dataRolePlatformWarning')).not.toBeInTheDocument()
   })
 
   it('shows only system roles when roleType is system', async () => {
-    await renderModal({ roleType: 'SYSTEM' })
+    await renderModal({ roleType: ROLE_TYPES.SYSTEM })
 
     await waitFor(() => {
       expect(screen.getByRole('cell', { name: 'System Admin' })).toBeInTheDocument()
@@ -155,7 +155,7 @@ describe('AssignRoleModal', () => {
   })
 
   it('shows data roles when roleType is data', async () => {
-    await renderModal({ roleType: 'DATA' })
+    await renderModal({ roleType: ROLE_TYPES.DATA })
 
     await waitFor(() => {
       expect(screen.getByRole('cell', { name: 'Data Manager' })).toBeInTheDocument()
@@ -165,7 +165,7 @@ describe('AssignRoleModal', () => {
   })
 
   it('shows already assigned roles with disabled checkbox', async () => {
-    await renderModal({ roleType: 'SYSTEM' })
+    await renderModal({ roleType: ROLE_TYPES.SYSTEM })
 
     await waitFor(() => {
       expect(screen.getByRole('cell', { name: 'Already Assigned' })).toBeInTheDocument()
@@ -183,7 +183,7 @@ describe('AssignRoleModal', () => {
   })
 
   it('calls onAssignRoles with selected Role objects on confirm', async () => {
-    await renderModal({ roleType: 'SYSTEM' })
+    await renderModal({ roleType: ROLE_TYPES.SYSTEM })
 
     await waitFor(() => {
       expect(screen.getByRole('cell', { name: 'System Admin' })).toBeInTheDocument()
@@ -196,7 +196,7 @@ describe('AssignRoleModal', () => {
     fireEvent.click(confirmButton)
 
     expect(defaultProps.onAssignRoles).toHaveBeenCalledWith([
-      expect.objectContaining({ id: 'r1', name: 'System Admin', roleType: 'SYSTEM' }),
+      expect.objectContaining({ id: 'r1', name: 'System Admin', roleType: ROLE_TYPES.SYSTEM }),
     ])
   })
 
