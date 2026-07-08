@@ -251,35 +251,6 @@ public final class NifiTestFixtures {
         """);
   }
 
-  /**
-   * Two chained mapping nodes in front of a FROST sink: the first is a plain record transform, the
-   * LAST carries the STA envelope target paths.
-   */
-  static Map<String, Object> graphWithChainedFrostMappings() throws Exception {
-    return map(
-        """
-        {
-          "nodes": [
-            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
-            { "id": "n-map1", "type": "mapping", "data": { "mappingConfig": {
-                "fields": { "$.station": "$.station_raw", "$.ref": "$.ref_raw" } } } },
-            { "id": "n-map2", "type": "mapping", "data": { "mappingConfig": {
-                "fields": {
-                  "$.things[].name": "$.station",
-                  "$.things[].description": { "op": "const", "value": "imported station" },
-                  "$.things[].properties.reference": "$.ref"
-                } } } },
-            { "id": "n-sink", "type": "frost", "data": { "entityId": "sink-1" } }
-          ],
-          "edges": [
-            { "id": "e1", "source": "n-src", "target": "n-map1" },
-            { "id": "e2", "source": "n-map1", "target": "n-map2" },
-            { "id": "e3", "source": "n-map2", "target": "n-sink" }
-          ]
-        }
-        """);
-  }
-
   /** A full chain with the cron trigger wired in front of the source. */
   static Map<String, Object> graphWithCron(String cronExpression) throws Exception {
     return map(
@@ -455,12 +426,6 @@ public final class NifiTestFixtures {
   static final StaKeys STA_KEYS = new StaKeys(List.of("reference"), List.of("reference"));
 
   /**
-   * A mapped MQTT→FROST flow: the compiled flat mapping (mixed strategies via the const) plus the
-   * entity plan, both produced by the real {@link FrostMappingCompiler} so the tests pin the actual
-   * compiler output. Lookup-only datastream (no create set) with an observation — the
-   * pre-existing-datastream shape.
-   */
-  /**
    * A metadata-only mapped MQTT→FROST flow: a creatable Thing and nothing else — the chain must
    * terminate cleanly after the Thing stage (no observation POST follows).
    */
@@ -488,6 +453,12 @@ public final class NifiTestFixtures {
         compilation.plan());
   }
 
+  /**
+   * A mapped MQTT→FROST flow: the compiled flat mapping (mixed strategies via the const) plus the
+   * entity plan, both produced by the real {@link FrostMappingCompiler} so the tests pin the actual
+   * compiler output. Lookup-only datastream (no create set) with an observation — the
+   * pre-existing-datastream shape.
+   */
   static FlowBuildSpec frostSinkWithMapping() throws Exception {
     Map<String, ValueNode> fields = new LinkedHashMap<>();
     fields.put("$.name", new ValueNode.CopyNode("$.station"));

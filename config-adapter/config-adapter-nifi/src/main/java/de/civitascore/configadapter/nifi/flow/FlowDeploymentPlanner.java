@@ -142,8 +142,8 @@ public class FlowDeploymentPlanner {
   /**
    * Has each transform node kind compile its own on-path nodes, then reassembles the units in flow
    * order (a kind compiles its nodes as one chain, but kinds may interleave on the path). At most
-   * one kind produces a sink pre-region plan — today the mapping kind's STA envelope for a mapped
-   * FROST sink.
+   * one kind produces a sink pre-region plan — today the mapping kind's FROST entity plan for a
+   * mapped FROST sink.
    */
   private Compilation compileTransforms(FlowPath path, SinkStage<?> sinkStage, SinkSpec sinkSpec)
       throws FatalAdapterException {

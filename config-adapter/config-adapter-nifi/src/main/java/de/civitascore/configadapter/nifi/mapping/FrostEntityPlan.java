@@ -9,8 +9,10 @@
  */
 package de.civitascore.configadapter.nifi.mapping;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 /**
  * The plan-time product of compiling a record mapping against a FROST sink: everything the sink's
@@ -55,8 +57,8 @@ public record FrostEntityPlan(
    * verbatim into a lookup URL — the identifier-per-segment form is the whitelist.
    */
   public record FilterTerm(String frostPath, String flatKey) {
-    private static final java.util.regex.Pattern SAFE_PATH =
-        java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(/[A-Za-z_][A-Za-z0-9_]*)*");
+    private static final Pattern SAFE_PATH =
+        Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(/[A-Za-z_][A-Za-z0-9_]*)*");
 
     public FilterTerm {
       Objects.requireNonNull(frostPath, "frostPath");
@@ -93,7 +95,7 @@ public record FrostEntityPlan(
   }
 
   private static List<FilterTerm> concat(List<FilterTerm> first, List<FilterTerm> second) {
-    List<FilterTerm> all = new java.util.ArrayList<>(first);
+    List<FilterTerm> all = new ArrayList<>(first);
     all.addAll(second);
     return all;
   }

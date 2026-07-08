@@ -42,13 +42,13 @@ components stays a reviewed decision.
 
 The resolved, typed configuration of one pipeline's sink — one sealed variant per sink kind, each
 carrying only its own fields with its own invariants (PostGIS: table name + primary-key columns;
-FROST: the saga's project id). Parsed from the raw catalog entry by the sink's own stage; the
-deployment request stays sink-agnostic.
+FROST: the saga's project id plus the schema-derived match keys). Parsed from the raw catalog entry
+by the sink's own stage; the deployment request stays sink-agnostic.
 
 ## Sink Pre-Region
 
 A plan-time handoff from the transform compilation to the sink's build region — data only the
-compilation can produce but only the sink consumes (today: the STA envelope rebuild for a mapped
+compilation can produce but only the sink consumes (today: the FROST entity plan for a mapped
 FROST sink). The slot is sink-neutral; each sink validates in its build half that it received a
 variant it can consume and rejects any other.
 
