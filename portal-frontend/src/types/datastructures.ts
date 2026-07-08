@@ -65,13 +65,15 @@ export const DatastructureVersionSummaryApiResponseSchema = z.object({
 // segment of the model's $id URN, whose validation rejects any other shape at release.
 export const VERSION_PATTERN = /^\d+\.\d+\.\d+$/
 
+const versionSchema = z
+  .string()
+  .trim()
+  .min(1, 'common.errors.required')
+  .regex(VERSION_PATTERN, 'datastructureVersions.errors.versionFormat')
+
 export const DatastructureVersionFormDraftSchema = z.object({
   id: z.string(),
-  version: z
-    .string()
-    .trim()
-    .min(1, 'common.errors.required')
-    .regex(VERSION_PATTERN, 'datastructureVersions.errors.versionFormat'),
+  version: versionSchema,
   description: z.string().trim(),
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   dataStructureVersionStatus: DatastructureStatusEnum,
@@ -89,11 +91,7 @@ export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormD
 })
 
 export const DatastructureVersionCreateSchema = z.object({
-  version: z
-    .string()
-    .trim()
-    .min(1, 'common.errors.required')
-    .regex(VERSION_PATTERN, 'datastructureVersions.errors.versionFormat'),
+  version: versionSchema,
   description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength').optional(),
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   dataStructureVersionStatus: DatastructureStatusEnum.optional(),
