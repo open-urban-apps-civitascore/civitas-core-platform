@@ -40,21 +40,27 @@ export const compileCanvas = (nodes: Node[], edges: Edge[]): Pick<MappingConfig,
     positions[derivedId] = node.position
     const ports = data.inputs ?? def.inputs
     const inputs: ValueNode[] = []
-    let index = 0
-    for (const port of ports) {
+    // Keep an empty slot for each unconnected port so fixed-arity transforms
+    // (e.g. geoPoint lon/lat) stay positionally aligned with their value tree.
+    ports.forEach((port, index) => {
       const edge = incoming(nodeId, port.id)
-      if (!edge) continue
+      if (!edge) {
+        inputs.push('')
+        return
+      }
       const child = byId.get(edge.source)
       const childType = edge.source !== SOURCE_NODE_ID && child ? (child.data as TransformNodeData).defType : null
       const childDerived = childType ? `${derivedId}.${index}#${childType}` : `${derivedId}.${index}`
       inputs.push(resolve(edge.source, edge.sourceHandle ?? '', childDerived))
-      index++
-    }
+    })
+    // Drop trailing empty slots so variadic spares (e.g. concat's extra port) are not persisted.
+    while (inputs.length && inputs[inputs.length - 1] === '') inputs.pop()
     return def.toValueNode(inputs, data.config ?? {})
   }
 
   for (const edge of edges) {
     if (edge.target !== TARGET_NODE_ID || !edge.targetHandle) continue
+
     const targetPath = edge.targetHandle
     const src = byId.get(edge.source)
     const rootType = edge.source !== SOURCE_NODE_ID && src ? (src.data as TransformNodeData).defType : null

@@ -109,8 +109,88 @@ describe('mapping editor compile', () => {
     })
   })
 
+  it('keeps geoPoint inputs positionally aligned when only latitude is wired', () => {
+    const geoPointDef = mappingRegistry.byType.geoPoint
+
+    const geoNodes: Node[] = [
+      {
+        id: SOURCE_NODE_ID,
+        type: 'mega',
+        position: { x: 0, y: 0 },
+        data: { role: 'source', fields: sourceTree.fields },
+      },
+      {
+        id: TARGET_NODE_ID,
+        type: 'mega',
+        position: { x: 700, y: 0 },
+        data: { role: 'target', fields: targetTree.fields },
+      },
+      {
+        id: 'gp',
+        type: 'transform',
+        position: { x: 350, y: 100 },
+        data: { defType: 'geoPoint', config: {}, inputs: geoPointDef.inputs, outputs: geoPointDef.outputs },
+      },
+    ]
+
+    // Only the latitude port is connected; longitude is left empty.
+    const geoEdges: Edge[] = [
+      { id: 'e2', source: SOURCE_NODE_ID, sourceHandle: '$.latitude', target: 'gp', targetHandle: 'lat' },
+      { id: 'e3', source: 'gp', sourceHandle: 'out', target: TARGET_NODE_ID, targetHandle: '$.geometry_column' },
+    ]
+
+    const { fields } = compileCanvas(geoNodes, geoEdges)
+    expect(fields['$.geometry_column']).toEqual({ op: 'geoPoint', lon: '', lat: '$.latitude' })
+
+    // Reopening the editor must keep the wire on the latitude port, not longitude.
+    const config: MappingConfig = {
+      $schema: 'https://civitasconnect.digital/core/mapping/v1',
+      source: 'urn:core:datastructure:a:b',
+      target: 'urn:core:datastructure:c:d',
+      fields,
+      positions: {},
+    }
+    const built = decompileConfig(config, sourceTree, targetTree)
+    const gpEdge = built.edges.find(e => e.source === SOURCE_NODE_ID && e.sourceHandle === '$.latitude')
+    expect(gpEdge?.targetHandle).toBe('lat')
+  })
+
+  it('keeps geoPoint inputs positionally aligned when only longitude is wired', () => {
+    const geoPointDef = mappingRegistry.byType.geoPoint
+
+    const geoNodes: Node[] = [
+      {
+        id: SOURCE_NODE_ID,
+        type: 'mega',
+        position: { x: 0, y: 0 },
+        data: { role: 'source', fields: sourceTree.fields },
+      },
+      {
+        id: TARGET_NODE_ID,
+        type: 'mega',
+        position: { x: 700, y: 0 },
+        data: { role: 'target', fields: targetTree.fields },
+      },
+      {
+        id: 'gp',
+        type: 'transform',
+        position: { x: 350, y: 100 },
+        data: { defType: 'geoPoint', config: {}, inputs: geoPointDef.inputs, outputs: geoPointDef.outputs },
+      },
+    ]
+
+    const geoEdges: Edge[] = [
+      { id: 'e1', source: SOURCE_NODE_ID, sourceHandle: '$.longitude', target: 'gp', targetHandle: 'lon' },
+      { id: 'e3', source: 'gp', sourceHandle: 'out', target: TARGET_NODE_ID, targetHandle: '$.geometry_column' },
+    ]
+
+    const { fields } = compileCanvas(geoNodes, geoEdges)
+    expect(fields['$.geometry_column']).toEqual({ op: 'geoPoint', lon: '$.longitude', lat: '' })
+  })
+
   it('does not wire an unconnected conversion input to the source node', () => {
     const config: MappingConfig = {
+
       $schema: 'https://civitasconnect.digital/core/mapping/v1',
       source: 'urn:core:datastructure:a:b',
       target: 'urn:core:datastructure:c:d',
