@@ -261,6 +261,24 @@ class DataSetSagaPublisherTest {
     }
 
     @Test
+    @DisplayName("fails the publish with a controlled error when the DSV reference is not a UUID")
+    void failsWhenReferencedVersionIsMalformed() {
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      DataSink sink = new DataSink();
+      sink.setId(UUID.randomUUID());
+      sink.setDataSinkType(DataSinkType.POSTGIS);
+      Map<String, Object> cfg = new HashMap<>();
+      cfg.put("tableName", "sensor_observations");
+      cfg.put("dataStructureVersionId", "not-a-uuid");
+      sink.setConfiguration(cfg);
+      DataSet dataSet = datasetWithPipeline(pipeline);
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class);
+    }
+
+    @Test
     @DisplayName("FROST sink without a DSV reference carries a null dataStructure, no failure")
     void frostSinkHasNoSchema() {
       UUID sinkId = UUID.randomUUID();

@@ -289,7 +289,18 @@ public class DataSetSagaPublisher {
     if (dsvIdRaw == null) {
       return null; // e.g. FROST passthrough sink — no data-structure version
     }
-    UUID dsvId = UUID.fromString(String.valueOf(dsvIdRaw));
+    UUID dsvId;
+    try {
+      dsvId = UUID.fromString(String.valueOf(dsvIdRaw));
+    } catch (IllegalArgumentException e) {
+      // Validated at sink save time, so this is unreachable in practice — but a corrupt raw value
+      // must still fail like its sibling checks (a controlled 400) rather than escaping as an
+      // unhandled 500 that echoes the malformed value.
+      throw new InvalidInputException(
+          "DataSink",
+          "configuration.dataStructureVersionId",
+          "dataStructureVersionId must be a valid UUID");
+    }
     var version =
         dataStructureVersionRepository
             .findById(dsvId)
