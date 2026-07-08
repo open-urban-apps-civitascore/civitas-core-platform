@@ -16,6 +16,7 @@ import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
@@ -42,6 +43,7 @@ class DataStructureVersionServiceTest {
   @Mock private DataStructureVersionMapper dataStructureVersionMapper;
   @Mock private DataStructureService dataStructureService;
   @Mock private DataSourceRepository dataSourceRepository;
+  @Mock private DataSinkRepository dataSinkRepository;
 
   @InjectMocks private DataStructureVersionService dataStructureVersionService;
 
@@ -63,6 +65,26 @@ class DataStructureVersionServiceTest {
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
+
+      assertThatThrownBy(() -> dataStructureVersionService.unrelease(versionId))
+          .isInstanceOf(ResourceInUseException.class);
+    }
+
+    @Test
+    @DisplayName("Should block unrelease when version is referenced by a DataSink")
+    void shouldBlockUnreleaseWhenReferencedByDataSink() {
+      UUID versionId = UUID.randomUUID();
+      DataStructure ds = new DataStructure();
+      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      version.setDataStructure(ds);
+
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
+      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
+      when(dataSinkRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
 
       assertThatThrownBy(() -> dataStructureVersionService.unrelease(versionId))
           .isInstanceOf(ResourceInUseException.class);
@@ -118,6 +140,27 @@ class DataStructureVersionServiceTest {
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
       when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
+
+      assertThatThrownBy(() -> dataStructureVersionService.deleteById(versionId))
+          .isInstanceOf(ResourceInUseException.class);
+    }
+
+    @Test
+    @DisplayName("Should block delete when version is referenced by a DataSink")
+    void shouldBlockDeleteWhenReferencedByDataSink() {
+      UUID versionId = UUID.randomUUID();
+      DataStructure ds = new DataStructure();
+      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      version.setDataStructure(ds);
+
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
+      when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
+      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
+      when(dataSinkRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
 
       assertThatThrownBy(() -> dataStructureVersionService.deleteById(versionId))
           .isInstanceOf(ResourceInUseException.class);
@@ -236,6 +279,50 @@ class DataStructureVersionServiceTest {
       assertThat(input.getModelName())
           .as("ModelName is editable while in use")
           .isEqualTo("UpdatedModelName");
+    }
+
+    @Test
+    @DisplayName(
+        "Should block structural changes via updateReleasedMeta when referenced by a DataSink")
+    void shouldBlockStructuralChangesWhenReferencedByDataSink() {
+      UUID versionId = UUID.randomUUID();
+      UUID dataStructureId = UUID.randomUUID();
+      DataStructure ds = new DataStructure();
+      ds.setId(dataStructureId);
+      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+
+      Map<String, Object> originalModel = new HashMap<>(Map.of("title", "Original"));
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setVersion("1.0.0");
+      version.setModel(originalModel);
+      version.setStyles(new HashMap<>(Map.of("color", "blue")));
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      version.setDataStructure(ds);
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setDataStructureId(dataStructureId);
+      input.setVersion("2.0.0");
+      input.setModel(new HashMap<>(Map.of("title", "SHOULD_NOT_CHANGE")));
+      input.setStyles(new HashMap<>(Map.of("color", "red")));
+
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
+      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
+      when(dataSinkRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
+      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
+              dataStructureId, "1.0.0"))
+          .thenReturn(Set.of(version));
+      when(dataStructureVersionRepository.save(any())).thenReturn(version);
+      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
+
+      dataStructureVersionService.updateReleasedMeta(versionId, input);
+
+      assertThat(input.getModel())
+          .as("Model should be reverted when a DataSink references the version")
+          .isEqualTo(originalModel);
+      assertThat(input.getVersion()).as("Version should be reverted").isEqualTo("1.0.0");
+      assertThat(input.getStyles().get("color")).as("Styles should be reverted").isEqualTo("blue");
     }
 
     @Test

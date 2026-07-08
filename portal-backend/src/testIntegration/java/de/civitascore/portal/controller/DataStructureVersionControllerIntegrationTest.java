@@ -1278,5 +1278,101 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .as("inUse should be false when no DataSource references this version")
           .isFalse();
     }
+
+    /**
+     * Builds a released version referenced only by a DataSink (via the {@code
+     * dataStructureVersionId} key of the sink's JSONB configuration) — no DataSource.
+     *
+     * @return the referenced, persisted version
+     */
+    private DataStructureVersion createSinkReferencedVersion() {
+      DataStructure ds = new DataStructure();
+      ds.setName("Sink-Referenced Data Structure");
+      ds.setDescription("Data structure with a version referenced by a DataSink");
+      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      ds.setCreatedFromDataSource(false);
+      ds = dataStructureRepository.save(ds);
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setDataStructure(ds);
+      version.setVersion("1.0.0");
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      version.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      version.setModel(portalData.dataStructureVersionModel("SinkReferenced"));
+      version.setModelName("Sink Referenced Model");
+      version = dataStructureVersionRepository.save(version);
+
+      UUID versionId = version.getId();
+      var dataSet = portalData.dataSet();
+      portalData.dataSink(
+          dataSet,
+          null,
+          sink -> sink.setConfiguration(Map.of("dataStructureVersionId", versionId.toString())));
+
+      return version;
+    }
+
+    @Test
+    @DisplayName("Should return inUse=true in version output DTO when a DataSink references it")
+    void shouldReturnInUseTrueWhenDataSinkReferencesVersion() {
+      DataStructureVersion version = createSinkReferencedVersion();
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              "/datastructures/"
+                  + version.getDataStructure().getId()
+                  + "/versions/"
+                  + version.getId(),
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().isInUse())
+          .as("inUse should be true when a DataSink references this version")
+          .isTrue();
+    }
+
+    @Test
+    @DisplayName("Should return 409 when deleting a version referenced by a DataSink")
+    void shouldReturn409WhenDeletingDataSinkReferencedVersion() {
+      DataStructureVersion version = createSinkReferencedVersion();
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              "/datastructures/"
+                  + version.getDataStructure().getId()
+                  + "/versions/"
+                  + version.getId(),
+              HttpMethod.DELETE,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT status")
+          .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when unreleasing a version referenced by a DataSink")
+    void shouldReturn409WhenUnreleasingDataSinkReferencedVersion() {
+      DataStructureVersion version = createSinkReferencedVersion();
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              "/datastructures/"
+                  + version.getDataStructure().getId()
+                  + "/versions/"
+                  + version.getId()
+                  + "/unrelease",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT status")
+          .isEqualTo(HttpStatus.CONFLICT);
+    }
   }
 }

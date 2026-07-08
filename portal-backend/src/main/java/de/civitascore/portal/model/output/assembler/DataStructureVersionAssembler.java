@@ -3,6 +3,7 @@ package de.civitascore.portal.model.output.assembler;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.output.DataStructureVersionOutputDTO;
+import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ public class DataStructureVersionAssembler
 
   private final DataStructureVersionMapper dataStructureVersionMapper;
   private final DataSourceRepository dataSourceRepository;
+  private final DataSinkRepository dataSinkRepository;
 
   /** {@inheritDoc} Delegates to the {@link DataStructureVersionMapper} for basic field mapping. */
   @Override
@@ -28,13 +30,15 @@ public class DataStructureVersionAssembler
   }
 
   /**
-   * {@inheritDoc} Sets the {@code inUse} flag based on whether any data source references this
-   * version.
+   * {@inheritDoc} Sets the {@code inUse} flag based on whether any data source or data sink
+   * references this version.
    */
   @Override
   public DataStructureVersionOutputDTO enrichDto(
       DataStructureVersionOutputDTO dto, DataStructureVersion entity) {
-    dto.setInUse(dataSourceRepository.existsByDataStructureVersionId(entity.getId()));
+    dto.setInUse(
+        dataSourceRepository.existsByDataStructureVersionId(entity.getId())
+            || dataSinkRepository.existsByDataStructureVersionId(entity.getId()));
     return dto;
   }
 
