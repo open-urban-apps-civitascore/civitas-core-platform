@@ -304,6 +304,26 @@ describe('validateFrostMappingCoversStaGroups', () => {
     expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
   })
 
+  it('accepts the optional properties bags and extra observation fields', () => {
+    const result = validatePipeline(
+      wiredToFrost(
+        staMapping({
+          ...creatableThingFields,
+          '$.Locations[].name': '$.loc',
+          '$.Locations[].description': '$.d',
+          '$.Locations[].encodingType': '$.e',
+          '$.Locations[].location': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
+          '$.Locations[].properties': '$.meta',
+          '$.Datastreams[].reference': '$.ref',
+          '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
+          '$.Datastreams[].Observations[].resultQuality': '$.q',
+          '$.Datastreams[].Observations[].validTime': '$.valid',
+        }),
+      ),
+    )
+    expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
+  })
+
   const FEATURE_OF_INTEREST_KEY = 'validation.messages.frostMappingFeatureOfInterestNeedsObservation'
 
   it('rejects a FeatureOfInterest without a mapped Observation', () => {

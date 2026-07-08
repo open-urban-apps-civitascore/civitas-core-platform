@@ -40,7 +40,7 @@ export const STA_ENTITIES: readonly StaEntity[] = [
       '$.Locations[].encodingType',
       '$.Locations[].location',
     ],
-    optionalPaths: [],
+    optionalPaths: ['$.Locations[].properties'],
   },
   {
     key: 'datastream',
@@ -60,13 +60,18 @@ export const STA_ENTITIES: readonly StaEntity[] = [
       '$.Datastreams[].ObservedProperty.definition',
       '$.Datastreams[].ObservedProperty.description',
     ],
-    optionalPaths: [],
+    optionalPaths: ['$.Datastreams[].Sensor.properties', '$.Datastreams[].ObservedProperty.properties'],
   },
   {
     key: 'observation',
     pathPrefix: '$.Datastreams[].Observations[',
     createPaths: ['$.Datastreams[].Observations[].result'],
-    optionalPaths: ['$.Datastreams[].Observations[].phenomenonTime', '$.Datastreams[].Observations[].resultTime'],
+    optionalPaths: [
+      '$.Datastreams[].Observations[].phenomenonTime',
+      '$.Datastreams[].Observations[].resultTime',
+      '$.Datastreams[].Observations[].resultQuality',
+      '$.Datastreams[].Observations[].validTime',
+    ],
   },
   {
     key: 'featureOfInterest',
@@ -77,7 +82,7 @@ export const STA_ENTITIES: readonly StaEntity[] = [
       '$.Datastreams[].Observations[].FeatureOfInterest.encodingType',
       '$.Datastreams[].Observations[].FeatureOfInterest.feature',
     ],
-    optionalPaths: [],
+    optionalPaths: ['$.Datastreams[].Observations[].FeatureOfInterest.properties'],
   },
 ]
 

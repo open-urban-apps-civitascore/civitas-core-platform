@@ -34,7 +34,7 @@ describe('STA target catalog mirrors the adapter catalog', () => {
           '$.Locations[].encodingType',
           '$.Locations[].location',
         ],
-        optionalPaths: [],
+        optionalPaths: ['$.Locations[].properties'],
       },
       {
         key: 'datastream',
@@ -53,12 +53,17 @@ describe('STA target catalog mirrors the adapter catalog', () => {
           '$.Datastreams[].ObservedProperty.definition',
           '$.Datastreams[].ObservedProperty.description',
         ],
-        optionalPaths: [],
+        optionalPaths: ['$.Datastreams[].Sensor.properties', '$.Datastreams[].ObservedProperty.properties'],
       },
       {
         key: 'observation',
         createPaths: ['$.Datastreams[].Observations[].result'],
-        optionalPaths: ['$.Datastreams[].Observations[].phenomenonTime', '$.Datastreams[].Observations[].resultTime'],
+        optionalPaths: [
+          '$.Datastreams[].Observations[].phenomenonTime',
+          '$.Datastreams[].Observations[].resultTime',
+          '$.Datastreams[].Observations[].resultQuality',
+          '$.Datastreams[].Observations[].validTime',
+        ],
       },
       {
         key: 'featureOfInterest',
@@ -68,7 +73,7 @@ describe('STA target catalog mirrors the adapter catalog', () => {
           '$.Datastreams[].Observations[].FeatureOfInterest.encodingType',
           '$.Datastreams[].Observations[].FeatureOfInterest.feature',
         ],
-        optionalPaths: [],
+        optionalPaths: ['$.Datastreams[].Observations[].FeatureOfInterest.properties'],
       },
     ])
   })
