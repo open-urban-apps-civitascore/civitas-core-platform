@@ -90,6 +90,12 @@ export interface BaseUMLElement {
   stereotype?: string
   documentation?: string
   package?: string
+  /**
+   * Marks this element as the designated document root of the diagram. At most one element may
+   * carry the flag (the editor enforces radio semantics); when set it overrides the containment
+   * derivation in `resolveRootElement`.
+   */
+  isRoot?: boolean
 }
 
 export interface UMLClass extends BaseUMLElement {

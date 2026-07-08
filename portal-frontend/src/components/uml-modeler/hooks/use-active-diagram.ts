@@ -25,6 +25,8 @@ interface ActiveDiagramContextValue {
   // Node operations
   addNode: (context: NodeCreationContext) => void
   updateNode: (nodeId: string, updates: Partial<UMLElement>) => void
+  /** Designates the node as the diagram's root (clearing any other flag); `null` clears it. */
+  setRootNode: (nodeId: string | null) => void
   deleteNodes: (nodeIds: string[]) => void
   selectNode: (nodeId: string, isMultiSelect?: boolean) => void
 
@@ -70,6 +72,7 @@ export const useActiveDiagram = (): ActiveDiagramContextValue => {
       dispatch: () => {},
       addNode: () => {},
       updateNode: () => {},
+      setRootNode: () => {},
       deleteNodes: () => {},
       selectNode: () => {},
       addEdge: () => {},

@@ -55,6 +55,9 @@ export type DiagramAction =
   | { type: 'ADD_EDGE'; payload: Connection }
   | { type: 'ADD_NODE'; payload: UMLNode }
   | { type: 'UPDATE_NODE'; payload: { id: string; updates: Partial<UMLElement> } }
+  // Root designation is radio-semantic (at most one flag diagram-wide), so it is one atomic
+  // action instead of per-node updates; `id: null` clears the designation entirely.
+  | { type: 'SET_ROOT_NODE'; payload: { id: string | null } }
   | { type: 'UPDATE_EDGE'; payload: { id: string; updates: Partial<UMLRelationship> } }
   | { type: 'DELETE_NODES'; payload: string[] }
   | { type: 'DELETE_EDGES'; payload: string[] }

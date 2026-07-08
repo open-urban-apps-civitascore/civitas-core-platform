@@ -1433,7 +1433,7 @@
     },
     "rootValidation": {
       "noRoot": "No root class can be determined in the diagram — every class is embedded in another one (cyclic structure).",
-      "ambiguousRoot": "The diagram has several possible root classes ({names}). Connect all classes into a hierarchy with exactly one root.",
+      "ambiguousRoot": "The diagram has several possible root classes ({names}). Mark the root class in the class properties or connect the classes into a hierarchy.",
       "unreachable": "These elements are not reachable from the root class \"{root}\": {names}. Connect them to the hierarchy or remove them."
     }
   },

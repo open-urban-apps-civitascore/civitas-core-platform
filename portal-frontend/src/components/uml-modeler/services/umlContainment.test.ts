@@ -191,4 +191,42 @@ describe('resolveRootElement', () => {
   it('returns empty for a diagram without elements', () => {
     expect(resolveRootElement(fullDiagram([]))).toEqual({ kind: 'empty' })
   })
+
+  it('lets the designated root (isRoot) resolve an otherwise ambiguous diagram', () => {
+    const alpha = { ...element('a', 'Alpha'), isRoot: true } as UMLElement
+    const beta = element('b', 'Beta')
+    // Both classes are non-embedded, but Beta must still hang under the designated root.
+    const d = fullDiagram([alpha, beta], [edge(relationship({ type: 'association', source: 'a', target: 'b' }))])
+    expect(resolveRootElement(d)).toEqual({ kind: 'class', root: alpha })
+  })
+
+  it('checks reachability from the designated root too', () => {
+    const alpha = { ...element('a', 'Alpha'), isRoot: true } as UMLElement
+    const beta = element('b', 'Beta')
+    expect(resolveRootElement(fullDiagram([alpha, beta]))).toEqual({
+      kind: 'invalid',
+      failure: { code: 'unreachable', rootName: 'Alpha', unreachableNames: ['Beta'] },
+    })
+  })
+
+  it('rejects several designated roots (corrupt persisted state) as ambiguous', () => {
+    const alpha = { ...element('a', 'Alpha'), isRoot: true } as UMLElement
+    const beta = { ...element('b', 'Beta'), isRoot: true } as UMLElement
+    expect(resolveRootElement(fullDiagram([alpha, beta]))).toEqual({
+      kind: 'invalid',
+      failure: { code: 'ambiguousRoot', candidateNames: ['Alpha', 'Beta'] },
+    })
+  })
+
+  it('prefers the designated root over the containment derivation', () => {
+    const part = { ...element('p', 'Part'), isRoot: true } as UMLElement
+    const whole = element('w', 'Whole')
+    // The flagged class is embedded; its container is then unreachable from it — surfaced as such
+    // rather than silently ignoring the designation.
+    const d = fullDiagram([whole, part], [edge(relationship({ type: 'composition', source: 'p', target: 'w' }))])
+    expect(resolveRootElement(d)).toEqual({
+      kind: 'invalid',
+      failure: { code: 'unreachable', rootName: 'Part', unreachableNames: ['Whole'] },
+    })
+  })
 })

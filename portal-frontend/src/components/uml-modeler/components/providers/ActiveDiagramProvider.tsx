@@ -95,6 +95,13 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
     [dispatch],
   )
 
+  const setRootNode = useCallback(
+    (nodeId: string | null) => {
+      dispatch({ type: 'SET_ROOT_NODE', payload: { id: nodeId } })
+    },
+    [dispatch],
+  )
+
   const deleteNodes = useCallback(
     (nodeIds: string[]) => {
       dispatch({ type: 'DELETE_NODES', payload: nodeIds })
@@ -229,6 +236,7 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
       // Node operations
       addNode,
       updateNode,
+      setRootNode,
       deleteNodes,
       selectNode,
 
@@ -263,6 +271,7 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
       dispatch,
       addNode,
       updateNode,
+      setRootNode,
       deleteNodes,
       selectNode,
       addEdge,

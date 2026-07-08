@@ -1001,6 +1001,22 @@ describe('exportToJsonSchema', () => {
     expect((schema.$defs as Record<string, unknown>)['Road-Segment-Part']).toBeDefined()
   })
 
+  it('exports the designated root (isRoot) when the derivation alone would be ambiguous', () => {
+    // Beta is referenced only as an attribute type: reachable from Alpha, but not embedded by any
+    // edge — without the designation both classes would be root candidates.
+    const alpha = cls('a', 'Alpha', [{ id: 'a1', name: 'beta', type: { id: 'b' } as unknown as string }])
+    ;(alpha.data.element as { isRoot?: boolean }).isRoot = true
+    const diagram = baseDiagram({
+      name: 'S',
+      nodes: [alpha, cls('b', 'Beta', [{ id: 'a2', name: 'b1' }])] as unknown as UMLDiagram['nodes'],
+      edges: [],
+    } as Partial<UMLDiagram>)
+
+    const schema = exportToJsonSchema(diagram)
+    expect(schema.properties).toEqual({ alpha: { $ref: '#/$defs/Alpha' } })
+    expect((classDef(schema, 'Alpha').properties as Record<string, unknown>).beta).toEqual({ $ref: '#/$defs/Beta' })
+  })
+
   it('does not collapse an ambiguous diagram onto a diagram-name-matching class', () => {
     const diagram = baseDiagram({
       name: 'beta',

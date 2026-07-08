@@ -180,11 +180,13 @@ export const collectReachableIds = (diagram: UMLDiagram, rootId: string): Set<st
 }
 
 /**
- * The single hierarchy root of a diagram, strictly: exactly one non-embedded, non-enumeration
- * element from which every other element is reachable. Anything else is `invalid` with a typed
- * failure instead of an order-dependent guess — several candidates (`ambiguousRoot`), a fully
- * embedded/cyclic diagram (`noRoot`), or stranded elements (`unreachable`). A diagram consisting
- * of exactly one enumeration keeps its special enum-root form.
+ * The single hierarchy root of a diagram: the explicitly flagged element (`isRoot`, set via the
+ * editor's root checkbox) or, without a flag, strictly the one non-embedded, non-enumeration
+ * element. From the root, every other element must be reachable. Anything else is `invalid` with
+ * a typed failure instead of an order-dependent guess — several flags or several derivation
+ * candidates (`ambiguousRoot`), a fully embedded/cyclic diagram (`noRoot`), or stranded elements
+ * (`unreachable`). A diagram consisting of exactly one enumeration keeps its special enum-root
+ * form.
  */
 export const resolveRootElement = (diagram: UMLDiagram): RootResolution => {
   const elements = elementsOf(diagram)
@@ -196,21 +198,41 @@ export const resolveRootElement = (diagram: UMLDiagram): RootResolution => {
     return { kind: 'invalid', failure: { code: 'ambiguousRoot', candidateNames: namesOf(elements) } }
   }
 
-  const containedIds = collectContainedIds(diagram)
-  const candidates = nonEnum.filter(e => !containedIds.has(e.id))
-  if (candidates.length === 0) return { kind: 'invalid', failure: { code: 'noRoot' } }
-  if (candidates.length > 1) {
-    return { kind: 'invalid', failure: { code: 'ambiguousRoot', candidateNames: namesOf(candidates) } }
-  }
+  const root = designatedRoot(nonEnum) ?? derivedRoot(nonEnum, diagram)
+  if ('failure' in root) return { kind: 'invalid', failure: root.failure }
 
-  const root = candidates[0]
-  const reachable = collectReachableIds(diagram, root.id)
+  const reachable = collectReachableIds(diagram, root.element.id)
   const unreachable = elements.filter(e => !reachable.has(e.id))
   if (unreachable.length > 0) {
     return {
       kind: 'invalid',
-      failure: { code: 'unreachable', rootName: root.name || root.type, unreachableNames: namesOf(unreachable) },
+      failure: {
+        code: 'unreachable',
+        rootName: root.element.name || root.element.type,
+        unreachableNames: namesOf(unreachable),
+      },
     }
   }
-  return { kind: 'class', root }
+  return { kind: 'class', root: root.element }
+}
+
+type RootPick = { element: UMLElement } | { failure: RootResolutionFailure }
+
+/** The user-designated root, if any. Several flags (corrupt persisted state) are ambiguous. */
+const designatedRoot = (nonEnum: UMLElement[]): RootPick | null => {
+  const flagged = nonEnum.filter(e => e.isRoot === true)
+  if (flagged.length === 0) return null
+  if (flagged.length > 1) return { failure: { code: 'ambiguousRoot', candidateNames: namesOf(flagged) } }
+  return { element: flagged[0] }
+}
+
+/** The containment-derived root: strictly the single non-embedded class. */
+const derivedRoot = (nonEnum: UMLElement[], diagram: UMLDiagram): RootPick => {
+  const containedIds = collectContainedIds(diagram)
+  const candidates = nonEnum.filter(e => !containedIds.has(e.id))
+  if (candidates.length === 0) return { failure: { code: 'noRoot' } }
+  if (candidates.length > 1) {
+    return { failure: { code: 'ambiguousRoot', candidateNames: namesOf(candidates) } }
+  }
+  return { element: candidates[0] }
 }
