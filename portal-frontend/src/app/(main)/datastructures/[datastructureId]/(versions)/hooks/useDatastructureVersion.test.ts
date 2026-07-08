@@ -182,7 +182,10 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     })
 
     expect(saved).toBe(true)
-    expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('messages.draftModelSkipped'))
+    expect(toast.warning).toHaveBeenCalledWith(
+      expect.stringContaining('messages.draftModelSkipped'),
+      expect.objectContaining({ duration: Infinity, closeButton: true }),
+    )
     expect(updateVersion.mutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ model: null }) }),
     )
@@ -196,7 +199,10 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
       await hook.result.current.saveDatastructureVersion(DS_ID)
     })
 
-    expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('messages.draftModelRemoved'))
+    expect(toast.warning).toHaveBeenCalledWith(
+      expect.stringContaining('messages.draftModelRemoved'),
+      expect.objectContaining({ duration: Infinity, closeButton: true }),
+    )
   })
 
   it('passes the exported model through for a resolvable diagram', async () => {
