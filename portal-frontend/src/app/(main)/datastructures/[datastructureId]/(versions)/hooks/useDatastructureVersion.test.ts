@@ -172,7 +172,7 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     expect(updateReleased.mutateAsync).not.toHaveBeenCalled()
   })
 
-  it('parks a draft diagram-only, warns, and sends model null', async () => {
+  it('parks a draft diagram-only, silently, sending model null', async () => {
     const { hook, updateVersion } = setup(version())
 
     act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
@@ -182,16 +182,13 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     })
 
     expect(saved).toBe(true)
-    expect(toast.warning).toHaveBeenCalledWith(
-      expect.stringContaining('messages.draftModelSkipped'),
-      expect.objectContaining({ duration: Infinity, closeButton: true, className: 'toast-error' }),
-    )
+    expect(toast.warning).not.toHaveBeenCalled()
     expect(updateVersion.mutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ model: null }) }),
     )
   })
 
-  it('warns about removing a previously persisted model on draft save', async () => {
+  it('parks a draft silently even when a model was previously persisted', async () => {
     const { hook } = setup(version({ model: { title: 'Struct' } as never }))
 
     act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
@@ -199,10 +196,8 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
       await hook.result.current.saveDatastructureVersion(DS_ID)
     })
 
-    expect(toast.warning).toHaveBeenCalledWith(
-      expect.stringContaining('messages.draftModelRemoved'),
-      expect.objectContaining({ duration: Infinity, closeButton: true, className: 'toast-error' }),
-    )
+    expect(toast.warning).not.toHaveBeenCalled()
+    expect(toast.error).not.toHaveBeenCalled()
   })
 
   it('passes the exported model through for a resolvable diagram', async () => {

@@ -1126,9 +1126,7 @@
       "updateSuccess": "The version of the data has been successfully updated.",
       "isInUseModelHint": "The data model can not be edited since it is already in use.",
       "isInUseStatusHint": "Can not be set to draft since this version is already in use.",
-      "isLastAvailableVersion": "Can not be set to draft because this is the last available version in an available Data structure. Set the Data structure to draft first.",
-      "draftModelSkipped": "The draft was saved without a schema model: {reason}",
-      "draftModelRemoved": "The draft was saved without a schema model, removing the previously stored model: {reason}"
+      "isLastAvailableVersion": "Can not be set to draft because this is the last available version in an available Data structure. Set the Data structure to draft first."
     },
     "errors": {
       "creationError": "An error occurred while creating the Data structure version.",

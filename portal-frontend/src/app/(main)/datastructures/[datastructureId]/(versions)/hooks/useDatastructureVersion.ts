@@ -296,24 +296,15 @@ export const useDatastructureVersion = ({
           model = buildUMLModelPayload(sessionDiagram, modelUri).model
         } catch (error) {
           if (!(error instanceof SchemaExportError)) throw error
-          const reason = rootFailureMessage(tUmlModeler, error.failure)
           // A version that is (or becomes) released must not exist without a model — the deploy
           // engine reads it. Keyed on the target status, not the dirty transition, so a version
-          // already released is refused too. A draft may still be parked; it saves diagram-only,
-          // which deletes any previously persisted model — the warning has to say so.
+          // already released is refused too. A draft saves silently diagram-only: the model/diagram
+          // distinction is not one the user should have to reason about while still modelling.
           if (statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE) {
+            const reason = rootFailureMessage(tUmlModeler, error.failure)
             toast.error(t('errors.releaseInvalidModel', { reason }))
             return false
           }
-          const messageKey = version?.model ? 'messages.draftModelRemoved' : 'messages.draftModelSkipped'
-          // Persists until dismissed and borrows the destructive styling: it competes with the
-          // success toast the save still fires, and a self-clearing, muted warning about a dropped
-          // schema model is too easy to miss.
-          toast.warning(t(messageKey, { reason }), {
-            duration: Infinity,
-            closeButton: true,
-            className: 'toast-error',
-          })
         }
       }
       const payload = mapDatastructureVersionFormToApiData(parsed.data, sessionDiagram, model)
