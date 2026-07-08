@@ -149,7 +149,7 @@ public final class StaTargetCatalog {
           new StaTarget(
               "$.Datastreams[].Observations[].resultQuality",
               StaEntity.OBSERVATION,
-              StaJsonType.RAW_JSON,
+              StaJsonType.ANY,
               TargetKind.OPTIONAL),
           new StaTarget(
               "$.Datastreams[].Observations[].validTime",

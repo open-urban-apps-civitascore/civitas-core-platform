@@ -118,7 +118,8 @@ class FrostMappingCompilerTest {
 
     assertEquals(
         "{\"result\":${sta_2_result:isEmpty():ifElse('null', ${sta_2_result})},"
-            + "\"resultQuality\":${sta_3_resultquality},"
+            + "\"resultQuality\":${sta_3_resultquality:isEmpty():ifElse('null',"
+            + " ${sta_3_resultquality:escapeJson():prepend('\"'):append('\"')})},"
             + "\"validTime\":${sta_4_validtime:isEmpty():ifElse('null',"
             + " ${sta_4_validtime:escapeJson():prepend('\"'):append('\"')})},"
             + "\"Datastream\":{\"@iot.id\":${frost.ds.id}}}",
