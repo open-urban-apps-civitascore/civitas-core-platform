@@ -256,6 +256,38 @@ class PostgisSagaHandlerTest {
     }
 
     @Test
+    void provisionSinkDerivesSchemaFromDatasetIdWhenNoneConfigured() throws Exception {
+      // No configuration.schema: the dedicated schema is derived from the trigger's datasetId (the
+      // same WorkspaceNames rule GeoServer uses), so the table lands in ds_99, not public.
+      Map<String, Object> trigger =
+          Map.of(
+              "datasetId",
+              "ds-99",
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of(
+                          "tableName",
+                          "sensor_readings",
+                          "columns",
+                          List.of(Map.of("name", "id", "type", "BIGINT", "nullable", false))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      List<String> executed = sql.getAllValues();
+      assertTrue(executed.stream().anyMatch(s -> s.startsWith("CREATE SCHEMA \"ds_99\"")));
+      assertTrue(
+          executed.stream()
+              .anyMatch(s -> s.startsWith("CREATE TABLE \"ds_99\".\"sensor_readings\"")));
+    }
+
+    @Test
     void provisionSinkAltersSchemaOwnerAfterCreatingRole() throws Exception {
       // ALTER SCHEMA … OWNER TO requires the target role to exist, so the owner change must come
       // after CREATE ROLE.
@@ -573,7 +605,7 @@ class PostgisSagaHandlerTest {
     }
 
     @Test
-    void deprovisionSinkDropsRoleAndTableButNotSchema() throws Exception {
+    void deprovisionSinkDropsRoleTableAndEmptySchema() throws Exception {
       SagaCommandResult result =
           handler.handle(compensate("DEPROVISION_SINK", postgisSinkTrigger()));
 
@@ -585,8 +617,34 @@ class PostgisSagaHandlerTest {
       assertTrue(
           executed.stream()
               .anyMatch(s -> s.startsWith("DROP TABLE \"ds_42\".\"sensor_readings\"")));
-      assertTrue(executed.stream().noneMatch(s -> s.startsWith("DROP SCHEMA")));
+      // The dedicated per-DataSet schema is removed with RESTRICT (only if empty)...
+      assertTrue(executed.contains("DROP SCHEMA \"ds_42\" RESTRICT"));
+      // ...and only after its table is dropped, so the schema is empty when the DROP SCHEMA runs.
+      int tableIdx = executed.indexOf("DROP TABLE \"ds_42\".\"sensor_readings\"");
+      int schemaIdx = executed.indexOf("DROP SCHEMA \"ds_42\" RESTRICT");
+      assertTrue(schemaIdx > tableIdx, "schema must be dropped after its table");
       verify(mockConnection).commit();
+    }
+
+    @Test
+    void deprovisionSinkNeverDropsThePublicSchema() throws Exception {
+      // A legacy sink still targeting the shared `public` schema must never trigger a DROP SCHEMA.
+      Map<String, Object> trigger =
+          Map.of(
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of("schema", "public", "tableName", "sensor_readings"))));
+
+      SagaCommandResult result = handler.handle(compensate("DEPROVISION_SINK", trigger));
+
+      assertEquals("COMPENSATION_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      assertTrue(sql.getAllValues().stream().noneMatch(s -> s.startsWith("DROP SCHEMA")));
     }
 
     @Test

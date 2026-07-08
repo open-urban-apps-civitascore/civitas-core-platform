@@ -15,5 +15,8 @@ package de.civitascore.configadapter.nifi.flow;
  *
  * @param frostProjectId the dataset's FROST project id (result of the saga's create-project step),
  *     or null when the saga carries none
+ * @param datasetId the dataset's technical id from the trigger, used to derive the dedicated
+ *     per-DataSet PostGIS schema (same {@code WorkspaceNames} rule as the GeoServer workspace); null
+ *     when the saga carries none
  */
-public record SinkResolutionContext(String frostProjectId) {}
+public record SinkResolutionContext(String frostProjectId, String datasetId) {}

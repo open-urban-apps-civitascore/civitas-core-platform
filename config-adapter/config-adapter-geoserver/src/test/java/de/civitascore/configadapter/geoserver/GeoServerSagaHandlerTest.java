@@ -143,6 +143,26 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
+    void createDatastoreReadsFromTheDatasetSchemaDerivedFromDatasetId() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        // The datastore's schema connection parameter is the DataSet's dedicated schema, which is
+        // the workspace name (both derive from datasetId) — so GeoServer reads from ds_abc, the
+        // same schema PostGIS created the table in, instead of public. No sink config carries it.
+        Response created = mock(Response.class);
+        when(created.getStatus()).thenReturn(201);
+        when(mockBuilder.post(any(Entity.class))).thenReturn(created);
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand("EXECUTE_STEP", "CREATE_DATASTORE", Map.of("datasetId", "ds-abc")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("ds_abc_postgis", result.resultData().get("datastoreName"));
+        assertEquals("ds_abc", datastoreConnectionParam("schema"));
+      }
+    }
+
+    @Test
     void provisionLayersStepPublishesOneFeatureTypePerLayer() {
       try (GeoServerSagaHandler handler = createHandler()) {
         Response created = mock(Response.class);
@@ -1141,7 +1161,6 @@ class GeoServerSagaHandlerTest {
     when(mockConfig.getProperty("geoserver.postgis.port", "5432")).thenReturn("5432");
     when(mockConfig.getProperty("geoserver.postgis.database", "civitas_geo"))
         .thenReturn("civitas_geo");
-    when(mockConfig.getProperty("geoserver.postgis.schema", "public")).thenReturn("public");
     when(mockConfig.getProperty("geoserver.postgis.user")).thenReturn("geo_user");
     when(mockConfig.getProperty("geoserver.postgis.password")).thenReturn("secret");
     handler.initialize(mockConfig);
@@ -1228,5 +1247,25 @@ class GeoServerSagaHandlerTest {
   @SuppressWarnings("unchecked")
   private static Map<String, Object> asMap(Object value) {
     return (Map<String, Object>) value;
+  }
+
+  /**
+   * The value of a connection parameter (e.g. {@code schema}) from the last datastore POST body.
+   */
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private String datastoreConnectionParam(String key) {
+    ArgumentCaptor<Entity> captor = ArgumentCaptor.forClass(Entity.class);
+    verify(mockBuilder, atLeastOnce()).post(captor.capture());
+    Map<String, Object> body = (Map<String, Object>) captor.getValue().getEntity();
+    Map<String, Object> dataStore = (Map<String, Object>) body.get("dataStore");
+    Map<String, Object> connectionParameters =
+        (Map<String, Object>) dataStore.get("connectionParameters");
+    List<Map<String, Object>> entries =
+        (List<Map<String, Object>>) connectionParameters.get("entry");
+    return entries.stream()
+        .filter(entry -> key.equals(entry.get("@key")))
+        .map(entry -> (String) entry.get("$"))
+        .findFirst()
+        .orElse(null);
   }
 }

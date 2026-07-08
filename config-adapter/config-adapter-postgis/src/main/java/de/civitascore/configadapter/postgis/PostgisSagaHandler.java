@@ -16,6 +16,7 @@ import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.model.dataset.DataStructureSchema;
+import de.civitascore.configadapter.model.dataset.WorkspaceNames;
 import de.civitascore.configadapter.model.postgis.ColumnConfig;
 import de.civitascore.configadapter.model.postgis.DbRoleConfig;
 import de.civitascore.configadapter.model.postgis.GeometryColumnConfig;
@@ -32,6 +33,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -63,7 +65,7 @@ import org.slf4j.LoggerFactory;
  * <pre>{@code
  * { "type": "POSTGIS",
  *   "configuration": {
- *     "schema": "ds_42",                 // optional; created (idempotent) if present
+ *     "schema": "ds_42",                 // optional; else derived from the trigger's datasetId
  *     "owner": "ds_42_admin",            // optional schema owner
  *     "tableName": "sensor_readings",    // required; the table GeoServer reads
  *     "columns": [ {name,type,...} ],    // optional explicit override (see below)
@@ -81,10 +83,15 @@ import org.slf4j.LoggerFactory;
  * comes from explicit {@code configuration.primaryKey} when present, otherwise from the {@code
  * x-core-primaryKey} markers in {@code dataStructure}.
  *
- * <p>{@code PROVISION_SINK} creates schema (if given), table, and read role + grants for each sink
- * in one transaction; {@code DEPROVISION_SINK} drops the table and role (schemas are left, as they
- * may be shared). Both re-derive their targets from {@code datasinks}, so the
- * compensation/forward-delete paths are symmetric.
+ * <p>The per-DataSet schema name is taken from {@code configuration.schema} when present, otherwise
+ * derived from the trigger's {@code datasetId} via {@link
+ * de.civitascore.configadapter.model.dataset.WorkspaceNames#fromDatasetId} — the same rule the
+ * GeoServer workspace uses, so the table lands in the schema GeoServer reads from.
+ *
+ * <p>{@code PROVISION_SINK} creates the schema, table, and read role + grants for each sink in one
+ * transaction; {@code DEPROVISION_SINK} drops the table and role, then drops the now-empty
+ * per-DataSet schema ({@code RESTRICT}, never {@code public}). Both re-derive their targets from
+ * {@code datasinks} + {@code datasetId}, so the compensation/forward-delete paths are symmetric.
  *
  * <p>CREATE/PROVISION are idempotent (duplicate-object SQLStates absorbed); DROP/DEPROVISION are
  * idempotent (missing-object SQLStates absorbed), so steps and compensations are safe to retry.
@@ -99,6 +106,9 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   private static final String ADAPTER_NAME = "postgis";
   private static final String COMPENSATE_TYPE = "COMPENSATE_STEP";
   private static final String DATASINK_TYPE_POSTGIS = "POSTGIS";
+
+  /** The shared schema that predates per-DataSet schemas; never dropped on deprovision. */
+  private static final String SHARED_PUBLIC_SCHEMA = "public";
 
   private final ObjectMapper objectMapper =
       new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -244,13 +254,30 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       throws SQLException {
     List<SinkSpec> sinks = parseSinks(command, false);
     List<String> statements = new ArrayList<>();
+    Set<String> schemasToDrop = new LinkedHashSet<>();
     for (SinkSpec sink : sinks) {
       if (sink.role() != null) {
         statements.addAll(dialect().dropRole(sink.role()));
       }
       statements.addAll(dialect().dropTable(sink.table().getSchema(), sink.table().getName()));
-      // The schema is intentionally left in place: it may be shared across datasets. The table and
-      // read role are the per-dataset artifacts this step removes.
+      // Collect the per-DataSet schema for removal after all tables are dropped. Never the shared
+      // `public` schema, and never a blank/absent one (legacy sinks without a dedicated schema).
+      SchemaConfig schema = sink.schema();
+      if (schema != null
+          && schema.getName() != null
+          && !schema.getName().isBlank()
+          && !SHARED_PUBLIC_SCHEMA.equalsIgnoreCase(schema.getName())) {
+        schemasToDrop.add(schema.getName());
+      }
+    }
+    // Drop each dedicated per-DataSet schema once, after all its tables are gone. A DataSet's
+    // POSTGIS sinks share one schema, so dropping per-sink would hit the sibling tables still
+    // present. DROP SCHEMA RESTRICT (the dialect default) removes it only when empty, so a schema
+    // that unexpectedly still holds objects is left in place rather than cascade-deleting data.
+    for (String schemaName : schemasToDrop) {
+      SchemaConfig schema = new SchemaConfig();
+      schema.setName(schemaName);
+      statements.addAll(dialect().dropSchema(schema));
     }
     ddl.runDdl(statements, false, true);
 
@@ -383,6 +410,13 @@ public class PostgisSagaHandler implements SagaCommandHandler {
         throw new IllegalArgumentException("POSTGIS data sink is missing configuration.tableName");
       }
       String schemaName = stringValue(config, "schema");
+      if (schemaName == null || schemaName.isBlank()) {
+        // No explicit schema in the payload: derive the dedicated per-DataSet schema from the
+        // trigger's datasetId (the same WorkspaceNames rule GeoServer uses for the workspace), so
+        // the sink table lands in its own schema instead of the shared public schema — and the
+        // GeoServer datastore, which derives the same name, reads from it.
+        schemaName = datasetSchemaName(command);
+      }
 
       SchemaConfig schema = null;
       if (schemaName != null && !schemaName.isBlank()) {
@@ -532,6 +566,18 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   private static String stringValue(Map<String, Object> map, String key) {
     return map.get(key) instanceof String s ? s : null;
+  }
+
+  /**
+   * The dedicated per-DataSet schema, derived from the trigger's {@code datasetId} via the shared
+   * {@link WorkspaceNames#fromDatasetId} rule — the same derivation the GeoServer workspace uses, so
+   * the sink table lands in the schema GeoServer reads from. Returns {@code null} when the payload
+   * carries no {@code datasetId} (e.g. a non-dataset caller), leaving the table unqualified.
+   */
+  private static String datasetSchemaName(SagaCommandMessage command) {
+    return command.payload().get("datasetId") instanceof String datasetId && !datasetId.isBlank()
+        ? WorkspaceNames.fromDatasetId(datasetId)
+        : null;
   }
 
   /** A payload boolean; absent or non-{@code Boolean} → false. */

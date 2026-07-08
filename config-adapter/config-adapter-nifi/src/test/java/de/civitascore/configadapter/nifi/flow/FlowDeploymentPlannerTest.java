@@ -210,6 +210,27 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
+  void perDatasetSchemaBindsOntoTheWrite() throws Exception {
+    // The dedicated per-DataSet schema lands on PutDatabaseRecord's "Schema Name", so the write
+    // targets that schema instead of the connection default (public). The template default is now
+    // null, so an unset schema would fall back to search_path rather than forcing public.
+    Datasource source = mqttSource(null);
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      DeploymentPlan plan =
+          planner(resolver)
+              .plan(
+                  new PipelineDeploymentRequest(
+                      "p-mqtt-schema",
+                      graphWithMapping(),
+                      source,
+                      new PostgisSinkSpec("sensor_observations", "ds_test", List.of())));
+      assertTrue(
+          plan.snapshotJson().contains("\"Schema Name\":\"ds_test\""),
+          "per-DataSet schema bound onto PutDatabaseRecord");
+    }
+  }
+
+  @Test
   void whereWithTimeLiteralIsAllowed() throws Exception {
     // a ':' inside a quoted time literal must not be mistaken for a placeholder
     Datasource source = sqlSourceBasic();

@@ -19,7 +19,7 @@
     "Delete Keys": null,
     "Record Reader": "${CS:JsonTreeReader}",
     "Quote Table Identifiers": "true",
-    "Schema Name": "public",
+    "Schema Name": null,
     "Database Session AutoCommit": "false",
     "Unmatched Field Behavior": "Ignore Unmatched Fields",
     "Database Name": null,

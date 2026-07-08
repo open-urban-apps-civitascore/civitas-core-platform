@@ -14,6 +14,7 @@ import static de.civitascore.configadapter.nifi.flow.stage.BindingSupport.putIfP
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.dataset.DataStructureSchema;
+import de.civitascore.configadapter.model.dataset.WorkspaceNames;
 import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
 import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.flow.SinkType;
@@ -79,11 +80,24 @@ public final class PostgisSinkStage implements SinkStage<PostgisSinkSpec> {
   public PostgisSinkSpec parseSpec(Map<String, Object> datasink, SinkResolutionContext ctx)
       throws FatalAdapterException {
     String tableName = null;
+    String schemaName = null;
     if (datasink.get("configuration") instanceof Map<?, ?> config) {
-      tableName = asString(((Map<String, Object>) config).get("tableName"));
+      Map<String, Object> configuration = (Map<String, Object>) config;
+      tableName = asString(configuration.get("tableName"));
+      schemaName = asString(configuration.get("schema"));
+    }
+    if (schemaName == null || schemaName.isBlank()) {
+      // No explicit schema: derive the dedicated per-DataSet schema from the trigger's datasetId
+      // (the same WorkspaceNames rule PostGIS and GeoServer use), so PutDatabaseRecord writes into
+      // ds_<dataset> — the schema PostGIS created the table in — instead of the search_path default.
+      String datasetId = ctx.datasetId();
+      schemaName =
+          datasetId == null || datasetId.isBlank()
+              ? null
+              : WorkspaceNames.fromDatasetId(datasetId);
     }
     try {
-      return new PostgisSinkSpec(tableName, resolvePrimaryKey(datasink));
+      return new PostgisSinkSpec(tableName, schemaName, resolvePrimaryKey(datasink));
     } catch (IllegalArgumentException e) {
       // e.g. a missing tableName; keep the raw detail internal and publish only the safe external
       // message for the error code.
@@ -121,6 +135,12 @@ public final class PostgisSinkStage implements SinkStage<PostgisSinkSpec> {
     // PostgisSinkSpec guarantees a non-blank tableName (the invalid state is rejected at
     // construction), so PutDatabaseRecord always has a target here.
     out.putSinkProperty("Table Name", sink.tableName());
+    // Write into the dedicated per-DataSet schema instead of the connection's default (public). The
+    // spec normalizes a blank schema to null, so an unset schema leaves "Schema Name" out and the
+    // write resolves via search_path — the same behavior as the template default.
+    if (sink.schemaName() != null) {
+      out.putSinkProperty("Schema Name", sink.schemaName());
+    }
     // With a primary key (the data structure's x-core-primaryKey marker), write UPSERT keyed on
     // it so a cron-recurring source that re-reads rows updates instead of duplicating them. NiFi
     // does not derive the conflict key from the table PK — it must be given via Update Keys.
