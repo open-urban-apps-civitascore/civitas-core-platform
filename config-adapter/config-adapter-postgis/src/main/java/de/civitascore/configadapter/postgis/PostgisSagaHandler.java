@@ -273,9 +273,10 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       }
     }
     // Drop each per-DataSet schema once, after its tables: a DataSet's sinks share one schema, so a
-    // per-sink drop would hit sibling tables. RESTRICT drops it only when empty; a still-non-empty
-    // schema (2BP01) is absorbed and left in place (never dropping unexpected data), and the
-    // already-applied table/role drops are not rolled back.
+    // per-sink drop would hit sibling tables. RESTRICT (never CASCADE) means the schema is dropped
+    // only once empty — which it is here, its tables having just been dropped. A schema left
+    // unexpectedly non-empty makes this step fail (the best-effort delete then continues); nothing
+    // is force-dropped.
     for (String schemaName : schemasToDrop) {
       SchemaConfig schema = new SchemaConfig();
       schema.setName(schemaName);

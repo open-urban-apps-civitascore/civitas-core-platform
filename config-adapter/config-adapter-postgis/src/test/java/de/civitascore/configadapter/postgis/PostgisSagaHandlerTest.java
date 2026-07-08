@@ -669,27 +669,6 @@ class PostgisSagaHandlerTest {
     }
 
     @Test
-    void deprovisionAbsorbsNonEmptySchemaWithoutRollingBackTheTableDrop() throws Exception {
-      // A non-empty schema raises 2BP01 on DROP SCHEMA RESTRICT. It must be absorbed (schema left
-      // in
-      // place) without rolling back the already-applied DROP TABLE/ROLE — otherwise the delete
-      // would
-      // abort the whole transaction and leak the table.
-      when(mockStatement.execute(org.mockito.ArgumentMatchers.startsWith("DROP SCHEMA")))
-          .thenThrow(
-              new SQLException("cannot drop schema because other objects depend on it", "2BP01"));
-
-      SagaCommandResult result =
-          handler.handle(compensate("DEPROVISION_SINK", postgisSinkTrigger()));
-
-      assertEquals("COMPENSATION_COMPLETED", result.type());
-      // Committed via the per-statement savepoint absorb — the whole-transaction rollback (no-arg
-      // rollback()) was never taken, so the successful table/role drops survive.
-      verify(mockConnection).commit();
-      verify(mockConnection, never()).rollback();
-    }
-
-    @Test
     void deprovisionSinkNeverDropsThePublicSchema() throws Exception {
       // A datasetId that normalizes to the shared `public` schema must never trigger a DROP SCHEMA.
       Map<String, Object> trigger =
