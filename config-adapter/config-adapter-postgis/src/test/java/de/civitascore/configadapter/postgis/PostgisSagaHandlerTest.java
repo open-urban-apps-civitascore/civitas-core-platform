@@ -628,16 +628,15 @@ class PostgisSagaHandlerTest {
 
     @Test
     void deprovisionSinkNeverDropsThePublicSchema() throws Exception {
-      // A legacy sink still targeting the shared `public` schema must never trigger a DROP SCHEMA.
+      // A datasetId that normalizes to the shared `public` schema must never trigger a DROP SCHEMA.
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "public",
               "datasinks",
               List.of(
                   Map.of(
-                      "type",
-                      "POSTGIS",
-                      "configuration",
-                      Map.of("schema", "public", "tableName", "sensor_readings"))));
+                      "type", "POSTGIS", "configuration", Map.of("tableName", "sensor_readings"))));
 
       SagaCommandResult result = handler.handle(compensate("DEPROVISION_SINK", trigger));
 
@@ -661,15 +660,15 @@ class PostgisSagaHandlerTest {
     @Test
     void deprovisionSinkWorksWithoutColumnDefinitions() throws Exception {
       // A delete trigger carries only the sink identifiers — dropping needs no column derivation.
+      // The schema is derived from datasetId (ds-42 → ds_42), not from configuration.
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
-                      "type",
-                      "POSTGIS",
-                      "configuration",
-                      Map.of("schema", "ds_42", "tableName", "sensor_readings"))));
+                      "type", "POSTGIS", "configuration", Map.of("tableName", "sensor_readings"))));
 
       SagaCommandResult result = handler.handle(compensate("DEPROVISION_SINK", trigger));
 
@@ -688,13 +687,15 @@ class PostgisSagaHandlerTest {
       // dropped, not built) — otherwise "PK not in columns" would wrongly fail the delete saga.
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
                       "type",
                       "POSTGIS",
                       "configuration",
-                      Map.of("schema", "ds_42", "tableName", "sensor_readings"),
+                      Map.of("tableName", "sensor_readings"),
                       "dataStructure",
                       Map.of(
                           "properties",

@@ -65,8 +65,6 @@ import org.slf4j.LoggerFactory;
  * <pre>{@code
  * { "type": "POSTGIS",
  *   "configuration": {
- *     "schema": "ds_42",                 // optional; else derived from the trigger's datasetId
- *     "owner": "ds_42_admin",            // optional schema owner
  *     "tableName": "sensor_readings",    // required; the table GeoServer reads
  *     "columns": [ {name,type,...} ],    // optional explicit override (see below)
  *     "geometryColumns": [ {name,geometryType,srid,...} ],
@@ -77,21 +75,25 @@ import org.slf4j.LoggerFactory;
  *   "dataStructure": { ... } }           // resolved JSON Schema from Model Atlas
  * }</pre>
  *
+ * <p>The schema is not part of {@code configuration}: it is derived from the trigger's {@code
+ * datasetId} (see below).
+ *
  * <p>Columns come from explicit {@code configuration.columns} when present, otherwise derived from
  * {@code dataStructure} via {@link DataStructureTableMapper}; at least one column or geometry
  * column must result for provisioning (deprovisioning needs only the identifiers). The primary key
  * comes from explicit {@code configuration.primaryKey} when present, otherwise from the {@code
  * x-core-primaryKey} markers in {@code dataStructure}.
  *
- * <p>The per-DataSet schema name is taken from {@code configuration.schema} when present, otherwise
- * derived from the trigger's {@code datasetId} via {@link
+ * <p>The per-DataSet schema name is derived from the trigger's {@code datasetId} via {@link
  * de.civitascore.configadapter.model.dataset.WorkspaceNames#fromDatasetId} — the same rule the
- * GeoServer workspace uses, so the table lands in the schema GeoServer reads from.
+ * GeoServer workspace uses, so the table lands in the schema GeoServer reads from. A provision
+ * without a {@code datasetId} is rejected rather than silently falling back to {@code public}.
  *
  * <p>{@code PROVISION_SINK} creates the schema, table, and read role + grants for each sink in one
- * transaction; {@code DEPROVISION_SINK} drops the table and role, then drops the now-empty
- * per-DataSet schema ({@code RESTRICT}, never {@code public}). Both re-derive their targets from
- * {@code datasinks} + {@code datasetId}, so the compensation/forward-delete paths are symmetric.
+ * transaction; {@code DEPROVISION_SINK} drops the table and role, then drops the per-DataSet schema
+ * ({@code RESTRICT} — left in place if still non-empty; never {@code public}). Both re-derive their
+ * targets from {@code datasinks} + {@code datasetId}, so the compensation/forward-delete paths are
+ * symmetric.
  *
  * <p>CREATE/PROVISION are idempotent (duplicate-object SQLStates absorbed); DROP/DEPROVISION are
  * idempotent (missing-object SQLStates absorbed), so steps and compensations are safe to retry.
@@ -270,7 +272,9 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       }
     }
     // Drop each per-DataSet schema once, after its tables: a DataSet's sinks share one schema, so a
-    // per-sink drop would hit sibling tables. RESTRICT removes it only if empty — never data.
+    // per-sink drop would hit sibling tables. RESTRICT drops it only when empty; a still-non-empty
+    // schema (2BP01) is absorbed and left in place (never dropping unexpected data), and the
+    // already-applied table/role drops are not rolled back.
     for (String schemaName : schemasToDrop) {
       SchemaConfig schema = new SchemaConfig();
       schema.setName(schemaName);
@@ -406,18 +410,23 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       if (tableName == null || tableName.isBlank()) {
         throw new IllegalArgumentException("POSTGIS data sink is missing configuration.tableName");
       }
-      String schemaName = stringValue(config, "schema");
-      if (schemaName == null || schemaName.isBlank()) {
-        // Derive the per-DataSet schema from the datasetId (same rule as the GeoServer workspace),
-        // so the table lands in its own schema — the one GeoServer reads — not public.
-        schemaName = datasetSchemaName(command);
+      // The per-DataSet schema is always derived from the trigger's datasetId (same WorkspaceNames
+      // rule the GeoServer workspace uses), so PostGIS, GeoServer and NiFi all agree on one name.
+      // A dataset provision must never silently fall back to the shared public schema, so fail fast
+      // when no datasetId is present (an anomaly — PROVISION_SINK is a dataset-saga-only
+      // operation).
+      String schemaName = datasetSchemaName(command);
+      if (requireColumns && (schemaName == null || schemaName.isBlank())) {
+        throw new IllegalArgumentException(
+            "POSTGIS data sink '"
+                + tableName
+                + "' cannot derive a per-DataSet schema: the trigger carries no datasetId");
       }
 
       SchemaConfig schema = null;
       if (schemaName != null && !schemaName.isBlank()) {
         schema = new SchemaConfig();
         schema.setName(schemaName);
-        schema.setOwner(stringValue(config, "owner"));
       }
 
       List<GeometryColumnConfig> geometryColumns =

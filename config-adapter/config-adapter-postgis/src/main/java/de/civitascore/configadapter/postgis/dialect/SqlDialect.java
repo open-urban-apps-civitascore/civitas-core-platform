@@ -111,6 +111,13 @@ public interface SqlDialect {
   boolean isMissing(SQLException e);
 
   /**
+   * Returns true if the SQL exception indicates the target still has dependent objects (a {@code
+   * RESTRICT} drop against a non-empty schema/table) — used on a DROP to leave the object in place
+   * rather than fail, without rolling back the sibling drops in the same transaction.
+   */
+  boolean isDependentObjects(SQLException e);
+
+  /**
    * Returns true if the SQL exception indicates a transient connectivity problem (connection
    * failure, exclusion class {@code 08*}) — used to classify the error as retryable.
    */

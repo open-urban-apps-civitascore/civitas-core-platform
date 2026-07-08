@@ -80,19 +80,16 @@ public final class PostgisSinkStage implements SinkStage<PostgisSinkSpec> {
   public PostgisSinkSpec parseSpec(Map<String, Object> datasink, SinkResolutionContext ctx)
       throws FatalAdapterException {
     String tableName = null;
-    String schemaName = null;
     if (datasink.get("configuration") instanceof Map<?, ?> config) {
-      Map<String, Object> configuration = (Map<String, Object>) config;
-      tableName = asString(configuration.get("tableName"));
-      schemaName = asString(configuration.get("schema"));
+      tableName = asString(((Map<String, Object>) config).get("tableName"));
     }
-    if (schemaName == null || schemaName.isBlank()) {
-      // Derive the per-DataSet schema from the datasetId (same rule as PostGIS/GeoServer) so the
-      // write targets ds_<dataset> — the schema the table was created in — not the search_path.
-      String datasetId = ctx.datasetId();
-      schemaName =
-          datasetId == null || datasetId.isBlank() ? null : WorkspaceNames.fromDatasetId(datasetId);
-    }
+    // The write targets the per-DataSet schema, derived from the trigger's datasetId (same
+    // WorkspaceNames rule PostGIS and GeoServer use) — the schema the table was created in, not the
+    // connection search_path. Null only for a non-dataset caller, then the write resolves via
+    // search_path.
+    String datasetId = ctx.datasetId();
+    String schemaName =
+        datasetId == null || datasetId.isBlank() ? null : WorkspaceNames.fromDatasetId(datasetId);
     try {
       return new PostgisSinkSpec(tableName, schemaName, resolvePrimaryKey(datasink));
     } catch (IllegalArgumentException e) {

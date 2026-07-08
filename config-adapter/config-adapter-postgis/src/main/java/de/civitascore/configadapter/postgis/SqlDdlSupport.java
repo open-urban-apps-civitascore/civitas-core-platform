@@ -171,6 +171,16 @@ final class SqlDdlSupport implements AutoCloseable {
             Encode.forJava(String.valueOf(e.getSQLState())));
         return;
       }
+      if (absorbMissing && dialect.isDependentObjects(e)) {
+        // A RESTRICT drop against a non-empty schema/table. Roll back to the savepoint so the
+        // sibling drops already applied in this transaction survive, and leave the object in place
+        // — deprovision is best-effort and must never destroy data it did not expect.
+        connection.rollback(savepoint);
+        logger.info(
+            "PostGIS object still has dependent objects (SQLState {}), leaving it in place",
+            Encode.forJava(String.valueOf(e.getSQLState())));
+        return;
+      }
       throw e;
     }
   }

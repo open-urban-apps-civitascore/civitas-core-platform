@@ -44,6 +44,7 @@ public final class PostgisDialect implements SqlDialect {
   private static final String SQLSTATE_UNDEFINED_TABLE = "42P01";
   private static final String SQLSTATE_UNDEFINED_OBJECT = "42704";
   private static final String SQLSTATE_INVALID_SCHEMA = "3F000";
+  private static final String SQLSTATE_DEPENDENT_OBJECTS = "2BP01";
   private static final String SQLSTATE_CLASS_CONNECTION = "08";
 
   @Override
@@ -229,6 +230,11 @@ public final class PostgisDialect implements SqlDialect {
     return SQLSTATE_UNDEFINED_TABLE.equals(state)
         || SQLSTATE_INVALID_SCHEMA.equals(state)
         || SQLSTATE_UNDEFINED_OBJECT.equals(state);
+  }
+
+  @Override
+  public boolean isDependentObjects(SQLException e) {
+    return e != null && SQLSTATE_DEPENDENT_OBJECTS.equals(e.getSQLState());
   }
 
   @Override

@@ -25,8 +25,8 @@ class PostgisSinkStageTest {
   @Test
   void parseSpecDerivesTheSchemaFromTheDatasetId() {
     // The per-DataSet schema is derived from the trigger's datasetId (the same WorkspaceNames rule
-    // PostGIS and GeoServer use) so PutDatabaseRecord writes into ds_<dataset>. An explicit
-    // configuration.schema still wins; no datasetId leaves it null (search_path fallback).
+    // PostGIS and GeoServer use) so PutDatabaseRecord writes into ds_<dataset>; no datasetId leaves
+    // it null (search_path fallback). configuration.schema is never consulted.
     PostgisSinkStage stage = new PostgisSinkStage(null);
 
     PostgisSinkSpec derived =
@@ -38,26 +38,12 @@ class PostgisSinkStageTest {
                     new SinkResolutionContext(null, "ds-1")));
     assertEquals("ds_1", derived.schemaName());
 
-    PostgisSinkSpec explicit =
-        assertDoesNotThrow(
-            () ->
-                stage.parseSpec(
-                    Map.of(
-                        "id",
-                        "sk-2",
-                        "type",
-                        "POSTGIS",
-                        "configuration",
-                        Map.of("tableName", "t", "schema", "custom_schema")),
-                    new SinkResolutionContext(null, "ds-1")));
-    assertEquals("custom_schema", explicit.schemaName());
-
     PostgisSinkSpec none =
         assertDoesNotThrow(
             () ->
                 stage.parseSpec(
                     Map.of(
-                        "id", "sk-3", "type", "POSTGIS", "configuration", Map.of("tableName", "t")),
+                        "id", "sk-2", "type", "POSTGIS", "configuration", Map.of("tableName", "t")),
                     new SinkResolutionContext(null, null)));
     assertNull(none.schemaName());
   }
