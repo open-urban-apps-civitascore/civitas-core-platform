@@ -66,7 +66,7 @@ export const useQueryParams = () => {
     [pathname, router, searchParams],
   )
 
-  const setTabValueParam = (tabValue: string, replace = false) => {
+  const setTabValueParam = (tabValue: string, shouldReplace = false) => {
     const params = new URLSearchParams(searchParams)
     if (tabValue) {
       params.set(QUERY_PARAMS.tabValue, tabValue)
@@ -75,14 +75,14 @@ export const useQueryParams = () => {
     }
     params.set(QUERY_PARAMS.pageIndex, '0')
     const url = `${pathname}?${params.toString()}`
-    if (replace) {
+    if (shouldReplace) {
       router.replace(url)
     } else {
       router.push(url)
     }
   }
 
-  const setSubTabValueParam = (subTabValue: string, replace = false) => {
+  const setSubTabValueParam = (subTabValue: string, shouldReplace = false) => {
     const params = new URLSearchParams(searchParams)
     if (subTabValue) {
       params.set(QUERY_PARAMS.subTabValue, subTabValue)
@@ -90,7 +90,7 @@ export const useQueryParams = () => {
       params.delete(QUERY_PARAMS.subTabValue)
     }
     const url = `${pathname}?${params.toString()}`
-    if (replace) {
+    if (shouldReplace) {
       router.replace(url)
     } else {
       router.push(url)
