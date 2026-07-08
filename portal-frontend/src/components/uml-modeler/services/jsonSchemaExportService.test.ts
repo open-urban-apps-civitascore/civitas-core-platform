@@ -299,9 +299,24 @@ describe('exportToJsonSchema', () => {
   })
 
   it('emits enumerations using the enum keyword', () => {
+    // The root reaches the enum through an attribute typed by it; association edges are out of scope
+    // and would leave the enum unreachable.
+    const rootNode = baseDiagram().nodes[0]
     const diagram = baseDiagram({
       nodes: [
-        ...baseDiagram().nodes,
+        {
+          ...rootNode,
+          data: {
+            ...rootNode.data,
+            element: {
+              ...rootNode.data.element,
+              attributes: [
+                ...rootNode.data.element.attributes,
+                { id: 'a4', name: 'status', type: { id: 'elem-2' }, visibility: 'public' },
+              ],
+            },
+          },
+        },
         {
           id: 'node-2',
           type: 'enumeration',
@@ -317,26 +332,6 @@ describe('exportToJsonSchema', () => {
               ],
             },
             label: 'Status',
-          },
-        },
-      ],
-      edges: [
-        {
-          id: 'edge-1',
-          type: 'association',
-          source: 'node-1',
-          target: 'node-2',
-          data: {
-            relationship: {
-              id: 'rel-1',
-              type: 'association',
-              source: 'elem-1',
-              target: 'elem-2',
-              targetRole: 'status',
-            },
-            label: '',
-            isSelected: false,
-            isDirty: false,
           },
         },
       ],
@@ -505,9 +500,24 @@ describe('exportToJsonSchema', () => {
   })
 
   it('enumerations alone do not count as roots — single class stays the root class', () => {
+    // The class reaches the enum through an attribute typed by it, keeping it reachable without an
+    // out-of-scope association edge.
+    const rootNode = baseDiagram().nodes[0]
     const diagram = baseDiagram({
       nodes: [
-        ...baseDiagram().nodes,
+        {
+          ...rootNode,
+          data: {
+            ...rootNode.data,
+            element: {
+              ...rootNode.data.element,
+              attributes: [
+                ...rootNode.data.element.attributes,
+                { id: 'a4', name: 'sensorType', type: { id: 'elem-enum' }, visibility: 'public' },
+              ],
+            },
+          },
+        },
         {
           id: 'node-enum',
           type: 'enumeration',
@@ -523,26 +533,6 @@ describe('exportToJsonSchema', () => {
               ],
             },
             label: 'SensorType',
-          },
-        },
-      ],
-      edges: [
-        {
-          id: 'edge-enum',
-          type: 'association',
-          source: 'node-1',
-          target: 'node-enum',
-          data: {
-            relationship: {
-              id: 'rel-enum',
-              type: 'association',
-              source: 'elem-1',
-              target: 'elem-enum',
-              targetRole: 'sensorType',
-            },
-            label: '',
-            isSelected: false,
-            isDirty: false,
           },
         },
       ],
@@ -636,26 +626,52 @@ describe('exportToJsonSchema', () => {
     source: 'node-1',
     target: 'node-2',
     data: {
-      relationship: { id: 'rel-1', type, source: 'elem-1', target: 'elem-2' },
+      relationship: { id: 'rel-1', type, source: 'elem-1', target: 'elem-2', targetRole: 'reading' },
       label: '',
       isSelected: false,
       isDirty: false,
     },
   })
 
+  /**
+   * Composition that embeds Reading into TrafficSensor under `sensorReading`. Strict single-root
+   * export needs every class reachable and non-competing, so the second class can no longer float
+   * disconnected — this in-scope edge anchors it while the out-of-scope edge under test still
+   * contributes nothing.
+   */
+  const readingCompositionEdge = {
+    id: 'edge-comp',
+    type: 'composition' as const,
+    source: 'node-2',
+    target: 'node-1',
+    data: {
+      relationship: {
+        id: 'rel-comp',
+        type: 'composition' as const,
+        source: 'elem-2',
+        target: 'elem-1',
+        sourceRole: 'sensorReading',
+      },
+      label: '',
+      isSelected: false,
+      isDirty: false,
+    },
+  }
+
   it.each(['association', 'aggregation', 'dependency'] as const)(
     'ignores out-of-scope relationship type %s: the edge contributes no property and export still succeeds',
     type => {
       const diagram = baseDiagram({
         nodes: [...baseDiagram().nodes, readingNode],
-        edges: [outOfScopeEdge(type)],
+        edges: [readingCompositionEdge, outOfScopeEdge(type)],
       })
 
       const schema = exportToJsonSchema(diagram)
-      // The out-of-scope edge is dropped, so TrafficSensor gains no reference to Reading; both
-      // classes are still emitted under $defs.
+      // The out-of-scope edge is dropped, so its `reading` role adds no property; only the
+      // composition's `sensorReading` reference to Reading survives. Both classes are emitted.
       const properties = classDef(schema, 'TrafficSensor').properties as Record<string, unknown>
       expect(Object.keys(properties)).not.toContain('reading')
+      expect(properties.sensorReading).toEqual({ $ref: '#/$defs/Reading' })
       const defs = schema.$defs as Record<string, Record<string, unknown>>
       expect(defs.TrafficSensor).toBeDefined()
       expect(defs.Reading).toBeDefined()
@@ -680,6 +696,9 @@ describe('exportToJsonSchema', () => {
         label: 'Owner',
       },
     }
+    // Owner is also composed into TrafficSensor (in scope, role `ownerRef`) so every class is
+    // reachable and non-competing under strict rooting; the out-of-scope association is what must
+    // contribute nothing.
     const diagram = baseDiagram({
       nodes: [...baseDiagram().nodes, readingNode, strayNode],
       edges: [
@@ -696,6 +715,25 @@ describe('exportToJsonSchema', () => {
               source: 'elem-2',
               target: 'elem-1',
               sourceRole: 'reading',
+            },
+            label: '',
+            isSelected: false,
+            isDirty: false,
+          },
+        },
+        // Composition: Owner (part/source) into TrafficSensor (container/target).
+        {
+          id: 'edge-owner',
+          type: 'composition',
+          source: 'node-3',
+          target: 'node-1',
+          data: {
+            relationship: {
+              id: 'rel-owner',
+              type: 'composition',
+              source: 'elem-3',
+              target: 'elem-1',
+              sourceRole: 'ownerRef',
             },
             label: '',
             isSelected: false,
@@ -786,18 +824,32 @@ describe('exportToJsonSchema', () => {
   })
 
   it('ignores realization rather than mapping it like inheritance', () => {
+    // IFace composes Impl (in scope) so a single root resolves and Impl is reachable. The
+    // realization edge on top is out of scope: Impl gets no allOf parent and stays a plain object.
     const diagram = baseDiagram({
       name: 'IFace',
       nodes: [
         cls('iface', 'IFace', [{ id: 'a1', name: 'y' }]),
         cls('impl', 'Impl', [{ id: 'a2', name: 'x' }]),
       ] as unknown as UMLDiagram['nodes'],
-      edges: [inhEdge('1', 'impl', 'iface', 'realization')],
+      edges: [
+        {
+          id: 'edge-comp',
+          type: 'composition',
+          source: 'node-impl',
+          target: 'node-iface',
+          data: {
+            relationship: { id: 'rel-comp', type: 'composition', source: 'impl', target: 'iface', sourceRole: 'impl' },
+            label: '',
+            isSelected: false,
+            isDirty: false,
+          },
+        },
+        inhEdge('1', 'impl', 'iface', 'realization'),
+      ],
     } as Partial<UMLDiagram>)
 
     const schema = exportToJsonSchema(diagram)
-    // The realization edge is dropped: Impl gets no allOf parent, so both classes remain plain
-    // object schemas and export still succeeds.
     expect(classDef(schema, 'Impl').allOf).toBeUndefined()
     expect(classDef(schema, 'Impl').type).toBe('object')
     expect((schema.$defs as Record<string, unknown>).IFace).toBeDefined()

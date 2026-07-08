@@ -51,14 +51,6 @@ const fixtures: { label: string; diagram: UMLDiagram }[] = [
     ),
   },
   {
-    label: 'realization (diagram name = interface)',
-    diagram: diagram(
-      'IFace',
-      [cls('iface', 'IFace', [{ id: 'a1', name: 'y' }]), cls('impl', 'Impl', [{ id: 'a2', name: 'x' }])],
-      [rel('1', 'realization', 'impl', 'iface')],
-    ),
-  },
-  {
     label: 'multi-level inheritance',
     diagram: diagram(
       'Base',
@@ -123,14 +115,6 @@ const fixtures: { label: string; diagram: UMLDiagram }[] = [
         rel('1', 'inheritance', 'car', 'vehicle'),
         rel('2', 'composition', 'engine', 'vehicle', { sourceRole: 'engine' }),
       ],
-    ),
-  },
-  {
-    label: 'association (target embedded, source is root)',
-    diagram: diagram(
-      'Order',
-      [cls('order', 'Order', [{ id: 'a1', name: 'orderNo' }]), cls('item', 'Item', [{ id: 'a2', name: 'sku' }])],
-      [rel('1', 'association', 'order', 'item', { targetRole: 'items', targetMultiplicity: '*' })],
     ),
   },
 ]

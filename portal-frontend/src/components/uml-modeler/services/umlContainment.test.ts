@@ -75,16 +75,16 @@ describe('parseMultiplicity / isManyMultiplicity', () => {
 })
 
 describe('collectContainedIds', () => {
-  it('embeds the part side of every structural edge and inheritance/realization parents', () => {
+  it('embeds the part side of every structural edge and inheritance parents', () => {
     const d = diagram([
       edge(relationship({ type: 'composition', source: 'part', target: 'whole' })),
       edge(relationship({ type: 'inheritance', source: 'sub', target: 'parent' })),
-      // The association target becomes a property of the source, so it is embedded as well.
+      // Out-of-scope edges (association, aggregation) carry no containment and embed nothing.
       edge(relationship({ type: 'association', source: 'order', target: 'item' })),
       edge(relationship({ type: 'aggregation', source: 'wheel', target: 'car' })),
     ])
     const contained = collectContainedIds(d)
-    expect([...contained].sort()).toEqual(['item', 'parent', 'part'])
+    expect([...contained].sort()).toEqual(['parent', 'part'])
   })
 })
 
@@ -193,10 +193,15 @@ describe('resolveRootElement', () => {
   })
 
   it('lets the designated root (isRoot) resolve an otherwise ambiguous diagram', () => {
-    const alpha = { ...element('a', 'Alpha'), isRoot: true } as UMLElement
     const beta = element('b', 'Beta')
-    // Both classes are non-embedded, but Beta must still hang under the designated root.
-    const d = fullDiagram([alpha, beta], [edge(relationship({ type: 'association', source: 'a', target: 'b' }))])
+    // Alpha references Beta as an attribute type: Beta is reachable but not embedded, so both stay
+    // root candidates. Only the isRoot flag breaks the otherwise-ambiguous tie.
+    const alpha = {
+      ...element('a', 'Alpha'),
+      isRoot: true,
+      attributes: [{ id: 'a1', name: 'beta', type: { id: 'b' } }],
+    } as UMLElement
+    const d = fullDiagram([alpha, beta])
     expect(resolveRootElement(d)).toEqual({ kind: 'class', root: alpha })
   })
 
