@@ -65,7 +65,6 @@ import org.slf4j.LoggerFactory;
  * <pre>{@code
  * { "type": "POSTGIS",
  *   "configuration": {
- *     "owner": "ds_42_admin",            // optional schema owner (ALTER SCHEMA … OWNER)
  *     "tableName": "sensor_readings",    // required; the table GeoServer reads
  *     "columns": [ {name,type,...} ],    // optional explicit override (see below)
  *     "geometryColumns": [ {name,geometryType,srid,...} ],
@@ -236,10 +235,6 @@ public class PostgisSagaHandler implements SagaCommandHandler {
             dialect()
                 .grantSelectOnTable(
                     sink.role().getName(), sink.table().getSchema(), sink.table().getName()));
-      }
-      // After role creation: ALTER SCHEMA … OWNER TO requires the owner role to already exist.
-      if (sink.schema() != null) {
-        statements.addAll(dialect().alterSchemaOwner(sink.schema()));
       }
       provisioned.add(sink.identifiers());
     }
@@ -429,7 +424,6 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       if (schemaName != null && !schemaName.isBlank()) {
         schema = new SchemaConfig();
         schema.setName(schemaName);
-        schema.setOwner(stringValue(config, "owner"));
       }
 
       List<GeometryColumnConfig> geometryColumns =
