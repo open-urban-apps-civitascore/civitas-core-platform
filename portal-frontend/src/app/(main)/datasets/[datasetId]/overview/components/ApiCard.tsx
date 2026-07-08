@@ -33,7 +33,6 @@ interface ApiCardProps {
 export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpenDataAccess }: ApiCardProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.apis.card')
   const tStandard = useTranslations('datasets.overview.completion.dataFlow.apis.standardLabels')
-  const tApis = useTranslations('datasets.overview.completion.dataFlow.apis')
   const tProtected = useTranslations('datasets.overview.completion.apis.config')
 
   const router = useRouter()
@@ -106,10 +105,8 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpen
             <span className={cn('font-medium truncate ', (canView || canEdit) && 'group-hover:underline')}>
               {api.name}
             </span>
-            {api.description ? (
+            {api.description && (
               <span className="text-sm font-normal text-muted-foreground line-clamp-2">{api.description}</span>
-            ) : (
-              <span className="text-sm font-normal text-muted-foreground">{tApis('noDescription')}</span>
             )}
           </div>
 

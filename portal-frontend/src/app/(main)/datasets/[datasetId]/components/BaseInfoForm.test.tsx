@@ -98,7 +98,7 @@ describe('BaseInfoForm', () => {
       )
     }
     render(<TestWrapperEmpty />)
-    expect(document.querySelector('svg.lucide-circle')).toBeInTheDocument()
+    expect(document.querySelector('svg.lucide-circle-dashed')).toBeInTheDocument()
     expect(document.querySelector('svg.lucide-circle-check-big')).not.toBeInTheDocument()
   })
 

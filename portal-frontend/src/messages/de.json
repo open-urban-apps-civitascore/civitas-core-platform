@@ -2,7 +2,24 @@
   "welcome": {
     "title": "Willkommen in CIVITAS/CORE V2 Beta",
     "subtitle": "Neu hier?",
-    "docsButton": "Dokumentation"
+    "docsButton": "Dokumentation",
+    "recommendedWorkflow": {
+      "title": "Empfohlener Ablauf",
+      "steps": {
+        "datastructure": {
+          "title": "Datenstruktur erstellen",
+          "subtitle": "Beschreibt die Daten"
+        },
+        "datasource": {
+          "title": "Datenquelle erstellen",
+          "subtitle": "Nutzt die Datenstruktur"
+        },
+        "pipeline": {
+          "title": "<b>Dataset erstellen</b> und <b>Pipeline konfigurieren</b>",
+          "subtitle": "Nutzt die Datenquelle, um den Datenfluss zu starten"
+        }
+      }
+    }
   },
   "common": {
     "type-to-search": "Zum Suchen tippen",
@@ -258,7 +275,7 @@
       "completion": {
         "title": "Erstellungsfortschritt",
         "accessManagement": {
-          "title": "Zugriffsberechtigungen",
+          "title": "Zugriff",
           "button": {
             "readOnly": "Gruppen und Rollen ansehen",
             "editable": "Gruppen und Rollen bearbeiten"
@@ -281,7 +298,6 @@
           "apis": {
             "title": "APIs",
             "empty": "Noch keine API vorhanden",
-            "noDescription": "Keine Beschreibung vorhanden",
             "addButton": "API hinzufügen",
             "sensorThings": "SensorThings API",
             "sensorThingsSubtitle": "Zeitreihendaten",
@@ -742,7 +758,8 @@
       "GROUP": "Gruppe",
       "PERMISSION": "Berechtigung",
       "ROLE": "Rolle",
-      "USER": "Benutzer"
+      "USER": "Benutzer",
+      "DATASET_DASHBOARD": "Datensatz-Dashboard"
     }
   },
   "roles": {

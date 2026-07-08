@@ -4,7 +4,10 @@ import { vi } from 'vitest'
 import Page from './page'
 
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
+  useTranslations: () =>
+    Object.assign((key: string) => key, {
+      rich: (key: string) => key,
+    }),
 }))
 
 vi.mock('next/image', () => ({
@@ -42,5 +45,27 @@ describe('Page', () => {
   it('renders the file icon inside the documentation button', () => {
     const link = screen.getByRole('link', { name: /docsButton/i })
     expect(link.querySelector('svg')).toBeInTheDocument()
+  })
+
+  it('renders the recommended workflow section title', () => {
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('title')
+  })
+
+  it('renders each workflow step title and subtitle', () => {
+    expect(screen.getByText('steps.datastructure.title')).toBeInTheDocument()
+    expect(screen.getByText('steps.datastructure.subtitle')).toBeInTheDocument()
+    expect(screen.getByText('steps.datasource.title')).toBeInTheDocument()
+    expect(screen.getByText('steps.datasource.subtitle')).toBeInTheDocument()
+    expect(screen.getByText('steps.pipeline.title')).toBeInTheDocument()
+    expect(screen.getByText('steps.pipeline.subtitle')).toBeInTheDocument()
+  })
+
+  it('renders the three workflow illustrations with correct sources', () => {
+    const images = document.querySelectorAll('img[src^="/svg/workflow/"]')
+    expect(Array.from(images).map(img => img.getAttribute('src'))).toEqual([
+      '/svg/workflow/datastructure.svg',
+      '/svg/workflow/datasource.svg',
+      '/svg/workflow/pipeline.svg',
+    ])
   })
 })

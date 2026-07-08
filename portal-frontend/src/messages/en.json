@@ -2,7 +2,24 @@
   "welcome": {
     "title": "Welcome to CIVITAS/CORE V2 Beta",
     "subtitle": "New here?",
-    "docsButton": "Documentation"
+    "docsButton": "Documentation",
+    "recommendedWorkflow": {
+      "title": "Recommended workflow",
+      "steps": {
+        "datastructure": {
+          "title": "Create a Data structure",
+          "subtitle": "Describes the Data"
+        },
+        "datasource": {
+          "title": "Create a Data source",
+          "subtitle": "Use the Data structure"
+        },
+        "pipeline": {
+          "title": "<b>Create a Dataset</b> and <b>configure a Pipeline</b>",
+          "subtitle": "Use the Data source to start the Dataflow"
+        }
+      }
+    }
   },
   "common": {
     "type-to-search": "Type to search",
@@ -259,7 +276,7 @@
       "completion": {
         "title": "Creation Progress",
         "accessManagement": {
-          "title": "Access Management",
+          "title": "Access",
           "button": {
             "readOnly": "View Groups and Roles",
             "editable": "Edit Groups and Roles"
@@ -282,7 +299,6 @@
           "apis": {
             "title": "APIs",
             "empty": "No API available yet",
-            "noDescription": "No description provided",
             "addButton": "Add API",
             "sensorThings": "SensorThings API",
             "sensorThingsSubtitle": "Time Series Data",
@@ -749,7 +765,8 @@
       "GROUP": "Group",
       "PERMISSION": "Permission",
       "ROLE": "Role",
-      "USER": "User"
+      "USER": "User",
+      "DATASET_DASHBOARD": "Dataset Dashboard"
     }
   },
   "roles": {

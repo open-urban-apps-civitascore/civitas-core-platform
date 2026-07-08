@@ -60,9 +60,10 @@ describe('ApiCard', () => {
       expect(screen.getByText('A test API')).toBeInTheDocument()
     })
 
-    it('shows no-description fallback when description is absent', () => {
+    it('renders nothing when description is absent', () => {
       renderComponent({ api: makeApi({ description: undefined }) })
-      expect(screen.getByText('noDescription')).toBeInTheDocument()
+      expect(screen.queryByText('A test API')).not.toBeInTheDocument()
+      expect(screen.queryByText('noDescription')).not.toBeInTheDocument()
     })
 
     it('renders the slug in the path preview', () => {
