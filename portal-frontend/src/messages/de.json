@@ -1314,6 +1314,12 @@
         "typeMismatchWithType": "Typen stimmen nicht überein ({type}). Konvertierungsfunktion hinzufügen.",
         "typeMismatch": "Typen stimmen nicht überein. Konvertierungsfunktion hinzufügen."
       },
+      "unconnectedWarning": {
+        "title": "Nicht verbundene Transformationen entfernen?",
+        "description": "{count, plural, one {# Transformation ist} other {# Transformationen sind}} nicht mit dem Ausgang verbunden und {count, plural, one {wird} other {werden}} beim Verlassen des Editors entfernt.",
+        "confirm": "Verlassen und entfernen"
+      },
+
       "categories": {
         "literal": "Literal",
         "recordPathFunctions": "RecordPath-Funktionen",

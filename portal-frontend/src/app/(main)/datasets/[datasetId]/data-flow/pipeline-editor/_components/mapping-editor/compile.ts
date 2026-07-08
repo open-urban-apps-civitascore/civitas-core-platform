@@ -65,6 +65,23 @@ export const compileCanvas = (nodes: Node[], edges: Edge[]): Pick<MappingConfig,
   return { fields, positions }
 }
 
+/**
+ * Transform nodes whose output does not (transitively) reach the target node.
+ * `compileCanvas` only serializes nodes reachable backwards from the target, so
+ * these would be silently dropped on save — the editor warns about them on exit.
+ */
+export const findUnconnectedTransformNodes = (nodes: Node[], edges: Edge[]): Node[] => {
+  const reachable = new Set<string>()
+  const queue = edges.filter(e => e.target === TARGET_NODE_ID).map(e => e.source)
+  while (queue.length) {
+    const id = queue.shift()!
+    if (id === SOURCE_NODE_ID || reachable.has(id)) continue
+    reachable.add(id)
+    for (const e of edges) if (e.target === id) queue.push(e.source)
+  }
+  return nodes.filter(n => n.type === 'transform' && !reachable.has(n.id))
+}
+
 // ---------------------------------------------------------------------------
 // Decompile: mapping config → canvas (MegaNodes + transform nodes + edges)
 // ---------------------------------------------------------------------------

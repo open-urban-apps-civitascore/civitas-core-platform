@@ -1327,6 +1327,12 @@
         "typeMismatchWithType": "Types don't match ({type}). Add a conversion function.",
         "typeMismatch": "Types don't match. Add a conversion function."
       },
+      "unconnectedWarning": {
+        "title": "Remove unconnected transforms?",
+        "description": "{count, plural, one {# transform is} other {# transforms are}} not connected to the output and will be removed when you leave the editor.",
+        "confirm": "Leave and remove"
+      },
+
       "categories": {
         "literal": "Literal",
         "recordPathFunctions": "RecordPath Functions",

@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import {
   CanvasScaffold,
   createTransformNodeType,
@@ -23,7 +24,13 @@ import { buildDataStructureUrn } from '@/utils/urn'
 
 import type { MappingConfig } from './_types'
 import { ARRAY_EDGE_STYLE } from './_types'
-import { compileCanvas, decompileConfig, SOURCE_NODE_ID, TARGET_NODE_ID } from './compile'
+import {
+  compileCanvas,
+  decompileConfig,
+  findUnconnectedTransformNodes,
+  SOURCE_NODE_ID,
+  TARGET_NODE_ID,
+} from './compile'
 import { TransformInspector } from './inspector/TransformInspector'
 import { MegaNode } from './nodes/MegaNode'
 import { umlDiagramToSchemaTree } from './schema/adapter'
@@ -112,6 +119,8 @@ export const MappingEditorModal = ({
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Which exit action is awaiting confirmation because unconnected transforms would be dropped.
+  const [pendingExit, setPendingExit] = useState<'apply' | 'close' | null>(null)
   const nextId = useRef(0)
   const initialized = useRef(false)
 
@@ -300,7 +309,10 @@ export const MappingEditorModal = ({
   // Look up the def from the translated registry so the inspector receives translated labels
   const selectedDef = selectedData ? translatedRegistry.byType[selectedData.defType] : undefined
 
-  const handleSave = () => {
+  // Transform nodes that aren't wired to the output — compileCanvas drops these on save.
+  const unconnectedTransforms = useMemo(() => findUnconnectedTransformNodes(nodes, edges), [nodes, edges])
+
+  const doSave = () => {
     const { fields, positions } = compileCanvas(nodes, edges)
     // A selectable source/target is always a released version, so name and
     // version are present. If buildDataStructureUrn throws here, the platform is
@@ -316,7 +328,21 @@ export const MappingEditorModal = ({
       },
       requiredFieldPaths(targetTree),
     )
+  }
+
+  const performExit = (action: 'apply' | 'close') => {
+    setPendingExit(null)
+    if (action === 'apply') doSave()
     onOpenChange(false)
+  }
+
+  // Warn before leaving if unconnected transforms would be discarded; otherwise exit directly.
+  const requestExit = (action: 'apply' | 'close') => {
+    if (unconnectedTransforms.length > 0) {
+      setPendingExit(action)
+      return
+    }
+    performExit(action)
   }
 
   const { mapped, unmapped } = status.counts
@@ -326,10 +352,10 @@ export const MappingEditorModal = ({
       <DialogTitle className="text-base">{name || t('toolbar.title')}</DialogTitle>
       <span className="text-center text-xs text-muted-foreground">{t('toolbar.status', { mapped, unmapped })}</span>
       <div className="flex items-center justify-end gap-2">
-        <Button size="sm" onClick={handleSave} disabled={!isReady}>
+        <Button size="sm" onClick={() => requestExit('apply')} disabled={!isReady}>
           {tCommon('actions.apply')}
         </Button>
-        <Button size="sm" variant="outline" onClick={() => onOpenChange(false)}>
+        <Button size="sm" variant="outline" onClick={() => requestExit('close')}>
           {tCommon('actions.close')}
         </Button>
       </div>
@@ -347,44 +373,58 @@ export const MappingEditorModal = ({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        showCloseButton={false}
-        className={FULLSCREEN}
-        aria-describedby={undefined}
-        onKeyDown={stopDeletePropagation}
-      >
-        <EditorLayout
-          toolbar={toolbar}
-          palette={<PaletteShell registry={translatedRegistry} title={t('palette.title')} />}
-          inspector={
-            <InspectorShell
-              title={t('inspector.title')}
-              isEmpty={!selectedDef}
-              emptyMessage={t('inspector.emptyMessage')}
-            >
-              {selectedDef && selectedData && (
-                <TransformInspector def={selectedDef} config={selectedData.config} onChange={updateConfig} />
-              )}
-            </InspectorShell>
-          }
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          showCloseButton={false}
+          className={FULLSCREEN}
+          aria-describedby={undefined}
+          onKeyDown={stopDeletePropagation}
         >
-          <CanvasScaffold
-            nodes={displayNodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onConnectStart={onConnectStart}
-            onConnectEnd={onConnectEnd}
-            isValidConnection={isValidConnection}
-            onDropNode={onDropNode}
-            onSelectionChange={setSelectedId}
-            deleteKeyCode={['Delete', 'Backspace']}
-          />
-        </EditorLayout>
-      </DialogContent>
-    </Dialog>
+          <EditorLayout
+            toolbar={toolbar}
+            palette={<PaletteShell registry={translatedRegistry} title={t('palette.title')} />}
+            inspector={
+              <InspectorShell
+                title={t('inspector.title')}
+                isEmpty={!selectedDef}
+                emptyMessage={t('inspector.emptyMessage')}
+              >
+                {selectedDef && selectedData && (
+                  <TransformInspector def={selectedDef} config={selectedData.config} onChange={updateConfig} />
+                )}
+              </InspectorShell>
+            }
+          >
+            <CanvasScaffold
+              nodes={displayNodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onConnectStart={onConnectStart}
+              onConnectEnd={onConnectEnd}
+              isValidConnection={isValidConnection}
+              onDropNode={onDropNode}
+              onSelectionChange={setSelectedId}
+              deleteKeyCode={['Delete', 'Backspace']}
+            />
+          </EditorLayout>
+        </DialogContent>
+      </Dialog>
+
+      <WarningModal
+        open={pendingExit !== null}
+        title={t('unconnectedWarning.title')}
+        description={t('unconnectedWarning.description', { count: unconnectedTransforms.length })}
+        confirmButtonTitle={t('unconnectedWarning.confirm')}
+        onOpenChange={isOpen => {
+          if (!isOpen) setPendingExit(null)
+        }}
+        onDiscard={() => setPendingExit(null)}
+        onConfirm={() => pendingExit && performExit(pendingExit)}
+      />
+    </>
   )
 }

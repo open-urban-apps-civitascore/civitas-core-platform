@@ -2,7 +2,13 @@ import type { Edge, Node } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
 
 import type { MappingConfig, SchemaTree } from './_types'
-import { compileCanvas, decompileConfig, SOURCE_NODE_ID, TARGET_NODE_ID } from './compile'
+import {
+  compileCanvas,
+  decompileConfig,
+  findUnconnectedTransformNodes,
+  SOURCE_NODE_ID,
+  TARGET_NODE_ID,
+} from './compile'
 import { concatInputPorts, mappingRegistry } from './transforms'
 
 const sourceTree: SchemaTree = {
@@ -137,8 +143,24 @@ describe('mapping editor compile', () => {
     expect(targetEdges.map(e => e.targetHandle).sort()).toEqual(['$.fullCode', '$.title'])
   })
 
+  it('flags a transform whose output is not wired to the target', () => {
+    // 'i' (toString) only has its input connected; 'c' (concat) reaches the target.
+    const partialEdges: Edge[] = [
+      { id: 'e2', source: SOURCE_NODE_ID, sourceHandle: '$.id', target: 'i', targetHandle: 'in' },
+      { id: 'e4', source: SOURCE_NODE_ID, sourceHandle: '$.suffix', target: 'c', targetHandle: 'in1' },
+      { id: 'e5', source: 'c', sourceHandle: 'out', target: TARGET_NODE_ID, targetHandle: '$.fullCode' },
+    ]
+    const unconnected = findUnconnectedTransformNodes(nodes, partialEdges)
+    expect(unconnected.map(n => n.id)).toEqual(['i'])
+  })
+
+  it('flags nothing when every transform reaches the target', () => {
+    expect(findUnconnectedTransformNodes(nodes, edges)).toHaveLength(0)
+  })
+
   it('round-trips: compile → decompile → compile is stable', () => {
     const compiled = compileCanvas(nodes, edges)
+
     const config: MappingConfig = {
       $schema: 'https://civitasconnect.digital/core/mapping/v1',
       source: 'urn:core:datastructure:a:b',
