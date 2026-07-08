@@ -244,7 +244,7 @@ class UserContextControllerIT {
     // Different scope types
     List<String> scopeTypes =
         group.getAssignments().stream().map(AssignmentContext::getScopeType).toList();
-    assertThat(scopeTypes).containsExactlyInAnyOrder("TENANT", "DATASPACE");
+    assertThat(scopeTypes).containsExactlyInAnyOrder("TENANT", "DATAPOOL");
 
     // TENANT assignment has no scope entity (scopeId is null)
     AssignmentContext tenantAssignment =
@@ -254,13 +254,13 @@ class UserContextControllerIT {
             .orElseThrow();
     assertThat(tenantAssignment.getScopeId()).isNull();
 
-    // DATASPACE assignment has scopeId from data_space_id FK column
-    AssignmentContext dataspaceAssignment =
+    // DATAPOOL assignment has scopeId from datapool_id FK column
+    AssignmentContext datapoolAssignment =
         group.getAssignments().stream()
-            .filter(a -> "DATASPACE".equals(a.getScopeType()))
+            .filter(a -> "DATAPOOL".equals(a.getScopeType()))
             .findFirst()
             .orElseThrow();
-    assertThat(dataspaceAssignment.getScopeId())
+    assertThat(datapoolAssignment.getScopeId())
         .isEqualTo("f7777777-7777-7777-7777-777777777777");
   }
 }

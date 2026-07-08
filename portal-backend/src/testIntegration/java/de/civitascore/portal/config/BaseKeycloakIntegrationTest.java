@@ -77,6 +77,9 @@ public abstract class BaseKeycloakIntegrationTest {
 
     registry.add("spring.security.oauth2.resourceserver.jwt.issuer-uri", () -> issuerUri);
     registry.add("spring.security.oauth2.resourceserver.jwt.jwk-set-uri", () -> jwkSetUri);
+
+    registry.add("keycloak.auth-server-url", () -> authServerUrl);
+    registry.add("keycloak.realm", () -> REALM_NAME);
   }
 
   @BeforeEach
