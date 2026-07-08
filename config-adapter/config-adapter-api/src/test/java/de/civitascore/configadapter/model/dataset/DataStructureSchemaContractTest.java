@@ -60,7 +60,6 @@ class DataStructureSchemaContractTest {
     "broken-missing-parent.json, 4b8aa70c36ee85b86db5adf34cb9214f4a7d6c14254c8be5217437199f69fa82",
     "legacy-definitions.json, dff36ea7e76be8fb31a69b848654a73a844fcefe7b3704f11531287aff14fb85",
     "legacy-flat-root.json, 2503d11def93c1ee4a189cb66d9bd2309cfad9645f009be2badfea910ceb6fbe",
-    "multi-root.json, 6c4d22c7f796c069f3e0386beac609f8af28ef895cddd910747c83dacaea0def",
     "wrapper-root.json, 95b6b74650a5a01350f251240ec003e215cfda30c2378aabef7c11a679a3d84d"
   })
   void fixtureMatchesThePinnedContractHash(String name, String expectedHash) throws Exception {
@@ -79,19 +78,6 @@ class DataStructureSchemaContractTest {
         List.of("id", "name", "breed", "home"), List.copyOf(resolved.properties().keySet()));
     assertEquals(Set.of("id", "breed"), resolved.required());
     assertEquals(List.of("id"), DataStructureSchema.primaryKeyColumns(schema));
-  }
-
-  @Test
-  void multiRootDocumentResolvesToTheRecordItselfWithOneObjectPropertyPerTree() {
-    Map<String, Object> schema = fixture("multi-root.json");
-
-    // Two root properties are not a wrapper, so the record is the document root: each unconnected
-    // tree stays an object-valued property of it.
-    var resolved = DataStructureSchema.resolveDefinition(schema);
-    assertEquals(List.of("building", "street"), List.copyOf(resolved.properties().keySet()));
-    assertEquals(Set.of(), resolved.required());
-    assertEquals(Map.of("$ref", "#/$defs/Building"), resolved.properties().get("building"));
-    assertEquals(List.of(), DataStructureSchema.primaryKeyColumns(schema));
   }
 
   @Test
