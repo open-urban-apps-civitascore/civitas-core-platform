@@ -82,7 +82,7 @@ const createVersionDetail = (overrides?: Partial<DatastructureVersion>): Datastr
 
 const createVersionFormData = (overrides?: Partial<DatastructureVersionFormData>): DatastructureVersionFormData => ({
   id: 'version-id',
-  version: '1.0',
+  version: '1.0.0',
   description: 'Version Description',
   dataStructureVersionStatus: 'DRAFT',
   dataStructureVersionSource: 'OWN',

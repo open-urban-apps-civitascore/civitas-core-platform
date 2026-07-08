@@ -481,6 +481,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       renderComponent()
 
       const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
+      await user.clear(versionInput)
       await user.type(versionInput, '2.0.0')
 
       await waitFor(() => {
@@ -493,6 +494,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       renderComponent()
 
       const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
+      await user.clear(versionInput)
       await user.type(versionInput, '2.0.0')
 
       const confirmButtons = screen.getAllByTestId('confirmButton')
@@ -618,6 +620,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       renderComponent()
 
       const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
+      await user.clear(versionInput)
       await user.type(versionInput, '2.0.0')
 
       const cancelButtons = screen.getAllByTestId('cancelButton')
@@ -654,6 +657,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
       const initialValue = versionInput.value
 
+      await user.clear(versionInput)
       await user.type(versionInput, '2.0.0')
 
       const cancelButtons = screen.getAllByTestId('cancelButton')
@@ -676,6 +680,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       renderComponent()
 
       const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
+      await user.clear(versionInput)
       await user.type(versionInput, '2.0.0')
 
       const cancelButtons = screen.getAllByTestId('cancelButton')

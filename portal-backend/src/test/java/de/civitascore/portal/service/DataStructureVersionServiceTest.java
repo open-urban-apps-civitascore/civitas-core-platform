@@ -8,6 +8,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
@@ -563,6 +564,24 @@ class DataStructureVersionServiceTest {
 
       assertThat(version.getDataStructureVersionStatus())
           .isEqualTo(DataStructureVersionStatus.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName("rejection message does not reveal the expected DataStructure id")
+    void rejectionDoesNotRevealDataStructureId() {
+      DataStructureVersion version =
+          draftVersionWithModel(
+              new HashMap<>(
+                  Map.of(
+                      "$id",
+                      "urn:core:platform:civitas:datastructure:common:WeatherModel:0000000001:1.0.0")));
+
+      assertThatThrownBy(() -> dataStructureVersionService.release(version.getId()))
+          .isInstanceOf(InvalidInputException.class)
+          // anchor to the real rejection so the negative assertions cannot pass vacuously
+          .hasMessageContaining("not a valid CORE URN")
+          .hasMessageNotContaining(DATA_STRUCTURE_ID.toString())
+          .hasMessageNotContaining(CoreUrn.disambiguatorFor(DATA_STRUCTURE_ID));
     }
 
     @Test
