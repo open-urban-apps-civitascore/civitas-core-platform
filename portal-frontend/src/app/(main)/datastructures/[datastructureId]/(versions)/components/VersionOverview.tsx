@@ -167,16 +167,17 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   }
 
   const exitEditMode = () => {
-    if (isCreateMode) router.push(`/datastructures/${datastructureId}`)
-    else {
-      setIsReadOnly(true)
-      setIsExitModalOpen(false)
-    }
+    setIsExitModalOpen(false)
+    router.push(`/datastructures/${datastructureId}`)
   }
 
   const handleExitWarningSave = async () => {
     const isSaved = await handleSubmit()
-    if (isSaved) exitEditMode()
+    if (isSaved) {
+      exitEditMode()
+    } else {
+      setIsExitModalOpen(false)
+    }
   }
 
   const handleExit = () => {
