@@ -119,7 +119,8 @@ export const diagramReducer = (state: UMLDiagram, action: DiagramAction): UMLDia
         ...state,
         nodes: state.nodes.map(node => {
           const shouldFlag = node.id === id
-          if ((node.data.element.isRoot === true) === shouldFlag) return node
+          const isFlagged = node.data.element.isRoot === true
+          if (isFlagged === shouldFlag) return node
           return {
             ...node,
             data: {

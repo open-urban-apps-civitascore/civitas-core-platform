@@ -11,7 +11,7 @@ import type { UMLAttribute, UMLElement, UMLType } from '@/components/uml-modeler
 import { hasAttributes } from '@/components/uml-modeler/types/uml'
 
 import type { FieldNode, FieldType, SchemaTree } from '../_types'
-import { GEOMETRY, isGeometryType, portTypeFor } from '../_types'
+import { field, GEOMETRY, isGeometryType } from '../_types'
 
 export { GEOMETRY }
 
@@ -138,17 +138,10 @@ const buildFields = (el: UMLElement, base: string, index: DiagramIndex, visited:
     const required = isAttributeRequired(attr)
     if (ref && hasAttributes(ref) && !visited.has(ref.id)) {
       const type: FieldType = isManyMultiplicity(attr.multiplicity) ? 'array' : 'object'
-      fields.push({
-        path,
-        name: attr.name,
-        type,
-        portType: portTypeFor(type),
-        required,
-        children: buildFields(ref, path + (type === 'array' ? '[]' : ''), index, new Set([...visited, el.id])),
-      })
+      const children = buildFields(ref, path + (type === 'array' ? '[]' : ''), index, new Set([...visited, el.id]))
+      fields.push(field(path, attr.name, type, required, children))
     } else {
-      const type = scalarType(attr.type)
-      fields.push({ path, name: attr.name, type, portType: portTypeFor(type), required })
+      fields.push(field(path, attr.name, scalarType(attr.type), required))
     }
   }
 
@@ -156,16 +149,10 @@ const buildFields = (el: UMLElement, base: string, index: DiagramIndex, visited:
     if (visited.has(rel.target.id)) continue
     const path = `${base}.${rel.name}`
     const type: FieldType = rel.many ? 'array' : 'object'
-    fields.push({
-      path,
-      name: rel.name,
-      type,
-      portType: portTypeFor(type),
-      // Relationship lower bound is not threaded here; treat nested relations as optional so they
-      // don't force a mapping (scalar attribute requiredness is what matters in practice).
-      required: false,
-      children: buildFields(rel.target, path + (type === 'array' ? '[]' : ''), index, new Set([...visited, el.id])),
-    })
+    const children = buildFields(rel.target, path + (type === 'array' ? '[]' : ''), index, new Set([...visited, el.id]))
+    // Relationship lower bound is not threaded here; treat nested relations as optional so they
+    // don't force a mapping (scalar attribute requiredness is what matters in practice).
+    fields.push(field(path, rel.name, type, false, children))
   }
 
   return fields

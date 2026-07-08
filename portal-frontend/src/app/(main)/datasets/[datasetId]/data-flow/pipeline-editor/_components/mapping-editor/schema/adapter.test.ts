@@ -55,7 +55,7 @@ describe('umlDiagramToSchemaTree — required derivation', () => {
     const required = (name: string) => tree.fields.find(f => f.name === name)?.required
     expect(required('id')).toBe(true) // {id}
     expect(required('name')).toBe(true) // 1
-    expect(required('nick')).toBe(false) // 0..1 optional
+    expect(required('nick')).toBeFalsy() // 0..1 optional — the factory omits the flag when false
     expect(required('tags')).toBe(true) // 1..*
     expect(required('note')).toBe(true) // unset = single required
   })
