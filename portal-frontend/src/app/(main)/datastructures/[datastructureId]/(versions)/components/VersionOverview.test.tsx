@@ -600,7 +600,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
   })
 
   describe('exit behavior - edit mode', () => {
-    it('switches to read only view when exit is clicked in edit mode without changes', async () => {
+    it('navigates back to the datastructure when exit is clicked in edit mode without changes', async () => {
       const user = userEvent.setup()
 
       renderComponent()
@@ -609,8 +609,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       await user.click(cancelButtons[0])
 
       await waitFor(() => {
-        expect(screen.getByTestId('editButton')).toBeInTheDocument()
-        expect(mockPush).not.toHaveBeenCalled()
+        expect(mockPush).toHaveBeenCalledWith(`/datastructures/${mockDatastructure.id}`)
       })
     })
 
@@ -649,14 +648,12 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       })
     })
 
-    it('resets form when discard button in ExitWarningModal is clicked', async () => {
+    it('navigates back to the datastructure when discard button in ExitWarningModal is clicked', async () => {
       const user = userEvent.setup()
 
       renderComponent()
 
       const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
-      const initialValue = versionInput.value
-
       await user.clear(versionInput)
       await user.type(versionInput, '2.0.0')
 
@@ -670,11 +667,11 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       })
 
       await waitFor(() => {
-        expect(versionInput.value).toBe(initialValue)
+        expect(mockPush).toHaveBeenCalledWith(`/datastructures/${mockDatastructure.id}`)
       })
     })
 
-    it('saves when save is clicked in ExitWarningModal', async () => {
+    it('saves and navigates back to the datastructure when save is clicked in ExitWarningModal', async () => {
       const user = userEvent.setup()
 
       renderComponent()
@@ -697,8 +694,36 @@ describe('VersionOverview - hasUserChanges Modal', () => {
             endpoint: `/datastructures/${mockDatastructure.id}/versions/${mockVersion.id}`,
           }),
         )
-        expect(mockPush).not.toHaveBeenCalled()
+        expect(mockPush).toHaveBeenCalledWith(`/datastructures/${mockDatastructure.id}`)
       })
+    })
+
+    it('does not navigate away and closes the modal when save fails in ExitWarningModal', async () => {
+      const user = userEvent.setup()
+      mockUpdateMutateAsync.mockRejectedValueOnce(new Error('Request failed'))
+
+      renderComponent()
+
+      const versionInput = screen.getByTestId('versionTextField') as HTMLInputElement
+      await user.clear(versionInput)
+      await user.type(versionInput, '2.0.0')
+
+      const cancelButtons = screen.getAllByTestId('cancelButton')
+      await user.click(cancelButtons[0])
+
+      await waitFor(async () => {
+        expect(screen.getByTestId('saveButton')).toBeInTheDocument()
+        await user.click(screen.getByTestId('saveButton'))
+      })
+
+      await waitFor(() => {
+        expect(mockUpdateMutateAsync).toHaveBeenCalled()
+      })
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      })
+      expect(mockPush).not.toHaveBeenCalled()
     })
   })
 
