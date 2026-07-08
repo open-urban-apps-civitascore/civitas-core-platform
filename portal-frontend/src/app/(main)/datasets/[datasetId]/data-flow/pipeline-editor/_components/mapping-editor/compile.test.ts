@@ -190,7 +190,6 @@ describe('mapping editor compile', () => {
 
   it('does not wire an unconnected conversion input to the source node', () => {
     const config: MappingConfig = {
-
       $schema: 'https://civitasconnect.digital/core/mapping/v1',
       source: 'urn:core:datastructure:a:b',
       target: 'urn:core:datastructure:c:d',
