@@ -22,14 +22,15 @@
  *   for many multiplicities).
  *
  * Root: the document root is the data structure itself, titled after the
- * diagram. Every class is emitted under `$defs`; the single root class (the
- * one not embedded by any structural or inheritance edge, and from which every
- * other element is reachable) is referenced from the document root via a
- * `$ref` property, so the structure's name — not an arbitrary class — is
- * always the top level. A diagram without exactly one such root is invalid and
- * the export throws {@link SchemaExportError} instead of guessing. A diagram
- * consisting of a single enumeration keeps its `enum` at the document root
- * instead.
+ * diagram. Every class is emitted under `$defs`; the single root class — the
+ * `isRoot`-designated element or, absent a designation, the one class not
+ * embedded by any structural or inheritance edge — is referenced from the
+ * document root via a `$ref` property, so the structure's name — not an
+ * arbitrary class — is always the top level. Every other element must be
+ * reachable from the root; otherwise (or when no unique root exists) the
+ * export throws {@link SchemaExportError} instead of guessing. An empty
+ * diagram exports an empty object schema; a diagram consisting of a single
+ * enumeration keeps its `enum` at the document root instead.
  */
 
 import type { UMLDiagram } from '../types/diagram'

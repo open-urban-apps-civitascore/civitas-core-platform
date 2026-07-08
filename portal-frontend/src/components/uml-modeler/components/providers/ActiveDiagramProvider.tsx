@@ -13,9 +13,9 @@ import {
   getSelectedNodes,
   validateRelationshipConnection,
 } from '../../services/diagramService'
-import type { DiagramAction, NodeCreationContext, UMLDiagram, UMLEdge } from '../../types/diagram'
+import type { DiagramAction, NodeCreationContext, UMLDiagram, UMLEdge, UMLElementUpdate } from '../../types/diagram'
 import type { UseMultiSessionReturn } from '../../types/session'
-import type { UMLElement, UMLRelationship, UMLRelationshipType } from '../../types/uml'
+import type { UMLRelationship, UMLRelationshipType } from '../../types/uml'
 
 interface ActiveDiagramProviderComponentProps {
   children: ReactNode
@@ -89,7 +89,7 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
   )
 
   const updateNode = useCallback(
-    (nodeId: string, updates: Partial<UMLElement>) => {
+    (nodeId: string, updates: UMLElementUpdate) => {
       dispatch({ type: 'UPDATE_NODE', payload: { id: nodeId, updates } })
     },
     [dispatch],

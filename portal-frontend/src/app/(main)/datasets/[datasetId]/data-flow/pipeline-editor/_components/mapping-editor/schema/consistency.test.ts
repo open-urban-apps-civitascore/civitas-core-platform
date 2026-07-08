@@ -7,6 +7,8 @@ import type { FieldNode } from '../_types'
 import { umlDiagramToSchemaTree } from './adapter'
 import { modelToSchemaTree } from './modelAdapter'
 
+const treeOf = (diagram: UMLDiagram, fallbackName: string) => umlDiagramToSchemaTree(diagram, fallbackName).tree
+
 const cls = (id: string, name: string, attrs: { id: string; name: string; type?: string }[]) => ({
   id: `node-${id}`,
   type: 'class' as const,
@@ -169,13 +171,13 @@ describe('root-selection consistency (adapter vs generator)', () => {
   // not itself a class. The editor adapter still roots on the single root class, which the generator
   // references via its one $ref property — so the adapter root equals that referenced class.
   it.each(fixtures)('agrees on the root class for $label', ({ diagram }) => {
-    const adapterRoot = umlDiagramToSchemaTree(diagram, diagram.name).name
+    const adapterRoot = treeOf(diagram, diagram.name).name
     const generatorRootClass = rootClassOf(exportToJsonSchema(diagram) as JsonSchema)
     expect(adapterRoot).toBe(generatorRootClass)
   })
 
   it.each(fixtures)('agrees on the root field set for $label', ({ diagram }) => {
-    const adapterFields = umlDiagramToSchemaTree(diagram, diagram.name).fields.map(f => f.name)
+    const adapterFields = treeOf(diagram, diagram.name).fields.map(f => f.name)
     const schema = exportToJsonSchema(diagram) as JsonSchema
     const defs = schema.$defs ?? {}
     const rootClass = rootClassOf(schema)
@@ -194,7 +196,7 @@ describe('model-walker consistency (modelToSchemaTree vs adapter)', () => {
   // subtree must expose exactly the leaf paths the diagram adapter derives directly — the paths are
   // the mapping contract and must not depend on which representation the editor happens to read.
   it.each(fixtures)('agrees on root class and leaf paths for $label', ({ diagram }) => {
-    const adapterTree = umlDiagramToSchemaTree(diagram, diagram.name)
+    const adapterTree = treeOf(diagram, diagram.name)
     const modelTree = modelToSchemaTree(exportToJsonSchema(diagram), diagram.name)
 
     expect(modelTree.name).toBe(diagram.name)
@@ -216,6 +218,6 @@ describe('model-walker consistency (modelToSchemaTree vs adapter)', () => {
     // The export refuses to persist a model for the invalid diagram, and the adapter's fallback
     // tree agrees by exposing nothing mappable — neither side invents a record shape.
     expect(() => exportToJsonSchema(multiRoot)).toThrow(SchemaExportError)
-    expect(umlDiagramToSchemaTree(multiRoot, multiRoot.name)).toEqual({ name: 'TrafficSensor', fields: [] })
+    expect(treeOf(multiRoot, multiRoot.name)).toEqual({ name: 'TrafficSensor', fields: [] })
   })
 })

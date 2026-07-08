@@ -131,8 +131,10 @@ const collectInto = (
     if (!visitedRefs.has(parentName)) {
       visitedRefs.add(parentName)
       const parent = defs[parentName]
-      // Skipping a missing parent would render a truncated tree for a model the engine rejects.
-      if (!parent) {
+      // Missing AND empty parents are rejected, exactly like the engine (`target.isEmpty()` in
+      // DataStructureSchema) — skipping one would render a truncated tree for a model the engine
+      // refuses to resolve.
+      if (!parent || Object.keys(parent).length === 0) {
         throw new ModelResolutionError(`Parent $ref '${ref}' resolves to no definition`)
       }
       collectInto(parent, defs, into, visitedRefs)
@@ -170,14 +172,14 @@ const wrappedRootName = (root: SchemaNode, defs: Record<string, SchemaNode>): st
   return name
 }
 
-interface RootResolution {
+interface ResolvedRecordRoot {
   /** The resolved root class, or null when the record is the document root itself. */
   className: string | null
   definition: ResolvedDefinition
 }
 
 /** Mirrors `DataStructureSchema.resolveDefinition`'s precedence: wrapper → root itself → named definition. */
-const resolveRoot = (root: SchemaNode, defs: Record<string, SchemaNode>): RootResolution => {
+const resolveRecordRoot = (root: SchemaNode, defs: Record<string, SchemaNode>): ResolvedRecordRoot => {
   const wrapperName = wrappedRootName(root, defs)
   if (wrapperName) {
     return { className: wrapperName, definition: mergeDefinition(defs[wrapperName], defs) }
@@ -321,7 +323,7 @@ export const modelToSchemaTree = (model: Record<string, unknown>, fallbackName: 
   if ('enum' in root) return { name, fields: [] }
 
   const defs = definitionsOf(root)
-  const { className, definition } = resolveRoot(root, defs)
+  const { className, definition } = resolveRecordRoot(root, defs)
   if (className === null) {
     // Document-root properties carry only the schema-declared requiredness.
     return { name, fields: buildFields(definition, defs, '$', new Set()) }

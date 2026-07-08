@@ -1114,7 +1114,8 @@
       "isInUseModelHint": "Das Datenmodell kann nicht bearbeitet werden, da es bereits verwendet wird.",
       "isInUseStatusHint": "Kann nicht auf Entwurf gesetzt werden, da diese Version bereits verwendet wird.",
       "isLastAvailableVersion": "Kann nicht auf Entwurf gesetzt werden, da dies die letzte verfügbare Version einer verfügbaren Datenstruktur ist. Setzen Sie zuerst die Datenstruktur auf Entwurf.",
-      "draftModelSkipped": "Der Entwurf wurde ohne Schema-Modell gespeichert: {reason}"
+      "draftModelSkipped": "Der Entwurf wurde ohne Schema-Modell gespeichert: {reason}",
+      "draftModelRemoved": "Der Entwurf wurde ohne Schema-Modell gespeichert, das zuvor gespeicherte Modell wurde dabei entfernt: {reason}"
     },
     "errors": {
       "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
@@ -1317,6 +1318,7 @@
     "lines": "{count, plural, one {# Zeile} other {# Zeilen}}",
     "mappingEditor": {
       "modelUnresolvable": "Das gespeicherte Schema von „{name}“ konnte nicht gelesen werden. Angezeigt wird die Diagrammstruktur — sie kann von der Struktur abweichen, die beim Deployment verwendet wird.",
+      "diagramUnresolvable": "„{name}“ liefert keine abbildbaren Felder: {reason}",
       "toolbar": {
         "title": "Mapping",
         "status": "{mapped} zugeordnet · {unmapped} nicht zugeordnet"

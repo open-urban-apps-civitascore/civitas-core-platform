@@ -1127,7 +1127,8 @@
       "isInUseModelHint": "The data model can not be edited since it is already in use.",
       "isInUseStatusHint": "Can not be set to draft since this version is already in use.",
       "isLastAvailableVersion": "Can not be set to draft because this is the last available version in an available Data structure. Set the Data structure to draft first.",
-      "draftModelSkipped": "The draft was saved without a schema model: {reason}"
+      "draftModelSkipped": "The draft was saved without a schema model: {reason}",
+      "draftModelRemoved": "The draft was saved without a schema model, removing the previously stored model: {reason}"
     },
     "errors": {
       "creationError": "An error occurred while creating the Data structure version.",
@@ -1330,6 +1331,7 @@
     "lines": "{count, plural, one {# line} other {# lines}}",
     "mappingEditor": {
       "modelUnresolvable": "The stored schema of \"{name}\" could not be read. Showing the diagram structure instead — it may differ from the structure used at deploy time.",
+      "diagramUnresolvable": "\"{name}\" provides no mappable fields: {reason}",
       "toolbar": {
         "title": "Mapping",
         "status": "{mapped} mapped · {unmapped} unmapped"

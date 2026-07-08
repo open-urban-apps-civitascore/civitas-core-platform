@@ -44,7 +44,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         name: sessionName || diagram.name,
       }
     } catch (error) {
-      if (!(error instanceof SchemaExportError)) throw error
+      // A rethrow from an onClick handler bypasses error boundaries and leaves the user with a
+      // silent dead button — walker bugs stay loud via the console, but still get a toast.
+      if (!(error instanceof SchemaExportError)) {
+        console.error('UML model save failed', error)
+        toast.error(t('save.error'))
+        return
+      }
       toast.error(rootFailureMessage(t, error.failure))
       return
     }
@@ -65,7 +71,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       downloadJsonSchema(diagram)
       toast.success(t('export.success'))
     } catch (error) {
-      toast.error(error instanceof SchemaExportError ? rootFailureMessage(t, error.failure) : t('export.error'))
+      if (error instanceof SchemaExportError) {
+        toast.error(rootFailureMessage(t, error.failure))
+        return
+      }
+      // The generic toast alone would make an export bug undebuggable.
+      console.error('JSON schema export failed', error)
+      toast.error(t('export.error'))
     }
   }, [diagram, t])
 

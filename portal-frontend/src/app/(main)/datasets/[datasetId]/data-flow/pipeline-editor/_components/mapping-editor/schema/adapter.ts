@@ -1,4 +1,5 @@
 import { isAttributeRequired } from '@/components/uml-modeler/services/jsonSchemaExportService'
+import type { RootResolutionFailure } from '@/components/uml-modeler/services/umlContainment'
 import {
   classifyStructuralEdge,
   INHERITANCE_RELATIONS,
@@ -170,19 +171,41 @@ const buildFields = (el: UMLElement, base: string, index: DiagramIndex, visited:
   return fields
 }
 
+export interface DiagramSchemaTree {
+  readonly tree: SchemaTree
+  /**
+   * Why the diagram yields no usable root — the same condition under which the schema export
+   * refuses to produce a model. Callers must surface it: the empty tree alone reads as "nothing
+   * to map" although the reason is precisely known. `null` for a resolvable (or empty/enum-only)
+   * diagram.
+   */
+  readonly failure: RootResolutionFailure | null
+}
+
 /**
  * Converts a datastructure version's `styles` (UML diagram) into the editor's field tree: the
  * single root class anchors its fields directly at `$` (the runtime record is the class itself).
- * A diagram without a unique root — the same condition under which the schema export refuses to
- * produce a model — yields an empty tree rather than a guessed one; an enumeration root is a
- * scalar value at runtime and carries no mappable record fields either.
+ * A diagram without a unique root yields an empty tree rather than a guessed one, carrying the
+ * typed failure; an empty diagram or an enumeration root (a scalar value at runtime) also has no
+ * mappable record fields but is not a failure.
  */
-export const umlDiagramToSchemaTree = (diagram: UMLDiagram | null | undefined, fallbackName: string): SchemaTree => {
-  if (!diagram) return { name: fallbackName, fields: [] }
+export const umlDiagramToSchemaTree = (
+  diagram: UMLDiagram | null | undefined,
+  fallbackName: string,
+): DiagramSchemaTree => {
+  if (!diagram) return { tree: { name: fallbackName, fields: [] }, failure: null }
   const resolution = resolveRootElement(diagram)
-  if (resolution.kind === 'enum') return { name: resolution.root.name || fallbackName, fields: [] }
-  if (resolution.kind !== 'class') return { name: fallbackName, fields: [] }
+  if (resolution.kind === 'enum') {
+    return { tree: { name: resolution.root.name || fallbackName, fields: [] }, failure: null }
+  }
+  if (resolution.kind === 'invalid') {
+    return { tree: { name: fallbackName, fields: [] }, failure: resolution.failure }
+  }
+  if (resolution.kind === 'empty') return { tree: { name: fallbackName, fields: [] }, failure: null }
   const root = resolution.root
   const index = indexDiagram(diagram)
-  return { name: root.name || fallbackName, fields: buildFields(root, '$', index, new Set([root.id])) }
+  return {
+    tree: { name: root.name || fallbackName, fields: buildFields(root, '$', index, new Set([root.id])) },
+    failure: null,
+  }
 }

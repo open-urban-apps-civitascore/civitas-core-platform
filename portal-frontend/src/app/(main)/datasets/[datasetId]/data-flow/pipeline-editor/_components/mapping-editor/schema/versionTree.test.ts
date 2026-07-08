@@ -73,10 +73,33 @@ describe('versionToSchemaTree', () => {
     expect(versionToSchemaTree(version({}), 'fallback')).toEqual({
       tree: { name: 'fallback', fields: [] },
       isModelBroken: false,
+      diagramFailure: null,
     })
     expect(versionToSchemaTree(undefined, 'fallback')).toEqual({
       tree: { name: 'fallback', fields: [] },
       isModelBroken: false,
+      diagramFailure: null,
     })
+  })
+
+  it('surfaces the root failure of a rootless diagram saved without a model', () => {
+    const ambiguous = {
+      ...styles,
+      nodes: [
+        styles.nodes[0],
+        {
+          ...styles.nodes[0],
+          id: 'cls2',
+          data: {
+            ...styles.nodes[0].data,
+            element: { ...styles.nodes[0].data.element, id: 'cls2', name: 'Second' },
+          },
+        },
+      ],
+    } as unknown as UMLDiagram
+
+    const { tree, diagramFailure } = versionToSchemaTree(version({ styles: ambiguous }), 'fallback')
+    expect(tree.fields).toEqual([])
+    expect(diagramFailure).toEqual({ code: 'ambiguousRoot', candidateNames: ['FromDiagram', 'Second'] })
   })
 })

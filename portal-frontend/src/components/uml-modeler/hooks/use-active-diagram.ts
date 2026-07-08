@@ -4,8 +4,15 @@ import type { Connection } from '@xyflow/react'
 import { createContext, useContext } from 'react'
 
 import { createEmptyDiagram, getDiagramStats } from '../services/diagramService'
-import type { DiagramAction, NodeCreationContext, UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
-import type { UMLElement, UMLRelationship, UMLRelationshipType } from '../types/uml'
+import type {
+  DiagramAction,
+  NodeCreationContext,
+  UMLDiagram,
+  UMLEdge,
+  UMLElementUpdate,
+  UMLNode,
+} from '../types/diagram'
+import type { UMLRelationship } from '../types/uml'
 
 interface ActiveDiagramContextValue {
   // Current active diagram
@@ -24,7 +31,7 @@ interface ActiveDiagramContextValue {
 
   // Node operations
   addNode: (context: NodeCreationContext) => void
-  updateNode: (nodeId: string, updates: Partial<UMLElement>) => void
+  updateNode: (nodeId: string, updates: UMLElementUpdate) => void
   /** Designates the node as the diagram's root (clearing any other flag); `null` clears it. */
   setRootNode: (nodeId: string | null) => void
   deleteNodes: (nodeIds: string[]) => void

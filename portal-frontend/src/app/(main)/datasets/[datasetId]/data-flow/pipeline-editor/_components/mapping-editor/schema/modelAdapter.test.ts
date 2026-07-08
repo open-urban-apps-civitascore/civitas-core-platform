@@ -311,6 +311,19 @@ describe('modelToSchemaTree', () => {
     ).toThrow(/Gone/)
   })
 
+  it('rejects an empty allOf parent definition, matching the engine', () => {
+    // DataStructureSchema treats a present-but-empty parent map like a missing one.
+    expect(() =>
+      modelToSchemaTree(
+        wrapperModel({
+          Thing: { allOf: [{ $ref: '#/$defs/Empty' }], type: 'object', properties: { a: { type: 'string' } } },
+          Empty: {},
+        }),
+        'fallback',
+      ),
+    ).toThrow(/Empty/)
+  })
+
   it('rejects a local property $ref that resolves to no definition', () => {
     expect(() =>
       modelToSchemaTree(
