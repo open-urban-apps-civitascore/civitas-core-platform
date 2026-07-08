@@ -25,7 +25,7 @@ export const useUMLDiagram = (): UseUMLDiagramCoreReturn => {
         relationshipTypes: {},
       },
       isDirty: false,
-      activeRelationshipType: 'association',
+      activeRelationshipType: null,
       dispatch: () => {},
       addNode: () => {},
       updateNode: () => {},

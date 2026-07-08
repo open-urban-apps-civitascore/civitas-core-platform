@@ -20,7 +20,8 @@ export interface UseUMLDiagramCoreReturn {
   diagram: UMLDiagram
   stats: ReturnType<typeof getDiagramStats>
   isDirty: boolean
-  activeRelationshipType: string
+  // null = no relationship tool selected (neutral). Connections cannot be drawn until a tool is picked.
+  activeRelationshipType: UMLRelationshipType | null
 
   // Actions
   dispatch: (action: DiagramAction) => void
@@ -38,7 +39,7 @@ export interface UseUMLDiagramCoreReturn {
   selectEdge: (edgeId: string, isMultiSelect?: boolean) => void
 
   // Simple relationship type setting
-  setActiveRelationshipType: (type: string) => void
+  setActiveRelationshipType: (type: UMLRelationshipType | null) => void
 
   // Selection operations
   clearSelection: () => void
@@ -59,7 +60,7 @@ export interface UseUMLDiagramCoreReturn {
 
 export const useUMLDiagramCore = (initialDiagram?: UMLDiagram): UseUMLDiagramCoreReturn => {
   const [diagram, dispatch] = useReducer(diagramReducer, initialDiagram ?? createEmptyDiagram())
-  const [activeRelationshipType, setActiveRelationshipType] = useState('association')
+  const [activeRelationshipType, setActiveRelationshipType] = useState<UMLRelationshipType | null>(null)
 
   // Memoized stats calculation
   const stats = useMemo(() => getDiagramStats(diagram), [diagram])
@@ -100,12 +101,13 @@ export const useUMLDiagramCore = (initialDiagram?: UMLDiagram): UseUMLDiagramCor
   // Edge operations
   const addEdge = useCallback(
     (connection: Connection) => {
-      const edgeType = activeRelationshipType || 'association'
+      if (!activeRelationshipType) return
+      const edgeType = activeRelationshipType
       if (validateRelationshipConnection(diagram, connection, edgeType)) {
         // Create basic relationship data
         const relationshipData = {
           id: crypto.randomUUID(),
-          type: edgeType as UMLRelationshipType,
+          type: edgeType,
           source: connection.source!,
           target: connection.target!,
         }
@@ -119,7 +121,7 @@ export const useUMLDiagramCore = (initialDiagram?: UMLDiagram): UseUMLDiagramCor
 
         const newEdge: UMLEdge = {
           id: crypto.randomUUID(),
-          type: edgeType as UMLRelationshipType,
+          type: edgeType,
           source: connection.source!,
           target: connection.target!,
           data: edgeData,
@@ -212,12 +214,13 @@ export const useUMLDiagramCore = (initialDiagram?: UMLDiagram): UseUMLDiagramCor
     dispatch({ type: 'MARK_DIRTY' })
   }, [])
 
-  const setActiveRelationshipTypeCallback = useCallback((type: string) => {
+  const setActiveRelationshipTypeCallback = useCallback((type: UMLRelationshipType | null) => {
     setActiveRelationshipType(type)
   }, [])
 
   const validateConnectionCallback = useCallback(
     (connection: Connection) => {
+      if (!activeRelationshipType) return false
       return validateRelationshipConnection(diagram, connection, activeRelationshipType)
     },
     [diagram, activeRelationshipType],

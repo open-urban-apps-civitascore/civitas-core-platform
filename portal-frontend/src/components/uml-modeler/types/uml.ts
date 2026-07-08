@@ -117,7 +117,9 @@ export interface UMLEnumeration extends BaseUMLElement {
 
 export type UMLElement = UMLClass | UMLInterface | UMLAbstractClass | UMLEnumeration
 
-// Relationship types
+// Relationship types. The full historical vocabulary; the supported subset a user may actually draw
+// or pick is defined once as RELATIONSHIP_PALETTE_ITEMS in constants/paletteItems.ts. Out-of-scope
+// types are not rejected — legacy models keep them — but carry no semantics and are ignored on export.
 export type UMLRelationshipType =
   | 'association'
   | 'aggregation'

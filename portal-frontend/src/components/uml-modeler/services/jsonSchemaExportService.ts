@@ -3,8 +3,13 @@
  *
  * Converts UML diagram data to a JSON Schema (draft 2020-12) document.
  *
- * Conventional UML -> JSON Schema mapping:
- * - Each UML class/interface/abstractClass becomes an object schema.
+ * Only relationship types in the supported release scope contribute to the
+ * schema; any other type (including legacy edges in older models) carries no
+ * semantics and is silently ignored — no mapping is invented for it. The scope
+ * is deliberately small and grows over time — see umlContainment.
+ *
+ * UML -> JSON Schema mapping:
+ * - Each UML class becomes an object schema.
  * - Each attribute becomes a `properties` entry.
  * - Primitive UML types map to JSON Schema `type`/`format`.
  * - Geometry types map to a GeoJSON-style `$ref`.
@@ -13,15 +18,15 @@
  *   are added to the class's `required` array.
  * - Enumerations map to the `enum` keyword.
  * - Inheritance maps to `allOf: [{ $ref }, { ...own }]`.
- * - Associations/aggregation/composition map to a `$ref` property (an array
- *   `$ref` for many multiplicities).
+ * - Composition maps to a `$ref` property on the container (an array `$ref`
+ *   for many multiplicities).
  *
  * Root: the document root is the data structure itself, titled after the
  * diagram. Every class is emitted under `$defs`; the root class (the one not
- * contained by any other via composition, aggregation, inheritance, or
- * realization) is referenced from the document root via a `$ref` property, so
- * the structure's name — not an arbitrary class — is always the top level. An
- * enumeration-only diagram keeps its `enum` at the document root instead.
+ * contained by any other via composition or inheritance) is referenced from
+ * the document root via a `$ref` property, so the structure's name — not an
+ * arbitrary class — is always the top level. An enumeration-only diagram keeps
+ * its `enum` at the document root instead.
  */
 
 import type { UMLDiagram } from '../types/diagram'
@@ -254,6 +259,10 @@ const buildClassSchema = (
 
 /**
  * Main export function - converts a UMLDiagram into a JSON Schema document.
+ * Relationships outside the supported scope carry no semantics and are ignored
+ * (see {@link classifyStructuralEdge} / {@link collectParentIds}), so a legacy
+ * model with out-of-scope edges still exports — those edges just contribute
+ * nothing to the schema.
  */
 export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): JsonSchemaObject => {
   const elements = (diagram.nodes ?? []).map(node => node.data?.element).filter((e): e is UMLElement => !!e)

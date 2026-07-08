@@ -38,7 +38,7 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
   sessionManager,
 }) => {
   const activeSession = sessionManager.getActiveSession()
-  const [activeRelationshipType, setActiveRelationshipType] = useState('association')
+  const [activeRelationshipType, setActiveRelationshipType] = useState<UMLRelationshipType | null>(null)
 
   const diagram = activeSession?.diagram || createEmptyDiagram()
 
@@ -119,17 +119,18 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
   // Edge operations
   const addEdge = useCallback(
     (connection: Connection) => {
-      const edgeType = activeRelationshipType || 'association'
+      if (!activeRelationshipType) return
+      const edgeType = activeRelationshipType
       if (!validateRelationshipConnection(diagram, connection, edgeType)) return
       const newEdge: UMLEdge = {
         id: crypto.randomUUID(),
-        type: edgeType as UMLRelationshipType,
+        type: edgeType,
         source: connection.source!,
         target: connection.target!,
         data: {
           relationship: {
             id: crypto.randomUUID(),
-            type: edgeType as UMLRelationshipType,
+            type: edgeType,
             source: connection.source!,
             target: connection.target!,
           },
@@ -205,7 +206,8 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
   }, [diagram, deleteNodes, deleteEdges])
 
   const validateConnectionCallback = useCallback(
-    (connection: Connection) => validateRelationshipConnection(diagram, connection, activeRelationshipType),
+    (connection: Connection) =>
+      activeRelationshipType ? validateRelationshipConnection(diagram, connection, activeRelationshipType) : false,
     [diagram, activeRelationshipType],
   )
 
