@@ -393,7 +393,7 @@
                 "tablePlaceHolder": "Select Table ...",
                 "attributes": "Attributes",
                 "attributesPlaceHolder": "Select Attributes ...",
-                "filter": "Define Filters",
+                "filter": "Define CQL-Filter",
                 "filterHint": "with CQL, e. g. attribute='value'"
               },
               "geometry": {

@@ -392,7 +392,7 @@
                 "tablePlaceHolder": "Tabelle auswählen ...",
                 "attributes": "Attribute",
                 "attributesPlaceHolder": "Attribute auswählen ...",
-                "filter": "Filter definieren",
+                "filter": "CQL-Filter definieren",
                 "filterHint": "mit CQL, z. B. attribut='wert'"
               },
               "geometry": {
