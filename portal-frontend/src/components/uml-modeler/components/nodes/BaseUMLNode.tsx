@@ -55,7 +55,7 @@ export const BaseUMLNode: React.FC<BaseUMLNodeProps> = ({
       <div
         className="node-header"
         style={{
-          height: NODE_DIMENSIONS.headerHeight,
+          minHeight: NODE_DIMENSIONS.headerHeight,
           padding: `${NODE_DIMENSIONS.sectionPadding}px`,
           borderBottom: `${NODE_DIMENSIONS.separatorHeight}px solid ${UML_COLORS[elementType].border}`,
           textAlign: 'center',
