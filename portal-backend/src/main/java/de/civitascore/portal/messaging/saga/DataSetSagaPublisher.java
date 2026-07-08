@@ -299,7 +299,7 @@ public class DataSetSagaPublisher {
       throw new InvalidInputException(
           "DataSink",
           "configuration.dataStructureVersionId",
-          "dataStructureVersionId must be a valid UUID");
+          "dataStructureVersionId on sink " + sink.getId() + " is not a valid UUID");
     }
     var version =
         dataStructureVersionRepository
