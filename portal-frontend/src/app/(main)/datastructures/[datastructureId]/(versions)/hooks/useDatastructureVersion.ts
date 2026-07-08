@@ -306,9 +306,14 @@ export const useDatastructureVersion = ({
             return false
           }
           const messageKey = version?.model ? 'messages.draftModelRemoved' : 'messages.draftModelSkipped'
-          // Persists until dismissed: it competes with the success toast the save still fires,
-          // and a self-clearing warning about a dropped schema model is too easy to miss.
-          toast.warning(t(messageKey, { reason }), { duration: Infinity, closeButton: true })
+          // Persists until dismissed and borrows the destructive styling: it competes with the
+          // success toast the save still fires, and a self-clearing, muted warning about a dropped
+          // schema model is too easy to miss.
+          toast.warning(t(messageKey, { reason }), {
+            duration: Infinity,
+            closeButton: true,
+            className: 'toast-error',
+          })
         }
       }
       const payload = mapDatastructureVersionFormToApiData(parsed.data, sessionDiagram, model)

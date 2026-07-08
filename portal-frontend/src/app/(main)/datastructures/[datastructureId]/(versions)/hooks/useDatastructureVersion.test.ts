@@ -184,7 +184,7 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     expect(saved).toBe(true)
     expect(toast.warning).toHaveBeenCalledWith(
       expect.stringContaining('messages.draftModelSkipped'),
-      expect.objectContaining({ duration: Infinity, closeButton: true }),
+      expect.objectContaining({ duration: Infinity, closeButton: true, className: 'toast-error' }),
     )
     expect(updateVersion.mutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ model: null }) }),
@@ -201,7 +201,7 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
 
     expect(toast.warning).toHaveBeenCalledWith(
       expect.stringContaining('messages.draftModelRemoved'),
-      expect.objectContaining({ duration: Infinity, closeButton: true }),
+      expect.objectContaining({ duration: Infinity, closeButton: true, className: 'toast-error' }),
     )
   })
 
