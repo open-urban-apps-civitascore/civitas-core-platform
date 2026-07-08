@@ -564,7 +564,7 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
         requireCompleteCreateSet(entity('location'))
       }
 
-      const isDatastreamTouched = [...assigned].some(path => path.startsWith('$.Datastreams['))
+      const isDatastreamTouched = [...assigned].some(path => path.startsWith(entity('datastream').pathPrefix))
       if (isDatastreamTouched) {
         if (keys.datastream.length === 0) {
           errors.push(
