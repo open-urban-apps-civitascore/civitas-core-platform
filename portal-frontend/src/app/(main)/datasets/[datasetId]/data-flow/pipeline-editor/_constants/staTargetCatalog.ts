@@ -15,7 +15,7 @@ import type { FieldNode, SchemaTree } from '../_components/mapping-editor/_types
 
 export interface StaEntity {
   /** Stable key, also used in validation message params. */
-  readonly key: 'thing' | 'location' | 'datastream' | 'observation'
+  readonly key: 'thing' | 'location' | 'datastream' | 'observation' | 'featureOfInterest'
   /** The element prefix every field path of the entity starts with (`$.` for the Thing itself). */
   readonly pathPrefix: string
   /** Paths that must ALL be assigned once ANY of them is (the entity's create set). */
@@ -67,6 +67,17 @@ export const STA_ENTITIES: readonly StaEntity[] = [
     pathPrefix: '$.Datastreams[].Observations[',
     createPaths: ['$.Datastreams[].Observations[].result'],
     optionalPaths: ['$.Datastreams[].Observations[].phenomenonTime', '$.Datastreams[].Observations[].resultTime'],
+  },
+  {
+    key: 'featureOfInterest',
+    pathPrefix: '$.Datastreams[].Observations[].FeatureOfInterest',
+    createPaths: [
+      '$.Datastreams[].Observations[].FeatureOfInterest.name',
+      '$.Datastreams[].Observations[].FeatureOfInterest.description',
+      '$.Datastreams[].Observations[].FeatureOfInterest.encodingType',
+      '$.Datastreams[].Observations[].FeatureOfInterest.feature',
+    ],
+    optionalPaths: [],
   },
 ]
 

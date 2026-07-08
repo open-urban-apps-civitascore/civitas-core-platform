@@ -304,6 +304,59 @@ describe('validateFrostMappingCoversStaGroups', () => {
     expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
   })
 
+  const FEATURE_OF_INTEREST_KEY = 'validation.messages.frostMappingFeatureOfInterestNeedsObservation'
+
+  it('rejects a FeatureOfInterest without a mapped Observation', () => {
+    expect(
+      has(
+        wiredToFrost(
+          staMapping({
+            '$.reference': '$.ref',
+            '$.Datastreams[].reference': '$.ref',
+            '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
+            '$.Datastreams[].Observations[].FeatureOfInterest.description': '$.d',
+            '$.Datastreams[].Observations[].FeatureOfInterest.encodingType': '$.e',
+            '$.Datastreams[].Observations[].FeatureOfInterest.feature': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
+          }),
+        ),
+        FEATURE_OF_INTEREST_KEY,
+      ),
+    ).toBe(true)
+  })
+
+  it('rejects a partially mapped FeatureOfInterest create set', () => {
+    expect(
+      has(
+        wiredToFrost(
+          staMapping({
+            '$.reference': '$.ref',
+            '$.Datastreams[].reference': '$.ref',
+            '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
+            '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
+          }),
+        ),
+        CREATE_SET_KEY,
+      ),
+    ).toBe(true)
+  })
+
+  it('accepts an Observation with a fully mapped FeatureOfInterest', () => {
+    const result = validatePipeline(
+      wiredToFrost(
+        staMapping({
+          '$.reference': '$.ref',
+          '$.Datastreams[].reference': '$.ref',
+          '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
+          '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
+          '$.Datastreams[].Observations[].FeatureOfInterest.description': '$.d',
+          '$.Datastreams[].Observations[].FeatureOfInterest.encodingType': '$.e',
+          '$.Datastreams[].Observations[].FeatureOfInterest.feature': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
+        }),
+      ),
+    )
+    expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
+  })
+
   it('exempts the FROST-final mapping from the unconditional required-fields rule', () => {
     // A lookup-only mapping deliberately leaves required create fields (e.g. $.name) unmapped —
     // the catalog's conditional requiredness owns this node, not the generic snapshot rule.

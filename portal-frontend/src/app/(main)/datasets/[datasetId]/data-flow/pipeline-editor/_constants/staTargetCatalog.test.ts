@@ -60,6 +60,16 @@ describe('STA target catalog mirrors the adapter catalog', () => {
         createPaths: ['$.Datastreams[].Observations[].result'],
         optionalPaths: ['$.Datastreams[].Observations[].phenomenonTime', '$.Datastreams[].Observations[].resultTime'],
       },
+      {
+        key: 'featureOfInterest',
+        createPaths: [
+          '$.Datastreams[].Observations[].FeatureOfInterest.name',
+          '$.Datastreams[].Observations[].FeatureOfInterest.description',
+          '$.Datastreams[].Observations[].FeatureOfInterest.encodingType',
+          '$.Datastreams[].Observations[].FeatureOfInterest.feature',
+        ],
+        optionalPaths: [],
+      },
     ])
   })
 

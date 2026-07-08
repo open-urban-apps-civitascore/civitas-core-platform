@@ -586,11 +586,17 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
       }
 
       const observation = entity('observation')
-      if (
-        anyAssigned([...observation.createPaths, ...observation.optionalPaths]) &&
-        !allAssigned(observation.createPaths)
-      ) {
+      const isObservationTouched = anyAssigned([...observation.createPaths, ...observation.optionalPaths])
+      if (isObservationTouched && !allAssigned(observation.createPaths)) {
         errors.push(errorAt(node, 'validation.messages.frostMappingObservationNeedsResult', { label }))
+      }
+
+      const featureOfInterest = entity('featureOfInterest')
+      if (anyAssigned(featureOfInterest.createPaths)) {
+        if (!isObservationTouched) {
+          errors.push(errorAt(node, 'validation.messages.frostMappingFeatureOfInterestNeedsObservation', { label }))
+        }
+        requireCompleteCreateSet(featureOfInterest)
       }
 
       if (keys.isFallback && keys.thing.length > 0) {

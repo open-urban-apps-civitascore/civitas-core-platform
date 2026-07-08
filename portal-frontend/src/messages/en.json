@@ -1283,6 +1283,7 @@
         "frostMappingCreateSetIncomplete": "{label} maps {entity} partially; creating it also requires: {fields} (or map none of the create fields for lookup-only)",
         "frostMappingLocationNeedsCreatableThing": "{label} maps a Location — that requires a fully mapped Thing (name, description), since Locations are created via its deep insert",
         "frostMappingObservationNeedsResult": "{label} maps an Observation without $.Datastreams[].Observations[].result",
+        "frostMappingFeatureOfInterestNeedsObservation": "{label} maps a FeatureOfInterest without an Observation — the feature is deep-inserted into the observation body",
         "frostMappingUnsafeMatchKeyName": "{label}: the match-key name \"{keyName}\" is not a valid identifier (letters, digits, underscore; must not start with a digit) — rename the attribute",
         "frostMappingReservedMatchKeyName": "{label}: the match-key name \"{keyName}\" collides with a standard SensorThings field — rename the identifying attribute",
         "frostMappingFallbackMatchKey": "{label}: no '{id}' attribute marked — the match key falls back to \"reference\"",
