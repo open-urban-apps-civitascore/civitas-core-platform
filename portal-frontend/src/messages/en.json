@@ -1467,11 +1467,11 @@
         "addDataset": "Create Dataset",
         "noDatasets": "No datasets available",
         "noDatasetsSubTitle": "No datasets have been added to this data pool yet.",
-        "tableHeader": {
+        "tableHeaders": {
           "name": "Name",
-          "createdBy": "Contact Person",
+          "contact": "Contact Person",
           "modifiedAt": "Updated",
-          "datasetStatus": "Status"
+          "status": "Status"
         }
       }
     },
