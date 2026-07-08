@@ -71,7 +71,6 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   private static final String DEFAULT_POSTGIS_HOST = "localhost";
   private static final String DEFAULT_POSTGIS_PORT = "5432";
   private static final String DEFAULT_POSTGIS_DATABASE = "civitas_geo";
-  private static final String DEFAULT_POSTGIS_SCHEMA = "public";
 
   private static final Pattern WORKSPACE_NAME_PATTERN = Pattern.compile("[a-z0-9_]+");
 
@@ -98,7 +97,6 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   private String postgisHost;
   private String postgisPort;
   private String postgisDatabase;
-  private String postgisSchema;
   private String postgisUser;
   private String postgisPassword;
 
@@ -127,7 +125,6 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       this.postgisHost = getProperty("postgis.host", DEFAULT_POSTGIS_HOST);
       this.postgisPort = getProperty("postgis.port", DEFAULT_POSTGIS_PORT);
       this.postgisDatabase = getProperty("postgis.database", DEFAULT_POSTGIS_DATABASE);
-      this.postgisSchema = getProperty("postgis.schema", DEFAULT_POSTGIS_SCHEMA);
       this.postgisUser = getProperty("postgis.user");
       this.postgisPassword =
           GeoServerCredentials.decrypt(getProperty("postgis.password"), stretchedKey);
@@ -361,7 +358,9 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
    * state.
    */
   private void createDatastore(String workspaceName, String datastoreName) {
-    Map<String, Object> datastoreBody = buildDatastoreBody(datastoreName);
+    // The datastore's schema is the workspace name: both derive from datasetId, so GeoServer reads
+    // exactly the schema PostGIS created the table in.
+    Map<String, Object> datastoreBody = buildDatastoreBody(datastoreName, workspaceName);
     try (Response createResponse =
         auth.apply(
                 client()
@@ -914,12 +913,12 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     }
   }
 
-  private Map<String, Object> buildDatastoreBody(String datastoreName) {
+  private Map<String, Object> buildDatastoreBody(String datastoreName, String schema) {
     List<Map<String, Object>> entries = new ArrayList<>();
     entries.add(Map.of("@key", "host", "$", postgisHost));
     entries.add(Map.of("@key", "port", "$", postgisPort));
     entries.add(Map.of("@key", "database", "$", postgisDatabase));
-    entries.add(Map.of("@key", "schema", "$", postgisSchema));
+    entries.add(Map.of("@key", "schema", "$", schema));
     entries.add(Map.of("@key", "user", "$", postgisUser != null ? postgisUser : ""));
     entries.add(Map.of("@key", "passwd", "$", postgisPassword != null ? postgisPassword : ""));
     entries.add(Map.of("@key", "dbtype", "$", "postgis"));

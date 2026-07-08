@@ -256,9 +256,41 @@ class PostgisSagaHandlerTest {
     }
 
     @Test
-    void provisionSinkAltersSchemaOwnerAfterCreatingRole() throws Exception {
-      // ALTER SCHEMA … OWNER TO requires the target role to exist, so the owner change must come
-      // after CREATE ROLE.
+    void provisionSinkDerivesSchemaFromDatasetIdWhenNoneConfigured() throws Exception {
+      // No configuration.schema: the dedicated schema is derived from the trigger's datasetId (the
+      // same WorkspaceNames rule GeoServer uses), so the table lands in ds_99, not public.
+      Map<String, Object> trigger =
+          Map.of(
+              "datasetId",
+              "ds-99",
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of(
+                          "tableName",
+                          "sensor_readings",
+                          "columns",
+                          List.of(Map.of("name", "id", "type", "BIGINT", "nullable", false))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      List<String> executed = sql.getAllValues();
+      assertTrue(executed.stream().anyMatch(s -> s.startsWith("CREATE SCHEMA \"ds_99\"")));
+      assertTrue(
+          executed.stream()
+              .anyMatch(s -> s.startsWith("CREATE TABLE \"ds_99\".\"sensor_readings\"")));
+    }
+
+    @Test
+    void provisionSinkWithoutDatasetIdFailsRatherThanTargetingPublic() {
+      // A POSTGIS provision must never silently create the table in the shared public schema; with
+      // no datasetId the per-DataSet schema cannot be derived, so the step fails.
       Map<String, Object> trigger =
           Map.of(
               "datasinks",
@@ -268,34 +300,15 @@ class PostgisSagaHandlerTest {
                       "POSTGIS",
                       "configuration",
                       Map.of(
-                          "schema", "ds_42",
-                          "owner", "ds_42_geo",
-                          "tableName", "sensor_readings",
+                          "tableName",
+                          "sensor_readings",
                           "columns",
-                              List.of(Map.of("name", "id", "type", "BIGINT", "nullable", false)),
-                          "readRole", Map.of("name", "ds_42_geo", "canLogin", true)))));
+                          List.of(Map.of("name", "id", "type", "BIGINT", "nullable", false))))));
 
       SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
 
-      assertEquals("STEP_COMPLETED", result.type());
-      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
-      List<String> executed = sql.getAllValues();
-      int createRoleIdx = indexOfFirst(executed, s -> s.startsWith("CREATE ROLE \"ds_42_geo\""));
-      int alterOwnerIdx =
-          indexOfFirst(executed, s -> s.startsWith("ALTER SCHEMA \"ds_42\" OWNER TO"));
-      assertTrue(createRoleIdx >= 0, "role should be created");
-      assertTrue(alterOwnerIdx >= 0, "schema owner should be altered");
-      assertTrue(createRoleIdx < alterOwnerIdx, "owner change must run after the role is created");
-    }
-
-    private int indexOfFirst(List<String> statements, java.util.function.Predicate<String> match) {
-      for (int i = 0; i < statements.size(); i++) {
-        if (match.test(statements.get(i))) {
-          return i;
-        }
-      }
-      return -1;
+      assertEquals("STEP_FAILED", result.type());
+      assertTrue(result.error() != null && result.error().contains("datasetId"), result.error());
     }
 
     @Test
@@ -310,6 +323,8 @@ class PostgisSagaHandlerTest {
     void provisionSinkWithoutColumnsFails() {
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
@@ -328,6 +343,8 @@ class PostgisSagaHandlerTest {
     void provisionSinkDerivesColumnsFromDataStructureWhenNoneConfigured() throws Exception {
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
@@ -376,6 +393,8 @@ class PostgisSagaHandlerTest {
       // constraint-less table). (Composite-key ORDER is covered by DataStructureSchemaTest.)
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
@@ -416,6 +435,8 @@ class PostgisSagaHandlerTest {
       // as the NiFi adapter) — the table PRIMARY KEY is the explicit column, not the marked one
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
@@ -450,6 +471,8 @@ class PostgisSagaHandlerTest {
       // column would be emitted; reject with a clear error instead of broken DDL
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
@@ -481,6 +504,8 @@ class PostgisSagaHandlerTest {
       // uniqueness. The missing component is rejected rather than dropped.
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
@@ -512,6 +537,8 @@ class PostgisSagaHandlerTest {
       // marker still applies (the override contract is specifically a *non-empty* list).
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
@@ -573,7 +600,7 @@ class PostgisSagaHandlerTest {
     }
 
     @Test
-    void deprovisionSinkDropsRoleAndTableButNotSchema() throws Exception {
+    void deprovisionSinkDropsRoleTableAndEmptySchema() throws Exception {
       SagaCommandResult result =
           handler.handle(compensate("DEPROVISION_SINK", postgisSinkTrigger()));
 
@@ -585,8 +612,33 @@ class PostgisSagaHandlerTest {
       assertTrue(
           executed.stream()
               .anyMatch(s -> s.startsWith("DROP TABLE \"ds_42\".\"sensor_readings\"")));
-      assertTrue(executed.stream().noneMatch(s -> s.startsWith("DROP SCHEMA")));
+      // The dedicated per-DataSet schema is removed with RESTRICT (only if empty)...
+      assertTrue(executed.contains("DROP SCHEMA \"ds_42\" RESTRICT"));
+      // ...and only after its table is dropped, so the schema is empty when the DROP SCHEMA runs.
+      int tableIdx = executed.indexOf("DROP TABLE \"ds_42\".\"sensor_readings\"");
+      int schemaIdx = executed.indexOf("DROP SCHEMA \"ds_42\" RESTRICT");
+      assertTrue(schemaIdx > tableIdx, "schema must be dropped after its table");
       verify(mockConnection).commit();
+    }
+
+    @Test
+    void deprovisionSinkNeverDropsThePublicSchema() throws Exception {
+      // A datasetId that normalizes to the shared `public` schema must never trigger a DROP SCHEMA.
+      Map<String, Object> trigger =
+          Map.of(
+              "datasetId",
+              "public",
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type", "POSTGIS", "configuration", Map.of("tableName", "sensor_readings"))));
+
+      SagaCommandResult result = handler.handle(compensate("DEPROVISION_SINK", trigger));
+
+      assertEquals("COMPENSATION_COMPLETED", result.type());
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      assertTrue(sql.getAllValues().stream().noneMatch(s -> s.startsWith("DROP SCHEMA")));
     }
 
     @Test
@@ -603,15 +655,15 @@ class PostgisSagaHandlerTest {
     @Test
     void deprovisionSinkWorksWithoutColumnDefinitions() throws Exception {
       // A delete trigger carries only the sink identifiers — dropping needs no column derivation.
+      // The schema is derived from datasetId (ds-42 → ds_42), not from configuration.
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
-                      "type",
-                      "POSTGIS",
-                      "configuration",
-                      Map.of("schema", "ds_42", "tableName", "sensor_readings"))));
+                      "type", "POSTGIS", "configuration", Map.of("tableName", "sensor_readings"))));
 
       SagaCommandResult result = handler.handle(compensate("DEPROVISION_SINK", trigger));
 
@@ -630,13 +682,15 @@ class PostgisSagaHandlerTest {
       // dropped, not built) — otherwise "PK not in columns" would wrongly fail the delete saga.
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
                       "type",
                       "POSTGIS",
                       "configuration",
-                      Map.of("schema", "ds_42", "tableName", "sensor_readings"),
+                      Map.of("tableName", "sensor_readings"),
                       "dataStructure",
                       Map.of(
                           "properties",

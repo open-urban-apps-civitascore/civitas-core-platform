@@ -10,12 +10,29 @@
 package de.civitascore.configadapter.nifi.flow.stage.sink;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class PostgisSinkSpecTest {
+
+  @Test
+  void escapesExpressionLanguageInTheSchemaName() {
+    // "Schema Name" is EL-enabled in PutDatabaseRecord too, so a tenant ${…} must be escaped for
+    // the same reason as the table name.
+    PostgisSinkSpec spec = new PostgisSinkSpec("t", "${HOSTNAME}", List.of());
+    assertEquals("$${HOSTNAME}", spec.schemaName());
+  }
+
+  @Test
+  void normalizesABlankSchemaToNull() {
+    // A blank schema means "unset": bind() then omits "Schema Name" and the write resolves via the
+    // connection search_path, rather than pinning an empty schema.
+    assertNull(new PostgisSinkSpec("t", "  ", List.of()).schemaName());
+    assertNull(new PostgisSinkSpec("t").schemaName());
+  }
 
   @Test
   void escapesExpressionLanguageInTheTableName() {

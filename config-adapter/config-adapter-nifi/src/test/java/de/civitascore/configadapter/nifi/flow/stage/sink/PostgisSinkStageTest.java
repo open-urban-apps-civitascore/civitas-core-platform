@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.nifi.flow.stage.sink;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -22,6 +23,32 @@ import org.junit.jupiter.api.Test;
 class PostgisSinkStageTest {
 
   @Test
+  void parseSpecDerivesTheSchemaFromTheDatasetId() {
+    // The per-DataSet schema is derived from the trigger's datasetId (the same WorkspaceNames rule
+    // PostGIS and GeoServer use) so PutDatabaseRecord writes into ds_<dataset>; no datasetId leaves
+    // it null (search_path fallback). configuration.schema is never consulted.
+    PostgisSinkStage stage = new PostgisSinkStage(null);
+
+    PostgisSinkSpec derived =
+        assertDoesNotThrow(
+            () ->
+                stage.parseSpec(
+                    Map.of(
+                        "id", "sk-1", "type", "POSTGIS", "configuration", Map.of("tableName", "t")),
+                    new SinkResolutionContext(null, "ds-1")));
+    assertEquals("ds_1", derived.schemaName());
+
+    PostgisSinkSpec none =
+        assertDoesNotThrow(
+            () ->
+                stage.parseSpec(
+                    Map.of(
+                        "id", "sk-2", "type", "POSTGIS", "configuration", Map.of("tableName", "t")),
+                    new SinkResolutionContext(null, null)));
+    assertNull(none.schemaName());
+  }
+
+  @Test
   void parseSpecRejectsAMissingTableNameAsInvalidPayload() {
     // The construction-time IllegalArgumentException must be wrapped like the FROST stage does:
     // unwrapped it bypasses the saga handler's safe-external-message discipline.
@@ -32,7 +59,7 @@ class PostgisSinkStageTest {
             () ->
                 stage.parseSpec(
                     Map.of("id", "sk-1", "type", "POSTGIS", "configuration", Map.of()),
-                    new SinkResolutionContext(null)));
+                    new SinkResolutionContext(null, null)));
     assertEquals(AdapterErrorCode.INVALID_PAYLOAD, ex.getErrorCode());
   }
 

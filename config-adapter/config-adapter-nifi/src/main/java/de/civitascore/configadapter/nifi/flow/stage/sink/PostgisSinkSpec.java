@@ -18,11 +18,13 @@ import java.util.List;
  * A PostGIS sink's resolved configuration.
  *
  * @param tableName the target table
+ * @param schemaName the target schema the table lives in (the dedicated per-DataSet schema); {@code
+ *     null} when unset, so PutDatabaseRecord falls back to the connection's {@code search_path}
  * @param primaryKeyColumns the target's primary-key columns (from the data structure's {@code
  *     x-core-primaryKey} marker); empty for INSERT semantics, non-empty switches PutDatabaseRecord
  *     to UPSERT keyed on these columns so repeated reads do not duplicate rows
  */
-public record PostgisSinkSpec(String tableName, List<String> primaryKeyColumns)
+public record PostgisSinkSpec(String tableName, String schemaName, List<String> primaryKeyColumns)
     implements SinkSpec {
 
   public PostgisSinkSpec {
@@ -37,15 +39,30 @@ public record PostgisSinkSpec(String tableName, List<String> primaryKeyColumns)
     // it here, at the boundary where tenant text enters the spec, so the invariant holds for every
     // sink path — the same escape the mapping values already get.
     tableName = NifiExpressionLanguage.escape(tableName);
+    // Optional: blank → null (bind() then omits "Schema Name" → search_path). Escaped like the
+    // table name because it lands in PutDatabaseRecord's EL-enabled "Schema Name" property.
+    schemaName = normalizeSchemaName(schemaName);
     // These names are joined verbatim into NiFi's likewise EL-enabled "Update Keys", so normalize
     // them here: trim, reject blank entries (a broken UPSERT config otherwise), de-duplicate while
     // preserving order, and escape EL for the same reason as the table name.
     primaryKeyColumns = sanitizeKeyColumns(primaryKeyColumns);
   }
 
-  /** A sink without an explicit primary key (INSERT semantics). */
+  /** A sink with a table name and primary key but no explicit schema (search_path fallback). */
+  public PostgisSinkSpec(String tableName, List<String> primaryKeyColumns) {
+    this(tableName, null, primaryKeyColumns);
+  }
+
+  /** A sink without an explicit schema or primary key (INSERT semantics). */
   public PostgisSinkSpec(String tableName) {
-    this(tableName, List.of());
+    this(tableName, null, List.of());
+  }
+
+  private static String normalizeSchemaName(String schema) {
+    if (schema == null || schema.isBlank()) {
+      return null;
+    }
+    return NifiExpressionLanguage.escape(schema.trim());
   }
 
   @Override
