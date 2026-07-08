@@ -3,12 +3,12 @@ package de.civitascore.portal.model.output.assembler;
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.datasink.DataSinkConfigurationOutput;
-import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.output.DataSinkOutputDTO;
 import de.civitascore.portal.model.output.FrostConfigurationOutput;
 import de.civitascore.portal.model.output.PostgisConfigurationOutput;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -52,7 +52,7 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
       return dto;
     }
 
-    dto.setConfiguration(buildConfiguration(entity.getDataSinkType(), entity.getConfiguration()));
+    dto.setConfiguration(buildConfiguration(entity));
     return dto;
   }
 
@@ -63,22 +63,30 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
     return (I) dataSinkMapper.toInput(entity);
   }
 
-  private DataSinkConfigurationOutput buildConfiguration(
-      DataSinkType type, Map<String, Object> raw) {
-    return switch (type) {
-      case FROST -> buildFrostConfiguration(raw);
+  private DataSinkConfigurationOutput buildConfiguration(DataSink entity) {
+    Map<String, Object> raw = entity.getConfiguration();
+    return switch (entity.getDataSinkType()) {
+      case FROST -> buildFrostConfiguration(entity.getId(), raw);
       case POSTGIS -> buildPostgisConfiguration(raw);
       default -> null;
     };
   }
 
-  private FrostConfigurationOutput buildFrostConfiguration(Map<String, Object> raw) {
+  private FrostConfigurationOutput buildFrostConfiguration(UUID sinkId, Map<String, Object> raw) {
     FrostConfigurationOutput output = new FrostConfigurationOutput();
     Object dsvIdRaw = raw == null ? null : raw.get("dataStructureVersionId");
     if (dsvIdRaw != null) {
-      // The write path validates the id, so a malformed persisted value is data corruption —
-      // surfacing it beats rendering a target-less sink that a re-save would silently strip.
-      output.setDataStructureVersionId(UUID.fromString(dsvIdRaw.toString()));
+      try {
+        output.setDataStructureVersionId(UUID.fromString(dsvIdRaw.toString()));
+      } catch (IllegalArgumentException e) {
+        // Validated at sink save time, so this is unreachable in practice — but a corrupt raw
+        // value must fail like its write-path sibling (a controlled 400) rather than escaping as
+        // an unhandled 500 that echoes the malformed value.
+        throw new InvalidInputException(
+            "DataSink",
+            "configuration.dataStructureVersionId",
+            "dataStructureVersionId on sink " + sinkId + " is not a valid UUID");
+      }
     }
     return output;
   }
