@@ -55,6 +55,11 @@ public final class StaTargetCatalog {
               StaJsonType.RAW_JSON,
               TargetKind.CREATE),
           new StaTarget(
+              "$.Locations[].properties",
+              StaEntity.LOCATION,
+              StaJsonType.RAW_JSON,
+              TargetKind.OPTIONAL),
+          new StaTarget(
               "$.Datastreams[].name", StaEntity.DATASTREAM, StaJsonType.STRING, TargetKind.CREATE),
           new StaTarget(
               "$.Datastreams[].description",
@@ -102,6 +107,11 @@ public final class StaTargetCatalog {
               StaJsonType.STRING,
               TargetKind.CREATE),
           new StaTarget(
+              "$.Datastreams[].Sensor.properties",
+              StaEntity.DATASTREAM,
+              StaJsonType.RAW_JSON,
+              TargetKind.OPTIONAL),
+          new StaTarget(
               "$.Datastreams[].ObservedProperty.name",
               StaEntity.DATASTREAM,
               StaJsonType.STRING,
@@ -117,6 +127,11 @@ public final class StaTargetCatalog {
               StaJsonType.STRING,
               TargetKind.CREATE),
           new StaTarget(
+              "$.Datastreams[].ObservedProperty.properties",
+              StaEntity.DATASTREAM,
+              StaJsonType.RAW_JSON,
+              TargetKind.OPTIONAL),
+          new StaTarget(
               "$.Datastreams[].Observations[].result",
               StaEntity.OBSERVATION,
               StaJsonType.ANY,
@@ -128,6 +143,16 @@ public final class StaTargetCatalog {
               TargetKind.OPTIONAL),
           new StaTarget(
               "$.Datastreams[].Observations[].resultTime",
+              StaEntity.OBSERVATION,
+              StaJsonType.STRING,
+              TargetKind.OPTIONAL),
+          new StaTarget(
+              "$.Datastreams[].Observations[].resultQuality",
+              StaEntity.OBSERVATION,
+              StaJsonType.RAW_JSON,
+              TargetKind.OPTIONAL),
+          new StaTarget(
+              "$.Datastreams[].Observations[].validTime",
               StaEntity.OBSERVATION,
               StaJsonType.STRING,
               TargetKind.OPTIONAL),
@@ -150,7 +175,12 @@ public final class StaTargetCatalog {
               "$.Datastreams[].Observations[].FeatureOfInterest.feature",
               StaEntity.FEATURE_OF_INTEREST,
               StaJsonType.RAW_JSON,
-              TargetKind.CREATE));
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].Observations[].FeatureOfInterest.properties",
+              StaEntity.FEATURE_OF_INTEREST,
+              StaJsonType.RAW_JSON,
+              TargetKind.OPTIONAL));
 
   /**
    * The entities of the Thing-shaped record. Declaration order is the find-or-create order of the

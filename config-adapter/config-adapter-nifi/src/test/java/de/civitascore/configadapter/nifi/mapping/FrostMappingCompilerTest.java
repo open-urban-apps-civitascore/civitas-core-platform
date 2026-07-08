@@ -104,6 +104,49 @@ class FrostMappingCompilerTest {
   }
 
   @Test
+  void rendersOptionalObservationFieldsResultQualityAndValidTime() throws Exception {
+    MappingConfig mapping =
+        mapping(
+            "$.reference", new CopyNode("$.ref"),
+            "$.Datastreams[].reference", new CopyNode("$.ref"),
+            "$.Datastreams[].Observations[].result",
+                new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.temp"), null),
+            "$.Datastreams[].Observations[].resultQuality", new CopyNode("$.quality"),
+            "$.Datastreams[].Observations[].validTime", new CopyNode("$.valid"));
+
+    FrostCompilation compilation = compiler.compile(mapping, KEYS);
+
+    assertEquals(
+        "{\"result\":${sta_2_result:isEmpty():ifElse('null', ${sta_2_result})},"
+            + "\"resultQuality\":${sta_3_resultquality},"
+            + "\"validTime\":${sta_4_validtime:isEmpty():ifElse('null',"
+            + " ${sta_4_validtime:escapeJson():prepend('\"'):append('\"')})},"
+            + "\"Datastream\":{\"@iot.id\":${frost.ds.id}}}",
+        compilation.plan().observationBody());
+  }
+
+  @Test
+  void rendersAnOptionalPropertiesBagOnALocation() throws Exception {
+    MappingConfig mapping =
+        mapping(
+            "$.name", new CopyNode("$.station"),
+            "$.description", new ConstNode("s", null),
+            "$.reference", new CopyNode("$.ref"),
+            "$.Locations[].name", new ConstNode("loc", null),
+            "$.Locations[].description", new ConstNode("d", null),
+            "$.Locations[].encodingType", new ConstNode("application/geo+json", null),
+            "$.Locations[].location",
+                new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")),
+            "$.Locations[].properties", new CopyNode("$.meta"));
+
+    FrostCompilation compilation = compiler.compile(mapping, KEYS);
+
+    // The properties bag embeds verbatim (RAW_JSON), after the fixed Location fields.
+    assertTrue(compilation.plan().thingBody().contains("\"location\":${sta_6_location},"));
+    assertTrue(compilation.plan().thingBody().contains("\"properties\":${sta_7_properties}}]"));
+  }
+
+  @Test
   void deepInsertsAMappedFeatureOfInterestIntoTheObservationBody() throws Exception {
     MappingConfig mapping =
         mapping(
