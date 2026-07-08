@@ -392,7 +392,7 @@
                 "tablePlaceHolder": "Tabelle auswählen ...",
                 "attributes": "Attribute",
                 "attributesPlaceHolder": "Attribute auswählen ...",
-                "filter": "Filter definieren",
+                "filter": "CQL-Filter definieren",
                 "filterHint": "mit CQL, z. B. attribut='wert'"
               },
               "geometry": {
@@ -400,6 +400,7 @@
                 "geometryField": "Geometriefeld",
                 "geometryFieldPlaceHolder": "Geometriefeld auswählen ...",
                 "nativeCrs": "Natives Koordinatenreferenzsystem (CRS)",
+                "nativeCrsMissingWarning": "Für die Geometrie der Datenstruktur der ausgewählten Tabelle ist kein Koordinatenreferenzsystem (CRS) definiert. Fügen Sie dem Geometrieattribut in der Datenstruktur ein CRS hinzu, bevor dieser Layer gespeichert werden kann.",
                 "definedCrs": "Angegebenes Koordinatenreferenzsystem (CRS)",
                 "crsPlaceHolder": "CRS auswählen ...",
                 "boundingBox": "Bounding Box",

@@ -185,7 +185,7 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
   const isBaseInfoValid = formSchema.shape.baseInfo.safeParse(baseInfoValues).success
 
   const layersValues = form.watch('layers')
-  const isLayersValid = formSchema.shape.layers.safeParse(layersValues).success
+  const isLayersValid = layersValues.length > 0 && formSchema.shape.layers.safeParse(layersValues).success
 
   const stylesValues = form.watch('styles')
   const isStylesValid = formSchema.shape.styles.safeParse(stylesValues).success
