@@ -223,6 +223,9 @@ public class FrostMappingCompiler {
     for (StaTarget target : StaTargetCatalog.targetsOf(StaEntity.OBSERVATION)) {
       byPath.put(target.path(), target);
     }
+    for (StaTarget target : StaTargetCatalog.targetsOf(StaEntity.FEATURE_OF_INTEREST)) {
+      byPath.put(target.path(), target);
+    }
     return byPath;
   }
 
@@ -238,6 +241,7 @@ public class FrostMappingCompiler {
     validateLocation(mapping);
     validateDatastream(mapping, keys);
     validateObservation(mapping);
+    validateFeatureOfInterest(mapping);
   }
 
   private void validateFieldEntries(MappingConfig mapping, Map<String, StaTarget> targetsByPath)
@@ -295,6 +299,18 @@ public class FrostMappingCompiler {
     if (!mapping.fields().containsKey(resultPath)) {
       throw reject("a mapped Observation must map " + resultPath);
     }
+  }
+
+  private void validateFeatureOfInterest(MappingConfig mapping) throws FatalAdapterException {
+    if (!touches(mapping, StaEntity.FEATURE_OF_INTEREST)) {
+      return;
+    }
+    if (!touches(mapping, StaEntity.OBSERVATION)) {
+      throw reject(
+          "mapping a FeatureOfInterest requires a mapped Observation — the feature is deep-inserted"
+              + " into the observation body");
+    }
+    requireCompleteCreateSet(mapping, StaEntity.FEATURE_OF_INTEREST);
   }
 
   /** Every match-key path of the entity must be mapped once the entity is touched at all. */
@@ -409,6 +425,12 @@ public class FrostMappingCompiler {
       Map<String, StaTarget> targetsByPath) {
     Map<String, Object> tree =
         entityTree(mapping, StaEntity.OBSERVATION, List.of(), flatKeyByPath, targetsByPath);
+    if (touches(mapping, StaEntity.FEATURE_OF_INTEREST)) {
+      tree.put(
+          "FeatureOfInterest",
+          entityTree(
+              mapping, StaEntity.FEATURE_OF_INTEREST, List.of(), flatKeyByPath, targetsByPath));
+    }
     tree.put("Datastream", Map.of("@iot.id", "${" + FrostEntityPlan.DS_ID_ATTRIBUTE + "}"));
     return renderObject(tree);
   }

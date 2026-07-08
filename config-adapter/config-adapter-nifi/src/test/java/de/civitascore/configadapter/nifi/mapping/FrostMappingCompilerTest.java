@@ -104,6 +104,63 @@ class FrostMappingCompilerTest {
   }
 
   @Test
+  void deepInsertsAMappedFeatureOfInterestIntoTheObservationBody() throws Exception {
+    MappingConfig mapping =
+        mapping(
+            "$.reference", new CopyNode("$.ref"),
+            "$.Datastreams[].reference", new CopyNode("$.ref"),
+            "$.Datastreams[].Observations[].result",
+                new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.temp"), null),
+            "$.Datastreams[].Observations[].FeatureOfInterest.name", new ConstNode("foi", null),
+            "$.Datastreams[].Observations[].FeatureOfInterest.description",
+                new ConstNode("d", null),
+            "$.Datastreams[].Observations[].FeatureOfInterest.encodingType",
+                new ConstNode("application/geo+json", null),
+            "$.Datastreams[].Observations[].FeatureOfInterest.feature",
+                new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")));
+
+    FrostCompilation compilation = compiler.compile(mapping, KEYS);
+
+    assertEquals(
+        "{\"result\":${sta_2_result:isEmpty():ifElse('null', ${sta_2_result})},"
+            + "\"FeatureOfInterest\":{\"name\":\"${sta_3_name:escapeJson()}\","
+            + "\"description\":\"${sta_4_description:escapeJson()}\","
+            + "\"encodingType\":\"${sta_5_encodingtype:escapeJson()}\","
+            + "\"feature\":${sta_6_feature}},"
+            + "\"Datastream\":{\"@iot.id\":${frost.ds.id}}}",
+        compilation.plan().observationBody());
+  }
+
+  @Test
+  void rejectsAFeatureOfInterestWithoutAnObservation() {
+    MappingConfig mapping =
+        mapping(
+            "$.reference", new CopyNode("$.ref"),
+            "$.Datastreams[].reference", new CopyNode("$.ref"),
+            "$.Datastreams[].Observations[].FeatureOfInterest.name", new ConstNode("foi", null),
+            "$.Datastreams[].Observations[].FeatureOfInterest.description",
+                new ConstNode("d", null),
+            "$.Datastreams[].Observations[].FeatureOfInterest.encodingType",
+                new ConstNode("application/geo+json", null),
+            "$.Datastreams[].Observations[].FeatureOfInterest.feature",
+                new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")));
+
+    assertThrows(FatalAdapterException.class, () -> compiler.compile(mapping, KEYS));
+  }
+
+  @Test
+  void rejectsAPartiallyMappedFeatureOfInterestCreateSet() {
+    MappingConfig mapping =
+        mapping(
+            "$.reference", new CopyNode("$.ref"),
+            "$.Datastreams[].reference", new CopyNode("$.ref"),
+            "$.Datastreams[].Observations[].result", new CopyNode("$.temp"),
+            "$.Datastreams[].Observations[].FeatureOfInterest.name", new ConstNode("foi", null));
+
+    assertThrows(FatalAdapterException.class, () -> compiler.compile(mapping, KEYS));
+  }
+
+  @Test
   void rendersDeepInsertBodiesForACreatableChain() throws Exception {
     Map<String, ValueNode> fields = new LinkedHashMap<>();
     fields.put("$.name", new CopyNode("$.station"));

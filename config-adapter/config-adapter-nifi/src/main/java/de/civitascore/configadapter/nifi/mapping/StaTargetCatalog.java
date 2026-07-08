@@ -130,7 +130,27 @@ public final class StaTargetCatalog {
               "$.Datastreams[].Observations[].resultTime",
               StaEntity.OBSERVATION,
               StaJsonType.STRING,
-              TargetKind.OPTIONAL));
+              TargetKind.OPTIONAL),
+          new StaTarget(
+              "$.Datastreams[].Observations[].FeatureOfInterest.name",
+              StaEntity.FEATURE_OF_INTEREST,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].Observations[].FeatureOfInterest.description",
+              StaEntity.FEATURE_OF_INTEREST,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].Observations[].FeatureOfInterest.encodingType",
+              StaEntity.FEATURE_OF_INTEREST,
+              StaJsonType.STRING,
+              TargetKind.CREATE),
+          new StaTarget(
+              "$.Datastreams[].Observations[].FeatureOfInterest.feature",
+              StaEntity.FEATURE_OF_INTEREST,
+              StaJsonType.RAW_JSON,
+              TargetKind.CREATE));
 
   /**
    * The entities of the Thing-shaped record. Declaration order is the find-or-create order of the
@@ -144,7 +164,12 @@ public final class StaTargetCatalog {
     /** Nested datastreams (with Sensor/ObservedProperty/unitOfMeasurement deep-inserted). */
     DATASTREAM("$.Datastreams[]"),
     /** Observations of the record's datastream; always appended, never deduplicated. */
-    OBSERVATION("$.Datastreams[].Observations[]");
+    OBSERVATION("$.Datastreams[].Observations[]"),
+    /**
+     * The observation's feature of interest, deep-inserted into the observation body. Optional: a
+     * mapping that omits it lets FROST default the FoI to the Thing's location.
+     */
+    FEATURE_OF_INTEREST("$.Datastreams[].Observations[].FeatureOfInterest");
 
     private final String pathPrefix;
 
