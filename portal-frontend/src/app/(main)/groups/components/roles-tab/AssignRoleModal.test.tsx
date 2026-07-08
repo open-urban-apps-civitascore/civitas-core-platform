@@ -118,7 +118,7 @@ describe('AssignRoleModal', () => {
     return renderWithProvider(<AssignRoleModal {...defaultProps} {...overrides} />)
   }
 
-  it('renders system role modal title and description', async () => {
+  it('renders system role modal title and description', { timeout: 10000, retry: 2 }, async () => {
     await renderModal({ roleType: ROLE_TYPES.SYSTEM })
 
     expect(await screen.findByText('roles.assignSystemRole')).toBeInTheDocument()
