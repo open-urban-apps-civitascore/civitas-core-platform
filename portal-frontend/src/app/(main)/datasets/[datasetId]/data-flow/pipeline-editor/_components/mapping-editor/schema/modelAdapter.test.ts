@@ -143,7 +143,7 @@ describe('modelToSchemaTree', () => {
     expect(tree.fields[0].children?.map(f => f.name)).toEqual(['current'])
   })
 
-  it('renders a multi-root document as one object node per root property, without a record node', () => {
+  it('renders a document root with several object properties directly, without a record node', () => {
     const tree = modelToSchemaTree(
       {
         title: 'TrafficSensor',
@@ -216,7 +216,7 @@ describe('modelToSchemaTree', () => {
     expect(requiredFieldPaths(tree)).toEqual([])
   })
 
-  it('does not require multi-root trees: a record may populate only some roots', () => {
+  it('does not require document-root object properties: a record may populate only some of them', () => {
     const tree = modelToSchemaTree(
       {
         title: 'MultiRoot',

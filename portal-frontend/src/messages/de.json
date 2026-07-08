@@ -1113,12 +1113,14 @@
       "updateSuccess": "Die Version der Datenstruktur wurde erfolgreich aktualisiert.",
       "isInUseModelHint": "Das Datenmodell kann nicht bearbeitet werden, da es bereits verwendet wird.",
       "isInUseStatusHint": "Kann nicht auf Entwurf gesetzt werden, da diese Version bereits verwendet wird.",
-      "isLastAvailableVersion": "Kann nicht auf Entwurf gesetzt werden, da dies die letzte verfügbare Version einer verfügbaren Datenstruktur ist. Setzen Sie zuerst die Datenstruktur auf Entwurf."
+      "isLastAvailableVersion": "Kann nicht auf Entwurf gesetzt werden, da dies die letzte verfügbare Version einer verfügbaren Datenstruktur ist. Setzen Sie zuerst die Datenstruktur auf Entwurf.",
+      "draftModelSkipped": "Der Entwurf wurde ohne Schema-Modell gespeichert: {reason}"
     },
     "errors": {
       "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
       "versionAlreadyExists": "Es existiert bereits eine Version mit der gleichen Versionsnummer in dieser Datenstruktur.",
-      "versionFormat": "Die Versionsnummer muss dem Format X.Y.Z folgen (z. B. 1.0.0)."
+      "versionFormat": "Die Versionsnummer muss dem Format X.Y.Z folgen (z. B. 1.0.0).",
+      "releaseInvalidModel": "Die Version kann nicht veröffentlicht werden: {reason}"
     }
   },
   "pipelineEditor": {
@@ -1415,6 +1417,11 @@
     "export": {
       "success": "Diagramm erfolgreich exportiert",
       "error": "Diagramm konnte nicht exportiert werden. Bitte versuchen Sie es erneut."
+    },
+    "rootValidation": {
+      "noRoot": "Im Diagramm lässt sich keine Wurzelklasse bestimmen — jede Klasse ist in eine andere eingebettet (zyklische Struktur).",
+      "ambiguousRoot": "Das Diagramm hat mehrere mögliche Wurzelklassen ({names}). Verbinden Sie alle Klassen zu einer Hierarchie mit genau einer Wurzel.",
+      "unreachable": "Diese Elemente sind von der Wurzelklasse „{root}“ aus nicht erreichbar: {names}. Verbinden Sie sie mit der Hierarchie oder entfernen Sie sie."
     }
   },
   "datapools": {

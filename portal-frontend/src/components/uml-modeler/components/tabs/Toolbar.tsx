@@ -10,8 +10,9 @@ import { BasicDropdownMenu } from '@/components/dropdown-menu/BasicDropdownMenu'
 import { Button } from '@/components/ui/button'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
-import { downloadJsonSchema } from '../../services/jsonSchemaExportService'
+import { downloadJsonSchema, SchemaExportError } from '../../services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '../../services/modelUploadService'
+import { rootFailureMessage } from '../../services/rootFailureMessage'
 
 interface ToolbarProps {
   onSave?: () => void
@@ -36,9 +37,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const handleSave = useCallback(() => {
     if (isSaving) return
 
-    const payload = {
-      ...buildUMLModelPayload(diagram),
-      name: sessionName || diagram.name,
+    let payload
+    try {
+      payload = {
+        ...buildUMLModelPayload(diagram),
+        name: sessionName || diagram.name,
+      }
+    } catch (error) {
+      if (!(error instanceof SchemaExportError)) throw error
+      toast.error(rootFailureMessage(t, error.failure))
+      return
     }
 
     createModel.mutate(payload, {
@@ -56,8 +64,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     try {
       downloadJsonSchema(diagram)
       toast.success(t('export.success'))
-    } catch {
-      toast.error(t('export.error'))
+    } catch (error) {
+      toast.error(error instanceof SchemaExportError ? rootFailureMessage(t, error.failure) : t('export.error'))
     }
   }, [diagram, t])
 

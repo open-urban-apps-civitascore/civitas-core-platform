@@ -1,21 +1,16 @@
-import {
-  assignDefKeys,
-  assignRootPropertyNames,
-  isAttributeRequired,
-} from '@/components/uml-modeler/services/jsonSchemaExportService'
+import { isAttributeRequired } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import {
   classifyStructuralEdge,
-  collectContainedIds,
   INHERITANCE_RELATIONS,
   isManyMultiplicity,
-  selectRootElements,
+  resolveRootElement,
 } from '@/components/uml-modeler/services/umlContainment'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import type { UMLAttribute, UMLElement, UMLType } from '@/components/uml-modeler/types/uml'
 import { hasAttributes } from '@/components/uml-modeler/types/uml'
 
 import type { FieldNode, FieldType, SchemaTree } from '../_types'
-import { field, GEOMETRY, isGeometryType, portTypeFor } from '../_types'
+import { GEOMETRY, isGeometryType, portTypeFor } from '../_types'
 
 export { GEOMETRY }
 
@@ -176,34 +171,18 @@ const buildFields = (el: UMLElement, base: string, index: DiagramIndex, visited:
 }
 
 /**
- * Converts a datastructure version's `styles` (UML diagram) into the editor's field tree. A
- * single-root diagram anchors the class's fields directly at `$` (the runtime record is the class
- * itself); a diagram with several unconnected trees mirrors the generated schema, whose document
- * root holds one property per root class — each root becomes a node at `$.<property name>`, named
- * by the same collision-safe assignment the schema export uses, so the fallback tree's paths match
- * the persisted model's properties. Enumeration roots are scalar values at runtime and render as
- * string leaves.
+ * Converts a datastructure version's `styles` (UML diagram) into the editor's field tree: the
+ * single root class anchors its fields directly at `$` (the runtime record is the class itself).
+ * A diagram without a unique root — the same condition under which the schema export refuses to
+ * produce a model — yields an empty tree rather than a guessed one; an enumeration root is a
+ * scalar value at runtime and carries no mappable record fields either.
  */
 export const umlDiagramToSchemaTree = (diagram: UMLDiagram | null | undefined, fallbackName: string): SchemaTree => {
   if (!diagram) return { name: fallbackName, fields: [] }
+  const resolution = resolveRootElement(diagram)
+  if (resolution.kind === 'enum') return { name: resolution.root.name || fallbackName, fields: [] }
+  if (resolution.kind !== 'class') return { name: fallbackName, fields: [] }
+  const root = resolution.root
   const index = indexDiagram(diagram)
-  const elements = (diagram.nodes ?? []).map(n => n.data?.element).filter((e): e is UMLElement => !!e)
-  if (elements.length === 0) return { name: fallbackName, fields: [] }
-  const roots = selectRootElements(elements, collectContainedIds(diagram))
-
-  if (roots.length === 1) {
-    const root = roots[0]
-    return { name: root.name || fallbackName, fields: buildFields(root, '$', index, new Set([root.id])) }
-  }
-
-  const propertyNames = assignRootPropertyNames(roots, assignDefKeys(elements))
-  // Root nodes stay optional: a multi-root record may populate only some of its trees, so an
-  // unmapped root must not fail pipeline validation.
-  const fields: FieldNode[] = roots.map(root => {
-    const name = propertyNames.get(root.id) as string
-    const path = `$.${name}`
-    if (root.type === 'enumeration') return field(path, name, 'str', false)
-    return field(path, name, 'object', false, buildFields(root, path, index, new Set([root.id])))
-  })
-  return { name: fallbackName, fields }
+  return { name: root.name || fallbackName, fields: buildFields(root, '$', index, new Set([root.id])) }
 }

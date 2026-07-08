@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { exportToJsonSchema } from '@/components/uml-modeler/services/jsonSchemaExportService'
+import { exportToJsonSchema, SchemaExportError } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 
 import type { FieldNode } from '../_types'
@@ -204,7 +204,7 @@ describe('model-walker consistency (modelToSchemaTree vs adapter)', () => {
     expect(leafPaths(modelTree.fields[0].children).sort()).toEqual(leafPaths(adapterTree.fields).sort())
   })
 
-  it('agrees on a multi-root diagram: one object node per unconnected tree', () => {
+  it('rejects a diagram with several unconnected roots consistently in export and adapter', () => {
     const multiRoot = diagram(
       'TrafficSensor',
       [
@@ -213,27 +213,9 @@ describe('model-walker consistency (modelToSchemaTree vs adapter)', () => {
       ],
       [],
     )
-    const adapterTree = umlDiagramToSchemaTree(multiRoot, multiRoot.name)
-    const modelTree = modelToSchemaTree(exportToJsonSchema(multiRoot), multiRoot.name)
-
-    expect(modelTree.name).toBe('TrafficSensor')
-    // Multi-root trees agree structurally: root properties directly, no wrapping record node.
-    expect(modelTree.fields.map(f => f.path)).toEqual(adapterTree.fields.map(f => f.path))
-    expect(leafPaths(modelTree.fields).sort()).toEqual(leafPaths(adapterTree.fields).sort())
-  })
-
-  it('agrees on colliding multi-root names: adapter paths match the exported property names', () => {
-    const colliding = diagram(
-      'MyStructure',
-      [cls('a', 'Foo', [{ id: 'a1', name: 'a1' }]), cls('b', 'foo', [{ id: 'a2', name: 'b1' }])],
-      [],
-    )
-    const schema = exportToJsonSchema(colliding) as JsonSchema
-    const exportedPaths = Object.keys(schema.properties ?? {}).map(name => `$.${name}`)
-    const adapterPaths = umlDiagramToSchemaTree(colliding, colliding.name).fields.map(f => f.path)
-    expect(adapterPaths).toEqual(exportedPaths)
-    expect(new Set(exportedPaths).size).toBe(2)
-    const modelPaths = modelToSchemaTree(schema as Record<string, unknown>, colliding.name).fields.map(f => f.path)
-    expect(modelPaths).toEqual(exportedPaths)
+    // The export refuses to persist a model for the invalid diagram, and the adapter's fallback
+    // tree agrees by exposing nothing mappable — neither side invents a record shape.
+    expect(() => exportToJsonSchema(multiRoot)).toThrow(SchemaExportError)
+    expect(umlDiagramToSchemaTree(multiRoot, multiRoot.name)).toEqual({ name: 'TrafficSensor', fields: [] })
   })
 })

@@ -14,7 +14,9 @@ import {
   useUpdateDatastructureVersionReleased,
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
+import { SchemaExportError } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
+import { rootFailureMessage } from '@/components/uml-modeler/services/rootFailureMessage'
 import { useError } from '@/hooks/use-error'
 import { STATUS_TYPES } from '@/types/common'
 import {
@@ -66,6 +68,7 @@ export const useDatastructureVersion = ({
 }: UseDatastructureVersionProps) => {
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
+  const tUmlModeler = useTranslations('umlModeler')
   const router = useRouter()
   const { handleFormValidationError } = useError()
   const [initialSession, setInitialSession] = useState(() => buildSessionFromVersion(version))
@@ -287,7 +290,25 @@ export const useDatastructureVersion = ({
       const modelUri = sessionDiagram
         ? buildDataStructureUrn(dataStructureName, datastructureId, parsed.data.version)
         : undefined
-      const { model } = sessionDiagram ? buildUMLModelPayload(sessionDiagram, modelUri) : { model: null }
+      let model: Record<string, unknown> | null = null
+      if (sessionDiagram) {
+        try {
+          model = buildUMLModelPayload(sessionDiagram, modelUri).model
+        } catch (error) {
+          if (!(error instanceof SchemaExportError)) throw error
+          const reason = rootFailureMessage(tUmlModeler, error.failure)
+          const shouldRelease =
+            !!form.formState.dirtyFields.dataStructureVersionStatus &&
+            statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+          // Releasing a version whose diagram yields no schema would deploy without a model, so
+          // the release is refused outright; a draft may still be parked — it saves diagram-only.
+          if (shouldRelease) {
+            toast.error(t('errors.releaseInvalidModel', { reason }))
+            return false
+          }
+          toast.warning(t('messages.draftModelSkipped', { reason }))
+        }
+      }
       const payload = mapDatastructureVersionFormToApiData(parsed.data, sessionDiagram, model)
 
       if (isCreateMode) {

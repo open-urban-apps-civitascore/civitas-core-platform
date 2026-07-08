@@ -19,6 +19,7 @@
 
 import type { UMLDiagram } from '../types/diagram'
 import type { UMLElement, UMLRelationship, UMLRelationshipType } from '../types/uml'
+import { hasAttributes } from '../types/uml'
 
 /** Structural part-of containments in scope. Its container sits at the edge target (diamond end). */
 export const STRUCTURAL_RELATIONS: ReadonlySet<UMLRelationshipType> = new Set<UMLRelationshipType>(['composition'])
@@ -115,17 +116,101 @@ export const collectParentIds = (diagram: UMLDiagram, elementId: string): string
   return parents
 }
 
+/** Why a diagram yields no usable root; consumers render these as user-facing validation text. */
+export type RootResolutionFailure =
+  | { code: 'noRoot' }
+  | { code: 'ambiguousRoot'; candidateNames: string[] }
+  | { code: 'unreachable'; rootName: string; unreachableNames: string[] }
+
+export type RootResolution =
+  | { kind: 'empty' }
+  | { kind: 'class'; root: UMLElement }
+  | { kind: 'enum'; root: UMLElement }
+  | { kind: 'invalid'; failure: RootResolutionFailure }
+
+const elementsOf = (diagram: UMLDiagram): UMLElement[] =>
+  (diagram.nodes ?? []).map(node => node.data?.element).filter((e): e is UMLElement => !!e)
+
+const namesOf = (elements: UMLElement[]): string[] => elements.map(e => e.name || e.type)
+
 /**
- * The hierarchy roots: every non-embedded, non-enumeration element, in node order. A diagram may
- * legitimately hold several unconnected trees — each of their tops is a root, and the document
- * root (the data structure itself) references all of them, so nothing depends on which class was
- * inserted first. A fully embedded (e.g. cyclic) diagram has no derivable top, so every class
- * counts; an enumeration-only diagram falls back to the enumerations themselves.
+ * Every element id reachable from the root, following the directions in which the schema embeds:
+ * structural edges container → part, inheritance/realization subclass → parent (the parent is
+ * merged into the subclass), and attribute type references (an element used as an attribute's type
+ * is embedded without any edge). A subclass of a reached class is deliberately NOT reached — its
+ * own properties never appear in the record.
  */
-export const selectRootElements = (elements: UMLElement[], containedIds: Set<string>): UMLElement[] => {
+export const collectReachableIds = (diagram: UMLDiagram, rootId: string): Set<string> => {
+  const partsByContainer = new Map<string, string[]>()
+  for (const edge of diagram.edges ?? []) {
+    const rel = edge.data?.relationship
+    if (!rel) continue
+    if (INHERITANCE_RELATIONS.has(rel.type)) {
+      partsByContainer.set(rel.source, [...(partsByContainer.get(rel.source) ?? []), rel.target])
+      continue
+    }
+    const containment = classifyStructuralEdge(rel)
+    if (containment) {
+      partsByContainer.set(containment.containerId, [
+        ...(partsByContainer.get(containment.containerId) ?? []),
+        containment.partId,
+      ])
+    }
+  }
+
+  const elementById = new Map(elementsOf(diagram).map(e => [e.id, e]))
+  const reachable = new Set<string>([rootId])
+  const queue = [rootId]
+  while (queue.length > 0) {
+    const currentId = queue.shift() as string
+    const next = [...(partsByContainer.get(currentId) ?? [])]
+    const element = elementById.get(currentId)
+    if (element && hasAttributes(element)) {
+      for (const attr of element.attributes) {
+        if (typeof attr.type !== 'string' && attr.type.id) next.push(attr.type.id)
+      }
+    }
+    for (const id of next) {
+      if (reachable.has(id)) continue
+      reachable.add(id)
+      queue.push(id)
+    }
+  }
+  return reachable
+}
+
+/**
+ * The single hierarchy root of a diagram, strictly: exactly one non-embedded, non-enumeration
+ * element from which every other element is reachable. Anything else is `invalid` with a typed
+ * failure instead of an order-dependent guess — several candidates (`ambiguousRoot`), a fully
+ * embedded/cyclic diagram (`noRoot`), or stranded elements (`unreachable`). A diagram consisting
+ * of exactly one enumeration keeps its special enum-root form.
+ */
+export const resolveRootElement = (diagram: UMLDiagram): RootResolution => {
+  const elements = elementsOf(diagram)
+  if (elements.length === 0) return { kind: 'empty' }
+
   const nonEnum = elements.filter(e => e.type !== 'enumeration')
+  if (nonEnum.length === 0) {
+    if (elements.length === 1) return { kind: 'enum', root: elements[0] }
+    return { kind: 'invalid', failure: { code: 'ambiguousRoot', candidateNames: namesOf(elements) } }
+  }
+
+  const containedIds = collectContainedIds(diagram)
   const candidates = nonEnum.filter(e => !containedIds.has(e.id))
-  if (candidates.length > 0) return candidates
-  if (nonEnum.length > 0) return nonEnum
-  return elements
+  if (candidates.length === 0) return { kind: 'invalid', failure: { code: 'noRoot' } }
+  if (candidates.length > 1) {
+    return { kind: 'invalid', failure: { code: 'ambiguousRoot', candidateNames: namesOf(candidates) } }
+  }
+
+  const root = candidates[0]
+  const reachable = collectReachableIds(diagram, root.id)
+  const unreachable = elements.filter(e => !reachable.has(e.id))
+  if (unreachable.length > 0) {
+    return {
+      kind: 'invalid',
+      failure: { code: 'unreachable', rootName: root.name || root.type, unreachableNames: namesOf(unreachable) },
+    }
+  }
+  return { kind: 'class', root }
 }

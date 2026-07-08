@@ -15,8 +15,8 @@ import { field, isGeometryType } from '../_types'
  * JSONB-column reading of the same spec. The runtime records are
  * entity-shaped (the wrapper never appears in the data), so all field paths stay anchored at the
  * record: a resolved root class becomes the tree's single `$` node, while a document-root record
- * (multi-root, legacy flat) exposes its properties directly; the data structure's name (the
- * schema `title`) is the tree name.
+ * (legacy flat root) exposes its properties directly; the data structure's name (the schema
+ * `title`) is the tree name.
  */
 
 /**
@@ -309,10 +309,10 @@ const childrenOf = (
  * the data structure (schema `title`). When the resolution yields a root class (wrapper or named
  * definition), that class is the tree's single `$` node — a normal mappable object port
  * representing the whole record — with the class's fields nested beneath it. When the record is
- * the document root itself (several root properties, legacy flat root), the properties sit
- * directly in the tree: a `$` node would just repeat the tree name without adding a level that
- * exists in the data. Throws {@link ModelResolutionError} on structurally broken models — callers
- * fall back to the diagram-based tree.
+ * the document root itself (legacy flat root), the properties sit directly in the tree: a `$`
+ * node would just repeat the tree name without adding a level that exists in the data. Throws
+ * {@link ModelResolutionError} on structurally broken models — callers fall back to the
+ * diagram-based tree.
  */
 export const modelToSchemaTree = (model: Record<string, unknown>, fallbackName: string): SchemaTree => {
   const root = model as SchemaNode
@@ -323,9 +323,7 @@ export const modelToSchemaTree = (model: Record<string, unknown>, fallbackName: 
   const defs = definitionsOf(root)
   const { className, definition } = resolveRoot(root, defs)
   if (className === null) {
-    // Root properties carry only the schema-declared requiredness (none for multi-root exports):
-    // a multi-root record may populate only some of its trees, so an unmapped root must not fail
-    // pipeline validation.
+    // Document-root properties carry only the schema-declared requiredness.
     return { name, fields: buildFields(definition, defs, '$', new Set()) }
   }
 
