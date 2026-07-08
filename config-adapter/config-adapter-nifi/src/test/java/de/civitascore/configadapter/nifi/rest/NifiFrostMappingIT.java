@@ -60,25 +60,27 @@ import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
 
 /**
- * DATA-CORRECTNESS integration test for the mapped FROST path (record mapping → generated STA
- * envelope template → find-or-create) against a <b>real FROST-Server</b>. Two pipelines are planned
- * through the real {@link FlowDeploymentPlanner} (so the {@code StaEnvelopeCompiler} output is what
+ * DATA-CORRECTNESS integration test for the mapped FROST path (record mapping → per-entity body
+ * templates → find-or-create) against a <b>real FROST-Server</b>. Two pipelines are planned through
+ * the real {@link FlowDeploymentPlanner} (so the {@code FrostMappingCompiler} output is what
  * deploys) and exercised end to end:
  *
  * <ul>
- *   <li><b>MQTT (non-STA payload)</b>: the envelope is rebuilt from mapped record fields — Thing
- *       find-or-create stays idempotent across re-deliveries, the observation lands typed on the
- *       pre-provisioned Datastream, and tenant values containing NiFi-EL/backreference syntax
- *       ({@code ${HOSTNAME}}, {@code $1}, {@code ${SINGLE_USER_CREDENTIALS_PASSWORD}}) arrive
- *       <i>literally</i> in FROST — the injection-hardening proof for the template path.
+ *   <li><b>MQTT (non-STA payload)</b>: the STA bodies are rendered from mapped record fields —
+ *       Thing find-or-create stays idempotent across re-deliveries, the observation lands typed on
+ *       the pre-provisioned Datastream (with an explicitly deep-inserted FeatureOfInterest and the
+ *       optional {@code resultQuality}/{@code validTime} fields), and tenant values containing
+ *       NiFi-EL/backreference syntax ({@code ${HOSTNAME}}, {@code $1}, {@code
+ *       ${SINGLE_USER_CREDENTIALS_PASSWORD}}) arrive <i>literally</i> in FROST — the
+ *       injection-hardening proof for the template path.
  *   <li><b>SQL (table rows)</b>: a multi-record batch is split into individual STA elements ({@code
  *       $[*]}), deduplicating the Thing across rows and re-reads.
  * </ul>
  *
  * <p>Failure paths must never drop silently: a missing source field renders a JSON {@code null}
- * result (valid envelope), an unmatched Datastream routes to the error sink without creating
- * anything, and a FROST-rejected observation (bad {@code phenomenonTime}) never becomes an
- * observation while the flow keeps running. Skipped when Docker is unavailable.
+ * result (valid body), an unmatched Datastream routes to the error sink without creating anything,
+ * and a FROST-rejected observation (bad {@code phenomenonTime}) never becomes an observation while
+ * the flow keeps running. Skipped when Docker is unavailable.
  */
 class NifiFrostMappingIT extends AbstractNifiIT {
 
@@ -268,6 +270,41 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   }
 
   @Test
+  void mappedObservationCarriesAnExplicitFeatureOfInterestAndOptionalFields() throws Exception {
+    // The mapping deep-inserts a FeatureOfInterest and maps resultQuality/validTime — the
+    // observation must carry the explicit feature (name "Sampling point"), not FROST's default
+    // Thing-location fallback, plus the two optional fields.
+    String payload = payload("FoI Station", REF_MAP, DS_MAP, "18.0", "\"2026-02-01T00:00:00Z\"");
+
+    JsonNode observation;
+    try (MqttPublisher publisher = publisher("civitas-it-foi")) {
+      await()
+          .atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(
+              () -> {
+                publisher.publish(TOPIC, payload);
+                return hasFeatureOfInterest(observationsWithFeature(dsMapId));
+              });
+      observation = withFeatureOfInterest(observationsWithFeature(dsMapId));
+    }
+
+    assertEquals(
+        "Sampling point",
+        observation.path("FeatureOfInterest").path("name").asText(),
+        "the observation must reference the explicitly mapped FeatureOfInterest");
+    assertEquals(
+        "Point",
+        observation.path("FeatureOfInterest").path("feature").path("type").asText(),
+        "the FeatureOfInterest feature must be the geoPoint-rendered GeoJSON object");
+    assertEquals("good", observation.path("resultQuality").asText(), "resultQuality must survive");
+    assertTrue(
+        observation.path("validTime").asText().contains("2026-02-01T00:00:00"),
+        "validTime must survive as the mapped instant");
+  }
+
+  @Test
   void missingSourceFieldRendersJsonNullResult() throws Exception {
     // No 'temp' in the payload: the flat attribute is empty, the placeholder's isEmpty()/ifElse
     // branch must render result:null — a VALID envelope (null is correct semantics, not an error),
@@ -389,7 +426,13 @@ class NifiFrostMappingIT extends AbstractNifiIT {
           "$.reference": "$.ref",
           "$.Datastreams[].reference": "$.ref",
           "$.Datastreams[].Observations[].result": { "op": "toFloat", "input": "$.temp" },
-          "$.Datastreams[].Observations[].phenomenonTime": "$.ts"
+          "$.Datastreams[].Observations[].phenomenonTime": "$.ts",
+          "$.Datastreams[].Observations[].validTime": "$.ts",
+          "$.Datastreams[].Observations[].resultQuality": { "op": "const", "value": "good" },
+          "$.Datastreams[].Observations[].FeatureOfInterest.name": { "op": "const", "value": "Sampling point" },
+          "$.Datastreams[].Observations[].FeatureOfInterest.description": { "op": "const", "value": "Where the reading was taken" },
+          "$.Datastreams[].Observations[].FeatureOfInterest.encodingType": { "op": "const", "value": "application/geo+json" },
+          "$.Datastreams[].Observations[].FeatureOfInterest.feature": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" }
         }
         """
         .formatted(INJECTION_DESCRIPTION);
@@ -610,6 +653,40 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     return mapper.readTree(response.body()).path("value");
   }
 
+  private JsonNode observationsWithFeature(long datastreamId) throws Exception {
+    String query =
+        URLEncoder.encode("FeatureOfInterest", StandardCharsets.UTF_8).replace("+", "%20");
+    HttpResponse<String> response =
+        http.send(
+            HttpRequest.newBuilder()
+                .uri(
+                    URI.create(
+                        frostUrl(
+                            "/Datastreams(" + datastreamId + ")/Observations?$expand=" + query)))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    return mapper.readTree(response.body()).path("value");
+  }
+
+  private static boolean hasFeatureOfInterest(JsonNode observations) {
+    for (JsonNode observation : observations) {
+      if ("Sampling point".equals(observation.path("FeatureOfInterest").path("name").asText())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static JsonNode withFeatureOfInterest(JsonNode observations) {
+    for (JsonNode observation : observations) {
+      if ("Sampling point".equals(observation.path("FeatureOfInterest").path("name").asText())) {
+        return observation;
+      }
+    }
+    throw new IllegalStateException("no observation carried the mapped FeatureOfInterest");
+  }
+
   private List<Double> resultValues(long datastreamId) throws Exception {
     JsonNode observations = observations(datastreamId);
     List<Double> results = new ArrayList<>();
@@ -668,7 +745,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         + ref
         + "\",\"dsname\":\""
         + dsName
-        + "\","
+        + "\",\"lon\":7.1,\"lat\":51.5,"
         + (temp == null ? "" : "\"temp\":" + temp + ",")
         + "\"ts\":"
         + tsJson
