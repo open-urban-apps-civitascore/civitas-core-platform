@@ -363,7 +363,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   useEffect(() => {
     if (!subTabValue) {
-      setSubTabValueParam(defaultSubTab)
+      setSubTabValueParam(defaultSubTab, true)
     }
   }, [subTabValue, setSubTabValueParam, defaultSubTab])
 

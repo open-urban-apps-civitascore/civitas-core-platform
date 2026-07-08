@@ -4,7 +4,7 @@ import { RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -47,7 +47,14 @@ const RolesPage = () => {
     tabValue,
   } = useQueryParams()
 
-  const [selectedRoleType, setSelectedRoleType] = useState<string>(tabValue || DEFAULT_TAB)
+  const selectedRoleType = tabValue || DEFAULT_TAB
+
+  useEffect(() => {
+    if (!tabValue) {
+      setTabValueParam(DEFAULT_TAB, true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabValue])
 
   const requestParams = useMemo(() => {
     const params = getApiRequestParamsByUrl()
@@ -67,9 +74,7 @@ const RolesPage = () => {
         tabsSectionProps={{
           tabs,
           onClick: type => {
-            setSelectedRoleType(type)
             setTabValueParam(type)
-            setPaginationParams({ pageIndex: 0, pageSize })
           },
           selectedTab: selectedRoleType,
         }}
