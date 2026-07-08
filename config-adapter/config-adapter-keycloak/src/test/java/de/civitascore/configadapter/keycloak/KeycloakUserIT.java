@@ -162,7 +162,7 @@ class KeycloakUserIT extends KeycloakAdapterITBase {
     userConfig.setFirstName("Email");
     userConfig.setLastName("User");
     userConfig.setEnabled(true);
-    userConfig.setRequiredActions(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
+    userConfig.setRequiredActions(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP"));
 
     adapter.processConfigEvent(
         Topics.USER_CREATED.toString(),
@@ -173,6 +173,7 @@ class KeycloakUserIT extends KeycloakAdapterITBase {
     UserRepresentation createdUser = users.getFirst();
     assertTrue(createdUser.getRequiredActions().contains("VERIFY_EMAIL"));
     assertTrue(createdUser.getRequiredActions().contains("UPDATE_PASSWORD"));
+    assertTrue(createdUser.getRequiredActions().contains("CONFIGURE_TOTP"));
 
     String mailpitApiUrl = getMailpitApiUrl();
     await()
@@ -261,7 +262,7 @@ class KeycloakUserIT extends KeycloakAdapterITBase {
       userConfig.setFirstName("NoRedirect");
       userConfig.setLastName("User");
       userConfig.setEnabled(true);
-      userConfig.setRequiredActions(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
+      userConfig.setRequiredActions(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP"));
 
       noRedirectAdapter.processConfigEvent(
           Topics.USER_CREATED.toString(),
@@ -273,6 +274,7 @@ class KeycloakUserIT extends KeycloakAdapterITBase {
       assertEquals(1, users.size());
       assertTrue(users.getFirst().getRequiredActions().contains("VERIFY_EMAIL"));
       assertTrue(users.getFirst().getRequiredActions().contains("UPDATE_PASSWORD"));
+      assertTrue(users.getFirst().getRequiredActions().contains("CONFIGURE_TOTP"));
 
       // Email should still be sent via the simple overload
       String mailpitApiUrl = getMailpitApiUrl();
@@ -318,7 +320,7 @@ class KeycloakUserIT extends KeycloakAdapterITBase {
     userConfig.setFirstName("Fail");
     userConfig.setLastName("User");
     userConfig.setEnabled(true);
-    userConfig.setRequiredActions(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
+    userConfig.setRequiredActions(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP"));
 
     // The adapter has invitation config set (from setUp), but the client doesn't exist
     // in this realm — the error should propagate as FatalAdapterException

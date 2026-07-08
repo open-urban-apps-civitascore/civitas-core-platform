@@ -105,7 +105,8 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
     UserRepresentation keycloakUser = findKeycloakUserByEmail(TEST_EMAIL);
     assertThat(keycloakUser).isNotNull();
     assertThat(keycloakUser.isEmailVerified()).isFalse();
-    assertThat(keycloakUser.getRequiredActions()).contains("VERIFY_EMAIL", "UPDATE_PASSWORD");
+    assertThat(keycloakUser.getRequiredActions())
+        .contains("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP");
 
     Group group = groupRepository.findByName(TEST_GROUP_NAME).orElseThrow();
     assertThat(group.getMembers()).extracting("email").containsExactly(TEST_EMAIL);
@@ -126,7 +127,8 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
     UserRepresentation keycloakUser = findKeycloakUserByEmail(TEST_SYNC_EMAIL);
     assertThat(keycloakUser).isNotNull();
     assertThat(keycloakUser.isEmailVerified()).isFalse();
-    assertThat(keycloakUser.getRequiredActions()).contains("VERIFY_EMAIL", "UPDATE_PASSWORD");
+    assertThat(keycloakUser.getRequiredActions())
+        .contains("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP");
   }
 
   @Test

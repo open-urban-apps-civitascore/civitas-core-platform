@@ -175,7 +175,7 @@ public class UserInitializer {
       userConfig.setEmailVerified(true);
     } else {
       userConfig.setEmailVerified(false);
-      userConfig.setRequiredActions(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
+      userConfig.setRequiredActions(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP"));
     }
 
     try {

@@ -114,7 +114,8 @@ class UserServiceTest {
   class ToConfigValuePreSaveTests {
 
     @Test
-    @DisplayName("Should set VERIFY_EMAIL and UPDATE_PASSWORD for new user (no externalId)")
+    @DisplayName(
+        "Should set VERIFY_EMAIL, UPDATE_PASSWORD and CONFIGURE_TOTP for new user (no externalId)")
     void shouldSetRequiredActionsForNewUser() {
       UserService service = createService();
       User user = userWithId(UUID.randomUUID());
@@ -125,7 +126,7 @@ class UserServiceTest {
       UserConfig config = (UserConfig) service.toConfigValuePreSave(user, input);
 
       assertThat(config.getRequiredActions())
-          .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD");
+          .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP");
       assertThat(config.getEmailVerified()).isFalse();
     }
 
@@ -141,7 +142,7 @@ class UserServiceTest {
       UserConfig config = (UserConfig) service.toConfigValuePreSave(user, input);
 
       assertThat(config.getRequiredActions())
-          .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD");
+          .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP");
       assertThat(config.getEmailVerified()).isFalse();
     }
 
@@ -328,7 +329,7 @@ class UserServiceTest {
       UserConfig config = (UserConfig) service.toConfigValuePostSave(user, input, preSave);
 
       assertThat(config.getRequiredActions())
-          .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD");
+          .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP");
       assertThat(config.getEmailVerified()).isFalse();
     }
   }

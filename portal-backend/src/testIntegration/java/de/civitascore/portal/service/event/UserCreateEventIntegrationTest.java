@@ -39,8 +39,8 @@ class UserCreateEventIntegrationTest extends BaseEventPublishingIntegrationTest 
                   .as("emailVerified should be false for a newly created user")
                   .isFalse();
               assertThat(keycloakUser.getRequiredActions())
-                  .as("New user should be required to verify email and update password")
-                  .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD");
+                  .as("New user should be required to verify email, update password and setup OTP")
+                  .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP");
             });
   }
 
@@ -66,8 +66,8 @@ class UserCreateEventIntegrationTest extends BaseEventPublishingIntegrationTest 
                   .as("emailVerified should be false for a newly created user")
                   .isFalse();
               assertThat(keycloakUser.getRequiredActions())
-                  .as("New user should be required to verify email and update password")
-                  .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD");
+                  .as("New user should be required to verify email, update password and setup OTP")
+                  .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP");
             });
   }
 }
