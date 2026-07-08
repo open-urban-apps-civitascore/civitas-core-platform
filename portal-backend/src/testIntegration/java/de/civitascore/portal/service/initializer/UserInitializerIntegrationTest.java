@@ -49,7 +49,7 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
   @BeforeEach
   void reseedAndRunInitializers() {
     txTemplate.executeWithoutResult(
-        status -> {
+        _ -> {
           permissionInitializer.initialize();
           roleInitializer.initialize();
         });
@@ -73,8 +73,8 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
 
     List<Assignment> assignments = assignmentRepository.findAllByGroupId(group.getId());
     assertThat(assignments).hasSize(1);
-    assertThat(assignments.get(0).getRole().getName()).isEqualTo("Tenant Admin");
-    assertThat(assignments.get(0).getScopeType()).isNull();
+    assertThat(assignments.getFirst().getRole().getName()).isEqualTo("Tenant Admin");
+    assertThat(assignments.getFirst().getScopeType()).isNull();
   }
 
   @Test
@@ -86,8 +86,8 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
 
     List<Assignment> assignments = assignmentRepository.findAllByGroupId(group.getId());
     assertThat(assignments).hasSize(1);
-    assertThat(assignments.get(0).getRole().getName()).isEqualTo("Data Architect");
-    assertThat(assignments.get(0).getScopeType()).isEqualTo(ScopeType.TENANT);
+    assertThat(assignments.getFirst().getRole().getName()).isEqualTo("Data Architect");
+    assertThat(assignments.getFirst().getScopeType()).isEqualTo(ScopeType.TENANT);
   }
 
   @Test
