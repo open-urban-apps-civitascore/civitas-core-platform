@@ -109,6 +109,8 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static final String DS_NEVER = "DS-NEVER-1";
   private static final String REF_BADTS = "REF-BADTS-1";
   private static final String DS_BADTS = "DS-BADTS-1";
+  private static final String REF_FOI = "REF-FOI-1";
+  private static final String DS_FOI = "DS-FOI-1";
   private static final String REF_SQL = "REF-SQL-1";
   private static final String DS_SQL = "DS-SQL-1";
 
@@ -126,6 +128,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static long dsNullId;
   private static long dsBadTsId;
   private static long dsSqlId;
+  private static long dsFoiId;
 
   private final HttpClient http = HttpClient.newHttpClient();
 
@@ -202,6 +205,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     dsNullId = createDatastream(DS_NULL, REF_NULL, "HOLDER-NULL");
     dsBadTsId = createDatastream(DS_BADTS, REF_BADTS, "HOLDER-BADTS");
     dsSqlId = createDatastream(DS_SQL, REF_SQL, "HOLDER-SQL");
+    dsFoiId = createDatastream(DS_FOI, REF_FOI, "HOLDER-FOI");
 
     deployMqttPipeline();
     deploySqlPipeline();
@@ -273,8 +277,9 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   void mappedObservationCarriesAnExplicitFeatureOfInterestAndOptionalFields() throws Exception {
     // The mapping deep-inserts a FeatureOfInterest and maps resultQuality/validTime — the
     // observation must carry the explicit feature (name "Sampling point"), not FROST's default
-    // Thing-location fallback, plus the two optional fields.
-    String payload = payload("FoI Station", REF_MAP, DS_MAP, "18.0", "\"2026-02-01T00:00:00Z\"");
+    // Thing-location fallback, plus the two optional fields. Uses its own station (REF_FOI) so it
+    // never shares a find-or-create Thing with the injection-hardening test (REF_MAP).
+    String payload = payload("FoI Station", REF_FOI, DS_FOI, "18.0", "\"2026-02-01T00:00:00Z\"");
 
     JsonNode observation;
     try (MqttPublisher publisher = publisher("civitas-it-foi")) {
@@ -285,9 +290,9 @@ class NifiFrostMappingIT extends AbstractNifiIT {
           .until(
               () -> {
                 publisher.publish(TOPIC, payload);
-                return hasFeatureOfInterest(observationsWithFeature(dsMapId));
+                return hasFeatureOfInterest(observationsWithFeature(dsFoiId));
               });
-      observation = withFeatureOfInterest(observationsWithFeature(dsMapId));
+      observation = withFeatureOfInterest(observationsWithFeature(dsFoiId));
     }
 
     assertEquals(
@@ -299,9 +304,10 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         observation.path("FeatureOfInterest").path("feature").path("type").asText(),
         "the FeatureOfInterest feature must be the geoPoint-rendered GeoJSON object");
     assertEquals("good", observation.path("resultQuality").asText(), "resultQuality must survive");
+    String validTime = observation.path("validTime").asText();
     assertTrue(
-        observation.path("validTime").asText().contains("2026-02-01T00:00:00"),
-        "validTime must survive as the mapped instant");
+        validTime.contains("/") && validTime.contains("2026-02-01T00:00:00"),
+        "validTime must survive as the mapped TM_Period interval (start/end), was: " + validTime);
   }
 
   @Test
@@ -427,7 +433,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
           "$.Datastreams[].reference": "$.ref",
           "$.Datastreams[].Observations[].result": { "op": "toFloat", "input": "$.temp" },
           "$.Datastreams[].Observations[].phenomenonTime": "$.ts",
-          "$.Datastreams[].Observations[].validTime": "$.ts",
+          "$.Datastreams[].Observations[].validTime": { "op": "concat", "separator": "/", "inputs": ["$.ts", "$.ts"] },
           "$.Datastreams[].Observations[].resultQuality": { "op": "const", "value": "good" },
           "$.Datastreams[].Observations[].FeatureOfInterest.name": { "op": "const", "value": "Sampling point" },
           "$.Datastreams[].Observations[].FeatureOfInterest.description": { "op": "const", "value": "Where the reading was taken" },
