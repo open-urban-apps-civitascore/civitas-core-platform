@@ -65,6 +65,7 @@ import org.slf4j.LoggerFactory;
  * <pre>{@code
  * { "type": "POSTGIS",
  *   "configuration": {
+ *     "owner": "ds_42_admin",            // optional schema owner (ALTER SCHEMA … OWNER)
  *     "tableName": "sensor_readings",    // required; the table GeoServer reads
  *     "columns": [ {name,type,...} ],    // optional explicit override (see below)
  *     "geometryColumns": [ {name,geometryType,srid,...} ],
@@ -427,6 +428,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       if (schemaName != null && !schemaName.isBlank()) {
         schema = new SchemaConfig();
         schema.setName(schemaName);
+        schema.setOwner(stringValue(config, "owner"));
       }
 
       List<GeometryColumnConfig> geometryColumns =

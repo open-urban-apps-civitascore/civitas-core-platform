@@ -288,9 +288,9 @@ class PostgisSagaHandlerTest {
     }
 
     @Test
-    void provisionSinkAltersSchemaOwnerAfterCreatingRole() throws Exception {
-      // ALTER SCHEMA … OWNER TO requires the target role to exist, so the owner change must come
-      // after CREATE ROLE.
+    void provisionSinkWithoutDatasetIdFailsRatherThanTargetingPublic() {
+      // A POSTGIS provision must never silently create the table in the shared public schema; with
+      // no datasetId the per-DataSet schema cannot be derived, so the step fails.
       Map<String, Object> trigger =
           Map.of(
               "datasinks",
@@ -300,12 +300,40 @@ class PostgisSagaHandlerTest {
                       "POSTGIS",
                       "configuration",
                       Map.of(
-                          "schema", "ds_42",
-                          "owner", "ds_42_geo",
-                          "tableName", "sensor_readings",
+                          "tableName",
+                          "sensor_readings",
                           "columns",
-                              List.of(Map.of("name", "id", "type", "BIGINT", "nullable", false)),
-                          "readRole", Map.of("name", "ds_42_geo", "canLogin", true)))));
+                          List.of(Map.of("name", "id", "type", "BIGINT", "nullable", false))))));
+
+      SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
+
+      assertEquals("STEP_FAILED", result.type());
+      assertTrue(result.error() != null && result.error().contains("datasetId"), result.error());
+    }
+
+    @Test
+    void provisionSinkAltersSchemaOwnerAfterCreatingRole() throws Exception {
+      // ALTER SCHEMA … OWNER TO requires the target role to exist, so the owner change must come
+      // after CREATE ROLE.
+      Map<String, Object> trigger =
+          Map.of(
+              "datasetId",
+              "ds-42",
+              "datasinks",
+              List.of(
+                  Map.of(
+                      "type",
+                      "POSTGIS",
+                      "configuration",
+                      Map.of(
+                          "owner",
+                          "ds_42_geo",
+                          "tableName",
+                          "sensor_readings",
+                          "columns",
+                          List.of(Map.of("name", "id", "type", "BIGINT", "nullable", false)),
+                          "readRole",
+                          Map.of("name", "ds_42_geo", "canLogin", true)))));
 
       SagaCommandResult result = handler.handle(execute("PROVISION_SINK", trigger));
 
@@ -342,6 +370,8 @@ class PostgisSagaHandlerTest {
     void provisionSinkWithoutColumnsFails() {
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
@@ -360,6 +390,8 @@ class PostgisSagaHandlerTest {
     void provisionSinkDerivesColumnsFromDataStructureWhenNoneConfigured() throws Exception {
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
@@ -408,6 +440,8 @@ class PostgisSagaHandlerTest {
       // constraint-less table). (Composite-key ORDER is covered by DataStructureSchemaTest.)
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
@@ -448,6 +482,8 @@ class PostgisSagaHandlerTest {
       // as the NiFi adapter) — the table PRIMARY KEY is the explicit column, not the marked one
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
@@ -482,6 +518,8 @@ class PostgisSagaHandlerTest {
       // column would be emitted; reject with a clear error instead of broken DDL
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
@@ -513,6 +551,8 @@ class PostgisSagaHandlerTest {
       // uniqueness. The missing component is rejected rather than dropped.
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
@@ -544,6 +584,8 @@ class PostgisSagaHandlerTest {
       // marker still applies (the override contract is specifically a *non-empty* list).
       Map<String, Object> trigger =
           Map.of(
+              "datasetId",
+              "ds-42",
               "datasinks",
               List.of(
                   Map.of(
@@ -624,6 +666,27 @@ class PostgisSagaHandlerTest {
       int schemaIdx = executed.indexOf("DROP SCHEMA \"ds_42\" RESTRICT");
       assertTrue(schemaIdx > tableIdx, "schema must be dropped after its table");
       verify(mockConnection).commit();
+    }
+
+    @Test
+    void deprovisionAbsorbsNonEmptySchemaWithoutRollingBackTheTableDrop() throws Exception {
+      // A non-empty schema raises 2BP01 on DROP SCHEMA RESTRICT. It must be absorbed (schema left
+      // in
+      // place) without rolling back the already-applied DROP TABLE/ROLE — otherwise the delete
+      // would
+      // abort the whole transaction and leak the table.
+      when(mockStatement.execute(org.mockito.ArgumentMatchers.startsWith("DROP SCHEMA")))
+          .thenThrow(
+              new SQLException("cannot drop schema because other objects depend on it", "2BP01"));
+
+      SagaCommandResult result =
+          handler.handle(compensate("DEPROVISION_SINK", postgisSinkTrigger()));
+
+      assertEquals("COMPENSATION_COMPLETED", result.type());
+      // Committed via the per-statement savepoint absorb — the whole-transaction rollback (no-arg
+      // rollback()) was never taken, so the successful table/role drops survive.
+      verify(mockConnection).commit();
+      verify(mockConnection, never()).rollback();
     }
 
     @Test
