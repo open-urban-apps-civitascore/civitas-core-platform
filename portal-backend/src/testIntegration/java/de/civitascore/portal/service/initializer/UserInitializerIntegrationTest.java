@@ -15,10 +15,12 @@ import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @ActiveProfiles({"test-integration", "init", "init-test"})
@@ -149,5 +151,23 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
     assertThat(groupRepository.count()).isEqualTo(2);
     assertThat(userRepository.count()).isEqualTo(2);
     assertThat(assignmentRepository.count()).isEqualTo(2);
+  }
+
+  @Nested
+  @TestPropertySource(properties = "keycloak.enforce-otp=false")
+  @DisplayName("With OTP enforcement disabled (KEYCLOAK_ENFORCE_OTP=false)")
+  class OtpEnforcementDisabled {
+
+    @Test
+    @DisplayName("Should sync user without CONFIGURE_TOTP when OTP enforcement is disabled")
+    void shouldSyncUserWithoutConfigureTotpWhenEnforcementDisabled() {
+
+      UserRepresentation keycloakUser = findKeycloakUserByEmail(TEST_EMAIL);
+      assertThat(keycloakUser).isNotNull();
+      assertThat(keycloakUser.isEmailVerified()).isFalse();
+      assertThat(keycloakUser.getRequiredActions())
+          .contains("VERIFY_EMAIL", "UPDATE_PASSWORD")
+          .doesNotContain("CONFIGURE_TOTP");
+    }
   }
 }

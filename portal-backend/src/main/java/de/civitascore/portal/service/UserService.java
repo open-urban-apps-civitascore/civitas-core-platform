@@ -120,7 +120,9 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     if (isNewUser) {
       requiredActions.add("VERIFY_EMAIL");
       requiredActions.add("UPDATE_PASSWORD");
-      requiredActions.add("CONFIGURE_TOTP");
+      if (keycloakProperties.enforceOtp()) {
+        requiredActions.add("CONFIGURE_TOTP");
+      }
     }
 
     boolean hasEmailChanged = !Objects.equals(entity.getEmail(), input.getEmail());

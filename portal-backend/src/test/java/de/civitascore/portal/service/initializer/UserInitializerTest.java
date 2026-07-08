@@ -55,7 +55,7 @@ class UserInitializerTest {
             groupRepository,
             configEventPublisher,
             environment,
-            new KeycloakProperties(TARGET_REALM, "http://keycloak:8080", "civitas-core"),
+            new KeycloakProperties(TARGET_REALM, "http://keycloak:8080", "civitas-core", true),
             new EventProperties(30));
     when(properties.getGroups()).thenReturn(List.of());
     when(properties.getUsers()).thenReturn(List.of(userEntry()));

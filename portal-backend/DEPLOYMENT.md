@@ -51,6 +51,7 @@
 | `KEYCLOAK_ISSUER_URI` | `https://keycloak.example.com` | JWT `iss` claim validation. **Can differ from `KEYCLOAK_AUTH_SERVER_URL`** when the container reaches Keycloak on an internal hostname but tokens carry an external issuer. |
 | `KEYCLOAK_REALM` | `civitas-core` | Realm name |
 | `KEYCLOAK_TARGET_REALM` | `civitas-core` | Realm used when provisioning users/groups/roles via config-adapter |
+| `KEYCLOAK_ENFORCE_OTP` | `true` | When `true` (default), newly created users get the `CONFIGURE_TOTP` required action and must set up TOTP on first login. Set to `false` to disable enforced OTP setup. |
 
 ---
 
@@ -318,6 +319,7 @@ Set by `application-local.yaml` and `application-postgres.yaml`. Override via en
 | `KEYCLOAK_ISSUER_URI` | `http://localhost:8080` | `KEYCLOAK_ISSUER_URI` |
 | `KEYCLOAK_REALM` | `civitas-core` | `KEYCLOAK_REALM` |
 | `KEYCLOAK_TARGET_REALM` | `civitas-core` | `KEYCLOAK_TARGET_REALM` |
+| `KEYCLOAK_ENFORCE_OTP` | `true` | `KEYCLOAK_ENFORCE_OTP` |
 | `SPRING_JPA_HIBERNATE_DDL_AUTO` | `validate` | — |
 | `SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL` | `true` | — |
 
@@ -358,6 +360,7 @@ environment:
   KEYCLOAK_ISSUER_URI: https://keycloak.example.com
   KEYCLOAK_REALM: civitas-core
   KEYCLOAK_TARGET_REALM: civitas-core
+  KEYCLOAK_ENFORCE_OTP: "true"
 
   # Kafka
   KAFKA_BOOTSTRAP_SERVERS: kafka:9092
