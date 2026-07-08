@@ -40,21 +40,27 @@ export const compileCanvas = (nodes: Node[], edges: Edge[]): Pick<MappingConfig,
     positions[derivedId] = node.position
     const ports = data.inputs ?? def.inputs
     const inputs: ValueNode[] = []
-    let index = 0
-    for (const port of ports) {
+    // Keep an empty slot for each unconnected port so fixed-arity transforms
+    // (e.g. geoPoint lon/lat) stay positionally aligned with their value tree.
+    ports.forEach((port, index) => {
       const edge = incoming(nodeId, port.id)
-      if (!edge) continue
+      if (!edge) {
+        inputs.push('')
+        return
+      }
       const child = byId.get(edge.source)
       const childType = edge.source !== SOURCE_NODE_ID && child ? (child.data as TransformNodeData).defType : null
       const childDerived = childType ? `${derivedId}.${index}#${childType}` : `${derivedId}.${index}`
       inputs.push(resolve(edge.source, edge.sourceHandle ?? '', childDerived))
-      index++
-    }
+    })
+    // Each def's toValueNode decides how to treat empty slots: positional ops (geoPoint)
+    // keep them, variadic ops (concat) drop them.
     return def.toValueNode(inputs, data.config ?? {})
   }
 
   for (const edge of edges) {
     if (edge.target !== TARGET_NODE_ID || !edge.targetHandle) continue
+
     const targetPath = edge.targetHandle
     const src = byId.get(edge.source)
     const rootType = edge.source !== SOURCE_NODE_ID && src ? (src.data as TransformNodeData).defType : null
@@ -63,6 +69,23 @@ export const compileCanvas = (nodes: Node[], edges: Edge[]): Pick<MappingConfig,
   }
 
   return { fields, positions }
+}
+
+/**
+ * Transform nodes whose output does not (transitively) reach the target node.
+ * `compileCanvas` only serializes nodes reachable backwards from the target, so
+ * these would be silently dropped on save — the editor warns about them on exit.
+ */
+export const findUnconnectedTransformNodes = (nodes: Node[], edges: Edge[]): Node[] => {
+  const reachable = new Set<string>()
+  const queue = edges.filter(e => e.target === TARGET_NODE_ID).map(e => e.source)
+  while (queue.length) {
+    const id = queue.shift()!
+    if (id === SOURCE_NODE_ID || reachable.has(id)) continue
+    reachable.add(id)
+    for (const e of edges) if (e.target === id) queue.push(e.source)
+  }
+  return nodes.filter(n => n.type === 'transform' && !reachable.has(n.id))
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +130,11 @@ export const decompileConfig = (
     })
   }
 
+  // The config stores one value tree per target field, so a transform node feeding
+  // multiple target ports appears as identical trees. Cache materialized op nodes by
+  // their canonical shape to restore a single shared node with multiple outgoing edges.
+  const nodeCache = new Map<string, { nodeId: string; handleId: string; isArray: boolean }>()
+
   const materialize = (vn: ValueNode, derivedId: string): { nodeId: string; handleId: string; isArray: boolean } => {
     if (typeof vn === 'string') {
       return { nodeId: SOURCE_NODE_ID, handleId: vn, isArray: sourceFields.get(vn)?.portType === 'array' }
@@ -119,7 +147,12 @@ export const decompileConfig = (
       }
     }
 
+    const cacheKey = JSON.stringify(vn)
+    const cached = nodeCache.get(cacheKey)
+    if (cached) return cached
+
     const def = mappingRegistry.byType[vn.op]
+
     const childVns = def?.opInputs(vn) ?? []
     // concat keeps a spare trailing port so users can add inputs without replacing wires
     const inputs = vn.op === 'concat' ? concatInputPorts(childVns.length + 1) : (def?.inputs ?? [])
@@ -134,13 +167,17 @@ export const decompileConfig = (
     })
 
     childVns.forEach((child, i) => {
+      // Empty-string input means the port was left unconnected; don't materialize
+      if (child === '') return
       const childType = isOpNode(child) && child.op !== 'copy' ? child.op : null
       const childDerived = childType ? `${derivedId}.${i}#${childType}` : `${derivedId}.${i}`
       const endpoint = materialize(child, childDerived)
       addEdge(endpoint.nodeId, endpoint.handleId, derivedId, inputs[i]?.id ?? 'in', endpoint.isArray)
     })
 
-    return { nodeId: derivedId, handleId: outputs[0]?.id ?? 'out', isArray: outputs[0]?.type === 'array' }
+    const endpoint = { nodeId: derivedId, handleId: outputs[0]?.id ?? 'out', isArray: outputs[0]?.type === 'array' }
+    nodeCache.set(cacheKey, endpoint)
+    return endpoint
   }
 
   for (const [targetPath, vn] of Object.entries(config.fields)) {
