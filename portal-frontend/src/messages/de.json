@@ -733,6 +733,7 @@
     "values": {
       "ASSIGNMENT": "Zuweisung",
       "DATASET": "Datensatz",
+      "DATASET_DASHBOARD": "Datensatz-Dashboard",
       "DATASET_PAYLOAD": "Datensatz-Payload",
       "DATASOURCE": "Datenquelle",
       "DATASTRUCTURE": "Datenstruktur",
