@@ -126,8 +126,15 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   const handleSave = async (): Promise<boolean> => {
     const isSaved = await saveDatastructure()
     if (isSaved) {
-      setIsExitModalOpen(false)
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
+    }
+    return isSaved
+  }
+
+  const handleSaveAndExit = async (): Promise<boolean> => {
+    const isSaved = await handleSave()
+    if (isSaved) {
+      setIsExitModalOpen(false)
       updateMode(false)
     }
     return isSaved
@@ -225,7 +232,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
         isLoading={isLoading}
         onOpenChange={setIsExitModalOpen}
         onDiscard={handleDiscardAndExit}
-        onConfirm={handleSave}
+        onConfirm={handleSaveAndExit}
       />
     </PageContainer>
   )
