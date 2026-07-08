@@ -18,6 +18,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -255,15 +256,22 @@ public class DataStructureVersionService
       return;
     }
     UUID dataStructureId = version.getDataStructure().getId();
+    String echoedModelId = StringUtils.abbreviate(modelId.toString(), 256);
     if (!CoreUrn.matchesId(modelId.toString(), dataStructureId)) {
+      // The generic exception message reaches the client verbatim; internal identifiers and
+      // derivation details stay out of it. The full context for diagnosis goes to the log.
+      log.warn(
+          "Rejected model $id on release of DataStructureVersion {}: '{}' does not match"
+              + " DataStructure {} (expected disambiguator {})",
+          version.getId(),
+          Encode.forJava(echoedModelId),
+          dataStructureId,
+          CoreUrn.disambiguatorFor(dataStructureId));
       throw new InvalidInputException(
           "model.$id",
           version.getId(),
-          "DataStructure model $id must be a CORE URN whose disambiguator is derived from the"
-              + " DataStructure id "
-              + dataStructureId
-              + ": "
-              + modelId);
+          "DataStructure model $id is not a valid CORE URN for this DataStructure: "
+              + echoedModelId);
     }
   }
 
