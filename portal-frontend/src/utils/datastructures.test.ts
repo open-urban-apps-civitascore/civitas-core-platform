@@ -1,5 +1,6 @@
 import { assert, describe, expect, it } from 'vitest'
 
+import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import type {
   Datastructure,
   DatastructuresListData,
@@ -7,6 +8,7 @@ import type {
   DatastructureVersionFormData,
   DatastructureVersionSummary,
 } from '@/types/datastructures'
+import { DATASTRUCTURE_STATUS_TYPES, DATASTRUCTURE_VERSION_SOURCE } from '@/types/datastructures'
 
 import {
   buildSessionFromVersion,
@@ -385,5 +387,58 @@ describe('buildSessionFromVersion', () => {
     expect(result.dirtyFields).toEqual(new Set())
     expect(result.lastModified).toBeInstanceOf(Date)
     expect(result.created).toBeInstanceOf(Date)
+  })
+})
+
+describe('root designation round-trip through persisted styles', () => {
+  it('keeps the isRoot flag across save payload and session rebuild', () => {
+    const flagged = {
+      id: 'node-a',
+      type: 'class',
+      position: { x: 0, y: 0 },
+      data: {
+        element: { id: 'a', name: 'Alpha', type: 'class', isRoot: true, attributes: [], operations: [] },
+        label: 'Alpha',
+      },
+    }
+    const other = {
+      id: 'node-b',
+      type: 'class',
+      position: { x: 0, y: 0 },
+      data: {
+        element: { id: 'b', name: 'Beta', type: 'class', attributes: [], operations: [] },
+        label: 'Beta',
+      },
+    }
+    const diagram = {
+      id: 'diagram-1',
+      name: 'Struct',
+      nodes: [flagged, other],
+      edges: [],
+      lastModified: new Date(0),
+      isDirty: false,
+    } as unknown as UMLDiagram
+
+    const payload = mapDatastructureVersionFormToApiData(
+      {
+        id: 'v1',
+        version: '1.0.0',
+        description: '',
+        dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
+        dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
+        modelName: 'Struct',
+        nodes: diagram.nodes,
+        edges: diagram.edges,
+      },
+      diagram,
+      null,
+    )
+    // Serialize/deserialize like the persistence boundary does — a designation dropped by a
+    // structured clone or JSON round-trip would silently degrade the diagram to ambiguous.
+    const persisted = JSON.parse(JSON.stringify(payload)) as { styles: UMLDiagram }
+    const session = buildSessionFromVersion({ styles: persisted.styles, modelName: 'Struct' } as DatastructureVersion)
+
+    const rebuilt = session.diagram.nodes.map(node => node.data.element)
+    expect(rebuilt.map(element => element.isRoot)).toEqual([true, undefined])
   })
 })

@@ -12,8 +12,15 @@ import {
   getSelectedNodes,
   validateRelationshipConnection,
 } from '../services/diagramService'
-import type { DiagramAction, NodeCreationContext, UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
-import type { UMLElement, UMLRelationship, UMLRelationshipType } from '../types/uml'
+import type {
+  DiagramAction,
+  NodeCreationContext,
+  UMLDiagram,
+  UMLEdge,
+  UMLElementUpdate,
+  UMLNode,
+} from '../types/diagram'
+import type { UMLRelationship, UMLRelationshipType } from '../types/uml'
 
 export interface UseUMLDiagramCoreReturn {
   // State
@@ -28,7 +35,7 @@ export interface UseUMLDiagramCoreReturn {
 
   // Node operations
   addNode: (context: NodeCreationContext) => void
-  updateNode: (nodeId: string, updates: Partial<UMLElement>) => void
+  updateNode: (nodeId: string, updates: UMLElementUpdate) => void
   deleteNodes: (nodeIds: string[]) => void
   selectNode: (nodeId: string, isMultiSelect?: boolean) => void
 
@@ -71,7 +78,7 @@ export const useUMLDiagramCore = (initialDiagram?: UMLDiagram): UseUMLDiagramCor
     dispatch({ type: 'ADD_NODE', payload: newNode })
   }, [])
 
-  const updateNode = useCallback((nodeId: string, updates: Partial<UMLElement>) => {
+  const updateNode = useCallback((nodeId: string, updates: UMLElementUpdate) => {
     dispatch({ type: 'UPDATE_NODE', payload: { id: nodeId, updates } })
   }, [])
 

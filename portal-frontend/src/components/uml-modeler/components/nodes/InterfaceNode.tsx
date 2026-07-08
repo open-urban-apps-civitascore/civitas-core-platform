@@ -31,6 +31,7 @@ export const InterfaceNode: React.FC<NodeProps> = ({ data, selected: isSelected 
       isSelected={isSelected}
       stereotype={element.stereotype || '<<interface>>'}
       name={element.name}
+      isRoot={element.isRoot}
     >
       {/* Operations Section - Interfaces only have operations */}
       <NodeSection isEmpty={!element.operations || element.operations.length === 0}>

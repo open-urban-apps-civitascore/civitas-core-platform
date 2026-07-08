@@ -22,6 +22,19 @@ export type GeometryType =
 
 export type FieldType = 'str' | 'int' | 'float' | 'bool' | 'date' | GeometryType | 'array' | 'object'
 
+export const GEOMETRY: ReadonlySet<GeometryType> = new Set<GeometryType>([
+  'Point',
+  'LineString',
+  'Polygon',
+  'MultiPoint',
+  'MultiLineString',
+  'MultiPolygon',
+  'GeometryCollection',
+])
+
+/** Type guard: is the given type name one of the concrete geometry types? */
+export const isGeometryType = (value: string): value is GeometryType => (GEOMETRY as ReadonlySet<string>).has(value)
+
 export interface FieldNode {
   /** JSONPath, e.g. "$.klassen[].name" */
   path: string
@@ -32,6 +45,34 @@ export interface FieldNode {
   required?: boolean
   children?: FieldNode[]
 }
+
+/** The port category is a pure function of the field type. */
+export const portTypeFor = (type: FieldType): PortType => {
+  if (type === 'array') return 'array'
+  if (type === 'object') return 'object'
+  if (isGeometryType(type)) return 'geometry'
+  return 'scalar'
+}
+
+/**
+ * The single {@link FieldNode} factory for every tree producer: derives `portType` from `type` and
+ * keeps `required`/`children` absent rather than false/empty, so all producers emit the same
+ * canonical node shape.
+ */
+export const field = (
+  path: string,
+  name: string,
+  type: FieldType,
+  required: boolean,
+  children?: FieldNode[],
+): FieldNode => ({
+  path,
+  name,
+  type,
+  portType: portTypeFor(type),
+  ...(required ? { required } : {}),
+  ...(children && children.length > 0 ? { children } : {}),
+})
 
 export interface SchemaTree {
   name: string

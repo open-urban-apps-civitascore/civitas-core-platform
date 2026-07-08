@@ -20,7 +20,13 @@ export const ClassNode: React.FC<NodeProps> = ({ data, selected: isSelected = fa
   const element = nodeData.element as UMLClass
 
   return (
-    <BaseUMLNode elementType="class" isSelected={isSelected} stereotype={element.stereotype} name={element.name}>
+    <BaseUMLNode
+      elementType="class"
+      isSelected={isSelected}
+      stereotype={element.stereotype}
+      name={element.name}
+      isRoot={element.isRoot}
+    >
       {/* Attributes Section */}
       <NodeSection isEmpty={!element.attributes || element.attributes.length === 0}>
         {element.attributes?.map(attribute => (

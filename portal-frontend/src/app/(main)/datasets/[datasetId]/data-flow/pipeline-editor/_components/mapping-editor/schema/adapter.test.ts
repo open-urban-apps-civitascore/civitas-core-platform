@@ -5,6 +5,8 @@ import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import { umlDiagramToSchemaTree } from './adapter'
 import { requiredFieldPaths } from './fieldTree'
 
+const treeOf = (diagram: UMLDiagram | null, fallbackName: string) => umlDiagramToSchemaTree(diagram, fallbackName).tree
+
 /** Minimal class node for the diagram fixtures below. */
 const classNode = (
   id: string,
@@ -49,17 +51,17 @@ describe('umlDiagramToSchemaTree — required derivation', () => {
   } as unknown as UMLDiagram
 
   it('marks fields required from {id} and multiplicity lower bound', () => {
-    const tree = umlDiagramToSchemaTree(diagram, 'thing')
+    const tree = treeOf(diagram, 'thing')
     const required = (name: string) => tree.fields.find(f => f.name === name)?.required
     expect(required('id')).toBe(true) // {id}
     expect(required('name')).toBe(true) // 1
-    expect(required('nick')).toBe(false) // 0..1 optional
+    expect(required('nick')).toBeFalsy() // 0..1 optional — the factory omits the flag when false
     expect(required('tags')).toBe(true) // 1..*
     expect(required('note')).toBe(true) // unset = single required
   })
 
   it('requiredFieldPaths returns only the required field paths', () => {
-    expect(requiredFieldPaths(umlDiagramToSchemaTree(diagram, 'thing'))).toEqual(['$.id', '$.name', '$.tags', '$.note'])
+    expect(requiredFieldPaths(treeOf(diagram, 'thing'))).toEqual(['$.id', '$.name', '$.tags', '$.note'])
   })
 })
 
@@ -73,7 +75,7 @@ describe('umlDiagramToSchemaTree', () => {
       edges: [edge('composition', 'props-id', 'thing-id', { sourceRole: 'properties' })],
     } as unknown as UMLDiagram
 
-    const tree = umlDiagramToSchemaTree(diagram, 'thing')
+    const tree = treeOf(diagram, 'thing')
 
     expect(tree.name).toBe('Thing')
     expect(tree.fields.map(f => f.name)).toEqual(['name', 'id', 'properties'])
@@ -84,32 +86,42 @@ describe('umlDiagramToSchemaTree', () => {
   })
 
   it('ignores an out-of-scope aggregation edge: the part is not nested', () => {
+    // Part is reachable (composed under `owned`) so the diagram has a single root; the aggregation
+    // edge with role `parts` is out of scope and must add no field of its own.
     const diagram = {
       nodes: [classNode('whole-id', 'Whole', [{ name: 'label' }]), classNode('part-id', 'Part', [{ name: 'value' }])],
-      edges: [edge('aggregation', 'part-id', 'whole-id', { sourceRole: 'parts' })],
+      edges: [
+        edge('composition', 'part-id', 'whole-id', { sourceRole: 'owned' }),
+        edge('aggregation', 'part-id', 'whole-id', { sourceRole: 'parts' }),
+      ],
     } as unknown as UMLDiagram
 
-    const tree = umlDiagramToSchemaTree(diagram, 'whole')
+    const tree = treeOf(diagram, 'whole')
 
     expect(tree.name).toBe('Whole')
     expect(tree.fields.find(f => f.name === 'parts')).toBeUndefined()
-    expect(tree.fields.map(f => f.name)).toEqual(['label'])
+    expect(tree.fields.map(f => f.name)).toEqual(['label', 'owned'])
   })
 
   it('ignores an out-of-scope association edge: the target is not nested', () => {
+    // Customer is reachable (composed under `owned`) so a single root resolves; the association
+    // edge with role `customer` is out of scope and must add no field of its own.
     const diagram = {
       nodes: [
         classNode('order-id', 'Order', [{ name: 'orderNo' }]),
         classNode('cust-id', 'Customer', [{ name: 'email' }]),
       ],
-      edges: [edge('association', 'order-id', 'cust-id', { targetRole: 'customer' })],
+      edges: [
+        edge('composition', 'cust-id', 'order-id', { sourceRole: 'owned' }),
+        edge('association', 'order-id', 'cust-id', { targetRole: 'customer' }),
+      ],
     } as unknown as UMLDiagram
 
-    const tree = umlDiagramToSchemaTree(diagram, 'order')
+    const tree = treeOf(diagram, 'order')
 
     expect(tree.name).toBe('Order')
     expect(tree.fields.find(f => f.name === 'customer')).toBeUndefined()
-    expect(tree.fields.map(f => f.name)).toEqual(['orderNo'])
+    expect(tree.fields.map(f => f.name)).toEqual(['orderNo', 'owned'])
   })
 
   it('reads the part multiplicity from the source end for composition (* -> array)', () => {
@@ -118,17 +130,22 @@ describe('umlDiagramToSchemaTree', () => {
       edges: [edge('composition', 'r-id', 'thing-id', { sourceRole: 'readings', sourceMultiplicity: '*' })],
     } as unknown as UMLDiagram
 
-    const nested = umlDiagramToSchemaTree(diagram, 'thing').fields.find(f => f.name === 'readings')
+    const nested = treeOf(diagram, 'thing').fields.find(f => f.name === 'readings')
     expect(nested?.type).toBe('array')
   })
 
   it('ignores an out-of-scope association edge regardless of its multiplicity', () => {
+    // Item is reachable (composed under `owned`) so a single root resolves; the many-valued
+    // association with role `items` is out of scope and yields no array field.
     const diagram = {
       nodes: [classNode('order-id', 'Order', [{ name: 'orderNo' }]), classNode('item-id', 'Item', [{ name: 'sku' }])],
-      edges: [edge('association', 'order-id', 'item-id', { targetRole: 'items', targetMultiplicity: '*' })],
+      edges: [
+        edge('composition', 'item-id', 'order-id', { sourceRole: 'owned' }),
+        edge('association', 'order-id', 'item-id', { targetRole: 'items', targetMultiplicity: '*' }),
+      ],
     } as unknown as UMLDiagram
 
-    expect(umlDiagramToSchemaTree(diagram, 'order').fields.find(f => f.name === 'items')).toBeUndefined()
+    expect(treeOf(diagram, 'order').fields.find(f => f.name === 'items')).toBeUndefined()
   })
 
   it('never roots on an embedded part even when fallbackName matches it', () => {
@@ -140,20 +157,22 @@ describe('umlDiagramToSchemaTree', () => {
       edges: [edge('composition', 'props-id', 'thing-id', { sourceRole: 'properties' })],
     } as unknown as UMLDiagram
 
-    expect(umlDiagramToSchemaTree(diagram, 'properties').name).toBe('Thing')
+    expect(treeOf(diagram, 'properties').name).toBe('Thing')
   })
 
-  it('prefers a name-matching element among structural roots', () => {
+  it('yields an empty tree for a diagram with several unconnected root classes', () => {
+    // The same condition under which the schema export refuses to produce a model — the fallback
+    // tree must not invent a record shape the engine would never see.
     const diagram = {
       nodes: [classNode('a', 'Alpha', [{ name: 'a1' }]), classNode('b', 'Beta', [{ name: 'b1' }])],
       edges: [],
     } as unknown as UMLDiagram
 
-    expect(umlDiagramToSchemaTree(diagram, 'beta').name).toBe('Beta')
+    expect(treeOf(diagram, 'MyStructure')).toEqual({ name: 'MyStructure', fields: [] })
   })
 
   it('returns an empty tree for a null diagram', () => {
-    expect(umlDiagramToSchemaTree(null, 'fallback')).toEqual({ name: 'fallback', fields: [] })
+    expect(treeOf(null, 'fallback')).toEqual({ name: 'fallback', fields: [] })
   })
 
   it('roots on the subclass and inlines inherited attributes (inherited first)', () => {
@@ -162,23 +181,27 @@ describe('umlDiagramToSchemaTree', () => {
       edges: [inhEdge('dog', 'animal')],
     } as unknown as UMLDiagram
 
-    const tree = umlDiagramToSchemaTree(diagram, 'animal')
+    const tree = treeOf(diagram, 'animal')
     expect(tree.name).toBe('Dog')
     expect(tree.fields.map(f => f.name)).toEqual(['name', 'breed'])
     expect(tree.fields.map(f => f.path)).toEqual(['$.name', '$.breed'])
   })
 
   it('ignores realization rather than inlining it like inheritance', () => {
+    // Impl is reachable (composed under `impl`) so IFace is the single root. Realization is out of
+    // scope, so Impl's `x` is NOT inlined into IFace the way inheritance would flatten a parent — it
+    // stays nested under the composition, and IFace's own fields are just `y` plus the composed part.
     const diagram = {
       nodes: [classNode('iface', 'IFace', [{ name: 'y' }]), classNode('impl', 'Impl', [{ name: 'x' }])],
-      edges: [inhEdge('impl', 'iface', 'realization')],
+      edges: [edge('composition', 'impl', 'iface', { sourceRole: 'impl' }), inhEdge('impl', 'iface', 'realization')],
     } as unknown as UMLDiagram
 
-    // The realization edge is dropped, so Impl is not embedded and inherits nothing; the
-    // name-matching IFace stays the root with only its own attribute.
-    const tree = umlDiagramToSchemaTree(diagram, 'iface')
+    const tree = treeOf(diagram, 'iface')
     expect(tree.name).toBe('IFace')
-    expect(tree.fields.map(f => f.name)).toEqual(['y'])
+    expect(tree.fields.map(f => f.name)).toEqual(['y', 'impl'])
+    const nested = tree.fields.find(f => f.name === 'impl')
+    expect(nested?.type).toBe('object')
+    expect(nested?.children?.map(c => c.name)).toEqual(['x'])
   })
 
   it('inlines multi-level inheritance (A → B → C) top-down', () => {
@@ -191,7 +214,7 @@ describe('umlDiagramToSchemaTree', () => {
       edges: [inhEdge('mid', 'base'), inhEdge('leaf', 'mid')],
     } as unknown as UMLDiagram
 
-    const tree = umlDiagramToSchemaTree(diagram, 'leaf')
+    const tree = treeOf(diagram, 'leaf')
     expect(tree.name).toBe('Leaf')
     expect(tree.fields.map(f => f.name)).toEqual(['a', 'b', 'c'])
   })
@@ -206,7 +229,7 @@ describe('umlDiagramToSchemaTree', () => {
       edges: [inhEdge('leaf', 'p1'), inhEdge('leaf', 'p2')],
     } as unknown as UMLDiagram
 
-    const tree = umlDiagramToSchemaTree(diagram, 'leaf')
+    const tree = treeOf(diagram, 'leaf')
     expect(tree.name).toBe('Leaf')
     expect(tree.fields.map(f => f.name)).toEqual(['x', 'y', 'own'])
   })
@@ -220,7 +243,7 @@ describe('umlDiagramToSchemaTree', () => {
       edges: [inhEdge('child', 'parent')],
     } as unknown as UMLDiagram
 
-    const tree = umlDiagramToSchemaTree(diagram, 'child')
+    const tree = treeOf(diagram, 'child')
     expect(tree.fields.map(f => f.name)).toEqual(['value'])
     expect(tree.fields[0].type).toBe('int')
   })
@@ -235,7 +258,7 @@ describe('umlDiagramToSchemaTree', () => {
       edges: [inhEdge('leaf', 'p1'), inhEdge('leaf', 'p2')],
     } as unknown as UMLDiagram
 
-    const tree = umlDiagramToSchemaTree(diagram, 'leaf')
+    const tree = treeOf(diagram, 'leaf')
     expect(tree.fields.map(f => f.name)).toEqual(['code', 'own'])
     expect(tree.fields[0].type).toBe('str')
   })
@@ -250,7 +273,7 @@ describe('umlDiagramToSchemaTree', () => {
       edges: [inhEdge('car', 'vehicle'), edge('composition', 'engine', 'car', { sourceRole: 'engine' })],
     } as unknown as UMLDiagram
 
-    const tree = umlDiagramToSchemaTree(diagram, 'car')
+    const tree = treeOf(diagram, 'car')
     expect(tree.name).toBe('Car')
     expect(tree.fields.map(f => f.name)).toEqual(['vin', 'doors', 'engine'])
     expect(tree.fields.find(f => f.name === 'engine')?.children?.map(c => c.name)).toEqual(['power'])
@@ -266,23 +289,19 @@ describe('umlDiagramToSchemaTree', () => {
       edges: [inhEdge('car', 'vehicle'), edge('composition', 'engine', 'vehicle', { sourceRole: 'engine' })],
     } as unknown as UMLDiagram
 
-    const tree = umlDiagramToSchemaTree(diagram, 'car')
+    const tree = treeOf(diagram, 'car')
     expect(tree.name).toBe('Car')
     expect(tree.fields.map(f => f.name)).toEqual(['vin', 'doors', 'engine'])
     expect(tree.fields.find(f => f.name === 'engine')?.children?.map(c => c.name)).toEqual(['power'])
   })
 
-  it('terminates on a cyclic inheritance and emits each attribute once', () => {
+  it('yields an empty tree for a cyclic inheritance without a derivable top', () => {
     const diagram = {
       nodes: [classNode('a', 'A', [{ name: 'a1' }]), classNode('b', 'B', [{ name: 'b1' }])],
       edges: [inhEdge('a', 'b'), inhEdge('b', 'a')],
     } as unknown as UMLDiagram
 
-    const tree = umlDiagramToSchemaTree(diagram, 'a')
-    const names = tree.fields.map(f => f.name)
-    expect(new Set(names).size).toBe(names.length)
-    expect(names).toContain('a1')
-    expect(names).toContain('b1')
+    expect(treeOf(diagram, 'a')).toEqual({ name: 'a', fields: [] })
   })
 
   it('never roots on the inheritance parent even when fallbackName matches it', () => {
@@ -291,16 +310,37 @@ describe('umlDiagramToSchemaTree', () => {
       edges: [inhEdge('dog', 'animal')],
     } as unknown as UMLDiagram
 
-    expect(umlDiagramToSchemaTree(diagram, 'animal').name).toBe('Dog')
+    expect(treeOf(diagram, 'animal').name).toBe('Dog')
   })
 
-  it('prefers the diagram name over the fallbackName when both could match a root', () => {
+  it('does not collapse an ambiguous diagram onto a name-matching class', () => {
     const diagram = {
       name: 'Beta',
       nodes: [classNode('a', 'Alpha', [{ name: 'a1' }]), classNode('b', 'Beta', [{ name: 'b1' }])],
       edges: [],
     } as unknown as UMLDiagram
 
-    expect(umlDiagramToSchemaTree(diagram, 'alpha').name).toBe('Beta')
+    // The name match must not silently pick a root; the invalid diagram yields no mappable tree.
+    expect(treeOf(diagram, 'alpha')).toEqual({ name: 'alpha', fields: [] })
+  })
+
+  it('renders a single-enumeration diagram as a tree without record fields', () => {
+    const enumOnly = {
+      nodes: [
+        {
+          id: 'node-e1',
+          type: 'enumeration',
+          position: { x: 0, y: 0 },
+          data: {
+            element: { id: 'e1', name: 'Status', type: 'enumeration', literals: [{ id: 'l1', name: 'ON' }] },
+            label: 'Status',
+          },
+        },
+      ],
+      edges: [],
+    } as unknown as UMLDiagram
+
+    // An enumeration is a scalar value at runtime — there is no record to map fields against.
+    expect(treeOf(enumOnly, 'MyStructure')).toEqual({ name: 'Status', fields: [] })
   })
 })

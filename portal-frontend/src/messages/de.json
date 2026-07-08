@@ -1118,7 +1118,8 @@
     "errors": {
       "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
       "versionAlreadyExists": "Es existiert bereits eine Version mit der gleichen Versionsnummer in dieser Datenstruktur.",
-      "versionFormat": "Die Versionsnummer muss dem Format X.Y.Z folgen (z. B. 1.0.0)."
+      "versionFormat": "Die Versionsnummer muss dem Format X.Y.Z folgen (z. B. 1.0.0).",
+      "releaseInvalidModel": "Die Version kann nicht veröffentlicht werden: {reason}"
     }
   },
   "pipelineEditor": {
@@ -1314,6 +1315,8 @@
     },
     "lines": "{count, plural, one {# Zeile} other {# Zeilen}}",
     "mappingEditor": {
+      "modelUnresolvable": "Das gespeicherte Schema von „{name}“ konnte nicht gelesen werden. Angezeigt wird die Diagrammstruktur — sie kann von der Struktur abweichen, die beim Deployment verwendet wird.",
+      "diagramUnresolvable": "„{name}“ liefert keine abbildbaren Felder: {reason}",
       "toolbar": {
         "title": "Mapping",
         "status": "{mapped} zugeordnet · {unmapped} nicht zugeordnet"
@@ -1414,6 +1417,11 @@
     "export": {
       "success": "Diagramm erfolgreich exportiert",
       "error": "Diagramm konnte nicht exportiert werden. Bitte versuchen Sie es erneut."
+    },
+    "rootValidation": {
+      "noRoot": "Im Diagramm lässt sich keine Wurzelklasse bestimmen — jede Klasse ist in eine andere eingebettet (zyklische Struktur).",
+      "ambiguousRoot": "Das Diagramm hat mehrere mögliche Wurzelklassen ({names}). Markieren Sie die Wurzelklasse in den Klasseneigenschaften oder verbinden Sie die Klassen zu einer Hierarchie.",
+      "unreachable": "Diese Elemente sind von der Wurzelklasse „{root}“ aus nicht erreichbar: {names}. Verbinden Sie sie mit der Hierarchie oder entfernen Sie sie."
     }
   },
   "datapools": {

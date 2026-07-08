@@ -22,23 +22,22 @@
  *   for many multiplicities).
  *
  * Root: the document root is the data structure itself, titled after the
- * diagram. Every class is emitted under `$defs`; the root class (the one not
- * contained by any other via composition or inheritance) is referenced from
- * the document root via a `$ref` property, so the structure's name — not an
- * arbitrary class — is always the top level. An enumeration-only diagram keeps
- * its `enum` at the document root instead.
+ * diagram. Every class is emitted under `$defs`; the single root class — the
+ * `isRoot`-designated element or, absent a designation, the one class not
+ * embedded by any structural or inheritance edge — is referenced from the
+ * document root via a `$ref` property, so the structure's name — not an
+ * arbitrary class — is always the top level. Every other element must be
+ * reachable from the root; otherwise (or when no unique root exists) the
+ * export throws {@link SchemaExportError} instead of guessing. An empty
+ * diagram exports an empty object schema; a diagram consisting of a single
+ * enumeration keeps its `enum` at the document root instead.
  */
 
 import type { UMLDiagram } from '../types/diagram'
 import type { UMLAttribute, UMLElement, UMLEnumeration, UMLRelationship, UMLType } from '../types/uml'
 import { hasAttributes } from '../types/uml'
-import {
-  classifyStructuralEdge,
-  collectContainedIds,
-  collectParentIds,
-  parseMultiplicity,
-  selectRootElement,
-} from './umlContainment'
+import type { RootResolutionFailure } from './umlContainment'
+import { classifyStructuralEdge, collectParentIds, parseMultiplicity, resolveRootElement } from './umlContainment'
 
 const JSON_SCHEMA_DIALECT = 'https://json-schema.org/draft/2020-12/schema'
 const BASE_MODEL_URI = 'http://civitas.org/model'
@@ -258,34 +257,56 @@ const buildClassSchema = (
 }
 
 /**
- * Main export function - converts a UMLDiagram into a JSON Schema document.
- * Relationships outside the supported scope carry no semantics and are ignored
- * (see {@link classifyStructuralEdge} / {@link collectParentIds}), so a legacy
- * model with out-of-scope edges still exports — those edges just contribute
- * nothing to the schema.
+ * Maps every element id to a stable, unique `$defs` key (name-based, `_n`-suffixed on collision).
+ * The keys are embedded verbatim in `#/$defs/<key>` refs, which the platform resolvers match by
+ * prefix-stripping rather than JSON-Pointer evaluation — so instead of `~0`/`~1`-escaping the refs
+ * (which those resolvers would not unescape), pointer-special characters are kept out of the keys
+ * themselves, making every emitted ref a valid JSON Pointer for standard tooling too.
  */
-export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): JsonSchemaObject => {
-  const elements = (diagram.nodes ?? []).map(node => node.data?.element).filter((e): e is UMLElement => !!e)
-
-  // Map every class element id to a stable `$defs` key.
-  const classDefKeyById = new Map<string, string>()
+export const assignDefKeys = (elements: UMLElement[]): Map<string, string> => {
+  const defKeyById = new Map<string, string>()
   const usedKeys = new Set<string>()
   for (const element of elements) {
-    let key = element.name || 'Type'
+    const key = (element.name || 'Type').replace(/[~/]/g, '-')
     let candidate = key
     let suffix = 1
     while (usedKeys.has(candidate)) {
       candidate = `${key}_${suffix++}`
     }
-    key = candidate
-    usedKeys.add(key)
-    classDefKeyById.set(element.id, key)
+    usedKeys.add(candidate)
+    defKeyById.set(element.id, candidate)
   }
+  return defKeyById
+}
+
+/**
+ * The diagram cannot be exported as a schema: it has no unique root class or leaves elements
+ * unreachable from it. Carries the typed {@link RootResolutionFailure} so callers can render a
+ * precise, actionable message.
+ */
+export class SchemaExportError extends Error {
+  constructor(readonly failure: RootResolutionFailure) {
+    super(`diagram has no exportable root: ${failure.code}`)
+    this.name = 'SchemaExportError'
+  }
+}
+
+/**
+ * Main export function - converts a UMLDiagram into a JSON Schema document.
+ *
+ * @throws SchemaExportError when the diagram has no unique root class or elements are unreachable
+ *   from it — callers surface this as a validation message instead of persisting a guessed schema
+ */
+export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): JsonSchemaObject => {
+  const elements = (diagram.nodes ?? []).map(node => node.data?.element).filter((e): e is UMLElement => !!e)
+
+  const classDefKeyById = assignDefKeys(elements)
 
   const sanitizedName = sanitizeName(diagram.name) || 'untitled'
   const id = modelUri || `${BASE_MODEL_URI}/${sanitizedName}`
 
-  const rootElement = selectRootElement(elements, collectContainedIds(diagram), diagram.name)
+  const resolution = resolveRootElement(diagram)
+  if (resolution.kind === 'invalid') throw new SchemaExportError(resolution.failure)
 
   const schema: JsonSchemaObject = {
     $id: id,
@@ -294,38 +315,37 @@ export const exportToJsonSchema = (diagram: UMLDiagram, modelUri?: string): Json
     type: 'object',
   }
 
-  if (!rootElement) {
+  if (resolution.kind === 'empty') {
     schema.properties = {}
     return schema
   }
 
-  if (rootElement.type !== 'enumeration') {
-    schema.properties = {
-      [sanitizeName(rootElement.name) || (classDefKeyById.get(rootElement.id) as string)]: {
-        $ref: `#/$defs/${classDefKeyById.get(rootElement.id)}`,
-      },
+  const rootElement = resolution.root
+  if (resolution.kind === 'enum') {
+    const rootSchema = buildClassSchema(rootElement, diagram, classDefKeyById)
+    Object.assign(schema, rootSchema)
+    // buildClassSchema omits `type` for enumerations, so drop the pre-initialized `type: 'object'`.
+    delete schema.type
+    schema.$id = id
+    schema.$schema = JSON_SCHEMA_DIALECT
+    schema.title = rootElement.name || diagram.name
+
+    const defs = buildDefs(
+      elements.filter(e => e.id !== rootElement.id),
+      diagram,
+      classDefKeyById,
+    )
+    if (Object.keys(defs).length > 0) {
+      schema.$defs = defs
     }
-    schema.$defs = buildDefs(elements, diagram, classDefKeyById)
     return schema
   }
 
-  const rootSchema = buildClassSchema(rootElement, diagram, classDefKeyById)
-  Object.assign(schema, rootSchema)
-  // buildClassSchema omits `type` for enumerations, so drop the pre-initialized `type: 'object'`.
-  delete schema.type
-  schema.$id = id
-  schema.$schema = JSON_SCHEMA_DIALECT
-  schema.title = rootElement.name || diagram.name
-
-  const defs = buildDefs(
-    elements.filter(e => e.id !== rootElement.id),
-    diagram,
-    classDefKeyById,
-  )
-  if (Object.keys(defs).length > 0) {
-    schema.$defs = defs
+  const rootDefKey = classDefKeyById.get(rootElement.id) as string
+  schema.properties = {
+    [sanitizeName(rootElement.name) || rootDefKey]: { $ref: `#/$defs/${rootDefKey}` },
   }
-
+  schema.$defs = buildDefs(elements, diagram, classDefKeyById)
   return schema
 }
 

@@ -20,6 +20,7 @@ import type { PortType, TransformNodeData } from '@/components/node-editor/types
 import { buildRegistry } from '@/components/node-editor/types'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { rootFailureMessage } from '@/components/uml-modeler/services/rootFailureMessage'
 import { buildDataStructureUrn } from '@/utils/urn'
 
 import type { MappingConfig } from './_types'
@@ -33,8 +34,8 @@ import {
 } from './compile'
 import { TransformInspector } from './inspector/TransformInspector'
 import { MegaNode } from './nodes/MegaNode'
-import { umlDiagramToSchemaTree } from './schema/adapter'
 import { flattenTree, objectFieldsCompatible, requiredFieldPaths } from './schema/fieldTree'
+import { versionToSchemaTree } from './schema/versionTree'
 import { computeStatus } from './status'
 import type { MappingTransformDef } from './transforms'
 import { concatInputPorts, LITERAL_DEFAULT_TYPE, literalOutputPort, mappingRegistry } from './transforms'
@@ -70,6 +71,7 @@ export const MappingEditorModal = ({
 }: MappingEditorModalProps) => {
   const t = useTranslations('pipelineEditor.mappingEditor')
   const tCommon = useTranslations('common')
+  const tUmlModeler = useTranslations('umlModeler')
 
   /**
    * Build a translated copy of the registry so PaletteShell renders
@@ -105,16 +107,45 @@ export const MappingEditorModal = ({
     isEnabled: open,
   })
 
-  const sourceTree = useMemo(
-    () => umlDiagramToSchemaTree(sourceQuery.data?.data?.styles, source.name ?? 'source'),
+  const sourceResolution = useMemo(
+    () => versionToSchemaTree(sourceQuery.data?.data, source.name ?? 'source'),
     [sourceQuery.data, source.name],
   )
-  const targetTree = useMemo(
-    () => umlDiagramToSchemaTree(targetQuery.data?.data?.styles, target.name ?? 'target'),
+  const targetResolution = useMemo(
+    () => versionToSchemaTree(targetQuery.data?.data, target.name ?? 'target'),
     [targetQuery.data, target.name],
   )
+  const sourceTree = sourceResolution.tree
+  const targetTree = targetResolution.tree
   const sourceFields = useMemo(() => flattenTree(sourceTree), [sourceTree])
   const targetFields = useMemo(() => flattenTree(targetTree), [targetTree])
+
+  // The diagram-derived fallback tree is not the artifact the engine reads — the user must know
+  // before drawing mappings against it — and a rootless diagram yields an empty tree whose reason
+  // would otherwise be invisible. The stable role-keyed toast ids absorb re-renders (StrictMode,
+  // refetches) into one visible warning per side, even when both structures share a name.
+  useEffect(() => {
+    if (!open) return
+    for (const [role, resolution] of [
+      ['source', sourceResolution],
+      ['target', targetResolution],
+    ] as const) {
+      if (resolution.isModelBroken) {
+        toast.warning(t('modelUnresolvable', { name: resolution.tree.name }), {
+          id: `model-broken-${role}`,
+        })
+      }
+      if (resolution.diagramFailure) {
+        toast.warning(
+          t('diagramUnresolvable', {
+            name: resolution.tree.name,
+            reason: rootFailureMessage(tUmlModeler, resolution.diagramFailure),
+          }),
+          { id: `diagram-unresolvable-${role}` },
+        )
+      }
+    }
+  }, [open, sourceResolution, targetResolution, t, tUmlModeler])
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])

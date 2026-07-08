@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality } from '../constants/umlTypes'
 import type { UMLDiagram } from '../types/diagram'
-import { canMultiplicityBePrimaryKey, exportToJsonSchema, sanitizeName } from './jsonSchemaExportService'
+import {
+  canMultiplicityBePrimaryKey,
+  exportToJsonSchema,
+  sanitizeName,
+  SchemaExportError,
+} from './jsonSchemaExportService'
 
 const baseDiagram = (overrides?: Partial<UMLDiagram>): UMLDiagram => ({
   id: 'diagram-1',
@@ -294,9 +299,24 @@ describe('exportToJsonSchema', () => {
   })
 
   it('emits enumerations using the enum keyword', () => {
+    // The root reaches the enum through an attribute typed by it; association edges are out of scope
+    // and would leave the enum unreachable.
+    const rootNode = baseDiagram().nodes[0]
     const diagram = baseDiagram({
       nodes: [
-        ...baseDiagram().nodes,
+        {
+          ...rootNode,
+          data: {
+            ...rootNode.data,
+            element: {
+              ...rootNode.data.element,
+              attributes: [
+                ...rootNode.data.element.attributes,
+                { id: 'a4', name: 'status', type: { id: 'elem-2' }, visibility: 'public' },
+              ],
+            },
+          },
+        },
         {
           id: 'node-2',
           type: 'enumeration',
@@ -427,7 +447,7 @@ describe('exportToJsonSchema', () => {
     expect(schema.title).toBe('Status')
   })
 
-  it('keeps a single-root layout when the diagram has multiple unconnected classes', () => {
+  it('rejects a diagram with several unconnected root classes', () => {
     const diagram = baseDiagram({
       nodes: [
         {
@@ -464,22 +484,40 @@ describe('exportToJsonSchema', () => {
       edges: [],
     })
 
-    const schema = exportToJsonSchema(diagram)
-
-    // The document root is the data structure (diagram name). Only the selected root class is a
-    // $ref property of it; every class — root and non-root — is emitted under $defs.
-    expect(schema.type).toBe('object')
-    expect(schema.title).toBe('TrafficSensor')
-    expect(schema.properties).toEqual({ building: { $ref: '#/$defs/Building' } })
-    const defs = schema.$defs as Record<string, Record<string, unknown>>
-    expect(defs.Building).toBeDefined()
-    expect(defs.Street).toBeDefined()
+    // Several unconnected root classes leave no single record shape to derive — the export
+    // refuses with the candidates named instead of persisting a guessed schema.
+    let thrown: unknown
+    try {
+      exportToJsonSchema(diagram)
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown).toBeInstanceOf(SchemaExportError)
+    expect((thrown as SchemaExportError).failure).toEqual({
+      code: 'ambiguousRoot',
+      candidateNames: ['Building', 'Street'],
+    })
   })
 
   it('enumerations alone do not count as roots — single class stays the root class', () => {
+    // The class reaches the enum through an attribute typed by it, keeping it reachable without an
+    // out-of-scope association edge.
+    const rootNode = baseDiagram().nodes[0]
     const diagram = baseDiagram({
       nodes: [
-        ...baseDiagram().nodes,
+        {
+          ...rootNode,
+          data: {
+            ...rootNode.data,
+            element: {
+              ...rootNode.data.element,
+              attributes: [
+                ...rootNode.data.element.attributes,
+                { id: 'a4', name: 'sensorType', type: { id: 'elem-enum' }, visibility: 'public' },
+              ],
+            },
+          },
+        },
         {
           id: 'node-enum',
           type: 'enumeration',
@@ -588,26 +626,52 @@ describe('exportToJsonSchema', () => {
     source: 'node-1',
     target: 'node-2',
     data: {
-      relationship: { id: 'rel-1', type, source: 'elem-1', target: 'elem-2' },
+      relationship: { id: 'rel-1', type, source: 'elem-1', target: 'elem-2', targetRole: 'reading' },
       label: '',
       isSelected: false,
       isDirty: false,
     },
   })
 
+  /**
+   * Composition that embeds Reading into TrafficSensor under `sensorReading`. Strict single-root
+   * export needs every class reachable and non-competing, so the second class can no longer float
+   * disconnected — this in-scope edge anchors it while the out-of-scope edge under test still
+   * contributes nothing.
+   */
+  const readingCompositionEdge = {
+    id: 'edge-comp',
+    type: 'composition' as const,
+    source: 'node-2',
+    target: 'node-1',
+    data: {
+      relationship: {
+        id: 'rel-comp',
+        type: 'composition' as const,
+        source: 'elem-2',
+        target: 'elem-1',
+        sourceRole: 'sensorReading',
+      },
+      label: '',
+      isSelected: false,
+      isDirty: false,
+    },
+  }
+
   it.each(['association', 'aggregation', 'dependency'] as const)(
     'ignores out-of-scope relationship type %s: the edge contributes no property and export still succeeds',
     type => {
       const diagram = baseDiagram({
         nodes: [...baseDiagram().nodes, readingNode],
-        edges: [outOfScopeEdge(type)],
+        edges: [readingCompositionEdge, outOfScopeEdge(type)],
       })
 
       const schema = exportToJsonSchema(diagram)
-      // The out-of-scope edge is dropped, so TrafficSensor gains no reference to Reading; both
-      // classes are still emitted under $defs.
+      // The out-of-scope edge is dropped, so its `reading` role adds no property; only the
+      // composition's `sensorReading` reference to Reading survives. Both classes are emitted.
       const properties = classDef(schema, 'TrafficSensor').properties as Record<string, unknown>
       expect(Object.keys(properties)).not.toContain('reading')
+      expect(properties.sensorReading).toEqual({ $ref: '#/$defs/Reading' })
       const defs = schema.$defs as Record<string, Record<string, unknown>>
       expect(defs.TrafficSensor).toBeDefined()
       expect(defs.Reading).toBeDefined()
@@ -632,6 +696,9 @@ describe('exportToJsonSchema', () => {
         label: 'Owner',
       },
     }
+    // Owner is also composed into TrafficSensor (in scope, role `ownerRef`) so every class is
+    // reachable and non-competing under strict rooting; the out-of-scope association is what must
+    // contribute nothing.
     const diagram = baseDiagram({
       nodes: [...baseDiagram().nodes, readingNode, strayNode],
       edges: [
@@ -648,6 +715,25 @@ describe('exportToJsonSchema', () => {
               source: 'elem-2',
               target: 'elem-1',
               sourceRole: 'reading',
+            },
+            label: '',
+            isSelected: false,
+            isDirty: false,
+          },
+        },
+        // Composition: Owner (part/source) into TrafficSensor (container/target).
+        {
+          id: 'edge-owner',
+          type: 'composition',
+          source: 'node-3',
+          target: 'node-1',
+          data: {
+            relationship: {
+              id: 'rel-owner',
+              type: 'composition',
+              source: 'elem-3',
+              target: 'elem-1',
+              sourceRole: 'ownerRef',
             },
             label: '',
             isSelected: false,
@@ -738,18 +824,32 @@ describe('exportToJsonSchema', () => {
   })
 
   it('ignores realization rather than mapping it like inheritance', () => {
+    // IFace composes Impl (in scope) so a single root resolves and Impl is reachable. The
+    // realization edge on top is out of scope: Impl gets no allOf parent and stays a plain object.
     const diagram = baseDiagram({
       name: 'IFace',
       nodes: [
         cls('iface', 'IFace', [{ id: 'a1', name: 'y' }]),
         cls('impl', 'Impl', [{ id: 'a2', name: 'x' }]),
       ] as unknown as UMLDiagram['nodes'],
-      edges: [inhEdge('1', 'impl', 'iface', 'realization')],
+      edges: [
+        {
+          id: 'edge-comp',
+          type: 'composition',
+          source: 'node-impl',
+          target: 'node-iface',
+          data: {
+            relationship: { id: 'rel-comp', type: 'composition', source: 'impl', target: 'iface', sourceRole: 'impl' },
+            label: '',
+            isSelected: false,
+            isDirty: false,
+          },
+        },
+        inhEdge('1', 'impl', 'iface', 'realization'),
+      ],
     } as Partial<UMLDiagram>)
 
     const schema = exportToJsonSchema(diagram)
-    // The realization edge is dropped: Impl gets no allOf parent, so both classes remain plain
-    // object schemas and export still succeeds.
     expect(classDef(schema, 'Impl').allOf).toBeUndefined()
     expect(classDef(schema, 'Impl').type).toBe('object')
     expect((schema.$defs as Record<string, unknown>).IFace).toBeDefined()
@@ -802,7 +902,174 @@ describe('exportToJsonSchema', () => {
     ])
   })
 
-  it('references the diagram-name-matching class as the root class (case-insensitive)', () => {
+  it('rejects a class the root cannot reach, naming root and stray', () => {
+    const diagram = baseDiagram({
+      name: 'S',
+      nodes: [
+        cls('a', 'Root', [{ id: 'a1', name: 'a1' }]),
+        cls('b', 'Part', [{ id: 'a2', name: 'b1' }]),
+        cls('c', 'Stray', [{ id: 'a3', name: 'c1' }]),
+      ] as unknown as UMLDiagram['nodes'],
+      edges: [
+        {
+          id: 'edge-1',
+          type: 'composition',
+          source: 'node-b',
+          target: 'node-a',
+          data: {
+            relationship: { id: 'rel-1', type: 'composition', source: 'b', target: 'a', sourceRole: 'parts' },
+            label: '',
+            isSelected: false,
+            isDirty: false,
+          },
+        },
+        {
+          id: 'edge-2',
+          type: 'composition',
+          source: 'node-b',
+          target: 'node-c',
+          data: {
+            relationship: { id: 'rel-2', type: 'composition', source: 'b', target: 'c', sourceRole: 'parts' },
+            label: '',
+            isSelected: false,
+            isDirty: false,
+          },
+        },
+      ] as unknown as UMLDiagram['edges'],
+    } as Partial<UMLDiagram>)
+
+    // Part hangs under both Root and Stray — no class is fully unconnected, yet no single record
+    // shape exists either. Two non-embedded classes remain, so the export rejects as ambiguous.
+    let thrown: unknown
+    try {
+      exportToJsonSchema(diagram)
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown).toBeInstanceOf(SchemaExportError)
+    expect((thrown as SchemaExportError).failure).toEqual({
+      code: 'ambiguousRoot',
+      candidateNames: ['Root', 'Stray'],
+    })
+  })
+
+  it('rejects an isolated enumeration as unreachable from the root class', () => {
+    const diagram = baseDiagram({
+      name: 'S',
+      nodes: [
+        cls('a', 'Root', [{ id: 'a1', name: 'a1' }]),
+        {
+          id: 'node-e1',
+          type: 'enumeration',
+          position: { x: 0, y: 0 },
+          data: {
+            element: {
+              id: 'e1',
+              name: 'Status',
+              type: 'enumeration',
+              literals: [{ id: 'l1', name: 'ON' }],
+            },
+            label: 'Status',
+          },
+        },
+      ] as unknown as UMLDiagram['nodes'],
+      edges: [],
+    } as Partial<UMLDiagram>)
+
+    let thrown: unknown
+    try {
+      exportToJsonSchema(diagram)
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown).toBeInstanceOf(SchemaExportError)
+    expect((thrown as SchemaExportError).failure).toEqual({
+      code: 'unreachable',
+      rootName: 'Root',
+      unreachableNames: ['Status'],
+    })
+  })
+
+  it('rejects several enumerations without any class as ambiguous', () => {
+    const diagram = baseDiagram({
+      name: 'S',
+      nodes: [
+        {
+          id: 'node-e1',
+          type: 'enumeration',
+          position: { x: 0, y: 0 },
+          data: {
+            element: {
+              id: 'e1',
+              name: 'Status',
+              type: 'enumeration',
+              literals: [{ id: 'l1', name: 'ON' }],
+            },
+            label: 'Status',
+          },
+        },
+        {
+          id: 'node-e2',
+          type: 'enumeration',
+          position: { x: 0, y: 0 },
+          data: {
+            element: {
+              id: 'e2',
+              name: 'Kind',
+              type: 'enumeration',
+              literals: [{ id: 'l2', name: 'A' }],
+            },
+            label: 'Kind',
+          },
+        },
+      ] as unknown as UMLDiagram['nodes'],
+      edges: [],
+    } as Partial<UMLDiagram>)
+
+    let thrown: unknown
+    try {
+      exportToJsonSchema(diagram)
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown).toBeInstanceOf(SchemaExportError)
+    expect((thrown as SchemaExportError).failure).toEqual({
+      code: 'ambiguousRoot',
+      candidateNames: ['Status', 'Kind'],
+    })
+  })
+
+  it('keeps $defs keys free of JSON-Pointer-special characters', () => {
+    const diagram = baseDiagram({
+      name: 'S',
+      nodes: [cls('a', 'Road/Segment~Part', [{ id: 'a1', name: 'a1' }])] as unknown as UMLDiagram['nodes'],
+      edges: [],
+    } as Partial<UMLDiagram>)
+
+    const schema = exportToJsonSchema(diagram)
+    // In a def key, '~' would make '#/$defs/<key>' an invalid JSON Pointer and '/' a valid one
+    // that resolves to the wrong, nested location.
+    expect(schema.properties).toEqual({ 'road-segment-part': { $ref: '#/$defs/Road-Segment-Part' } })
+    expect((schema.$defs as Record<string, unknown>)['Road-Segment-Part']).toBeDefined()
+  })
+
+  it('exports the designated root (isRoot) when the derivation alone would be ambiguous', () => {
+    // Beta is referenced only as an attribute type: reachable from Alpha, but not embedded by any
+    // edge — without the designation both classes would be root candidates.
+    const alpha = cls('a', 'Alpha', [{ id: 'a1', name: 'beta', type: { id: 'b' } as unknown as string }])
+    ;(alpha.data.element as { isRoot?: boolean }).isRoot = true
+    const diagram = baseDiagram({
+      name: 'S',
+      nodes: [alpha, cls('b', 'Beta', [{ id: 'a2', name: 'b1' }])] as unknown as UMLDiagram['nodes'],
+      edges: [],
+    } as Partial<UMLDiagram>)
+
+    const schema = exportToJsonSchema(diagram)
+    expect(schema.properties).toEqual({ alpha: { $ref: '#/$defs/Alpha' } })
+    expect((classDef(schema, 'Alpha').properties as Record<string, unknown>).beta).toEqual({ $ref: '#/$defs/Beta' })
+  })
+
+  it('does not collapse an ambiguous diagram onto a diagram-name-matching class', () => {
     const diagram = baseDiagram({
       name: 'beta',
       nodes: [
@@ -812,10 +1079,18 @@ describe('exportToJsonSchema', () => {
       edges: [],
     } as Partial<UMLDiagram>)
 
-    const schema = exportToJsonSchema(diagram)
-    // Document title is the diagram name; the name-matching class Beta is picked as the root class.
-    expect(schema.title).toBe('beta')
-    expect(schema.properties).toEqual({ beta: { $ref: '#/$defs/Beta' } })
+    // A class named like the diagram must not silently win — the ambiguity is the user's to fix.
+    let thrown: unknown
+    try {
+      exportToJsonSchema(diagram)
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown).toBeInstanceOf(SchemaExportError)
+    expect((thrown as SchemaExportError).failure).toEqual({
+      code: 'ambiguousRoot',
+      candidateNames: ['Alpha', 'Beta'],
+    })
   })
 })
 

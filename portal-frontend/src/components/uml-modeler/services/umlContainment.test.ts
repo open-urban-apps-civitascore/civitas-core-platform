@@ -8,7 +8,7 @@ import {
   collectParentIds,
   isManyMultiplicity,
   parseMultiplicity,
-  selectRootElement,
+  resolveRootElement,
 } from './umlContainment'
 
 const relationship = (over: Partial<UMLRelationship> & Pick<UMLRelationship, 'type' | 'source' | 'target'>) =>
@@ -23,7 +23,13 @@ const edge = (rel: UMLRelationship) => ({
 
 const diagram = (edges: ReturnType<typeof edge>[]): UMLDiagram => ({ edges }) as unknown as UMLDiagram
 
-const element = (id: string, name: string, type: UMLElement['type'] = 'class') => ({ id, name, type }) as UMLElement
+const element = (id: string, name: string, type: UMLElement['type'] = 'class') =>
+  ({
+    id,
+    name,
+    type,
+    ...(type === 'enumeration' ? { literals: [] } : { attributes: [], operations: [] }),
+  }) as UMLElement
 
 describe('classifyStructuralEdge', () => {
   it('orients composition with the container at the target', () => {
@@ -69,11 +75,11 @@ describe('parseMultiplicity / isManyMultiplicity', () => {
 })
 
 describe('collectContainedIds', () => {
-  it('embeds composition parts and inheritance parents; ignores out-of-scope types', () => {
+  it('embeds the part side of every structural edge and inheritance parents', () => {
     const d = diagram([
       edge(relationship({ type: 'composition', source: 'part', target: 'whole' })),
       edge(relationship({ type: 'inheritance', source: 'sub', target: 'parent' })),
-      // Out-of-scope: neither embeds anything.
+      // Out-of-scope edges (association, aggregation) carry no containment and embed nothing.
       edge(relationship({ type: 'association', source: 'order', target: 'item' })),
       edge(relationship({ type: 'aggregation', source: 'wheel', target: 'car' })),
     ])
@@ -94,16 +100,138 @@ describe('collectParentIds', () => {
   })
 })
 
-describe('selectRootElement', () => {
-  const els = [element('p', 'Parent'), element('s', 'Sub'), element('e', 'Status', 'enumeration')]
+describe('resolveRootElement', () => {
+  const node = (el: UMLElement) => ({ id: el.id, data: { element: el } })
+  const fullDiagram = (elements: UMLElement[], edges: ReturnType<typeof edge>[] = []): UMLDiagram =>
+    ({ nodes: elements.map(node), edges }) as unknown as UMLDiagram
 
-  it('excludes embedded and enumeration elements', () => {
-    expect(selectRootElement(els, new Set(['p']), undefined)?.name).toBe('Sub')
+  it('resolves the single non-embedded class and reaches parts and inheritance parents', () => {
+    const els = [element('r', 'Root'), element('p', 'Part'), element('b', 'Base')]
+    const d = fullDiagram(els, [
+      edge(relationship({ type: 'composition', source: 'p', target: 'r' })),
+      edge(relationship({ type: 'inheritance', source: 'r', target: 'b' })),
+    ])
+    expect(resolveRootElement(d)).toEqual({ kind: 'class', root: els[0] })
   })
 
-  it('prefers the primary name, then the secondary, then the first candidate', () => {
-    expect(selectRootElement(els, new Set(), 'sub')?.name).toBe('Sub')
-    expect(selectRootElement(els, new Set(), undefined, 'parent')?.name).toBe('Parent')
-    expect(selectRootElement(els, new Set(), undefined)?.name).toBe('Parent')
+  it('reaches an element referenced only as an attribute type', () => {
+    const status = element('e', 'Status', 'enumeration')
+    const root = {
+      ...element('r', 'Root'),
+      attributes: [{ id: 'a1', name: 'status', type: { id: 'e' } }],
+    } as UMLElement
+    expect(resolveRootElement(fullDiagram([root, status]))).toEqual({ kind: 'class', root })
+  })
+
+  it('rejects several root candidates as ambiguous instead of picking one', () => {
+    const d = fullDiagram([element('p', 'Parent'), element('s', 'Sub')])
+    expect(resolveRootElement(d)).toEqual({
+      kind: 'invalid',
+      failure: { code: 'ambiguousRoot', candidateNames: ['Parent', 'Sub'] },
+    })
+  })
+
+  it('rejects a fully embedded (cyclic) diagram as having no root', () => {
+    const d = fullDiagram(
+      [element('a', 'A'), element('b', 'B')],
+      [
+        edge(relationship({ type: 'composition', source: 'a', target: 'b' })),
+        edge(relationship({ type: 'composition', source: 'b', target: 'a' })),
+      ],
+    )
+    expect(resolveRootElement(d)).toEqual({ kind: 'invalid', failure: { code: 'noRoot' } })
+  })
+
+  it('rejects two containers sharing a part as ambiguous', () => {
+    const els = [element('r', 'Root'), element('p', 'Part'), element('x', 'Stray')]
+    const d = fullDiagram(els, [
+      edge(relationship({ type: 'composition', source: 'p', target: 'r' })),
+      edge(relationship({ type: 'composition', source: 'p', target: 'x' })),
+    ])
+    // Part hangs under both Root and Stray, so nothing is fully unconnected — Stray itself is
+    // still not reachable from Root and must be flagged.
+    expect(resolveRootElement(d)).toEqual({
+      kind: 'invalid',
+      failure: { code: 'ambiguousRoot', candidateNames: ['Root', 'Stray'] },
+    })
+  })
+
+  it('rejects a sibling subclass of the root as a second candidate', () => {
+    const els = [element('r', 'Root'), element('b', 'Base'), element('s', 'Sub')]
+    const d = fullDiagram(els, [
+      edge(relationship({ type: 'inheritance', source: 'r', target: 'b' })),
+      edge(relationship({ type: 'inheritance', source: 's', target: 'b' })),
+    ])
+    // Both Root and Sub are non-embedded — ambiguous before reachability even matters.
+    expect(resolveRootElement(d)).toEqual({
+      kind: 'invalid',
+      failure: { code: 'ambiguousRoot', candidateNames: ['Root', 'Sub'] },
+    })
+  })
+
+  it('flags an isolated enumeration as unreachable from the root', () => {
+    const els = [element('r', 'Root'), element('e', 'Status', 'enumeration')]
+    expect(resolveRootElement(fullDiagram(els))).toEqual({
+      kind: 'invalid',
+      failure: { code: 'unreachable', rootName: 'Root', unreachableNames: ['Status'] },
+    })
+  })
+
+  it('keeps the single-enumeration diagram as an enum root, rejects several enums', () => {
+    const status = element('e1', 'Status', 'enumeration')
+    expect(resolveRootElement(fullDiagram([status]))).toEqual({ kind: 'enum', root: status })
+
+    const enums = [status, element('e2', 'Kind', 'enumeration')]
+    expect(resolveRootElement(fullDiagram(enums))).toEqual({
+      kind: 'invalid',
+      failure: { code: 'ambiguousRoot', candidateNames: ['Status', 'Kind'] },
+    })
+  })
+
+  it('returns empty for a diagram without elements', () => {
+    expect(resolveRootElement(fullDiagram([]))).toEqual({ kind: 'empty' })
+  })
+
+  it('lets the designated root (isRoot) resolve an otherwise ambiguous diagram', () => {
+    const beta = element('b', 'Beta')
+    // Alpha references Beta as an attribute type: Beta is reachable but not embedded, so both stay
+    // root candidates. Only the isRoot flag breaks the otherwise-ambiguous tie.
+    const alpha = {
+      ...element('a', 'Alpha'),
+      isRoot: true,
+      attributes: [{ id: 'a1', name: 'beta', type: { id: 'b' } }],
+    } as UMLElement
+    const d = fullDiagram([alpha, beta])
+    expect(resolveRootElement(d)).toEqual({ kind: 'class', root: alpha })
+  })
+
+  it('checks reachability from the designated root too', () => {
+    const alpha = { ...element('a', 'Alpha'), isRoot: true } as UMLElement
+    const beta = element('b', 'Beta')
+    expect(resolveRootElement(fullDiagram([alpha, beta]))).toEqual({
+      kind: 'invalid',
+      failure: { code: 'unreachable', rootName: 'Alpha', unreachableNames: ['Beta'] },
+    })
+  })
+
+  it('rejects several designated roots (corrupt persisted state) as ambiguous', () => {
+    const alpha = { ...element('a', 'Alpha'), isRoot: true } as UMLElement
+    const beta = { ...element('b', 'Beta'), isRoot: true } as UMLElement
+    expect(resolveRootElement(fullDiagram([alpha, beta]))).toEqual({
+      kind: 'invalid',
+      failure: { code: 'ambiguousRoot', candidateNames: ['Alpha', 'Beta'] },
+    })
+  })
+
+  it('prefers the designated root over the containment derivation', () => {
+    const part = { ...element('p', 'Part'), isRoot: true } as UMLElement
+    const whole = element('w', 'Whole')
+    // The flagged class is embedded; its container is then unreachable from it — surfaced as such
+    // rather than silently ignoring the designation.
+    const d = fullDiagram([whole, part], [edge(relationship({ type: 'composition', source: 'p', target: 'w' }))])
+    expect(resolveRootElement(d)).toEqual({
+      kind: 'invalid',
+      failure: { code: 'unreachable', rootName: 'Part', unreachableNames: ['Whole'] },
+    })
   })
 })

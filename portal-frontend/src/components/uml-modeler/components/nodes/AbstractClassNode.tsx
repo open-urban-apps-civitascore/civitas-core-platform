@@ -31,6 +31,7 @@ export const AbstractClassNode: React.FC<NodeProps> = ({ data, selected: isSelec
       isSelected={isSelected}
       stereotype={element.stereotype}
       name={element.name}
+      isRoot={element.isRoot}
     >
       {/* Attributes Section */}
       <NodeSection isEmpty={!element.attributes || element.attributes.length === 0}>

@@ -1131,7 +1131,8 @@
     "errors": {
       "creationError": "An error occurred while creating the Data structure version.",
       "versionAlreadyExists": "A version with the same version number already exists in this Data structure.",
-      "versionFormat": "The version number must follow the format X.Y.Z (e. g. 1.0.0)."
+      "versionFormat": "The version number must follow the format X.Y.Z (e. g. 1.0.0).",
+      "releaseInvalidModel": "The version cannot be released: {reason}"
     }
   },
   "pipelineEditor": {
@@ -1327,6 +1328,8 @@
     },
     "lines": "{count, plural, one {# line} other {# lines}}",
     "mappingEditor": {
+      "modelUnresolvable": "The stored schema of \"{name}\" could not be read. Showing the diagram structure instead — it may differ from the structure used at deploy time.",
+      "diagramUnresolvable": "\"{name}\" provides no mappable fields: {reason}",
       "toolbar": {
         "title": "Mapping",
         "status": "{mapped} mapped · {unmapped} unmapped"
@@ -1427,6 +1430,11 @@
     "export": {
       "success": "Diagram exported successfully",
       "error": "Failed to export diagram. Please try again."
+    },
+    "rootValidation": {
+      "noRoot": "No root class can be determined in the diagram — every class is embedded in another one (cyclic structure).",
+      "ambiguousRoot": "The diagram has several possible root classes ({names}). Mark the root class in the class properties or connect the classes into a hierarchy.",
+      "unreachable": "These elements are not reachable from the root class \"{root}\": {names}. Connect them to the hierarchy or remove them."
     }
   },
   "datapools": {

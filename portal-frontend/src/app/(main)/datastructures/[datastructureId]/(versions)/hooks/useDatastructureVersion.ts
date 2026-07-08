@@ -14,7 +14,9 @@ import {
   useUpdateDatastructureVersionReleased,
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
+import { SchemaExportError } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
+import { rootFailureMessage } from '@/components/uml-modeler/services/rootFailureMessage'
 import { useError } from '@/hooks/use-error'
 import { STATUS_TYPES } from '@/types/common'
 import {
@@ -66,6 +68,7 @@ export const useDatastructureVersion = ({
 }: UseDatastructureVersionProps) => {
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
+  const tUmlModeler = useTranslations('umlModeler')
   const router = useRouter()
   const { handleFormValidationError } = useError()
   const [initialSession, setInitialSession] = useState(() => buildSessionFromVersion(version))
@@ -287,7 +290,23 @@ export const useDatastructureVersion = ({
       const modelUri = sessionDiagram
         ? buildDataStructureUrn(dataStructureName, datastructureId, parsed.data.version)
         : undefined
-      const { model } = sessionDiagram ? buildUMLModelPayload(sessionDiagram, modelUri) : { model: null }
+      let model: Record<string, unknown> | null = null
+      if (sessionDiagram) {
+        try {
+          model = buildUMLModelPayload(sessionDiagram, modelUri).model
+        } catch (error) {
+          if (!(error instanceof SchemaExportError)) throw error
+          // A version that is (or becomes) released must not exist without a model — the deploy
+          // engine reads it. Keyed on the target status, not the dirty transition, so a version
+          // already released is refused too. A draft saves silently diagram-only: the model/diagram
+          // distinction is not one the user should have to reason about while still modelling.
+          if (statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE) {
+            const reason = rootFailureMessage(tUmlModeler, error.failure)
+            toast.error(t('errors.releaseInvalidModel', { reason }))
+            return false
+          }
+        }
+      }
       const payload = mapDatastructureVersionFormToApiData(parsed.data, sessionDiagram, model)
 
       if (isCreateMode) {

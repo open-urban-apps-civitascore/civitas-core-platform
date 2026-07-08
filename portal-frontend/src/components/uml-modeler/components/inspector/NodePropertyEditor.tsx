@@ -15,7 +15,7 @@ interface NodePropertyEditorProps {
 }
 
 export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({ node }) => {
-  const { updateNode } = useActiveDiagram()
+  const { updateNode, setRootNode } = useActiveDiagram()
   const { isReadOnly } = useReadOnly()
   const [activeSection, setActiveSection] = useState<'basic' | 'attributes' | 'literals'>('basic')
 
@@ -35,6 +35,13 @@ export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({ node }) 
       updateNode(node.id, { stereotype: newStereotype })
     },
     [node.id, updateNode],
+  )
+
+  const handleRootChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      setRootNode(event.target.checked ? node.id : null)
+    },
+    [node.id, setRootNode],
   )
 
   const addEnumLiteral = useCallback(() => {
@@ -129,6 +136,26 @@ export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({ node }) 
                 disabled={isReadOnly}
               />
             </div>
+
+            {/* Root designation — enumerations are scalar values and can never be the record root */}
+            {element.type !== 'enumeration' && (
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={element.isRoot === true}
+                    onChange={handleRootChange}
+                    disabled={isReadOnly}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Root class
+                </label>
+                <p className="mt-1 text-xs text-gray-500">
+                  The root class is the top of the exported schema. Selecting it here clears the flag on any other
+                  class.
+                </p>
+              </div>
+            )}
 
             {/* Stereotype */}
             {availableStereotypes.length > 0 && (
