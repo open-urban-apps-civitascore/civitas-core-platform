@@ -1047,10 +1047,7 @@ class DataStructureControllerIntegrationTest
     }
 
     /**
-     * Builds a released DataStructure whose single version is referenced only by a DataSink (via
-     * the {@code dataStructureVersionId} key of the sink's JSONB configuration) — no DataSource.
-     *
-     * @return the referenced DataStructure ID
+     * Builds a released DataStructure whose version is referenced by a DataSink, not a DataSource.
      */
     private UUID createStructureReferencedByDataSink() {
       DataStructure ds =

@@ -336,10 +336,7 @@ public class DataStructureVersionService
     }
   }
 
-  /**
-   * A version is in use when a data source or a data sink references it. Data sinks store the
-   * reference under the shared {@code dataStructureVersionId} key of their JSONB configuration.
-   */
+  /** A version is in use when a data source or a data sink references it. */
   private boolean isInUse(UUID versionId) {
     return dataSourceRepository.existsByDataStructureVersionId(versionId)
         || dataSinkRepository.existsByDataStructureVersionId(versionId);

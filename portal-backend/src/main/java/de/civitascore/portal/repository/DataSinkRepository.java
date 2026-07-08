@@ -29,14 +29,11 @@ public interface DataSinkRepository extends BaseRepository<DataSink, UUID> {
   List<DataSink> findByDataSetId(UUID dataSetId);
 
   /**
-   * Checks whether any DataSink references the given DataStructureVersion. A sink stores the
-   * reference under the shared {@code dataStructureVersionId} key of its JSONB {@code
-   * configuration} — POSTGIS sinks require it, FROST sinks may carry it — so the check spans every
-   * sink type. The write path validates the id, so a stored value that is not a valid UUID is
-   * corruption and surfaces as a query error rather than being silently treated as no reference.
+   * Check if any data sink references the given data structure version. Sinks (POSTGIS and FROST)
+   * store the reference under the {@code dataStructureVersionId} key of their JSONB configuration.
    *
-   * @param versionId the DataStructureVersion ID to check
-   * @return true if at least one DataSink references this version
+   * @param versionId the data structure version ID to check
+   * @return true if at least one data sink references this version
    */
   @Query(
       value =
@@ -46,11 +43,10 @@ public interface DataSinkRepository extends BaseRepository<DataSink, UUID> {
   boolean existsByDataStructureVersionId(@Param("versionId") UUID versionId);
 
   /**
-   * Checks whether any DataSink references any of the given DataStructureVersion IDs. See {@link
-   * #existsByDataStructureVersionId(UUID)} for how the reference is stored.
+   * Check if any data sink references any of the given data structure version IDs.
    *
-   * @param versionIds the DataStructureVersion IDs to check; must be non-empty
-   * @return true if at least one DataSink references any of the given versions
+   * @param versionIds the collection of data structure version IDs to check; must be non-empty
+   * @return true if at least one data sink references any of the given versions
    */
   @Query(
       value =

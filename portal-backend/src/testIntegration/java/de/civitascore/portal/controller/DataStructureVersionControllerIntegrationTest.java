@@ -1279,12 +1279,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .isFalse();
     }
 
-    /**
-     * Builds a released version referenced only by a DataSink (via the {@code
-     * dataStructureVersionId} key of the sink's JSONB configuration) — no DataSource.
-     *
-     * @return the referenced, persisted version
-     */
+    /** Builds a released version referenced by a DataSink, not a DataSource. */
     private DataStructureVersion createSinkReferencedVersion() {
       DataStructure ds = new DataStructure();
       ds.setName("Sink-Referenced Data Structure");

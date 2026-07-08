@@ -206,8 +206,6 @@ public class DataStructureService
     if (versionIds.isEmpty()) {
       return;
     }
-    // A version is in use when a data source or a data sink references it. Data sinks store the
-    // reference under the shared 'dataStructureVersionId' key of their JSONB configuration.
     if (dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)
         || dataSinkRepository.existsByDataStructureVersionIdIn(versionIds)) {
       throw new ResourceInUseException(
