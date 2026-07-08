@@ -131,6 +131,8 @@ class FrostSinkStageTest {
 
     FatalAdapterException ex =
         assertThrows(FatalAdapterException.class, () -> stage.parseSpec(datasink, ctx));
-    assertTrue(ex.getMessage() != null);
+    assertTrue(
+        ex.getMessage().contains("Datastreams") && ex.getMessage().contains("no items"),
+        "the broken-schema error must name the offending array property, was: " + ex.getMessage());
   }
 }

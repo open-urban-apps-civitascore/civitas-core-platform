@@ -74,6 +74,21 @@ public class FrostMappingCompiler {
     public StaKeys {
       thingKeys = List.copyOf(Objects.requireNonNull(thingKeys, "thingKeys"));
       datastreamKeys = List.copyOf(Objects.requireNonNull(datastreamKeys, "datastreamKeys"));
+      // A key name reaches a $filter URL and a template key. Enforce its shape at this boundary so
+      // an unsafe name can never inhabit a constructed StaKeys — the domain rules (non-empty,
+      // required once an entity is touched, reserved-name collisions) stay in the compiler where
+      // the rejection messages are actionable.
+      for (String key : concatKeys(thingKeys, datastreamKeys)) {
+        if (!StaTargetCatalog.isSafeKeyName(key)) {
+          throw new IllegalArgumentException("unsafe match-key name: " + key);
+        }
+      }
+    }
+
+    private static List<String> concatKeys(List<String> first, List<String> second) {
+      List<String> all = new ArrayList<>(first);
+      all.addAll(second);
+      return all;
     }
   }
 
@@ -135,10 +150,8 @@ public class FrostMappingCompiler {
         observationMapped ? renderObservationBody(mapping, flatKeyByPath, targetsByPath) : null;
 
     List<FilterTerm> thingFilter = filterTerms(keys.thingKeys(), StaEntity.THING, flatKeyByPath);
-    boolean datastreamTouched =
-        touches(mapping, StaEntity.DATASTREAM) || touches(mapping, StaEntity.OBSERVATION);
     List<FilterTerm> datastreamFilter =
-        datastreamTouched
+        touchesDatastreamTier(mapping)
             ? filterTerms(keys.datastreamKeys(), StaEntity.DATASTREAM, flatKeyByPath)
             : List.of();
 
@@ -279,7 +292,7 @@ public class FrostMappingCompiler {
 
   private void validateDatastream(MappingConfig mapping, StaKeys keys)
       throws FatalAdapterException {
-    if (!touches(mapping, StaEntity.DATASTREAM) && !touches(mapping, StaEntity.OBSERVATION)) {
+    if (!touchesDatastreamTier(mapping)) {
       return;
     }
     if (keys.datastreamKeys().isEmpty()) {
@@ -372,6 +385,15 @@ public class FrostMappingCompiler {
   private boolean touches(MappingConfig mapping, StaEntity entity) {
     return StaTargetCatalog.targetsOf(entity).stream()
         .anyMatch(t -> mapping.fields().containsKey(t.path()));
+  }
+
+  /**
+   * Whether the mapping reaches the datastream stage at all: either the datastream itself or an
+   * observation is mapped (an observation always implies its datastream must be found first). A
+   * FeatureOfInterest never widens this — it may only be mapped alongside an observation.
+   */
+  private boolean touchesDatastreamTier(MappingConfig mapping) {
+    return touches(mapping, StaEntity.DATASTREAM) || touches(mapping, StaEntity.OBSERVATION);
   }
 
   private String supportedPaths(Map<String, StaTarget> targetsByPath) {

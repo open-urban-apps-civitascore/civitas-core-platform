@@ -404,12 +404,13 @@ class FrostMappingCompilerTest {
   }
 
   @Test
-  void rejectsAnUnsafeKeyName() {
-    StaKeys unsafe = new StaKeys(List.of("ref' or true"), List.of());
-    FatalAdapterException ex =
+  void rejectsAnUnsafeKeyNameAtTheStaKeysBoundary() {
+    // An unsafe key name can never inhabit a constructed StaKeys — it is rejected at the type
+    // boundary before it could reach the compiler, let alone a $filter URL.
+    IllegalArgumentException ex =
         assertThrows(
-            FatalAdapterException.class, () -> compiler.compile(thingOnlyMapping(), unsafe));
-    assertTrue(ex.getMessage().contains("safe identifier"));
+            IllegalArgumentException.class, () -> new StaKeys(List.of("ref' or true"), List.of()));
+    assertTrue(ex.getMessage().contains("unsafe match-key name"));
   }
 
   @Test
@@ -432,5 +433,90 @@ class FrostMappingCompilerTest {
     assertThrows(
         FatalAdapterException.class,
         () -> compiler.compile(new MappingConfig(null, null, Map.of()), KEYS));
+  }
+
+  // ─── ANY-typed result placeholder branches ───────────────────────────────────
+
+  private String observationResult(ValueNode resultNode) throws Exception {
+    FrostCompilation compilation =
+        compiler.compile(
+            mapping(
+                "$.reference", new CopyNode("$.ref"),
+                "$.Datastreams[].reference", new CopyNode("$.ref"),
+                "$.Datastreams[].Observations[].result", resultNode),
+            KEYS);
+    String body = compilation.plan().observationBody();
+    // "result":<placeholder>,"Datastream": …
+    int start = body.indexOf("\"result\":") + "\"result\":".length();
+    return body.substring(start, body.indexOf(",\"Datastream\""));
+  }
+
+  @Test
+  void anyResultFromANumericConvertRendersUnquoted() throws Exception {
+    String placeholder =
+        observationResult(new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.temp"), null));
+    assertEquals("${sta_2_result:isEmpty():ifElse('null', ${sta_2_result})}", placeholder);
+  }
+
+  @Test
+  void anyResultFromANumberConstRendersUnquoted() throws Exception {
+    assertEquals(
+        "${sta_2_result:isEmpty():ifElse('null', ${sta_2_result})}",
+        observationResult(new ConstNode(42, null)));
+  }
+
+  @Test
+  void anyResultFromABooleanConstRendersUnquoted() throws Exception {
+    assertEquals(
+        "${sta_2_result:isEmpty():ifElse('null', ${sta_2_result})}",
+        observationResult(new ConstNode(true, null)));
+  }
+
+  @Test
+  void anyResultFromACopyRendersQuotedString() throws Exception {
+    // A copy is a string source: the ANY placeholder must quote+escape it (unquoted would be
+    // invalid JSON for a text result).
+    assertEquals("\"${sta_2_result:escapeJson()}\"", observationResult(new CopyNode("$.reading")));
+  }
+
+  @Test
+  void anyResultFromAStringConstRendersQuoted() throws Exception {
+    assertEquals("\"${sta_2_result:escapeJson()}\"", observationResult(new ConstNode("ok", null)));
+  }
+
+  // ─── Byte-deterministic ordering ─────────────────────────────────────────────
+
+  @Test
+  void bodyIsRenderedInCatalogOrderRegardlessOfMappingOrder() throws Exception {
+    // The Thing body must be catalog-ordered (name, description, then the key properties) even when
+    // the mapping supplies the fields in a scrambled order — the snapshot must be reproducible.
+    String scrambled =
+        compiler
+            .compile(
+                mapping(
+                    "$.description", new ConstNode("d", null),
+                    "$.reference", new CopyNode("$.ref"),
+                    "$.name", new CopyNode("$.station")),
+                KEYS)
+            .plan()
+            .thingBody();
+    String ordered =
+        compiler
+            .compile(
+                mapping(
+                    "$.name", new CopyNode("$.station"),
+                    "$.description", new ConstNode("d", null),
+                    "$.reference", new CopyNode("$.ref")),
+                KEYS)
+            .plan()
+            .thingBody();
+    // Field order in the rendered JSON follows the catalog, not the input map — the "name" key
+    // precedes "description" precedes the "properties" bag in both.
+    assertTrue(scrambled.indexOf("\"name\"") < scrambled.indexOf("\"description\""));
+    assertTrue(scrambled.indexOf("\"description\"") < scrambled.indexOf("\"properties\""));
+    // The two differ only by the flat-key index suffix (input order drives sta_<n>), never by
+    // JSON field order.
+    assertEquals(
+        scrambled.replaceAll("sta_\\d+_", "sta_N_"), ordered.replaceAll("sta_\\d+_", "sta_N_"));
   }
 }

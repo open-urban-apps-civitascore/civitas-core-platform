@@ -12,7 +12,6 @@ package de.civitascore.configadapter.nifi.mapping;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * The catalog of paths a FROST mapping may target, anchored at the mapped record: the target data
@@ -283,11 +282,6 @@ public final class StaTargetCatalog {
 
   private StaTargetCatalog() {}
 
-  /** All fixed targetable paths in template key order. */
-  public static List<StaTarget> targets() {
-    return TARGETS;
-  }
-
   /** The fixed catalog entry for a target path, or empty if the path is not a fixed target. */
   public static Optional<StaTarget> byPath(String path) {
     return TARGETS.stream().filter(target -> target.path().equals(path)).findFirst();
@@ -312,10 +306,5 @@ public final class StaTargetCatalog {
    */
   public static boolean isSafeKeyName(String keyName) {
     return keyName != null && SAFE_KEY_NAME.matcher(keyName).matches();
-  }
-
-  /** The supported fixed paths as a comma-separated list (for rejection messages). */
-  public static String supportedPaths() {
-    return TARGETS.stream().map(StaTarget::path).collect(Collectors.joining(", "));
   }
 }

@@ -740,30 +740,32 @@ class NifiFlowBuilderTest {
     // silently skips it on start — the queue in front would stall forever.
     JsonNode flow = build(NifiTestFixtures.frostSinkWithThingOnlyMapping());
 
-    // Exactly one of the two id extractors is terminal (the re-GET's); its 'matched' must be
-    // auto-terminated while the mid-chain one stays connected.
+    // The chain ends at the create-confirm route (created-and-confirmed path); its 'unmatched'
+    // must be auto-terminated. Neither id extractor is terminal now — the re-GET feeds the confirm
+    // route.
     int extractors = 0;
-    int terminalExtractors = 0;
     JsonNode route = null;
+    JsonNode confirm = null;
     for (JsonNode c : flow.get("flowContents").get("processors")) {
       if (c.path("type").asText().endsWith("EvaluateJsonPath")
           && c.path("properties").has("frost.thing.id")) {
         extractors++;
-        if (autoTerminates(c, "matched")) {
-          terminalExtractors++;
-        }
       }
       if (c.path("type").asText().endsWith("RouteOnAttribute")
           && c.path("properties").path("new").asText().contains("frost.thing.id")) {
         route = c;
       }
+      if (c.path("type").asText().endsWith("RouteOnAttribute")
+          && c.path("properties").path("unconfirmed").asText().contains("frost.thing.id")) {
+        confirm = c;
+      }
     }
     assertEquals(2, extractors, "lookup and re-GET extractors must exist");
-    assertEquals(
-        1,
-        terminalExtractors,
-        "the terminal re-GET extractor's matched relationship must be auto-terminated");
     assertTrue(route != null, "the Thing route must exist");
+    assertTrue(confirm != null, "the create-confirm route must exist");
+    assertTrue(
+        autoTerminates(confirm, "unmatched"),
+        "the created-and-confirmed path must be auto-terminated at the chain end");
     assertTrue(
         autoTerminates(route, "unmatched"),
         "the found route must stay auto-terminated at the chain end");
@@ -772,6 +774,40 @@ class NifiFlowBuilderTest {
       assertFalse(
           c.path("properties").path("HTTP URL").asText().endsWith("/Observations"),
           "a thing-only mapping must not post observations");
+    }
+  }
+
+  @Test
+  void bothThingOutcomesFeedTheNextStage() throws Exception {
+    // Regression guard against silent steady-state data loss: the Thing stage has two tails — the
+    // found route ('unmatched') and the created-and-confirmed route ('unmatched'). BOTH must feed
+    // the Datastream GET; wiring only the created path would make every re-delivered record find
+    // its Thing and then skip the rest, losing observations forever while all count tests stay
+    // green.
+    JsonNode flow = build(NifiTestFixtures.frostSinkWithMapping());
+
+    String dsGetId = null;
+    List<String> routeUnmatchedSources = new java.util.ArrayList<>();
+    for (JsonNode c : flow.get("flowContents").get("processors")) {
+      String type = c.path("type").asText();
+      String props = c.path("properties").toString();
+      if (type.endsWith("InvokeHTTP")
+          && c.path("properties").path("HTTP Method").asText().equals("GET")
+          && c.path("properties").path("HTTP URL").asText().contains("/Datastreams")) {
+        dsGetId = c.path("identifier").asText();
+      }
+      // The two Thing-stage RouteOnAttribute processors (find route + create-confirm route) both
+      // reference frost.thing.id and both emit their onward flow on 'unmatched'.
+      if (type.endsWith("RouteOnAttribute") && props.contains("frost.thing.id")) {
+        routeUnmatchedSources.add(c.path("identifier").asText());
+      }
+    }
+    assertTrue(dsGetId != null, "the Datastream GET must exist");
+    assertEquals(2, routeUnmatchedSources.size(), "both Thing-stage routes must exist");
+    for (String src : routeUnmatchedSources) {
+      assertTrue(
+          hasConnection(flow, src, dsGetId, "unmatched"),
+          "both the found and the created-and-confirmed Thing route must feed the Datastream GET");
     }
   }
 

@@ -211,6 +211,16 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       BuildContext ctx, Processor upstreamTail, List<Processor> upstreamFailureSources)
       throws FatalAdapterException {
     Processor errorSink = ctx.loadProcessor(Fragment.LOG_MESSAGE, null);
+    // Append the FROST response body: a create rejected by a SensorThings constraint (e.g. a
+    // malformed TimeInterval, a missing required property) answers 4xx with the reason in the body,
+    // which InvokeHTTP captures into frost.response.body. Without it the operator sees only the
+    // status code and cannot tell which field the mapping got wrong.
+    setProp(
+        errorSink,
+        "log-message",
+        "Pipeline record dropped (cause in the failing processor's bulletin):"
+            + " httpStatus=${invokehttp.status.code} exception=${invokehttp.java.exception.class}"
+            + " frostResponse=${frost.response.body} file=${uuid}");
     ctx.addProcessor(errorSink);
     for (Processor failureSource : upstreamFailureSources) {
       ctx.addConnection(failureSource, errorSink, "failure");
@@ -344,6 +354,7 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       setProp(post, "HTTP Method", "POST");
       setProp(post, "HTTP URL", base + "/Observations");
       setProp(post, "Request Content-Type", "application/json");
+      setProp(post, "Response Body Attribute Name", "frost.response.body");
       ctx.addProcessor(renderBody);
       ctx.addProcessor(post);
       connect(ctx, tails, renderBody);
@@ -353,9 +364,10 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       return;
     }
     // Without an observation the chain ends here — the metadata is ensured, nothing more to
-    // write. The tails must be auto-terminated explicitly: the re-GET extractor's 'matched' is
-    // not auto-terminated by its fragment, and an unconnected relationship leaves the processor
-    // invalid — NiFi silently skips invalid processors and the queue in front stalls forever.
+    // write. The tails must be auto-terminated explicitly: the confirm route's 'unmatched' (the
+    // created-and-confirmed path) is not auto-terminated by its fragment, and an unconnected
+    // relationship leaves the processor invalid — NiFi silently skips invalid processors and the
+    // queue in front stalls forever.
     for (Tail tail : tails) {
       addAutoTerminated(tail.processor(), tail.relationship());
     }
@@ -421,13 +433,26 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     setProp(post, "HTTP Method", "POST");
     setProp(post, "HTTP URL", postUrl);
     setProp(post, "Request Content-Type", "application/json");
+    // Capture the FROST response body ONLY on the POST: a rejected create answers 4xx with the
+    // failing constraint in the body, which the error sink logs. The GET/reGet responses must stay
+    // in the FlowFile content — the EvaluateJsonPath extractors read $.value[0].@iot.id from it, so
+    // diverting their body to an attribute would break find-or-create entirely.
+    setProp(post, "Response Body Attribute Name", "frost.response.body");
     Processor reGet = ctx.loadProcessor(Fragment.INVOKE_HTTP, "Response", disc + "ReGet");
     setProp(reGet, "HTTP Method", "GET");
     setProp(reGet, "HTTP URL", lookupUrl);
     Processor reId = ctx.loadProcessor(Fragment.EVALUATE_JSON_PATH, "matched", disc + "ReId");
     setProp(reId, idAttribute, "$.value[0]['@iot.id']");
+    // A POST that returns 2xx but whose re-GET cannot re-find the entity by its own match key
+    // (FROST normalises/stores the key differently than rendered, a visibility edge, …) would
+    // otherwise inject an empty id: the child stage would post "@iot.id":} and take a misleading
+    // 400, or a terminal entity would drop silently. Route the still-empty id to the error sink as
+    // its own condition so "create unconfirmed" is logged as itself.
+    Processor confirm =
+        ctx.loadProcessor(Fragment.ROUTE_ON_ATTRIBUTE, "unconfirmed", disc + "Confirm");
+    setProp(confirm, "unconfirmed", "${" + idAttribute + ":isEmpty()}");
 
-    for (Processor p : List.of(renderBody, post, reGet, reId)) {
+    for (Processor p : List.of(renderBody, post, reGet, reId, confirm)) {
       ctx.addProcessor(p);
     }
     ctx.addConnection(route, renderBody, "new");
@@ -436,12 +461,14 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
     ctx.addChainConnection(post, reGet);
     removeAutoTerminated(reGet, "Response");
     ctx.addChainConnection(reGet, reId);
+    ctx.addChainConnection(reId, confirm);
     ctx.routeFailure(renderBody, errorSink);
     routeHttpFailures(ctx, post, errorSink);
     routeHttpFailures(ctx, reGet, errorSink);
     ctx.routeFailure(reId, errorSink);
+    ctx.addConnection(confirm, errorSink, "unconfirmed");
 
-    return List.of(new Tail(reId, "matched"), new Tail(route, "unmatched"));
+    return List.of(new Tail(confirm, "unmatched"), new Tail(route, "unmatched"));
   }
 
   /** A stage outcome: the processor and the relationship the next stage consumes. */
