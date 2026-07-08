@@ -12,7 +12,7 @@ import type {
   UMLElementUpdate,
   UMLNode,
 } from '../types/diagram'
-import type { UMLRelationship } from '../types/uml'
+import type { UMLRelationship, UMLRelationshipType } from '../types/uml'
 
 interface ActiveDiagramContextValue {
   // Current active diagram
