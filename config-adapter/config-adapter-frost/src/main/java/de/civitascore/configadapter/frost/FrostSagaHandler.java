@@ -29,7 +29,8 @@ import org.owasp.encoder.Encode;
  * <ul>
  *   <li>{@code CREATE_PROJECT} — POST /Projects
  *   <li>{@code UPDATE_PROJECT} — PATCH /Projects({projectId})
- *   <li>{@code DELETE_PROJECT} — DELETE /Projects({projectId})
+ *   <li>{@code DELETE_PROJECT} — DELETE all Things of the project (cascades to their Datastreams
+ *       and Observations), then DELETE /Projects({projectId})
  *   <li>{@code RESTORE_PROJECT} — PATCH /Projects({projectId}) with previous state (update
  *       compensation)
  * </ul>
@@ -37,6 +38,7 @@ import org.owasp.encoder.Encode;
  * <p>Compensation operations: {@code DELETE_PROJECT} to compensate a {@code CREATE_PROJECT}, {@code
  * RESTORE_PROJECT} to compensate an {@code UPDATE_PROJECT}.
  */
+@SuppressWarnings("PMD.TooManyMethods") // One method per saga operation plus focused helpers
 public class FrostSagaHandler extends AbstractSagaCommandHandler {
 
   private static final String ADAPTER_NAME = "frost";
@@ -294,6 +296,14 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     String projectId = requireString(command, KEY_PROJECT_ID);
     boolean compensating = "COMPENSATE_STEP".equals(command.type());
 
+    FrostProjectCleanup cleanup =
+        new FrostProjectCleanup(client(), authStrategy, serverUrl, command.sagaId());
+    // Parse (and thereby validate) the provisioned ids before anything is deleted — a malformed
+    // payload must fail the step up front, not after the Things are already gone.
+    Map<String, List<String>> provisionedEntities = provisionedEntities(command);
+    cleanup.deleteProjectThings(projectId, compensating);
+    cleanup.deleteProvisionedEntities(provisionedEntities);
+
     try (Response response =
         authStrategy
             .apply(
@@ -327,6 +337,57 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
           ? SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId())
           : SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
     }
+  }
+
+  /**
+   * Optional payload map of provisioned FROST entity ids per entity set (payload key {@code
+   * "provisionedEntities"}), filled by the portal once Datastream provisioning exists. Absent or
+   * malformed → empty (nothing to delete).
+   */
+  private static Map<String, List<String>> provisionedEntities(SagaCommandMessage command) {
+    Object raw = command.payload().get("provisionedEntities");
+    // Absent key = payload predates (or doesn't use) the contract — nothing to delete. A PRESENT
+    // key with the wrong shape is a broken producer and must fail loudly, like a malformed id.
+    if (raw == null) {
+      return Map.of();
+    }
+    if (!(raw instanceof Map<?, ?> bySet)) {
+      throw new IllegalArgumentException(
+          "DELETE_PROJECT payload field 'provisionedEntities' is not a map: "
+              + raw.getClass().getSimpleName());
+    }
+    Map<String, List<String>> result = new HashMap<>();
+    for (Map.Entry<?, ?> entry : bySet.entrySet()) {
+      if (!(entry.getValue() instanceof List<?> ids)) {
+        throw new IllegalArgumentException(
+            "DELETE_PROJECT payload field 'provisionedEntities."
+                + entry.getKey()
+                + "' is not a list");
+      }
+      result.put(
+          String.valueOf(entry.getKey()),
+          ids.stream().map(rawId -> scalarId(entry.getKey(), rawId)).toList());
+    }
+    return result;
+  }
+
+  /**
+   * A provisioned entity id must be a non-blank scalar. Anything else (null, object, blank) is a
+   * broken producer — failing loudly beats silently skipping the id, which would silently retain
+   * the entity in FROST.
+   */
+  private static String scalarId(Object entitySet, Object rawId) {
+    if (rawId instanceof Number number) {
+      return String.valueOf(number);
+    }
+    if (rawId instanceof String id && !id.isBlank()) {
+      return id;
+    }
+    throw new IllegalArgumentException(
+        "DELETE_PROJECT payload field 'provisionedEntities."
+            + entitySet
+            + "' contains a non-scalar or blank id: "
+            + rawId);
   }
 
   private SagaCommandResult handleRestoreProject(SagaCommandMessage command) {
