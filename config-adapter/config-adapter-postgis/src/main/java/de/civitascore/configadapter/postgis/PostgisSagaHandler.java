@@ -260,8 +260,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
         statements.addAll(dialect().dropRole(sink.role()));
       }
       statements.addAll(dialect().dropTable(sink.table().getSchema(), sink.table().getName()));
-      // Collect the per-DataSet schema for removal after all tables are dropped. Never the shared
-      // `public` schema, and never a blank/absent one (legacy sinks without a dedicated schema).
+      // Collect the per-DataSet schema to drop after its tables (never public or a blank one).
       SchemaConfig schema = sink.schema();
       if (schema != null
           && schema.getName() != null
@@ -270,10 +269,8 @@ public class PostgisSagaHandler implements SagaCommandHandler {
         schemasToDrop.add(schema.getName());
       }
     }
-    // Drop each dedicated per-DataSet schema once, after all its tables are gone. A DataSet's
-    // POSTGIS sinks share one schema, so dropping per-sink would hit the sibling tables still
-    // present. DROP SCHEMA RESTRICT (the dialect default) removes it only when empty, so a schema
-    // that unexpectedly still holds objects is left in place rather than cascade-deleting data.
+    // Drop each per-DataSet schema once, after its tables: a DataSet's sinks share one schema, so a
+    // per-sink drop would hit sibling tables. RESTRICT removes it only if empty — never data.
     for (String schemaName : schemasToDrop) {
       SchemaConfig schema = new SchemaConfig();
       schema.setName(schemaName);
@@ -411,10 +408,8 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       }
       String schemaName = stringValue(config, "schema");
       if (schemaName == null || schemaName.isBlank()) {
-        // No explicit schema in the payload: derive the dedicated per-DataSet schema from the
-        // trigger's datasetId (the same WorkspaceNames rule GeoServer uses for the workspace), so
-        // the sink table lands in its own schema instead of the shared public schema — and the
-        // GeoServer datastore, which derives the same name, reads from it.
+        // Derive the per-DataSet schema from the datasetId (same rule as the GeoServer workspace),
+        // so the table lands in its own schema — the one GeoServer reads — not public.
         schemaName = datasetSchemaName(command);
       }
 

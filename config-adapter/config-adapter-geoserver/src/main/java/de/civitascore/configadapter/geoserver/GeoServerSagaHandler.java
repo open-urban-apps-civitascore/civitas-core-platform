@@ -358,10 +358,8 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
    * state.
    */
   private void createDatastore(String workspaceName, String datastoreName) {
-    // The datastore reads from the DataSet's dedicated schema. That schema IS the workspace name:
-    // both derive from datasetId via WorkspaceNames (PostGIS creates the table there; APISIX
-    // rewrites to the same workspace), so the schema GeoServer reads is guaranteed to match the
-    // schema PostGIS created — no separate config knob needed.
+    // The datastore's schema is the workspace name: both derive from datasetId, so GeoServer reads
+    // exactly the schema PostGIS created the table in.
     Map<String, Object> datastoreBody = buildDatastoreBody(datastoreName, workspaceName);
     try (Response createResponse =
         auth.apply(

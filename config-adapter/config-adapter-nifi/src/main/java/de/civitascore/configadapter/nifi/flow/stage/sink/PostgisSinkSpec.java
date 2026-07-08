@@ -39,9 +39,8 @@ public record PostgisSinkSpec(String tableName, String schemaName, List<String> 
     // it here, at the boundary where tenant text enters the spec, so the invariant holds for every
     // sink path — the same escape the mapping values already get.
     tableName = NifiExpressionLanguage.escape(tableName);
-    // The schema is optional: blank normalizes to null so bind() leaves "Schema Name" unset and the
-    // write resolves via search_path. When present it lands in PutDatabaseRecord's EL-enabled
-    // "Schema Name" property, so escape it for the same reason as the table name.
+    // Optional: blank → null (bind() then omits "Schema Name" → search_path). Escaped like the
+    // table name because it lands in PutDatabaseRecord's EL-enabled "Schema Name" property.
     schemaName = normalizeSchemaName(schemaName);
     // These names are joined verbatim into NiFi's likewise EL-enabled "Update Keys", so normalize
     // them here: trim, reject blank entries (a broken UPSERT config otherwise), de-duplicate while
