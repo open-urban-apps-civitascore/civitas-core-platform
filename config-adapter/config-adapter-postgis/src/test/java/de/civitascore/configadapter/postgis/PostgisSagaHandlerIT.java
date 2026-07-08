@@ -165,9 +165,11 @@ class PostgisSagaHandlerIT extends AbstractPostgisIT {
   }
 
   private static Map<String, Object> postgisSinkTrigger() {
+    // datasetId "sink-it" derives to schema "sink_it" (WorkspaceNames: '-' → '_'); the schema is
+    // never taken from configuration.
     return Map.of(
         "datasetId",
-        "ds-sink-it",
+        "sink-it",
         "datasinks",
         List.of(
             Map.of(
@@ -175,8 +177,6 @@ class PostgisSagaHandlerIT extends AbstractPostgisIT {
                 "POSTGIS",
                 "configuration",
                 Map.of(
-                    "schema",
-                    "sink_it",
                     "tableName",
                     "observations",
                     "columns",
