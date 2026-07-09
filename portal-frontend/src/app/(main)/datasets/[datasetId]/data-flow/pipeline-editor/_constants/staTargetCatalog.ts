@@ -106,25 +106,35 @@ export const STA_FIXED_TARGET_PATHS: ReadonlySet<string> = new Set(
 )
 
 /**
- * The effective match keys of a Thing-shaped target structure, snapshotted onto the mapping node
- * at save time (the validation rules cannot re-derive them — they never see the schema tree).
+ * A Thing-shaped target structure's FROST vocabulary, snapshotted onto the mapping node at save
+ * time (the validation rules cannot re-derive it — they never see the schema tree): the match keys
+ * (find-or-create identity, drive the required-key checks) and the full set of mappable
+ * `properties`-bag paths (the whitelist). The match keys are always a subset of the bag paths.
  */
-export interface StaMatchKeys {
+export interface StaTargetVocabulary {
   /** Record paths of the Thing's match-key attributes (e.g. `["$.properties.reference"]`). */
   readonly thing: readonly string[]
   /** Record paths of the Datastream's match-key attributes; empty without a Datastreams class. */
   readonly datastream: readonly string[]
   /** Whether any entity's keys came from the `reference` fallback instead of an `{id}` marker. */
   readonly isFallback: boolean
+  /**
+   * All record paths the Thing's and Datastream's `properties` bags declare (the match key plus
+   * any free attributes) — the mappable `$.…properties.<name>` targets the engine accepts on top of
+   * the fixed catalog. Snapshotted so validation can whitelist them without the schema tree.
+   */
+  readonly thingBag: readonly string[]
+  readonly datastreamBag: readonly string[]
 }
 
 /**
  * Derives the match keys the engine will use: the `{id}`-marked scalar attributes of the entity's
  * `properties` bag, else a `reference` attribute inside it, else none (the validation reports the
  * gap only when the entity is actually mapped) — SensorThings keeps identifiers in `properties`,
- * not top-level. Mirrors the engine's `FrostSinkStage.resolveStaKeys`.
+ * not top-level. Also collects every path the bags declare (match key + free attributes) as the
+ * mappable bag targets. Mirrors the engine's `FrostSinkStage.resolveStaProperties`.
  */
-export const deriveStaMatchKeys = (targetTree: SchemaTree): StaMatchKeys => {
+export const deriveStaMatchKeys = (targetTree: SchemaTree): StaTargetVocabulary => {
   const record = recordFields(targetTree)
   const datastreams = record.find(child => child.name === 'Datastreams')?.children ?? []
 
@@ -143,6 +153,8 @@ export const deriveStaMatchKeys = (targetTree: SchemaTree): StaMatchKeys => {
     // an explicit {id} marker, not only the Thing's.
     isFallback:
       (thingMarked.length === 0 && thing.length > 0) || (datastreamMarked.length === 0 && datastream.length > 0),
+    thingBag: thingProperties.map(node => node.path),
+    datastreamBag: datastreamProperties.map(node => node.path),
   }
 }
 

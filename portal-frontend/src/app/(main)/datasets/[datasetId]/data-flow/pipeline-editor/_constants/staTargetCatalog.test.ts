@@ -113,6 +113,8 @@ describe('deriveStaMatchKeys', () => {
       thing: ['$.properties.stationRef'],
       datastream: ['$.Datastreams[].properties.dsRef'],
       isFallback: false,
+      thingBag: ['$.properties.stationRef'],
+      datastreamBag: ['$.Datastreams[].properties.dsRef'],
     })
   })
 
@@ -128,6 +130,8 @@ describe('deriveStaMatchKeys', () => {
       thing: ['$.properties.reference'],
       datastream: ['$.Datastreams[].properties.reference'],
       isFallback: true,
+      thingBag: ['$.properties.reference'],
+      datastreamBag: ['$.Datastreams[].properties.reference'],
     })
   })
 

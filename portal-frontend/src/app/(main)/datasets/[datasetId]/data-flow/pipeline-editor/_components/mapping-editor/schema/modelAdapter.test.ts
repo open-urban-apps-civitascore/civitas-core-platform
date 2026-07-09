@@ -496,6 +496,9 @@ describe('x-core-primaryKey marker', () => {
       thing: ['$.properties.stationRef'],
       datastream: ['$.Datastreams[].properties.dsRef'],
       isFallback: false,
+      // the bag exposes every attribute as a mappable target, including the non-scalar 'tags'
+      thingBag: ['$.properties.stationRef', '$.properties.tags'],
+      datastreamBag: ['$.Datastreams[].properties.dsRef'],
     })
   })
 })

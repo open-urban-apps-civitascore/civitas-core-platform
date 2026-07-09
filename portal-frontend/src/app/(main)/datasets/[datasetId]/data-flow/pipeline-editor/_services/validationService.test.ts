@@ -154,6 +154,8 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
     thing: ['$.properties.reference'],
     datastream: ['$.Datastreams[].properties.reference'],
     isFallback: false,
+    thingBag: ['$.properties.reference'],
+    datastreamBag: ['$.Datastreams[].properties.reference'],
   }
 
   // 'omit' drops the snapshot entirely — an explicit undefined would just re-trigger the default.
@@ -232,7 +234,7 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
   })
 
   it('reports a structure without a datastream match key only when the entity is touched', () => {
-    const noDsKey = { ...MATCH_KEYS, datastream: [] }
+    const noDsKey = { ...MATCH_KEYS, datastream: [], datastreamBag: [] }
     expect(has(wiredToFrost(staMapping({ '$.properties.reference': '$.ref' }, noDsKey)), NO_KEY_IN_STRUCTURE_KEY)).toBe(
       false,
     )
@@ -406,7 +408,7 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
 
   it('rejects an unsafe match-key name at edit time (mirrors the deploy whitelist)', () => {
     const UNSAFE_KEY = 'validation.messages.frostMappingUnsafeMatchKeyName'
-    const umlaut = { ...MATCH_KEYS, thing: ['$.properties.größe'] }
+    const umlaut = { ...MATCH_KEYS, thing: ['$.properties.größe'], thingBag: ['$.properties.größe'] }
     const result = validatePipeline(wiredToFrost(staMapping({ '$.properties.größe': '$.ref' }, umlaut)))
     const errors = result.errors.filter(e => e.messageKey === UNSAFE_KEY)
     expect(errors).toHaveLength(1)
@@ -415,7 +417,7 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
 
   it("rejects a match key named 'properties' (it shadows the bag it lives in)", () => {
     const RESERVED_KEY = 'validation.messages.frostMappingReservedMatchKeyName'
-    const reserved = { ...MATCH_KEYS, thing: ['$.properties.properties'] }
+    const reserved = { ...MATCH_KEYS, thing: ['$.properties.properties'], thingBag: ['$.properties.properties'] }
     const result = validatePipeline(wiredToFrost(staMapping({ '$.properties.properties': '$.n' }, reserved)))
     expect(result.errors.some(e => e.messageKey === RESERVED_KEY)).toBe(true)
   })

@@ -496,7 +496,7 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
           .filter(([, value]) => isNonEmptyMappingValue(value))
           .map(([key]) => key),
       )
-      const allowed = new Set([...STA_FIXED_TARGET_PATHS, ...keys.thing, ...keys.datastream])
+      const allowed = new Set([...STA_FIXED_TARGET_PATHS, ...keys.thingBag, ...keys.datastreamBag])
       const entity = (key: StaEntity['key']): StaEntity =>
         STA_ENTITIES.find(candidate => candidate.key === key) as StaEntity
 
@@ -524,10 +524,10 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
         }
       }
 
-      // The engine whitelists key names (they reach $filter URLs and template keys) and rejects a
-      // key named after the 'properties' bag it lives in — surface both at edit time.
-      const checkKeyNames = (keyPaths: readonly string[]) => {
-        for (const path of keyPaths) {
+      // The engine whitelists every bag attribute name (they reach $filter URLs and template keys)
+      // and rejects one named after the 'properties' bag it lives in — surface both at edit time.
+      const checkKeyNames = (bagPaths: readonly string[]) => {
+        for (const path of bagPaths) {
           const keyName = path.split('.').pop() as string
           if (!isSafeStaKeyName(keyName)) {
             errors.push(errorAt(node, 'validation.messages.frostMappingUnsafeMatchKeyName', { label, keyName }))
@@ -536,8 +536,8 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
           }
         }
       }
-      checkKeyNames(keys.thing)
-      checkKeyNames(keys.datastream)
+      checkKeyNames(keys.thingBag)
+      checkKeyNames(keys.datastreamBag)
 
       // Thing: the match keys are the find-or-create identity — always required.
       if (keys.thing.length === 0) {
