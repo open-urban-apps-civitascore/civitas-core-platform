@@ -36,13 +36,14 @@ import java.util.stream.Collectors;
  * <p>Validation is mandatory here, not left to the runtime error sink: the saga/API path bypasses
  * the editor's validation, and a mapping missing a match key would deploy a flow that routes every
  * message to the error sink — an invisible permanent failure instead of a clear plan error. Thing
- * and Datastream follow two rules: the <b>match key</b> paths (from {@code x-core-primaryKey},
- * fallback {@code reference}) must be mapped — the Thing's always, the Datastream's once any
- * Datastream/Observation path is touched — and the fixed <b>create set</b> is all-or-nothing: all
- * present makes the entity creatable (miss → POST), none present leaves it lookup-only (miss →
- * error sink). Locations and Observations are create-only (Thing deep insert / append). Runtime
- * <em>data</em> errors (a malformed date, a wrong type) stay error-sink territory; the deployed
- * chain guards empty match-key values into the error sink before any lookup.
+ * and Datastream follow two rules: the <b>match key</b> paths (from {@code x-core-primaryKey} under
+ * the entity's {@code properties}, fallback {@code properties.reference}) must be mapped — the
+ * Thing's always, the Datastream's once any Datastream/Observation path is touched — and the fixed
+ * <b>create set</b> is all-or-nothing: all present makes the entity creatable (miss → POST), none
+ * present leaves it lookup-only (miss → error sink). Locations and Observations are create-only
+ * (Thing deep insert / append). Runtime <em>data</em> errors (a malformed date, a wrong type) stay
+ * error-sink territory; the deployed chain guards empty match-key values into the error sink before
+ * any lookup.
  *
  * <p>Everything emitted is byte-deterministic: template keys follow the catalog order, flat keys
  * and capture properties follow the mapping's insertion order — never map iteration of unspecified
@@ -61,34 +62,105 @@ public class FrostMappingCompiler {
   private final RecordPathCompiler recordPathCompiler;
 
   /**
-   * The schema-derived match keys of the mapping's target structure, resolved by the sink spec: the
-   * entity classes' {@code x-core-primaryKey} attributes (fallback: a {@code reference} attribute).
-   * Key names must pass {@link StaTargetCatalog#isSafeKeyName(String)} — they end up in {@code
-   * $filter} expressions and template keys.
-   *
-   * @param thingKeys the Thing class's key attribute names (never empty for a valid FROST target)
-   * @param datastreamKeys the Datastream class's key attribute names (empty when the structure has
-   *     no Datastreams class)
+   * One attribute of an entity's schema-derived {@code properties} bag: a {@link KeyAttribute} (the
+   * match key — the one attribute marked {@code x-core-primaryKey}, fallback one named {@code
+   * reference}) or a {@link FreeAttribute} (any other modelled attribute). The name of every
+   * attribute must pass {@link StaTargetCatalog#isSafeKeyName(String)} (it reaches a template key,
+   * and the key also a {@code $filter} URL) and must not be {@code properties} (it would shadow the
+   * bag it lives in).
    */
-  public record StaKeys(List<String> thingKeys, List<String> datastreamKeys) {
-    public StaKeys {
-      thingKeys = List.copyOf(Objects.requireNonNull(thingKeys, "thingKeys"));
-      datastreamKeys = List.copyOf(Objects.requireNonNull(datastreamKeys, "datastreamKeys"));
-      // A key name reaches a $filter URL and a template key. Enforce its shape at this boundary so
-      // an unsafe name can never inhabit a constructed StaKeys — the domain rules (non-empty,
-      // required once an entity is touched, reserved-name collisions) stay in the compiler where
-      // the rejection messages are actionable.
-      for (String key : concatKeys(thingKeys, datastreamKeys)) {
-        if (!StaTargetCatalog.isSafeKeyName(key)) {
-          throw new IllegalArgumentException("unsafe match-key name: " + key);
-        }
+  public sealed interface StaBagAttribute permits KeyAttribute, FreeAttribute {
+    String name();
+
+    /** The JSON type the value renders as. */
+    StaJsonType type();
+
+    private static void requireValidName(String name) {
+      Objects.requireNonNull(name, "name");
+      if (!StaTargetCatalog.isSafeKeyName(name)) {
+        throw new IllegalArgumentException("unsafe properties attribute name: " + name);
+      }
+      if ("properties".equals(name)) {
+        throw new IllegalArgumentException("a properties attribute must not be named 'properties'");
+      }
+    }
+  }
+
+  /**
+   * The match key: a string identifier that renders quoted in the create body and also contributes
+   * the entity's {@code $filter} term. Always {@link StaJsonType#STRING} — it is interpolated into
+   * a {@code $filter} URL, so a non-string type is not representable.
+   */
+  public record KeyAttribute(String name) implements StaBagAttribute {
+    public KeyAttribute {
+      StaBagAttribute.requireValidName(name);
+    }
+
+    @Override
+    public StaJsonType type() {
+      return StaJsonType.STRING;
+    }
+  }
+
+  /**
+   * A free bag attribute rendered into the create body only (never the {@code $filter}): a scalar
+   * is {@link StaJsonType#ANY} (its JSON type inferred from the mapped value), an {@code
+   * object}/{@code array}/{@code $ref} is {@link StaJsonType#RAW_JSON} (embedded verbatim).
+   */
+  public record FreeAttribute(String name, StaJsonType type) implements StaBagAttribute {
+    public FreeAttribute {
+      StaBagAttribute.requireValidName(name);
+      Objects.requireNonNull(type, "type");
+    }
+  }
+
+  /**
+   * The schema-derived {@code properties} bag of the mapping's Thing-shaped target structure, per
+   * entity: every attribute the bag declares, in declaration order. SensorThings keeps identifiers
+   * in {@code properties}, and so may any number of free attributes the tenant models alongside the
+   * key. Each entity's bag holds at most one {@link KeyAttribute}.
+   *
+   * @param thing the Thing's bag attributes (its match key is required for a valid FROST target)
+   * @param datastream the Datastream's bag attributes (empty when the structure has no Datastreams
+   *     class)
+   */
+  public record StaProperties(List<StaBagAttribute> thing, List<StaBagAttribute> datastream) {
+    public StaProperties {
+      thing = List.copyOf(Objects.requireNonNull(thing, "thing"));
+      datastream = List.copyOf(Objects.requireNonNull(datastream, "datastream"));
+      requireAtMostOneKey(thing, "thing");
+      requireAtMostOneKey(datastream, "datastream");
+    }
+
+    private static void requireAtMostOneKey(List<StaBagAttribute> bag, String entity) {
+      if (bag.stream().filter(attr -> attr instanceof KeyAttribute).count() > 1) {
+        throw new IllegalArgumentException("a " + entity + " properties bag has more than one key");
       }
     }
 
-    private static List<String> concatKeys(List<String> first, List<String> second) {
-      List<String> all = new ArrayList<>(first);
-      all.addAll(second);
-      return all;
+    /** The match-key attribute name of an entity's bag (at most one — the {@link KeyAttribute}). */
+    private static List<String> keysOf(List<StaBagAttribute> bag) {
+      return bag.stream()
+          .filter(attr -> attr instanceof KeyAttribute)
+          .map(StaBagAttribute::name)
+          .toList();
+    }
+
+    public List<String> thingKeys() {
+      return keysOf(thing);
+    }
+
+    public List<String> datastreamKeys() {
+      return keysOf(datastream);
+    }
+
+    /** A properties bag whose only attribute per entity is the named match key. */
+    public static StaProperties ofKeys(List<String> thingKeys, List<String> datastreamKeys) {
+      return new StaProperties(keyAttributes(thingKeys), keyAttributes(datastreamKeys));
+    }
+
+    private static List<StaBagAttribute> keyAttributes(List<String> keys) {
+      return keys.stream().map(key -> (StaBagAttribute) new KeyAttribute(key)).toList();
     }
   }
 
@@ -110,17 +182,17 @@ public class FrostMappingCompiler {
    * Compiles the mapping.
    *
    * @param mapping the parsed mapping with record-anchored target paths
-   * @param keys the target structure's match keys
+   * @param properties the target structure's per-entity {@code properties} bag (attributes + match
+   *     key)
    * @return the flat properties and the entity plan
    * @throws FatalAdapterException if a target path is outside the catalog, a touched entity misses
-   *     its match key or maps its create set partially, a key name is unsafe, or a constant is
-   *     {@code null}
+   *     its match key or maps its create set partially, or a constant is {@code null}
    */
-  public FrostCompilation compile(MappingConfig mapping, StaKeys keys)
+  public FrostCompilation compile(MappingConfig mapping, StaProperties properties)
       throws FatalAdapterException {
-    validateKeyNames(keys);
-    Map<String, StaTarget> targetsByPath = targetsByPath(keys);
-    validate(mapping, keys, targetsByPath);
+    validateKeyNames(properties);
+    Map<String, StaTarget> targetsByPath = targetsByPath(properties);
+    validate(mapping, properties, targetsByPath);
 
     Map<String, String> flatKeyByPath = new LinkedHashMap<>();
     int index = 0;
@@ -141,18 +213,19 @@ public class FrostMappingCompiler {
     boolean observationMapped = touches(mapping, StaEntity.OBSERVATION);
 
     String thingBody =
-        thingCreatable ? renderThingBody(mapping, keys, flatKeyByPath, targetsByPath) : null;
+        thingCreatable ? renderThingBody(mapping, properties, flatKeyByPath, targetsByPath) : null;
     String datastreamBody =
         datastreamCreatable
-            ? renderDatastreamBody(mapping, keys, flatKeyByPath, targetsByPath)
+            ? renderDatastreamBody(mapping, properties, flatKeyByPath, targetsByPath)
             : null;
     String observationBody =
         observationMapped ? renderObservationBody(mapping, flatKeyByPath, targetsByPath) : null;
 
-    List<FilterTerm> thingFilter = filterTerms(keys.thingKeys(), StaEntity.THING, flatKeyByPath);
+    List<FilterTerm> thingFilter =
+        filterTerms(properties.thingKeys(), StaEntity.THING, flatKeyByPath);
     List<FilterTerm> datastreamFilter =
         touchesDatastreamTier(mapping)
-            ? filterTerms(keys.datastreamKeys(), StaEntity.DATASTREAM, flatKeyByPath)
+            ? filterTerms(properties.datastreamKeys(), StaEntity.DATASTREAM, flatKeyByPath)
             : List.of();
 
     return new FrostCompilation(
@@ -168,56 +241,26 @@ public class FrostMappingCompiler {
 
   // ─── Validation ─────────────────────────────────────────────────────────────
 
-  private void validateKeyNames(StaKeys keys) throws FatalAdapterException {
-    for (String key : keys.thingKeys()) {
-      requireSafeKeyName(key, "Thing");
-      requireUnreservedKeyName(key, StaEntity.THING);
-    }
-    for (String key : keys.datastreamKeys()) {
-      requireSafeKeyName(key, "Datastream");
-      requireUnreservedKeyName(key, StaEntity.DATASTREAM);
-    }
-    if (keys.thingKeys().isEmpty()) {
+  private void validateKeyNames(StaProperties properties) throws FatalAdapterException {
+    // Attribute-name shape (safe identifier, not the reserved 'properties') is enforced at the
+    // StaBagAttribute boundary; the only domain rule left is that the Thing must declare a key.
+    if (properties.thingKeys().isEmpty()) {
       throw reject(
-          "the FROST target structure declares no match key on its Thing class; mark the"
-              + " identifying attribute with the UML {id} flag or add a 'reference' attribute");
-    }
-  }
-
-  private void requireSafeKeyName(String key, String entity) throws FatalAdapterException {
-    if (!StaTargetCatalog.isSafeKeyName(key)) {
-      // The key name is tenant-modelled and ends up in $filter expressions and template keys —
-      // anything outside the identifier whitelist is rejected, never escaped.
-      throw reject("the " + entity + " match-key attribute '" + key + "' is not a safe identifier");
+          "the FROST target structure declares no match key on its Thing's properties class; mark"
+              + " an attribute under properties with the UML {id} flag or add a 'reference'"
+              + " attribute under properties");
     }
   }
 
   /**
-   * A match key named like a fixed catalog field ({@code name}, {@code Sensor}, …) would make one
-   * mapping path mean two things — the standard SensorThings field and the {@code properties}-bag
-   * key — so it is rejected rather than resolved by precedence.
+   * The full targetable vocabulary: the fixed catalog paths plus one schema-derived target per
+   * {@code properties} bag attribute of the Thing and Datastream ({@code KEY} for the match key,
+   * {@code OPTIONAL} for the free attributes, each carrying its modelled JSON type).
    */
-  private void requireUnreservedKeyName(String key, StaEntity entity) throws FatalAdapterException {
-    boolean reserved =
-        StaTargetCatalog.byPath(StaTargetCatalog.keyPath(entity, key)).isPresent()
-            || StaTargetCatalog.targetsOf(entity).stream()
-                .anyMatch(target -> target.relativePath().split("\\.")[0].equals(key));
-    if (reserved) {
-      throw reject(
-          "the match-key attribute '"
-              + key
-              + "' collides with a standard SensorThings field of "
-              + entity.name().toLowerCase(Locale.ROOT)
-              + "; rename the identifying attribute");
-    }
-  }
-
-  /** The full targetable vocabulary: fixed catalog paths plus the schema-derived key paths. */
-  private Map<String, StaTarget> targetsByPath(StaKeys keys) {
+  private Map<String, StaTarget> targetsByPath(StaProperties properties) {
     Map<String, StaTarget> byPath = new LinkedHashMap<>();
-    for (String key : keys.thingKeys()) {
-      String path = StaTargetCatalog.keyPath(StaEntity.THING, key);
-      byPath.put(path, new StaTarget(path, StaEntity.THING, StaJsonType.STRING, TargetKind.KEY));
+    for (StaTarget target : bagTargets(StaEntity.THING, properties.thing())) {
+      byPath.put(target.path(), target);
     }
     for (StaTarget target : StaTargetCatalog.targetsOf(StaEntity.THING)) {
       byPath.putIfAbsent(target.path(), target);
@@ -225,10 +268,8 @@ public class FrostMappingCompiler {
     for (StaTarget target : StaTargetCatalog.targetsOf(StaEntity.LOCATION)) {
       byPath.put(target.path(), target);
     }
-    for (String key : keys.datastreamKeys()) {
-      String path = StaTargetCatalog.keyPath(StaEntity.DATASTREAM, key);
-      byPath.put(
-          path, new StaTarget(path, StaEntity.DATASTREAM, StaJsonType.STRING, TargetKind.KEY));
+    for (StaTarget target : bagTargets(StaEntity.DATASTREAM, properties.datastream())) {
+      byPath.put(target.path(), target);
     }
     for (StaTarget target : StaTargetCatalog.targetsOf(StaEntity.DATASTREAM)) {
       byPath.putIfAbsent(target.path(), target);
@@ -242,17 +283,34 @@ public class FrostMappingCompiler {
     return byPath;
   }
 
-  private void validate(MappingConfig mapping, StaKeys keys, Map<String, StaTarget> targetsByPath)
+  /**
+   * One {@code $.…properties.<name>} target per bag attribute — KEY for the match key, else
+   * OPTIONAL.
+   */
+  private List<StaTarget> bagTargets(StaEntity entity, List<StaBagAttribute> bag) {
+    return bag.stream()
+        .map(
+            attr ->
+                new StaTarget(
+                    StaTargetCatalog.keyPath(entity, attr.name()),
+                    entity,
+                    attr.type(),
+                    attr instanceof KeyAttribute ? TargetKind.KEY : TargetKind.OPTIONAL))
+        .toList();
+  }
+
+  private void validate(
+      MappingConfig mapping, StaProperties properties, Map<String, StaTarget> targetsByPath)
       throws FatalAdapterException {
     if (mapping.fields().isEmpty()) {
       throw reject("a FROST mapping must map at least the Thing's match key");
     }
     validateFieldEntries(mapping, targetsByPath);
 
-    requireKeys(mapping, keys.thingKeys(), StaEntity.THING);
+    requireKeys(mapping, properties.thingKeys(), StaEntity.THING);
     requireCompleteCreateSet(mapping, StaEntity.THING);
     validateLocation(mapping);
-    validateDatastream(mapping, keys);
+    validateDatastream(mapping, properties);
     validateObservation(mapping);
     validateFeatureOfInterest(mapping);
   }
@@ -290,17 +348,18 @@ public class FrostMappingCompiler {
     requireCompleteCreateSet(mapping, StaEntity.LOCATION);
   }
 
-  private void validateDatastream(MappingConfig mapping, StaKeys keys)
+  private void validateDatastream(MappingConfig mapping, StaProperties properties)
       throws FatalAdapterException {
     if (!touchesDatastreamTier(mapping)) {
       return;
     }
-    if (keys.datastreamKeys().isEmpty()) {
+    if (properties.datastreamKeys().isEmpty()) {
       throw reject(
-          "the FROST target structure declares no match key on its Datastream class; mark the"
-              + " identifying attribute with the UML {id} flag or add a 'reference' attribute");
+          "the FROST target structure declares no match key on its Datastream's properties class;"
+              + " mark an attribute under properties with the UML {id} flag or add a 'reference'"
+              + " attribute under properties");
     }
-    requireKeys(mapping, keys.datastreamKeys(), StaEntity.DATASTREAM);
+    requireKeys(mapping, properties.datastreamKeys(), StaEntity.DATASTREAM);
     requireCompleteCreateSet(mapping, StaEntity.DATASTREAM);
   }
 
@@ -416,11 +475,11 @@ public class FrostMappingCompiler {
 
   private String renderThingBody(
       MappingConfig mapping,
-      StaKeys keys,
+      StaProperties properties,
       Map<String, String> flatKeyByPath,
       Map<String, StaTarget> targetsByPath) {
     Map<String, Object> tree =
-        entityTree(mapping, StaEntity.THING, keys.thingKeys(), flatKeyByPath, targetsByPath);
+        entityTree(mapping, StaEntity.THING, properties.thing(), flatKeyByPath, targetsByPath);
     if (touches(mapping, StaEntity.LOCATION)) {
       Map<String, Object> location =
           entityTree(mapping, StaEntity.LOCATION, List.of(), flatKeyByPath, targetsByPath);
@@ -431,12 +490,12 @@ public class FrostMappingCompiler {
 
   private String renderDatastreamBody(
       MappingConfig mapping,
-      StaKeys keys,
+      StaProperties properties,
       Map<String, String> flatKeyByPath,
       Map<String, StaTarget> targetsByPath) {
     Map<String, Object> tree =
         entityTree(
-            mapping, StaEntity.DATASTREAM, keys.datastreamKeys(), flatKeyByPath, targetsByPath);
+            mapping, StaEntity.DATASTREAM, properties.datastream(), flatKeyByPath, targetsByPath);
     tree.put("Thing", Map.of("@iot.id", "${" + FrostEntityPlan.THING_ID_ATTRIBUTE + "}"));
     return renderObject(tree);
   }
@@ -458,15 +517,16 @@ public class FrostMappingCompiler {
   }
 
   /**
-   * The entity's body tree: fixed fields in catalog order, then the match keys under {@code
-   * properties} — a created entity must carry its match key, or the next message could never find
-   * it. Leaves are rendered placeholders; inner nodes are the static intermediate objects
-   * (unitOfMeasurement, Sensor, …).
+   * The entity's body tree: fixed fields in catalog order, then the mapped {@code properties} bag
+   * attributes (the match key — a created entity must carry it, or the next message could never
+   * find it — plus any free attributes the tenant mapped, in declaration order). Leaves are
+   * rendered placeholders; inner nodes are the static intermediate objects (unitOfMeasurement,
+   * Sensor, …).
    */
   private Map<String, Object> entityTree(
       MappingConfig mapping,
       StaEntity entity,
-      List<String> keys,
+      List<StaBagAttribute> bag,
       Map<String, String> flatKeyByPath,
       Map<String, StaTarget> targetsByPath) {
     Map<String, Object> tree = new LinkedHashMap<>();
@@ -487,15 +547,18 @@ public class FrostMappingCompiler {
       }
       node.put(segments[segments.length - 1], placeholder);
     }
-    if (!keys.isEmpty()) {
-      Map<String, Object> properties = new LinkedHashMap<>();
-      for (String key : keys) {
-        StaTarget target = targetsByPath.get(StaTargetCatalog.keyPath(entity, key));
-        properties.put(
-            key,
-            placeholder(
-                target, flatKeyByPath.get(target.path()), mapping.fields().get(target.path())));
+    Map<String, Object> properties = new LinkedHashMap<>();
+    for (StaBagAttribute attr : bag) {
+      String path = StaTargetCatalog.keyPath(entity, attr.name());
+      if (!mapping.fields().containsKey(path)) {
+        continue;
       }
+      properties.put(
+          attr.name(),
+          placeholder(
+              targetsByPath.get(path), flatKeyByPath.get(path), mapping.fields().get(path)));
+    }
+    if (!properties.isEmpty()) {
       tree.put("properties", properties);
     }
     return tree;

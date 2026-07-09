@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-import type { StaMatchKeys } from '../../../_constants/staTargetCatalog'
+import type { StaTargetVocabulary } from '../../../_constants/staTargetCatalog'
 import { usePipelinePermissions } from '../../../_hooks/use-pipeline-permissions'
 import type { MappingNodeData } from '../../../_types/nodes'
 import { emptyMappingConfig, type MappingConfig } from '../../mapping-editor/_types'
@@ -136,7 +136,7 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
       ...invalidateMapping,
     })
 
-  const handleSave = (config: MappingConfig, targetRequiredFields: string[], staMatchKeys: StaMatchKeys) =>
+  const handleSave = (config: MappingConfig, targetRequiredFields: string[], staMatchKeys: StaTargetVocabulary) =>
     onUpdate({ mappingConfig: config, targetRequiredFields, staMatchKeys, configured: true })
 
   return (

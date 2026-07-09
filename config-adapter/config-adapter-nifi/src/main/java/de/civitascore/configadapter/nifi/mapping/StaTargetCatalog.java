@@ -10,7 +10,6 @@
 package de.civitascore.configadapter.nifi.mapping;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
@@ -19,9 +18,10 @@ import java.util.regex.Pattern;
  * Locations, Datastreams and their Observations), so the paths here are exactly what the mapping
  * editor emits against that structure. The fixed vocabulary below is a reviewable constant — every
  * generated JSON key and FROST path of an entity body comes from here — with one schema-derived
- * extension: each entity's match key (its {@code x-core-primaryKey} attribute, fallback {@code
- * reference}) contributes {@code $.<key>} / {@code $.Datastreams[].<key>} paths whose names pass
- * {@link #isSafeKeyName(String)} before they may appear in a {@code $filter} or template.
+ * extension: each entity's match key (its {@code properties.<key>} attribute marked {@code
+ * x-core-primaryKey}, fallback a {@code properties.reference} attribute) contributes {@code
+ * $.properties.<key>} / {@code $.Datastreams[].properties.<key>} paths whose names pass {@link
+ * #isSafeKeyName(String)} before they may appear in a {@code $filter} or template.
  */
 public final class StaTargetCatalog {
 
@@ -282,22 +282,20 @@ public final class StaTargetCatalog {
 
   private StaTargetCatalog() {}
 
-  /** The fixed catalog entry for a target path, or empty if the path is not a fixed target. */
-  public static Optional<StaTarget> byPath(String path) {
-    return TARGETS.stream().filter(target -> target.path().equals(path)).findFirst();
-  }
-
   /** The fixed paths of one entity, in template key order. */
   public static List<StaTarget> targetsOf(StaEntity entity) {
     return TARGETS.stream().filter(target -> target.entity() == entity).toList();
   }
 
   /**
-   * The record path of an entity's schema-derived match-key attribute ({@code $.<key>} for the
-   * Thing, {@code $.Datastreams[].<key>} for the datastream).
+   * The record path of an entity's schema-derived match-key attribute, nested under the entity's
+   * {@code properties} bag ({@code $.properties.<key>} for the Thing, {@code
+   * $.Datastreams[].properties.<key>} for the datastream) — SensorThings has no top-level match-key
+   * field; an identifier lives in the entity's {@code properties} object, which is also where the
+   * created body carries it and where the {@code $filter} looks it up ({@code properties/<key>}).
    */
   public static String keyPath(StaEntity entity, String keyName) {
-    return entity.pathOf(keyName);
+    return entity.pathOf("properties." + keyName);
   }
 
   /**

@@ -6,9 +6,10 @@
  * everything else at deploy, so validation surfaces the same constraints at edit time.
  *
  * Each entity follows two engine rules mirrored here: its match-key paths (the `{id}`-marked
- * attributes of the entity class, fallback: a `reference` attribute) must be mapped once the
- * entity is touched, and its fixed create set is all-or-nothing — all mapped makes the entity
- * creatable (a FROST miss creates it), none leaves it lookup-only (a miss is a data error).
+ * attributes inside the entity's `properties` bag, fallback: a `properties.reference` attribute)
+ * must be mapped once the entity is touched, and its fixed create set is all-or-nothing — all
+ * mapped makes the entity creatable (a FROST miss creates it), none leaves it lookup-only (a miss
+ * is a data error).
  */
 
 import type { FieldNode, SchemaTree } from '../_components/mapping-editor/_types'
@@ -93,19 +94,11 @@ export const STA_ENTITIES: readonly StaEntity[] = [
 export const isSafeStaKeyName = (keyName: string): boolean => /^[A-Za-z_][A-Za-z0-9_]*$/.test(keyName)
 
 /**
- * Mirror of the engine's reserved-name rule: a match key named like a standard SensorThings
- * field of its entity ({@link STA_ENTITIES} first path segment) would make one mapping path mean
- * two things, so the deploy rejects it.
+ * Mirror of the engine's reserved-name rule: the match key lives inside the entity's `properties`
+ * bag, so a key literally named `properties` would render as `properties.properties` and shadow
+ * the bag itself — the deploy rejects it.
  */
-export const isReservedStaKeyName = (entityKey: 'thing' | 'datastream', keyName: string): boolean => {
-  const entity = STA_ENTITIES.find(candidate => candidate.key === entityKey) as StaEntity
-  return entity.createPaths.some(path => firstSegment(path, entity.pathPrefix) === keyName)
-}
-
-const firstSegment = (path: string, pathPrefix: string): string => {
-  const prefix = pathPrefix === '$.' ? '$.' : `${pathPrefix}].`
-  return path.slice(prefix.length).split(/[.[]/)[0]
-}
+export const isReservedStaKeyName = (keyName: string): boolean => keyName === 'properties'
 
 /** All fixed catalog paths (the schema-derived match-key paths come on top per structure). */
 export const STA_FIXED_TARGET_PATHS: ReadonlySet<string> = new Set(
@@ -113,31 +106,45 @@ export const STA_FIXED_TARGET_PATHS: ReadonlySet<string> = new Set(
 )
 
 /**
- * The effective match keys of a Thing-shaped target structure, snapshotted onto the mapping node
- * at save time (the validation rules cannot re-derive them — they never see the schema tree).
+ * A Thing-shaped target structure's FROST vocabulary, snapshotted onto the mapping node at save
+ * time (the validation rules cannot re-derive it — they never see the schema tree): the match keys
+ * (find-or-create identity, drive the required-key checks) and the full set of mappable
+ * `properties`-bag paths (the whitelist). The match keys are always a subset of the bag paths.
  */
-export interface StaMatchKeys {
-  /** Record paths of the Thing's match-key attributes (e.g. `["$.reference"]`). */
+export interface StaTargetVocabulary {
+  /** Record paths of the Thing's match-key attributes (e.g. `["$.properties.reference"]`). */
   readonly thing: readonly string[]
   /** Record paths of the Datastream's match-key attributes; empty without a Datastreams class. */
   readonly datastream: readonly string[]
   /** Whether any entity's keys came from the `reference` fallback instead of an `{id}` marker. */
   readonly isFallback: boolean
+  /**
+   * All record paths the Thing's and Datastream's `properties` bags declare (the match key plus
+   * any free attributes) — the mappable `$.…properties.<name>` targets the engine accepts on top of
+   * the fixed catalog. Snapshotted so validation can whitelist them without the schema tree.
+   */
+  readonly thingBag: readonly string[]
+  readonly datastreamBag: readonly string[]
 }
 
 /**
- * Derives the match keys the engine will use: the entity class's `{id}`-marked scalar attributes,
- * else a declared `reference` attribute, else none (the validation reports the gap only when the
- * entity is actually mapped). Mirrors the engine's `FrostSinkStage.resolveStaKeys`.
+ * Derives the match keys the engine will use: the `{id}`-marked scalar attributes of the entity's
+ * `properties` bag, else a `reference` attribute inside it, else none (the validation reports the
+ * gap only when the entity is actually mapped) — SensorThings keeps identifiers in `properties`,
+ * not top-level. Also collects every path the bags declare (match key + free attributes) as the
+ * mappable bag targets. Mirrors the engine's `FrostSinkStage.resolveStaProperties`.
  */
-export const deriveStaMatchKeys = (targetTree: SchemaTree): StaMatchKeys => {
+export const deriveStaMatchKeys = (targetTree: SchemaTree): StaTargetVocabulary => {
   const record = recordFields(targetTree)
   const datastreams = record.find(child => child.name === 'Datastreams')?.children ?? []
 
-  const thingMarked = keyPaths(record)
-  const datastreamMarked = keyPaths(datastreams)
-  const thing = thingMarked.length > 0 ? thingMarked : fallbackReference(record)
-  const datastream = datastreamMarked.length > 0 ? datastreamMarked : fallbackReference(datastreams)
+  const thingProperties = propertiesFields(record)
+  const datastreamProperties = propertiesFields(datastreams)
+
+  const thingMarked = keyPaths(thingProperties)
+  const datastreamMarked = keyPaths(datastreamProperties)
+  const thing = thingMarked.length > 0 ? thingMarked : fallbackReference(thingProperties)
+  const datastream = datastreamMarked.length > 0 ? datastreamMarked : fallbackReference(datastreamProperties)
 
   return {
     thing,
@@ -146,8 +153,14 @@ export const deriveStaMatchKeys = (targetTree: SchemaTree): StaMatchKeys => {
     // an explicit {id} marker, not only the Thing's.
     isFallback:
       (thingMarked.length === 0 && thing.length > 0) || (datastreamMarked.length === 0 && datastream.length > 0),
+    thingBag: thingProperties.map(node => node.path),
+    datastreamBag: datastreamProperties.map(node => node.path),
   }
 }
+
+/** The children of an entity's `properties` bag attribute, or empty if it has none. */
+const propertiesFields = (entityFields: FieldNode[]): FieldNode[] =>
+  entityFields.find(child => child.name === 'properties')?.children ?? []
 
 /**
  * The record's direct fields: the tree either roots a single resolved class node (`$`) or exposes

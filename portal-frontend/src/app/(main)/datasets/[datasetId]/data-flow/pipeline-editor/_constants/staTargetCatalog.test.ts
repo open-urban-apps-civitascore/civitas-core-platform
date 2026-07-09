@@ -86,44 +86,62 @@ describe('STA target catalog mirrors the adapter catalog', () => {
 })
 
 describe('deriveStaMatchKeys', () => {
+  // The match key lives inside the entity's `properties` bag, mirrored here as a child object node.
+  const thingProperties = (children: ReturnType<typeof field>[]) =>
+    field('$.properties', 'properties', 'object', false, children)
+  const datastreamProperties = (children: ReturnType<typeof field>[]) =>
+    field('$.Datastreams[].properties', 'properties', 'object', false, children)
+
   const thingTree = (children: ReturnType<typeof field>[]): SchemaTree => ({
     name: 'SensorThingsDataModel',
     fields: [field('$', 'Thing', 'object', false, children)],
   })
 
-  it('uses the {id}-marked scalar attributes of Thing and Datastream', () => {
+  it('uses the {id}-marked scalar attributes inside the properties bag of Thing and Datastream', () => {
     const tree = thingTree([
-      { ...field('$.stationRef', 'stationRef', 'str', true), primaryKey: true },
+      thingProperties([{ ...field('$.properties.stationRef', 'stationRef', 'str', true), primaryKey: true }]),
       field('$.name', 'name', 'str', true),
       field('$.Datastreams', 'Datastreams', 'array', false, [
-        { ...field('$.Datastreams[].dsRef', 'dsRef', 'str', true), primaryKey: true },
+        datastreamProperties([
+          { ...field('$.Datastreams[].properties.dsRef', 'dsRef', 'str', true), primaryKey: true },
+        ]),
         field('$.Datastreams[].name', 'name', 'str', true),
       ]),
     ])
 
     expect(deriveStaMatchKeys(tree)).toEqual({
-      thing: ['$.stationRef'],
-      datastream: ['$.Datastreams[].dsRef'],
+      thing: ['$.properties.stationRef'],
+      datastream: ['$.Datastreams[].properties.dsRef'],
       isFallback: false,
+      thingBag: ['$.properties.stationRef'],
+      datastreamBag: ['$.Datastreams[].properties.dsRef'],
     })
   })
 
-  it('falls back to a declared reference attribute when no {id} is marked', () => {
+  it('falls back to a reference attribute inside the properties bag when no {id} is marked', () => {
     const tree = thingTree([
-      field('$.reference', 'reference', 'str', true),
+      thingProperties([field('$.properties.reference', 'reference', 'str', true)]),
       field('$.Datastreams', 'Datastreams', 'array', false, [
-        field('$.Datastreams[].reference', 'reference', 'str', true),
+        datastreamProperties([field('$.Datastreams[].properties.reference', 'reference', 'str', true)]),
       ]),
     ])
 
     expect(deriveStaMatchKeys(tree)).toEqual({
-      thing: ['$.reference'],
-      datastream: ['$.Datastreams[].reference'],
+      thing: ['$.properties.reference'],
+      datastream: ['$.Datastreams[].properties.reference'],
       isFallback: true,
+      thingBag: ['$.properties.reference'],
+      datastreamBag: ['$.Datastreams[].properties.reference'],
     })
   })
 
-  it('yields empty keys when the structure declares neither marker nor reference', () => {
+  it('yields empty keys when the properties bag declares neither marker nor reference', () => {
+    const keys = deriveStaMatchKeys(thingTree([thingProperties([field('$.properties.note', 'note', 'str', false)])]))
+    expect(keys.thing).toEqual([])
+    expect(keys.datastream).toEqual([])
+  })
+
+  it('yields empty keys when the entity has no properties bag', () => {
     const keys = deriveStaMatchKeys(thingTree([field('$.name', 'name', 'str', true)]))
     expect(keys.thing).toEqual([])
     expect(keys.datastream).toEqual([])
@@ -131,9 +149,9 @@ describe('deriveStaMatchKeys', () => {
 
   it('reports the fallback when only the datastream relies on it', () => {
     const tree = thingTree([
-      { ...field('$.stationRef', 'stationRef', 'str', true), primaryKey: true },
+      thingProperties([{ ...field('$.properties.stationRef', 'stationRef', 'str', true), primaryKey: true }]),
       field('$.Datastreams', 'Datastreams', 'array', false, [
-        field('$.Datastreams[].reference', 'reference', 'str', true),
+        datastreamProperties([field('$.Datastreams[].properties.reference', 'reference', 'str', true)]),
       ]),
     ])
     expect(deriveStaMatchKeys(tree).isFallback).toBe(true)
@@ -142,9 +160,9 @@ describe('deriveStaMatchKeys', () => {
   it('reads document-root records (multi-root/legacy flat) directly', () => {
     const tree: SchemaTree = {
       name: 'Flat',
-      fields: [{ ...field('$.reference', 'reference', 'str', true), primaryKey: true }],
+      fields: [thingProperties([{ ...field('$.properties.reference', 'reference', 'str', true), primaryKey: true }])],
     }
-    expect(deriveStaMatchKeys(tree).thing).toEqual(['$.reference'])
+    expect(deriveStaMatchKeys(tree).thing).toEqual(['$.properties.reference'])
     expect(deriveStaMatchKeys(tree).isFallback).toBe(false)
   })
 })
@@ -157,11 +175,12 @@ describe('key-name mirrors of the engine rules', () => {
     expect(isSafeStaKeyName("ref' or true")).toBe(false)
   })
 
-  it('reserves the standard SensorThings field names per entity', () => {
-    expect(isReservedStaKeyName('thing', 'name')).toBe(true)
-    expect(isReservedStaKeyName('thing', 'observationType')).toBe(false)
-    expect(isReservedStaKeyName('datastream', 'Sensor')).toBe(true)
-    expect(isReservedStaKeyName('datastream', 'unitOfMeasurement')).toBe(true)
-    expect(isReservedStaKeyName('datastream', 'stationRef')).toBe(false)
+  it("reserves only 'properties', the bag the match key lives in", () => {
+    expect(isReservedStaKeyName('properties')).toBe(true)
+    // Standard SensorThings field names no longer collide — the key lives inside the bag.
+    expect(isReservedStaKeyName('name')).toBe(false)
+    expect(isReservedStaKeyName('Sensor')).toBe(false)
+    expect(isReservedStaKeyName('reference')).toBe(false)
+    expect(isReservedStaKeyName('stationRef')).toBe(false)
   })
 })

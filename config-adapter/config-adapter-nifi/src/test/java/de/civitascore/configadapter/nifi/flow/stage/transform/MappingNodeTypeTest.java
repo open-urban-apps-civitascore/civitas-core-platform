@@ -17,7 +17,7 @@ import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
-import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaKeys;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import java.util.List;
@@ -38,7 +38,7 @@ class MappingNodeTypeTest {
   void mappedFrostSinkWithoutTargetStructureIsRejected() {
     // The FROST compiler derives match keys from the mapping's target structure — a datasink
     // without it cannot deploy a mapped flow, only a passthrough.
-    GraphNode mapping = mappingNode("m1", Map.of("$.reference", "$.ref"));
+    GraphNode mapping = mappingNode("m1", Map.of("$.properties.reference", "$.ref"));
 
     FatalAdapterException ex =
         assertThrows(
@@ -54,13 +54,13 @@ class MappingNodeTypeTest {
     // Earlier mappings of a chain are ordinary record transformations; only the last one compiles
     // against the FROST catalog.
     GraphNode first = mappingNode("m1", Map.of("$.stationName", "$.raw"));
-    GraphNode last = mappingNode("m2", Map.of("$.reference", "$.stationName"));
+    GraphNode last = mappingNode("m2", Map.of("$.properties.reference", "$.stationName"));
 
     var compilation =
         mappingNodeType.compile(
             List.of(first, last),
             envelopeSink,
-            new FrostSinkSpec("1", new StaKeys(List.of("reference"), List.of())));
+            new FrostSinkSpec("1", StaProperties.ofKeys(List.of("reference"), List.of())));
 
     assertEquals(2, compilation.units().size());
   }

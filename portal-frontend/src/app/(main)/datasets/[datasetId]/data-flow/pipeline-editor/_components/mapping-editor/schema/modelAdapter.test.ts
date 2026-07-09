@@ -457,25 +457,35 @@ describe('x-core-primaryKey marker', () => {
       Thing: {
         type: 'object',
         properties: {
-          stationRef: { type: 'string', 'x-core-primaryKey': true },
+          // SensorThings keeps the identifier in the properties bag, not top-level.
+          properties: {
+            type: 'object',
+            properties: {
+              stationRef: { type: 'string', 'x-core-primaryKey': true },
+              tags: { type: 'array', items: { type: 'string' }, 'x-core-primaryKey': true },
+            },
+          },
           name: { type: 'string' },
-          tags: { type: 'array', items: { type: 'string' }, 'x-core-primaryKey': true },
           Datastreams: { type: 'array', items: { $ref: '#/$defs/Datastream' } },
         },
       },
       Datastream: {
         type: 'object',
-        properties: { dsRef: { type: 'string', 'x-core-primaryKey': true } },
+        properties: {
+          properties: {
+            type: 'object',
+            properties: { dsRef: { type: 'string', 'x-core-primaryKey': true } },
+          },
+        },
       },
     },
   }
 
   it('flags marked scalar fields and ignores the marker on non-scalars', () => {
     const tree = modelToSchemaTree(thingModel, 'fallback')
-    const thing = tree.fields[0]
-    const byName = new Map((thing.children ?? []).map(child => [child.name, child]))
+    const thingProperties = tree.fields[0].children?.find(child => child.name === 'properties')
+    const byName = new Map((thingProperties?.children ?? []).map(child => [child.name, child]))
     expect(byName.get('stationRef')?.primaryKey).toBe(true)
-    expect(byName.get('name')?.primaryKey).toBeUndefined()
     // a marker on an array cannot back a find-or-create key — mirrors the engine's scalar rule
     expect(byName.get('tags')?.primaryKey).toBeUndefined()
   })
@@ -483,9 +493,12 @@ describe('x-core-primaryKey marker', () => {
   it('feeds deriveStaMatchKeys through the real adapter output (seam test)', () => {
     const keys = deriveStaMatchKeys(modelToSchemaTree(thingModel, 'fallback'))
     expect(keys).toEqual({
-      thing: ['$.stationRef'],
-      datastream: ['$.Datastreams[].dsRef'],
+      thing: ['$.properties.stationRef'],
+      datastream: ['$.Datastreams[].properties.dsRef'],
       isFallback: false,
+      // the bag exposes every attribute as a mappable target, including the non-scalar 'tags'
+      thingBag: ['$.properties.stationRef', '$.properties.tags'],
+      datastreamBag: ['$.Datastreams[].properties.dsRef'],
     })
   })
 })

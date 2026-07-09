@@ -28,7 +28,7 @@ import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.CompiledTransform;
 import de.civitascore.configadapter.nifi.mapping.ConversionOp;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler;
-import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaKeys;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
 import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
@@ -163,8 +163,8 @@ public final class NifiTestFixtures {
                 "fields": {
                   "$.name": "$.station",
                   "$.description": { "op": "const", "value": "imported station" },
-                  "$.reference": "$.ref",
-                  "$.Datastreams[].reference": "$.ref",
+                  "$.properties.reference": "$.ref",
+                  "$.Datastreams[].properties.reference": "$.ref",
                   "$.Datastreams[].Observations[].result": { "op": "toFloat", "input": "$.temp" },
                   "$.Datastreams[].Observations[].phenomenonTime": "$.ts"
                 } } } },
@@ -423,7 +423,8 @@ public final class NifiTestFixtures {
   }
 
   /** The Thing/Datastream match keys of the mapped-FROST fixtures. */
-  static final StaKeys STA_KEYS = new StaKeys(List.of("reference"), List.of("reference"));
+  static final StaProperties STA_KEYS =
+      StaProperties.ofKeys(List.of("reference"), List.of("reference"));
 
   /**
    * A metadata-only mapped MQTT→FROST flow: a creatable Thing and nothing else — the chain must
@@ -431,7 +432,7 @@ public final class NifiTestFixtures {
    */
   static FlowBuildSpec frostSinkWithThingOnlyMapping() throws Exception {
     Map<String, ValueNode> fields = new LinkedHashMap<>();
-    fields.put("$.reference", new ValueNode.CopyNode("$.ref"));
+    fields.put("$.properties.reference", new ValueNode.CopyNode("$.ref"));
     fields.put("$.name", new ValueNode.CopyNode("$.station"));
     fields.put("$.description", new ValueNode.ConstNode("registered station", null));
     FrostMappingCompiler.FrostCompilation compilation =
@@ -463,12 +464,12 @@ public final class NifiTestFixtures {
     Map<String, ValueNode> fields = new LinkedHashMap<>();
     fields.put("$.name", new ValueNode.CopyNode("$.station"));
     fields.put("$.description", new ValueNode.ConstNode("imported station", null));
-    fields.put("$.reference", new ValueNode.CopyNode("$.ref"));
+    fields.put("$.properties.reference", new ValueNode.CopyNode("$.ref"));
     fields.put(
         "$.Datastreams[].Observations[].result",
         new ValueNode.ConvertNode(ConversionOp.TO_FLOAT, new ValueNode.CopyNode("$.temp"), null));
     fields.put("$.Datastreams[].Observations[].phenomenonTime", new ValueNode.CopyNode("$.ts"));
-    fields.put("$.Datastreams[].reference", new ValueNode.CopyNode("$.ref"));
+    fields.put("$.Datastreams[].properties.reference", new ValueNode.CopyNode("$.ref"));
     FrostMappingCompiler.FrostCompilation compilation =
         new FrostMappingCompiler(new RecordPathCompiler())
             .compile(new MappingConfig(null, null, fields), STA_KEYS);

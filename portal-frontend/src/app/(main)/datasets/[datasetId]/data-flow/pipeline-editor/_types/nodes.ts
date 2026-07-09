@@ -1,5 +1,5 @@
 import { type MappingConfig } from '../_components/mapping-editor/_types'
-import type { StaMatchKeys } from '../_constants/staTargetCatalog'
+import type { StaTargetVocabulary } from '../_constants/staTargetCatalog'
 import { PIPELINE_NODE_TYPES } from './pipeline'
 
 // ============================================================================
@@ -167,7 +167,7 @@ export interface MappingNodeData extends BasePipelineNodeData {
    * {@code x-core-primaryKey} marker, fallback {@code reference}). Only consumed when this mapping
    * feeds a FROST sink; {@code undefined} on legacy nodes saved before this existed.
    */
-  staMatchKeys?: StaMatchKeys
+  staMatchKeys?: StaTargetVocabulary
 }
 
 // ============================================================================

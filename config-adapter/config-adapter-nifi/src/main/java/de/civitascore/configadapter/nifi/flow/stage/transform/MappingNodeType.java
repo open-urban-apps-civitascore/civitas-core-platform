@@ -74,7 +74,7 @@ public final class MappingNodeType implements TransformNodeType {
     if (sink.mappingSupport() == MappingSupport.ENVELOPE) {
       // The last mapping targets the sink's Thing-shaped structure; the ones before it are
       // ordinary record transformations between structures.
-      if (!(sinkSpec instanceof FrostSinkSpec frost) || frost.staKeys() == null) {
+      if (!(sinkSpec instanceof FrostSinkSpec frost) || frost.staProperties() == null) {
         throw new FatalAdapterException(
             AdapterErrorCode.NIFI_TEMPLATE_ERROR,
             "a mapped FROST pipeline requires the mapping's target data structure on the FROST"
@@ -86,7 +86,7 @@ public final class MappingNodeType implements TransformNodeType {
       }
       FrostMappingCompiler.FrostCompilation compilation =
           frostMappingCompiler.compile(
-              mappingConfigs.get(mappingConfigs.size() - 1), frost.staKeys());
+              mappingConfigs.get(mappingConfigs.size() - 1), frost.staProperties());
       units.add(new CompiledMapping(compilation.flatProperties()));
       return new Compilation(units, compilation.plan());
     }

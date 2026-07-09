@@ -28,7 +28,7 @@ import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
-import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaKeys;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
 import java.io.File;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -497,8 +497,8 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         {
           "$.name": "$.station",
           "$.description": { "op": "const", "value": "%s" },
-          "$.reference": "$.ref",
-          "$.Datastreams[].reference": "$.ref",
+          "$.properties.reference": "$.ref",
+          "$.Datastreams[].properties.reference": "$.ref",
           "$.Datastreams[].Observations[].result": { "op": "toFloat", "input": "$.temp" },
           "$.Datastreams[].Observations[].phenomenonTime": "$.ts",
           "$.Datastreams[].Observations[].validTime": { "op": "concat", "separator": "/", "inputs": ["$.ts", "$.ts"] },
@@ -551,14 +551,14 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     String fields =
         """
         {
-          "$.reference": "$.ref",
+          "$.properties.reference": "$.ref",
           "$.name": "$.station",
           "$.description": { "op": "const", "value": "Created station" },
           "$.Locations[].name": { "op": "const", "value": "Station location" },
           "$.Locations[].description": { "op": "const", "value": "Reported position" },
           "$.Locations[].encodingType": { "op": "const", "value": "application/geo+json" },
           "$.Locations[].location": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" },
-          "$.Datastreams[].reference": "$.ref",
+          "$.Datastreams[].properties.reference": "$.ref",
           "$.Datastreams[].name": { "op": "const", "value": "Air temperature" },
           "$.Datastreams[].description": { "op": "const", "value": "Air temperature at the station" },
           "$.Datastreams[].observationType": { "op": "const", "value": "http://www.opengis.net/def/observationType/OGC-OM/2.0/OM_Measurement" },
@@ -658,7 +658,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
                   source,
                   new FrostSinkSpec(
                       String.valueOf(projectId),
-                      new StaKeys(List.of("reference"), List.of("reference")))));
+                      StaProperties.ofKeys(List.of("reference"), List.of("reference")))));
       client.deployFlow(plan);
     }
   }

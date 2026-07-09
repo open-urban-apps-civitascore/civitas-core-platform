@@ -1285,7 +1285,7 @@
         "frostMappingObservationNeedsResult": "{label} maps an Observation without $.Datastreams[].Observations[].result",
         "frostMappingFeatureOfInterestNeedsObservation": "{label} maps a FeatureOfInterest without an Observation — the feature is deep-inserted into the observation body",
         "frostMappingUnsafeMatchKeyName": "{label}: the match-key name \"{keyName}\" is not a valid identifier (letters, digits, underscore; must not start with a digit) — rename the attribute",
-        "frostMappingReservedMatchKeyName": "{label}: the match-key name \"{keyName}\" collides with a standard SensorThings field — rename the identifying attribute",
+        "frostMappingReservedMatchKeyName": "{label}: the match-key name \"{keyName}\" is reserved — it must not be named after the properties bag it lives in; rename the identifying attribute",
         "frostMappingFallbackMatchKey": "{label}: no '{id}' attribute marked — the match key falls back to \"reference\"",
         "nodeNotWired": "{label} must be connected with both an incoming and an outgoing edge",
         "mappingRequiredFieldsMissing": "{label} does not map all required target fields: {fields}",
