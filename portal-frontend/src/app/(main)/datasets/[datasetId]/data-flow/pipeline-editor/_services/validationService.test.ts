@@ -151,8 +151,8 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
   const frostSink: TestNode = { id: 'frost-1', type: 'frost', data: { label: 'FROST', configured: true } }
 
   const MATCH_KEYS = {
-    thing: ['$.reference'],
-    datastream: ['$.Datastreams[].reference'],
+    thing: ['$.properties.reference'],
+    datastream: ['$.Datastreams[].properties.reference'],
     isFallback: false,
   }
 
@@ -170,7 +170,7 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
   })
 
   const creatableThingFields = {
-    '$.reference': '$.ref',
+    '$.properties.reference': '$.ref',
     '$.name': '$.station',
     '$.description': '$.desc',
   }
@@ -198,16 +198,18 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
     expect(errors).toHaveLength(1)
     expect(errors[0].elementId).toBe('map-1')
     expect(errors[0].messageParams?.entity).toBe('thing')
-    expect(errors[0].messageParams?.fields).toBe('$.reference')
+    expect(errors[0].messageParams?.fields).toBe('$.properties.reference')
   })
 
   it('accepts a lookup-only Thing mapping (key only, no create fields)', () => {
-    const result = validatePipeline(wiredToFrost(staMapping({ '$.reference': '$.ref' })))
+    const result = validatePipeline(wiredToFrost(staMapping({ '$.properties.reference': '$.ref' })))
     expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
   })
 
   it('rejects a partially mapped create set, naming the missing fields', () => {
-    const result = validatePipeline(wiredToFrost(staMapping({ '$.reference': '$.ref', '$.name': '$.station' })))
+    const result = validatePipeline(
+      wiredToFrost(staMapping({ '$.properties.reference': '$.ref', '$.name': '$.station' })),
+    )
     const errors = result.errors.filter(e => e.messageKey === CREATE_SET_KEY)
     expect(errors).toHaveLength(1)
     expect(errors[0].messageParams?.entity).toBe('thing')
@@ -218,7 +220,7 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
     const result = validatePipeline(
       wiredToFrost(
         staMapping({
-          '$.reference': '$.ref',
+          '$.properties.reference': '$.ref',
           '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
         }),
       ),
@@ -226,15 +228,19 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
     const errors = result.errors.filter(e => e.messageKey === MATCH_KEYS_KEY)
     expect(errors).toHaveLength(1)
     expect(errors[0].messageParams?.entity).toBe('datastream')
-    expect(errors[0].messageParams?.fields).toBe('$.Datastreams[].reference')
+    expect(errors[0].messageParams?.fields).toBe('$.Datastreams[].properties.reference')
   })
 
   it('reports a structure without a datastream match key only when the entity is touched', () => {
     const noDsKey = { ...MATCH_KEYS, datastream: [] }
-    expect(has(wiredToFrost(staMapping({ '$.reference': '$.ref' }, noDsKey)), NO_KEY_IN_STRUCTURE_KEY)).toBe(false)
+    expect(has(wiredToFrost(staMapping({ '$.properties.reference': '$.ref' }, noDsKey)), NO_KEY_IN_STRUCTURE_KEY)).toBe(
+      false,
+    )
     expect(
       has(
-        wiredToFrost(staMapping({ '$.reference': '$.ref', '$.Datastreams[].Observations[].result': '$.v' }, noDsKey)),
+        wiredToFrost(
+          staMapping({ '$.properties.reference': '$.ref', '$.Datastreams[].Observations[].result': '$.v' }, noDsKey),
+        ),
         NO_KEY_IN_STRUCTURE_KEY,
       ),
     ).toBe(true)
@@ -244,7 +250,7 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
     const result = validatePipeline(
       wiredToFrost(
         staMapping({
-          '$.reference': '$.ref',
+          '$.properties.reference': '$.ref',
           '$.Locations[].name': '$.loc',
           '$.Locations[].description': '$.d',
           '$.Locations[].encodingType': '$.e',
@@ -260,8 +266,8 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
       has(
         wiredToFrost(
           staMapping({
-            '$.reference': '$.ref',
-            '$.Datastreams[].reference': '$.ref',
+            '$.properties.reference': '$.ref',
+            '$.Datastreams[].properties.reference': '$.ref',
             '$.Datastreams[].Observations[].phenomenonTime': '$.ts',
           }),
         ),
@@ -282,7 +288,7 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
       wiredToFrost(
         staMapping({
           ...creatableThingFields,
-          '$.Datastreams[].reference': '$.ref',
+          '$.Datastreams[].properties.reference': '$.ref',
           '$.Datastreams[].name': '$.dsName',
           '$.Datastreams[].description': '$.d',
           '$.Datastreams[].observationType': '$.t',
@@ -315,7 +321,7 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
           '$.Locations[].encodingType': '$.e',
           '$.Locations[].location': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
           '$.Locations[].properties': '$.meta',
-          '$.Datastreams[].reference': '$.ref',
+          '$.Datastreams[].properties.reference': '$.ref',
           '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
           '$.Datastreams[].Observations[].resultQuality': '$.q',
           '$.Datastreams[].Observations[].validTime': '$.valid',
@@ -332,8 +338,8 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
       has(
         wiredToFrost(
           staMapping({
-            '$.reference': '$.ref',
-            '$.Datastreams[].reference': '$.ref',
+            '$.properties.reference': '$.ref',
+            '$.Datastreams[].properties.reference': '$.ref',
             '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
             '$.Datastreams[].Observations[].FeatureOfInterest.description': '$.d',
             '$.Datastreams[].Observations[].FeatureOfInterest.encodingType': '$.e',
@@ -350,8 +356,8 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
       has(
         wiredToFrost(
           staMapping({
-            '$.reference': '$.ref',
-            '$.Datastreams[].reference': '$.ref',
+            '$.properties.reference': '$.ref',
+            '$.Datastreams[].properties.reference': '$.ref',
             '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
             '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
           }),
@@ -365,8 +371,8 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
     const result = validatePipeline(
       wiredToFrost(
         staMapping({
-          '$.reference': '$.ref',
-          '$.Datastreams[].reference': '$.ref',
+          '$.properties.reference': '$.ref',
+          '$.Datastreams[].properties.reference': '$.ref',
           '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
           '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
           '$.Datastreams[].Observations[].FeatureOfInterest.description': '$.d',
@@ -388,7 +394,7 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
       data: {
         label: 'Mapping',
         configured: true,
-        mappingConfig: { fields: { '$.reference': '$.ref' }, positions: {} },
+        mappingConfig: { fields: { '$.properties.reference': '$.ref' }, positions: {} },
         targetRequiredFields: ['$.name'],
         staMatchKeys: MATCH_KEYS,
       },
@@ -400,28 +406,28 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
 
   it('rejects an unsafe match-key name at edit time (mirrors the deploy whitelist)', () => {
     const UNSAFE_KEY = 'validation.messages.frostMappingUnsafeMatchKeyName'
-    const umlaut = { ...MATCH_KEYS, thing: ['$.größe'] }
-    const result = validatePipeline(wiredToFrost(staMapping({ '$.größe': '$.ref' }, umlaut)))
+    const umlaut = { ...MATCH_KEYS, thing: ['$.properties.größe'] }
+    const result = validatePipeline(wiredToFrost(staMapping({ '$.properties.größe': '$.ref' }, umlaut)))
     const errors = result.errors.filter(e => e.messageKey === UNSAFE_KEY)
     expect(errors).toHaveLength(1)
     expect(errors[0].messageParams?.keyName).toBe('größe')
   })
 
-  it('rejects a match key shadowing a standard SensorThings field', () => {
+  it("rejects a match key named 'properties' (it shadows the bag it lives in)", () => {
     const RESERVED_KEY = 'validation.messages.frostMappingReservedMatchKeyName'
-    const reserved = { ...MATCH_KEYS, thing: ['$.name'] }
-    const result = validatePipeline(wiredToFrost(staMapping({ '$.name': '$.n' }, reserved)))
+    const reserved = { ...MATCH_KEYS, thing: ['$.properties.properties'] }
+    const result = validatePipeline(wiredToFrost(staMapping({ '$.properties.properties': '$.n' }, reserved)))
     expect(result.errors.some(e => e.messageKey === RESERVED_KEY)).toBe(true)
   })
 
   it('warns when the match key came from the reference fallback', () => {
     const fallback = { ...MATCH_KEYS, isFallback: true }
-    const result = validatePipeline(wiredToFrost(staMapping({ '$.reference': '$.ref' }, fallback)))
+    const result = validatePipeline(wiredToFrost(staMapping({ '$.properties.reference': '$.ref' }, fallback)))
     expect(result.warnings.some(w => w.messageKey === FALLBACK_KEY)).toBe(true)
   })
 
   it('treats a configured node without a match-key snapshot as never saved', () => {
-    const result = validatePipeline(wiredToFrost(staMapping({ '$.reference': '$.ref' }, 'omit')))
+    const result = validatePipeline(wiredToFrost(staMapping({ '$.properties.reference': '$.ref' }, 'omit')))
     expect(result.errors.some(e => e.messageKey === 'validation.messages.mappingNotSaved')).toBe(true)
   })
 

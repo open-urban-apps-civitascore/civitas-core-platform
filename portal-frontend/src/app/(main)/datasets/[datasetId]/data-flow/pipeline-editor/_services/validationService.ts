@@ -524,20 +524,20 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
         }
       }
 
-      // The engine whitelists key names (they reach $filter URLs and template keys) and rejects
-      // names shadowing standard SensorThings fields — surface both at edit time.
-      const checkKeyNames = (entityKey: 'thing' | 'datastream', keyPaths: readonly string[]) => {
+      // The engine whitelists key names (they reach $filter URLs and template keys) and rejects a
+      // key named after the 'properties' bag it lives in — surface both at edit time.
+      const checkKeyNames = (keyPaths: readonly string[]) => {
         for (const path of keyPaths) {
           const keyName = path.split('.').pop() as string
           if (!isSafeStaKeyName(keyName)) {
             errors.push(errorAt(node, 'validation.messages.frostMappingUnsafeMatchKeyName', { label, keyName }))
-          } else if (isReservedStaKeyName(entityKey, keyName)) {
+          } else if (isReservedStaKeyName(keyName)) {
             errors.push(errorAt(node, 'validation.messages.frostMappingReservedMatchKeyName', { label, keyName }))
           }
         }
       }
-      checkKeyNames('thing', keys.thing)
-      checkKeyNames('datastream', keys.datastream)
+      checkKeyNames(keys.thing)
+      checkKeyNames(keys.datastream)
 
       // Thing: the match keys are the find-or-create identity — always required.
       if (keys.thing.length === 0) {
